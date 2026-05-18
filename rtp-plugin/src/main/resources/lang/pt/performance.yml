@@ -3,12 +3,19 @@
 # Tentativas máximas de busca
 # Quantas vezes o plugin buscará uma localização segura antes de desistir.
 # Impacto: ALTO - valores altos podem aumentar muito o uso de CPU por requisição.
+# @type: integer
+# @range: [1, null]
+# @default: 32
 tentativasMaximas: 10
 
 # Pré-carregamento de destino (chunks)
 # Raio de chunks a pré-carregar ao redor do destino.
 # Número de chunks carregados = ( 1 + 2 * raio )^2.
 # Impacto: ALTO - um valor muito alto pode causar quedas de TPS ao teletransportar.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
 distanciaVisaoSelecao: 0
 
 # Chunk radius loaded around the final location immediately before
@@ -23,12 +30,20 @@ distanciaVisaoTeletransporte: 0
 # Tempo entre buscas por novas localizações para preencher os caches de região.
 # ( 20 ticks = 1 segundo ).
 # Impacto: MÉDIO - valores menores preenchem o cache mais rápido mas usam mais CPU.
+# @type: integer
+# @range: [1, null]
+# @unit: ticks
+# @default: 20
 periodo: 20
 
 # Tempo alocado por tarefa (milissegundos)
 # Tempo máximo (ms) dedicado a tarefas do RTP por tick.
 # Faixa: 0 - 50.
 # Impacto: MÉDIO - valores altos permitem processar mais rápido, ao custo do tempo de tick.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
 tempoAlocadoSincrono: 50
 
 # Maximum milliseconds per tick spent in asynchronous tasks.
@@ -42,21 +57,30 @@ tempoAlocadoAssincrono: 50
 # TPS mínimo do servidor antes de enfileirar uma nova localização para o cache.
 # Faixa: 0.0 - 20.0.
 # Impacto: BAIXO - evita que o plugin adicione lag quando o servidor está com problemas.
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
 tpsMinimo: 19.0
 
 # Enfileiramento pós-teletransporte
 # Se true, o plugin tentará preencher o cache de localizações imediatamente após um RTP.
 # Impacto: MÉDIO
+# @type: boolean
+# @default: false
 enfileirarPosTeletransporte: false
 
 # Carregamento síncrono
 # Usar carregamento síncrono de chunks para a seleção de localizações.
 # Impacto: ALTO - NÃO RECOMENDADO! Pode provocar travamentos sérios do servidor.
+# @type: boolean
+# @default: false
 carregamentoSincrono: false
 
 # Análise de permissões (inicialização)
 # onEventParsing: Incompatível com permissões amplas tipo *.*.
 # Impacto: MÉDIO (onEvent) / BAIXO (effect)
+# @type: boolean
+# @default: false
 analiseAoEvento: false
 
 # Parse effect permission nodes at startup.
@@ -68,6 +92,8 @@ analiseEfeitos: true
 # biomeRecall: Reutilizar localizações previamente encontradas por bioma.
 # biomeRecallForced: Usar apenas biomas já descobertos e armazenados em cache.
 # Impacto: BAIXO a MÉDIO
+# @type: boolean
+# @default: true
 lembrancaBioma: true
 
 # When set, only serve biome-filtered requests from cache (never
@@ -79,6 +105,8 @@ lembrancaBiomaForcada: false
 # Verificação passiva de chunks
 # Busca localizações seguras dentro de todos os chunks carregados no alcance de uma região.
 # Impacto: ALTO - pode aumentar significativamente a carga do servidor em eventos de carregamento de chunks.
+# @type: boolean
+# @default: false
 verificarNoCarregamentoChunk: false
 
 # Modo de preenchimento de cache por observação (Region Data Visitor)
@@ -89,36 +117,43 @@ verificarNoCarregamentoChunk: false
 # de modo que os efeitos colaterais (registro de localizações ruins, coleta de
 # biomas observados) se acumulam em segundo plano sem que a fila cresça além do
 # seu limite. NUNCA aciona a geração de mundo: chunks que não estão em disco são
-# omitidos pelo pre-filtro Anvil do ADR-016 com veredicto UNKNOWN.
+# omitidos pelo pre-filtro Anvil do com veredicto UNKNOWN.
 # visitorEnabled: interruptor mestre (true ativa o modo observação).
 # A cadência é herdada do ajuste `period` acima; não há um parâmetro de taxa
 # separado.
 # Impacto: BAIXO - limitado pelo `period` existente; só há trabalho quando o
 # cache não tem margem para preenchimentos no modo padrão.
+# @type: boolean
+# @default: false
 visitorEnabled: true
 
-# --- parity-repair: identity entries appended to satisfy LocaleFullParityTest
-# --- values copied verbatim from English baseline; translate as needed.
+# Manter cache reservado para teletransportes ao entrar (rtp.onevent.firstjoin / rtp.onevent.join). Dimensionado pelos slots vazios restantes. Ver
+# @type: boolean
+# @default: false
 loginCacheEnabled: false
 
-# Hard cap for the login cache. 0 = auto (server max-players,
-# snapshotted at startup).
+# Limite rígido do cache de entrada. 0 = automático (max-players do servidor na inicialização).
 # @type: integer
 # @range: [0, null]
 # @default: 0
 loginCacheCap: 0
 
-# NAO MODIFIQUE O NUMERO DE VERSAO
-pregeneratedPreference: "0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass."
+# Probability of rejecting an ungenerated chunk per selection attempt.
+# 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land.
+# Generated chunks always pass.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+pregeneratedPreference: 0.0
 
 # Fraction of L3 backlog capacity at which refill resumes (hysteresis).
 # 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill
 # continuously. Higher values group .mca-bin checks for better
-# CPU/memory efficiency. See ADR-028.
+# CPU/memory efficiency.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
-backlogRefillThreshold: "0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously."
+backlogRefillThreshold: 0.5
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

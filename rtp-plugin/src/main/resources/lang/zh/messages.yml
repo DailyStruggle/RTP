@@ -1,15 +1,12 @@
 # --- RTP 消息（简体中文） ---
 # 玩家与控制台可见消息的中文翻译。
-#
 # 重要事项：
-#   - 本文件的键名应与 lang/zh/messages.lang.yml 的右列（即插件内部键名的
-#     中文翻译）保持一致。若 messages.lang.yml 中没有某个键，将回退到基础
-#     英文文件 (lang/messages.lang.yml) 中的英文键名。
-#   - 必须原样保留方括号占位符: [P0], [delay], [attempts], [world],
-#     [region], [remainingCooldown], [scan_chunks] 等。
-#   - 必须保留颜色代码 &a &e &c 以及十六进制颜色 (#2636ef)。
-#
-# REQ-RTP-F-013 / ADR-020。
+# - 本文件的键名应与 lang/zh/messages.lang.yml 的右列（即插件内部键名的
+# 中文翻译）保持一致。若 messages.lang.yml 中没有某个键，将回退到基础
+# 英文文件 (lang/messages.lang.yml) 中的英文键名。
+# - 必须原样保留方括号占位符: [P0], [delay], [attempts], [world],
+# [region], [remainingCooldown], [scan_chunks] 等。
+# - 必须保留颜色代码 &a &e &c 以及十六进制颜色 (#2636ef)。
 # ###############################################################################
 # 第 1 节: 通用配置
 # ###############################################################################
@@ -22,7 +19,7 @@
 # ###############################################################################
 已在传送: "&e[P0] 你已经在传送中！"
 
-# if the plugin is currently reloading
+# 当插件正在重载时
 传送被拒_重载中: "&e[P0] 插件正在重载，传送暂时被禁用。请稍后再试。"
 延迟消息: "&e[P0] 将在 [delay] 后传送，请勿移动。"
 区块加载中: "&e[P0] 正在加载区块，请稍候……"
@@ -31,23 +28,23 @@
 # if teleport is cancelled
 取消传送: "&e[P0] 传送已取消！"
 
-# if no safe places after reaching max attempts
-# placeholder: [attempts] - the maximum number of attempts
+# 达到最大尝试次数后仍未找到安全位置时
+# 占位符: [attempts] - 最大尝试次数
 不安全: "&e[P0] 在 [attempts] 次尝试中未找到安全位置"
 
-# when the player is on cooldown
-# placeholder: [remainingCooldown] - the remaining time
+# 当玩家处于冷却中时
+# 占位符: [remainingCooldown] - 剩余时间
 冷却消息: "&e[P0] 你必须等待 [remainingCooldown] 才能再次传送"
 
-# if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
+# 当区域没有排队的位置且玩家没有 rtp.unqueued 权限时
 队列中无可用位置: "#f5eb73[P0] 当前没有可用的位置"
 
-# when the queue line shifts
-# placeholder: [spot] - the current position in line
+# 当队列前进时
+# 占位符: [spot] - 当前队列位置
 队列更新: "#2636ef[P0] 你在队列中的位置: [spot]"
 
-# if the player doesn't have enough money to teleport in the region
-# placeholder: [money] - how much money is required for the command
+# 玩家在该区域传送所需的金钱不足时
+# 占位符: [money] - 命令所需的金额
 余额不足: "&e[P0] 你至少需要 $[money] 才能执行此操作。"
 
 # ###############################################################################
@@ -64,36 +61,36 @@
 # ###############################################################################
 旧文件: "&b[P0] 检测到旧的 [filename]。正在更新"
 
-# detected a bukkit world that isn't in the config file
-# placeholder: [world] - the world detected
+# 检测到配置文件中没有的 bukkit 世界
+# 占位符: [world] - 检测到的世界
 新世界: "&b[P0] 检测到新世界 '[world]'"
 
-# world doesn't exist in bukkit
-# placeholder: [world] - the world name
+# bukkit 中不存在该世界
+# 占位符: [world] - 世界名称
 无效世界: "&e[P0] 找不到世界 '[world]'"
 
-# plugin reload/update text
-# placeholder: [filename] - name of file
+# 插件重载 / 更新提示
+# 占位符: [filename] - 文件名
 重载中: "&b[P0] 正在加载 [filename]……"
 已重载: "&b[P0] [filename] 已成功加载。"
 更新中: "&a[P0] 正在更新 [filename]……"
 已更新: "&a[P0] [filename] 已成功更新。"
 
-# plugin doesn't have the command the user requested
-# placeholder: [arg] - the argument attempted
+# 插件没有用户请求的命令
+# 占位符: [arg] - 尝试的参数
 参数错误: "&c[P0] 命令参数无效 [arg]"
 
-# when the console tries to run a command meant only for players
+# 当控制台尝试运行仅限玩家的命令时
 控制台命令不允许: "&c[P0] 你必须以游戏内玩家身份执行此命令。"
 
 # busy 与 invalidCommand 未在 messages.lang.yml 中翻译 -> 使用英文键名（回退到基础英文）。
-busy: "&c[P0] 忙"
+繁忙: "&c[P0] 忙"
 
 # plugin doesn't have the subcommand or parameter the user requested
 # placeholder: [arg] - the argument attempted
-invalidCommand: "&c[P0] 无效命令 - [arg]"
+无效命令: "&c[P0] 无效命令 - [arg]"
 
-# user doesn't have permission for the command requested
+# 用户没有所请求命令的权限
 无权限: "&e抱歉，你没有权限执行此命令。如果你认为这是错误，请联系服务器管理员。"
 
 # ###############################################################################
@@ -123,37 +120,37 @@ invalidCommand: "&c[P0] 无效命令 - [arg]"
 信息_传送: "&7活动传送状态机: &f[teleports]"
 信息_MSPT: "&7当前插件 MSPT: &f[mspt]"
 信息_总加载次数: "&7累计加载区块数: &f[loads]"
-infoLoadsByOrigin: "&7Loads by Origin: &f[loadsByOrigin]"
+信息_按来源加载: "&7Loads by Origin: &f[loadsByOrigin]"
 信息_泄漏率: "&7当前区块泄漏率: &f[leakRate]"
 # --- Metrics SPI health block (METRICS_PLAN.md > /rtp info Surface) ---
-infoQueueDepth: "&7Players Waiting In Region Queues: &f[queueDepth]"
-infoPendingTeleports: "&7Pending Teleport Pipelines: &f[pendingTeleports]"
-infoAvgPipelineMs: "&7Avg Pipeline Latency: &f[avgPipelineMs] ms"
-infoHeap: "&7JVM Heap: &f[heapUsedMb] / [heapMaxMb] MiB"
-# Header line for the Health pipeline labelled block in /rtp info.
-infoHealthPipelineHeader: "&7--- Health: pipeline ---"
-# TPS readout for the 1m / 5m / 15m windows. Placeholders: [tps1m] [tps5m] [tps15m].
-infoTps: "&7TPS (1m/5m/15m): &f[tps1m] / [tps5m] / [tps15m]"
-# Live server MSPT and tick-budget utilisation. Placeholders: [mspt] [tickBudgetUtilisation].
-infoMSPTLive: "&7Server MSPT: &f[mspt] ms (&7tick budget: &f[tickBudgetUtilisation]&7)"
+信息_队列深度: "&7Players Waiting In Region Queues: &f[queueDepth]"
+信息_等待传送: "&7Pending Teleport Pipelines: &f[pendingTeleports]"
+信息_平均管道毫秒: "&7Avg Pipeline Latency: &f[avgPipelineMs] ms"
+信息_堆内存: "&7JVM Heap: &f[heapUsedMb] / [heapMaxMb] MiB"
+# /rtp info 中 Health pipeline 标记块的标题行。
+信息_健康管道标题: "&7--- Health: pipeline ---"
+# 1m / 5m / 15m 窗口的 TPS 读数。占位符: [tps1m] [tps5m] [tps15m]。
+信息_TPS: "&7TPS (1m/5m/15m): &f[tps1m] / [tps5m] / [tps15m]"
+# 实时服务器 MSPT 与 tick 预算使用率。占位符: [mspt] [tickBudgetUtilisation]。
+信息_MSPT实时: "&7Server MSPT: &f[mspt] ms (&7tick budget: &f[tickBudgetUtilisation]&7)"
 # Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
-infoSoftCap: "&7Players: &f[playerCount] / [softCap]"
-# Most recent database round-trip latency in ms. Placeholder: [databaseLatencyMs].
-infoDatabaseLatencyMs: "&7Database Latency: &f[databaseLatencyMs] ms"
+信息_软上限: "&7Players: &f[playerCount] / [softCap]"
+# 最近一次数据库往返延迟（毫秒）。占位符: [databaseLatencyMs]。
+信息_数据库延迟毫秒: "&7Database Latency: &f[databaseLatencyMs] ms"
 # Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
 # to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&e/&c.
-infoThresholdTpsGreen: 19.5
-infoThresholdTpsYellow: 18.0
-infoThresholdMsptGreen: 30.0
-infoThresholdMsptYellow: 45.0
-infoThresholdCacheFillGreen: 0.5
-infoThresholdCacheFillYellow: 0.25
-infoThresholdNetworkAgeYellow: 5.0
+信息_TPS阈值_绿: 19.5
+信息_TPS阈值_黄: 18.0
+信息_MSPT阈值_绿: 30.0
+信息_MSPT阈值_黄: 45.0
+信息_缓存填充阈值_绿: 0.5
+信息_缓存填充阈值_黄: 0.25
+信息_网络快照陈旧阈值_黄: 5.0
 # Header line introducing the per-Folia-region table (Folia runtime only).
-infoFoliaRegionsHeader: "&7--- Folia regions ---"
+信息_Folia区域标题: "&7--- Folia regions ---"
 # Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
-infoFoliaRegion: "  &f[regionId]&7: tps=&f[tps1m]&7 mspt=&f[mspt]&7 players=&f[playerCount]&7 queue=&f[queueDepth]&7 budget=&f[tickBudgetUtilisation]"
+信息_Folia区域: "  &f[regionId]&7: tps=&f[tps1m]&7 mspt=&f[mspt]&7 players=&f[playerCount]&7 queue=&f[queueDepth]&7 budget=&f[tickBudgetUtilisation]"
 信息_免责声明_标题: "&7--- 诊断说明 ---"
 信息_免责声明: "&7诊断说明: 如果服务器孤儿区块总数超过本插件的累计加载数 ([loads])，则本插件并非内存泄漏的唯一原因。"
 信息_世界标题: "#008080世界:"
@@ -199,65 +196,65 @@ rtp_说明: "传送到一个随机位置"
 测试_说明: "测试 RTP 功能"
 
 # ###############################################################################
-# Section 8b: Generalized Menu Framework (ADR-035 / ADR-044)
+# Section 8b: Generalized Menu Framework
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
-menuInvalid: "&c[P0] that menu link is invalid."
+菜单_无效: "&c[P0] that menu link is invalid."
 # Sent when a menu token has expired or was already consumed.
-menuExpired: "&c[P0] that menu link has expired. Please reopen the menu."
-# Sent when a menu redeem cannot resolve the calling player UUID.
-menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
+菜单_已过期: "&c[P0] that menu link has expired. Please reopen the menu."
+# 当菜单兑换无法解析调用玩家 UUID 时发送。
+菜单_未知玩家: "&c[P0] menu links can only be used by in-game players."
 # Hover-fallback template used by the menu reflector when no YAML block-comment
 # is available for a parameter. Placeholder: [type] - the declared parameter type.
-menuHoverFallbackType: "type: [type]"
+菜单_悬停_备用类型: "type: [type]"
 # Hover-fallback template used by the menu reflector when a parameter exposes a
 # small curated value set. Placeholder: [values] - comma-joined accepted values.
-menuHoverFallbackBounds: "accepted: [values]"
+菜单_悬停_备用范围: "accepted: [values]"
 # Label for the "go back one level" navigation row prepended to every non-root menu page.
-menuBack: "&7« back"
+菜单_返回: "&7« back"
 # Label template for the "execute the assembled command" row prepended to every
 # runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
-menuExecute: "&a▶ run [command]"
+菜单_执行: "&a▶ run [command]"
 # Header row at the top of a parameter-value picker sub-page (Stage A.2).
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
-menuPickValue: "&epick a value for [param] (will run: /rtp [command] [param]:<value>)"
+菜单_选择值: "&epick a value for [param] (will run: /rtp [command] [param]:<value>)"
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list.
-menuTypeValue: "&7✎ type a custom value..."
+菜单_输入值: "&7✎ type a custom value..."
 # Non-clickable header row at the top of every non-root menu page (Stage A.4).
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
-menuConstructed: "&7building: &f/rtp [command]"
+菜单_已构建: "&7building: &f/rtp [command]"
 # Non-clickable title row prepended to the root /rtp menu page (Stage A.5).
 # Provides a welcoming header before the player descends into any subcommand.
-menuRootTitle: "&6&l⚡ RTP menu"
+菜单_主标题: "&6&l⚡ RTP menu"
 # Non-clickable subtitle/hint row prepended to the root /rtp menu page below
 # menuRootTitle (Stage A.5). Short orientation text for first-time users.
-menuRootHint: "&7click an option below to begin"
+菜单_主提示: "&7click an option below to begin"
 # Navigation rows appended to paginated menu pages (Stage A.6) — clicking
 # them moves to the previous/next page of the same model. Placeholder:
 # [page] - the 1-based human-readable target page number.
-menuPagePrev: "&7« previous page ([page])"
-menuPageNext: "&7next page ([page]) »"
+菜单_上一页: "&7« previous page ([page])"
+菜单_下一页: "&7next page ([page]) »"
 # Section divider on the front page above teleport rows (player view).
-menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
+菜单_首页_传送分区: "&8--- &7teleport &8---"
 # Section divider on the front page above admin rows (admin view).
-menuFrontPageSectionAdmin: "&8--- &7admin &8---"
+菜单_首页_管理分区: "&8--- &7admin &8---"
 # Front-page rows. No placeholders.
-menuFrontPageRowTeleport: "&a▶ /rtp &7- teleport to a random location"
-menuFrontPageRowRegion: "&a▶ /rtp region:&7... &7- pick a region"
-menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- pick a biome"
-menuFrontPageRowHelp: "&a▶ /rtp help &7- list commands"
-menuFrontPageRowInfo: "&b▶ /rtp info &7- plugin diagnostics"
-menuFrontPageRowConfig: "&b▶ /rtp config &7- edit config files"
-menuFrontPageRowScan: "&b▶ /rtp scan &7- pre-fill region caches"
-menuFrontPageRowDiagnostics: "&c▶ /rtp test full &7- run full diagnostics"
-menuFrontPageRowReload: "&c▶ /rtp reload &7- reload config files"
-# Hover text for the diagnostics row warning about cost. No placeholders.
-menuFrontPageHoverDiagnostics: "&7runs full diagnostic suite; may be expensive"
-# Hover text for the reload row warning about side-effects. No placeholders.
-menuFrontPageHoverReload: "&7reloads all config files; in-flight teleports may be affected"
+菜单_首页_传送行: "&a▶ /rtp &7- teleport to a random location"
+菜单_首页_区域行: "&a▶ /rtp region:&7... &7- pick a region"
+菜单_首页_生物群系行: "&a▶ /rtp biome:&7... &7- pick a biome"
+菜单_首页_帮助行: "&a▶ /rtp help &7- list commands"
+菜单_首页_信息行: "&b▶ /rtp info &7- plugin diagnostics"
+菜单_首页_配置行: "&b▶ /rtp config &7- edit config files"
+菜单_首页_扫描行: "&b▶ /rtp scan &7- pre-fill region caches"
+菜单_首页_诊断行: "&c▶ /rtp test full &7- run full diagnostics"
+菜单_首页_重载行: "&c▶ /rtp reload &7- reload config files"
+# 诊断行的悬停文本，提示成本。无占位符。
+菜单_首页_悬停_诊断: "&7runs full diagnostic suite; may be expensive"
+# 重载行的悬停文本，提示副作用。无占位符。
+菜单_首页_悬停_重载: "&7reloads all config files; in-flight teleports may be affected"
 
 # ###############################################################################
 # 第 9 节: PlaceholderAPI 支持
@@ -283,7 +280,7 @@ menuFrontPageHoverReload: "&7reloads all config files; in-flight teleports may b
 # ###############################################################################
 # 第 11 节: 元数据
 # ###############################################################################
-version: 1.0
+版本: 1.0
 
 # ###############################################################################
 # 第 12 节: 开发者选项

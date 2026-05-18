@@ -1,18 +1,14 @@
 # --- RTP User-Facing Messages ---
 # All player- and console-visible strings.
-#
 # Formatting:
-#   - Bukkit legacy color codes (e.g. &a, &e, &c)
-#   - Hex color codes (e.g. #2636ef)
-#   - PlaceholderAPI placeholders (when PAPI is installed)
-#
+# - Bukkit legacy color codes (e.g. &a, &e, &c)
+# - Hex color codes (e.g. #2636ef)
+# - PlaceholderAPI placeholders (when PAPI is installed)
 # Placeholders:
-#   - Shared "[Pn]" placeholders are defined in the `placeholders` list below.
-#     [P0] is the RTP prefix by default.
-#   - Per-message placeholders (e.g. [attempts], [world]) are documented inline
-#     above each message that uses them.
-#
-# REQ-RTP-F-013: every user-facing message is configurable here.
+# - Shared "[Pn]" placeholders are defined in the `placeholders` list below.
+# [P0] is the RTP prefix by default.
+# - Per-message placeholders (e.g. [attempts], [world]) are documented inline
+# above each message that uses them.
 # ###############################################################################
 # Section 1: General Configuration
 # ###############################################################################
@@ -28,7 +24,7 @@ placeholders:
 # when teleporting, say this
 alreadyTeleporting: "&e[P0] you're already teleporting!"
 
-# if the plugin is currently reloading
+# gdy wtyczka jest aktualnie przeładowywana
 teleportDeniedReloading: "&e[P0] teleports are temporarily disabled while the plugin reloads. Please try again shortly."
 delayMessage: "&e[P0] Teleporting in [delay]. Don't move"
 chunkLoading: "&e[P0] Loading chunks! please wait..."
@@ -37,23 +33,23 @@ teleportMessage: "&e[P0] Teleported in [attempts] attempts, in [processingTime]"
 # if teleport is cancelled
 teleportCancel: "&e[P0] Teleport cancelled!"
 
-# if no safe places after reaching max attempts
-# placeholder: [attempts] - the maximum number of attempts
+# brak bezpiecznych miejsc po wyczerpaniu maksymalnej liczby prób
+# zmienna: [attempts] - maksymalna liczba prób
 unsafe: "&e[P0] could not find a safe location within [attempts] attempts"
 
-# when the player is on cooldown
-# placeholder: [remainingCooldown] - the remaining time
+# gdy gracz jest na odnowieniu
+# zmienna: [remainingCooldown] - pozostały czas
 cooldownMessage: "&e[P0] You can't teleport again for [remainingCooldown]"
 
-# if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
+# gdy region nie ma żadnych lokalizacji w kolejce, a gracz nie posiada uprawnienia rtp.unqueued
 noLocationsQueued: "#f5eb73[P0] no locations ready at this time"
 
-# when the queue line shifts
-# placeholder: [spot] - the current position in line
+# gdy kolejka się przesuwa
+# zmienna: [spot] - bieżąca pozycja w kolejce
 queueUpdate: "#2636ef[P0] your spot in line: [spot]"
 
-# if the player doesn't have enough money to teleport in the region
-# placeholder: [money] - how much money is required for the command
+# gdy gracz nie ma wystarczająco pieniędzy na teleportację w regionie
+# zmienna: [money] - kwota wymagana przez polecenie
 notEnoughMoney: "&e[P0] you need at least $[money] for that."
 
 # ###############################################################################
@@ -73,26 +69,26 @@ millis: "ms"
 # placeholder: [filename] - name of file, including file extension
 oldFile: "&b[P0] old [filename] detected. Updating"
 
-# detected a bukkit world that isn't in the config file
-# placeholder: [world] - the world detected
+# wykryto świat bukkit nieobecny w pliku konfiguracyjnym
+# zmienna: [world] - wykryty świat
 newWorld: "&b[P0] detected a new world '[world]'"
 
-# world doesn't exist in bukkit
-# placeholder: [world] - the world name
+# świat nie istnieje w bukkit
+# zmienna: [world] - nazwa świata
 invalidWorld: "&e[P0] could not find world '[world]'"
 
-# plugin reload/update text
-# placeholder: [filename] - name of file
+# tekst przeładowania / aktualizacji wtyczki
+# zmienna: [filename] - nazwa pliku
 reloading: "&b[P0] loading [filename]..."
 reloaded: "&b[P0] successfully loaded [filename]."
 updating: "&a[P0] updating [filename]..."
 updated: "&a[P0] successfully updated [filename]."
 
-# plugin doesn't have the command the user requested
-# placeholder: [arg] - the argument attempted
+# wtyczka nie zawiera polecenia, o które prosił użytkownik
+# zmienna: [arg] - próbowany argument
 badArg: "&c[P0] invalid command argument [arg]"
 
-# when the console tries to run a command meant only for players
+# gdy konsola próbuje wykonać polecenie tylko dla graczy
 consoleCmdNotAllowed: "&c[P0] You must be an in-game player to execute this command."
 
 # plugin is busy reloading
@@ -102,7 +98,7 @@ busy: "&c[P0] busy"
 # placeholder: [arg] - the argument attempted
 invalidCommand: "&c[P0] invalid command - [arg]"
 
-# user doesn't have permission for the command requested
+# użytkownik nie ma uprawnień do żądanego polecenia
 noPerms: "&eI'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
 
 # ###############################################################################
@@ -145,15 +141,15 @@ infoQueueDepth: "&7Players Waiting In Region Queues: &f[queueDepth]"
 infoPendingTeleports: "&7Pending Teleport Pipelines: &f[pendingTeleports]"
 infoAvgPipelineMs: "&7Avg Pipeline Latency: &f[avgPipelineMs] ms"
 infoHeap: "&7JVM Heap: &f[heapUsedMb] / [heapMaxMb] MiB"
-# Header line for the Health pipeline labelled block in /rtp info.
+# Wiersz nagłówka dla bloku Health pipeline w /rtp info.
 infoHealthPipelineHeader: "&7--- Health: pipeline ---"
-# TPS readout for the 1m / 5m / 15m windows. Placeholders: [tps1m] [tps5m] [tps15m].
+# Odczyt TPS dla okien 1m / 5m / 15m. Zmienne: [tps1m] [tps5m] [tps15m].
 infoTps: "&7TPS (1m/5m/15m): &f[tps1m] / [tps5m] / [tps15m]"
-# Live server MSPT and tick-budget utilisation. Placeholders: [mspt] [tickBudgetUtilisation].
+# Bieżący MSPT serwera oraz wykorzystanie budżetu ticka. Zmienne: [mspt] [tickBudgetUtilisation].
 infoMSPTLive: "&7Server MSPT: &f[mspt] ms (&7tick budget: &f[tickBudgetUtilisation]&7)"
 # Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
 infoSoftCap: "&7Players: &f[playerCount] / [softCap]"
-# Most recent database round-trip latency in ms. Placeholder: [databaseLatencyMs].
+# Najnowsze opóźnienie tam i z powrotem bazy danych w ms. Zmienna: [databaseLatencyMs].
 infoDatabaseLatencyMs: "&7Database Latency: &f[databaseLatencyMs] ms"
 # Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
 # to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&e/&c.
@@ -215,13 +211,13 @@ info_description: "check the current state of the plugin"
 test_description: "test RTP functions"
 
 # ###############################################################################
-# Section 8b: Generalized Menu Framework (ADR-035 / ADR-044)
+# Section 8b: Generalized Menu Framework
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 menuInvalid: "&c[P0] that menu link is invalid."
 # Sent when a menu token has expired or was already consumed.
 menuExpired: "&c[P0] that menu link has expired. Please reopen the menu."
-# Sent when a menu redeem cannot resolve the calling player UUID.
+# Wysyłane, gdy realizacja menu nie może rozpoznać UUID wywołującego gracza.
 menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
 # Hover-fallback template used by the menu reflector when no YAML block-comment
 # is available for a parameter. Placeholder: [type] - the declared parameter type.
@@ -270,9 +266,9 @@ menuFrontPageRowConfig: "&b▶ /rtp config &7- edit config files"
 menuFrontPageRowScan: "&b▶ /rtp scan &7- pre-fill region caches"
 menuFrontPageRowDiagnostics: "&c▶ /rtp test full &7- run full diagnostics"
 menuFrontPageRowReload: "&c▶ /rtp reload &7- reload config files"
-# Hover text for the diagnostics row warning about cost. No placeholders.
+# Tekst najechania dla wiersza diagnostyki ostrzegającego o koszcie. Brak zmiennych.
 menuFrontPageHoverDiagnostics: "&7runs full diagnostic suite; may be expensive"
-# Hover text for the reload row warning about side-effects. No placeholders.
+# Tekst najechania dla wiersza przeładowania ostrzegającego o skutkach ubocznych. Brak zmiennych.
 menuFrontPageHoverReload: "&7reloads all config files; in-flight teleports may be affected"
 
 # ###############################################################################

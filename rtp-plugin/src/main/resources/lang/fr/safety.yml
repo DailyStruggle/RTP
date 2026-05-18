@@ -1,32 +1,60 @@
 # --- RTP Safety Configuration ---
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/SAFETY.md
 # Seconds of invulnerability after teleport
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 5
 invulnerabilityTime: 5
 
 # Block radius around landing to check for hazards
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 0
 safetyRadius: 0
 
 # Max retries for stale-chunk guard
+# @type: integer
+# @range: [0, null]
+# @default: 2
 staleChunkRetryLimit: 2
 
 # Off-thread anvil prefilter
+# @type: boolean
+# @default: true
 anvilPrefilterEnabled: true
 
 # Radius of emergency platform (-1 to disable)
+# @type: integer
+# @range: [-1, null]
+# @unit: blocks
+# @default: -1
 platformRadius: -1
 
 # Depth of platform
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
 platformDepth: 1
 
 # Air space above platform
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
 platformAirHeight: 2
 
 # Material for platform
+# @type: material
+# @source: material
+# @default: GLASS
 platformMaterial: "GLASS"
 
 # Blocks treated as passable air for landing-safety checks.
 # Accepts Bukkit Material names and "#minecraft:<tag>" tag references
-# (see ADR-017).
+#.
 # @type: list<material>
 # @source: material
 airBlocks:
@@ -38,9 +66,9 @@ airBlocks:
   - "LIGHT"
   - "#minecraft:flowers"
   - "#minecraft:small_flowers"
-  # Note: #minecraft:tall_flowers is an item-only tag in vanilla; its members
-  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) are already covered by
-  # #minecraft:flowers above.
+  # Note: #minecraft:tall_flowers est un tag uniquement d'objet en vanilla; ses membres
+  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) sont deja couverts par
+  # #minecraft:flowers ci-dessus.
   - "#minecraft:tall_flowers"
   - "SHORT_GRASS"
   - "TALL_GRASS"
@@ -100,7 +128,7 @@ airBlocks:
 
 # Blocks that disqualify a landing spot (lava, hazards, etc.).
 # Accepts Bukkit Material names, "#minecraft:<tag>" tag references, and
-# state predicates such as "*[waterlogged=true]" (see ADR-017).
+# state predicates such as "*[waterlogged=true]".
 # @type: list<material>
 # @source: material
 unsafeBlocks:
@@ -134,6 +162,8 @@ unsafeBlocks:
   - "#minecraft:logs"
 
 # If true, 'biomes' is a whitelist; otherwise a blacklist
+# @type: boolean
+# @default: false
 biomeWhitelist: false
 
 # Biomes treated as whitelist or blacklist members per biomeWhitelist.

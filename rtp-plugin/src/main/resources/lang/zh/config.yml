@@ -1,26 +1,42 @@
 # 传送延迟（秒）
 # 玩家在实际执行传送之前必须等待的时间。
 # 有时会让服务器有时间预加载目标区块。
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
 传送延迟: 2
 
 # 移动取消（方块）
 # 若玩家在延迟期间移动超过此距离，传送将被取消。设为 -1 可禁用。
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
 取消距离: 2
 
 # 传送之间的等待时间（秒）
 # 玩家两次成功使用 RTP 之间必须等待的时间。
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
 传送冷却: 300
 
 # 传送后命令
 # 一次成功传送之后要执行的命令列表。
 # 占位符 [player] 表示玩家名。
+# @type: list<string>
 控制台命令:
   - "say [player] 刚刚被随机传送了！"
 
-# Commands executed as the teleporting player on successful teleport.
-# Use [player] for the target player's name. Empty string entries are ignored.
+# 在成功传送后以被传送玩家身份执行的命令。
+# 使用 [player] 表示玩家名称。空条目将被忽略。
 # @type: list<string>
 玩家命令:
+  # 在成功传送后以被传送玩家身份执行的命令。
+  # 使用 [player] 表示玩家名称。空条目将被忽略。
+  # @type: list<string>
   - ""
 
 # --- 数据库设置 ---
@@ -29,20 +45,24 @@
   # 可用类型: yaml, sqlite, mysql, postgresql
   # - yaml/sqlite: 本地文件（无需额外配置）
   # - mysql/postgresql: 远程数据库（需要下方的凭据）
+  # @type: enum
+  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
+  # @default: "sqlite"
   type: "sqlite"
   # 网络数据库凭据（本地类型会忽略）
+  # @type: string
   host: "127.0.0.1"
-  # Database port. Used by mysql/postgresql only.
+  # 数据库端口。仅由 mysql/postgresql 使用。
   # @type: integer
   # @range: [1, 65535]
   port: 3306
-  # Database / schema name. Used by mysql/postgresql only.
+  # 数据库 / 模式名称。仅 mysql/postgresql 使用。
   # @type: string
   name: "rtp"
-  # Database username. Used by mysql/postgresql only.
+  # 数据库用户名。仅 mysql/postgresql 使用。
   # @type: string
   username: "root"
-  # Database password. Used by mysql/postgresql only.
+  # 数据库密码。仅 mysql/postgresql 使用。
   # @type: string
   password: "password"
 
@@ -65,18 +85,21 @@
     # @type: string
     password: ""
 
-# Generalized menu framework (ADR-035 / ADR-044).
-# `renderer` is an ordered preference list of renderer ids. On exception or
-# missing adapter the framework walks the list and falls back to the next
-# entry. If the list is exhausted the no-token open-page path falls back to
-# the configurable `menuInvalid` message. Available ids: book. (The chat
-# renderer ships in a follow-up and will be added to the default list at
-# that point.)
+# 通用菜单框架。
+# `renderer` 是渲染器 id 的有序偏好列表。出现异常或缺少适配器时，
+# 框架会遍历该列表并回退到下一条目。若列表耗尽，无 token 的打开页
+# 路径将回退到可配置的 `menuInvalid` 消息。可用 id: book。(聊天
+# 渲染器将在后续版本中提供，届时会加入默认列表。)
 menu:
   # Ordered preference list of renderer ids.
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:
+    # 通用菜单框架。
+    # `renderer` 是渲染器 id 的有序偏好列表。出现异常或缺少适配器时，
+    # 框架会遍历该列表并回退到下一条目。若列表耗尽，无 token 的打开页
+    # 路径将回退到可配置的 `menuInvalid` 消息。可用 id: book。(聊天
+    # 渲染器将在后续版本中提供，届时会加入默认列表。)
     - "book"
 
 # 请勿修改版本号

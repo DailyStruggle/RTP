@@ -12,7 +12,6 @@
 #   - Per-message placeholders (e.g. [attempts], [world]) are documented inline
 #     above each message that uses them.
 #
-# REQ-RTP-F-013: every user-facing message is configurable here.
 # ###############################################################################
 # Section 1: General Configuration
 # ###############################################################################
@@ -215,7 +214,7 @@ info_description: "check the current state of the plugin"
 test_description: "test RTP functions"
 
 # ###############################################################################
-# Section 8b: Generalized Menu Framework (ADR-035 / ADR-044)
+# Section 8b: Generalized Menu Framework
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 menuInvalid: "&c[P0] that menu link is invalid."

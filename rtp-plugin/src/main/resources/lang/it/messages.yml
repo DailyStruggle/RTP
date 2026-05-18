@@ -1,18 +1,14 @@
 # --- Messaggi visibili agli utenti di RTP ---
 # Tutte le stringhe visibili ai giocatori e alla console.
-#
 # Formattazione:
-#   - Codici colore legacy di Bukkit (es. &a, &e, &c)
-#   - Codici colore esadecimali (es. #2636ef)
-#   - Segnaposto di PlaceholderAPI (quando PAPI è installato)
-#
+# - Codici colore legacy di Bukkit (es. &a, &e, &c)
+# - Codici colore esadecimali (es. #2636ef)
+# - Segnaposto di PlaceholderAPI (quando PAPI è installato)
 # Segnaposto:
-#   - I segnaposto condivisi "[Pn]" sono definiti nella lista `placeholders` qui sotto.
-#     [P0] è il prefisso RTP per impostazione predefinita.
-#   - I segnaposto specifici per messaggio (es. [attempts], [world]) sono documentati
-#     in linea sopra ogni messaggio che li usa.
-#
-# REQ-RTP-F-013: ogni messaggio visibile all'utente è configurabile qui.
+# - I segnaposto condivisi "[Pn]" sono definiti nella lista `placeholders` qui sotto.
+# [P0] è il prefisso RTP per impostazione predefinita.
+# - I segnaposto specifici per messaggio (es. [attempts], [world]) sono documentati
+# in linea sopra ogni messaggio che li usa.
 # ###############################################################################
 # Sezione 1: Configurazione generale
 # ###############################################################################
@@ -153,7 +149,7 @@ infoTps: "&7TPS (1m/5m/15m): &f[tps1m] / [tps5m] / [tps15m]"
 infoMSPTLive: "&7MSPT del server: &f[mspt] ms (&7budget tick: &f[tickBudgetUtilisation]&7)"
 # Soft-cap configurato dei giocatori vs il conteggio online attuale. Segnaposto: [softCap] [playerCount].
 infoSoftCap: "&7Giocatori: &f[playerCount] / [softCap]"
-# Latenza più recente di andata e ritorno del database in ms. Segnaposto: [databaseLatencyMs].
+# Latenza round-trip più recente del database in ms. Segnaposto: [databaseLatencyMs].
 infoLatenzaDatabaseMs: "&7Latenza database: &f[databaseLatencyMs] ms"
 # Soglie delle fasce colore di salute. Double consumati da ColourBands in rtp-core
 # per avvolgere i segnaposto di varianti colorate (es. [tps1mColoured]) con &a/&e/&c.
@@ -215,7 +211,7 @@ info_descrizione: "controlla lo stato attuale del plugin"
 test_descrizione: "testa le funzioni di RTP"
 
 # ###############################################################################
-# Sezione 8b: Framework di menù generalizzato (ADR-035 / ADR-044)
+# Sezione 8b: Framework di menù generalizzato
 # ###############################################################################
 # Inviato quando un token di menù è sconosciuto, malformato o appartiene a un altro giocatore.
 menuInvalid: "&c[P0] quel collegamento del menù non è valido."

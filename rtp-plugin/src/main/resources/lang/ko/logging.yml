@@ -14,16 +14,16 @@
 # Log successful teleport events
 텔레포트: true
 
-# 이벤트 기반 자동 RTP 로그
-이벤트_월드변경: "true # 플레이어가 월드를 변경할 때"
-# Log RTP triggered on join
-이벤트_접속: "true     # 플레이어가 서버에 접속할 때"
-# Log RTP triggered on respawn
-이벤트_리스폰: "true    # 플레이어가 리스폰할 때"
-# Log move event processing
-이벤트_이동: "true     # 플레이어가 이동할 때(이동 기반 RTP 활성화 시)"
-# Log teleport event processing
-이벤트_텔레포트: "true  # 플레이어가 텔레포트할 때(텔레포트 기반 RTP 활성화 시)"
+# 플레이어가 월드를 변경할 때
+이벤트_월드변경: true
+# 플레이어가 서버에 접속할 때
+이벤트_접속: true
+# 플레이어가 리스폰할 때
+이벤트_리스폰: true
+# 플레이어가 이동할 때(이동 기반 RTP 활성화 시)
+이벤트_이동: true
+# 플레이어가 텔레포트할 때(텔레포트 기반 RTP 활성화 시)
+이벤트_텔레포트: true
 
 # 선택 실패 디버그
 # 안전한 위치를 찾지 못했을 때의 세부 정보를 로그에 남깁니다. 실패율과 검색 매개변수를 포함합니다.

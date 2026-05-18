@@ -2,23 +2,40 @@
 # 서버 경제 시스템을 통해 무작위 텔레포트 비용을 설정합니다.
 # 환불 정책
 # 텔레포트가 취소될 때 요금을 환불하고 쿨다운을 초기화할지 여부.
+# @type: boolean
+# @default: true
 취소시환불: true
 
 # 텔레포트 비용
 # 표준 /rtp 명령어의 기본 요금.
+# @type: number
+# @range: [0.0, null]
+# @default: 50.0
 가격: 50.0
 
 # 다른 플레이어를 텔레포트(/rtp <플레이어>)할 때의 요금.
+# @type: number
+# @range: [0.0, null]
+# @default: 200.0
 타인가격: 200.0
 
 # 사용자 정의 매개변수(/rtp region:<region> 등)를 사용할 때의 요금.
+# @type: number
+# @range: [0.0, null]
+# @default: 1000000000.0
 매개변수가격: 1000000000.0
 
 # 바이옴 지정(/rtp biome:<biome>) 의 추가 요금.
+# @type: number
+# @range: [0.0, null]
+# @default: 5000.0
 바이옴가격: 5000.0
 
 # 강제되는 최소 잔액.
 # RTP 사용 후 플레이어 잔액이 이 값 미만으로 내려갈 수 없습니다.
+# @type: number
+# @range: [0.0, null]
+# @default: 0.0
 최소잔액: 0.0
 
 # 버전 번호는 변경하지 마세요

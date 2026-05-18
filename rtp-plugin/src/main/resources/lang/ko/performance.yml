@@ -3,12 +3,19 @@
 # 최대 검색 시도 횟수
 # 한 번의 요청에서 안전한 위치를 찾기 위한 최대 시도 횟수. 초과 시 포기합니다.
 # 영향: 높음 — 큰 값은 요청당 CPU 사용량을 크게 증가시킵니다.
+# @type: integer
+# @range: [1, null]
+# @default: 32
 최대시도횟수: 10
 
 # 목적지 사전 로드(청크)
 # 목적지 주변에서 미리 로드할 청크의 반경.
 # 로드되는 청크 수 = ( 1 + 2 * 반경 )^2.
 # 영향: 높음 — 너무 크면 텔레포트 시 TPS 저하를 일으킬 수 있습니다.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
 시야거리_선택: 0
 
 # Chunk radius loaded around the final location immediately before
@@ -23,12 +30,20 @@
 # 각 리전의 위치 캐시를 백그라운드에서 보충하는 간격.
 # ( 20 틱 = 1 초 ).
 # 영향: 중간 — 값이 작을수록 보충은 빨라지지만 CPU 를 더 많이 사용합니다.
+# @type: integer
+# @range: [1, null]
+# @unit: ticks
+# @default: 20
 주기: 20
 
 # 작업당 할당 시간(밀리초)
 # 1 틱 내에서 RTP 작업에 사용하는 최대 시간(밀리초).
 # 범위: 0 - 50.
 # 영향: 중간 — 클수록 처리 속도가 빨라지지만 틱을 압박할 수 있습니다.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
 할당시간_동기: 50
 
 # Maximum milliseconds per tick spent in asynchronous tasks.
@@ -42,21 +57,30 @@
 # 새 위치를 캐시에 추가하기 전에 필요한 최소 서버 TPS.
 # 범위: 0.0 - 20.0.
 # 영향: 낮음 — 서버가 이미 랙이 있을 때 플러그인이 부하를 가중시키는 것을 방지합니다.
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
 최소TPS: 19.0
 
 # 텔레포트 후 큐잉
 # true 인 경우 RTP 직후에 플러그인이 위치 캐시 보충을 시도합니다.
 # 영향: 중간
+# @type: boolean
+# @default: false
 텔레포트후큐잉: false
 
 # 동기 로딩
 # 위치 선택 시 동기 청크 로드를 사용합니다.
 # 영향: 높음 — 권장하지 않습니다! 심각한 서버 랙을 유발할 수 있습니다.
+# @type: boolean
+# @default: false
 동기로딩: false
 
 # 시작 시 권한 파싱
 # onEventParsing: 와일드카드 권한 *.* 와 호환되지 않습니다.
 # 영향: 중간 (onEvent) / 낮음 (effect)
+# @type: boolean
+# @default: false
 이벤트시파싱: false
 
 # Parse effect permission nodes at startup.
@@ -68,6 +92,8 @@
 # biomeRecall: 바이옴별로 과거에 찾은 위치를 재사용합니다.
 # biomeRecallForced: 캐시된 바이옴만 사용합니다.
 # 영향: 낮음~중간
+# @type: boolean
+# @default: true
 바이옴기억: true
 
 # When set, only serve biome-filtered requests from cache (never
@@ -79,6 +105,8 @@
 # 청크 로드 시 패시브 검사
 # 리전 범위 내에서 로드된 모든 청크에서 안전한 위치를 찾습니다.
 # 영향: 높음 — 청크 로드 이벤트에서 서버 부하를 크게 증가시킬 수 있습니다.
+# @type: boolean
+# @default: false
 청크로드시검사: false
 
 # 관찰 모드 캐시 보충 (Region Data Visitor)
@@ -89,38 +117,42 @@
 # 바이옴 수집 등)는 백그라운드에서 누적되지만 큐가 한계를 초과하지는
 # 않습니다.
 # 월드 생성을 결코 유발하지 않습니다: 디스크에 기록되지 않은 청크는
-# ADR-016 의 Anvil 사전 필터에 의해 UNKNOWN 으로 건너뜁니다.
+# 의 Anvil 사전 필터에 의해 UNKNOWN 으로 건너뜁니다.
 # visitorEnabled: 메인 스위치 (true 로 관찰 모드 활성화).
 # 빈도는 위의 `period` 설정을 따릅니다. 전용 속도 매개변수는 없습니다.
 # 영향: 낮음 — 기존 `period` 에 의해 율속되며, 기본 보충 모드에서 캐시에
 # 여유가 있을 때만 추가 작업이 수행됩니다.
+# @type: boolean
+# @default: false
 visitorEnabled: true
 
-# Maintain a reserved cache of locations for join-time teleports
-# (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty
-# player slots. See ADR-023.
+# 접속 텔레포트 (rtp.onevent.firstjoin / rtp.onevent.join) 용 예약 캐시를 유지합니다. 남은 빈 슬롯 수로 크기가 결정됩니다. 참고.
 # @type: boolean
 # @default: false
 loginCacheEnabled: false
 
-# Hard cap for the login cache. 0 = auto (server max-players,
-# snapshotted at startup).
+# 접속 캐시 상한. 0 = 자동 (시작 시 서버 max-players).
 # @type: integer
 # @range: [0, null]
 # @default: 0
 loginCacheCap: 0
 
-# 버전 번호는 변경하지 마세요
-pregeneratedPreference: "0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass."
+# Probability of rejecting an ungenerated chunk per selection attempt.
+# 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land.
+# Generated chunks always pass.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+pregeneratedPreference: 0.0
 
 # Fraction of L3 backlog capacity at which refill resumes (hysteresis).
 # 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill
 # continuously. Higher values group .mca-bin checks for better
-# CPU/memory efficiency. See ADR-028.
+# CPU/memory efficiency.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
-backlogRefillThreshold: "0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously."
+backlogRefillThreshold: 0.5
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

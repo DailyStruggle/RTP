@@ -204,13 +204,66 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
                   MenuConsumerProfile.defaultProfile(),
                   assembledPath);
         };
+    // Stage A.2: wire the param-picker builder so OpenParamPicker redeems
+    // resolve to a value-picker sub-page instead of the "picker-page
+    // disabled" reject path (see MenuRedeemSubcommand.dispatchOpenParamPicker).
+    final MenuRedeemSubcommand.MenuParamPickerBuilder menuParamPickerBuilder =
+        (parent, viewer, parentPath, paramName) ->
+            new CommandTreeMenuBuilder(menuTokenRegistry)
+                .buildParamPicker(
+                    parent,
+                    viewer,
+                    menuPermissionProbe.apply(viewer),
+                    MenuConsumerProfile.defaultProfile(),
+                    parentPath,
+                    paramName);
+    // ADR-045: try to wire an anvil-GUI input opener for the
+    // "type a custom value..." picker row. Reflective for the same reason
+    // as the renderer — rtp-plugin doesn't link rtp-paper-common at compile
+    // time. Null is the documented disabled state; redeem rejects with the
+    // configurable menuInvalid message in that case.
+    final MenuRedeemSubcommand.AnvilInputOpener anvilOpener =
+        selectAnvilOpener(plugin);
     addSubCommand(
         new MenuRedeemSubcommand(
             this,
             menuTokenRegistry,
             menuPermissionProbe,
             menuRenderer,
-            menuPageBuilder));
+            menuPageBuilder,
+            menuParamPickerBuilder,
+            anvilOpener));
+  }
+
+  /**
+   * ADR-045 — instantiates the Paper {@code AnvilInputSession} reflectively
+   * and registers it as a Bukkit listener bound to the RTP plugin. Returns
+   * {@code null} when the Paper-side class is not on the runtime classpath
+   * (e.g. plain Spigot), or instantiation / registration failed; callers
+   * tolerate {@code null} (the picker row falls back to the configurable
+   * {@code menuInvalid} reject when the player clicks it).
+   */
+  private static @org.jetbrains.annotations.Nullable
+      MenuRedeemSubcommand.AnvilInputOpener selectAnvilOpener(Plugin plugin) {
+    final String className =
+        "io.github.dailystruggle.rtp.paper.menu.AnvilInputSession";
+    try {
+      Class<?> cls = Class.forName(className);
+      Object instance = cls.getConstructor().newInstance();
+      cls.getMethod("register", Plugin.class).invoke(instance, plugin);
+      return (MenuRedeemSubcommand.AnvilInputOpener) instance;
+    } catch (ClassNotFoundException cnfe) {
+      RTP.log(
+          Level.INFO,
+          "menu anvil-input unavailable on this platform (" + className + ")");
+      return null;
+    } catch (ReflectiveOperationException roe) {
+      RTP.log(
+          Level.WARNING,
+          "failed to instantiate menu anvil-input opener: " + roe.getMessage(),
+          roe);
+      return null;
+    }
   }
 
   /**

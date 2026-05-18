@@ -1,5 +1,5 @@
-# --- RTP Integration Settings ---
-# If true, RTP will reroll the location if it lands within a claim/region from the respective plugin.
+# --- Paramètres d'intégration RTP ---
+# Si true, RTP relance le tirage de l'emplacement s'il tombe dans un claim/une région du plugin concerné.
 rerollFactions: false
 rerollGriefDefender: false
 rerollGriefPrevention: false

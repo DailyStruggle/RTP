@@ -281,10 +281,14 @@ public class MenuStageTwoTest {
     }
 
     @Test
-    void reflectorFallsBackToSuggestInputWhenParameterHasNoSuggestions() {
-        // Stage A.2 fallback contract: a parameter whose values()/relevantValues()
-        // is empty (or absent) keeps the pre-Stage-A.2 SuggestInput behavior,
-        // so the player can type a free-form value (numeric ranges, etc).
+    void reflectorOpensParamPickerEvenWhenParameterHasNoSuggestions() {
+        // Updated contract: parameters with no suggestions still emit an
+        // OpenParamPicker so the player reaches a sub-page that renders the
+        // "✎ type a custom value..." chat-prefill row plus any (empty)
+        // suggestion list. The earlier SuggestInput-only fallback meant a
+        // free-form parameter such as `regions add` was "stuck" — clicking
+        // it produced no visible prompt under renderers that don't surface
+        // chat suggestions inline.
         LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         root.getParameterLookup().put("freeform", anonParam("", "no suggestions"));
@@ -299,8 +303,8 @@ public class MenuStageTwoTest {
                 if ("freeform".equals(frag.text())) paramAction = frag.action();
             }
         }
-        assertInstanceOf(MenuAction.SuggestInput.class, paramAction,
-                "no-suggestion parameter must fall back to SuggestInput");
+        assertInstanceOf(MenuAction.OpenParamPicker.class, paramAction,
+                "no-suggestion parameter must still open the picker sub-page");
     }
 
     // ------------------------------------------------------------------------

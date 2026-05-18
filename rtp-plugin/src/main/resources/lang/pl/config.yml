@@ -32,10 +32,13 @@ teleportCooldown: 300
 consoleCommands:
   - "say [player] has just randomly teleported!"
 
-# Commands executed as the teleporting player on successful teleport.
-# Use [player] for the target player's name. Empty string entries are ignored.
+# Polecenia wykonywane jako teleportowany gracz po udanej teleportacji.
+# Użyj [player] dla nazwy gracza. Puste wpisy są ignorowane.
 # @type: list<string>
 playerCommands:
+  # Polecenia wykonywane jako teleportowany gracz po udanej teleportacji.
+  # Użyj [player] dla nazwy gracza. Puste wpisy są ignorowane.
+  # @type: list<string>
   - ""
 
 # Database backend used for persistence.
@@ -50,31 +53,31 @@ database:
   # Database host. Used by mysql/postgresql only.
   # @type: string
   host: "127.0.0.1"
-  # Database port. Used by mysql/postgresql only.
+  # Port bazy danych. Używany tylko przez mysql/postgresql.
   # @type: integer
   # @range: [1, 65535]
   port: 3306
-  # Database / schema name. Used by mysql/postgresql only.
+  # Nazwa bazy danych / schematu. Używana tylko przez mysql/postgresql.
   # @type: string
   name: "rtp"
-  # Database username. Used by mysql/postgresql only.
+  # Nazwa użytkownika bazy danych. Używana tylko przez mysql/postgresql.
   # @type: string
   username: "root"
-  # Database password. Used by mysql/postgresql only.
+  # Hasło bazy danych. Używane tylko przez mysql/postgresql.
   # @type: string
   password: "password"
 
 # Cross-server / proxy transport settings. See docs/dev/MULTI_SERVER_PLAN.md.
 network:
   redis:
-    # Enable Redis-backed network state binding.
+    # Włącza wiązanie stanu sieci oparte na Redis.
     # @type: boolean
     # @default: false
     enabled: false
     # Redis host.
     # @type: string
     host: "127.0.0.1"
-    # Redis port.
+    # Port Redis.
     # @type: integer
     # @range: [1, 65535]
     port: 6379
@@ -82,18 +85,25 @@ network:
     # @type: string
     password: ""
 
-# Generalized menu framework (ADR-035 / ADR-044).
-# `renderer` is an ordered preference list of renderer ids. On exception or
-# missing adapter the framework walks the list and falls back to the next
-# entry. If the list is exhausted the no-token open-page path falls back to
-# the configurable `menuInvalid` message. Available ids: book. (The chat
-# renderer ships in a follow-up and will be added to the default list at
-# that point.)
+# Uogólniony framework menu.
+# `renderer` to uporządkowana lista preferencji identyfikatorów rendererów.
+# W razie wyjątku lub braku adaptera framework przechodzi przez listę i
+# korzysta z kolejnego wpisu. Po wyczerpaniu listy ścieżka otwarcia bez
+# tokenu wraca do konfigurowalnej wiadomości `menuInvalid`. Dostępne id:
+# book. (Renderer chatu pojawi się w późniejszym wydaniu i wówczas
+# zostanie dodany do listy domyślnej.)
 menu:
   # Ordered preference list of renderer ids.
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:
+    # Uogólniony framework menu.
+    # `renderer` to uporządkowana lista preferencji identyfikatorów rendererów.
+    # W razie wyjątku lub braku adaptera framework przechodzi przez listę i
+    # korzysta z kolejnego wpisu. Po wyczerpaniu listy ścieżka otwarcia bez
+    # tokenu wraca do konfigurowalnej wiadomości `menuInvalid`. Dostępne id:
+    # book. (Renderer chatu pojawi się w późniejszym wydaniu i wówczas
+    # zostanie dodany do listy domyślnej.)
     - "book"
 
 # DO NOT TOUCH VERSION NUMBER

@@ -1,27 +1,43 @@
 # 텔레포트 지연(초)
 # 실제 텔레포트가 발동하기 전에 플레이어가 기다리는 시간.
 # 서버가 목적지 청크를 미리 로드할 시간을 확보합니다.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
 텔레포트지연: 2
 
 # 이동 취소(블록)
 # 지연 중 플레이어가 이 거리 이상 이동하면 텔레포트를 취소합니다.
 # -1 로 설정하면 비활성화됩니다.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
 취소거리: 2
 
 # 텔레포트 간격(초)
 # 플레이어가 RTP 를 연속해서 사용하기 전에 기다려야 하는 시간.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
 텔레포트쿨다운: 300
 
 # 텔레포트 후 명령어
 # 텔레포트 성공 후 실행할 명령어 목록.
 # 자리표시자 [player] 는 플레이어 이름을 나타냅니다.
+# @type: list<string>
 콘솔명령어:
   - "say [player] 가 무작위 텔레포트했습니다!"
 
-# Commands executed as the teleporting player on successful teleport.
-# Use [player] for the target player's name. Empty string entries are ignored.
+# 텔레포트 성공 시 대상 플레이어로 실행되는 명령어.
+# [player] 는 대상 플레이어 이름입니다. 빈 항목은 무시됩니다.
 # @type: list<string>
 플레이어명령어:
+  # 텔레포트 성공 시 대상 플레이어로 실행되는 명령어.
+  # [player] 는 대상 플레이어 이름입니다. 빈 항목은 무시됩니다.
+  # @type: list<string>
   - ""
 
 # --- 데이터베이스 설정 ---
@@ -30,20 +46,24 @@
   # 사용 가능한 type: yaml, sqlite, mysql, postgresql
   # - yaml/sqlite: 로컬 파일(추가 설정 불필요)
   # - mysql/postgresql: 원격 데이터베이스(아래 인증 정보 필요)
+  # @type: enum
+  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
+  # @default: "sqlite"
   type: "sqlite"
   # 네트워크 데이터베이스 인증 정보(로컬에서는 무시됨)
+  # @type: string
   host: "127.0.0.1"
-  # Database port. Used by mysql/postgresql only.
+  # 데이터베이스 포트. mysql/postgresql 에서만 사용됩니다.
   # @type: integer
   # @range: [1, 65535]
   port: 3306
-  # Database / schema name. Used by mysql/postgresql only.
+  # 데이터베이스 / 스키마 이름. mysql/postgresql 에서만 사용됩니다.
   # @type: string
   name: "rtp"
-  # Database username. Used by mysql/postgresql only.
+  # 데이터베이스 사용자 이름. mysql/postgresql 에서만 사용됩니다.
   # @type: string
   username: "root"
-  # Database password. Used by mysql/postgresql only.
+  # 데이터베이스 비밀번호. mysql/postgresql 에서만 사용됩니다.
   # @type: string
   password: "password"
 
@@ -66,18 +86,25 @@
     # @type: string
     password: ""
 
-# Generalized menu framework (ADR-035 / ADR-044).
-# `renderer` is an ordered preference list of renderer ids. On exception or
-# missing adapter the framework walks the list and falls back to the next
-# entry. If the list is exhausted the no-token open-page path falls back to
-# the configurable `menuInvalid` message. Available ids: book. (The chat
-# renderer ships in a follow-up and will be added to the default list at
-# that point.)
+# 일반화된 메뉴 프레임워크.
+# `renderer` 는 렌더러 ID 우선순위 리스트입니다. 예외가 발생하거나
+# 어댑터가 없는 경우 프레임워크는 리스트를 순회하며 다음 항목으로
+# 폴백합니다. 리스트가 소진되면 토큰 없는 페이지 열기 경로는 구성
+# 가능한 `menuInvalid` 메시지로 폴백합니다. 사용 가능한 ID: book.
+# (채팅 렌더러는 후속 릴리스에서 추가되며, 그 시점에 기본 리스트에
+# 포함될 예정입니다.)
 menu:
   # Ordered preference list of renderer ids.
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:
+    # 일반화된 메뉴 프레임워크.
+    # `renderer` 는 렌더러 ID 우선순위 리스트입니다. 예외가 발생하거나
+    # 어댑터가 없는 경우 프레임워크는 리스트를 순회하며 다음 항목으로
+    # 폴백합니다. 리스트가 소진되면 토큰 없는 페이지 열기 경로는 구성
+    # 가능한 `menuInvalid` 메시지로 폴백합니다. 사용 가능한 ID: book.
+    # (채팅 렌더러는 후속 릴리스에서 추가되며, 그 시점에 기본 리스트에
+    # 포함될 예정입니다.)
     - "book"
 
 # 버전 번호는 변경하지 마세요

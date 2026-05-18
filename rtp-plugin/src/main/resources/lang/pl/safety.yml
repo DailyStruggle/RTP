@@ -17,14 +17,13 @@ invulnerabilityTime: 5
 safetyRadius: 0
 
 # Maximum retries for the stale-chunk guard before failing the attempt.
-# See ADR-015.
 # @type: integer
 # @range: [0, null]
 # @default: 2
 staleChunkRetryLimit: 2
 
 # Use the off-thread anvil NBT prefilter to reject candidates without
-# loading their chunks. See ADR-016.
+# loading their chunks.
 # @type: boolean
 # @default: true
 anvilPrefilterEnabled: true
@@ -59,7 +58,7 @@ platformMaterial: "GLASS"
 
 # Blocks treated as passable air for landing-safety checks.
 # Accepts Bukkit Material names and "#minecraft:<tag>" tag references
-# (see ADR-017).
+#.
 # @type: list<material>
 # @source: material
 airBlocks:
@@ -71,9 +70,9 @@ airBlocks:
   - "LIGHT"
   - "#minecraft:flowers"
   - "#minecraft:small_flowers"
-  # Note: #minecraft:tall_flowers is an item-only tag in vanilla; its members
-  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) are already covered by
-  # #minecraft:flowers above.
+  # Uwaga: #minecraft:tall_flowers w vanilla jest tagiem tylko dla przedmiotów; jego członkowie
+  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) są już objęci tagiem
+  # #minecraft:flowers powyżej.
   - "SHORT_GRASS"
   - "TALL_GRASS"
   - "SHORT_DRY_GRASS"
@@ -133,7 +132,7 @@ airBlocks:
 
 # Blocks that disqualify a landing spot (lava, hazards, etc.).
 # Accepts Bukkit Material names, "#minecraft:<tag>" tag references, and
-# state predicates such as "*[waterlogged=true]" (see ADR-017).
+# state predicates such as "*[waterlogged=true]".
 # @type: list<material>
 # @source: material
 unsafeBlocks:

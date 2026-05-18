@@ -142,9 +142,6 @@ public final class CommandTreeMenuBuilder {
         Objects.requireNonNull(profile, "profile");
         Objects.requireNonNull(assembledPath, "assembledPath");
 
-        Deque<String> commandPath = new ArrayDeque<>();
-        commandPath.addLast(root.name() == null ? "" : root.name());
-
         List<MenuLine> lines = new ArrayList<>();
 
         // 0root. Root-page UX framing — non-clickable title + hint rows
@@ -217,22 +214,29 @@ public final class CommandTreeMenuBuilder {
                 if (perm != null && !perm.isEmpty() && !permission.test(perm)) {
                     continue; // hidden, per scope answer A
                 }
-                String[] args = appendArg(commandPath, name);
                 String hover = sub.description();
                 if (hover != null && hover.isEmpty()) hover = null;
+
+                // Args for the click action target the full /rtp invocation:
+                // assembledPath (e.g. ["config", "regions", "default.yml"]) plus
+                // this sub's name (e.g. "view"). `commandPath` excludes the
+                // assembledPath prefix, so using it for RunRtpCommand would
+                // drop everything above the current page (issue: clicking
+                // `view` under `config regions default.yml` dispatched
+                // `/rtp view` and produced "invalid command: view").
+                String[] childPath = new String[assembledPath.size() + 1];
+                for (int i = 0; i < assembledPath.size(); i++) {
+                    childPath[i] = assembledPath.get(i);
+                }
+                childPath[assembledPath.size()] = name;
 
                 MenuAction action;
                 if (sub instanceof TreeCommand subTree && hasNavigableContent(subTree, permission)) {
                     // Descend: clicking re-opens the menu at the subtree.
-                    String[] childPath = new String[assembledPath.size() + 1];
-                    for (int i = 0; i < assembledPath.size(); i++) {
-                        childPath[i] = assembledPath.get(i);
-                    }
-                    childPath[assembledPath.size()] = name;
                     action = new MenuAction.OpenMenu(childPath);
                 } else {
                     // Pure leaf: clicking executes the subcommand directly.
-                    action = new MenuAction.RunRtpCommand(args);
+                    action = new MenuAction.RunRtpCommand(childPath);
                 }
                 lines.add(MenuLine.of(new MenuFragment(name, hover, action)));
             }
@@ -256,13 +260,12 @@ public final class CommandTreeMenuBuilder {
                 }
                 String name = e.getKey();
                 MenuAction action;
-                Set<String> suggestions = safeSuggestions(param, callerId);
-                if (suggestions != null && !suggestions.isEmpty()) {
-                    action = new MenuAction.OpenParamPicker(parentPath, name);
-                } else {
-                    String prefix = profile.suggestPrefix(commandPath, name);
-                    action = new MenuAction.SuggestInput(prefix);
-                }
+                // Always open the picker sub-page: it carries both a
+                // "✎ type a custom value..." chat-prefill row and any
+                // suggestion rows. Parameters with no suggestions (free-form
+                // string inputs like `regions add`) still reach a clear
+                // prompt rather than a silent SuggestInput click.
+                action = new MenuAction.OpenParamPicker(parentPath, name);
                 String hover = resolveParamHover(profile, root, name, param);
                 lines.add(MenuLine.of(new MenuFragment(name, hover, action)));
             }
@@ -324,19 +327,6 @@ public final class CommandTreeMenuBuilder {
         return false;
     }
 
-    private static String[] appendArg(Deque<String> commandPath, String tail) {
-        // commandPath is the path from `/rtp` root down to the current node; the
-        // emitted args target the same root, so we skip the leading element when
-        // it equals the implicit command label.
-        List<String> out = new ArrayList<>(commandPath.size());
-        boolean first = true;
-        for (String segment : commandPath) {
-            if (first) { first = false; continue; }
-            out.add(segment);
-        }
-        out.add(tail);
-        return out.toArray(new String[0]);
-    }
 
     private String resolveParamHover(MenuConsumerProfile profile,
                                      TreeCommand parent,
@@ -488,8 +478,15 @@ public final class CommandTreeMenuBuilder {
         }
         String typeLabel = lookupMsg(MessagesKeys.menuTypeValue,
                 "✎ type a custom value...");
+        // ADR-045 — on renderers that support it (Paper/Folia BookMenuRenderer),
+        // this row opens an anvil GUI; the renderer mints a token bound to a
+        // sibling subcommand which opens the anvil server-side and submits
+        // `/rtp <parentPath...> <paramName>:<typed>` on confirm. Renderers
+        // that don't support anvil input fall back to chat-prefill semantics
+        // by re-rendering this action as a `SuggestInput(typePrefix)` click.
+        String[] parentPathArr = parentPath.toArray(new String[0]);
         MenuLine typeLine = MenuLine.of(new MenuFragment(typeLabel, null,
-                new MenuAction.SuggestInput(typePrefix)));
+                new MenuAction.PromptAnvilInput(parentPathArr, paramName, "")));
 
         // Build value rows — Stage A.3: clicking a suggested value *stages*
         // the assignment into the assembled path (re-opens the parent command

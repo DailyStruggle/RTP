@@ -17,14 +17,14 @@ tempoInvulnerabilita: 5
 raggioSicurezza: 0
 
 # Numero massimo di tentativi per la guardia dei chunk obsoleti prima di far fallire il tentativo.
-# Vedi ADR-015.
+# Vedi
 # @type: integer
 # @range: [0, null]
 # @default: 2
 limiteRipetizioniChunkObsoleti: 2
 
 # Usa il prefiltro NBT anvil fuori dal thread per rifiutare i candidati senza
-# caricare i loro chunk. Vedi ADR-016.
+# caricare i loro chunk. Vedi
 # @type: boolean
 # @default: true
 prefiltroAnvilAttivo: true
@@ -59,7 +59,7 @@ materialePiattaforma: "GLASS"
 
 # Blocchi trattati come aria attraversabile per i controlli di sicurezza di atterraggio.
 # Accetta nomi di Material di Bukkit e riferimenti a tag "#minecraft:<tag>"
-# (vedi ADR-017).
+# (vedi).
 # @type: list<material>
 # @source: material
 blocchiAria:
@@ -133,7 +133,7 @@ blocchiAria:
 
 # Blocchi che squalificano un punto di atterraggio (lava, pericoli, ecc.).
 # Accetta nomi di Material di Bukkit, riferimenti a tag "#minecraft:<tag>" e
-# predicati di stato come "*[waterlogged=true]" (vedi ADR-017).
+# predicati di stato come "*[waterlogged=true]" (vedi).
 # @type: list<material>
 # @source: material
 blocchiPericolosi:

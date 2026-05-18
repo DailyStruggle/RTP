@@ -1,27 +1,43 @@
 # Retraso del teletransporte (segundos)
 # Tiempo que el jugador debe esperar antes de que se realice el teletransporte.
 # A veces le da tiempo al servidor para precargar los chunks de destino.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
 retrasoTeletransporte: 2
 
 # Cancelación por movimiento (bloques)
 # Si el jugador se mueve más de esta distancia durante el retraso, el
 # teletransporte se cancela. Establece -1 para desactivarlo.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
 distanciaCancelar: 2
 
 # Tiempo de espera entre teletransportes (segundos)
 # Tiempo que el jugador debe esperar entre usos exitosos de RTP.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
 enfriamientoTeletransporte: 300
 
 # Comandos posteriores al teletransporte
 # Lista de comandos a ejecutar tras un teletransporte exitoso.
 # El marcador [player] representa el nombre del jugador.
+# @type: list<string>
 comandosConsola:
   - "say ¡[player] acaba de teletransportarse aleatoriamente!"
 
-# Commands executed as the teleporting player on successful teleport.
-# Use [player] for the target player's name. Empty string entries are ignored.
+# Comandos ejecutados como el jugador teletransportado tras un teletransporte exitoso.
+# Use [player] para el nombre del jugador. Las entradas vacías se ignoran.
 # @type: list<string>
 comandosJugador:
+  # Comandos ejecutados como el jugador teletransportado tras un teletransporte exitoso.
+  # Use [player] para el nombre del jugador. Las entradas vacías se ignoran.
+  # @type: list<string>
   - ""
 
 # --- Configuración de la base de datos ---
@@ -30,20 +46,24 @@ baseDeDatos:
   # Tipos disponibles: yaml, sqlite, mysql, postgresql
   # - yaml/sqlite: archivos locales (sin configuración adicional)
   # - mysql/postgresql: base de datos remota (requiere credenciales abajo)
+  # @type: enum
+  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
+  # @default: "sqlite"
   type: "sqlite"
   # Credenciales de base de datos en red (ignoradas para tipos locales)
+  # @type: string
   host: "127.0.0.1"
-  # Database port. Used by mysql/postgresql only.
+  # Puerto de la base de datos. Solo lo usan mysql/postgresql.
   # @type: integer
   # @range: [1, 65535]
   port: 3306
-  # Database / schema name. Used by mysql/postgresql only.
+  # Nombre de la base de datos / esquema. Solo lo usan mysql/postgresql.
   # @type: string
   name: "rtp"
-  # Database username. Used by mysql/postgresql only.
+  # Nombre de usuario de la base de datos. Solo lo usan mysql/postgresql.
   # @type: string
   username: "root"
-  # Database password. Used by mysql/postgresql only.
+  # Contraseña de la base de datos. Solo la usan mysql/postgresql.
   # @type: string
   password: "password"
 
@@ -66,18 +86,25 @@ red:
     # @type: string
     password: ""
 
-# Generalized menu framework (ADR-035 / ADR-044).
-# `renderer` is an ordered preference list of renderer ids. On exception or
-# missing adapter the framework walks the list and falls back to the next
-# entry. If the list is exhausted the no-token open-page path falls back to
-# the configurable `menuInvalid` message. Available ids: book. (The chat
-# renderer ships in a follow-up and will be added to the default list at
-# that point.)
+# Marco de menús generalizado.
+# `renderer` es una lista ordenada de preferencia de ids de renderer. En
+# caso de excepción o de adaptador faltante, el framework recorre la lista
+# y recurre a la siguiente entrada. Si la lista se agota, la ruta de
+# apertura sin token cae al mensaje configurable `menuInvalid`. Ids
+# disponibles: book. (El renderer de chat llegará en una entrega posterior
+# y se añadirá entonces a la lista por defecto.)
 menu:
   # Ordered preference list of renderer ids.
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:
+    # Marco de menús generalizado.
+    # `renderer` es una lista ordenada de preferencia de ids de renderer. En
+    # caso de excepción o de adaptador faltante, el framework recorre la lista
+    # y recurre a la siguiente entrada. Si la lista se agota, la ruta de
+    # apertura sin token cae al mensaje configurable `menuInvalid`. Ids
+    # disponibles: book. (El renderer de chat llegará en una entrega posterior
+    # y se añadirá entonces a la lista por defecto.)
     - "book"
 
 # NO MODIFIQUES EL NÚMERO DE VERSIÓN

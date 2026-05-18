@@ -14,17 +14,16 @@ comando: false
 # Log successful teleport events
 teletransporte: true
 
-# Registros de RTP automáticos o por evento
-# Registros para RTP activados por eventos:
-evento_cambioMundo: "true # Cuando el jugador cambia de mundo"
-# Log RTP triggered on join
-evento_union: "true       # Cuando el jugador se une al servidor"
-# Log RTP triggered on respawn
-evento_reaparicion: "true # Cuando el jugador reaparece"
-# Log move event processing
-evento_movimiento: "true  # Cuando el jugador se mueve (si el RTP por movimiento está activo)"
-# Log teleport event processing
-evento_teletransporte: "true # Cuando el jugador se teletransporta (si el RTP por teletransporte está activo)"
+# Cuando el jugador cambia de mundo
+evento_cambioMundo: true
+# Cuando el jugador se une al servidor
+evento_union: true
+# Cuando el jugador reaparece
+evento_reaparicion: true
+# Cuando el jugador se mueve (si el RTP por movimiento está activo)
+evento_movimiento: true
+# Cuando el jugador se teletransporta (si el RTP por teletransporte está activo)
+evento_teletransporte: true
 
 # Depuración de fallos de selección
 # Registra información detallada cuando la selección de una ubicación segura falla,

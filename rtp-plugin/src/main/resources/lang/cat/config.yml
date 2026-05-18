@@ -1,27 +1,43 @@
 # Stalk delay (tail flicks)
 # How long the kitty crouches before the actual pounce.
 # Gives the server time to pre-load destination kibble.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
 stalk_delay: 2
 
 # Too-far-to-chase (blocks)
 # If the kitty wanders this far during the crouch, the pounce is cancelled.
 # Set -1 to disable.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
 too_far_to_chase: 2
 
 # Nap time (tail flicks)
 # How long a kitty must nap before pouncing again.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
 nap_time: 300
 
 # Post-pounce tricks
 # Commands the tall human runs after a successful pounce.
 # Placeholder [player] is the kitty's name.
+# @type: list<string>
 tall_human_tricks:
   - "say [player] has just randomly pounced! Mrrow!"
 
-# Commands executed as the teleporting player on successful teleport.
-# Use [player] for the target player's name. Empty string entries are ignored.
+# Tricks the kitty performs after a successful pounce.
+# Use [player] for the kitty's name. Empty entries are ignored.
 # @type: list<string>
 human_tricks:
+  # Tricks the kitty performs after a successful pounce.
+  # Use [player] for the kitty's name. Empty entries are ignored.
+  # @type: list<string>
   - ""
 
 # --- Scratching post (database) ---
@@ -30,20 +46,24 @@ scratching_post:
   # Allowed types: yaml, sqlite, mysql, postgresql
   # - yaml/sqlite: local file (no extra setup)
   # - mysql/postgresql: remote post (credentials below)
+  # @type: enum
+  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
+  # @default: "sqlite"
   type: "sqlite"
   # Network post credentials (ignored for local types)
+  # @type: string
   host: "127.0.0.1"
-  # Database port. Used by mysql/postgresql only.
+  # Port for the kibble-stash. Only mysql/postgresql sniff at this one.
   # @type: integer
   # @range: [1, 65535]
   port: 3306
-  # Database / schema name. Used by mysql/postgresql only.
+  # Kibble-stash / schema name. Sniffed by mysql/postgresql only.
   # @type: string
   name: "rtp"
-  # Database username. Used by mysql/postgresql only.
+  # Kibble-stash username. Sniffed by mysql/postgresql only.
   # @type: string
   username: "root"
-  # Database password. Used by mysql/postgresql only.
+  # Tall-human's secret kibble-stash password. Sniffed by mysql/postgresql only.
   # @type: string
   password: "password"
 
@@ -66,7 +86,7 @@ yarn_ball:
     # @type: string
     password: ""
 
-# Generalized menu framework (ADR-035 / ADR-044).
+# Generalized menu framework.
 # `renderer` is an ordered preference list of renderer ids. On exception or
 # missing adapter the framework walks the list and falls back to the next
 # entry. If the list is exhausted the no-token open-page path falls back to
@@ -78,6 +98,13 @@ menu:
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:
+    # Generalized menu framework.
+    # `renderer` is an ordered preference list of renderer ids. On exception or
+    # missing adapter the framework walks the list and falls back to the next
+    # entry. If the list is exhausted the no-token open-page path falls back to
+    # the configurable `menuInvalid` message. Available ids: book. (The chat
+    # renderer ships in a follow-up and will be added to the default list at
+    # that point.)
     - "book"
 
 # Do not bite the version number, sacred catnip

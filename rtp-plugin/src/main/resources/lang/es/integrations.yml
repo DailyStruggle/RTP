@@ -1,5 +1,5 @@
-# --- RTP Integration Settings ---
-# If true, RTP will reroll the location if it lands within a claim/region from the respective plugin.
+# --- Configuración de integración de RTP ---
+# Si es true, RTP volverá a elegir la ubicación si cae dentro de un claim/región del plugin correspondiente.
 rerollFactions: false
 rerollGriefDefender: false
 rerollGriefPrevention: false

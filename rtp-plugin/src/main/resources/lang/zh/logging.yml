@@ -14,16 +14,16 @@
 # Log successful teleport events
 传送: true
 
-# 事件触发的自动 RTP 日志
-事件_切换世界: "true # 玩家切换世界时"
-# Log RTP triggered on join
-事件_加入: "true     # 玩家加入服务器时"
-# Log RTP triggered on respawn
-事件_重生: "true     # 玩家重生时"
-# Log move event processing
-事件_移动: "true     # 玩家移动时（若启用按移动触发的 RTP）"
-# Log teleport event processing
-事件_传送: "true     # 玩家传送时（若启用按传送触发的 RTP）"
+# 玩家切换世界时
+事件_切换世界: true
+# 玩家加入服务器时
+事件_加入: true
+# 玩家重生时
+事件_重生: true
+# 玩家移动时（若启用按移动触发的 RTP）
+事件_移动: true
+# 玩家传送时（若启用按传送触发的 RTP）
+事件_传送: true
 
 # 选择失败调试
 # 当查找安全位置失败时记录详细信息，包括失败率与查询参数。

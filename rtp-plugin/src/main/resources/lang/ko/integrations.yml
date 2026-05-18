@@ -1,5 +1,5 @@
-# --- RTP Integration Settings ---
-# If true, RTP will reroll the location if it lands within a claim/region from the respective plugin.
+# --- RTP 통합 설정 ---
+# true 인 경우 해당 플러그인의 claim/region 안에 떨어지면 RTP 가 위치를 다시 추첨합니다.
 rerollFactions: false
 rerollGriefDefender: false
 rerollGriefPrevention: false

@@ -95,7 +95,7 @@ visitatoreAttivo: false
 
 # Mantieni una cache riservata di posizioni per teletrasporti all'accesso
 # (rtp.onevent.firstjoin / rtp.onevent.join). Dimensionata sugli slot giocatore
-# vuoti rimanenti. Vedi ADR-023.
+# vuoti rimanenti. Vedi
 # @type: boolean
 # @default: false
 cacheLoginAttiva: false
@@ -118,7 +118,7 @@ preferenzaPregenerati: 0.0
 # Frazione della capacità dell'arretrato L3 alla quale riprende il riempimento (isteresi).
 # 0.5 = riempi solo dopo che L3 scende al 50% (predefinito). 1.0 = riempi
 # continuamente. Valori più alti raggruppano i controlli .mca-bin per migliore
-# efficienza CPU/memoria. Vedi ADR-028.
+# efficienza CPU/memoria. Vedi
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5

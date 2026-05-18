@@ -1,31 +1,31 @@
-# --- RTP Metrics Settings ---
-# Reporting-only knobs for the Phase M2 metrics SPI. Throttle / tuning
-# knobs continue to live in performance.yml.
-# Documentation: docs/dev/METRICS_PLAN.md > Folia Aggregation
-# Populate MetricsSnapshot.foliaRegions() with per-region detail on Folia.
-# Has no effect on Paper / Bukkit / Fabric (single-region runtimes always
-# return an empty list, which is the correct answer for those platforms).
+# --- Paramètres des métriques RTP ---
+# Réglages purement de reporting pour la SPI de métriques de la Phase M2. Les
+# réglages de régulation / réglage restent dans performance.yml.
+# Documentation : docs/dev/METRICS_PLAN.md > Folia Aggregation
+# Remplit MetricsSnapshot.foliaRegions() avec le détail par région sur Folia.
+# Sans effet sur Paper / Bukkit / Fabric (les runtimes mono-région renvoient
+# toujours une liste vide, ce qui est la bonne réponse pour ces plateformes).
 # @type: boolean
 # @default: true
 foliaIncludeRegions: true
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# tps{1,5,15}m fields of MetricsSnapshot on Folia.
-# Accepted values: mean | max
+# Stratégie d'agrégation pour fusionner les échantillons par région dans
+# les champs scalaires tps{1,5,15}m de MetricsSnapshot sur Folia.
+# Valeurs acceptées : mean | max
 # @type: enum
 # @default: mean
 foliaAggregationTps: "mean"
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# mspt field of MetricsSnapshot on Folia.
-# Accepted values: mean | max
+# Stratégie d'agrégation pour fusionner les échantillons par région dans
+# le champ scalaire mspt de MetricsSnapshot sur Folia.
+# Valeurs acceptées : mean | max
 # @type: enum
 # @default: max
 foliaAggregationMspt: "max"
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# tickBudgetUtilisation field of MetricsSnapshot on Folia.
-# Accepted values: mean | max
+# Stratégie d'agrégation pour fusionner les échantillons par région dans
+# le champ scalaire tickBudgetUtilisation de MetricsSnapshot sur Folia.
+# Valeurs acceptées : mean | max
 # @type: enum
 # @default: max
 foliaAggregationTickBudget: "max"

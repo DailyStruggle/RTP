@@ -1,32 +1,38 @@
 # --- Configuração de segurança do RTP ---
 # Configura como o plugin determina se uma localização de teletransporte é "segura".
-#
-# Gramática de tokens (ADR-017):
-#   MATERIAL                          -- material simples, p. ex. LAVA
-#   MATERIAL[prop=val,prop2=val2]     -- material apenas se TODAS as propriedades de
-#                                        estado de bloco coincidirem
-#   #namespace:tag                    -- expande para todos os materiais dessa tag
-#   #namespace:tag[prop=val]          -- membros da tag apenas se as propriedades coincidirem
-#   *[prop=val]                       -- QUALQUER material quando as propriedades coincidem (coringa)
-#
+# Gramática de tokens:
+# MATERIAL -- material simples, p. ex. LAVA
+# MATERIAL[prop=val,prop2=val2] -- material apenas se TODAS as propriedades de
+# estado de bloco coincidirem
+# #namespace:tag -- expande para todos os materiais dessa tag
+# #namespace:tag[prop=val] -- membros da tag apenas se as propriedades coincidirem
+# *[prop=val] -- QUALQUER material quando as propriedades coincidem (coringa)
 # Os valores das propriedades são comparados ignorando maiúsculas/minúsculas
 # com a forma string do BlockData do Bukkit. Tags desconhecidas expandem para
 # o conjunto vazio (no-op, fail-open); tokens malformados são registrados uma
-# vez em nível WARN ao recarregar (REQ-RTP-S-004).
+# vez em nível WARN ao recarregar .
 # A ordem dentro de uma lista não importa.
 # Invulnerabilidade (segundos)
 # Duração da invulnerabilidade concedida ao jogador após teletransportar-se.
 # Evita dano por fogo, afogamento ou queda ao chegar.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 5
 tempoInvulnerabilidade: 5
 
 # Raio de verificação de segurança (blocos)
 # Raio ao redor do bloco alvo a verificar em busca de condições perigosas.
 # Valores maiores dão mais segurança mas dificultam encontrar um local.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 0
 raioSeguranca: 0
 
 # Limite de tentativas por chunk obsoleto (contagem)
 # Orçamento limitado de retentativas para o guardião de chunks obsoletos
-# (ADR-015 / REQ-RTP-S-005). Após uma carga assíncrona de chunk se resolver,
+# . Após uma carga assíncrona de chunk se resolver,
 # a tarefa subsequente de avaliação de bloco é enfileirada em uma pipeline de
 # tarefas Count-Bound (agendador de Region Thread do Folia). Se a pipeline
 # estiver saturada, o GC nativo de chunks pode descarregar o chunk antes que a
@@ -36,6 +42,9 @@ raioSeguranca: 0
 # esgotar, o candidato é rejeitado pela rota "unsafe" habitual (registra-se
 # um WARN; nada é descartado silenciosamente).
 # Padrão: 2. Aumente apenas em forks com um GC de chunks muito agressivo.
+# @type: integer
+# @range: [0, null]
+# @default: 2
 staleChunkRetryLimit: 2
 
 # Pre-filtro Anvil somente leitura (apenas Spigot vanilla)
@@ -47,9 +56,11 @@ staleChunkRetryLimit: 2
 # Não tem efeito no Paper nem no Folia (substituem a rota de carga de chunks
 # por APIs assíncronas nativas e nunca entram no pre-filtro).
 # A reverificação ao vivo chunk.isSafe(...) continua sendo a fonte autoritativa
-# em caso de ACCEPT; REJECT é o único atalho. Veja ADR-016 / REQ-RTP-S-005.
+# em caso de ACCEPT; REJECT é o único atalho. Veja
 # Padrão: true. Defina como false para desativar a sonda (útil em forks
 # modificados com formatos de região exóticos).
+# @type: boolean
+# @default: true
 anvilPrefilterEnabled: true
 
 # Plataformas de aterrissagem
@@ -62,6 +73,10 @@ anvilPrefilterEnabled: true
 # desativada por padrão.
 # Aumente para 0 ou mais apenas se ainda observar aterrissagens inseguras e
 # desejar a opção de fallback antiga.
+# @type: integer
+# @range: [-1, null]
+# @unit: blocks
+# @default: -1
 raioPlataforma: -1
 
 # Depth (vertical thickness) of the emergency platform.
@@ -73,15 +88,24 @@ profundidadePlataforma: 1
 
 # Altura de ar a garantir acima da plataforma.
 # Pode causar problemas de iluminação se for muito alta.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
 alturaArPlataforma: 2
 
 # Tipo de bloco padrão para a plataforma se não houver um bloco sólido.
+# @type: material
+# @source: material
+# @default: GLASS
 materialPlataforma: "GLASS"
 
 # Blocos de ar
 # Tipos de materiais considerados como espaço transitável/não bloqueante acima da aterrissagem.
 # Use tags de blocos vanilla sempre que possível para manter compatibilidade futura
 # com novas adições da Mojang.
+# @type: list<material>
+# @source: material
 blocosAr:
   # Variantes reais de ar (nenhuma tag as cobre todas de uma vez)
   - "AIR"
@@ -93,9 +117,9 @@ blocosAr:
   # Flores
   - "#minecraft:flowers"
   - "#minecraft:small_flowers"
-  # Note: #minecraft:tall_flowers is an item-only tag in vanilla; its members
-  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) are already covered by
-  # #minecraft:flowers above.
+  # Nota: #minecraft:tall_flowers e uma tag apenas de itens no vanilla; seus membros
+  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) ja estao cobertos por
+  # #minecraft:flowers acima.
   - "#minecraft:tall_flowers"
   # Plantas similares à grama e arbustos não cobertos pelas tags de flores
   - "SHORT_GRASS"
@@ -168,13 +192,15 @@ blocosAr:
 # Materiais ou estados de bloco que o plugin rejeitará como destino de aterrissagem,
 # ou qualquer bloco dentro de `safetyRadius` do alvo. Aceita predicados de estado
 # e coringas (veja a gramática no início do arquivo).
+# @type: list<material>
+# @source: material
 blocosInseguros:
   # Fluidos
   - "WATER"
   - "LAVA"
   - "BUBBLE_COLUMN"
   # Qualquer bloco waterlogged (lajes/escadas/cercas/muros/placas/correntes/...) --
-  # substitui o antigo pseudo-token 'WATERLOGGED'. Use o coringa do ADR-017.
+  # substitui o antigo pseudo-token 'WATERLOGGED'. Use o coringa do
   - "*[waterlogged=true]"
   # Fogo e perigos de calor
   - "#minecraft:fire"
@@ -212,6 +238,8 @@ blocosInseguros:
 #                  true  -> a lista `biomes` é uma lista branca (permite apenas estes biomas)
 # A lista negra padrão exclui oceanos, rios, void e outros biomas onde
 # uma aterrissagem firme e segura é improvável ou impossível.
+# @type: boolean
+# @default: false
 listaPermitidaBiomas: false
 
 # Biomes treated as whitelist or blacklist members per biomeWhitelist.
