@@ -1,5 +1,7 @@
-# --- Sprachzuordnung: config.yml ---
-language: "language"
+# --- Language Mapping: config.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# config.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 teleportDelay: "teleportVerzoegerung"
 cancelDistance: "distanzAbbruch"
 teleportCooldown: "teleportAbkuehlung"
@@ -7,4 +9,5 @@ consoleCommands: "konsolenBefehle"
 playerCommands: "spielerBefehle"
 database: "datenbank"
 network: "netzwerk"
+menu: "menu"
 version: "version"

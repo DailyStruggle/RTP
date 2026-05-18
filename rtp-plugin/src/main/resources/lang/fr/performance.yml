@@ -2,37 +2,66 @@
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/PERFORMANCE.md
 # Max search attempts before giving up
 maxAttempts: 32
+
 # Chunk radius to load during selection
 viewDistanceSelect: 0
+
 # Chunk radius to load before teleport
 viewDistanceTeleport: 0
+
 # Ticks between background cache cycles
 period: 20
+
 # Max ms per tick for sync tasks
 syncAllottedTime: 50
+
 # Max ms per tick for async tasks
 asyncAllottedTime: 50
+
 # Min TPS to continue background queueing
 minTPS: 19.0
+
 # Refill cache immediately after teleport
 postTeleportQueueing: false
+
 # Use sync chunk loading (NOT RECOMMENDED)
 syncLoading: false
+
 # Parse permissions on every event
 onEventParsing: false
+
 # Parse effect permissions on startup
 effectParsing: true
+
 # Reuse found biome locations
 biomeRecall: true
+
 # Only use biomes already in cache
 biomeRecallForced: false
+
 # Check for safe spots in all loaded chunks
 checkOnChunkLoads: false
+
 # Enable background data gathering
 visitorEnabled: true
 
+# Maintain a reserved cache of locations for join-time teleports
+# (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty
+# player slots. See ADR-023.
+# @type: boolean
+# @default: false
+loginCacheEnabled: false
+
+# Hard cap for the login cache. 0 = auto (server max-players,
+# snapshotted at startup).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+loginCacheCap: 0
+
 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
 pregeneratedPreference: 0.0
+
 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
 backlogRefillThreshold: 0.5
 

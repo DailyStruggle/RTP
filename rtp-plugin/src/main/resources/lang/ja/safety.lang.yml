@@ -1,16 +1,17 @@
-# --- 言語マッピング: safety.yml ---
-# 内部設定キー名（左側）を safety.yml で操作者に見えるキー名（右側）に対応付けます。
-# オプション名を改名・翻訳する場合は右側のみを編集してください。
-# 左側はコード定数なので変更しないでください。
-# このファイルが存在しない場合、プラグインは左右が同一の英語版を再生成します。
+# --- Language Mapping: safety.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# safety.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+invulnerabilityTime: "無敵時間"
 safetyRadius: "安全半径"
-biomeWhitelist: "バイオームホワイトリスト"
-airBlocks: "空気ブロック"
-biomes: "バイオーム"
-unsafeBlocks: "危険ブロック"
+staleChunkRetryLimit: "staleChunkRetryLimit"
+anvilPrefilterEnabled: "anvilPrefilterEnabled"
 platformRadius: "プラットフォーム半径"
+platformDepth: "プラットフォーム深さ"
 platformAirHeight: "プラットフォーム空気高さ"
 platformMaterial: "プラットフォーム素材"
-invulnerabilityTime: "無敵時間"
+airBlocks: "空気ブロック"
+unsafeBlocks: "危険ブロック"
+biomeWhitelist: "バイオームホワイトリスト"
+biomes: "バイオーム"
 version: "version"
-platformDepth: "プラットフォーム深さ"

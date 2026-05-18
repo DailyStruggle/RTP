@@ -1,12 +1,13 @@
-# --- Language Mapping: config.yml (cat dialect) ---
-# Mrrp! Left = code key (do not touch, sacred catnip).
-# Right = the meow-name shown to the human staff.
-# Purr only on the right side. ฅ^•ﻌ•^ฅ
-database: "scratching_post"
-playerCommands: "human_tricks"
-teleportCooldown: "nap_time"
-cancelDistance: "too_far_to_chase"
+# --- Language Mapping: config.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# config.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 teleportDelay: "stalk_delay"
+cancelDistance: "too_far_to_chase"
+teleportCooldown: "nap_time"
 consoleCommands: "tall_human_tricks"
-version: "meowsion"
+playerCommands: "human_tricks"
+database: "scratching_post"
 network: "yarn_ball"
+menu: "menu"
+version: "meowsion"

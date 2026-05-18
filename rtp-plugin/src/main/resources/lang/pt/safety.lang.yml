@@ -1,18 +1,17 @@
-# --- Mapeamento de Idioma: safety.yml ---
-# Mapeia as chaves internas (esquerda) para os nomes visíveis ao usuário
-# em safety.yml (direita). Edite apenas o lado direito para renomear ou
-# traduzir uma opção; o lado esquerdo é uma constante de código e não
-# deve ser alterado.
-# Se este arquivo estiver ausente, o plugin o regenera com pares
-# idênticos esquerda/direita (os valores padrão em inglês).
+# --- Language Mapping: safety.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# safety.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+invulnerabilityTime: "tempoInvulnerabilidade"
 safetyRadius: "raioSeguranca"
-biomeWhitelist: "listaPermitidaBiomas"
-airBlocks: "blocosAr"
-biomes: "biomas"
-unsafeBlocks: "blocosInseguros"
+staleChunkRetryLimit: "staleChunkRetryLimit"
+anvilPrefilterEnabled: "anvilPrefilterEnabled"
 platformRadius: "raioPlataforma"
+platformDepth: "profundidadePlataforma"
 platformAirHeight: "alturaArPlataforma"
 platformMaterial: "materialPlataforma"
-invulnerabilityTime: "tempoInvulnerabilidade"
+airBlocks: "blocosAr"
+unsafeBlocks: "blocosInseguros"
+biomeWhitelist: "listaPermitidaBiomas"
+biomes: "biomas"
 version: "version"
-platformDepth: "profundidadePlataforma"

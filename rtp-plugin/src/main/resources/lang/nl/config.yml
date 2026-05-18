@@ -1,29 +1,29 @@
-# --- Hoofdconfiguratie van RTP ---
-# Taal voor spelerberichten.
-# Standaard: "en" (Engelse basis in messages.yml).
-# Andere vertalingen staan in lang/<locale>/messages.yml en worden als laag
-# over de Engelse basis geladen. Ontbrekende sleutels vallen terug op Engels.
-# Een onbekende taal geeft een waarschuwing en valt ook terug op Engels.
-# Zie ADR-020 en REQ-RTP-F-013.
-language: "en"
 # Teletransportvertraging (seconden)
 # Tijd die de speler moet wachten voordat het teletransport plaatsvindt.
 # Geeft de server soms tijd om bestemmingschunks voor te laden.
 teletransportVertraging: 2
+
 # Annuleerdrempel (blokken)
 # Als de speler meer dan deze afstand beweegt tijdens de vertraging,
 # wordt het teletransport geannuleerd. Stel in op -1 om uit te schakelen.
 annuleerAfstand: 2
+
 # Wachttijd tussen teletransports (seconden)
 # Tijd die de speler moet wachten tussen succesvolle RTP-gebruiken.
 teletransportWachttijd: 300
+
 # Opdrachten na teletransport
 # Lijst van opdrachten die worden uitgevoerd na een succesvol teletransport.
 # De plaatshouder [player] staat voor de spelernaam.
 consoleOpdrachten:
   - "say [player] is zojuist willekeurig geteletransporteerd!"
+
+# Commands executed as the teleporting player on successful teleport.
+# Use [player] for the target player's name. Empty string entries are ignored.
+# @type: list<string>
 spelerOpdrachten:
   - ""
+
 # --- Databaseconfiguratie ---
 # Waar gecachte locaties en spelergegevens worden opgeslagen.
 database:
@@ -33,17 +33,52 @@ database:
   type: "sqlite"
   # Netwerkdatabasegegevens (genegeerd voor lokale typen)
   host: "127.0.0.1"
+  # Database port. Used by mysql/postgresql only.
+  # @type: integer
+  # @range: [1, 65535]
   port: 3306
+  # Database / schema name. Used by mysql/postgresql only.
+  # @type: string
   name: "rtp"
+  # Database username. Used by mysql/postgresql only.
+  # @type: string
   username: "root"
+  # Database password. Used by mysql/postgresql only.
+  # @type: string
   password: "password"
+
 # --- Netwerk en synchronisatie ---
 # Redis wordt gebruikt om gecachte locaties tussen meerdere servers te synchroniseren.
 netwerk:
   redis:
+    # Enable Redis-backed network state binding.
+    # @type: boolean
+    # @default: false
     enabled: false
+    # Redis host.
+    # @type: string
     host: "127.0.0.1"
+    # Redis port.
+    # @type: integer
+    # @range: [1, 65535]
     port: 6379
+    # Redis password. Empty string disables auth.
+    # @type: string
     password: ""
+
+# Generalized menu framework (ADR-035 / ADR-044).
+# `renderer` is an ordered preference list of renderer ids. On exception or
+# missing adapter the framework walks the list and falls back to the next
+# entry. If the list is exhausted the no-token open-page path falls back to
+# the configurable `menuInvalid` message. Available ids: book. (The chat
+# renderer ships in a follow-up and will be added to the default list at
+# that point.)
+menu:
+  # Ordered preference list of renderer ids.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    - "book"
+
 # WIJZIG HET VERSIENUMMER NIET
 version: 3.0

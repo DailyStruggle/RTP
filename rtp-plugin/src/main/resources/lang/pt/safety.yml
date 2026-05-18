@@ -63,6 +63,12 @@ anvilPrefilterEnabled: true
 # Aumente para 0 ou mais apenas se ainda observar aterrissagens inseguras e
 # desejar a opção de fallback antiga.
 raioPlataforma: -1
+
+# Depth (vertical thickness) of the emergency platform.
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
 profundidadePlataforma: 1
 
 # Altura de ar a garantir acima da plataforma.
@@ -87,6 +93,9 @@ blocosAr:
   # Flores
   - "#minecraft:flowers"
   - "#minecraft:small_flowers"
+  # Note: #minecraft:tall_flowers is an item-only tag in vanilla; its members
+  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) are already covered by
+  # #minecraft:flowers above.
   - "#minecraft:tall_flowers"
   # Plantas similares à grama e arbustos não cobertos pelas tags de flores
   - "SHORT_GRASS"
@@ -196,6 +205,7 @@ blocosInseguros:
   - "TALL_SEAGRASS"
   - "KELP"
   - "KELP_PLANT"
+  - "#minecraft:logs"
 
 # Filtro de biomas
 # biomeWhitelist: false -> a lista `biomes` é uma lista negra (omite estes biomas)
@@ -203,6 +213,10 @@ blocosInseguros:
 # A lista negra padrão exclui oceanos, rios, void e outros biomas onde
 # uma aterrissagem firme e segura é improvável ou impossível.
 listaPermitidaBiomas: false
+
+# Biomes treated as whitelist or blacklist members per biomeWhitelist.
+# @type: list<biome>
+# @source: biome
 biomas:
   # BIOMAS OCEANICOS
   - "OCEAN"
@@ -228,6 +242,9 @@ biomas:
   # BIOMAS DO NETHER (terreno perigoso/irregular)
   - "BASALT_DELTAS"
   # BIOMAS TECNICOS
+  - "THE_VOID"
+  - "LUSH_CAVES"
+  - "DEEP_DARK"
   - "THE_VOID"
 
 # NAO MODIFIQUE O NUMERO DE VERSAO

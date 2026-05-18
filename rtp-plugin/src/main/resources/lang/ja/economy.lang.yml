@@ -1,12 +1,11 @@
-# --- 言語マッピング: economy.yml ---
-# 内部設定キー名（左側）を economy.yml で操作者に見えるキー名（右側）に対応付けます。
-# オプション名を改名・翻訳する場合は右側のみを編集してください。
-# 左側はコード定数なので変更しないでください。
-# このファイルが存在しない場合、プラグインは左右が同一の英語版を再生成します。
-balanceFloor: "最低残高"
+# --- Language Mapping: economy.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# economy.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+refundOnCancel: "キャンセル時返金"
 price: "価格"
 priceOther: "他者への価格"
-refundOnCancel: "キャンセル時返金"
-biomePrice: "バイオーム価格"
 paramsPrice: "パラメータ価格"
+biomePrice: "バイオーム価格"
+balanceFloor: "最低残高"
 version: "version"

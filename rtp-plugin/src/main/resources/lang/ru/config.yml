@@ -1,13 +1,3 @@
-# --- Основная конфигурация RTP ---
-# Язык сообщений, видимых игроку.
-# По умолчанию: "en" (базовый английский, включённый в messages.yml).
-# Другие доступные переводы находятся в lang/<locale>/messages.yml и
-# загружаются как слой поверх базового английского. Отсутствующие в файле
-# языка ключи молча возвращаются к английскому. Неизвестный язык вызывает
-# предупреждение и тоже возвращается к английскому.
-# См. ADR-020 и REQ-RTP-F-013.
-language: "en"
-
 # Отсрочка телепорта (секунды)
 # Время, которое игрок должен ждать перед выполнением телепорта.
 # Иногда даёт серверу время предзагрузить целевые чанки.
@@ -27,6 +17,10 @@ language: "en"
 # Маркер [player] представляет имя игрока.
 командыКонсоли:
   - "say [player] только что телепортировался случайно!"
+
+# Commands executed as the teleporting player on successful teleport.
+# Use [player] for the target player's name. Empty string entries are ignored.
+# @type: list<string>
 командыИгрока:
   - ""
 
@@ -37,25 +31,41 @@ language: "en"
   # - yaml/sqlite: локальные файлы (без дополнительной настройки)
   # - mysql/postgresql: удалённая база данных (требуются учётные данные ниже)
   type: "sqlite"
-
   # Учётные данные сетевой базы данных (игнорируются для локальных типов)
   host: "127.0.0.1"
+  # Database port. Used by mysql/postgresql only.
+  # @type: integer
+  # @range: [1, 65535]
   port: 3306
+  # Database / schema name. Used by mysql/postgresql only.
+  # @type: string
   name: "rtp"
+  # Database username. Used by mysql/postgresql only.
+  # @type: string
   username: "root"
+  # Database password. Used by mysql/postgresql only.
+  # @type: string
   password: "password"
 
 # --- Сеть и синхронизация ---
 # Redis используется для синхронизации кэшированных локаций между несколькими серверами.
 сеть:
   redis:
+    # Enable Redis-backed network state binding.
+    # @type: boolean
+    # @default: false
     enabled: false
+    # Redis host.
+    # @type: string
     host: "127.0.0.1"
+    # Redis port.
+    # @type: integer
+    # @range: [1, 65535]
     port: 6379
+    # Redis password. Empty string disables auth.
+    # @type: string
     password: ""
 
-# НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ
-version: 3.0
 # --- parity-repair: identity entries appended to satisfy LocaleFullParityTest
 # --- values copied verbatim from English baseline; translate as needed.
 menu:
@@ -64,3 +74,6 @@ menu:
   # @options: ["book", "chat"]
   renderer:
     - "book"
+
+# НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ
+version: 3.0

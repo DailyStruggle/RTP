@@ -1,0 +1,39 @@
+# --- Interruttori di logging del plugin ---
+# Documentazione: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# Registra tutti i file ricaricati durante /rtp reload
+ricarica_dettagliata: false
+# Registra i dettagli di inizializzazione della regione
+init_regione_dettagliato: false
+
+# Registra i comandi RTP eseguiti dai giocatori
+comando: false
+# Registra gli eventi di teletrasporto riusciti
+teletrasporto: true
+
+# Registra RTP attivato da cambi di mondo
+evento_cambioMondo: true
+# Registra RTP attivato all'accesso
+evento_accesso: true
+# Registra RTP attivato al respawn
+evento_respawn: true
+# Registra l'elaborazione degli eventi di movimento
+evento_movimento: true
+# Registra l'elaborazione degli eventi di teletrasporto
+evento_teletrasporto: true
+
+# Registra informazioni quando la selezione della posizione fallisce
+fallimento_selezione: true
+
+# Log di debug per l'attività di memoria
+sistema_tracciamentoMemoria: false
+# Log di debug per l'attività del database
+sistema_database: false
+
+# Livello minimo di log con scope sul plugin. Il filtro effettivo è il più restrittivo
+# tra questo e quello del logger di Bukkit. Accetta: SEVERE, WARNING, INFO, CONFIG,
+# FINE, FINER, FINEST, ALL, OFF. Il valore predefinito ALL mantiene il comportamento
+# identico al logger di Bukkit.
+livello_minimo: "INFO"
+
+# NON MODIFICARE IL NUMERO DI VERSIONE
+versione: 1.0

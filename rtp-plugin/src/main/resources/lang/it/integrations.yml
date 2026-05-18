@@ -1,0 +1,13 @@
+# --- Impostazioni di integrazione di RTP ---
+# Se true, RTP rilancerà la posizione se ricade all'interno di un claim/regione del rispettivo plugin.
+rerollFactions: false
+rerollGriefDefender: false
+rerollGriefPrevention: false
+rerollHuskTowns: false
+rerollLands: false
+rerollRedProtect: false
+rerollTownyAdvanced: false
+rerollWorldGuard: false
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

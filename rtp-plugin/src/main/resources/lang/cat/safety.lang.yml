@@ -1,13 +1,17 @@
-# --- Language Mapping: safety.yml (cat dialect) ---
-# Where it is safe to land on four paws. Edit only the right side.
+# --- Language Mapping: safety.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# safety.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+invulnerabilityTime: "nine_lives_buffer"
 safetyRadius: "soft_landing_radius"
-biomeWhitelist: "friendly_smells"
-airBlocks: "empty_air_for_zoomies"
-biomes: "smells"
-unsafeBlocks: "scary_blocks"
+staleChunkRetryLimit: "staleChunkRetryLimit"
+anvilPrefilterEnabled: "anvilPrefilterEnabled"
 platformRadius: "paw_platform_radius"
+platformDepth: "paw_platform_depth"
 platformAirHeight: "paw_platform_headroom"
 platformMaterial: "paw_platform_material"
-invulnerabilityTime: "nine_lives_buffer"
+airBlocks: "empty_air_for_zoomies"
+unsafeBlocks: "scary_blocks"
+biomeWhitelist: "friendly_smells"
+biomes: "smells"
 version: "meowsion"
-platformDepth: "paw_platform_depth"

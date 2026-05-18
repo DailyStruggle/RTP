@@ -1,22 +1,24 @@
-# --- Mapeamento de Idioma: performance.yml ---
-# Mapeia as chaves internas (esquerda) para os nomes visíveis ao usuário
-# em performance.yml (direita). Edite apenas o lado direito para renomear
-# ou traduzir uma opção; o lado esquerdo é uma constante de código e não
-# deve ser alterado.
-# Se este arquivo estiver ausente, o plugin o regenera com pares
-# idênticos esquerda/direita (os valores padrão em inglês).
-period: "periodo"
-viewDistanceSelect: "distanciaVisaoSelecao"
-biomeRecall: "lembrancaBioma"
-version: "version"
+# --- Language Mapping: performance.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# performance.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 maxAttempts: "tentativasMaximas"
-biomeRecallForced: "lembrancaBiomaForcada"
-onEventParsing: "analiseAoEvento"
-checkOnChunkLoads: "verificarNoCarregamentoChunk"
-postTeleportQueueing: "enfileirarPosTeletransporte"
-syncLoading: "carregamentoSincrono"
-effectParsing: "analiseEfeitos"
+viewDistanceSelect: "distanciaVisaoSelecao"
 viewDistanceTeleport: "distanciaVisaoTeletransporte"
-minTPS: "tpsMinimo"
+period: "periodo"
 syncAllottedTime: "tempoAlocadoSincrono"
 asyncAllottedTime: "tempoAlocadoAssincrono"
+minTPS: "tpsMinimo"
+postTeleportQueueing: "enfileirarPosTeletransporte"
+syncLoading: "carregamentoSincrono"
+onEventParsing: "analiseAoEvento"
+effectParsing: "analiseEfeitos"
+biomeRecall: "lembrancaBioma"
+biomeRecallForced: "lembrancaBiomaForcada"
+checkOnChunkLoads: "verificarNoCarregamentoChunk"
+visitorEnabled: "visitorEnabled"
+loginCacheEnabled: "loginCacheEnabled"
+loginCacheCap: "loginCacheCap"
+pregeneratedPreference: "pregeneratedPreference"
+backlogRefillThreshold: "backlogRefillThreshold"
+version: "version"

@@ -1,10 +1,11 @@
-# --- Language Mapping: economy.yml (cat dialect) ---
-# Treats! Mrrow! Left side = code constant, do not chew.
-# Right side = how the kibble is counted by the human.
-balanceFloor: "empty_bowl"
+# --- Language Mapping: economy.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# economy.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+refundOnCancel: "treats_back_if_napping"
 price: "treat_cost"
 priceOther: "treat_cost_for_friend"
-refundOnCancel: "treats_back_if_napping"
-biomePrice: "territory_treat_cost"
 paramsPrice: "fancy_treat_cost"
+biomePrice: "territory_treat_cost"
+balanceFloor: "empty_bowl"
 version: "meowsion"

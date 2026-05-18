@@ -110,11 +110,12 @@ foreach ($full in $files) {
             continue
         }
 
-        # Pure comment line.
+        # Pure comment line. Preserve verbatim (including leading '#' and any
+        # internal '#' banner glyphs) so from-csv can emit it byte-identically
+        # without re-prefixing.
         if ($line -match '^\s*#') {
-            # Strip leading whitespace + leading '#' + at most one space.
-            $c = $line -replace '^\s*#', ''
-            if ($c.StartsWith(' ')) { $c = $c.Substring(1) }
+            # Strip only leading indentation; keep the '#' and the rest as-is.
+            $c = $line -replace '^\s+', ''
             $pendingComments.Add($c) | Out-Null
             continue
         }

@@ -1,14 +1,11 @@
-# --- Mapeo de Idioma: economy.yml ---
-# Asigna las claves internas (izquierda) a los nombres visibles para el
-# usuario en economy.yml (derecha). Modifica únicamente el lado derecho para
-# renombrar o traducir una opción; el lado izquierdo es una constante de
-# código y no debe cambiarse.
-# Si este archivo falta, el plugin lo regenera con pares idénticos
-# izquierda/derecha (los valores por defecto en inglés).
-balanceFloor: "saldoMinimo"
+# --- Language Mapping: economy.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# economy.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+refundOnCancel: "reembolsoAlCancelar"
 price: "precio"
 priceOther: "precioOtro"
-refundOnCancel: "reembolsoAlCancelar"
-biomePrice: "precioBioma"
 paramsPrice: "precioParametros"
+biomePrice: "precioBioma"
+balanceFloor: "saldoMinimo"
 version: "version"

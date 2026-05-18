@@ -10,6 +10,13 @@
 # ロードされるチャンク数 = ( 1 + 2 * 半径 )^2。
 # 影響: 高 — 大きすぎるとテレポート時に TPS 低下を引き起こすことがあります。
 視距離_選択: 0
+
+# Chunk radius loaded around the final location immediately before
+# teleport. 0 loads only the destination chunk.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
 視距離_テレポート: 0
 
 # 選択頻度（tick）
@@ -23,6 +30,12 @@
 # 範囲: 0 - 50。
 # 影響: 中 — 大きいほど処理は速くなりますが、tick を圧迫する可能性があります。
 割当時間_同期: 50
+
+# Maximum milliseconds per tick spent in asynchronous tasks.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
 割当時間_非同期: 50
 
 # 最低 TPS 要件
@@ -45,6 +58,10 @@
 # onEventParsing: ワイルドカード権限 *.* と互換性がありません。
 # 影響: 中 (onEvent) / 低 (effect)
 イベント時解析: false
+
+# Parse effect permission nodes at startup.
+# @type: boolean
+# @default: true
 エフェクト解析: true
 
 # バイオーム選択キャッシュ
@@ -52,6 +69,11 @@
 # biomeRecallForced: キャッシュ済みのバイオームのみを使用します。
 # 影響: 低〜中
 バイオーム記憶: true
+
+# When set, only serve biome-filtered requests from cache (never
+# generate new biome searches). Requires biomeRecall.
+# @type: boolean
+# @default: false
 バイオーム記憶_強制: false
 
 # チャンクロード時のパッシブチェック
@@ -74,7 +96,31 @@
 # 余裕があるときにのみ追加作業が行われます。
 visitorEnabled: true
 
+# Maintain a reserved cache of locations for join-time teleports
+# (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty
+# player slots. See ADR-023.
+# @type: boolean
+# @default: false
+loginCacheEnabled: false
+
+# Hard cap for the login cache. 0 = auto (server max-players,
+# snapshotted at startup).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+loginCacheCap: 0
+
 # バージョン番号は変更しないでください
 pregeneratedPreference: "0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass."
+
+# Fraction of L3 backlog capacity at which refill resumes (hysteresis).
+# 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill
+# continuously. Higher values group .mca-bin checks for better
+# CPU/memory efficiency. See ADR-028.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
 backlogRefillThreshold: "0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously."
+
+# DO NOT TOUCH VERSION NUMBER
 version: 1.0

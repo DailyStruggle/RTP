@@ -1,19 +1,18 @@
-# --- 言語マッピング: logging.yml ---
-# 内部設定キー名（左側）を logging.yml で操作者に見えるキー名（右側）に対応付けます。
-# オプション名を改名・翻訳する場合は右側のみを編集してください。
-# 左側はコード定数なので変更しないでください。
-# このファイルが存在しない場合、プラグインは左右が同一の英語版を再生成します。
-event_changeworld: "イベント_ワールド変更"
-event_respawn: "イベント_リスポーン"
+# --- Language Mapping: logging.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# logging.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 detailed_reload: "詳細_リロード"
+detailed_region_init: "詳細_リージョン初期化"
+command: "コマンド"
 teleport: "テレポート"
+event_changeworld: "イベント_ワールド変更"
 event_join: "イベント_参加"
+event_respawn: "イベント_リスポーン"
+event_move: "イベント_移動"
+event_teleport: "イベント_テレポート"
 selection_failure: "選択失敗"
 system_memory_tracker: "システム_メモリトラッカ"
 system_database: "システム_データベース"
-event_teleport: "イベント_テレポート"
-version: "version"
-detailed_region_init: "詳細_リージョン初期化"
-command: "コマンド"
-event_move: "イベント_移動"
 min_level: "最低レベル"
+version: "version"

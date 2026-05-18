@@ -2,14 +2,19 @@
 # Treats! Mrrow! How many kibbles a pounce costs.
 # Refund treats if the pounce is cancelled (tummy too rumbly)
 treats_back_if_napping: true
+
 # Base treat cost for /rtp
 treat_cost: 50.0
+
 # Treat cost when pouncing a friend kitty
 treat_cost_for_friend: 200.0
+
 # Extra fancy-treat cost for using parameters
 fancy_treat_cost: 1000000000.0
+
 # Extra territory-treat cost for picking a specific smell (biome)
 territory_treat_cost: 5000.0
+
 # Empty bowl: minimum treats to keep after paying
 empty_bowl: 0.0
 

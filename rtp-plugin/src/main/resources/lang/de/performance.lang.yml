@@ -1,21 +1,24 @@
 # --- Language Mapping: performance.yml ---
-# Maps internal config keys (left) to the user-visible key names used in
-# performance.yml (right). Edit only the right-hand side to rename or
-# translate a config option; the left-hand side is a code constant and must
-# not change. If this file is missing, the plugin regenerates it with
-# identical left/right pairs (the English defaults).
-period: "period"
-viewDistanceSelect: "viewDistanceSelect"
-biomeRecall: "biomeRecall"
-version: "version"
+# Maps internal baseline keys (left) to user-visible key names used in
+# performance.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 maxAttempts: "maxAttempts"
-biomeRecallForced: "biomeRecallForced"
-onEventParsing: "onEventParsing"
-checkOnChunkLoads: "checkOnChunkLoads"
-postTeleportQueueing: "postTeleportQueueing"
-syncLoading: "syncLoading"
-effectParsing: "effectParsing"
+viewDistanceSelect: "viewDistanceSelect"
 viewDistanceTeleport: "viewDistanceTeleport"
-minTPS: "minTPS"
+period: "period"
 syncAllottedTime: "syncAllottedTime"
 asyncAllottedTime: "asyncAllottedTime"
+minTPS: "minTPS"
+postTeleportQueueing: "postTeleportQueueing"
+syncLoading: "syncLoading"
+onEventParsing: "onEventParsing"
+effectParsing: "effectParsing"
+biomeRecall: "biomeRecall"
+biomeRecallForced: "biomeRecallForced"
+checkOnChunkLoads: "checkOnChunkLoads"
+visitorEnabled: "visitorEnabled"
+loginCacheEnabled: "loginCacheEnabled"
+loginCacheCap: "loginCacheCap"
+pregeneratedPreference: "pregeneratedPreference"
+backlogRefillThreshold: "backlogRefillThreshold"
+version: "version"

@@ -1,12 +1,3 @@
-# --- RTP Main Settings (cat dialect) ---
-# Mrrp! The language the human staff sees in their messages.
-# Default: "en" (English baseline bundled with messages.yml).
-# Other dialects live under lang/<locale>/messages.yml and are layered on top.
-# Missing keys silently fall back to English. Unknown locales hiss a warning
-# and also fall back to English.
-# See ADR-020 and REQ-RTP-F-013.
-language: "en"
-
 # Stalk delay (tail flicks)
 # How long the kitty crouches before the actual pounce.
 # Gives the server time to pre-load destination kibble.
@@ -26,6 +17,10 @@ nap_time: 300
 # Placeholder [player] is the kitty's name.
 tall_human_tricks:
   - "say [player] has just randomly pounced! Mrrow!"
+
+# Commands executed as the teleporting player on successful teleport.
+# Use [player] for the target player's name. Empty string entries are ignored.
+# @type: list<string>
 human_tricks:
   - ""
 
@@ -38,19 +33,52 @@ scratching_post:
   type: "sqlite"
   # Network post credentials (ignored for local types)
   host: "127.0.0.1"
+  # Database port. Used by mysql/postgresql only.
+  # @type: integer
+  # @range: [1, 65535]
   port: 3306
+  # Database / schema name. Used by mysql/postgresql only.
+  # @type: string
   name: "rtp"
+  # Database username. Used by mysql/postgresql only.
+  # @type: string
   username: "root"
+  # Database password. Used by mysql/postgresql only.
+  # @type: string
   password: "password"
 
 # --- Yarn ball (network sync) ---
 # Redis is used to share warm-spots between many tall-human boxes.
 yarn_ball:
   redis:
+    # Enable Redis-backed network state binding.
+    # @type: boolean
+    # @default: false
     enabled: false
+    # Redis host.
+    # @type: string
     host: "127.0.0.1"
+    # Redis port.
+    # @type: integer
+    # @range: [1, 65535]
     port: 6379
+    # Redis password. Empty string disables auth.
+    # @type: string
     password: ""
+
+# Generalized menu framework (ADR-035 / ADR-044).
+# `renderer` is an ordered preference list of renderer ids. On exception or
+# missing adapter the framework walks the list and falls back to the next
+# entry. If the list is exhausted the no-token open-page path falls back to
+# the configurable `menuInvalid` message. Available ids: book. (The chat
+# renderer ships in a follow-up and will be added to the default list at
+# that point.)
+menu:
+  # Ordered preference list of renderer ids.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    - "book"
 
 # Do not bite the version number, sacred catnip
 meowsion: 3.0

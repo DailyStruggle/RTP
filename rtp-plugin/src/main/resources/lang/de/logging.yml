@@ -2,28 +2,22 @@
 # Dokumentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
 # Protokolliert alle Dateien, die während /rtp reload neu geladen wurden
 detailliertesNeuladen: false
-
 # Details zur Regionsinitialisierung protokollieren
 detaillierteRegionsInitialisierung: false
 
 # Von Spielern ausgeführte RTP-Befehle protokollieren
 befehl: false
-
 # Erfolgreiche Teleport-Ereignisse protokollieren
 teleport: true
 
 # RTP ausgelöst durch Weltenwechsel protokollieren
 ereignisWeltwechsel: true
-
 # RTP ausgelöst beim Beitritt protokollieren
 ereignisBeitritt: true
-
 # RTP ausgelöst beim Respawn protokollieren
 ereignisRespawn: true
-
 # Verarbeitung von Bewegungsereignissen protokollieren
 ereignisBewegung: true
-
 # Verarbeitung von Teleport-Ereignissen protokollieren
 ereignisTeleport: true
 
@@ -32,7 +26,6 @@ auswahlFehlschlag: true
 
 # Debug-Protokolle für Speicheraktivität
 systemSpeicherTracker: false
-
 # Debug-Protokolle für Datenbankaktivität
 systemDatenbank: false
 

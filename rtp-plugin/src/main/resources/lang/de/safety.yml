@@ -2,21 +2,33 @@
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/SAFETY.md
 # Seconds of invulnerability after teleport
 invulnerabilityTime: 5
+
 # Block radius around landing to check for hazards
 safetyRadius: 0
+
 # Max retries for stale-chunk guard
 staleChunkRetryLimit: 2
+
 # Off-thread anvil prefilter
 anvilPrefilterEnabled: true
+
 # Radius of emergency platform (-1 to disable)
 platformRadius: -1
+
 # Depth of platform
 platformDepth: 1
+
 # Air space above platform
 platformAirHeight: 2
+
 # Material for platform
 platformMaterial: "GLASS"
 
+# Blocks treated as passable air for landing-safety checks.
+# Accepts Bukkit Material names and "#minecraft:<tag>" tag references
+# (see ADR-017).
+# @type: list<material>
+# @source: material
 airBlocks:
   - "AIR"
   - "CAVE_AIR"
@@ -26,6 +38,9 @@ airBlocks:
   - "LIGHT"
   - "#minecraft:flowers"
   - "#minecraft:small_flowers"
+  # Note: #minecraft:tall_flowers is an item-only tag in vanilla; its members
+  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) are already covered by
+  # #minecraft:flowers above.
   - "#minecraft:tall_flowers"
   - "SHORT_GRASS"
   - "TALL_GRASS"
@@ -82,8 +97,12 @@ airBlocks:
   - "MOSS_CARPET"
   - "PALE_MOSS_CARPET"
   - "LEAF_LITTER"
-  - "#minecraft:leaves"
 
+# Blocks that disqualify a landing spot (lava, hazards, etc.).
+# Accepts Bukkit Material names, "#minecraft:<tag>" tag references, and
+# state predicates such as "*[waterlogged=true]" (see ADR-017).
+# @type: list<material>
+# @source: material
 unsafeBlocks:
   - "WATER"
   - "LAVA"
@@ -116,6 +135,10 @@ unsafeBlocks:
 
 # If true, 'biomes' is a whitelist; otherwise a blacklist
 biomeWhitelist: false
+
+# Biomes treated as whitelist or blacklist members per biomeWhitelist.
+# @type: list<biome>
+# @source: biome
 biomes:
   - "OCEAN"
   - "DEEP_OCEAN"

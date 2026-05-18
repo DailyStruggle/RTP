@@ -1,0 +1,128 @@
+# --- Impostazioni di prestazione di RTP ---
+# Documentazione: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/PERFORMANCE.md
+# Numero massimo di tentativi di ricerca per invocazione di /rtp prima di rinunciare.
+# @type: integer
+# @range: [1, null]
+# @default: 32
+tentativiMassimi: 32
+
+# Raggio in chunk caricato attorno a una posizione candidata durante la selezione.
+# 0 carica solo il chunk candidato.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+distanzaVisualeSelezione: 0
+
+# Raggio in chunk caricato attorno alla posizione finale immediatamente prima
+# del teletrasporto. 0 carica solo il chunk di destinazione.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+distanzaVisualeTeletrasporto: 0
+
+# Tick tra cicli di cache in background (pre-riempimento regione, ricarica coda).
+# @type: integer
+# @range: [1, null]
+# @unit: ticks
+# @default: 20
+periodo: 20
+
+# Massimo di millisecondi per tick spesi in task sincroni.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+tempoAssegnatoSinc: 50
+
+# Massimo di millisecondi per tick spesi in task asincroni.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+tempoAssegnatoAsinc: 50
+
+# TPS minimo del server richiesto per continuare l'accodamento in background.
+# Il lavoro in background si mette in pausa quando i TPS scendono sotto questa soglia.
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+tpsMinimo: 19.0
+
+# Riempi la cache della regione immediatamente dopo un teletrasporto riuscito.
+# @type: boolean
+# @default: false
+accodamentoPostTeletrasporto: false
+
+# Usa il caricamento sincrono dei chunk. NON CONSIGLIATO. Viola lo spirito di S-005
+# su Folia e bloccherà il thread principale su Paper/Spigot.
+# @type: boolean
+# @default: false
+caricamentoSinc: false
+
+# Ri-analizza i nodi di permesso ad ogni evento invece di metterli in cache.
+# @type: boolean
+# @default: false
+parsingSuEvento: false
+
+# Analizza i nodi di permesso degli effetti all'avvio.
+# @type: boolean
+# @default: true
+parsingEffetti: true
+
+# Riutilizza dalle cache le posizioni già trovate corrispondenti al bioma.
+# @type: boolean
+# @default: true
+richiamoBioma: true
+
+# Quando impostato, serve le richieste filtrate per bioma solo dalla cache (non
+# genera mai nuove ricerche di bioma). Richiede biomeRecall.
+# @type: boolean
+# @default: false
+richiamoBiomaForzato: false
+
+# Scansiona punti di atterraggio sicuri in tutti i chunk caricati (pre-riempimento
+# opportunistico).
+# @type: boolean
+# @default: false
+controlloCaricamentoChunk: false
+
+# Attiva la raccolta dati in background per l'analisi dei visitatori.
+# @type: boolean
+# @default: false
+visitatoreAttivo: false
+
+# Mantieni una cache riservata di posizioni per teletrasporti all'accesso
+# (rtp.onevent.firstjoin / rtp.onevent.join). Dimensionata sugli slot giocatore
+# vuoti rimanenti. Vedi ADR-023.
+# @type: boolean
+# @default: false
+cacheLoginAttiva: false
+
+# Limite massimo per la cache di login. 0 = auto (max-players del server,
+# snapshot all'avvio).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+limiteCacheLogin: 0
+
+# Probabilità di rifiutare un chunk non generato per tentativo di selezione.
+# 0.0 = nessun bias (predefinito), 1.0 = evita strettamente le terre non generate.
+# I chunk generati passano sempre.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+preferenzaPregenerati: 0.0
+
+# Frazione della capacità dell'arretrato L3 alla quale riprende il riempimento (isteresi).
+# 0.5 = riempi solo dopo che L3 scende al 50% (predefinito). 1.0 = riempi
+# continuamente. Valori più alti raggruppano i controlli .mca-bin per migliore
+# efficienza CPU/memoria. Vedi ADR-028.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+sogliaRiempimentoArretrato: 0.5
+
+# NON MODIFICARE IL NUMERO DI VERSIONE
+versione: 1.0

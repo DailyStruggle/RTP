@@ -4,19 +4,25 @@
 # detailed_reload: リロードされたすべてのファイル/セクションをログ
 # detailed_region_init: 各リージョンの初期化をログ
 詳細_リロード: false
+# Log region initialization details
 詳細_リージョン初期化: false
 
 # 基本アクティビティログ
 # command: プレイヤーが実行した RTP コマンドをログ
 # teleport: 実際のテレポートイベントをログ
 コマンド: false
+# Log successful teleport events
 テレポート: true
 
 # イベント駆動の自動 RTP のログ
 イベント_ワールド変更: "true # プレイヤーがワールドを切り替えたとき"
+# Log RTP triggered on join
 イベント_参加: "true        # プレイヤーがサーバーに参加したとき"
+# Log RTP triggered on respawn
 イベント_リスポーン: "true   # プレイヤーがリスポーンしたとき"
+# Log move event processing
 イベント_移動: "true        # プレイヤーが移動したとき (移動駆動 RTP が有効な場合)"
+# Log teleport event processing
 イベント_テレポート: "true   # プレイヤーがテレポートしたとき (テレポート駆動 RTP が有効な場合)"
 
 # 選択失敗デバッグ
@@ -26,6 +32,7 @@
 # システムログ
 # バックグラウンドタスクとデータベース操作に関連します。
 システム_メモリトラッカ: false
+# Debug logs for database activity
 システム_データベース: false
 
 # プラグインレベルの最小ログレベル。実際のフィルタはこの値と Bukkit logger のうち

@@ -1,13 +1,3 @@
-# --- RTP メイン設定 ---
-# プレイヤーに表示されるメッセージの言語。
-# デフォルト: "en" (messages.yml に同梱された英語ベースライン)。
-# 他の翻訳は lang/<locale>/messages.yml にあり、英語ベースラインの上に
-# レイヤーとして読み込まれます。言語ファイルに無いキーは黙って英語に
-# フォールバックします。未知の言語コードは警告を出して同様に英語に
-# フォールバックします。
-# ADR-020 と REQ-RTP-F-013 を参照。
-language: "en"
-
 # テレポート遅延（秒）
 # 実際にテレポートが発動するまでにプレイヤーが待つ時間。
 # サーバーが目的地のチャンクを事前にロードする時間を確保できます。
@@ -27,6 +17,10 @@ language: "en"
 # プレースホルダ [player] はプレイヤー名を表します。
 コンソールコマンド:
   - "say [player] がランダムテレポートしました！"
+
+# Commands executed as the teleporting player on successful teleport.
+# Use [player] for the target player's name. Empty string entries are ignored.
+# @type: list<string>
 プレイヤーコマンド:
   - ""
 
@@ -37,22 +31,54 @@ language: "en"
   # - yaml/sqlite: ローカルファイル（追加設定不要）
   # - mysql/postgresql: リモートデータベース（下記の認証情報が必要）
   type: "sqlite"
-
   # ネットワークデータベースの認証情報（ローカルでは無視されます）
   host: "127.0.0.1"
+  # Database port. Used by mysql/postgresql only.
+  # @type: integer
+  # @range: [1, 65535]
   port: 3306
+  # Database / schema name. Used by mysql/postgresql only.
+  # @type: string
   name: "rtp"
+  # Database username. Used by mysql/postgresql only.
+  # @type: string
   username: "root"
+  # Database password. Used by mysql/postgresql only.
+  # @type: string
   password: "password"
 
 # --- ネットワーク同期 ---
 # Redis は複数サーバー間でキャッシュされた位置を同期するために使われます。
 ネットワーク:
   redis:
+    # Enable Redis-backed network state binding.
+    # @type: boolean
+    # @default: false
     enabled: false
+    # Redis host.
+    # @type: string
     host: "127.0.0.1"
+    # Redis port.
+    # @type: integer
+    # @range: [1, 65535]
     port: 6379
+    # Redis password. Empty string disables auth.
+    # @type: string
     password: ""
+
+# Generalized menu framework (ADR-035 / ADR-044).
+# `renderer` is an ordered preference list of renderer ids. On exception or
+# missing adapter the framework walks the list and falls back to the next
+# entry. If the list is exhausted the no-token open-page path falls back to
+# the configurable `menuInvalid` message. Available ids: book. (The chat
+# renderer ships in a follow-up and will be added to the default list at
+# that point.)
+menu:
+  # Ordered preference list of renderer ids.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    - "book"
 
 # バージョン番号は変更しないでください
 version: 3.0

@@ -1,13 +1,3 @@
-# --- Configuración principal de RTP ---
-# Idioma para los mensajes visibles al jugador.
-# Predeterminado: "en" (inglés base incluido en messages.yml).
-# Otras traducciones disponibles residen en lang/<locale>/messages.yml y se
-# cargan como una capa sobre el inglés base. Las claves ausentes en el archivo
-# de idioma vuelven silenciosamente al inglés. Un idioma desconocido genera
-# una advertencia y también vuelve al inglés.
-# Véase ADR-020 y REQ-RTP-F-013.
-language: "en"
-
 # Retraso del teletransporte (segundos)
 # Tiempo que el jugador debe esperar antes de que se realice el teletransporte.
 # A veces le da tiempo al servidor para precargar los chunks de destino.
@@ -27,6 +17,10 @@ enfriamientoTeletransporte: 300
 # El marcador [player] representa el nombre del jugador.
 comandosConsola:
   - "say ¡[player] acaba de teletransportarse aleatoriamente!"
+
+# Commands executed as the teleporting player on successful teleport.
+# Use [player] for the target player's name. Empty string entries are ignored.
+# @type: list<string>
 comandosJugador:
   - ""
 
@@ -37,22 +31,54 @@ baseDeDatos:
   # - yaml/sqlite: archivos locales (sin configuración adicional)
   # - mysql/postgresql: base de datos remota (requiere credenciales abajo)
   type: "sqlite"
-
   # Credenciales de base de datos en red (ignoradas para tipos locales)
   host: "127.0.0.1"
+  # Database port. Used by mysql/postgresql only.
+  # @type: integer
+  # @range: [1, 65535]
   port: 3306
+  # Database / schema name. Used by mysql/postgresql only.
+  # @type: string
   name: "rtp"
+  # Database username. Used by mysql/postgresql only.
+  # @type: string
   username: "root"
+  # Database password. Used by mysql/postgresql only.
+  # @type: string
   password: "password"
 
 # --- Red y sincronización ---
 # Redis se utiliza para sincronizar ubicaciones en caché entre varios servidores.
 red:
   redis:
+    # Enable Redis-backed network state binding.
+    # @type: boolean
+    # @default: false
     enabled: false
+    # Redis host.
+    # @type: string
     host: "127.0.0.1"
+    # Redis port.
+    # @type: integer
+    # @range: [1, 65535]
     port: 6379
+    # Redis password. Empty string disables auth.
+    # @type: string
     password: ""
+
+# Generalized menu framework (ADR-035 / ADR-044).
+# `renderer` is an ordered preference list of renderer ids. On exception or
+# missing adapter the framework walks the list and falls back to the next
+# entry. If the list is exhausted the no-token open-page path falls back to
+# the configurable `menuInvalid` message. Available ids: book. (The chat
+# renderer ships in a follow-up and will be added to the default list at
+# that point.)
+menu:
+  # Ordered preference list of renderer ids.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    - "book"
 
 # NO MODIFIQUES EL NÚMERO DE VERSIÓN
 version: 3.0

@@ -14,21 +14,40 @@
 # 섹션 1: 일반 설정
 # ###############################################################################
 자리표시자:
-  - "\"[RTP]\" #P0"
+  # P0
+  - "[RTP]"
 
 # ###############################################################################
 # 섹션 2: 텔레포트
 # ###############################################################################
 이미텔레포트중: "&e[P0] 이미 텔레포트 중입니다!"
+
+# if the plugin is currently reloading
 텔레포트거부_리로드중: "&e[P0] 플러그인 리로드 중이므로 텔레포트가 일시적으로 비활성화되었습니다. 잠시 후 다시 시도해 주세요."
 지연메시지: "&e[P0] [delay] 후에 텔레포트합니다. 움직이지 마세요."
 청크로딩중: "&e[P0] 청크를 로딩 중입니다. 잠시 기다려 주세요……"
 텔레포트메시지: "&e[P0] [attempts] 회 시도로 텔레포트했습니다 ([processingTime])"
+
+# if teleport is cancelled
 텔레포트취소: "&e[P0] 텔레포트가 취소되었습니다!"
+
+# if no safe places after reaching max attempts
+# placeholder: [attempts] - the maximum number of attempts
 위험: "&e[P0] [attempts] 회 시도해도 안전한 위치를 찾지 못했습니다"
+
+# when the player is on cooldown
+# placeholder: [remainingCooldown] - the remaining time
 쿨다운메시지: "&e[P0] 다시 텔레포트하려면 [remainingCooldown] 기다려야 합니다"
+
+# if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
 가능한위치없음: "#f5eb73[P0] 현재 사용 가능한 위치가 없습니다"
+
+# when the queue line shifts
+# placeholder: [spot] - the current position in line
 큐업데이트: "#2636ef[P0] 큐에서 당신의 순서: [spot]"
+
+# if the player doesn't have enough money to teleport in the region
+# placeholder: [money] - how much money is required for the command
 잔액부족: "&e[P0] 이 작업에는 최소 $[money] 이(가) 필요합니다."
 
 # ###############################################################################
@@ -44,17 +63,37 @@
 # 섹션 4: 시스템 / 관리
 # ###############################################################################
 구파일: "&b[P0] 오래된 [filename] 을(를) 감지했습니다. 업데이트 중"
+
+# detected a bukkit world that isn't in the config file
+# placeholder: [world] - the world detected
 신규월드: "&b[P0] 새 월드 '[world]' 을(를) 감지했습니다"
+
+# world doesn't exist in bukkit
+# placeholder: [world] - the world name
 잘못된월드: "&e[P0] 월드 '[world]' 을(를) 찾을 수 없습니다"
+
+# plugin reload/update text
+# placeholder: [filename] - name of file
 리로드중: "&b[P0] [filename] 을(를) 로딩 중……"
 리로드완료: "&b[P0] [filename] 로딩이 완료되었습니다."
 업데이트중: "&a[P0] [filename] 업데이트 중……"
 업데이트완료: "&a[P0] [filename] 업데이트가 정상적으로 완료되었습니다."
+
+# plugin doesn't have the command the user requested
+# placeholder: [arg] - the argument attempted
 잘못된인수: "&c[P0] 잘못된 명령어 인수입니다 [arg]"
+
+# when the console tries to run a command meant only for players
 콘솔불가: "&c[P0] 이 명령어는 게임 내 플레이어로 실행해야 합니다."
+
 # busy 와 invalidCommand 는 messages.lang.yml 에서 번역되지 않음 -> 영어 키 이름 (영어 기준선으로 폴백).
 busy: "&c[P0] 처리 중"
+
+# plugin doesn't have the subcommand or parameter the user requested
+# placeholder: [arg] - the argument attempted
 invalidCommand: "&c[P0] 잘못된 명령어 - [arg]"
+
+# user doesn't have permission for the command requested
 권한없음: "&e죄송합니다. 이 명령어를 실행할 권한이 없습니다. 오류라고 생각되시면 서버 관리자에게 문의하세요."
 
 # ###############################################################################
@@ -73,6 +112,7 @@ invalidCommand: "&c[P0] 잘못된 명령어 - [arg]"
 스캔재개: "#10A5F5[P0] 다음 리전의 스캔 작업을 재개했습니다: [scan_regions]"
 스캔실행중: "&c[P0] 다음 리전에서는 이미 스캔 작업이 실행 중입니다: [scan_regions]"
 스캔미실행: "&c[P0] 다음 리전에는 현재 스캔 작업이 없습니다: [scan_regions]"
+# placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 스캔상태: "&a[P0] [scan_chunks] / [scan_totalChunks] 청크 완료 (리전: [scan_regions]). [scan_cps] cps. 육지 비율: [scan_landPercentage]%. 남은 시간: [scan_eta]"
 
 # ###############################################################################
@@ -83,7 +123,37 @@ invalidCommand: "&c[P0] 잘못된 명령어 - [arg]"
 정보_텔레포트: "&7활성 텔레포트 상태 머신: &f[teleports]"
 정보_MSPT: "&7플러그인 현재 MSPT: &f[mspt]"
 정보_총로드수: "&7누적 로드된 청크 수: &f[loads]"
+infoLoadsByOrigin: "&7Loads by Origin: &f[loadsByOrigin]"
 정보_누수율: "&7현재 청크 누수율: &f[leakRate]"
+# --- Metrics SPI health block (METRICS_PLAN.md > /rtp info Surface) ---
+infoQueueDepth: "&7Players Waiting In Region Queues: &f[queueDepth]"
+infoPendingTeleports: "&7Pending Teleport Pipelines: &f[pendingTeleports]"
+infoAvgPipelineMs: "&7Avg Pipeline Latency: &f[avgPipelineMs] ms"
+infoHeap: "&7JVM Heap: &f[heapUsedMb] / [heapMaxMb] MiB"
+# Header line for the Health pipeline labelled block in /rtp info.
+infoHealthPipelineHeader: "&7--- Health: pipeline ---"
+# TPS readout for the 1m / 5m / 15m windows. Placeholders: [tps1m] [tps5m] [tps15m].
+infoTps: "&7TPS (1m/5m/15m): &f[tps1m] / [tps5m] / [tps15m]"
+# Live server MSPT and tick-budget utilisation. Placeholders: [mspt] [tickBudgetUtilisation].
+infoMSPTLive: "&7Server MSPT: &f[mspt] ms (&7tick budget: &f[tickBudgetUtilisation]&7)"
+# Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
+infoSoftCap: "&7Players: &f[playerCount] / [softCap]"
+# Most recent database round-trip latency in ms. Placeholder: [databaseLatencyMs].
+infoDatabaseLatencyMs: "&7Database Latency: &f[databaseLatencyMs] ms"
+# Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
+# to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&e/&c.
+infoThresholdTpsGreen: 19.5
+infoThresholdTpsYellow: 18.0
+infoThresholdMsptGreen: 30.0
+infoThresholdMsptYellow: 45.0
+infoThresholdCacheFillGreen: 0.5
+infoThresholdCacheFillYellow: 0.25
+infoThresholdNetworkAgeYellow: 5.0
+# Header line introducing the per-Folia-region table (Folia runtime only).
+infoFoliaRegionsHeader: "&7--- Folia regions ---"
+# Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
+# [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
+infoFoliaRegion: "  &f[regionId]&7: tps=&f[tps1m]&7 mspt=&f[mspt]&7 players=&f[playerCount]&7 queue=&f[queueDepth]&7 budget=&f[tickBudgetUtilisation]"
 정보_면책_헤더: "&7--- 진단 노트 ---"
 정보_면책: "&7진단 노트: 서버의 고립 청크 총수가 본 플러그인의 누적 로드 수 ([loads]) 를 초과하는 경우, 본 플러그인이 메모리 누수의 유일한 원인은 아닙니다."
 정보_월드헤더: "#008080월드:"
@@ -93,6 +163,8 @@ invalidCommand: "&c[P0] 잘못된 명령어 - [arg]"
 정보_콘솔_리전헤더: "&7--- 리전 ---"
 정보리전: "  #52B2BF[region]"
 
+# sub-info listings
+# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
 월드정보:
   - "#21ADA8[world]:"
   - "#99EEBB  - 리전: [region]"
@@ -127,6 +199,67 @@ rtp_설명: "무작위 위치로 텔레포트합니다"
 테스트_설명: "RTP 기능을 테스트합니다"
 
 # ###############################################################################
+# Section 8b: Generalized Menu Framework (ADR-035 / ADR-044)
+# ###############################################################################
+# Sent when a menu token is unknown, malformed, or belongs to another player.
+menuInvalid: "&c[P0] that menu link is invalid."
+# Sent when a menu token has expired or was already consumed.
+menuExpired: "&c[P0] that menu link has expired. Please reopen the menu."
+# Sent when a menu redeem cannot resolve the calling player UUID.
+menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
+# Hover-fallback template used by the menu reflector when no YAML block-comment
+# is available for a parameter. Placeholder: [type] - the declared parameter type.
+menuHoverFallbackType: "type: [type]"
+# Hover-fallback template used by the menu reflector when a parameter exposes a
+# small curated value set. Placeholder: [values] - comma-joined accepted values.
+menuHoverFallbackBounds: "accepted: [values]"
+# Label for the "go back one level" navigation row prepended to every non-root menu page.
+menuBack: "&7« back"
+# Label template for the "execute the assembled command" row prepended to every
+# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
+menuExecute: "&a▶ run [command]"
+# Header row at the top of a parameter-value picker sub-page (Stage A.2).
+# Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
+menuPickValue: "&epick a value for [param] (will run: /rtp [command] [param]:<value>)"
+# Label for the "type a custom value" fallback row on a parameter-value picker page.
+# Clicking it prefills chat with the assembled command up to '<param>:' so the player
+# can type any value, including ones not in the suggestion list.
+menuTypeValue: "&7✎ type a custom value..."
+# Non-clickable header row at the top of every non-root menu page (Stage A.4).
+# Surfaces the currently-constructed /rtp invocation including any staged
+# parameter assignments (name:value). Placeholder: [command] - assembled args.
+menuConstructed: "&7building: &f/rtp [command]"
+# Non-clickable title row prepended to the root /rtp menu page (Stage A.5).
+# Provides a welcoming header before the player descends into any subcommand.
+menuRootTitle: "&6&l⚡ RTP menu"
+# Non-clickable subtitle/hint row prepended to the root /rtp menu page below
+# menuRootTitle (Stage A.5). Short orientation text for first-time users.
+menuRootHint: "&7click an option below to begin"
+# Navigation rows appended to paginated menu pages (Stage A.6) — clicking
+# them moves to the previous/next page of the same model. Placeholder:
+# [page] - the 1-based human-readable target page number.
+menuPagePrev: "&7« previous page ([page])"
+menuPageNext: "&7next page ([page]) »"
+# Section divider on the front page above teleport rows (player view).
+menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
+# Section divider on the front page above admin rows (admin view).
+menuFrontPageSectionAdmin: "&8--- &7admin &8---"
+# Front-page rows. No placeholders.
+menuFrontPageRowTeleport: "&a▶ /rtp &7- teleport to a random location"
+menuFrontPageRowRegion: "&a▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- pick a biome"
+menuFrontPageRowHelp: "&a▶ /rtp help &7- list commands"
+menuFrontPageRowInfo: "&b▶ /rtp info &7- plugin diagnostics"
+menuFrontPageRowConfig: "&b▶ /rtp config &7- edit config files"
+menuFrontPageRowScan: "&b▶ /rtp scan &7- pre-fill region caches"
+menuFrontPageRowDiagnostics: "&c▶ /rtp test full &7- run full diagnostics"
+menuFrontPageRowReload: "&c▶ /rtp reload &7- reload config files"
+# Hover text for the diagnostics row warning about cost. No placeholders.
+menuFrontPageHoverDiagnostics: "&7runs full diagnostic suite; may be expensive"
+# Hover text for the reload row warning about side-effects. No placeholders.
+menuFrontPageHoverReload: "&7reloads all config files; in-flight teleports may be affected"
+
+# ###############################################################################
 # 섹션 9: PlaceholderAPI 지원
 # ###############################################################################
 플레이어_사용가능: "&a사용 가능"
@@ -144,6 +277,7 @@ rtp_설명: "무작위 위치로 텔레포트합니다"
 표시시간: 20
 페이드아웃: 20
 
+# actionbar setting
 액션바: ""
 
 # ###############################################################################

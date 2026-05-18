@@ -17,27 +17,54 @@
 # Duur van de onkwetsbaarheid die aan de speler wordt verleend na teletransport.
 # Voorkomt schade door vuur, verdrinking of vallen bij aankomst.
 onkwetsbaarheidstijd: 5
+
 # Veiligheidscontrolestraal (blokken)
 # Straal rondom het doelblok om te controleren op gevaarlijke omstandigheden.
 # Hogere waarden geven meer veiligheid maar maken het moeilijker een plek te vinden.
 veiligheidsStraal: 0
+
 # Maximaal aantal pogingen voor verouderde chunk (telling)
 # Begrensd pogingsbudget voor de verouderde-chunk-bewaker
 # (ADR-015 / REQ-RTP-S-005). Standaard: 2.
 staleChunkRetryLimit: 2
+
 # Anvil-alleen-lezen-voorfilter (alleen Spigot vanilla)
 # Off-thread veiligheidssonde die het opgeslagen regiobestand analyseert
 # en duidelijk onveilige kandidaten afwijst vóór het opvragen van de
 # autoritatieve live-chunk. Zie ADR-016 / REQ-RTP-S-005.
 # Standaard: true. Stel in op false om de sonde uit te schakelen.
 anvilPrefilterEnabled: true
+
 # Landingsplatforms
 # Maakt een landingsplatform op de teletransportbestemming.
 # Stel platformStraal in op -1 om platforms uit te schakelen.
 platformStraal: -1
+
+# Depth (vertical thickness) of the emergency platform.
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
 platformDiepte: 1
+
+# Air-space height cleared above the emergency platform.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
 platformLuchtHoogte: 2
+
+# Material used for the emergency landing platform.
+# @type: material
+# @source: material
+# @default: GLASS
 platformMateriaal: "GLASS"
+
+# Blocks treated as passable air for landing-safety checks.
+# Accepts Bukkit Material names and "#minecraft:<tag>" tag references
+# (see ADR-017).
+# @type: list<material>
+# @source: material
 luchtBlokken:
   - "AIR"
   - "CAVE_AIR"
@@ -47,6 +74,9 @@ luchtBlokken:
   - "LIGHT"
   - "#minecraft:flowers"
   - "#minecraft:small_flowers"
+  # Note: #minecraft:tall_flowers is an item-only tag in vanilla; its members
+  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) are already covered by
+  # #minecraft:flowers above.
   - "#minecraft:tall_flowers"
   - "SHORT_GRASS"
   - "TALL_GRASS"
@@ -103,7 +133,12 @@ luchtBlokken:
   - "MOSS_CARPET"
   - "PALE_MOSS_CARPET"
   - "LEAF_LITTER"
-  - "#minecraft:leaves"
+
+# Blocks that disqualify a landing spot (lava, hazards, etc.).
+# Accepts Bukkit Material names, "#minecraft:<tag>" tag references, and
+# state predicates such as "*[waterlogged=true]" (see ADR-017).
+# @type: list<material>
+# @source: material
 onveiligBlokken:
   - "WATER"
   - "LAVA"
@@ -133,7 +168,16 @@ onveiligBlokken:
   - "KELP"
   - "KELP_PLANT"
   - "#minecraft:logs"
+
+# If true, the biomes list is a whitelist (only these biomes are
+# allowed). If false, it is a blacklist (these biomes are excluded).
+# @type: boolean
+# @default: false
 bioomWitlijst: false
+
+# Biomes treated as whitelist or blacklist members per biomeWhitelist.
+# @type: list<biome>
+# @source: biome
 biomen:
   - "OCEAN"
   - "DEEP_OCEAN"
@@ -157,5 +201,6 @@ biomen:
   - "LUSH_CAVES"
   - "DEEP_DARK"
   - "THE_VOID"
+
 # WIJZIG HET VERSIENUMMER NIET
 version: 1.0

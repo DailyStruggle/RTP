@@ -10,6 +10,13 @@
 # Число загруженных чанков = ( 1 + 2 * радиус )^2.
 # Влияние: ВЫСОКОЕ - слишком высокое значение может вызвать падение TPS.
 дистанцияВидимостиВыбор: 0
+
+# Chunk radius loaded around the final location immediately before
+# teleport. 0 loads only the destination chunk.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
 дистанцияВидимостиТелепорт: 0
 
 # Частота выбора (тики игры)
@@ -23,6 +30,12 @@
 # Диапазон: 0 - 50.
 # Влияние: СРЕДНЕЕ - высокие значения позволяют обрабатывать быстрее, но за счёт времени тика.
 выделенноеВремяСинхр: 50
+
+# Maximum milliseconds per tick spent in asynchronous tasks.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
 выделенноеВремяАсинхр: 50
 
 # Минимальное требование TPS
@@ -45,6 +58,10 @@
 # onEventParsing: Несовместим с широкими правами вида *.*.
 # Влияние: СРЕДНЕЕ (onEvent) / НИЗКОЕ (effect)
 разборНаСобытие: false
+
+# Parse effect permission nodes at startup.
+# @type: boolean
+# @default: true
 разборЭффектов: true
 
 # Кэш выбора биомов
@@ -52,6 +69,11 @@
 # biomeRecallForced: Использовать только уже обнаруженные и закэшированные биомы.
 # Влияние: НИЗКОЕ - СРЕДНЕЕ
 запоминаниеБиома: true
+
+# When set, only serve biome-filtered requests from cache (never
+# generate new biome searches). Requires biomeRecall.
+# @type: boolean
+# @default: false
 запоминаниеБиомаПринуд: false
 
 # Пассивная проверка чанков
@@ -76,16 +98,28 @@
 # когда у кэша нет места для заполнений в режиме по умолчанию.
 visitorEnabled: true
 
-# НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ
-pregeneratedPreference: "0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass."
-backlogRefillThreshold: "0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously."
-version: 1.0
 # --- parity-repair: identity entries appended to satisfy LocaleFullParityTest
 # --- values copied verbatim from English baseline; translate as needed.
 loginCacheEnabled: false
+
 # Hard cap for the login cache. 0 = auto (server max-players,
 # snapshotted at startup).
 # @type: integer
 # @range: [0, null]
 # @default: 0
 loginCacheCap: 0
+
+# НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ
+pregeneratedPreference: "0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass."
+
+# Fraction of L3 backlog capacity at which refill resumes (hysteresis).
+# 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill
+# continuously. Higher values group .mca-bin checks for better
+# CPU/memory efficiency. See ADR-028.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+backlogRefillThreshold: "0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously."
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

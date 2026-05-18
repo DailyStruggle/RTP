@@ -1,22 +1,24 @@
-# --- Mapeo de Idioma: performance.yml ---
-# Asigna las claves internas (izquierda) a los nombres visibles para el
-# usuario en performance.yml (derecha). Modifica únicamente el lado derecho
-# para renombrar o traducir una opción; el lado izquierdo es una constante de
-# código y no debe cambiarse.
-# Si este archivo falta, el plugin lo regenera con pares idénticos
-# izquierda/derecha (los valores por defecto en inglés).
-period: "periodo"
-viewDistanceSelect: "distanciaVistaSeleccion"
-biomeRecall: "recuerdoBioma"
-version: "version"
+# --- Language Mapping: performance.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# performance.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 maxAttempts: "intentosMaximos"
-biomeRecallForced: "recuerdoBiomaForzado"
-onEventParsing: "analisisAlEvento"
-checkOnChunkLoads: "verificarEnCargaChunk"
-postTeleportQueueing: "encolarPostTeletransporte"
-syncLoading: "cargaSincrona"
-effectParsing: "analisisEfectos"
+viewDistanceSelect: "distanciaVistaSeleccion"
 viewDistanceTeleport: "distanciaVistaTeletransporte"
-minTPS: "tpsMinimo"
+period: "periodo"
 syncAllottedTime: "tiempoAsignadoSincrono"
 asyncAllottedTime: "tiempoAsignadoAsincrono"
+minTPS: "tpsMinimo"
+postTeleportQueueing: "encolarPostTeletransporte"
+syncLoading: "cargaSincrona"
+onEventParsing: "analisisAlEvento"
+effectParsing: "analisisEfectos"
+biomeRecall: "recuerdoBioma"
+biomeRecallForced: "recuerdoBiomaForzado"
+checkOnChunkLoads: "verificarEnCargaChunk"
+visitorEnabled: "visitorEnabled"
+loginCacheEnabled: "loginCacheEnabled"
+loginCacheCap: "loginCacheCap"
+pregeneratedPreference: "pregeneratedPreference"
+backlogRefillThreshold: "backlogRefillThreshold"
+version: "version"

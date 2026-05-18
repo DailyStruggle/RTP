@@ -10,6 +10,13 @@
 # 加载的区块数 = ( 1 + 2 * 半径 )^2。
 # 影响: 高 — 数值过大可能在传送时导致 TPS 下降。
 视距_选择: 0
+
+# Chunk radius loaded around the final location immediately before
+# teleport. 0 loads only the destination chunk.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
 视距_传送: 0
 
 # 选择频率（游戏刻）
@@ -23,6 +30,12 @@
 # 范围: 0 - 50。
 # 影响: 中 — 数值越大处理越快，但可能挤压 tick 时间。
 分配时间_同步: 50
+
+# Maximum milliseconds per tick spent in asynchronous tasks.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
 分配时间_异步: 50
 
 # 最低 TPS 要求
@@ -45,6 +58,10 @@
 # onEventParsing: 与通配符权限 *.* 不兼容。
 # 影响: 中 (onEvent) / 低 (effect)
 事件时解析: false
+
+# Parse effect permission nodes at startup.
+# @type: boolean
+# @default: true
 效果解析: true
 
 # 生物群系选择缓存
@@ -52,6 +69,11 @@
 # biomeRecallForced: 仅使用缓存中已发现的生物群系。
 # 影响: 低 至 中
 生物群系记忆: true
+
+# When set, only serve biome-filtered requests from cache (never
+# generate new biome searches). Requires biomeRecall.
+# @type: boolean
+# @default: false
 生物群系记忆_强制: false
 
 # 区块加载时被动检查
@@ -72,7 +94,31 @@
 # 会执行额外工作。
 visitorEnabled: true
 
+# Maintain a reserved cache of locations for join-time teleports
+# (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty
+# player slots. See ADR-023.
+# @type: boolean
+# @default: false
+loginCacheEnabled: false
+
+# Hard cap for the login cache. 0 = auto (server max-players,
+# snapshotted at startup).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+loginCacheCap: 0
+
 # 请勿修改版本号
 pregeneratedPreference: "0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass."
+
+# Fraction of L3 backlog capacity at which refill resumes (hysteresis).
+# 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill
+# continuously. Higher values group .mca-bin checks for better
+# CPU/memory efficiency. See ADR-028.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
 backlogRefillThreshold: "0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously."
+
+# DO NOT TOUCH VERSION NUMBER
 version: 1.0

@@ -146,22 +146,7 @@ rtp-fabric/**/.gradle/
 helpers/StressTestRTP/runs_analysis/input/
 helpers/StressTestRTP/runs_analysis/out/
 helpers/StressTestRTP/runs/
-effects-api/logs/2026-05-07-1.log.gz
-effects-api/logs/2026-05-07-2.log.gz
-effects-api/logs/2026-05-07-3.log.gz
-effects-api/logs/2026-05-07-4.log.gz
-effects-api/logs/2026-05-07-5.log.gz
-effects-api/logs/2026-05-07-6.log.gz
-effects-api/logs/2026-05-07-7.log.gz
-effects-api/logs/2026-05-08-1.log.gz
-effects-api/logs/2026-05-08-2.log.gz
-effects-api/logs/2026-05-08-3.log.gz
-effects-api/logs/2026-05-08-4.log.gz
-effects-api/logs/2026-05-08-5.log.gz
-effects-api/logs/2026-05-07-1.log.gz
-effects-api/logs/2026-05-07-2.log.gz
-effects-api/logs/2026-05-07-3.log.gz
-effects-api/logs/2026-05-07-4.log.gz
-effects-api/logs/2026-05-07-5.log.gz
-effects-api/logs/2026-05-07-6.log.gz
-effects-api/logs/2026-05-07-7.log.gz
+
+# Runtime log directories produced by test/dev runs (rotated .log.gz, latest.log)
+**/logs/
+*.log.gz
