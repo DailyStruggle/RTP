@@ -6,7 +6,7 @@
 # 英文文件 (lang/messages.lang.yml) 中的英文键名。
 # - 必须原样保留方括号占位符: [P0], [delay], [attempts], [world],
 # [region], [remainingCooldown], [scan_chunks] 等。
-# - 必须保留颜色代码 &a &e &c 以及十六进制颜色 (#2636ef)。
+# - 必须保留颜色代码 &a &7 &c 以及十六进制颜色 (#2636ef)。
 # ###############################################################################
 # 第 1 节: 通用配置
 # ###############################################################################
@@ -17,24 +17,24 @@
 # ###############################################################################
 # 第 2 节: 传送
 # ###############################################################################
-已在传送: "&e[P0] 你已经在传送中！"
+已在传送: "&7[P0] 你已经在传送中！"
 
 # 当插件正在重载时
-传送被拒_重载中: "&e[P0] 插件正在重载，传送暂时被禁用。请稍后再试。"
-延迟消息: "&e[P0] 将在 [delay] 后传送，请勿移动。"
-区块加载中: "&e[P0] 正在加载区块，请稍候……"
-传送消息: "&e[P0] 在 [attempts] 次尝试后已传送，用时 [processingTime]"
+传送被拒_重载中: "&7[P0] 插件正在重载，传送暂时被禁用。请稍后再试。"
+延迟消息: "&7[P0] 将在 [delay] 后传送，请勿移动。"
+区块加载中: "&7[P0] 正在加载区块，请稍候……"
+传送消息: "&7[P0] 在 [attempts] 次尝试后已传送，用时 [processingTime]"
 
 # if teleport is cancelled
-取消传送: "&e[P0] 传送已取消！"
+取消传送: "&7[P0] 传送已取消！"
 
 # 达到最大尝试次数后仍未找到安全位置时
 # 占位符: [attempts] - 最大尝试次数
-不安全: "&e[P0] 在 [attempts] 次尝试中未找到安全位置"
+不安全: "&7[P0] 在 [attempts] 次尝试中未找到安全位置"
 
 # 当玩家处于冷却中时
 # 占位符: [remainingCooldown] - 剩余时间
-冷却消息: "&e[P0] 你必须等待 [remainingCooldown] 才能再次传送"
+冷却消息: "&7[P0] 你必须等待 [remainingCooldown] 才能再次传送"
 
 # 当区域没有排队的位置且玩家没有 rtp.unqueued 权限时
 队列中无可用位置: "#f5eb73[P0] 当前没有可用的位置"
@@ -45,7 +45,7 @@
 
 # 玩家在该区域传送所需的金钱不足时
 # 占位符: [money] - 命令所需的金额
-余额不足: "&e[P0] 你至少需要 $[money] 才能执行此操作。"
+余额不足: "&7[P0] 你至少需要 $[money] 才能执行此操作。"
 
 # ###############################################################################
 # 第 3 节: 时间格式
@@ -67,7 +67,7 @@
 
 # bukkit 中不存在该世界
 # 占位符: [world] - 世界名称
-无效世界: "&e[P0] 找不到世界 '[world]'"
+无效世界: "&7[P0] 找不到世界 '[world]'"
 
 # 插件重载 / 更新提示
 # 占位符: [filename] - 文件名
@@ -91,20 +91,20 @@
 无效命令: "&c[P0] 无效命令 - [arg]"
 
 # 用户没有所请求命令的权限
-无权限: "&e抱歉，你没有权限执行此命令。如果你认为这是错误，请联系服务器管理员。"
+无权限: "&7抱歉，你没有权限执行此命令。如果你认为这是错误，请联系服务器管理员。"
 
 # ###############################################################################
 # 第 5 节: 管理日志
 # ###############################################################################
-位置已保存: "&e[P0] 已成功保存 [amount] 个 [region] 的位置"
-位置已加载: "&e[P0] 已成功加载 [amount] 个 [region] 的位置"
+位置已保存: "&7[P0] 已成功保存 [amount] 个 [region] 的位置"
+位置已加载: "&7[P0] 已成功加载 [amount] 个 [region] 的位置"
 
 # ###############################################################################
 # 第 6 节: 扫描命令
 # ###############################################################################
 开始扫描: "&a[P0] 已为以下区域启动扫描任务: [scan_regions]"
-重置扫描: "&e[P0] 已重置以下区域的扫描队列: [scan_regions]"
-取消扫描: "&e[P0] 已取消以下区域的扫描任务: [scan_regions]"
+重置扫描: "&7[P0] 已重置以下区域的扫描队列: [scan_regions]"
+取消扫描: "&7[P0] 已取消以下区域的扫描任务: [scan_regions]"
 暂停扫描: "#A020F0[P0] 已暂停以下区域的扫描任务: [scan_regions]"
 恢复扫描: "#10A5F5[P0] 已恢复以下区域的扫描任务: [scan_regions]"
 扫描进行中: "&c[P0] 以下区域已有扫描任务在进行: [scan_regions]"
@@ -116,29 +116,29 @@
 # 第 7 节: 信息命令
 # ###############################################################################
 信息标题: "&a======RTP 信息======"
-信息_票据: "&7全局活动区块票据: &f[tickets]"
-信息_传送: "&7活动传送状态机: &f[teleports]"
-信息_MSPT: "&7当前插件 MSPT: &f[mspt]"
-信息_总加载次数: "&7累计加载区块数: &f[loads]"
-信息_按来源加载: "&7Loads by Origin: &f[loadsByOrigin]"
-信息_泄漏率: "&7当前区块泄漏率: &f[leakRate]"
+信息_票据: "&7全局活动区块票据: #7E9CC8[tickets]"
+信息_传送: "&7活动传送状态机: #7E9CC8[teleports]"
+信息_MSPT: "&7当前插件 MSPT: #7E9CC8[mspt]"
+信息_总加载次数: "&7累计加载区块数: #7E9CC8[loads]"
+信息_按来源加载: "&7Loads by Origin: #7E9CC8[loadsByOrigin]"
+信息_泄漏率: "&7当前区块泄漏率: #7E9CC8[leakRate]"
 # --- Metrics SPI health block (METRICS_PLAN.md > /rtp info Surface) ---
-信息_队列深度: "&7Players Waiting In Region Queues: &f[queueDepth]"
-信息_等待传送: "&7Pending Teleport Pipelines: &f[pendingTeleports]"
-信息_平均管道毫秒: "&7Avg Pipeline Latency: &f[avgPipelineMs] ms"
-信息_堆内存: "&7JVM Heap: &f[heapUsedMb] / [heapMaxMb] MiB"
+信息_队列深度: "&7Players Waiting In Region Queues: #7E9CC8[queueDepth]"
+信息_等待传送: "&7Pending Teleport Pipelines: #7E9CC8[pendingTeleports]"
+信息_平均管道毫秒: "&7Avg Pipeline Latency: #7E9CC8[avgPipelineMs] ms"
+信息_堆内存: "&7JVM Heap: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # /rtp info 中 Health pipeline 标记块的标题行。
 信息_健康管道标题: "&7--- Health: pipeline ---"
 # 1m / 5m / 15m 窗口的 TPS 读数。占位符: [tps1m] [tps5m] [tps15m]。
-信息_TPS: "&7TPS (1m/5m/15m): &f[tps1m] / [tps5m] / [tps15m]"
+信息_TPS: "&7TPS (1m/5m/15m): #7E9CC8[tps1m] / [tps5m] / [tps15m]"
 # 实时服务器 MSPT 与 tick 预算使用率。占位符: [mspt] [tickBudgetUtilisation]。
-信息_MSPT实时: "&7Server MSPT: &f[mspt] ms (&7tick budget: &f[tickBudgetUtilisation]&7)"
+信息_MSPT实时: "&7Server MSPT: #7E9CC8[mspt] ms (&7tick budget: #7E9CC8[tickBudgetUtilisation]&7)"
 # Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
-信息_软上限: "&7Players: &f[playerCount] / [softCap]"
+信息_软上限: "&7Players: #7E9CC8[playerCount] / [softCap]"
 # 最近一次数据库往返延迟（毫秒）。占位符: [databaseLatencyMs]。
-信息_数据库延迟毫秒: "&7Database Latency: &f[databaseLatencyMs] ms"
+信息_数据库延迟毫秒: "&7Database Latency: #7E9CC8[databaseLatencyMs] ms"
 # Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
-# to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&e/&c.
+# to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&7/&c.
 信息_TPS阈值_绿: 19.5
 信息_TPS阈值_黄: 18.0
 信息_MSPT阈值_绿: 30.0
@@ -150,7 +150,7 @@
 信息_Folia区域标题: "&7--- Folia regions ---"
 # Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
-信息_Folia区域: "  &f[regionId]&7: tps=&f[tps1m]&7 mspt=&f[mspt]&7 players=&f[playerCount]&7 queue=&f[queueDepth]&7 budget=&f[tickBudgetUtilisation]"
+信息_Folia区域: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 信息_免责声明_标题: "&7--- 诊断说明 ---"
 信息_免责声明: "&7诊断说明: 如果服务器孤儿区块总数超过本插件的累计加载数 ([loads])，则本插件并非内存泄漏的唯一原因。"
 信息_世界标题: "#008080世界:"
@@ -217,7 +217,7 @@ rtp_说明: "传送到一个随机位置"
 菜单_执行: "&a▶ run [command]"
 # Header row at the top of a parameter-value picker sub-page (Stage A.2).
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
-菜单_选择值: "&epick a value for [param] (will run: /rtp [command] [param]:<value>)"
+菜单_选择值: "&7pick a value for [param] (will run: /rtp [command] [param]:<value>)"
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list.
@@ -225,10 +225,10 @@ rtp_说明: "传送到一个随机位置"
 # Non-clickable header row at the top of every non-root menu page (Stage A.4).
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
-菜单_已构建: "&7building: &f/rtp [command]"
+菜单_已构建: "&7building: #7E9CC8/rtp [command]"
 # Non-clickable title row prepended to the root /rtp menu page (Stage A.5).
 # Provides a welcoming header before the player descends into any subcommand.
-菜单_主标题: "&6&l⚡ RTP menu"
+菜单_主标题: "#5FB3B3&l⚡ RTP menu"
 # Non-clickable subtitle/hint row prepended to the root /rtp menu page below
 # menuRootTitle (Stage A.5). Short orientation text for first-time users.
 菜单_主提示: "&7click an option below to begin"
@@ -239,28 +239,154 @@ rtp_说明: "传送到一个随机位置"
 菜单_下一页: "&7next page ([page]) »"
 # Section divider on the front page above teleport rows (player view).
 菜单_首页_传送分区: "&8--- &7teleport &8---"
-# Section divider on the front page above admin rows (admin view).
-菜单_首页_管理分区: "&8--- &7admin &8---"
 # Front-page rows. No placeholders.
 菜单_首页_传送行: "&a▶ /rtp &7- teleport to a random location"
 菜单_首页_区域行: "&a▶ /rtp region:&7... &7- pick a region"
 菜单_首页_生物群系行: "&a▶ /rtp biome:&7... &7- pick a biome"
 菜单_首页_帮助行: "&a▶ /rtp help &7- list commands"
-菜单_首页_信息行: "&b▶ /rtp info &7- plugin diagnostics"
-菜单_首页_配置行: "&b▶ /rtp config &7- edit config files"
-菜单_首页_扫描行: "&b▶ /rtp scan &7- pre-fill region caches"
-菜单_首页_诊断行: "&c▶ /rtp test full &7- run full diagnostics"
-菜单_首页_重载行: "&c▶ /rtp reload &7- reload config files"
-# 诊断行的悬停文本，提示成本。无占位符。
-菜单_首页_悬停_诊断: "&7runs full diagnostic suite; may be expensive"
-# 重载行的悬停文本，提示副作用。无占位符。
-菜单_首页_悬停_重载: "&7reloads all config files; in-flight teleports may be affected"
+# Front-page admin entry row (PROPOSAL-admin-panel.md v2): the only inline
+# admin-visible row on the front page; click descends into the curated admin
+# panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
+menuFrontPageRowAdmin: "#9D7CD8▶ admin panel &7- operator tools"
+# Hover text for the admin-panel entry row. No placeholders.
+menuFrontPageHoverAdmin: "&7operator tools: config, scans, diagnostics, reload"
+# --- Admin panel book page (PROPOSAL-admin-panel.md v2) ---
+# Non-clickable title row at the top of the admin panel. No placeholders.
+menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+# Non-clickable hint row below menuAdminPanelTitle. No placeholders.
+menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
+# Section dividers on the admin panel. No placeholders.
+menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
+menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
+# Admin-panel rows + hovers. No placeholders.
+menuAdminPanelRowConfig: "&b▶ config editor"
+menuAdminPanelHoverConfig: "&7open the curated config selector"
+menuAdminPanelRowInfo: "&b▶ server info"
+menuAdminPanelHoverInfo: "&7show plugin version, region counts, and queue state"
+menuAdminPanelRowDiagnostics: "&c▶ full diagnostics"
+menuAdminPanelHoverDiagnostics: "&7runs the full diagnostic suite; may be expensive"
+menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
+menuAdminPanelHoverMemory: "&7dump active chunk-ticket and pipeline allocations"
+menuAdminPanelRowScan: "&b▶ scan control"
+menuAdminPanelHoverScan: "&7open the scan submenu (start / pause / cancel)"
+menuAdminPanelRowReload: "&c▶ reload"
+menuAdminPanelHoverReload: "&7reloads all config files; in-flight teleports may be affected"
+menuAdminPanelRowBrowse: "&b▶ browse all commands"
+menuAdminPanelHoverBrowse: "&7open the reflected /rtp command tree"
+menuAdminPanelRowBack: "&7« back"
+# Clickable row label for the Refresh affordance at the bottom of the /rtp info
+# book. Re-renders the current scope against a fresh metrics snapshot.
+# (PROPOSAL-info-as-book.md section 4.6)
+infoBookRefreshRow: "&a[Refresh]"
+# Hover text for the info-book refresh row.
+infoBookRefreshHover: "&7Re-render this page against a fresh metrics snapshot."
+# Clickable row label for the Switch-to-chat affordance at the bottom of the
+# /rtp info book. Re-runs the same scope through the legacy chat path.
+infoBookSwitchToTextRow: "&7[Switch to chat]"
+# Hover text for the info-book switch-to-chat row.
+infoBookSwitchToTextHover: "&7Re-run /rtp info in chat instead of the book."
+# Footer row rendered when the /rtp info book content exceeds the book page
+# cap. Clicking re-runs the same scope in chat mode so no data is lost.
+infoBookOverflowFooter: "&7(content truncated - click to view full output in chat)"
+# Non-clickable note row indicating that periodic auto-refresh for the info
+# book is not currently supported on this build (deferred to a later
+# milestone). Users may click the Refresh row to refresh manually.
+infoBookAutoRefreshDeferredNote: "&8(auto-refresh not yet supported; click Refresh to update)"
+# Non-clickable title row at the top of the config-file selector page (Stage C.1).
+# Shown when an admin clicks "/rtp config" from the front page.
+configSelectorTitle: "#5FB3B3&l⚙ config files"
+# Label for the "back to /rtp menu root" navigation row on the config selector page.
+configSelectorBackRow: "&7« back to menu"
+# Non-clickable title row at the top of a single config-file page (Stage C.2).
+# Placeholder: [file] - the config file name (e.g. "performance", "safety").
+configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
+# Label for the "back to config selector" navigation row on a single config-file page.
+configFileBackRow: "&7« back to config files"
+# Non-clickable hint row shown when a config file has no editable keys.
+configFileEmptyHint: "&7(no editable keys in this file)"
+# Per-key row label on a config-file page. Placeholders:
+#   [key]   - the config key name; [value] - the currently-stored value.
+configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
+# Hover text for a per-key row on a config-file page. Placeholders:
+#   [key], [value], [type] - the config key name, current value, and declared type.
+configKeyHoverFormat: "&7click to edit &7[key] &7(type: [type])"
+# Non-clickable title row at the top of a shape/vert type-picker page (Stage C.3a).
+# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
+configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+# Non-clickable title row at the top of a shape/vert sub-parameter page (Stage C.3b).
+# Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+# Hint sent when the book view falls back to the legacy raw-YAML chat dump
+# (no book renderer available on this platform).
+configViewRawHint: "&7[P0] book view unavailable; falling back to raw dump."
+# Placeholder text rendered in place of a config value that has not been set.
+configValueUnsetPlaceholder: "&8(unset)"
+
+# --- ADR-047 declarative chart composition bridge (REQ-RTP-MAP-006) ---
+# Sent to the viewer when an OPEN_MAP menu action fires but no concrete
+# MapBinding is registered (NoopMapBinding is still active, e.g. on the
+# Lite assembly or before RTPHooks wires the platform binding).
+mapBindingMissing: "&c[P0] map rendering is not available on this server."
+# Sent when MapDispatch receives a ChartSpec whose Kind has no registered
+# ChartSpecResolver (e.g. Stage 1 viewer clicks a Stage 3 sparkline before
+# the resolver lands).
+mapResolverMissing: "&c[P0] no chart resolver registered for this request."
+# Sent when a resolver runs but the underlying data source is unavailable
+# for the requested target (unknown region, no data yet, world unloaded).
+# Placeholder: [region] - the requested region name (may be empty).
+mapUnavailable: "&e[P1] chart data is not available right now."
+# Sent when the active MapBinding cannot allocate a map handle right now
+# (binding-defined back-pressure, e.g. per-viewer cap reached).
+mapBusy: "&e[P1] the map service is busy; please try again shortly."
+# Label for the clickable "/rtp info" menu row that, on click, mints a
+# ChartSpec(BAD_POINTS_HEATMAP, ...) token and asks the active MapBinding
+# to render a 128x128 heatmap of the current region's known bad-point
+# spiral indices. The row is omitted at render time when NoopMapBinding
+# is the installed binding (REQ-RTP-MAP-006 / ADR-047).
+menuInfoBadPointsLabel: "#9D7CD8&l\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\u2691 bad-points map"
+
+# --- Cross-server network mode messages (L6 / rtp-proxy-ADR-014) ---
+# Sent only when `network.enabled: true` and the player's `/rtp` is routed
+# across the cross-server wait queue (see network.yml `routing.mode`).
+# All keys are optional from the player's perspective - the L2 baseline
+# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
+# Sent when the request has been accepted into the cross-server wait queue
+# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
+# position from `pollStatus`; may be empty if the transport returns no
+# position.
+networkQueued: "&7[P0] queued for a cross-server destination (position [position])..."
+# Sent when the queue has handed the request off to the proxy router and
+# a backend selection is in progress.
+networkRouting: "&7[P0] routing to a backend..."
+# Sent when a backend has reserved a coordinate for this player and the
+# proxy is about to initiate the cross-server hop. Placeholder: [server]
+# - the destination backend's serverId.
+networkReserved: "&a[P0] coordinate reserved on [server]. Transferring..."
+# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+networkTransferring: "&a[P0] transferring to [server]..."
+# Sent when the cross-server path gave up and the request fell back to
+# the local backend. Placeholder: [reason] - one of the
+# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
+networkFallback: "&e[P0] cross-server unavailable ([reason]); falling back to local."
+# Sent when the cross-server request failed terminally (no fallback was
+# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
+networkFailed: "&c[P0] cross-server teleport failed: [reason]."
+# Sent when the player asked for a specific region (`/rtp <region>`) but
+# no backend in the network is currently serving it. Placeholder:
+# [region] - the requested region name.
+networkRegionUnavailable: "&c[P0] no backend is currently serving region '[region]'."
+# Sent when the requested region name resolves to two or more backends and
+# the operator-configured policy cannot pick one (D6 future: only fires
+# under stronger policies than L6's `warn`). Placeholder: [region].
+networkRegionAmbiguous: "&c[P0] region '[region]' is ambiguous across backends; please pin a server."
 
 # ###############################################################################
 # 第 9 节: PlaceholderAPI 支持
 # ###############################################################################
 玩家_可用: "&a可用"
-玩家_冷却中: "&e等待中"
+玩家_冷却中: "&7等待中"
 玩家_准备: "&b正在选择位置"
 玩家_加载中: "&b正在加载区块"
 玩家_传送中: "&b正在传送"

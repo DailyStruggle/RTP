@@ -189,15 +189,15 @@ public class InvalidCommandTest {
 
         TestRTPCmd rtpCmd = new TestRTPCmd();
 
-        // Simulation: rtp unknown:val
-        String[] args = new String[]{"unknown:val"};
+        // Simulation: rtp unknown=val
+        String[] args = new String[]{"unknown=val"};
 
         rtpCmd.onCommand(sender, rtpCmd, "rtp", args);
 
         io.github.dailystruggle.commandsapi.common.CommandsAPI.execute();
 
         boolean foundBadParameterFeedback = sender.sentMessages.stream()
-                .anyMatch(m -> m.contains("bad parameter") && m.contains("unknown:val"));
+                .anyMatch(m -> m.contains("bad parameter") && m.contains("unknown=val"));
 
         assertTrue(foundBadParameterFeedback, "No 'bad parameter' feedback sent for unknown delimited key. Sent: " + sender.sentMessages);
     }

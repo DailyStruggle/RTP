@@ -43,10 +43,20 @@ public final class WeightedAverageBackendSelector implements BackendSelector {
 
     @Override
     public Optional<String> choose(RtpRequest request, NetworkSnapshot snapshot) {
+        return choose(request, snapshot, Optional.empty());
+    }
+
+    @Override
+    public Optional<String> choose(RtpRequest request,
+                                   NetworkSnapshot snapshot,
+                                   Optional<String> serverIdFilter) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(snapshot, "snapshot");
+        Objects.requireNonNull(serverIdFilter, "serverIdFilter");
 
         return snapshot.all().stream()
+                .filter(b -> serverIdFilter.isEmpty()
+                        || serverIdFilter.get().equals(b.serverId()))
                 .filter(b -> qualifies(b, request, snapshot.timestampEpochMs()))
                 .min(Comparator
                         .comparingDouble((BackendHeartbeat b) -> score(b))
@@ -81,10 +91,38 @@ public final class WeightedAverageBackendSelector implements BackendSelector {
         if (!b.acceptingRequests()) {
             return false;
         }
-        if (req.regionKey().isPresent()
-                && !b.regionsAvailable().isEmpty()
-                && !b.regionsAvailable().contains(req.regionKey().get())) {
+        // L6 D4: kill switch excludes backend from candidate scoring.
+        if (b.killSwitch()) {
             return false;
+        }
+        if (req.regionKey().isPresent()) {
+            String key = req.regionKey().get();
+            // L6 D4 option (ii): prefer the typed Set<regions> when populated;
+            // fall back to the legacy regionsAvailable list for backends that
+            // have not been upgraded to publish the L6 fields yet.
+            boolean regionHosted = !b.regions().isEmpty()
+                    ? b.regions().contains(key)
+                    : (b.regionsAvailable().isEmpty()
+                            || b.regionsAvailable().contains(key));
+            if (!regionHosted) {
+                return false;
+            }
+            // L6 D4 option (ii): regionKeptCounts is scoped to
+            // networkKeptLocations. Only require a positive count when the
+            // backend has opted into publishing the map at all; otherwise the
+            // peer is pre-L6 and we let the dispatcher's queue-vs-fail logic
+            // handle "no coordinate" via the existing reservation path.
+            if (!b.regionKeptCounts().isEmpty()
+                    && b.regionKeptCounts().getOrDefault(key, 0) <= 0) {
+                return false;
+            }
+        } else {
+            // No region pinned: prefer backends with a warm kept pool. Skip
+            // the predicate for pre-L6 peers that publish keptCount == 0
+            // because they do not yet report the field (default zero).
+            if (b.keptCount() < 0) {
+                return false;
+            }
         }
         if (req.worldKey().isPresent()
                 && !b.worldsLoaded().isEmpty()

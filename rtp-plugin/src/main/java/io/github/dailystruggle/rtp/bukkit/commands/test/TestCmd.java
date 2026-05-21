@@ -162,6 +162,7 @@ public class TestCmd extends BaseRTPCmdImpl {
     addSubCommand(new FoliaOwnershipTestJob(this));
     addSubCommand(new DisconnectTestJob(this));
     addSubCommand(new SafetyVerifierTestJob(this));
+    addSubCommand(new NetworkSimulationTestJob(this));
 
     // Bukkit-bound subcommands and the `full`/`all` umbrella are registered
     // by BukkitTestCmd (see its Javadoc) so this class stays class-load-safe

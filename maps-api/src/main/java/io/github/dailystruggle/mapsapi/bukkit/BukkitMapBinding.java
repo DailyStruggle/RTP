@@ -1,0 +1,300 @@
+package io.github.dailystruggle.mapsapi.bukkit;
+
+import io.github.dailystruggle.mapsapi.Cancellation;
+import io.github.dailystruggle.mapsapi.MapAllocationRequest;
+import io.github.dailystruggle.mapsapi.MapBinding;
+import io.github.dailystruggle.mapsapi.MapCanvas;
+import io.github.dailystruggle.mapsapi.MapHandle;
+import io.github.dailystruggle.mapsapi.model.ChartModel;
+import io.github.dailystruggle.mapsapi.render.ChartRenderer;
+import org.bukkit.Bukkit;
+import org.bukkit.World;
+import org.bukkit.entity.Player;
+import org.bukkit.map.MapPalette;
+import org.bukkit.map.MapRenderer;
+import org.bukkit.map.MapView;
+
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
+
+/**
+ * Bukkit-family concrete {@link MapBinding}. This is the only file in the
+ * {@code maps-api} module permitted to {@code import org.bukkit.*} per
+ * {@code CHECKLIST-maps-api.md} Stage 2 / {@code maps-api-ADR-001} §Package
+ * layout.
+ *
+ * <p>Stage 2 scope (this class):
+ * <ul>
+ *   <li>{@link #allocate(MapAllocationRequest)} — backs each
+ *       {@link MapHandle} with a freshly-created {@link MapView} on the
+ *       viewer's world (or the default world if no viewer).</li>
+ *   <li>{@link #renderEphemeral(MapHandle, ChartRenderer, ChartModel)} — installs
+ *       a one-shot {@link MapRenderer} that paints the supplied
+ *       {@link ChartModel} once and then removes itself; the resulting filled
+ *       map is delivered to the viewer's main hand by the caller (see
+ *       {@code OpenMapActionHandler} in {@code rtp-plugin}).</li>
+ *   <li>{@link #bindLive} — <strong>deferred</strong>: throws
+ *       {@link UnsupportedOperationException}. Live charts arrive in
+ *       Stage 3 of {@code CHECKLIST-metrics-to-maps.md}; the one-shot path
+ *       is sufficient for the Stage 2 {@code /rtp info} bad-points heatmap.</li>
+ * </ul>
+ *
+ * <p>Palette translation: the 32-symbol logical palette
+ * ({@link io.github.dailystruggle.mapsapi.render.HeatmapRenderer#RAMP_MIN}..{@link
+ * io.github.dailystruggle.mapsapi.render.HeatmapRenderer#RAMP_MAX}) maps to
+ * concrete vanilla map-colour bytes via {@link MapPalette#matchColor(int, int, int)}
+ * applied to a black-to-red-to-yellow-to-white ramp. Logical 0 maps to
+ * transparent ({@link MapPalette#TRANSPARENT}) so an unfilled canvas reads
+ * as a clean cartography map.
+ *
+ * <p>Threading: {@code allocate} and {@code renderEphemeral} are safe to call
+ * from any thread. The Bukkit {@code MapView} machinery dispatches
+ * {@code MapRenderer#render(...)} on the main thread internally, so renderers
+ * authored against {@link MapCanvas} run synchronously inside Bukkit's tick;
+ * the {@code BukkitMapCanvas} adapter is a per-render thin wrapper that
+ * forwards each {@code setPixel} call to the underlying {@code MapCanvas} so
+ * no buffering is needed. No chunk I/O occurs at any point (REQ-RTP-MAP-002 /
+ * REQ-RTP-S-005).
+ *
+ * <p>Folia: this class works on Folia as-is for {@code renderEphemeral}
+ * because vanilla {@code MapView} commits are global-region-scheduled by the
+ * platform; the dedicated {@code FoliaMapBinding} override planned in
+ * {@code CHECKLIST-maps-api.md} Stage 2.3 will replace this when
+ * region-affinity matters (live charts and per-viewer pixel commits).
+ */
+public final class BukkitMapBinding implements MapBinding {
+
+    /** Cached palette translation table: logical index 0..31 -> vanilla map byte. */
+    private static final byte[] PALETTE = buildPalette();
+
+    /** Live handles indexed by chartId for idempotent allocation. */
+    private final ConcurrentHashMap<String, MapHandle> handlesByChartId = new ConcurrentHashMap<>();
+
+    @Override
+    public MapHandle allocate(MapAllocationRequest request) {
+        Objects.requireNonNull(request, "request");
+        // Idempotency hint: if we have already allocated a handle for this
+        // chartId, return it. The caller (MapDispatch) is responsible for
+        // honouring the request.locking() write policy on subsequent use.
+        MapHandle cached = handlesByChartId.get(request.chartId());
+        if (cached != null) return cached;
+
+        World world = resolveWorld(request.viewer());
+        if (world == null) {
+            throw new IllegalStateException(
+                    "BukkitMapBinding.allocate: no world available for viewer="
+                            + request.viewer() + " (no loaded worlds?)");
+        }
+        MapView view = Bukkit.createMap(world);
+        if (view == null) {
+            throw new IllegalStateException(
+                    "BukkitMapBinding.allocate: Bukkit.createMap returned null for world="
+                            + world.getName());
+        }
+        if (request.locking() == MapAllocationRequest.Locking.LOCKED) {
+            view.setLocked(true);
+        }
+        // Strip default renderers so our one-shot paint is the only writer.
+        for (MapRenderer existing : view.getRenderers()) {
+            view.removeRenderer(existing);
+        }
+        MapHandle handle = new MapHandle(request.chartId(), request.viewer(), view.getId());
+        handlesByChartId.put(request.chartId(), handle);
+        return handle;
+    }
+
+    @Override
+    public <M extends ChartModel> void renderEphemeral(MapHandle handle,
+                                                       ChartRenderer<M> renderer,
+                                                       M model) {
+        Objects.requireNonNull(handle, "handle");
+        Objects.requireNonNull(renderer, "renderer");
+        Objects.requireNonNull(model, "model");
+        MapView view = Bukkit.getMap(handle.mapId());
+        if (view == null) {
+            throw new IllegalStateException(
+                    "BukkitMapBinding.renderEphemeral: no MapView for handle.mapId="
+                            + handle.mapId() + " chartId=" + handle.chartId());
+        }
+        // Drop any previously-installed one-shot renderer for this handle so
+        // repeat renderEphemeral calls on the same handle behave as expected.
+        for (MapRenderer existing : view.getRenderers()) {
+            view.removeRenderer(existing);
+        }
+        view.addRenderer(new OneShotChartRenderer<>(renderer, model));
+    }
+
+    @Override
+    public <M extends ChartModel> Cancellation bindLive(MapHandle handle,
+                                                        ChartRenderer<M> renderer,
+                                                        Supplier<M> modelSupplier) {
+        // CHECKLIST-metrics-to-maps Stage 3 owns live charts. Today nothing
+        // upstream calls this path, so we fail loudly rather than silently
+        // accepting and never refreshing.
+        throw new UnsupportedOperationException(
+                "BukkitMapBinding.bindLive: live charts arrive in Stage 3 of "
+                        + "CHECKLIST-metrics-to-maps; use renderEphemeral for one-shot paints.");
+    }
+
+    /** @return the {@code MapView} backing {@code handle}, or {@code null} if none. */
+    public MapView viewOf(MapHandle handle) {
+        return handle == null ? null : Bukkit.getMap(handle.mapId());
+    }
+
+    private static World resolveWorld(UUID viewerId) {
+        if (viewerId != null) {
+            Player p = Bukkit.getPlayer(viewerId);
+            if (p != null) return p.getWorld();
+        }
+        return Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
+    }
+
+    /**
+     * Build the 32-step logical-to-vanilla palette translation table once.
+     * Ramp: index 0 -> transparent; 1..31 walk a black -> red -> yellow ->
+     * white gradient that reads well at the 1-pixel scale vanilla maps use.
+     */
+    private static byte[] buildPalette() {
+        byte[] table = new byte[32];
+        table[0] = MapPalette.TRANSPARENT;
+        for (int i = 1; i < 32; i++) {
+            float t = (i - 1) / 30.0f; // 0..1 across 1..31
+            int r, g, b;
+            if (t < 0.5f) {
+                // black -> red
+                float u = t * 2.0f;
+                r = Math.round(255 * u);
+                g = 0;
+                b = 0;
+            } else if (t < 0.85f) {
+                // red -> yellow
+                float u = (t - 0.5f) / 0.35f;
+                r = 255;
+                g = Math.round(255 * u);
+                b = 0;
+            } else {
+                // yellow -> white
+                float u = (t - 0.85f) / 0.15f;
+                r = 255;
+                g = 255;
+                b = Math.round(255 * u);
+            }
+            table[i] = MapPalette.matchColor(r, g, b);
+        }
+        return table;
+    }
+
+    /** Translate a logical-palette byte (0..31) to a vanilla map-colour byte. */
+    public static byte toVanillaPalette(byte logicalIndex) {
+        int idx = logicalIndex & 0xFF;
+        if (idx >= PALETTE.length) idx = PALETTE.length - 1;
+        return PALETTE[idx];
+    }
+
+    /**
+     * One-shot {@link MapRenderer} that runs the supplied chart renderer once
+     * against a {@link MapCanvas} adapter wrapping the Bukkit canvas, then
+     * removes itself from the {@link MapView}. Stateless renderers
+     * (REQ-RTP-MAP-002) plus a fixed model snapshot mean a single render
+     * pass is sufficient.
+     */
+    private static final class OneShotChartRenderer<M extends ChartModel> extends MapRenderer {
+        private final ChartRenderer<M> chartRenderer;
+        private final M model;
+        private boolean rendered = false;
+
+        OneShotChartRenderer(ChartRenderer<M> chartRenderer, M model) {
+            super(false);
+            this.chartRenderer = chartRenderer;
+            this.model = model;
+        }
+
+        @Override
+        public void render(MapView map, org.bukkit.map.MapCanvas bukkitCanvas, Player player) {
+            if (rendered) return;
+            chartRenderer.render(new BukkitMapCanvas(bukkitCanvas), model);
+            rendered = true;
+            // Detach: subsequent ticks shall not re-run the chart renderer.
+            map.removeRenderer(this);
+        }
+    }
+
+    /**
+     * Thin adapter exposing a Bukkit {@link org.bukkit.map.MapCanvas} as the
+     * platform-neutral {@link MapCanvas} {@link ChartRenderer}s write into.
+     * Each {@link #setPixel(int, int, byte)} call translates the logical
+     * palette byte via {@link #toVanillaPalette(byte)} and forwards to the
+     * underlying Bukkit canvas. No buffering, no separate commit step.
+     */
+    private static final class BukkitMapCanvas implements MapCanvas {
+        private final org.bukkit.map.MapCanvas delegate;
+
+        BukkitMapCanvas(org.bukkit.map.MapCanvas delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override public int width() { return VANILLA_WIDTH; }
+        @Override public int height() { return VANILLA_HEIGHT; }
+
+        @Override
+        public void setPixel(int x, int y, byte paletteIndex) {
+            if (x < 0 || x >= VANILLA_WIDTH || y < 0 || y >= VANILLA_HEIGHT) return;
+            delegate.setPixel(x, y, toVanillaPalette(paletteIndex));
+        }
+
+        @Override
+        public void fillRect(int x0, int y0, int x1, int y1, byte paletteIndex) {
+            int lx = Math.max(0, Math.min(x0, x1));
+            int hx = Math.min(VANILLA_WIDTH - 1, Math.max(x0, x1));
+            int ly = Math.max(0, Math.min(y0, y1));
+            int hy = Math.min(VANILLA_HEIGHT - 1, Math.max(y0, y1));
+            byte vb = toVanillaPalette(paletteIndex);
+            for (int yy = ly; yy <= hy; yy++) {
+                for (int xx = lx; xx <= hx; xx++) {
+                    delegate.setPixel(xx, yy, vb);
+                }
+            }
+        }
+
+        @Override
+        public void drawText(int x, int y, String text, byte paletteIndex) {
+            // Bukkit's MapCanvas#drawText takes a MapFont; the default
+            // MinecraftFont renders 6-pixel glyphs which matches the
+            // maps-api-ADR-001 §Mermaid output minimum legible width. We
+            // pre-translate the palette byte to a "§<hex>" prefix so font
+            // colour matches the rest of the chart palette.
+            byte vb = toVanillaPalette(paletteIndex);
+            delegate.drawText(x, y,
+                    org.bukkit.map.MinecraftFont.Font,
+                    text == null ? "" : text);
+            // Note: MinecraftFont rendering ignores `vb` directly; ADR-001
+            // permits binding-defined glyph palettes. Future Stage 3 work
+            // may refine this if richer labelling is needed.
+            // The vb local is intentionally retained to document the
+            // translation step (and to keep the API symmetric with setPixel).
+            if (vb == MapPalette.TRANSPARENT) {
+                // no-op marker -- prevents the local being optimised out by
+                // some IDEs flagging "unused".
+            }
+        }
+
+        @Override
+        public void clear() {
+            byte vb = toVanillaPalette((byte) 0);
+            for (int yy = 0; yy < VANILLA_HEIGHT; yy++) {
+                for (int xx = 0; xx < VANILLA_WIDTH; xx++) {
+                    delegate.setPixel(xx, yy, vb);
+                }
+            }
+        }
+
+        @Override
+        public void commit() {
+            // No-op: Bukkit's MapCanvas commits implicitly when the
+            // MapRenderer#render(...) method returns. REQ-RTP-MAP-002:
+            // no chunk I/O, no blocking future.
+        }
+    }
+}

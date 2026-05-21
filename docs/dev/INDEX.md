@@ -26,6 +26,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | A decision (why something is the way it is) | [`../adr/README.md`](../adr/README.md) |
 | Fabric status / blockers | [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) |
 | Multi-server / proxy (Velocity, BungeeCord) plan | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) (D-005 gated; admin stub: [`../admin/proxies/INDEX.md`](../admin/proxies/INDEX.md)) |
+| Why network mode (multi-server, multi-proxy) is in scope | [`../adr/ADR-036-network-mode-multi-server-multi-proxy.md`](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (umbrella; subproject refinements under [`../../rtp-proxy/docs/adr/`](../../rtp-proxy/docs/adr/)) |
 | Runtime metrics SPI (TPS / MSPT / heap / pipeline samples) | [`METRICS_PLAN.md`](METRICS_PLAN.md) |
 | Why Fabric is in scope (and Forge / NeoForge are not) | [`../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md`](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (renumbered from ADR-022) |
 | Why legacy MC / Java are out of scope | [`../adr/ADR-021-legacy-mc-and-java-support-scope.md`](../adr/ADR-021-legacy-mc-and-java-support-scope.md) |

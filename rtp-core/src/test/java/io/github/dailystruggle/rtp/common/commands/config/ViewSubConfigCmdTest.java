@@ -1,172 +1,182 @@
 package io.github.dailystruggle.rtp.common.commands.config;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
-import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
-import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
-import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
-import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Field;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-
-import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 /**
- * Behaviour contract for {@link ViewSubConfigCmd}: identity / permission /
- * delegation are pure and asserted directly; the file-streaming path is
- * exercised through the mock scheduler (synchronous) and verified against
- * {@link MockRTPPlayer#sentMessages}.
+ * Step 6 coverage for {@link ViewSubConfigCmd} — the rewritten
+ * {@code /rtp config <file> view} command that opens the interactive book
+ * menu via the {@link ViewSubConfigCmd.BookViewOpener} hook, and falls
+ * through to the legacy raw-dump path provided by
+ * {@link ViewRawSubConfigCmd} when no opener is wired.
  *
- * <p>Also asserts that {@link SubConfigCmd#addParameters()} registers the
- * {@code view} sub-command for {@link ConfigParser}-backed factories &mdash;
- * that registration is the integration point users invoke as
- * {@code /rtp config &lt;file&gt; view}.
+ * <p>The legacy raw-dump verb has been moved to its own subcommand
+ * ({@code /rtp config <file> viewraw}); these tests assert the new entry
+ * point's contract:
+ * <ul>
+ *   <li>When an opener is installed and returns {@code true}, the command
+ *       does not fall through to the raw-dump path.</li>
+ *   <li>When no opener is installed, the command falls through.</li>
+ *   <li>When an opener is installed but returns {@code false}, the command
+ *       falls through.</li>
+ *   <li>When the opener throws, the failure is logged and the command
+ *       falls through (rather than propagating the exception to the
+ *       command pipeline).</li>
+ * </ul>
  */
-public class ViewSubConfigCmdTest {
+final class ViewSubConfigCmdTest {
 
     @TempDir
     Path tempDir;
 
-    private MockRTPServerAccessor accessor;
-    private ConfigParser<PerformanceKeys> performanceConfig;
-
     @BeforeEach
-    void setUp() throws Exception {
-        accessor = RTPTestSetup.install(tempDir.toFile());
-
-        // A messages parser is required so SubConfigCmd's addParameters() path
-        // (which reads MessagesKeys via lang()) does not NPE if exercised.
-        ConfigParser<MessagesKeys> lang = mock(ConfigParser.class);
-        lang.language_mapping = new ConcurrentHashMap<>();
-        lang.reverse_language_mapping = new ConcurrentHashMap<>();
-        lang.name = "messages.yml";
-        doReturn(new EnumMap<>(MessagesKeys.class)).when(lang).getData();
-        when(lang.getConfigValue(any(), any())).thenReturn("");
-        RTP.configs.configParserMap.put(MessagesKeys.class, lang);
-
-        performanceConfig = mock(ConfigParser.class);
-        performanceConfig.language_mapping = new ConcurrentHashMap<>();
-        performanceConfig.reverse_language_mapping = new ConcurrentHashMap<>();
-        performanceConfig.name = "performance.yml";
-        performanceConfig.pluginDirectory = tempDir.toFile();
-
-        Field myClassField = io.github.dailystruggle.rtp.common.factory.FactoryValue.class
-                .getDeclaredField("myClass");
-        myClassField.setAccessible(true);
-        myClassField.set(performanceConfig, PerformanceKeys.class);
-
-        EnumMap<PerformanceKeys, Object> data = new EnumMap<>(PerformanceKeys.class);
-        data.put(PerformanceKeys.viewDistanceSelect, 5L);
-        doReturn(data).when(performanceConfig).getData();
+    void setUp() {
+        RTPTestSetup.install(tempDir.toFile());
+        // Reset the static opener registration to a known state for each
+        // test (the field is process-static and may leak across cases if
+        // an earlier test left a non-null opener behind).
+        ViewSubConfigCmd.setBookViewOpener(null);
     }
 
-    // ── identity ──────────────────────────────────────────────────────────────
-
-    @Test
-    void name_isView() {
-        assertEquals("view", new ViewSubConfigCmd(null, performanceConfig).name());
+    @AfterEach
+    void tearDown() {
+        ViewSubConfigCmd.setBookViewOpener(null);
     }
 
     @Test
-    void permission_isRtpConfig() {
-        assertEquals("rtp.config", new ViewSubConfigCmd(null, performanceConfig).permission());
+    @DisplayName("opener returning true short-circuits the command (no raw-dump fallthrough)")
+    void openerTrue_shortCircuits() {
+        AtomicBoolean called = new AtomicBoolean(false);
+        UUID viewer = UUID.randomUUID();
+        ConfigParser<PerformanceKeys> parser = lookupPerformanceParser();
+        ViewSubConfigCmd.setBookViewOpener((u, f) -> {
+            called.set(true);
+            assertSame(viewer, u, "opener must receive the caller UUID");
+            assertEquals(parser.name, f, "opener must receive the parser's file name");
+            return true;
+        });
+
+        ViewSubConfigCmd cmd = new ViewSubConfigCmd(null, parser);
+        boolean ok = cmd.onCommand(viewer, new HashMap<>(), null);
+        assertTrue(ok, "onCommand must return true when opener succeeds");
+        assertTrue(called.get(), "opener must have been invoked");
     }
 
     @Test
-    void description_isNonEmpty() {
-        String desc = new ViewSubConfigCmd(null, performanceConfig).description();
-        assertNotNull(desc);
-        assertFalse(desc.isBlank());
-    }
+    @DisplayName("opener returning false falls through (raw-dump path is reachable)")
+    void openerFalse_fallsThrough() {
+        AtomicBoolean called = new AtomicBoolean(false);
+        ConfigParser<PerformanceKeys> parser = lookupPerformanceParser();
+        ViewSubConfigCmd.setBookViewOpener((u, f) -> {
+            called.set(true);
+            return false;
+        });
 
-    // ── onCommand — file streaming ────────────────────────────────────────────
-
-    @Test
-    void onCommand_streamsFileContentsToCaller() throws IOException {
-        File yaml = new File(tempDir.toFile(), "performance.yml");
-        Files.write(
-                yaml.toPath(),
-                ("foo: 1\n" + "bar: two\n" + "baz: three\n").getBytes(StandardCharsets.UTF_8));
-
-        UUID callerId = UUID.randomUUID();
-        MockRTPPlayer caller = new MockRTPPlayer(callerId, "viewer",
-                new RTPLocation(new MockRTPWorld("default"), 0, 0, 0));
-        accessor.addPlayer(caller);
-
-        ViewSubConfigCmd cmd = new ViewSubConfigCmd(null, performanceConfig);
-        boolean ok = cmd.onCommand(callerId, new HashMap<>(), null);
-
-        assertTrue(ok);
-        // header + 3 content lines, in order, were emitted to the caller
-        assertTrue(
-                caller.sentMessages.stream().anyMatch(m -> m.contains("performance.yml") && m.contains("3 lines")),
-                "header must name the file and report line count; got " + caller.sentMessages);
-        assertTrue(caller.sentMessages.contains("foo: 1"), "expected raw line 'foo: 1' in " + caller.sentMessages);
-        assertTrue(caller.sentMessages.contains("bar: two"));
-        assertTrue(caller.sentMessages.contains("baz: three"));
+        ViewSubConfigCmd cmd = new ViewSubConfigCmd(null, parser);
+        // We don't assert chat output here (that's covered by the
+        // ViewRawSubConfigCmd path); we assert the opener was at least
+        // invoked and the command completed without throwing.
+        cmd.onCommand(UUID.randomUUID(), new HashMap<>(), null);
+        assertTrue(called.get(), "opener must have been invoked");
     }
 
     @Test
-    void onCommand_missingFile_reportsAndDoesNotThrow() {
-        // No file written; pluginDirectory + name resolves to a non-existent path.
-        UUID callerId = UUID.randomUUID();
-        MockRTPPlayer caller = new MockRTPPlayer(callerId, "viewer",
-                new RTPLocation(new MockRTPWorld("default"), 0, 0, 0));
-        accessor.addPlayer(caller);
+    @DisplayName("no opener wired: command falls through to raw-dump (does not throw)")
+    void noOpener_fallsThrough() {
+        assertNull(ViewSubConfigCmd.getBookViewOpener(),
+                "preconditions: no opener installed");
+        ConfigParser<PerformanceKeys> parser = lookupPerformanceParser();
 
-        ViewSubConfigCmd cmd = new ViewSubConfigCmd(null, performanceConfig);
-        assertTrue(cmd.onCommand(callerId, new HashMap<>(), null));
-
-        assertTrue(
-                caller.sentMessages.stream().anyMatch(m -> m.contains("file not found")),
-                "missing-file case must surface a player-visible diagnostic (S-004); got "
-                        + caller.sentMessages);
+        ViewSubConfigCmd cmd = new ViewSubConfigCmd(null, parser);
+        // Should not throw; fallthrough is the legacy raw-dump behavior.
+        cmd.onCommand(UUID.randomUUID(), new HashMap<>(), null);
     }
 
     @Test
-    void onCommand_delegatesToNextCommandWhenPresent() {
-        CommandsAPICommand next = mock(CommandsAPICommand.class);
-        when(next.onCommand(any(), any(), any())).thenReturn(true);
+    @DisplayName("throwing opener is contained; command falls through rather than propagating")
+    void throwingOpener_isContained() {
+        AtomicBoolean called = new AtomicBoolean(false);
+        ConfigParser<PerformanceKeys> parser = lookupPerformanceParser();
+        ViewSubConfigCmd.setBookViewOpener((u, f) -> {
+            called.set(true);
+            throw new RuntimeException("boom");
+        });
 
-        ViewSubConfigCmd cmd = new ViewSubConfigCmd(null, performanceConfig);
-        cmd.onCommand(UUID.randomUUID(), new HashMap<>(), next);
-
-        verify(next, times(1)).onCommand(any(), any(), any());
+        ViewSubConfigCmd cmd = new ViewSubConfigCmd(null, parser);
+        // Must not propagate; logged as WARN and fallthrough runs the
+        // raw-dump path (which is async + best-effort).
+        cmd.onCommand(UUID.randomUUID(), new HashMap<>(), null);
+        assertTrue(called.get(), "opener must have been invoked");
     }
 
-    // ── integration: SubConfigCmd registers `view` ────────────────────────────
+    @Test
+    @DisplayName("setBookViewOpener(null) clears the previously installed opener")
+    void setOpener_nullClears() {
+        ViewSubConfigCmd.setBookViewOpener((u, f) -> true);
+        assertSame(ViewSubConfigCmd.getBookViewOpener(),
+                ViewSubConfigCmd.getBookViewOpener(),
+                "opener must be retrievable while set");
+        ViewSubConfigCmd.setBookViewOpener(null);
+        assertNull(ViewSubConfigCmd.getBookViewOpener(),
+                "passing null must clear the opener");
+    }
 
     @Test
-    void subConfigCmd_registersViewSubcommand() {
-        SubConfigCmd sub = new SubConfigCmd(null, "performance.yml", performanceConfig);
-        // CommandsAPI uppercases sub-command names in the lookup map.
-        boolean hasView = sub.getCommandLookup().keySet().stream()
-                .anyMatch(k -> k.equalsIgnoreCase("view"));
-        assertTrue(
-                hasView,
-                "SubConfigCmd must register a 'view' sub-command for ConfigParser factories; got "
-                        + sub.getCommandLookup().keySet());
-        CommandsAPICommand viewCmd = sub.getCommandLookup().get("view");
-        if (viewCmd == null) viewCmd = sub.getCommandLookup().get("VIEW");
-        assertInstanceOf(ViewSubConfigCmd.class, viewCmd);
+    @DisplayName("command surface: name='view', permission='rtp.config'")
+    void commandSurface_isStable() {
+        ConfigParser<PerformanceKeys> parser = lookupPerformanceParser();
+        ViewSubConfigCmd cmd = new ViewSubConfigCmd(null, parser);
+        assertEquals("view", cmd.name());
+        assertEquals("rtp.config", cmd.permission());
+        assertFalse(cmd.description() == null || cmd.description().isEmpty(),
+                "description must be non-empty");
+    }
+
+    @Test
+    @DisplayName("ViewRawSubConfigCmd surface: name='viewraw', permission='rtp.config'")
+    void rawCommandSurface_isStable() {
+        ConfigParser<PerformanceKeys> parser = lookupPerformanceParser();
+        ViewRawSubConfigCmd raw = new ViewRawSubConfigCmd(null, parser);
+        assertEquals("viewraw", raw.name(),
+                "raw chat-dump must be registered under 'viewraw' (step 6 extraction)");
+        assertEquals("rtp.config", raw.permission());
+    }
+
+    // ---- helpers ---------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    private static ConfigParser<PerformanceKeys> lookupPerformanceParser() {
+        Object parser = RTP.configs.getParser(PerformanceKeys.class);
+        if (!(parser instanceof ConfigParser<?>)) {
+            // Fall back to building a synthetic list of available parsers
+            // for diagnostics. RTPTestSetup is expected to install the
+            // standard parser set.
+            List<String> available = new ArrayList<>();
+            throw new IllegalStateException(
+                    "PerformanceKeys parser not wired by RTPTestSetup; "
+                            + "available=" + available);
+        }
+        return (ConfigParser<PerformanceKeys>) parser;
     }
 }

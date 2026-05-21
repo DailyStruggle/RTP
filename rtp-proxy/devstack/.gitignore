@@ -1,0 +1,17 @@
+# Devstack runtime artifacts. Never commit these.
+.env
+jars/plugin/*
+jars/velocity/*
+!jars/plugin/.gitkeep
+!jars/velocity/.gitkeep
+# Synced jars fanned out by run-acceptance.ps1 Sync-ProxyJars into each proxy's
+# plugins dir (compose binds proxy-{a,b}/plugins -> /server/plugins).
+proxy-a/plugins/*.jar
+proxy-b/plugins/*.jar
+shared/forwarding.secret
+# itzg images write world/cache/log dirs into mounts if you bind them locally.
+**/world/
+**/world_nether/
+**/world_the_end/
+**/logs/
+**/cache/

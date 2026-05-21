@@ -120,6 +120,16 @@ pregeneratedPreference: 0.0
 # @range: [0.0, 1.0]
 # @default: 0.5
 backlogRefillThreshold: 0.5
-
+# Settings for /rtp admin prefab. The `apply` -> `confirm` flow writes
+# each touched config file with a sibling backup named
+# <file>.yml.bak.<epochMillis>; `bakRetention` caps how many such
+# backups are kept per file, oldest pruned first. Set to 1 to keep only
+# the most recent backup; values below 1 are clamped to 1. /rtp admin
+# prefab rollback walks backups newest-first across multiple invocations.
+prefab:
+  # @type: integer
+  # @range: [1, null]
+  # @default: 3
+  bakRetention: 3
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

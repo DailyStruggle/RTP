@@ -34,6 +34,38 @@ public class RegionQueueManager {
     public final LockFreeLocationBuffer unkeptLocations;
 
     /**
+     * Cross-server sibling of {@link #keptLocations} for L6 (PROPOSAL
+     * §12.2, CHECKLIST Slice A). Identical lifecycle (kept-with-ticket
+     * semantics, fed by the scan/verify pipeline, drained by the network
+     * reservation pulse) but isolated from local {@code /rtp} consumption so
+     * local players draining {@code keptLocations} cannot starve cross-server
+     * requests and vice versa.
+     *
+     * <p>Allocated only when {@code settings.networkReserveSize() > 0};
+     * {@code null} otherwise (the L6 D2 default = local routing means most
+     * deployments will leave this off until they opt in). Capacity is
+     * clamped to {@code min(networkReserveSize, cacheCap)}.
+     */
+    @org.jetbrains.annotations.Nullable
+    public final LockFreeLocationBuffer networkKeptLocations;
+
+    /**
+     * In-flight pinned reservations for cross-server transfers (L6
+     * PROPOSAL §12, CHECKLIST Slice A row A3). Keyed by the proxy-issued
+     * {@code networkTokenId} (see {@code ReservationToken} in
+     * {@code rtp-proxy-common}). An entry exists between
+     * {@link #reserveFromNetworkKept(UUID, String)} (called by the backend
+     * reservation pulse, Slice F row F1) and
+     * {@link #redeemReserved(UUID)} (called by {@code JoinTriggerSource}
+     * post-transfer, Slice F row F2) or {@link #releaseToNetworkKept(UUID)}
+     * (TTL reaper / disconnect, Slice F row F3 + Slice D row D7).
+     *
+     * <p>Never {@code null}; empty when no reservations are outstanding.
+     */
+    public final ConcurrentHashMap<UUID, RTPLocation> networkReservedLocations =
+            new ConcurrentHashMap<>();
+
+    /**
      * L3 backlog cache (ADR-028). Order-preserving FIFO of unverified candidate
      * locations produced by shape-only picks (no chunk I/O — S-005 safe). Each
      * entry carries a tri-state validity flag
@@ -124,10 +156,22 @@ public class RegionQueueManager {
             this.backlogLocations = (backlogCap > 0)
                     ? new BacklogLocationBuffer((int) Math.min(backlogCap, Integer.MAX_VALUE))
                     : null;
+            // L6 PROPOSAL §12.2: networkKeptLocations is a sibling pool capped
+            // by min(networkReserveSize, cacheCap). 0 disables the network split
+            // for this region (no allocation; regionKeptCounts heartbeat field omitted).
+            long networkReserve = settings.networkReserveSize();
+            if (networkReserve > 0) {
+                long networkCap = Math.min(networkReserve, settings.cacheCap());
+                if (networkCap > Integer.MAX_VALUE) networkCap = Integer.MAX_VALUE;
+                this.networkKeptLocations = new LockFreeLocationBuffer((int) networkCap);
+            } else {
+                this.networkKeptLocations = null;
+            }
         } else {
             this.unkeptLocations = new LockFreeLocationBuffer(1024);
             this.keptLocations = new LockFreeLocationBuffer(1024);
             this.backlogLocations = null;
+            this.networkKeptLocations = null;
         }
 
         installDatabaseCallbacks();
@@ -163,6 +207,142 @@ public class RegionQueueManager {
         if (this.loginLocations != null) {
             this.loginLocations.setCallbacks(saveCallback, deleteCallback);
         }
+        if (this.networkKeptLocations != null) {
+            this.networkKeptLocations.setCallbacks(saveCallback, deleteCallback);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // L6 network reservation API (CHECKLIST Slice A row A4).
+    //
+    // Reserve a coordinate from networkKeptLocations under a proxy-issued
+    // networkTokenId. Returns the reserved RTPLocation on success, null when
+    // the network sibling pool is absent or empty. On success the location is
+    // removed from networkKeptLocations and pinned in networkReservedLocations
+    // until redeemReserved/releaseToNetworkKept is called.
+    //
+    // regionKey is accepted for API symmetry with the cross-server selector
+    // predicate (Slice B); current single-region scope ignores it but
+    // implementers MUST keep the parameter so future per-region routing does
+    // not require an API churn.
+    //
+    // S-005 note: this method does no chunk I/O. The chunk reservation is
+    // already pinned on the candidate location at the moment it landed in
+    // networkKeptLocations (same lifecycle as keptLocations).
+    // -------------------------------------------------------------------------
+
+    /**
+     * Reserve a coordinate from {@link #networkKeptLocations} for an outstanding
+     * cross-server transfer identified by {@code networkTokenId}.
+     *
+     * @param networkTokenId proxy-issued token id; must be non-null
+     * @param regionKey      logical region key for selector-symmetry; may be {@code null}
+     * @return the reserved location, or {@code null} if no network coord is available
+     */
+    public RTPLocation reserveFromNetworkKept(UUID networkTokenId, String regionKey) {
+        if (networkTokenId == null) return null;
+        if (this.networkKeptLocations == null) return null;
+        // Disallow double-reserve on the same token id (idempotency carve-out:
+        // re-reserving with the same token returns the already-pinned coord,
+        // which is what the pulse retry path needs).
+        RTPLocation existing = networkReservedLocations.get(networkTokenId);
+        if (existing != null) return existing;
+        RTPLocation loc = this.networkKeptLocations.poll();
+        if (loc == null) return null;
+        RTPLocation prior = networkReservedLocations.putIfAbsent(networkTokenId, loc);
+        if (prior != null) {
+            // Lost the race: another caller already populated this token.
+            // Return the polled coord to the pool and surface the winner.
+            this.networkKeptLocations.offer(loc);
+            return prior;
+        }
+        return loc;
+    }
+
+    /**
+     * Redeem a previously reserved coordinate. Removes the entry from
+     * {@link #networkReservedLocations} and returns the bound location.
+     * The caller is expected to consume it (e.g. teleport on join, Slice F row F2).
+     * Subsequent calls with the same token return {@code null}.
+     *
+     * @param networkTokenId proxy-issued token id
+     * @return the reserved location, or {@code null} if no reservation is bound
+     */
+    public RTPLocation redeemReserved(UUID networkTokenId) {
+        if (networkTokenId == null) return null;
+        return networkReservedLocations.remove(networkTokenId);
+    }
+
+    /**
+     * Release a previously reserved coordinate back to {@link #networkKeptLocations}.
+     * Used by the TTL reaper (Slice D row D7), disconnect listener (Slice F
+     * row F3), and any failed-transfer cleanup path. Idempotent: a second call
+     * with the same token id is a no-op.
+     *
+     * @param networkTokenId proxy-issued token id
+     * @return {@code true} if a reservation was released, {@code false} otherwise
+     */
+    public boolean releaseToNetworkKept(UUID networkTokenId) {
+        if (networkTokenId == null) return false;
+        RTPLocation loc = networkReservedLocations.remove(networkTokenId);
+        if (loc == null) return false;
+        if (this.networkKeptLocations != null) {
+            // offer is bounded; if the sibling pool happens to be full (capacity
+            // shrunk by reload, or operator manually drained), drop to unkept so
+            // the coordinate is not silently lost (S-004 attribution rule).
+            if (!this.networkKeptLocations.offer(loc)) {
+                this.unkeptLocations.offer(new RTPLocation(loc.coords(), loc.attempts(), null));
+            }
+        } else {
+            this.unkeptLocations.offer(new RTPLocation(loc.coords(), loc.attempts(), null));
+        }
+        return true;
+    }
+
+    /**
+     * Pin a previously-redeemed cross-server reservation coordinate into
+     * {@code playerId}'s personal queue so the immediately-following local
+     * {@code /rtp} dispatch preferentially polls that coord. Used by the
+     * backend-side {@code JoinTriggerSource} on REDEEMED hit (Slice F row F2):
+     * the proxy already chose this backend at /rtp time and the coord was
+     * earmarked via {@link #reserveFromNetworkKept(UUID, String)}; on join
+     * the redeemed coord must reach the player without re-running the
+     * region selection that produced it.
+     *
+     * <p>S-004 contract: returns {@code true} when the coord was accepted
+     * into the personal queue (the player's /rtp will see it first);
+     * {@code false} when {@code playerId} or {@code loc} is null. Internal
+     * delegation to {@link #enqueuePlayerLocation(UUID, RTPLocation)}
+     * preserves the per-player single-slot invariant.</p>
+     *
+     * @param playerId joining player's UUID; must be non-null
+     * @param loc      redeemed reservation coordinate; must be non-null
+     * @return {@code true} if the coord was pinned to the personal queue
+     */
+    public boolean acceptRedeemedReservation(UUID playerId, RTPLocation loc) {
+        if (playerId == null || loc == null) return false;
+        enqueuePlayerLocation(playerId, loc);
+        return true;
+    }
+
+    /** @return the number of locations currently in {@link #keptLocations}. */
+    public long keptCount() {
+        return keptLocations.size();
+    }
+
+    /**
+     * @param regionKey logical region key; currently ignored (single-region scope)
+     * @return the number of locations currently in {@link #networkKeptLocations},
+     *         or {@code 0} when the network split is disabled for this region.
+     */
+    public long networkKeptCount(String regionKey) {
+        LockFreeLocationBuffer buf = this.networkKeptLocations;
+        return buf == null ? 0L : buf.size();
+    }
+
+    /** @return the number of in-flight cross-server reservations bound on this region. */
+    public long networkReservedCount() {
+        return networkReservedLocations.size();
     }
 
     /**

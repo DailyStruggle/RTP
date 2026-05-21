@@ -1,0 +1,157 @@
+name: Release rtp-lite to Modrinth
+
+# Publishes the lite assembly variant (ADR-024) to the Modrinth project
+# `rtp-lite` (https://modrinth.com/project/rtp-lite) on every tag matching
+# `lite-v*` (e.g. `lite-v1.0.0`, `lite-v1.0.1-beta.1`).
+#
+# Pro builds are intentionally NOT published here. Pro tags (`v*`) continue
+# to be handled by the existing Jenkins pipeline (Jenkinsfile) and the
+# BuiltByBit distribution channel; they should not trigger this workflow.
+#
+# Required repo secret:
+#   MODRINTH_TOKEN -- Modrinth PAT with the `Create version` scope.
+#
+# Release notes are taken from CHANGELOG-lite.md (the section matching the
+# tag's version string). See AGENTS.md `CHANGELOG Hygiene` for the
+# net-delta-from-last-released-tag rule that keeps that section honest.
+
+on:
+  push:
+    tags:
+      - 'lite-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. lite-v1.0.0). Must already exist.'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # workflow_dispatch path: check out the requested tag explicitly.
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 1
+
+      - name: Derive version from tag
+        id: version
+        run: |
+          RAW_TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          # Strip the `lite-v` prefix (e.g. `lite-v1.0.0` -> `1.0.0`).
+          VERSION="${RAW_TAG#lite-v}"
+          echo "tag=${RAW_TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Releasing lite version: ${VERSION} (from tag ${RAW_TAG})"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Per AGENTS.md `Final Full Build`: prefer the full multi-module build
+      # over a scoped `:rtp-plugin:remapLiteJar` so cross-module compile breaks
+      # and downstream test regressions are caught before publication. The
+      # lite jar is the artifact we ship; everything else is verification.
+      - name: Build (full multi-module + lite jar)
+        run: ./gradlew build :rtp-plugin:remapLiteJar
+
+      - name: Locate lite jar
+        id: artifact
+        run: |
+          # ADR-024: the lite artifact is the unclassified `RTP-<version>.jar`
+          # produced by `remapLiteJar` in rtp-plugin/build/libs/. The
+          # classified `*-dev.jar` is the pre-remap intermediate and is NOT
+          # the release artifact.
+          LITE_JAR=$(find rtp-plugin/build/libs -maxdepth 1 -type f -name 'RTP-*.jar' \
+            ! -name 'RTP-Pro-*' ! -name '*-dev.jar' ! -name '*-sources.jar' \
+            ! -name '*-javadoc.jar' | head -n 1)
+          if [ -z "$LITE_JAR" ]; then
+            echo "::error::Could not locate the lite jar under rtp-plugin/build/libs/"
+            ls -la rtp-plugin/build/libs/ || true
+            exit 1
+          fi
+          echo "lite_jar=${LITE_JAR}" >> "$GITHUB_OUTPUT"
+          echo "Found lite jar: ${LITE_JAR}"
+
+      - name: Extract release notes from CHANGELOG-lite.md
+        id: notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Extract the section for this version. Heading shape:
+          #   ## [1.0.0] - YYYY-MM-DD
+          # or
+          #   ## [1.0.0-beta.1] - Unreleased
+          # Stop at the next `## [` heading.
+          if [ ! -f CHANGELOG-lite.md ]; then
+            echo "::warning::CHANGELOG-lite.md not found; falling back to generic release notes."
+            echo "rtp-lite ${VERSION}" > release-notes.md
+          else
+            awk -v ver="$VERSION" '
+              BEGIN { capture = 0 }
+              /^## \[/ {
+                if (capture) { exit }
+                if (index($0, "[" ver "]") > 0) { capture = 1; next }
+              }
+              capture == 1 { print }
+            ' CHANGELOG-lite.md > release-notes.md
+            if [ ! -s release-notes.md ]; then
+              echo "::warning::No CHANGELOG-lite.md section matched [${VERSION}]; using a placeholder."
+              echo "rtp-lite ${VERSION}" > release-notes.md
+            fi
+          fi
+          echo "--- release-notes.md ---"
+          cat release-notes.md
+          echo "--- end ---"
+
+      - name: Publish to Modrinth
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: rtp-lite
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: ${{ steps.artifact.outputs.lite_jar }}
+          name: rtp-lite ${{ steps.version.outputs.version }}
+          version: ${{ steps.version.outputs.version }}
+          # Mark beta/alpha versions correctly so they do not surface as
+          # "latest stable" in admin filters.
+          version-type: ${{ contains(steps.version.outputs.version, 'beta') && 'beta' || contains(steps.version.outputs.version, 'alpha') && 'alpha' || 'release' }}
+          changelog-file: release-notes.md
+          loaders: |
+            paper
+            bukkit
+            spigot
+          # MC versions derived from the rtp-bukkit-v* / rtp-paper-v* submodule
+          # set. Folia is intentionally absent (ADR-024 keeps Folia in Pro
+          # only); Fabric is held until rtp-fabric Phase 4 closes
+          # (MULTI_PLATFORM_PLAN.md). Update this list when a new MC adapter
+          # submodule lands under rtp-bukkit/ or rtp-paper/.
+          game-versions: |
+            1.20
+            1.20.1
+            1.20.2
+            1.20.3
+            1.20.4
+            1.20.5
+            1.20.6
+            1.21
+            1.21.1
+            1.21.2
+            1.21.3
+            1.21.4
+            1.21.5
+          # Fail loudly if Modrinth rejects (e.g. version collision, slug typo,
+          # token scope). A silent skip would leave the tag without an
+          # artifact on Modrinth and contradict S-004 (no silently swallowed
+          # failures).
+          fail-mode: fail

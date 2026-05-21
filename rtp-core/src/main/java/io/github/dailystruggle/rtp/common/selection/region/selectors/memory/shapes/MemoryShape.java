@@ -210,6 +210,21 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     return false;
   }
 
+  /**
+   * Returns an immutable snapshot of the current bad-location key array
+   * (sorted, packed long-encoded XZ keys). Used by the ADR-047 declarative
+   * chart bridge ({@code BadPointsHeatmapResolver} in rtp-core) to compose a
+   * {@code Heatmap2D} without touching internal state. No chunk I/O, no
+   * locking on the read path (the field is {@code volatile} and reassigned
+   * atomically by writers under {@code writeLock}).
+   *
+   * @return a fresh array copy; never {@code null}, may be zero-length
+   */
+  public long[] badKeysSnapshot() {
+    long[] keys = badKeysCache;
+    return Arrays.copyOf(keys, keys.length);
+  }
+
   public void save(String fileName, String worldName) {
     if (!fileName.endsWith(".bin")) fileName = fileName + ".bin";
 
@@ -399,6 +414,12 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         data = java.nio.file.Files.readAllBytes(p);
       } catch (Exception e) {
         RTP.log(Level.WARNING, "[MemoryShape] Failed to read binary file: " + filePath + " - " + e.getMessage(), e);
+        return;
+      }
+      if (data.length < 4) {
+        // Empty or truncated binary - nothing to load. Most often produced
+        // by a save() call that hit an error before writing the world-name
+        // length header, or by a zero-byte file from a prior crash.
         return;
       }
       try {

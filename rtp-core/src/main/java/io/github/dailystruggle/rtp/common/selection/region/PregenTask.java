@@ -380,7 +380,7 @@ final class PregenTask implements Runnable {
         String probeBiome = probe.biomeAt(py);
         if (probeBiome != null) {
             String ub = probeBiome.toUpperCase();
-            if (state.biomeNames.contains(ub) != state.biomeWhitelist) {
+            if (BiomeNames.matches(state.biomeNames, ub) != state.biomeWhitelist) {
                 state.maxAttempts++;
                 if (state.verbose) {
                     state.failMap.get(LocationGenerator.FailTypes.prefilterBiome)
@@ -397,7 +397,7 @@ final class PregenTask implements Runnable {
         String probeBlock = probe.blockAt(py);
         if (probeBlock != null && state.unsafeBlocks != null) {
             String ub = probeBlock.toUpperCase();
-            if (state.unsafeBlocks.contains(ub)) {
+            if (MaterialNames.matches(state.unsafeBlocks, ub)) {
                 state.maxAttempts++;
                 if (state.verbose) {
                     state.failMap.get(LocationGenerator.FailTypes.prefilterBlock)
@@ -623,7 +623,7 @@ final class PregenTask implements Runnable {
 
         // --- biome filter (ADR-016 §13.1 — read from the resolved chunk) ---
         String currBiome = chunk.getBiome(finalX, finalY, finalZ).toUpperCase();
-        if (state.biomeNames.contains(currBiome) != state.biomeWhitelist) {
+        if (BiomeNames.matches(state.biomeNames, currBiome) != state.biomeWhitelist) {
             if (state.maxAttempts < state.maxAttemptsCeiling) state.maxAttempts++;
             if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
                 // addBadChunk: chunk-uniform — biome is a per-chunk property; the twin spiral

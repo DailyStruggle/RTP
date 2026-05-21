@@ -64,7 +64,7 @@ public final class BookMenuRenderer implements MenuRenderer {
      * Default TTL applied to each freshly-minted redeem token. Matches the
      * {@code menu.tokenTtlSeconds} default in ADR-035 §Migration / Rollout.
      */
-    public static final Duration DEFAULT_TOKEN_TTL = Duration.ofSeconds(60);
+    public static final Duration DEFAULT_TOKEN_TTL = Duration.ofHours(6);
 
     private final MenuTokenRegistry tokenRegistry;
     private final Duration tokenTtl;
@@ -230,7 +230,7 @@ public final class BookMenuRenderer implements MenuRenderer {
                 // `token=<value>` — the `menu:<token>` short form is not a
                 // valid commands-api parse on the `/rtp` root.
                 String token = tokenRegistry.mint(playerId, run, tokenTtl);
-                yield ClickEvent.runCommand("/rtp menu token:" + token);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
             }
             case MenuAction.OpenMenu open -> {
                 // Navigation click (back / forward-descend). At the click level
@@ -241,7 +241,7 @@ public final class BookMenuRenderer implements MenuRenderer {
                 // the OpenMenu path against the live TreeCommand graph — no
                 // commands-api re-entry on the navigation tail (ADR-035 §3).
                 String token = tokenRegistry.mint(playerId, open, tokenTtl);
-                yield ClickEvent.runCommand("/rtp menu token:" + token);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
             }
             case MenuAction.OpenParamPicker picker -> {
                 // Stage A.2 parameter-value picker click. Same /rtp menu
@@ -249,7 +249,7 @@ public final class BookMenuRenderer implements MenuRenderer {
                 // variants; MenuRedeemSubcommand walks parentPath and renders
                 // the picker page server-side.
                 String token = tokenRegistry.mint(playerId, picker, tokenTtl);
-                yield ClickEvent.runCommand("/rtp menu token:" + token);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
             }
             case MenuAction.PromptAnvilInput prompt -> {
                 // ADR-045 anvil-input click. Adventure has no client-driven
@@ -260,7 +260,7 @@ public final class BookMenuRenderer implements MenuRenderer {
                 // opens the anvil GUI on the player and submits the typed
                 // value back through the /rtp pipeline on confirm.
                 String token = tokenRegistry.mint(playerId, prompt, tokenTtl);
-                yield ClickEvent.runCommand("/rtp menu token:" + token);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
             }
             case MenuAction.ChangePage change ->
                     // Adventure pages are 1-based; MenuPage indices are 0-based.
@@ -275,14 +275,14 @@ public final class BookMenuRenderer implements MenuRenderer {
                 // path the other navigation variants use; MenuRedeemSubcommand
                 // dispatches to dispatchOpenConfigSelector.
                 String token = tokenRegistry.mint(playerId, selector, tokenTtl);
-                yield ClickEvent.runCommand("/rtp menu token:" + token);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
             }
             case MenuAction.OpenConfigFile fileAction -> {
                 // Curated config-subtree page 2 (PROPOSAL-config-view-as-book.md v3.7).
                 // Server-resolved through the /rtp menu token:<token> redeem path;
                 // MenuRedeemSubcommand dispatches to dispatchOpenConfigFile.
                 String token = tokenRegistry.mint(playerId, fileAction, tokenTtl);
-                yield ClickEvent.runCommand("/rtp menu token:" + token);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
             }
             case MenuAction.OpenConfigKey keyAction -> {
                 // Curated config-subtree page 3 (PROPOSAL-config-view-as-book.md v3.7).
@@ -290,7 +290,91 @@ public final class BookMenuRenderer implements MenuRenderer {
                 // MenuRedeemSubcommand dispatches to dispatchOpenConfigKey, which
                 // delegates to the existing buildParamPicker flow.
                 String token = tokenRegistry.mint(playerId, keyAction, tokenTtl);
-                yield ClickEvent.runCommand("/rtp menu token:" + token);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
+            case MenuAction.OpenConfigSubParamPage subParamAction -> {
+                // Curated config-subtree page 3b for shape/vert sub-parameters
+                // (PROPOSAL-config-view-as-book.md v3.7.5). Server-resolved through
+                // the /rtp menu token:<token> redeem path; MenuRedeemSubcommand
+                // dispatches to dispatchOpenConfigSubParamPage, which renders the
+                // activated type's name + sub-parameter rows.
+                String token = tokenRegistry.mint(playerId, subParamAction, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
+            case MenuAction.OpenConfigSearchPrompt searchPrompt -> {
+                // Cross-config search anvil-input prompt (PROPOSAL-rtp-menu-config-search.md
+                // §6 Q4 Decision (A)). Server-resolved through the same /rtp menu
+                // token:<token> redeem path; MenuRedeemSubcommand translates the
+                // prompt to a PromptAnvilInput(["menu","config","search"], "query", "")
+                // which the platform-side AnvilInputOpener opens.
+                String token = tokenRegistry.mint(playerId, searchPrompt, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
+            case MenuAction.OpenConfigSearchResults searchResults -> {
+                // Cross-config search results page (PROPOSAL-rtp-menu-config-search.md).
+                // Server-resolved through the /rtp menu token:<token> redeem path;
+                // MenuRedeemSubcommand dispatches to dispatchOpenConfigSearchResults,
+                // which walks every loaded config parser and renders raw-literal
+                // value text with off-blue highlight on the matched substring.
+                String token = tokenRegistry.mint(playerId, searchResults, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
+            case MenuAction.OpenAdminPanel adminPanel -> {
+                // Curated admin-panel page (PROPOSAL-admin-panel.md v2).
+                // Server-resolved through the /rtp menu token:<token> redeem path;
+                // MenuRedeemSubcommand dispatches to dispatchOpenAdminPanel, which
+                // permission-gates on rtp.menu.admin before rendering.
+                String token = tokenRegistry.mint(playerId, adminPanel, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
+            case MenuAction.OpenFrontPage frontPage -> {
+                // Curated front page (PROPOSAL-admin-panel.md v2). Used by the
+                // admin panel's back row. Distinct from OpenMenu([]) which would
+                // target the reflected TreeCommand root rather than the curated
+                // FrontPageBuilder output. Server-resolved through the same
+                // /rtp menu token:<token> redeem path; MenuRedeemSubcommand
+                // dispatches to dispatchOpenFrontPage.
+                String token = tokenRegistry.mint(playerId, frontPage, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
+            case MenuAction.OpenInfo openInfo -> {
+                // /rtp info book (PROPOSAL-info-as-book.md section 4.6).
+                // Server-resolved through the /rtp menu token:<token> redeem
+                // path; MenuRedeemSubcommand dispatches to dispatchOpenInfo,
+                // which gates on rtp.info before re-rendering the book at the
+                // supplied scope (global / world / region).
+                String token = tokenRegistry.mint(playerId, openInfo, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
+            case MenuAction.SwitchInfoToText switchInfo -> {
+                // /rtp info chat fallback (PROPOSAL-info-as-book.md section
+                // 4.6). Server-resolved through the /rtp menu token:<token>
+                // redeem path; MenuRedeemSubcommand dispatches to
+                // dispatchSwitchInfoToText, which re-enters the chat path
+                // (no book) for the supplied scope.
+                String token = tokenRegistry.mint(playerId, switchInfo, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
+            // Config-menu staging-cart redesign (CHECKLIST-config-staging-cart.md).
+            // All four cart-affecting actions are server-resolved exactly like the
+            // other curated config actions: mint a token and round-trip through
+            // /rtp menu token:<token>. MenuRedeemSubcommand dispatches to the
+            // matching dispatchStage/Unstage/Apply/DiscardStagedConfig arm.
+            case MenuAction.StageConfigValue stageAction -> {
+                String token = tokenRegistry.mint(playerId, stageAction, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
+            case MenuAction.UnstageConfigValue unstageAction -> {
+                String token = tokenRegistry.mint(playerId, unstageAction, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
+            case MenuAction.ApplyStagedConfig applyAction -> {
+                String token = tokenRegistry.mint(playerId, applyAction, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
+            case MenuAction.DiscardStagedConfig discardAction -> {
+                String token = tokenRegistry.mint(playerId, discardAction, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
             }
         };
     }

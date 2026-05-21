@@ -150,3 +150,5 @@ helpers/StressTestRTP/runs/
 # Runtime log directories produced by test/dev runs (rotated .log.gz, latest.log)
 **/logs/
 *.log.gz
+# Agent / contributor scratch notes (per .junie/AGENTS.md, Checklist-Based State Tracking)
+docs/dev/scratch/

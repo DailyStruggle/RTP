@@ -1,0 +1,45 @@
+# Velocity proxy-b config. Modern forwarding; shared secret in
+# /server/forwarding.secret (mounted from devstack/shared/forwarding.secret).
+config-version = "2.7"
+bind = "0.0.0.0:25577"
+motd = "<bold><red>RTP devstack proxy-b"
+show-max-players = 20
+online-mode = true
+force-key-authentication = true
+prevent-client-proxy-connections = false
+player-info-forwarding-mode = "MODERN"
+forwarding-secret-file = "forwarding.secret"
+announce-forge = false
+kick-existing-players = false
+ping-passthrough = "DISABLED"
+enable-player-address-logging = true
+forced-hosts = {}
+
+[servers]
+	backend-a = "backend-a:25565"
+	backend-b = "backend-b:25565"
+	try = ["backend-a", "backend-b"]
+
+[advanced]
+	compression-threshold = 256
+	compression-level = -1
+	login-ratelimit = 3000
+	connection-timeout = 5000
+	read-timeout = 30000
+	haproxy-protocol = false
+	tcp-fast-open = false
+	bungee-plugin-message-channel = true
+	show-ping-requests = false
+	failover-on-unexpected-server-disconnect = true
+	announce-proxy-commands = true
+	log-command-executions = false
+	log-player-connections = true
+	#Allows players transferred from other hosts via the
+	#Transfer packet (Minecraft 1.20.5) to be received.
+	accepts-transfers = false
+
+[query]
+	enabled = false
+	port = 25577
+	map = "Velocity"
+	show-plugins = false

@@ -4,16 +4,19 @@ import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
 import io.github.dailystruggle.rtp.proxy.common.spi.ProxyHeartbeat;
+import io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReleaseReason;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.spi.Subscription;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -64,8 +67,27 @@ public final class InMemoryNetworkStateBinding implements NetworkTransport {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Test affordance: publish a backend heartbeat into the local table. */
-    public void publishBackendHeartbeat(BackendHeartbeat row) {
+    /**
+     * Publish a backend heartbeat into the local table. Implements
+     * {@link NetworkTransport#publishBackendHeartbeat(BackendHeartbeat)} on
+     * the in-memory binding so production-shaped callers (rtp-core
+     * {@code BackendStatePublisher}) and existing test scaffolding can share
+     * one entry point. Synchronous fan-out to subscribers is preserved.
+     */
+    @Override
+    public CompletableFuture<Void> publishBackendHeartbeat(BackendHeartbeat row) {
+        Objects.requireNonNull(row, "row");
+        checkOpen();
+        return CompletableFuture.runAsync(() -> publishBackendHeartbeatSync(row), executor);
+    }
+
+    /**
+     * Synchronous variant retained for tests that need to observe the row in
+     * the local table immediately, without hopping onto the binding's
+     * executor. Production code should call
+     * {@link #publishBackendHeartbeat(BackendHeartbeat)}.
+     */
+    public void publishBackendHeartbeatSync(BackendHeartbeat row) {
         Objects.requireNonNull(row, "row");
         backends.put(row.serverId(), row);
         for (Sub sub : subscribers) {
@@ -135,6 +157,101 @@ public final class InMemoryNetworkStateBinding implements NetworkTransport {
             token.transition(current, next);
             tokens.remove(tokenId);
             activeByPlayer.remove(token.playerId(), tokenId);
+        }, executor);
+    }
+
+    @Override
+    public CompletableFuture<RedeemOutcome> redeem(String tokenId, UUID playerId, String expectedServerId) {
+        checkOpen();
+        Objects.requireNonNull(tokenId, "tokenId");
+        Objects.requireNonNull(playerId, "playerId");
+        Objects.requireNonNull(expectedServerId, "expectedServerId");
+        return CompletableFuture.supplyAsync(() -> {
+            ReservationToken token = tokens.get(tokenId);
+            if (token == null) return RedeemOutcome.NOT_FOUND;
+            if (!token.serverId().equals(expectedServerId)) return RedeemOutcome.WRONG_SERVER;
+            if (!token.playerId().equals(playerId)) return RedeemOutcome.WRONG_SERVER;
+            ReservationToken.State s = token.state();
+            if (s == ReservationToken.State.CONSUMED || s == ReservationToken.State.RELEASED) {
+                return RedeemOutcome.ALREADY_CONSUMED;
+            }
+            if (token.expiresEpochMs() > 0 && token.expiresEpochMs() <= clock.get().toEpochMilli()) {
+                return RedeemOutcome.EXPIRED;
+            }
+            if (s != ReservationToken.State.CLAIMED && s != ReservationToken.State.PENDING) {
+                return RedeemOutcome.BAD_STATE;
+            }
+            // Atomic CAS: a peer that wins the same transition first sees this caller
+            // get ALREADY_CONSUMED on the retry. Row-count atomicity per
+            // REQ-RTP-PROXY-004 / NetworkTransport.redeem contract.
+            if (!token.transition(s, ReservationToken.State.CONSUMED)) {
+                return RedeemOutcome.ALREADY_CONSUMED;
+            }
+            tokens.remove(tokenId, token);
+            activeByPlayer.remove(playerId, tokenId);
+            return RedeemOutcome.REDEEMED;
+        }, executor);
+    }
+
+    @Override
+    public CompletableFuture<Optional<ReservationToken>> findReservation(UUID playerId) {
+        checkOpen();
+        Objects.requireNonNull(playerId, "playerId");
+        return CompletableFuture.supplyAsync(() -> {
+            String tokenId = activeByPlayer.get(playerId);
+            if (tokenId == null) return Optional.<ReservationToken>empty();
+            ReservationToken token = tokens.get(tokenId);
+            if (token == null) return Optional.<ReservationToken>empty();
+            // Filter expired and terminal-state tokens; the listener treats
+            // their absence as "no reservation" per REQ-RTP-PROXY-VELOCITY-002.
+            ReservationToken.State s = token.state();
+            if (s == ReservationToken.State.CONSUMED || s == ReservationToken.State.RELEASED) {
+                return Optional.<ReservationToken>empty();
+            }
+            if (token.expiresEpochMs() <= clock.get().toEpochMilli()) {
+                return Optional.<ReservationToken>empty();
+            }
+            return Optional.of(token);
+        }, executor);
+    }
+
+    @Override
+    public CompletableFuture<List<String>> reapExpired(Instant now) {
+        checkOpen();
+        Objects.requireNonNull(now, "now");
+        return CompletableFuture.supplyAsync(() -> {
+            long nowMs = now.toEpochMilli();
+            List<String> reaped = new ArrayList<>();
+            for (Map.Entry<String, ReservationToken> e : tokens.entrySet()) {
+                ReservationToken token = e.getValue();
+                if (token.expiresEpochMs() > nowMs) continue;
+                ReservationToken.State s = token.state();
+                if (s != ReservationToken.State.PENDING && s != ReservationToken.State.CLAIMED) continue;
+                // Atomic transition: only the caller who wins the CAS owns the release.
+                if (!token.transition(s, ReservationToken.State.RELEASED)) continue;
+                tokens.remove(e.getKey(), token);
+                activeByPlayer.remove(token.playerId(), token.tokenId());
+                reaped.add(token.tokenId());
+            }
+            return reaped;
+        }, executor);
+    }
+
+    @Override
+    public CompletableFuture<List<ReservationToken>> listActiveForServer(String serverId) {
+        checkOpen();
+        Objects.requireNonNull(serverId, "serverId");
+        return CompletableFuture.supplyAsync(() -> {
+            long nowMs = clock.get().toEpochMilli();
+            List<ReservationToken> active = new ArrayList<>();
+            for (ReservationToken token : tokens.values()) {
+                if (!serverId.equals(token.serverId())) continue;
+                ReservationToken.State s = token.state();
+                if (s != ReservationToken.State.PENDING && s != ReservationToken.State.CLAIMED) continue;
+                if (token.expiresEpochMs() <= nowMs) continue;
+                active.add(token);
+            }
+            return active;
         }, executor);
     }
 

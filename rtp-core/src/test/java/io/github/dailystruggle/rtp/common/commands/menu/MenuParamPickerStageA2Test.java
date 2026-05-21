@@ -141,11 +141,11 @@ class MenuParamPickerStageA2Test {
         }
         assertTrue(valueRows.containsKey("true"), "boolean 'true' row present");
         assertTrue(valueRows.containsKey("false"), "boolean 'false' row present");
-        // Each value row's path is <parentPath..., ASYNC:value>.
+        // Each value row's path is <parentPath..., ASYNC=value>.
         String[] truePath = valueRows.get("true").path();
-        assertArrayEqualsLocal(new String[]{"config", "performance", "ASYNC:true"}, truePath, "true row path");
+        assertArrayEqualsLocal(new String[]{"config", "performance", "ASYNC=true"}, truePath, "true row path");
         String[] falsePath = valueRows.get("false").path();
-        assertArrayEqualsLocal(new String[]{"config", "performance", "ASYNC:false"}, falsePath, "false row path");
+        assertArrayEqualsLocal(new String[]{"config", "performance", "ASYNC=false"}, falsePath, "false row path");
     }
 
     @Test

@@ -18,5 +18,12 @@ public enum ReleaseReason {
     /** Backend rejected the reservation (e.g., shutting down). */
     BACKEND_REJECTED,
     /** Operator-issued release (admin command or shutdown). */
-    OPERATOR
+    OPERATOR,
+    /**
+     * Synthetic release issued by the {@code rtp test network} probe (Shape A
+     * token slice). Distinct from {@link #OPERATOR} so audit logs and any
+     * future telemetry filter can unambiguously separate probe traffic from
+     * real operator action; no special-case binding behaviour is required.
+     */
+    TEST_PROBE
 }

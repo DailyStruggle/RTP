@@ -43,7 +43,7 @@ public interface BaseRTPCmd extends TreeCommand {
   @Override
   default void msgBadParameter(UUID callerId, String parameterName, String parameterValue, java.util.function.Consumer<String> messageMethod) {
     String msg = msg(MessagesKeys.badArg, "[P0] bad parameter - [arg]");
-    msg = msg.replace("[arg]", parameterName + ":" + parameterValue);
+    msg = msg.replace("[arg]", parameterName + "=" + parameterValue);
     if(messageMethod != null) messageMethod.accept(msg);
     else RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg, null);
     RTP.log(Level.WARNING, msg);
@@ -68,7 +68,7 @@ public interface BaseRTPCmd extends TreeCommand {
 
   default void msgBadParameter(UUID callerId, String parameterName, String parameterValue, String tag) {
     String msg = msg(MessagesKeys.badArg, "[P0] bad parameter - [arg]");
-    msg = msg.replace("[arg]", parameterName + ":" + parameterValue);
+    msg = msg.replace("[arg]", parameterName + "=" + parameterValue);
     RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg, tag);
     RTP.log(Level.WARNING, msg);
   }

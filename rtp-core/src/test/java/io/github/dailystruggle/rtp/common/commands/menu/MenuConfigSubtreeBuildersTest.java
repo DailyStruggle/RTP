@@ -1,0 +1,332 @@
+package io.github.dailystruggle.rtp.common.commands.menu;
+
+import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.api.menu.MenuAction;
+import io.github.dailystruggle.rtp.api.menu.MenuFragment;
+import io.github.dailystruggle.rtp.api.menu.MenuLine;
+import io.github.dailystruggle.rtp.api.menu.MenuModel;
+import io.github.dailystruggle.rtp.api.menu.MenuPage;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Path;
+import java.util.List;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * Step 3 (PROPOSAL-config-view-as-book.md v3.7 / CHECKLIST step 3) — surface
+ * tests for {@code CommandTreeMenuBuilder.buildConfigSelector} and
+ * {@code buildConfigFile}.
+ *
+ * <p>These are the curated 3-page config subtree's first two pages
+ * (selector → per-file). The per-key page (page 3) reuses
+ * {@code buildParamPicker} verbatim and is exercised by
+ * {@code MenuParamPickerStageA2Test}.
+ */
+@DisplayName("PROPOSAL-config-view-as-book v3.7 § config subtree builders (step 3)")
+class MenuConfigSubtreeBuildersTest {
+
+    @TempDir
+    Path tempDir;
+
+    @BeforeEach
+    void setupRTP() {
+        RTPTestSetup.install(tempDir.toFile());
+    }
+
+    // ------------------------------------------------------------------------
+    // buildConfigSelector
+    // ------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("buildConfigSelector: Back + Search + header + one OpenConfigFile row per file")
+    void buildConfigSelector_layout() {
+        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+
+        List<String> files = List.of("performance.yml", "safety.yml", "config.yml");
+        MenuModel model = builder.buildConfigSelector(UUID.randomUUID(), files);
+
+        assertEquals(1, model.pages().size(), "selector is single-page");
+        List<MenuLine> lines = model.pages().get(0).lines();
+        // 1 Back + 1 Search + 1 header + 3 file rows = 6
+        assertEquals(6, lines.size(), "selector layout: back + search + header + N file rows");
+
+        // Row 0 → Back via OpenMenu(empty path) (root /rtp menu page).
+        MenuFragment back = lines.get(0).fragments().get(0);
+        assertInstanceOf(MenuAction.OpenMenu.class, back.action(),
+                "first row must be Back navigation");
+        assertEquals(0, ((MenuAction.OpenMenu) back.action()).path().length,
+                "Back must target the root menu page (empty path)");
+
+        // Row 1 → Search via OpenConfigSearchPrompt (per
+        // PROPOSAL-rtp-menu-config-search.md §10 item 6).
+        assertInstanceOf(MenuAction.OpenConfigSearchPrompt.class,
+                lines.get(1).fragments().get(0).action(),
+                "second row must be the search-configs entry point");
+
+        // Row 2 → header (no action).
+        assertEquals(null, lines.get(2).fragments().get(0).action(),
+                "header row must be non-clickable");
+
+        // Rows 3..5 → one OpenConfigFile per file, in encounter order.
+        for (int i = 0; i < files.size(); i++) {
+            MenuFragment row = lines.get(3 + i).fragments().get(0);
+            assertInstanceOf(MenuAction.OpenConfigFile.class, row.action(),
+                    "file row " + i + " must be OpenConfigFile");
+            assertEquals(files.get(i),
+                    ((MenuAction.OpenConfigFile) row.action()).fileName(),
+                    "file row " + i + " preserves the file name");
+        }
+    }
+
+    @Test
+    @DisplayName("buildConfigSelector: empty file list still yields a usable page (back + header only)")
+    void buildConfigSelector_emptyFileList() {
+        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+
+        MenuModel model = builder.buildConfigSelector(UUID.randomUUID(), List.of());
+
+        List<MenuLine> lines = model.pages().get(0).lines();
+        assertEquals(3, lines.size(),
+                "empty file list still produces back + search + header (no file rows)");
+        assertInstanceOf(MenuAction.OpenMenu.class,
+                lines.get(0).fragments().get(0).action());
+        assertInstanceOf(MenuAction.OpenConfigSearchPrompt.class,
+                lines.get(1).fragments().get(0).action());
+    }
+
+    @Test
+    @DisplayName("buildConfigSelector: null/empty file-name entries are skipped (defensive)")
+    void buildConfigSelector_skipsBlankEntries() {
+        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+
+        // The list contains a null and an empty string; both must be filtered
+        // out by the builder so we never try to construct
+        // OpenConfigFile("") (which would throw IAE per the rtp-api contract).
+        java.util.List<String> mixed = new java.util.ArrayList<>();
+        mixed.add("real.yml");
+        mixed.add(null);
+        mixed.add("");
+        mixed.add("other.yml");
+
+        MenuModel model = builder.buildConfigSelector(UUID.randomUUID(), mixed);
+        List<MenuLine> lines = model.pages().get(0).lines();
+        // back + search + header + 2 valid file rows
+        assertEquals(5, lines.size());
+        assertEquals("real.yml",
+                ((MenuAction.OpenConfigFile) lines.get(3).fragments().get(0).action()).fileName());
+        assertEquals("other.yml",
+                ((MenuAction.OpenConfigFile) lines.get(4).fragments().get(0).action()).fileName());
+    }
+
+    @Test
+    @DisplayName("buildConfigSelector: null inputs rejected")
+    void buildConfigSelector_nullsRejected() {
+        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        assertThrows(NullPointerException.class,
+                () -> builder.buildConfigSelector(null, List.of()));
+        assertThrows(NullPointerException.class,
+                () -> builder.buildConfigSelector(UUID.randomUUID(), null));
+    }
+
+    // ------------------------------------------------------------------------
+    // buildConfigFile
+    // ------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("buildConfigFile: Back→OpenConfigSelector + header + one OpenConfigKey row per loaded key")
+    void buildConfigFile_layout() {
+        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+
+        @SuppressWarnings("unchecked")
+        ConfigParser<PerformanceKeys> parser =
+                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        assertNotNull(parser, "RTPTestSetup must wire up the performance parser");
+
+        // The menu surfaces only keys actually loaded from disk (per the
+        // lite-parity rule). Seed the full enum here so the layout assertions
+        // below are about menu shape, not config IO. A separate test
+        // ({@code buildConfigFile_omitsKeysAbsentFromLoadedYaml}) covers the
+        // sparse case.
+        java.util.EnumMap<PerformanceKeys, Object> full =
+                new java.util.EnumMap<>(PerformanceKeys.class);
+        for (PerformanceKeys k : PerformanceKeys.values()) {
+            full.put(k, "seed");
+        }
+        parser.setData(full);
+
+        MenuModel model = builder.buildConfigFile(UUID.randomUUID(), "performance.yml", parser);
+        assertTrue(model.pages().size() >= 1, "must produce at least one page");
+
+        // Every page must lead with Back→OpenConfigSelector and a non-clickable
+        // header (pagination guarantee for the 32767-char Paper book limit).
+        for (int p = 0; p < model.pages().size(); p++) {
+            List<MenuLine> ls = model.pages().get(p).lines();
+            assertInstanceOf(MenuAction.OpenConfigSelector.class,
+                    ls.get(0).fragments().get(0).action(),
+                    "page " + p + " row 0 must be Back→config selector");
+            assertEquals(null, ls.get(1).fragments().get(0).action(),
+                    "page " + p + " row 1 must be non-clickable header");
+        }
+
+        // Aggregate OpenConfigKey rows across all pages, skipping back+header
+        // on each page. Order matches PerformanceKeys.values() declaration order.
+        List<MenuAction.OpenConfigKey> keyRows = new java.util.ArrayList<>();
+        List<MenuFragment> keyFragments = new java.util.ArrayList<>();
+        for (MenuPage page : model.pages()) {
+            List<MenuLine> ls = page.lines();
+            for (int i = 2; i < ls.size(); i++) {
+                MenuFragment f = ls.get(i).fragments().get(0);
+                assertInstanceOf(MenuAction.OpenConfigKey.class, f.action(),
+                        "key row must be OpenConfigKey");
+                keyRows.add((MenuAction.OpenConfigKey) f.action());
+                keyFragments.add(f);
+            }
+        }
+        PerformanceKeys[] expected = PerformanceKeys.values();
+        assertEquals(expected.length, keyRows.size(),
+                "aggregate: one OpenConfigKey per enum constant");
+        for (int i = 0; i < expected.length; i++) {
+            assertEquals("performance.yml", keyRows.get(i).fileName());
+            assertEquals(expected[i].name(), keyRows.get(i).paramName(),
+                    "key row " + i + " preserves the enum-key name");
+            assertTrue(keyFragments.get(i).text().contains(expected[i].name()),
+                    "row label must include the key name; got: " + keyFragments.get(i).text());
+        }
+    }
+
+    @Test
+    @DisplayName("buildConfigFile: empty-enum parser degrades to a hint row (v3.7.4)")
+    void buildConfigFile_emptyEnumHint() {
+        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+
+        // Stand up a ConfigParser over an empty enum on the fly. Re-using the
+        // tempDir wired by RTPTestSetup keeps file IO contained.
+        ConfigParser<EmptyKeys> empty = new ConfigParser<>(
+                EmptyKeys.class, "empty.yml", "1.0",
+                tempDir.toFile(),
+                tempDir.toFile(),
+                RTP.configs.fileDatabase);
+
+        MenuModel model = builder.buildConfigFile(UUID.randomUUID(), "empty.yml", empty);
+        List<MenuLine> lines = model.pages().get(0).lines();
+        // back + header + hint row
+        assertEquals(3, lines.size());
+        // The hint row is non-clickable.
+        assertEquals(null, lines.get(2).fragments().get(0).action(),
+                "empty-file hint must be non-clickable");
+        // And there are zero OpenConfigKey actions on the page (v3.7.4).
+        boolean anyKeyRow = false;
+        for (MenuLine line : lines) {
+            for (MenuFragment f : line.fragments()) {
+                if (f.action() instanceof MenuAction.OpenConfigKey) {
+                    anyKeyRow = true;
+                }
+            }
+        }
+        assertFalse(anyKeyRow, "empty-enum parser must not emit OpenConfigKey rows");
+    }
+
+    @Test
+    @DisplayName("buildConfigFile: null/empty inputs rejected")
+    void buildConfigFile_nullsRejected() {
+        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+
+        @SuppressWarnings("unchecked")
+        ConfigParser<PerformanceKeys> parser =
+                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+
+        assertThrows(NullPointerException.class,
+                () -> builder.buildConfigFile(null, "performance.yml", parser));
+        assertThrows(NullPointerException.class,
+                () -> builder.buildConfigFile(UUID.randomUUID(), null, parser));
+        assertThrows(NullPointerException.class,
+                () -> builder.buildConfigFile(UUID.randomUUID(), "performance.yml", null));
+        assertThrows(IllegalArgumentException.class,
+                () -> builder.buildConfigFile(UUID.randomUUID(), "", parser));
+    }
+
+    /** Empty-enum fixture for the v3.7.4 empty-file degradation test. */
+    private enum EmptyKeys { }
+
+    // ------------------------------------------------------------------------
+    // buildConfigFile: file-driven visibility (lite-style sparse YAML)
+    // ------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("buildConfigFile: keys absent from the YAML are not surfaced in the menu (lite parity)")
+    void buildConfigFile_omitsKeysAbsentFromLoadedYaml() {
+        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+
+        @SuppressWarnings("unchecked")
+        ConfigParser<PerformanceKeys> parser =
+                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        assertNotNull(parser, "RTPTestSetup must wire up the performance parser");
+
+        // Simulate a packaging variant (lite jar / hand-trimmed admin YAML)
+        // that deliberately omits a single key from the on-disk file. The
+        // in-memory parser state is the ground truth that the menu must
+        // mirror — iterating the raw `PerformanceKeys` enum constants would
+        // re-expose the omitted key purely because it exists in Java.
+        PerformanceKeys[] all = PerformanceKeys.values();
+        // Need at least two keys so that "omit one" is meaningful.
+        org.junit.jupiter.api.Assumptions.assumeTrue(all.length >= 2,
+                "PerformanceKeys must have >= 2 constants for this test");
+        PerformanceKeys omitted = all[0];
+        java.util.EnumMap<PerformanceKeys, Object> sparse =
+                new java.util.EnumMap<>(PerformanceKeys.class);
+        for (PerformanceKeys k : all) {
+            if (k == omitted) continue;
+            sparse.put(k, "seed");
+        }
+        parser.setData(sparse);
+
+        try {
+            MenuModel model = builder.buildConfigFile(
+                    UUID.randomUUID(), "performance.yml", parser);
+
+            int rowsForOmitted = 0;
+            int totalKeyRows = 0;
+            for (MenuPage page : model.pages()) {
+                List<MenuLine> ls = page.lines();
+                for (int i = 2; i < ls.size(); i++) {
+                    MenuFragment f = ls.get(i).fragments().get(0);
+                    if (f.action() instanceof MenuAction.OpenConfigKey ock) {
+                        totalKeyRows++;
+                        if (omitted.name().equals(ock.paramName())) {
+                            rowsForOmitted++;
+                        }
+                    }
+                }
+            }
+            assertEquals(0, rowsForOmitted,
+                    "omitted key '" + omitted.name() + "' must not appear in the menu");
+            assertEquals(sparse.size(), totalKeyRows,
+                    "menu must show exactly one row per loaded key, not per enum constant");
+        } finally {
+            // Leave the wired parser in a clean state for any other tests
+            // sharing this RTP.configs install in the same class.
+            RTP.configs.reloadConfigs();
+        }
+    }
+}

@@ -104,6 +104,7 @@ public class ReqRtpS005PaperStaleGuardFalsePositiveTest {
                 false,
                 10L,
                 1000L,
+                 0L,
                 5,
                 0.0,
                 1L,

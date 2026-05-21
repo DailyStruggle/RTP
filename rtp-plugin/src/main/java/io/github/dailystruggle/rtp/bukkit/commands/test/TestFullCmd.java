@@ -81,6 +81,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
               "async-reply",
               "disconnect-job",
               "safety-verifier",
+              "network",
               "stress"));
 
   /**

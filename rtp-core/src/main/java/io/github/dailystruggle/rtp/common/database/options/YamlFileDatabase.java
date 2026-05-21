@@ -212,6 +212,21 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
         file.set(keyStr, value);
       }
     }
+
+    // Persist immediately. Without this save, the next write() call reloads the
+    // file from disk via loadWithComments() and discards every in-memory edit
+    // applied here, so only the most recently-written row survives until the
+    // disconnect()-time flush - the symptom being that rtp_cached_locations.yml
+    // only ever contains a single entry regardless of how many rows were queued.
+    try {
+      file.save();
+      // The file's lastModified timestamp just changed; refresh the connect()
+      // cache marker so a subsequent connect() doesn't re-read stale bytes.
+      cachedLookupLastModified.get().put(tableName, file.file().lastModified());
+      cachedLookup.get().put(tableName, file);
+    } catch (IOException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
+    }
   }
 
   @Override
@@ -307,11 +322,80 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
   @Override
   public void setValue(String tableName, Map<?, ?> keyValuePairs) {
     super.setValue(tableName, keyValuePairs);
+
+    // Flat-row re-nesting for YAML persistence.
+    //
+    // Callers such as DatabaseAccessor.saveCachedLocation() pass a flat
+    // {column -> value} map whose primary-key column ("UUID" or "id") identifies
+    // the row. SQL backends INSERT that flat shape as one row directly. The YAML
+    // backend, however, stores each row as a YAML section keyed by the primary
+    // key (so loadCachedLocations() can iterate sections and read `region`,
+    // `world`, `x`, ... beneath each). Writing the flat shape would produce
+    // top-level keys (`region:`, `x:`, ...) that collide across rows: every
+    // subsequent write overwrites them, so only the most recently-written row
+    // survives, and loadCachedLocations() skips it because there is no
+    // configuration section to descend into. Symptom: `rtp_cached_locations.yml`
+    // contains a single flat row at shutdown and nothing is recovered on
+    // startup (no "loaded N locations" log line).
+    //
+    // Detect the flat-row shape and re-nest as {primaryKey -> columnsMap} before
+    // enqueueing. Maps that already look nested (a single entry whose value is
+    // itself a Map) are passed through unchanged.
+    Map<?, ?> effective = keyValuePairs;
+    if (looksLikeFlatRow(keyValuePairs)) {
+      String pk = extractPrimaryKey(keyValuePairs);
+      if (pk != null) {
+        Map<String, Object> nested = new LinkedHashMap<>();
+        Map<String, Object> row = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : keyValuePairs.entrySet()) {
+          row.put(String.valueOf(e.getKey()), e.getValue());
+        }
+        nested.put(pk, row);
+        effective = nested;
+      }
+    }
+
     Map<TableObj, TableObj> writeValues = new HashMap<>();
-    keyValuePairs.forEach((o, o2) -> writeValues.put(new TableObj(o), new TableObj(o2)));
+    effective.forEach((o, o2) -> writeValues.put(new TableObj(o), new TableObj(o2)));
     Map.Entry<String, Map<TableObj, TableObj>> writeRequest =
         new AbstractMap.SimpleEntry<>(tableName, writeValues);
     writeQueue.add(writeRequest);
+  }
+
+  /**
+   * A "flat row" is a column map: every value is a scalar (not a Map / not a
+   * FactoryValue / not a nested RtpYamlSection). A map that already wraps a
+   * single row under its primary key (one entry, value is a Map) is considered
+   * already-nested and is passed through unchanged.
+   */
+  private static boolean looksLikeFlatRow(Map<?, ?> m) {
+    if (m == null || m.isEmpty()) return false;
+    // Already-nested shape: { primaryKey -> Map }.
+    if (m.size() == 1) {
+      Object only = m.values().iterator().next();
+      if (only instanceof Map || only instanceof FactoryValue<?>) return false;
+    }
+    for (Object v : m.values()) {
+      if (v instanceof Map || v instanceof FactoryValue<?>) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Returns the primary-key value (as a string) for a flat row, or {@code null}
+   * if no recognised primary-key column is present. Mirrors the column-name
+   * preference order documented on {@link DatabaseAccessor#cacheValue(String, Map)}.
+   */
+  private static String extractPrimaryKey(Map<?, ?> m) {
+    String[] preferred = new String[] {"UUID", "id", "key", "primaryKey", "senderId", "name"};
+    for (String k : preferred) {
+      for (Map.Entry<?, ?> e : m.entrySet()) {
+        if (k.equals(String.valueOf(e.getKey())) && e.getValue() != null) {
+          return String.valueOf(e.getValue());
+        }
+      }
+    }
+    return null;
   }
 
   @Override

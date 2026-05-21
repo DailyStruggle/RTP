@@ -65,35 +65,37 @@ public class NoteEffect_1_12 extends Effect<NoteTypeNames> {
             }
         }
 
-        Sound sound = Sound.valueOf("BLOCK_NOTE_PLING");
-        switch (instrument) {
-            case BASS_DRUM:
-                sound = Sound.valueOf("BLOCK_NOTE_BASEDRUM");
-                break;
-            case SNARE_DRUM:
-                sound = Sound.valueOf("BLOCK_NOTE_SNARE");
-                break;
-            case BASS_GUITAR:
-                sound = Sound.valueOf("BLOCK_NOTE_BASS");
-                break;
-            case FLUTE:
-                sound = Sound.valueOf("BLOCK_NOTE_FLUTE");
-                break;
-            case BELL:
-                sound = Sound.valueOf("BLOCK_NOTE_BELL");
-                break;
-            case GUITAR:
-                sound = Sound.valueOf("BLOCK_NOTE_GUITAR");
-                break;
-            case CHIME:
-                sound = Sound.valueOf("BLOCK_NOTE_CHIME");
-                break;
-            case XYLOPHONE:
-                sound = Sound.valueOf("BLOCK_NOTE_XYLOPHONE");
-                break;
-        }
+        Sound sound = resolveNoteSound(instrument);
+        if (sound == null) return;
 
         Objects.requireNonNull(location.getWorld()).playSound(location,sound,1.0f,noteNumber);
+    }
+
+    private static Sound resolveNoteSound(Instrument instrument) {
+        String suffix;
+        switch (instrument) {
+            case BASS_DRUM: suffix = "BASEDRUM"; break;
+            case SNARE_DRUM: suffix = "SNARE"; break;
+            case BASS_GUITAR: suffix = "BASS"; break;
+            case FLUTE: suffix = "FLUTE"; break;
+            case BELL: suffix = "BELL"; break;
+            case GUITAR: suffix = "GUITAR"; break;
+            case CHIME: suffix = "CHIME"; break;
+            case XYLOPHONE: suffix = "XYLOPHONE"; break;
+            default: suffix = "PLING"; break;
+        }
+        // Try modern Folia/Paper enum name first (BLOCK_NOTE_BLOCK_*), then legacy (BLOCK_NOTE_*).
+        Sound s = tryValueOf("BLOCK_NOTE_BLOCK_" + suffix);
+        if (s == null) s = tryValueOf("BLOCK_NOTE_" + suffix);
+        return s;
+    }
+
+    private static Sound tryValueOf(String name) {
+        try {
+            return Sound.valueOf(name);
+        } catch (IllegalArgumentException | NoSuchFieldError e) {
+            return null;
+        }
     }
 
     @Override

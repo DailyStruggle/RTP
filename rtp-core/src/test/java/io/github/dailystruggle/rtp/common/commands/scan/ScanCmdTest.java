@@ -78,6 +78,7 @@ public class ScanCmdTest {
                 false,
                 10L,
                 1000L,
+                 0L,
                 5,
                 0.0,
                 1L,
@@ -317,7 +318,7 @@ public class ScanCmdTest {
         Square square2 = new Square();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
-                "region2", world, square2, vert2, false, false, 10L, 1000L, 5, 0.0, 1L, "", false);
+                "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
         Region region2 = new Region("region2", settings2);
         RTP.selectionAPI.permRegionLookup.put("region2", region2);
 
@@ -431,7 +432,7 @@ public class ScanCmdTest {
         Square square2 = new Square();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
-                "region2", world, square2, vert2, false, false, 10L, 1000L, 5, 0.0, 1L, "", false);
+                "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
         Region region2 = new Region("region2", settings2);
         RTP.selectionAPI.permRegionLookup.put("region2", region2);
 
@@ -506,7 +507,7 @@ public class ScanCmdTest {
         Square square2 = new Square();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
-                "region2", world, square2, vert2, false, false, 10L, 1000L, 5, 0.0, 1L, "", false);
+                "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
         Region region2 = new Region("region2", settings2);
         RTP.selectionAPI.permRegionLookup.put("region2", region2);
 
@@ -681,7 +682,7 @@ public class ScanCmdTest {
         Square square2 = new Square();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
-                "region2", world, square2, vert2, false, false, 10L, 1000L, 5, 0.0, 1L, "", false);
+                "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
         Region region2 = new Region("region2", settings2);
         RTP.selectionAPI.permRegionLookup.put("region2", region2);
 
@@ -698,7 +699,7 @@ public class ScanCmdTest {
         Square square2 = new Square();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
-                "region2", world, square2, vert2, false, false, 10L, 1000L, 5, 0.0, 1L, "", false);
+                "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
         Region region2 = new Region("region2", settings2);
         RTP.selectionAPI.permRegionLookup.put("region2", region2);
 
@@ -758,7 +759,7 @@ public class ScanCmdTest {
         Square square2 = new Square();
         LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
         RegionSettings settings2 = new RegionSettings(
-                "region2", world, square2, vert2, false, false, 10L, 1000L, 5, 0.0, 1L, "", false);
+                "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
         Region region2 = new Region("region2", settings2);
         RTP.selectionAPI.permRegionLookup.put("region2", region2);
 

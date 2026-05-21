@@ -308,6 +308,122 @@ class YamlFileDatabaseTest {
         assertEquals(-200, loc.getZ());
     }
 
+    /**
+     * Regression: multiple sequential {@code write()} calls must all persist to disk.
+     *
+     * <p>Prior to the fix, {@code YamlFileDatabase.write()} reloaded the file from
+     * disk on every call but only saved on {@code disconnect()}, so each write
+     * blew away the prior in-memory edits and only the most recent row survived.
+     * Symptom: {@code rtp_cached_locations.yml} only ever contained a single row
+     * regardless of how many were queued. See
+     * {@link io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase#write}.
+     */
+    @Test
+    void write_multipleRows_allPersisted() throws IOException {
+        Map<String, RtpYamlConfig> database = db.connect();
+
+        for (int i = 0; i < 5; i++) {
+            Map<DatabaseAccessor.TableObj, DatabaseAccessor.TableObj> pairs = new LinkedHashMap<>();
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("region", "myRegion");
+            row.put("world", "world");
+            row.put("x", i * 10);
+            row.put("y", 64);
+            row.put("z", i * 20);
+            row.put("attempts", 1);
+            row.put("seed", 0L);
+            row.put("player_uuid", "shared");
+            pairs.put(new DatabaseAccessor.TableObj("loc" + i), new DatabaseAccessor.TableObj(row));
+            db.write(database, "rtp_cached_locations", pairs);
+        }
+
+        var locations = db.loadCachedLocations("myRegion");
+        assertEquals(5, locations.size(),
+                "all five queued rows must be persisted to rtp_cached_locations.yml, " +
+                "not just the most recently written one");
+    }
+
+    /**
+     * Regression: {@link YamlFileDatabase#setValue(String, Map)} must re-nest a
+     * flat {@code {column -> value}} row under its primary-key column before
+     * enqueueing the write. Otherwise the row is laid out as top-level keys
+     * (matching the user-attached {@code rtp_cached_locations.yml} sample showing
+     * a single flat row with `x:`, `y:`, `z:`, `UUID:` at document root), every
+     * subsequent row collides on those top-level keys, and {@code loadCachedLocations}
+     * skips the file because there are no per-row configuration sections to descend
+     * into. End-to-end shape: {@code DatabaseAccessor.saveCachedLocation} -> flat
+     * columns -> {@code flushDirtyCache} -> {@code setValue(String, Map)} ->
+     * {@code processQueries} -> {@code write} -> {@code loadCachedLocations}.
+     */
+    @Test
+    void setValue_flatRow_isNestedUnderPrimaryKey() throws IOException {
+        // Simulate the flat columns map produced by DatabaseAccessor.saveCachedLocation:
+        // every column is a scalar, "UUID" is the synthetic composite primary key
+        // (region:world:x:y:z), and there is no outer wrapping.
+        Map<String, Object> flatRow = new LinkedHashMap<>();
+        flatRow.put("region", "myRegion");
+        flatRow.put("world", "world");
+        flatRow.put("x", 100);
+        flatRow.put("y", 64);
+        flatRow.put("z", -200);
+        flatRow.put("attempts", 3);
+        flatRow.put("seed", 12345L);
+        flatRow.put("player_uuid", "shared");
+        flatRow.put("UUID", "myRegion:world:100:64:-200");
+
+        db.setValue("rtp_cached_locations", flatRow);
+
+        // Drain the writeQueue end-to-end via processQueries, mirroring what the
+        // periodic database task does at runtime.
+        db.processQueries(Long.MAX_VALUE);
+        db.disconnect(db.connect());
+
+        var locations = db.loadCachedLocations("myRegion");
+        assertEquals(1, locations.size(),
+                "flat-shape setValue must produce a section-keyed row that " +
+                "loadCachedLocations can read back");
+        DatabaseAccessor.StoredLocation loc = locations.get(0);
+        assertEquals("myRegion:world:100:64:-200", loc.getId());
+        assertEquals(100, loc.getX());
+        assertEquals(64, loc.getY());
+        assertEquals(-200, loc.getZ());
+
+        // The file must NOT contain top-level "region:" / "x:" keys at the
+        // document root - that is the pre-fix mojibake shape from the attached
+        // user sample.
+        String yaml = Files.readString(tempDir.resolve("rtp_cached_locations.yml"));
+        assertFalse(yaml.startsWith("region:"),
+                "row columns must be nested under the primary key, not at document root");
+    }
+
+    /**
+     * Regression: two sequential {@code setValue(flatRow)} calls with different
+     * primary keys must both end up as distinct sections in the YAML file.
+     * Pre-fix, both rows collapsed onto the same top-level keys and only the
+     * last one survived.
+     */
+    @Test
+    void setValue_twoFlatRows_bothPersistedAsDistinctSections() throws IOException {
+        for (int i = 0; i < 2; i++) {
+            Map<String, Object> flatRow = new LinkedHashMap<>();
+            flatRow.put("region", "myRegion");
+            flatRow.put("world", "world");
+            flatRow.put("x", i * 100);
+            flatRow.put("y", 64);
+            flatRow.put("z", i * -100);
+            flatRow.put("attempts", 1);
+            flatRow.put("seed", 0L);
+            flatRow.put("player_uuid", "shared");
+            flatRow.put("UUID", "row-" + i);
+            db.setValue("rtp_cached_locations", flatRow);
+            db.processQueries(Long.MAX_VALUE);
+        }
+        db.disconnect(db.connect());
+
+        assertEquals(2, db.loadCachedLocations("myRegion").size(),
+                "both flat-row writes must persist as distinct sections");
+    }
+
     @Test
     void loadCachedLocations_differentRegion_returnsEmpty() throws IOException {
         Path yamlPath = tempDir.resolve("rtp_cached_locations.yml");

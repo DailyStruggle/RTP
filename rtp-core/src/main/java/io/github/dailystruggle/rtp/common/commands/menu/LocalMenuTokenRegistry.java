@@ -48,8 +48,17 @@ import java.util.logging.Level;
  */
 public final class LocalMenuTokenRegistry implements MenuTokenRegistry {
 
-    /** Default value of {@code menu.maxOutstandingTokensPerPlayer}. */
-    public static final int DEFAULT_MAX_OUTSTANDING_PER_PLAYER = 256;
+    /**
+     * Default value of {@code menu.maxOutstandingTokensPerPlayer}.
+     *
+     * <p>Raised from the historical 256 to 8192 so a player can browse deep paginated
+     * menus (e.g. the config-view book over {@code messages.yml}, which mints &gt;150
+     * tokens per render across 13 pages) and re-render the same menu several times
+     * without earlier pages' tokens being evicted by the per-player FIFO cap. Per-player
+     * memory cost at the cap is still small (a few hundred KiB of short strings and tiny
+     * {@code Entry} records).</p>
+     */
+    public static final int DEFAULT_MAX_OUTSTANDING_PER_PLAYER = 8192;
 
     /** Default sweep period when {@link #scheduleSweeps()} is invoked. */
     public static final Duration DEFAULT_SWEEP_PERIOD = Duration.ofSeconds(30);

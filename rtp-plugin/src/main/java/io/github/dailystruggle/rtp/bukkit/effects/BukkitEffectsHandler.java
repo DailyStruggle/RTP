@@ -96,12 +96,48 @@ public class BukkitEffectsHandler {
         List<Effect<?>> effects = EffectFactory.buildEffects(prefix, union);
         for (Effect<?> effect : effects) {
             effect.setTarget(player);
-            // Schedule on the main thread so platform-restricted ops inside
-            // Effect#run (NoteEffect#setBlockData, FireworkEffect spawn) don't
-            // trip Paper's AsyncCatcher. Effect extends BukkitRunnable, so
-            // runTask handles main-thread dispatch.
-            BukkitEffectsInitializer.runEffect(plugin, effect);
+            // Schedule on a thread that legally owns the player so that
+            // platform-restricted ops inside Effect#run (NoteEffect playSound,
+            // FireworkEffect spawn, etc.) don't trip Paper's AsyncCatcher
+            // (REQ-RTP-S-005). On Folia, Bukkit.getScheduler().runTask throws
+            // UnsupportedOperationException and BukkitEffectsInitializer's
+            // catch-block then falls back to running the effect directly on
+            // the calling async pipeline thread, which is the failure mode
+            // this routes around. We prefer RTP.scheduler.scheduleTeleport
+            // (Folia entity-scheduler aware; "scheduleTeleport" is the
+            // historic name for a generic "run runnable on a thread owning
+            // the player after N ticks" path) and fall back to the legacy
+            // runEffect helper when no RTPPlayer is available (Paper/Spigot).
+            dispatchEffectForPlayer(plugin, effect, rp);
         }
+    }
+
+    /**
+     * Run {@code effect} on a thread that legally owns its target player.
+     * Folia: routes through {@link RTP#scheduler}'s
+     * {@code scheduleTeleport(RTPPlayer, RTPRunnable, delayTicks)} entry
+     * point (per-entity scheduler hop). Paper/Spigot or when the
+     * {@link RTPPlayer} view is unavailable: falls back to the legacy
+     * {@link BukkitEffectsInitializer#runEffect(org.bukkit.plugin.Plugin, Effect)} helper,
+     * whose {@code Bukkit.getScheduler().runTask} path remains the correct
+     * main-thread dispatch on those platforms.
+     */
+    private static void dispatchEffectForPlayer(JavaPlugin plugin, Effect<?> effect, RTPPlayer rp) {
+        if (RTP.scheduler != null && rp != null) {
+            try {
+                RTP.scheduler.scheduleTeleport(
+                        rp,
+                        new io.github.dailystruggle.rtp.common.tasks.RTPRunnable((Runnable) effect),
+                        1L);
+                return;
+            } catch (Throwable t) {
+                RTP.log(Level.FINE,
+                        "[effects] RTP.scheduler dispatch failed ("
+                                + t.getClass().getName() + ": " + t.getMessage()
+                                + "); falling back to BukkitEffectsInitializer.runEffect");
+            }
+        }
+        BukkitEffectsInitializer.runEffect(plugin, effect);
     }
 
     /**

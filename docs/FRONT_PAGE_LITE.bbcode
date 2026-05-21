@@ -12,6 +12,17 @@
 [/CENTER]
 
 [SIZE=6][B][COLOR=#27AE60]Why operators pick RTP[/COLOR][/B][/SIZE]
+[B]RTP is the fastest, lowest-latency free Random Teleport plugin for Bukkit-native Minecraft servers (Paper, Bukkit, Arclight, Mohist, and other Bukkit-family forks), with Fabric supported as a first-class platform.[/B] In plain operator terms:
+
+[LIST]
+[*][B]No lag spikes when players spam [I]/rtp[/I].[/B] Worst-case main-thread tick stays at 4 ms (vs. 70-771 ms for the next plugins) - your TPS holds at 20.00 during a teleport burst.
+[*][B]Instant teleports, no "Finding a safe location..." wait.[/B] Pre-verified location queue serves [I]/rtp[/I] in one tick instead of loading chunks on demand.
+[*][B]Works on plain Bukkit servers at Paper-class speed.[/B] Off-tick [I].mca[/I] Anvil pre-filter, worst tick stays at 3 ms while competitors spike past 3 seconds.
+[*][B]Eight claim-plugin integrations bundled[/B] (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect) - no add-ons to install.
+[*][B]Audited safety[/B]: no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures (REQ-RTP-S-001..S-007).
+[*][B]Truly free.[/B] No paywalled [I]/rtp[/I], no nag screens, no ads - only anonymous bStats usage stats (admin opt-out).
+[/LIST]
+
 On [B]Paper 1.21[/B], measured on the in-repo benchmark harness, two clients spamming [I]/rtp[/I] back-to-back:
 
 [TABLE]
@@ -24,6 +35,28 @@ On [B]Paper 1.21[/B], measured on the in-repo benchmark harness, two clients spa
 
 Same throughput as the next-best plugin, [B]~17× lower worst-case tick spike, 35% less CPU per teleport.[/B] On Spigot, RTP's worst tick stays at 3 ms while competitors spike past 3 seconds. Reproduce on your own rig: [URL=https://github.com/dailystruggle/RTP/tree/V3-beta/helpers/StressTestRTP][I]helpers/StressTestRTP/[/I][/URL].
 
+[SPOILER='🧪 Engineering receipts (proof, not marketing)']
+Every number on this page is anchored in the repo:
+[LIST]
+[*][B]Reproducible benchmarks[/B] with raw CSVs and per-run analyses: [URL='https://github.com/dailystruggle/RTP/tree/V3-beta/helpers/StressTestRTP'][B]helpers/StressTestRTP/[/B][/URL]
+[*][B]Requirements traced to tests[/B] — every REQ-* (including the S-001…S-007 prohibition guards: no main-thread chunk loading, no silently swallowed teleport failures, …) has an implementing class and regression test: [URL='https://github.com/dailystruggle/RTP/blob/V3-beta/docs/dev/TRACEABILITY.md'][B]TRACEABILITY.md[/B][/URL]
+[*][B]28+ ADRs[/B], dated and numbered, covering platform-in-scope decisions, the Anvil subsystem, the Brigadier bridge, supersession trails: [URL='https://github.com/dailystruggle/RTP/tree/V3-beta/docs/adr'][B]docs/adr/[/B][/URL]
+[*][B]bStats[/B] enabled — anonymous usage stats help prioritize platform work.
+[/LIST]
+[/SPOILER]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=6][B][COLOR=#C0392B]Operator fit (30-second check)[/COLOR][/B][/SIZE]
+A few hard requirements. If any are a [B]no[/B], EssentialsX [I]/rtp[/I] or HuskHomes are fine free alternatives.
+
+[LIST]
+[*]✅ [B]Java 21+[/B] on your host (REQ-RTP-SYS-001, non-negotiable).
+[*]✅ [B]Paper, Spigot, or a Bukkit-family fork[/B] (Arclight / Mohist supported for Forge / NeoForge bridges). Fabric is supported and regularly tested, with its featureset lagging the Bukkit family by a release or two.
+[*]✅ [B]In-game editing or YAML, your call.[/B] Browse and tune config from the clickable [I]/rtp menu[/I] (book on Paper / Folia, chat-paginated elsewhere), or edit the plain YAML files directly and version-control them.
+[*]❌ Folia, proxy/cross-server, SQL/Redis, Vault economy → those live in [B]RTP-Pro[/B].
+[/LIST]
+
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#16A085]Install (30 seconds)[/COLOR][/B][/SIZE]
@@ -31,9 +64,10 @@ Same throughput as the next-best plugin, [B]~17× lower worst-case tick spike, 3
 [*]Drop [I]RTP-x.y.z.jar[/I] into [I]plugins/[/I].
 [*]Start the server. A [I]default[/I] region is generated for you.
 [*]Type [B]/rtp[/B].
+[*]Run [B]/rtp menu[/B] to browse regions, worlds, and configuration in-game (clickable book on Paper / Folia, chat-paginated fallback elsewhere).
 [/LIST]
 
-That's it. Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/I] later. Full admin guide is auto-unpacked into [I]plugins/RTP/docs/[/I] on first run, and lives online at the [URL='https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_SERVER_ADMINS.md'][B]admin guide[/B][/URL].
+That's it. Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/I] later — via [I]/rtp menu[/I] or by editing the YAML directly. Full admin guide is auto-unpacked into [I]plugins/RTP/docs/[/I] on first run, and lives online at the [URL='https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_SERVER_ADMINS.md'][B]admin guide[/B][/URL].
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
@@ -60,7 +94,7 @@ That's it. Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/
 [TR][TD][B]Arclight / Mohist[/B] (Forge / NeoForge bridges)[/TD][TD]✅ Officially supported[/TD][TD]Use the Spigot/Paper jar. Recommended way to run on Forge/NeoForge.[/TD][/TR]
 [TR][TD][B]Folia[/B][/TD][TD]❌ Not in this build[/TD][TD]Folia adapter ships in [B]RTP-Pro[/B].[/TD][/TR]
 [TR][TD][B]Multi-server / proxy[/B] (Velocity, BungeeCord)[/TD][TD]❌ Not in this build[/TD][TD]Cross-server queue ships in [B]RTP-Pro[/B] (beta.3+).[/TD][/TR]
-[TR][TD][B]Fabric[/B][/TD][TD]🧪 Functional (unstable frontier)[/TD][TD]First-class in-scope platform; stabilization ongoing.[/TD][/TR]
+[TR][TD][B]Fabric[/B][/TD][TD]✅ Supported[/TD][TD]First-class in-scope platform; tested regularly. Featureset lags the Bukkit family by a release or two.[/TD][/TR]
 [TR][TD][B]Native Forge / NeoForge[/B][/TD][TD]🔁 Use Arclight / Mohist[/TD][TD]No native adapter planned.[/TD][/TR]
 [/TABLE]
 
@@ -73,14 +107,20 @@ That's it. Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/
 
 [B]Metrics:[/B] Throughput (TP/s, higher better) · MSPT p99 (worst 1-in-100 main-thread tick in ms, lower better) · Min TPS (lowest TPS observed; 20.00 = no hiccup) · CPU / TP (main-thread CPU per successful teleport).
 
-[B]Paper 1.21.11[/B] — canonical head-to-head.
+[B]Paper 1.20.1 / 1.21.11[/B] — canonical head-to-head. Eight plugins, same harness, same world, same two OPed clients.
 [TABLE]
-[TR][TH]Plugin[/TH][TH]TP/s[/TH][TH]MSPT p99 (ms)[/TH][TH]Min TPS[/TH][TH]CPU / TP (ms)[/TH][/TR]
-[TR][TD][B]🧪 RTP[/B][/TD][TD][B]19.8[/B][/TD][TD][B]4[/B][/TD][TD][B]20.00[/B][/TD][TD][B]16.9[/B][/TD][/TR]
-[TR][TD]🧪 JakesRTP[/TD][TD]20.0[/TD][TD]70[/TD][TD]20.00[/TD][TD]26.0[/TD][/TR]
-[TR][TD]🧪 BetterRTP[/TD][TD]7.1[/TD][TD]771[/TD][TD]20.00[/TD][TD]53.6[/TD][/TR]
-[TR][TD]🧪 HuskHomes[/TD][TD]6.2[/TD][TD]335[/TD][TD]20.00[/TD][TD]52.2[/TD][/TR]
+[TR][TH]Plugin[/TH][TH]TP/s[/TH][TH]MSPT p99 (ms)[/TH][TH]Min TPS[/TH][TH]CPU / TP (ms)[/TH][TH]Success[/TH][/TR]
+[TR][TD][B]🧪 RTP[/B][/TD][TD][B]19.8[/B][/TD][TD][B]4[/B][/TD][TD][B]20.00[/B][/TD][TD][B]16.9[/B][/TD][TD][B]100 %[/B][/TD][/TR]
+[TR][TD]🧪 JakesRTP[/TD][TD]20.0[/TD][TD]70[/TD][TD]20.00[/TD][TD]26.0[/TD][TD]100 %[/TD][/TR]
+[TR][TD]🧪 BetterRTP[/TD][TD]7.3[/TD][TD]852[/TD][TD]20.00[/TD][TD]53.6[/TD][TD]100 %[/TD][/TR]
+[TR][TD]🧪 HuskHomes[/TD][TD]6.2[/TD][TD]372[/TD][TD]20.00[/TD][TD]52.2[/TD][TD]100 %[/TD][/TR]
+[TR][TD]🧪 AdvancedRTP[/TD][TD]2.16[/TD][TD]2 100[/TD][TD]19.95[/TD][TD]92.1[/TD][TD]96.3 %[/TD][/TR]
+[TR][TD]🧪 EzRTP[/TD][TD]1.76[/TD][TD]2 903[/TD][TD]19.95[/TD][TD]139.6[/TD][TD]100 %[/TD][/TR]
+[TR][TD]🧪 AsyRTP[/TD][TD]1.67[/TD][TD]4 534[/TD][TD]19.95[/TD][TD]38.8[/TD][TD]100 %[/TD][/TR]
+[TR][TD]🧪 EssentialsX [I]/tpr[/I][/TD][TD]0.96[/TD][TD]4 504[/TD][TD]19.95[/TD][TD]88.9[/TD][TD]75.9 % §[/TD][/TR]
 [/TABLE]
+
+§ EssentialsX [I]/tpr[/I] is a teleport-[I]request[/I] command (handshake + accept), not a teleport-[I]do[/I] command; the harness's 5 s per-attempt deadline times out a fraction of the request-accept latencies. Numbers are dispatch-shaped, not plugin-broken.
 
 [B]Spigot 1.20.1[/B] — Spigot's platform-wide chunk-gen ceiling caps everyone in the 1–1.5 TP/s range during the burst; the latency tail is what matters.
 [TABLE]
@@ -137,7 +177,7 @@ Full methodology, raw CSVs, per-run analyses: [URL=https://github.com/dailystrug
 [*][B]/rtp [parameter]:[value][/B] — specify [I]region:[/I], [I]world:[/I], [I]player:[/I], or temporary overrides.
 [*][B]/rtp reload[/B] — reload all configuration from disk.
 [*][B]/rtp scan start|pause|resume|reset|cancel[/B] — pre-warm spatial memory by walking a region (renamed from [I]/rtp fill[/I] in 2.x).
-[*][B]/rtp config[/B] — interactive config editor. [I]Experimental in 3.0.0-beta.1[/I]; edit YAML directly for production.
+[*][B]/rtp menu[/B] — interactive admin menu; book on Paper / Folia, chat-paginated fallback elsewhere. Hardened in [I]3.0.0-beta.3[/I].
 [/LIST]
 
 [B]PlaceholderAPI[/B]
@@ -170,22 +210,22 @@ A: RTP trades a bounded amount of RAM (the queue, bounded by cacheCap) for speed
 A: GitHub issue with server version, RTP version, platform, relevant config files, and the error log section. See the [URL='https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_SERVER_ADMINS.md']admin guide[/URL] for the full reproduction template.
 [/SPOILER]
 
-[SPOILER='🧪 Engineering receipts']
-Every claim on this page is anchored in the repo:
+[SPOILER='📞 Community Support Policy (read before filing an issue)']
+Support for the free build is [B]community-tier and best-effort[/B] — a solo maintainer ships fixes when properly-reported issues land. Respecting this is how the plugin stays fast and current.
 [LIST]
-[*][B]Reproducible benchmarks[/B] with raw artifacts: [URL='https://github.com/dailystruggle/RTP/tree/V3-beta/helpers/StressTestRTP'][B]helpers/StressTestRTP/[/B][/URL]
-[*][B]Requirements traced to tests[/B] — every REQ-* (including the S-001…S-007 prohibition guards: no main-thread chunk loading, no silently swallowed teleport failures, …) has an implementing class and regression test: [URL='https://github.com/dailystruggle/RTP/blob/V3-beta/docs/dev/TRACEABILITY.md'][B]TRACEABILITY.md[/B][/URL]
-[*][B]28+ ADRs[/B], dated and numbered, covering platform-in-scope decisions, the Anvil subsystem, the Brigadier bridge, supersession trails: [URL='https://github.com/dailystruggle/RTP/tree/V3-beta/docs/adr'][B]docs/adr/[/B][/URL]
-[*][B]bStats[/B] enabled — anonymous usage stats help prioritize platform work.
+[*][B]Support covers bugs and configuration questions,[/B] after you've read the admin guide.
+[*][B]Bug reports need a reproduction:[/B] server version, RTP version, platform (Spigot / Paper / fork), [I]config.yml[/I], [I]regions/[/I], [I]safety.yml[/I], and the relevant [I]server.log[/I] section. Reports without these are asked for them once, then closed.
+[*][B]"It doesn't work" is not a bug report.[/B] Tell me what you did, what you expected, and what actually happened.
+[*][B]Unsupported on the free tier:[/B] native Forge / NeoForge (use Arclight / Mohist), plugin conflicts I can't reproduce, general MC-server admin questions.
+[*][B]Response time:[/B] no SLA on the free build. Critical safety issues (S-001…S-007 violations) jump the queue regardless. Guaranteed response windows are reserved for [B]RTP-Pro[/B].
+[*][B]Feature requests[/B] via GitHub issues. Priority follows the published roadmap, not ticket volume.
 [/LIST]
 [/SPOILER]
 
-[SPOILER='⚠️ Known limitations in 3.0.0-beta.2']
+[SPOILER='⚠️ Known limitations in 3.0.0-beta.3']
 [LIST]
 [*]Free build does not ship Folia, SQL/Redis, multi-server, Vault economy, multilingual [I]lang/**[/I], or the tag/state-predicate [I]safety.yml[/I] grammar — all are in [B]RTP-Pro[/B].
-[*]Fabric is functional but an unstable frontier — usable, but expect rough edges; production-critical servers should prefer Paper/Folia/Spigot for now.
 [*][I]safety.yml[/I] here accepts flat material names ([I]LAVA[/I], [I]MAGMA_BLOCK[/I], [I]CACTUS[/I], [I]FIRE[/I]). Unknown materials log one warning, never silently dropped.
-[*][I]/rtp config[/I] is experimental; edit YAML directly for production.
 [*]Edits to [I]safety.yml[/I] and biome filters do not yet invalidate the persisted shape cache — workaround: [I]/rtp scan reset <region>[/I].
 [*]Emergency landing platform default is now [I]platformRadius: -1[/I] (disabled). Set to [I]0[/I] or higher to restore legacy 2.x behavior.
 [/LIST]
@@ -215,9 +255,10 @@ Live list: [URL='https://github.com/dailystruggle/RTP/blob/V3-beta/CHANGELOG.md#
 [*][URL='https://github.com/dailystruggle/RTP'][B]Source on GitHub[/B][/URL] — star, watch, contribute, file issues
 [/LIST]
 
-[I]Support for the free build is community-tier and best-effort. Include server version, RTP version, platform, configs, and [I]server.log[/I] excerpt when reporting bugs. Priority and response-time guarantees are reserved for [B]RTP-Pro[/B].[/I]
-
 [CENTER]
 [COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR]
-[I][COLOR=#7F8C8D]bStats enabled — anonymous usage stats help prioritize platform work.[/COLOR][/I]
 [/CENTER]
+
+[QUOTE]
+[I]I'm a solo engineer maintaining a deterministic, high-performance teleport engine. The free build is the same core code that ships in RTP-Pro — released openly because single-server Bukkit/Paper operators deserve a fast, audited [I]/rtp[/I] without a paywall. If RTP saves your TPS, a star on GitHub or a properly-filed bug report goes a long way.[/I]
+[/QUOTE]

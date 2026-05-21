@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
@@ -56,6 +55,16 @@ public final class FrontPageBuilder {
 
     /** Admin-view gate permission. {@code rtp.admin} should imply this in {@code plugin.yml}. */
     public static final String ADMIN_PERMISSION = "rtp.menu.admin";
+
+    /**
+     * Permission gating the curated "config editor" row on the admin
+     * front page (proposal v3.7.1, checklist step 7). When the viewer
+     * holds this permission, the row dispatches an
+     * {@link MenuAction.OpenConfigSelector} that opens the curated
+     * config selector page; when missing, the row is hidden entirely
+     * (not greyed) so the page stays clean.
+     */
+    public static final String CONFIG_VIEW_PERMISSION = "rtp.config.view";
 
     /** Token TTL aligned with {@link CommandTreeMenuBuilder#DEFAULT_TOKEN_TTL}. */
     public static final Duration DEFAULT_TOKEN_TTL = CommandTreeMenuBuilder.DEFAULT_TOKEN_TTL;
@@ -118,7 +127,7 @@ public final class FrontPageBuilder {
                 new MenuAction.RunRtpCommand(new String[0]));
 
         if (adminView) {
-            appendAdminRows(rtpRoot, lines);
+            appendAdminRows(lines);
         } else {
             appendPlayerRows(rtpRoot, viewer, permission, lines);
         }
@@ -181,67 +190,26 @@ public final class FrontPageBuilder {
     }
 
     /**
-     * Admin-view rows after the always-on Teleport row. Each row drops
-     * silently if its target subtree is not registered on the live tree
-     * (the {@code OpenMenu} would otherwise navigate to a missing node).
+     * Admin-view rows after the always-on Teleport row
+     * (PROPOSAL-admin-panel.md v2). Collapses the previous inline admin block
+     * to a single {@code Admin panel} entry row that emits a
+     * {@link MenuAction.OpenAdminPanel}. The actual operator-facing rows
+     * (Config editor, Server info, Full diagnostics, Memory tracker, Scan
+     * control, Reload, Browse) now live on the dedicated admin-panel page
+     * built by {@link AdminPanelBuilder}.
+     *
+     * <p>The previous {@code menuFrontPageSectionAdmin} divider is gone: a
+     * single entry row needs no section header, and dropping the divider
+     * keeps the front page uniform between admin and non-admin viewers.
      */
-    private void appendAdminRows(TreeCommand rtpRoot, List<MenuLine> lines) {
-        String adminSection =
-                lookupMsg(MessagesKeys.menuFrontPageSectionAdmin, "── Administration ──");
-        if (adminSection != null && !adminSection.isEmpty()) {
-            lines.add(MenuLine.of(new MenuFragment(adminSection, null, null)));
-        }
-
-        // Info — always shipped on /rtp today; safe to assume RunRtpCommand
-        // dispatches cleanly.
-        if (hasSubcommand(rtpRoot, "info")) {
-            addRow(
-                    lines,
-                    lookupMsg(MessagesKeys.menuFrontPageRowInfo, "📋 Server info"),
-                    null,
-                    new MenuAction.RunRtpCommand(new String[]{"info"}));
-        }
-
-        // Config — descend into config sub-tree (paginated reflector).
-        if (hasSubcommand(rtpRoot, "config")) {
-            addRow(
-                    lines,
-                    lookupMsg(MessagesKeys.menuFrontPageRowConfig, "⚙ Config editor"),
-                    null,
-                    new MenuAction.OpenMenu(new String[]{"config"}));
-        }
-
-        // Scan — descend.
-        if (hasSubcommand(rtpRoot, "scan")) {
-            addRow(
-                    lines,
-                    lookupMsg(MessagesKeys.menuFrontPageRowScan, "🔄 Scan control"),
-                    null,
-                    new MenuAction.OpenMenu(new String[]{"scan"}));
-        }
-
-        // Full diagnostics — direct run with a warning hover.
-        if (hasSubcommand(rtpRoot, "test")) {
-            addRow(
-                    lines,
-                    lookupMsg(
-                            MessagesKeys.menuFrontPageRowDiagnostics, "🔍 Full diagnostics"),
-                    lookupMsg(
-                            MessagesKeys.menuFrontPageHoverDiagnostics,
-                            "Runs the full diagnostic suite."),
-                    new MenuAction.RunRtpCommand(new String[]{"test", "full"}));
-        }
-
-        // Reload — destructive, perm-gated by rtp.reload already; hover warns.
-        if (hasSubcommand(rtpRoot, "reload")) {
-            addRow(
-                    lines,
-                    lookupMsg(MessagesKeys.menuFrontPageRowReload, "⚠ Reload"),
-                    lookupMsg(
-                            MessagesKeys.menuFrontPageHoverReload,
-                            "Reloads all config files."),
-                    new MenuAction.RunRtpCommand(new String[]{"reload"}));
-        }
+    private void appendAdminRows(List<MenuLine> lines) {
+        addRow(
+                lines,
+                lookupMsg(MessagesKeys.menuFrontPageRowAdmin, "&6⚙ Admin panel"),
+                lookupMsg(
+                        MessagesKeys.menuFrontPageHoverAdmin,
+                        "Operator tools: config, scans, diagnostics, reload."),
+                new MenuAction.OpenAdminPanel());
     }
 
     // ---- helpers ----------------------------------------------------------
@@ -260,13 +228,6 @@ public final class FrontPageBuilder {
                     "front-page permission probe threw for '" + perm + "': " + e.getMessage(), e);
             return false;
         }
-    }
-
-    private static boolean hasSubcommand(TreeCommand root, String name) {
-        Map<String, CommandsAPICommand> lookup = root.getCommandLookup();
-        if (lookup == null || name == null) return false;
-        return lookup.containsKey(name)
-                || lookup.containsKey(name.toUpperCase(Locale.ROOT));
     }
 
     private static CommandParameter findParameter(TreeCommand root, String name) {

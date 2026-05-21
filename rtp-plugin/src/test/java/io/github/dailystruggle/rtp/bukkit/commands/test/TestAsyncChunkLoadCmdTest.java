@@ -55,25 +55,17 @@ class TestAsyncChunkLoadCmdTest {
   @Test
   @DisplayName("runProbe passes when getChunkAt completes on a worker thread (REQ-RTP-S-005)")
   void runProbePassesWhenCompletionIsOffCallerThread() throws Exception {
-    // Block the worker-side completion until the caller thread has had a
-    // chance to observe `future.isDone() == false`, guaranteeing the
-    // probe sees a truly-async completion path.
-    CompletableFuture<Void> gate = new CompletableFuture<>();
-    FakeAsyncWorld world = new FakeAsyncWorld(workerPool, gate);
+    // Deterministic handshake (replaces a prior Thread.sleep race):
+    // the fake hands the probe an uncompleted future and dispatches a
+    // worker that busy-waits until the future has acquired a dependent
+    // stage (i.e. the probe's whenComplete is registered) before
+    // completing it. This guarantees off-caller-thread completion
+    // regardless of CI load.
+    FakeAsyncWorld world = new FakeAsyncWorld(workerPool);
 
     CompletableFuture<TestAsyncChunkLoadCmd.Result> async =
         CompletableFuture.supplyAsync(
             () -> TestAsyncChunkLoadCmd.runProbe(world, 0, 0, 5_000L));
-
-    // Give the probe a beat to attach its whenComplete callback, then
-    // unblock the async chunk load. The 100 ms delay (paired with the
-    // 100 ms sleep inside FakeAsyncWorld#getChunkAt) is generous on
-    // purpose: under loaded CI a 20 ms pre-gate sleep can race the
-    // probe's whenComplete registration, causing inline completion on
-    // the caller thread and a spurious assertEquals failure at the
-    // completingThread check below.
-    Thread.sleep(100L);
-    gate.complete(null);
 
     TestAsyncChunkLoadCmd.Result r = async.get(5, TimeUnit.SECONDS);
 
@@ -129,7 +121,7 @@ class TestAsyncChunkLoadCmdTest {
   @Test
   @DisplayName("runProbe reports timeout when the future never completes")
   void runProbeTimesOut() {
-    FakeAsyncWorld world = new FakeAsyncWorld(workerPool, new CompletableFuture<>());
+    FakeNeverWorld world = new FakeNeverWorld();
     TestAsyncChunkLoadCmd.Result r = TestAsyncChunkLoadCmd.runProbe(world, 0, 0, 100L);
 
     assertFalse(r.pass, "timed-out probe must not pass");
@@ -193,35 +185,52 @@ class TestAsyncChunkLoadCmdTest {
   /** Minimal concrete {@link RTPWorld} that shells out to an {@link Executor} for chunk I/O. */
   private static class FakeAsyncWorld extends BaseFakeRTPWorld {
     private final Executor executor;
-    private final CompletableFuture<Void> gate;
 
-    FakeAsyncWorld(Executor executor, CompletableFuture<Void> gate) {
+    FakeAsyncWorld(Executor executor) {
       super("async-world");
       this.executor = executor;
-      this.gate = gate;
     }
 
     @Override
     public CompletableFuture<Long> getChunkAt(int cx, int cz) {
       long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
-      // Add a small delay on the executor after gate.complete fires so the
-      // probe's whenComplete callback is guaranteed to be registered before
-      // the returned future is actually completed. Without this delay, a
-      // fast gate.complete → executor-dispatch → inline-complete sequence
-      // can race the probe's whenComplete registration, causing the
-      // callback to fire inline on the caller thread instead of on the
-      // executor. The race is an artefact of the test fake, not the
-      // production S-005 contract.
-      return gate.thenApplyAsync(
-          v -> {
-            try {
-              Thread.sleep(100L);
-            } catch (InterruptedException ie) {
-              Thread.currentThread().interrupt();
+      CompletableFuture<Long> f = new CompletableFuture<>();
+      // Dispatch a worker that busy-waits until the probe's
+      // whenComplete dependent stage is observed on `f` before
+      // completing it. CompletableFuture#getNumberOfDependents reports
+      // the count of registered dependent actions; once it is >= 1 we
+      // know the probe has attached its whenComplete callback, so
+      // completing `f` from this worker thread will dispatch the
+      // callback on this thread (the workerPool), not inline on the
+      // caller. This replaces a Thread.sleep-based handshake that was
+      // timing-flaky under loaded CI.
+      executor.execute(
+          () -> {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(4);
+            while (f.getNumberOfDependents() < 1) {
+              if (System.nanoTime() > deadline) {
+                f.completeExceptionally(
+                    new IllegalStateException(
+                        "timed out waiting for whenComplete to attach"));
+                return;
+              }
+              Thread.onSpinWait();
             }
-            return key;
-          },
-          executor);
+            f.complete(key);
+          });
+      return f;
+    }
+  }
+
+  /** A world whose getChunkAt returns a future that never completes. */
+  private static class FakeNeverWorld extends BaseFakeRTPWorld {
+    FakeNeverWorld() {
+      super("never-world");
+    }
+
+    @Override
+    public CompletableFuture<Long> getChunkAt(int cx, int cz) {
+      return new CompletableFuture<>();
     }
   }
 

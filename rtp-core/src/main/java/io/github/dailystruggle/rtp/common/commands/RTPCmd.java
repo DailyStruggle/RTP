@@ -425,14 +425,20 @@ public interface RTPCmd extends BaseRTPCmd {
           return true;
         }
 
-        boolean take = economy.take(senderId, data.cost);
-        if (!take) {
-          String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
-          s = s.replace("[money]", String.valueOf(price));
-          RTP.serverAccessor.sendMessage(senderId, s);
-          RTP.getInstance().processingPlayers.remove(senderId);
-          return true;
-        }
+        final RTPEconomy economyRefSelf = economy;
+        final double takeCostSelf = data.cost;
+        final double priceSelfForMsg = price;
+        io.github.dailystruggle.rtp.common.economy.EconomyHop.run(
+            () -> {
+              if (!economyRefSelf.take(senderId, takeCostSelf)) {
+                RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP] economy.take returned false for " + senderId
+                        + " cost=" + takeCostSelf + " (balance check passed earlier)");
+                String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
+                s = s.replace("[money]", String.valueOf(priceSelfForMsg));
+                RTP.serverAccessor.sendMessage(senderId, s);
+              }
+            });
       }
 
       if (economy != null
@@ -455,20 +461,32 @@ public interface RTPCmd extends BaseRTPCmd {
           return true;
         }
 
-        boolean take = economy.take(player.uuid(), data.cost);
-        if (!take) {
-          String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
-          s = s.replace("[money]", String.valueOf(price));
-          RTP.serverAccessor.sendMessage(senderId, player.uuid(), s);
-          RTP.getInstance().processingPlayers.remove(senderId);
-          return true;
-        }
+        final RTPEconomy economyRefOther = economy;
+        final java.util.UUID otherId = player.uuid();
+        final double takeCostOther = data.cost;
+        final double priceOtherForMsg = price;
+        io.github.dailystruggle.rtp.common.economy.EconomyHop.run(
+            () -> {
+              if (!economyRefOther.take(otherId, takeCostOther)) {
+                RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP] economy.take returned false for " + otherId
+                        + " cost=" + takeCostOther + " (balance check passed earlier)");
+                String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
+                s = s.replace("[money]", String.valueOf(priceOtherForMsg));
+                RTP.serverAccessor.sendMessage(senderId, otherId, s);
+              }
+            });
       }
 
       Set<String> biomes = null;
       if (biomeList != null) {
         biomes = new HashSet<>(biomeList.size());
         for (String biome : biomeList) {
+          if (biome == null || biome.isEmpty()) continue;
+          // Upper-case for case-insensitivity. Namespace is preserved verbatim so that
+          // modded ids like `iris:overworld:plains` survive intact; vanilla-namespace
+          // equivalence (`plains` <-> `minecraft:plains`) is handled at the comparator
+          // site (`BiomeNames#matches`) rather than by normalizing the input.
           biomes.add(biome.toUpperCase());
         }
       }

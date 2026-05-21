@@ -37,7 +37,7 @@ public abstract class BukkitBaseRTPCmd extends BukkitTreeCommand
             (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
     String msg = String.valueOf(lang.getConfigValue(MessagesKeys.badArg, "[P0] bad parameter - [arg]"));
-    msg = msg.replace("[arg]", parameterName + ":" + parameterValue);
+    msg = msg.replace("[arg]", parameterName + "=" + parameterValue);
     // Format ([P0], &-codes, hex) before invoking the Consumer. The
     // messageMethod handed in by BukkitTreeCommand is sender::sendMessage,
     // which writes the *raw* template directly to the player and (because

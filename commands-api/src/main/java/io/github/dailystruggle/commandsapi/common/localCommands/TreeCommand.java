@@ -59,7 +59,7 @@ public interface TreeCommand extends CommandsAPICommand {
         List<String> possibleResults = new ArrayList<>();
         Map<String, CommandParameter> parameterLookup = getParameterLookup();
 
-        while (i<args.length && containsParamDelimiter(args[i])) {
+        while (i<args.length && args[i].indexOf('=') >= 0) {
             if(i<args.length-1) {
                 String[] arr = splitOnParamDelimiter(args[i]);
                 parameterValues.add(arr[0]);
@@ -69,7 +69,7 @@ public interface TreeCommand extends CommandsAPICommand {
                 if(parameter == null) parameter = tempParameters.get(arr[0]);
                 if(parameter != null) {
                     if (arr.length > 1) {
-                        String[] subParameters = arr[1].split(String.valueOf(CommandsAPI.multiParameterDelimiter));
+                        String[] subParameters = arr[1].split(",");
                         for (String subParamName : subParameters) {
                             Map<String, CommandParameter> parameterMap = parameter.subParams(subParamName);
                             if (parameterMap == null) continue;
@@ -84,7 +84,7 @@ public interface TreeCommand extends CommandsAPICommand {
         if(i==args.length) {//last value condition
             if(i>0) { //last value in a chain
                 i--;
-                int delimiterIdx = indexOfParamDelimiter(args[i]);
+                int delimiterIdx = args[i].indexOf('=');
                 String arg = delimiterIdx > 0 ? args[i].substring(0, delimiterIdx) : args[i];
 
                 if (delimiterIdx < 0) {
@@ -112,12 +112,12 @@ public interface TreeCommand extends CommandsAPICommand {
                 } else if (parameterLookup.containsKey(arg)) {
                     if(parameterValues.contains(arg)) return new ArrayList<>();
                     String val = args[i].substring(delimiterIdx+1);
-                    Set<String> vals = Arrays.stream(val.split(String.valueOf(CommandsAPI.multiParameterDelimiter))).collect(Collectors.toSet());
+                    Set<String> vals = Arrays.stream(val.split(",")).collect(Collectors.toSet());
                     CommandParameter parameter = parameterLookup.get(arg);
                     List<String> relevantValues = new ArrayList<>(parameter.relevantValues(callerId));
-                    String front = (args[i].contains(String.valueOf(CommandsAPI.multiParameterDelimiter)))
-                            ?  args[i].substring(0,args[i].lastIndexOf(CommandsAPI.multiParameterDelimiter))+CommandsAPI.multiParameterDelimiter
-                            : arg+CommandsAPI.parameterDelimiter;
+                    String front = (args[i].indexOf(',') >= 0)
+                            ?  args[i].substring(0,args[i].lastIndexOf(',')) + ","
+                            : arg + "=";
                     relevantValues = relevantValues.stream().filter(s -> !vals.contains(s)).map(s -> front + s).collect(Collectors.toList());
                     possibleResults.addAll(relevantValues);
                     for(String v : vals) {
@@ -127,12 +127,12 @@ public interface TreeCommand extends CommandsAPICommand {
                 } else if (tempParameters.containsKey(arg)) {
                     if(parameterValues.contains(arg)) return new ArrayList<>();
                     String val = args[i].substring(delimiterIdx+1);
-                    Set<String> vals = Arrays.stream(val.split(String.valueOf(CommandsAPI.multiParameterDelimiter))).collect(Collectors.toSet());
+                    Set<String> vals = Arrays.stream(val.split(",")).collect(Collectors.toSet());
                     CommandParameter parameter = tempParameters.get(arg);
                     List<String> relevantValues = new ArrayList<>(parameter.relevantValues(callerId));
-                    String front = (args[i].contains(String.valueOf(CommandsAPI.multiParameterDelimiter)))
-                            ?  args[i].substring(0,args[i].lastIndexOf(CommandsAPI.multiParameterDelimiter))+CommandsAPI.multiParameterDelimiter
-                            : arg+CommandsAPI.parameterDelimiter;
+                    String front = (args[i].indexOf(',') >= 0)
+                            ?  args[i].substring(0,args[i].lastIndexOf(',')) + ","
+                            : arg + "=";
                     relevantValues = relevantValues.stream().filter(s -> !vals.contains(s)).map(s -> front + s).collect(Collectors.toList());
                     possibleResults.addAll(relevantValues);
                     for(String v : vals) {
@@ -221,7 +221,7 @@ public interface TreeCommand extends CommandsAPICommand {
             String arg = args[i];
 
             //catch delimiter with no value
-            if (arg.endsWith(String.valueOf(CommandsAPI.parameterDelimiter)) || arg.endsWith(String.valueOf(CommandsAPI.parameterDelimiterAlt))) {
+            if (arg.endsWith("=")) {
                 msgBadParameter(callerId,arg.substring(0,arg.length()-1),"",messageMethod);
                 return CompletableFuture.completedFuture(false);
             }
@@ -291,7 +291,7 @@ public interface TreeCommand extends CommandsAPICommand {
             //collect into list for command experience
             CommandParameter currentParameterFinal = currentParameter;
             List<String> vals =
-                    Arrays.stream(val.split(String.valueOf(CommandsAPI.multiParameterDelimiter)))
+                    Arrays.stream(val.split(","))
                             .flatMap(token -> expandRegexToken(token, currentParameterFinal, callerId))
                             .distinct()
                             .filter(s -> {
@@ -322,7 +322,7 @@ public interface TreeCommand extends CommandsAPICommand {
                     String val2 = argSplit2[1];
                     CommandParameter currentParameter2Final = currentParameter2;
                     List<String> vals2 =
-                            Arrays.stream(val2.split(String.valueOf(CommandsAPI.multiParameterDelimiter)))
+                            Arrays.stream(val2.split(","))
                                     .flatMap(token -> expandRegexToken(token, currentParameter2Final, callerId))
                                     .distinct()
                                     .filter(s2 -> {
@@ -342,24 +342,15 @@ public interface TreeCommand extends CommandsAPICommand {
         return CompletableFuture.completedFuture(onCommand(callerId, parameterValues, null, messageMethod));
     }
 
-    /** Returns true if the token contains either accepted parameter delimiter. */
-    static boolean containsParamDelimiter(String token) {
-        return token.indexOf(CommandsAPI.parameterDelimiter) >= 0
-                || token.indexOf(CommandsAPI.parameterDelimiterAlt) >= 0;
-    }
-
-    /** Returns the index of the first accepted parameter delimiter, or -1 if absent. */
-    static int indexOfParamDelimiter(String token) {
-        int eq    = token.indexOf(CommandsAPI.parameterDelimiter);
-        int colon = token.indexOf(CommandsAPI.parameterDelimiterAlt);
-        if (eq < 0) return colon;
-        if (colon < 0) return eq;
-        return Math.min(eq, colon);
-    }
-
-    /** Splits a token on the first accepted parameter delimiter, limit 2. */
+    /**
+     * Splits a token on the first parameter delimiter ({@code =}), limit 2.
+     * Single named grammar primitive retained after the {@code :} -> {@code =}
+     * migration; the previous sibling helpers {@code containsParamDelimiter} and
+     * {@code indexOfParamDelimiter} were inlined as {@code indexOf('=')} calls
+     * because they wrapped a one-liner around a now-fixed delimiter.
+     */
     static String[] splitOnParamDelimiter(String token) {
-        int idx = indexOfParamDelimiter(token);
+        int idx = token.indexOf('=');
         if (idx < 0) return new String[]{token};
         return new String[]{token.substring(0, idx), token.substring(idx + 1)};
     }

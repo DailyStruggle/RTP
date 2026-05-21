@@ -17,6 +17,9 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
  * @param requirePermission   Whether a player needs a specific permission to use this region.
  * @param cacheCap            The maximum number of pre-generated locations to keep in the cache.
  * @param backlogCacheCap     The maximum number of unverified locations held in the L3 backlog cache (ADR-028). 0 disables L3.
+ * @param networkReserveSize  The number of {@code keptLocations}-equivalent slots reserved for the cross-server
+ *                            {@code networkKeptLocations} sibling pool (L6, PROPOSAL §12.2). {@code 0} disables the
+ *                            network split for this region; positive values are clamped to {@code min(networkReserveSize, cacheCap)}.
  * @param activeChunkCap      The maximum number of chunks to keep actively loaded for new locations.
  * @param price               The cost to use this region.
  * @param spatialResolution   The resolution for spatial hashing in memory-based shapes.
@@ -32,6 +35,7 @@ public record RegionSettings(
     boolean requirePermission,
     long cacheCap,
     long backlogCacheCap,
+    long networkReserveSize,
     int activeChunkCap,
     double price,
     long spatialResolution,

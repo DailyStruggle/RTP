@@ -15,6 +15,14 @@ import io.github.dailystruggle.mapsapi.model.Heatmap2D;
  */
 public final class HeatmapRenderer implements ChartRenderer<Heatmap2D> {
 
+    /**
+     * Process-wide singleton. The renderer is stateless (REQ-RTP-MAP-002) so a
+     * single instance is safe to share across resolvers, dispatchers, and
+     * binding implementations; {@code MapDispatch} (rtp-core, ADR-047)
+     * references it directly to avoid per-frame allocation.
+     */
+    public static final HeatmapRenderer INSTANCE = new HeatmapRenderer();
+
     /** Lowest palette ramp index (transparent / unset). */
     public static final byte RAMP_MIN = 0;
     /** Highest palette ramp index in the logical 32-symbol contract. */

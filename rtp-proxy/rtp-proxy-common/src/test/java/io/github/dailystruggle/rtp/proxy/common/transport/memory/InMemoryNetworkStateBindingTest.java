@@ -45,7 +45,7 @@ class InMemoryNetworkStateBindingTest {
     @Test
     @DisplayName("Snapshot reflects published backends (async hop preserved)")
     void snapshotReadsPublishedBackends() throws Exception {
-        binding.publishBackendHeartbeat(new BackendHeartbeat(
+        binding.publishBackendHeartbeatSync(new BackendHeartbeat(
                 "a", 1, PluginState.READY, true, System.currentTimeMillis(),
                 10, 0, 20, 0, 0, 0, List.of(), List.of()));
         NetworkSnapshot snap = binding.readSnapshot().get();
@@ -111,13 +111,13 @@ class InMemoryNetworkStateBindingTest {
     void subscriberLifecycle() {
         AtomicInteger seen = new AtomicInteger();
         Subscription sub = binding.subscribeBackendHeartbeats(h -> seen.incrementAndGet());
-        binding.publishBackendHeartbeat(new BackendHeartbeat(
+        binding.publishBackendHeartbeatSync(new BackendHeartbeat(
                 "a", 1, PluginState.READY, true, System.currentTimeMillis(),
                 10, 0, 20, 0, 0, 0, List.of(), List.of()));
         assertEquals(1, seen.get());
         sub.close();
         assertTrue(sub.isClosed());
-        binding.publishBackendHeartbeat(new BackendHeartbeat(
+        binding.publishBackendHeartbeatSync(new BackendHeartbeat(
                 "b", 1, PluginState.READY, true, System.currentTimeMillis(),
                 10, 0, 20, 0, 0, 0, List.of(), List.of()));
         assertEquals(1, seen.get(), "closed subscriber must not be re-notified");

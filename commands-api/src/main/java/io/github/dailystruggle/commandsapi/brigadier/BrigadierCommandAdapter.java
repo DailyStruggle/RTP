@@ -239,9 +239,7 @@ public final class BrigadierCommandAdapter {
                         builder.createOffset(builder.getStart() + tokenStart);
 
                 char delim = io.github.dailystruggle.commandsapi.common.CommandsAPI.parameterDelimiter;
-                char delimAlt = io.github.dailystruggle.commandsapi.common.CommandsAPI.parameterDelimiterAlt;
                 int delimIdx = token.indexOf(delim);
-                if (delimIdx < 0) delimIdx = token.indexOf(delimAlt);
 
                 if (!(node instanceof TreeCommand tree)) {
                     return tokenBuilder.buildFuture();
@@ -277,7 +275,7 @@ public final class BrigadierCommandAdapter {
                         }
                     }
                 } else {
-                    // Stage 2: token contains `=` (or `:`). Match the typed key to a
+                    // Stage 2: token contains `=`. Match the typed key to a
                     // parameter and offer its value list, filtered by the typed
                     // value-prefix. If no parameter matches the typed key, return
                     // empty (do not leak unrelated value lists).

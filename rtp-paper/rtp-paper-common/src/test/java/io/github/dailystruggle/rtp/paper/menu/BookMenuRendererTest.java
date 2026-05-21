@@ -109,8 +109,8 @@ final class BookMenuRendererTest {
         ClickEvent click = firstClickEvent(book.pages().get(0));
         assertNotNull(click, "RunRtpCommand fragment carries a click event");
         assertEquals(ClickEvent.Action.RUN_COMMAND, click.action());
-        assertEquals("/rtp menu token:tok-0", click.value(),
-                "click payload is the opaque /rtp menu token:<token> form, never a literal command");
+        assertEquals("/rtp menu token=tok-0", click.value(),
+                "click payload is the opaque /rtp menu token=<token> form, never a literal command");
     }
 
     @Test
@@ -151,7 +151,7 @@ final class BookMenuRendererTest {
     void buildBook_promptAnvilInput_emitsRunMenuTokenCommand() {
         // ADR-045: PromptAnvilInput is server-resolved like RunRtpCommand /
         // OpenMenu / OpenParamPicker — the renderer mints a fresh token and
-        // emits a /rtp menu token:<t> runCommand click, which the redeem
+        // emits a /rtp menu token=<t> runCommand click, which the redeem
         // path dispatches to the platform-side AnvilInputOpener.
         CapturingRegistry registry = new CapturingRegistry();
         BookMenuRenderer renderer = new BookMenuRenderer(registry, Duration.ofSeconds(30),
@@ -166,12 +166,66 @@ final class BookMenuRendererTest {
         ClickEvent click = firstClickEvent(book.pages().get(0));
         assertNotNull(click);
         assertEquals(ClickEvent.Action.RUN_COMMAND, click.action());
-        assertTrue(click.value().startsWith("/rtp menu token:"),
-                "PromptAnvilInput must round-trip through /rtp menu token:<t>; was: " + click.value());
+        assertTrue(click.value().startsWith("/rtp menu token="),
+                "PromptAnvilInput must round-trip through /rtp menu token=<t>; was: " + click.value());
         assertEquals(1, registry.mintedFor.size(),
                 "exactly one mint per PromptAnvilInput fragment");
         assertEquals(viewer, registry.mintedFor.get(0));
         assertEquals(prompt, registry.mintedActions.get(0));
+    }
+
+    @Test
+    void buildBook_openAdminPanel_mintsTokenAndEmitsMenuRunCommand() {
+        // PROPOSAL-admin-panel.md v2: OpenAdminPanel is a server-resolved
+        // navigation click, identical in wire shape to RunRtpCommand /
+        // OpenMenu / OpenConfig* — the renderer mints a fresh token and emits
+        // a /rtp menu token=<t> runCommand click. Permission gating
+        // (rtp.menu.admin) is enforced server-side in
+        // MenuRedeemSubcommand.dispatchOpenAdminPanel, not by the renderer.
+        CapturingRegistry registry = new CapturingRegistry();
+        BookMenuRenderer renderer = new BookMenuRenderer(registry, Duration.ofSeconds(30),
+                (uuid, model) -> null);
+        UUID viewer = UUID.randomUUID();
+        MenuAction.OpenAdminPanel adminPanel = new MenuAction.OpenAdminPanel();
+
+        Book book = renderer.buildBook(viewer,
+                singleLineModel(new MenuFragment("Admin panel", null, adminPanel)));
+
+        ClickEvent click = firstClickEvent(book.pages().get(0));
+        assertNotNull(click);
+        assertEquals(ClickEvent.Action.RUN_COMMAND, click.action());
+        assertTrue(click.value().startsWith("/rtp menu token="),
+                "OpenAdminPanel must round-trip through /rtp menu token=<t>; was: " + click.value());
+        assertEquals(1, registry.mintedFor.size(),
+                "exactly one mint per OpenAdminPanel fragment");
+        assertEquals(viewer, registry.mintedFor.get(0));
+        assertEquals(adminPanel, registry.mintedActions.get(0));
+    }
+
+    @Test
+    void buildBook_openFrontPage_mintsTokenAndEmitsMenuRunCommand() {
+        // PROPOSAL-admin-panel.md v2: OpenFrontPage is used by the admin
+        // panel's back row. Same wire shape as the other server-resolved
+        // navigation variants. Distinct from OpenMenu([]) which targets the
+        // reflected TreeCommand root rather than the curated front page.
+        CapturingRegistry registry = new CapturingRegistry();
+        BookMenuRenderer renderer = new BookMenuRenderer(registry, Duration.ofSeconds(30),
+                (uuid, model) -> null);
+        UUID viewer = UUID.randomUUID();
+        MenuAction.OpenFrontPage frontPage = new MenuAction.OpenFrontPage();
+
+        Book book = renderer.buildBook(viewer,
+                singleLineModel(new MenuFragment("Back", null, frontPage)));
+
+        ClickEvent click = firstClickEvent(book.pages().get(0));
+        assertNotNull(click);
+        assertEquals(ClickEvent.Action.RUN_COMMAND, click.action());
+        assertTrue(click.value().startsWith("/rtp menu token="),
+                "OpenFrontPage must round-trip through /rtp menu token=<t>; was: " + click.value());
+        assertEquals(1, registry.mintedFor.size(),
+                "exactly one mint per OpenFrontPage fragment");
+        assertEquals(viewer, registry.mintedFor.get(0));
+        assertEquals(frontPage, registry.mintedActions.get(0));
     }
 
     @Test

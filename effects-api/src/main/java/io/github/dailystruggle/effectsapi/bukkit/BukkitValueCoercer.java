@@ -1,6 +1,5 @@
 package io.github.dailystruggle.effectsapi.bukkit;
 
-import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.effectsapi.common.spi.TypeKey;
 import io.github.dailystruggle.effectsapi.common.spi.ValueCoercer;
 import org.bukkit.Color;
@@ -73,8 +72,18 @@ public final class BukkitValueCoercer implements ValueCoercer {
                 } catch (NumberFormatException nfe) { return false; }
             case COLOR:
                 if (resolveNamedColor(raw) != null) return true;
-                try { Integer.parseInt(raw, 16); return true; }
-                catch (NumberFormatException nfe) { return false; }
+                // Only accept hex literals that are unambiguously a color
+                // (6 hex digits, optionally `#`-prefixed). Without this guard
+                // a plain `0` or `1` greedily consumed COLOR / FADE slots in
+                // the adaptive-order parser and pushed downstream tokens off
+                // the end of the key list, surfacing as the recurring
+                // "[FireworkEffect] ignored N token(s)" diagnostic.
+                {
+                    String hex = raw.startsWith("#") ? raw.substring(1) : raw;
+                    if (hex.length() != 6) return false;
+                    try { Integer.parseInt(hex, 16); return true; }
+                    catch (NumberFormatException nfe) { return false; }
+                }
             case SOUND:
                 return resolveSound(raw) != null;
             case PARTICLE:
@@ -211,16 +220,21 @@ public final class BukkitValueCoercer implements ValueCoercer {
      * {@code getByName} both fail — covers the 1.21.3+ {@link Sound} migration
      * and the expected 26.1 migration of {@code Particle}/{@code EntityType}/
      * {@code Biome} from enums to registry-backed interfaces.
+     *
+     * <p>Accepts either form: a fully-qualified namespaced id
+     * ({@code minecraft:lava}, {@code myplugin:custom}) or a bare token
+     * ({@code lava}, {@code ENTITY_PLAYER_HURT}). Bare tokens default to the
+     * {@code minecraft} namespace and translate enum-style underscores to
+     * registry-key dots. Single {@link NamespacedKey#fromString} path post-
+     * {@code :} -> {@code =} command migration; the previous bifurcated
+     * coercion branch existed only because command argument values could
+     * not safely contain {@code :}.
      */
     private static Object resolveViaRegistry(Class<?> targetType, String token) {
         if (token == null || token.isEmpty() || targetType == null) return null;
         String raw = token.trim();
-        NamespacedKey key;
-        if (raw.contains(":")) {
-            key = NamespacedKey.fromString(raw.toLowerCase());
-        } else {
-            key = NamespacedKey.minecraft(raw.toLowerCase().replace('_', '.'));
-        }
+        if (raw.indexOf(':') < 0) raw = "minecraft:" + raw.replace('_', '.');
+        NamespacedKey key = NamespacedKey.fromString(raw.toLowerCase());
         if (key == null) return null;
         for (java.lang.reflect.Field f : Registry.class.getFields()) {
             if (!java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
@@ -266,7 +280,9 @@ public final class BukkitValueCoercer implements ValueCoercer {
     /**
      * Resolve an {@link org.bukkit.Sound} from a string token in a way that
      * works on both legacy (enum) and modern (registry-backed interface)
-     * Bukkit/Paper/Folia.
+     * Bukkit/Paper/Folia. Accepts both bare ({@code ENTITY_PLAYER_HURT}) and
+     * namespaced ({@code minecraft:entity.player.hurt}) forms; the bare form
+     * defaults to {@code minecraft} and translates underscores to dots.
      */
     private static Object resolveSound(String token) {
         if (token == null) return null;
@@ -277,13 +293,8 @@ public final class BukkitValueCoercer implements ValueCoercer {
             // fall through to registry lookup
         }
         String raw = token.trim();
-        NamespacedKey key;
-        if (raw.contains(":")) {
-            key = NamespacedKey.fromString(raw.toLowerCase());
-        } else {
-            String keyPath = raw.toLowerCase().replace('_', '.');
-            key = NamespacedKey.minecraft(keyPath);
-        }
+        if (raw.indexOf(':') < 0) raw = "minecraft:" + raw.replace('_', '.');
+        NamespacedKey key = NamespacedKey.fromString(raw.toLowerCase());
         if (key == null) return null;
         try {
             return Registry.SOUNDS.get(key);
@@ -318,19 +329,4 @@ public final class BukkitValueCoercer implements ValueCoercer {
         }
     }
 
-    /**
-     * String coercion variant matching the legacy {@code Effect#fixData}'s
-     * Color path: extracts the part after a {@link CommandsAPI} parameter
-     * delimiter and parses it as 6-digit hex. Reserved for callers
-     * that need the legacy behaviour outside the normal {@code parse} path.
-     */
-    @SuppressWarnings("unused")
-    public static Color legacyColorFromDelimitedString(String val) {
-        String str = val;
-        if (str.contains(String.valueOf(CommandsAPI.parameterDelimiterAlt)))
-            str = str.substring(str.indexOf(CommandsAPI.parameterDelimiterAlt) + 1);
-        else if (str.contains(String.valueOf(CommandsAPI.parameterDelimiter)))
-            str = str.substring(str.indexOf(CommandsAPI.parameterDelimiter) + 1);
-        return Color.fromRGB(Integer.parseInt(str, 16));
-    }
 }

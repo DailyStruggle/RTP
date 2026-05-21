@@ -8,7 +8,6 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.RTPCmd;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
-import io.github.dailystruggle.rtp.common.commands.help.HelpCmd;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
 import io.github.dailystruggle.rtp.common.commands.parameters.BiomeParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.BooleanParameter;
@@ -206,7 +205,12 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
         // Bukkit-only types. A platform-neutral lift is tracked under Step G2
         // follow-ups in MULTI_PLATFORM_PLAN.md.
         addSubCommand(new ReloadCmd(this));
-        addSubCommand(new HelpCmd(this));
+        // /rtp help intentionally NOT registered: commands-api's TreeCommand
+        // auto-emits a complete built-in help listing when no HELP
+        // subcommand exists (TreeCommand line 231), which lists every
+        // registered subcommand rather than only those that happen to
+        // have a matching MessagesKeys enum value (the bug the removed
+        // HelpCmd had).
         addSubCommand(new ConfigCmd(this));
         addSubCommand(new ScanCmd(this));
         addSubCommand(new InfoCmd(this));

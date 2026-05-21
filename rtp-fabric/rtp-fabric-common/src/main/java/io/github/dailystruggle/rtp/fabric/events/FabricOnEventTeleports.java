@@ -14,7 +14,6 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.storage.LevelResource;
 
 import java.io.File;
@@ -66,11 +65,23 @@ public final class FabricOnEventTeleports {
      * Entry point called by {@link FabricEventBridge}'s JOIN proxy after
      * {@code accessor.registerPlayerObject(player)}. Mirrors
      * {@code OnEventTeleports#onPlayerJoin}.
+     *
+     * <p>The {@code player} parameter is intentionally {@link Object}-typed:
+     * naming {@code net.minecraft.server.level.ServerPlayer} in this
+     * (obf-carrier) class would pin the intermediary class
+     * {@code class_3222} into the bytecode constant pool, and that class is
+     * absent on the MC 26.1 deobf runtime — link would fail at JOIN. UUID
+     * is resolved through {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#getPlayerUUID(Object)}
+     * (Loom-remapped per carrier) with a reflective {@code getUUID()}
+     * fallback, mirroring {@code FabricServerAccessor#unregisterPlayerObject}.
+     * Display name (used only for verbose logging) is resolved reflectively
+     * with a {@code toString()} fallback.
      */
-    public static void onJoin(MinecraftServer server, ServerPlayer player) {
+    public static void onJoin(MinecraftServer server, Object player) {
         if (server == null || player == null) return;
         try {
-            UUID id = player.getUUID();
+            UUID id = resolvePlayerUuid(player);
+            if (id == null) return;
             long start = System.nanoTime();
 
             RTPCommandSender sender = RTP.serverAccessor.getSender(id);
@@ -99,7 +110,7 @@ public final class FabricOnEventTeleports {
             if (firstJoin) {
                 if (verbose) {
                     RTP.log(Level.INFO,
-                            "#0080FF[RTP] teleporting player:" + player.getName().getString()
+                            "#0080FF[RTP] teleporting player:" + resolvePlayerName(player)
                                     + " on first join");
                 }
                 primeFromLoginCache(id);
@@ -115,7 +126,7 @@ public final class FabricOnEventTeleports {
                 }
                 if (verbose) {
                     RTP.log(Level.INFO,
-                            "#0080FF[RTP] teleporting player:" + player.getName().getString()
+                            "#0080FF[RTP] teleporting player:" + resolvePlayerName(player)
                                     + " on join");
                 }
                 primeFromLoginCache(id);
@@ -125,6 +136,57 @@ public final class FabricOnEventTeleports {
             RTP.log(Level.WARNING,
                     "[RTP] FabricOnEventTeleports.onJoin failed: "
                             + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
+        }
+    }
+
+    /**
+     * Resolve the player's UUID via the carrier-aware
+     * {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter}
+     * SPI (mojmap on 26.x, intermediary on 1.20/1.21.x), falling back to a
+     * reflective {@code getUUID()} lookup. Never names {@code ServerPlayer}
+     * symbolically in this class's bytecode — see {@link #onJoin}.
+     */
+    private static UUID resolvePlayerUuid(Object player) {
+        if (player == null) return null;
+        try {
+            io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+                    io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+            if (adapter != null) {
+                UUID uuid = adapter.getPlayerUUID(player);
+                if (uuid != null) return uuid;
+            }
+        } catch (Throwable ignored) {
+            // fall through to reflective probe
+        }
+        try {
+            java.lang.reflect.Method m = player.getClass().getMethod("getUUID");
+            Object u = m.invoke(player);
+            if (u instanceof UUID resolved) return resolved;
+        } catch (Throwable ignored) {
+            // best-effort
+        }
+        return null;
+    }
+
+    /**
+     * Best-effort resolution of the player's display name for verbose
+     * logging. Reflectively walks {@code getName()} then {@code getString()};
+     * any failure falls back to {@code toString()} so logging never throws.
+     */
+    private static String resolvePlayerName(Object player) {
+        if (player == null) return "<null>";
+        try {
+            Object component = player.getClass().getMethod("getName").invoke(player);
+            if (component == null) return player.toString();
+            try {
+                Object s = component.getClass().getMethod("getString").invoke(component);
+                if (s != null) return s.toString();
+            } catch (NoSuchMethodException ignored) {
+                // not a Component — fall back below
+            }
+            return component.toString();
+        } catch (Throwable ignored) {
+            return player.toString();
         }
     }
 

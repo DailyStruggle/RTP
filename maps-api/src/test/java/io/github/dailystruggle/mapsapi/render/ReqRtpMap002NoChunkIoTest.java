@@ -72,18 +72,23 @@ class ReqRtpMap002NoChunkIoTest {
     }
 
     @Test
-    @DisplayName("mapsapi (whole module) shall not import org.bukkit.* or net.minecraft.* in Stage 1")
-    void mapsApiStage1HasNoPlatformImports() {
-        // Stage 2 will relax this to allow mapsapi.bukkit; Stage 3 will allow
-        // mapsapi.fabric. Until those subpackages land, the entire module is
-        // platform-neutral and ArchUnit asserts that.
+    @DisplayName("mapsapi (excluding bukkit/fabric subpackages) shall not import org.bukkit.* or net.minecraft.*")
+    void mapsApiCoreHasNoPlatformImports() {
+        // Stage 2 carve-out: mapsapi.bukkit hosts BukkitMapBinding (the
+        // only file in the module permitted to import org.bukkit.*). Stage 3
+        // will add a mapsapi.fabric carve-out for net.minecraft / net.fabricmc.
+        // Every other package shall remain platform-neutral.
         ArchRule rule = noClasses()
                 .that().resideInAPackage("io.github.dailystruggle.mapsapi..")
+                .and().resideOutsideOfPackages(
+                        "io.github.dailystruggle.mapsapi.bukkit..",
+                        "io.github.dailystruggle.mapsapi.fabric..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "org.bukkit..",
                         "net.minecraft..")
-                .because("maps-api-ADR-001 §Package layout: Stage 1 ships SPI only; "
-                        + "bukkit / fabric subpackages land in Stage 2 / 3.");
+                .because("maps-api-ADR-001 §Package layout: only mapsapi.bukkit "
+                        + "(Stage 2) and mapsapi.fabric (Stage 3) may import "
+                        + "platform packages.");
         rule.check(PRODUCTION_CLASSES);
     }
 }

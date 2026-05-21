@@ -1,0 +1,5 @@
+foliaAggregationTps: "foliaAggregationTps"
+foliaIncludeRegions: "foliaIncludeRegions"
+foliaAggregationMspt: "foliaAggregationMspt"
+foliaAggregationTickBudget: "foliaAggregationTickBudget"
+version: "version"

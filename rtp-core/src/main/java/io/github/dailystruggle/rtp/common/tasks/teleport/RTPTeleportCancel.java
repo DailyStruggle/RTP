@@ -49,7 +49,10 @@ public final class RTPTeleportCancel extends RTPRunnable {
 
     if (RTP.economy != null && data.cost != 0.0) {
       if (refund && data.sender instanceof RTPPlayer) {
-        RTP.economy.give(data.sender.uuid(), data.cost);
+        final double refundAmount = data.cost;
+        final UUID refundTarget = data.sender.uuid();
+        io.github.dailystruggle.rtp.common.economy.EconomyHop.run(
+            () -> RTP.economy.give(refundTarget, refundAmount));
       }
     }
 

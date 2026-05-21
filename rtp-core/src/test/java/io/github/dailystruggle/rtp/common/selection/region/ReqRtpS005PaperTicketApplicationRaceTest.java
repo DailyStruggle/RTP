@@ -101,6 +101,7 @@ public class ReqRtpS005PaperTicketApplicationRaceTest {
                 false,
                 10L,
                 1000L,
+                 0L,
                 5,
                 0.0,
                 1L,

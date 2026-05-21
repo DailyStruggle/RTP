@@ -25,6 +25,18 @@ dependencies {
     api project(':commands-api')
     api project(':effects-api')
     api project(':metrics-api')
+    // maps-api SPI (ADR-046, ADR-047). rtp-core composes ChartSpec -> ChartModel
+    // via the ChartSpecResolver registry; concrete platform MapBinding
+    // implementations live in rtp-bukkit / rtp-fabric (Stage 2+). 'api' so
+    // downstream platform adapters and addons can author resolvers without
+    // re-declaring the dependency.
+    api project(':maps-api')
+    // Phase 2e-SQL slice (rtp-proxy-ADR-011 §Module Dependencies): backend-side
+    // wiring (BackendStatePublisher + BackendStateSampler) lives in rtp-core so
+    // every backend platform adapter inherits it without re-implementing.
+    // The reverse direction stays clean: rtp-proxy-common does NOT depend on
+    // rtp-core, so the network-state SPI remains host-agnostic.
+    api project(':rtp-proxy:rtp-proxy-common')
     // guava is provided by Spigot/Paper/Folia at runtime
     compileOnly 'com.google.guava:guava:33.2.1-jre'
     testRuntimeOnly 'com.google.guava:guava:33.2.1-jre'
