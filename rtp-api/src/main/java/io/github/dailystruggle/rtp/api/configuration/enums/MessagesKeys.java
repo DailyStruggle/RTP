@@ -363,8 +363,6 @@ public enum MessagesKeys {
   // --- Stage B front-page row labels (curated landing page) ---
   /** Section divider on the front page above teleport rows (player view). */
   menuFrontPageSectionTeleport,
-  /** Section divider on the front page above admin rows (admin view). */
-  menuFrontPageSectionAdmin,
   /** Front-page row: instant teleport. No placeholders. */
   menuFrontPageRowTeleport,
   /** Front-page row: open the region parameter-value picker. No placeholders. */
@@ -373,18 +371,166 @@ public enum MessagesKeys {
   menuFrontPageRowBiome,
   /** Front-page row: show help. No placeholders. */
   menuFrontPageRowHelp,
-  /** Front-page row (admin): show /rtp info. No placeholders. */
-  menuFrontPageRowInfo,
-  /** Front-page row (admin): open config sub-menu. No placeholders. */
-  menuFrontPageRowConfig,
-  /** Front-page row (admin): open scan sub-menu. No placeholders. */
-  menuFrontPageRowScan,
-  /** Front-page row (admin): run full diagnostics. No placeholders. */
-  menuFrontPageRowDiagnostics,
-  /** Front-page row (admin): reload config files. Destructive — hover warns. No placeholders. */
-  menuFrontPageRowReload,
-  /** Hover text for the diagnostics row warning about cost. No placeholders. */
-  menuFrontPageHoverDiagnostics,
-  /** Hover text for the reload row warning about side-effects. No placeholders. */
-  menuFrontPageHoverReload
+  /** Front-page row (admin): single entry point into the curated admin panel (PROPOSAL-admin-panel.md v2). No placeholders. */
+  menuFrontPageRowAdmin,
+  /** Hover text for the admin-panel entry row on the front page. No placeholders. */
+  menuFrontPageHoverAdmin,
+  // --- Admin panel book page (PROPOSAL-admin-panel.md v2) ---
+  /** Non-clickable title row at the top of the admin panel. No placeholders. */
+  menuAdminPanelTitle,
+  /** Non-clickable hint row below {@link #menuAdminPanelTitle}. No placeholders. */
+  menuAdminPanelHint,
+  /** Section divider above the Configuration block on the admin panel. */
+  menuAdminPanelSectionConfig,
+  /** Section divider above the Diagnostics block on the admin panel. */
+  menuAdminPanelSectionDiagnostics,
+  /** Section divider above the Lifecycle block on the admin panel. */
+  menuAdminPanelSectionLifecycle,
+  /** Section divider above the Browse block on the admin panel. */
+  menuAdminPanelSectionBrowse,
+  /** Admin-panel row: open the curated config selector. No placeholders. */
+  menuAdminPanelRowConfig,
+  /** Hover text for the admin-panel config-editor row. No placeholders. */
+  menuAdminPanelHoverConfig,
+  /** Admin-panel row: run /rtp info. No placeholders. */
+  menuAdminPanelRowInfo,
+  /** Hover text for the admin-panel info row. No placeholders. */
+  menuAdminPanelHoverInfo,
+  /** Admin-panel row: run full diagnostics. No placeholders. */
+  menuAdminPanelRowDiagnostics,
+  /** Hover text for the admin-panel diagnostics row. No placeholders. */
+  menuAdminPanelHoverDiagnostics,
+  /** Admin-panel row: run /rtp test memory. No placeholders. */
+  menuAdminPanelRowMemory,
+  /** Hover text for the admin-panel memory-tracker row. No placeholders. */
+  menuAdminPanelHoverMemory,
+  /** Admin-panel row: open the scan submenu. No placeholders. */
+  menuAdminPanelRowScan,
+  /** Hover text for the admin-panel scan-control row. No placeholders. */
+  menuAdminPanelHoverScan,
+  /** Admin-panel row: reload all config files. Destructive — hover warns. No placeholders. */
+  menuAdminPanelRowReload,
+  /** Hover text for the admin-panel reload row. No placeholders. */
+  menuAdminPanelHoverReload,
+  /** Admin-panel row: open the reflected /rtp command tree. No placeholders. */
+  menuAdminPanelRowBrowse,
+  /** Hover text for the admin-panel browse row. No placeholders. */
+  menuAdminPanelHoverBrowse,
+  /** Admin-panel row: return to the curated front page. No placeholders. */
+  menuAdminPanelRowBack,
+  // --- Info book (PROPOSAL-info-as-book.md section 4.7) ---
+  /**
+   * Clickable row label for the {@code Refresh} affordance at the bottom of the
+   * {@code /rtp info} book. Re-renders the current scope against a fresh
+   * {@code MetricsSnapshot}. No placeholders.
+   */
+  infoBookRefreshRow,
+  /** Hover text for the info-book refresh row. No placeholders. */
+  infoBookRefreshHover,
+  /**
+   * Clickable row label for the {@code Switch to chat} affordance at the bottom
+   * of the {@code /rtp info} book. Re-runs the same scope through the legacy
+   * chat path without minting a new book token. No placeholders.
+   */
+  infoBookSwitchToTextRow,
+  /** Hover text for the info-book "switch to chat" row. No placeholders. */
+  infoBookSwitchToTextHover,
+  /**
+   * Footer row rendered when the {@code /rtp info} book content exceeds the
+   * book page cap. Clicking re-runs the same scope in chat mode so no data is
+   * lost. No placeholders.
+   */
+  infoBookOverflowFooter,
+  /**
+   * Non-clickable note row indicating that periodic auto-refresh for the info
+   * book is not currently supported on this build (it is deferred to a later
+   * milestone; users may click {@link #infoBookRefreshRow} to refresh
+   * manually). No placeholders.
+   */
+  infoBookAutoRefreshDeferredNote,
+  // --- Stage C config-view book pages (PROPOSAL-config-view-as-book v3.7) ---
+  /** Non-clickable title row at the top of the config-file selector page (Stage C.1). */
+  configSelectorTitle,
+  /** Label for the back-to-menu-root navigation row on the config selector page. */
+  configSelectorBackRow,
+  /**
+   * Non-clickable title row at the top of a single config-file page (Stage C.2).
+   * The {@code [file]} placeholder is replaced with the config file name.
+   */
+  configFileTitle,
+  /** Label for the back-to-selector navigation row on a single config-file page. */
+  configFileBackRow,
+  /** Non-clickable hint row shown when a config file has no editable keys. */
+  configFileEmptyHint,
+  /**
+   * Per-key row label on a config-file page. Placeholders: {@code [key]},
+   * {@code [value]}.
+   */
+  configKeyRowFormat,
+  /**
+   * Hover text for a per-key row on a config-file page. Placeholders:
+   * {@code [key]}, {@code [value]}, {@code [type]}.
+   */
+  configKeyHoverFormat,
+  /**
+   * Non-clickable title row at the top of a shape/vert type-picker page
+   * (Stage C.3a). Placeholders: {@code [param]} ("shape" or "vert"),
+   * {@code [current]} (currently-active type name).
+   */
+  configTypePickerTitle,
+  /**
+   * Non-clickable title row at the top of a shape/vert sub-parameter page
+   * (Stage C.3b). Placeholders: {@code [param]} ("shape" or "vert"),
+   * {@code [type]} (the active type name).
+   */
+  configSubParamPageTitle,
+  /**
+   * Hint sent when the book view falls back to the legacy raw-YAML chat dump
+   * (no book renderer available on this platform).
+   */
+  configViewRawHint,
+  /** Placeholder text rendered in place of a config value that has not been set. */
+  configValueUnsetPlaceholder,
+  // --- ADR-047 declarative chart composition bridge (REQ-RTP-MAP-006) ---
+  /**
+   * Sent to the viewer when an {@code OPEN_MAP} menu action fires but no
+   * concrete {@code MapBinding} is registered (the {@code NoopMapBinding}
+   * is still active, e.g. on the Lite assembly or before {@code RTPHooks}
+   * wires the platform binding). Configurable per REQ-RTP-F-013, surfaces
+   * S-004 (no silent discard) and REQ-RTP-MAP-001 (require-by-contract).
+   * No placeholders.
+   */
+  mapBindingMissing,
+  /**
+   * Sent to the viewer when {@code MapDispatch} receives a {@code ChartSpec}
+   * whose {@code Kind} has no registered {@code ChartSpecResolver} (e.g.
+   * Stage 1 viewer clicks a Stage 3 sparkline before the resolver lands).
+   * Configurable per REQ-RTP-F-013, surfaces S-004 and S-007 (configurable
+   * "invalid command" feedback). No placeholders.
+   */
+  mapResolverMissing,
+  /**
+   * Sent to the viewer when a resolver runs but the underlying data source
+   * is unavailable for the requested target (e.g. unknown region name, no
+   * default region, world unloaded). Configurable per REQ-RTP-F-013, paired
+   * with a WARNING-level {@code RTP.log} entry per S-004. Placeholder
+   * {@code [region]} carries the requested region name; empty if unknown.
+   */
+  mapUnavailable,
+  /**
+   * Sent to the viewer when the active {@code MapBinding} cannot allocate a
+   * map handle right now (binding-defined back-pressure, e.g. per-viewer cap
+   * reached). Configurable per REQ-RTP-F-013, surfaces S-007. No placeholders.
+   */
+  mapBusy,
+  /**
+   * Label for the clickable row in the {@code /rtp info} menu that, on click,
+   * mints a {@code ChartSpec(BAD_POINTS_HEATMAP, ...)} token and asks the
+   * active {@code MapBinding} to render a 128x128 heatmap of the current
+   * region's known bad-point spiral indices. The row is omitted at render
+   * time when {@code NoopMapBinding} is the installed binding (gate per
+   * Stage 2 of {@code CHECKLIST-metrics-to-maps.md}). Configurable per
+   * REQ-RTP-F-013; surfaces ADR-047 / REQ-RTP-MAP-006. No placeholders.
+   */
+  menuInfoBadPointsLabel
 }

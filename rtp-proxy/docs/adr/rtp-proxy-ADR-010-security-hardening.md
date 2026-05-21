@@ -1,9 +1,14 @@
 # rtp-proxy-ADR-010 — Security Hardening (HMAC, `schemaVersion`, Kill Switch)
 
-**Status:** Proposed
+**Status:** Accepted
+**Accepted:** 2026-05-18
 **Date:** 2026-05-13
 **Refines:** [ADR-036](../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md)
 **Depends on:** [rtp-proxy-ADR-001](rtp-proxy-ADR-001-spi-shape.md), [rtp-proxy-ADR-002](rtp-proxy-ADR-002-network-yml-schema.md), [rtp-proxy-ADR-005](rtp-proxy-ADR-005-redis-binding.md), [rtp-proxy-ADR-007](rtp-proxy-ADR-007-postgres-binding.md), [rtp-proxy-ADR-009](rtp-proxy-ADR-009-generic-sql-binding.md)
+
+## Amendments
+
+- **2026-05-18** - Kill-switch propagation channel clarified prior to acceptance: the `KILL_SWITCH` flag is carried as a `boolean killSwitch` field on both `ProxyHeartbeat` and `BackendHeartbeat` (rtp-proxy-ADR-001 SPI value classes), defaulting to `false`. The earlier "first byte of every heartbeat payload" phrasing is replaced by this typed field; transports serialise it however their wire format prefers (Redis HSET column, SQL column, etc.). Operators flip the flag on any one host's `network.killSwitch` config; that host's next heartbeat carries `killSwitch=true` and peers honour it within one heartbeat interval, as before.
 
 ## Context
 

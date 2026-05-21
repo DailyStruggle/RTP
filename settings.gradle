@@ -153,10 +153,13 @@ include 'rtp-fabric:rtp-fabric-v26_1_R1'
 // weighted-average BackendSelector (rtp-proxy-ADR-004), and the reference
 // InMemoryNetworkStateBinding (rtp-proxy-ADR-003). Pure-Java, no proxy-vendor
 // or backend-platform imports (rtp-proxy-ADR-001 §Package Boundary Rules).
-// rtp-proxy-velocity (Phase 2) and rtp-proxy-bungee (Phase 3) remain
-// documentation-only until their respective subproject ADRs ratify
-// (rtp-proxy-ADR-006 / rtp-proxy-ADR-008 are still Proposed).
+// rtp-proxy-velocity (Phase 2a) — no-op shell included 2026-05-18 after
+// rtp-proxy-ADR-006 was Accepted. Compile-only Velocity API dependency;
+// entry-point honors network.enabled:false as a strict no-op.
+// rtp-proxy-bungee (Phase 3) remains documentation-only until
+// rtp-proxy-ADR-008 ratifies (still Proposed).
 include 'rtp-proxy:rtp-proxy-common'
+include 'rtp-proxy:rtp-proxy-velocity'
 
 include 'addons:RTP_ExampleAddon'
 

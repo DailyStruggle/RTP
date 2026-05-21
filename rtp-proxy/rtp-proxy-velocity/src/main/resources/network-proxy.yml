@@ -1,0 +1,55 @@
+# RTP Network Mode (Velocity proxy adapter)
+#
+# Phase 2 of MULTI_SERVER_PLAN.md. Disabled by default; flipping
+# `network.enabled: true` opts this proxy into the cross-server network.
+# See rtp-proxy-ADR-002 for the full schema, rtp-proxy-ADR-005 for the
+# Redis binding, and rtp-proxy-ADR-011 for the SQL binding.
+#
+# REQ-RTP-NET-002 (Behavioural Parity When Disabled): when `enabled: false`
+# this file is read, validated, and otherwise ignored - no threads start,
+# no transport opens, no commands register. The proxy behaves
+# byte-identically to a build that does not ship this adapter.
+network:
+  enabled: false
+  schemaVersion: 1
+  # Stable proxy identity. Required when `enabled: true`. No default - the
+  # operator MUST supply one; two proxies sharing a proxyId will overwrite
+  # each other's heartbeat row. Must be non-empty.
+  proxyId: ""
+  # Proxy role. `auto` lets the adapter take part as a participant proxy
+  # (the only role shipped in Phase 2). `proxy` is reserved for future
+  # multi-role topologies. Backends use `role: backend` in their own
+  # network.yml; do not set that value here.
+  role: auto
+  # Environment variable holding the shared HMAC secret. Required when
+  # `enabled: true` AND `transport.type: redis`; SQL binding currently
+  # treats the env var as optional (DB connection auth + TLS is the
+  # security boundary - rtp-proxy-ADR-011 Q1).
+  secretEnv: RTP_NET_SECRET
+transport:
+  # Backing store for cross-process state.
+  # - `in-memory`: development only; nothing leaves the JVM. Use this when
+  #   you want to load the adapter but not actually cross-talk with peers.
+  # - `redis`: Jedis-backed heartbeats + pub/sub fan-out (rtp-proxy-ADR-005).
+  #   Recommended for production; project goal is redis-first.
+  # - `sql`: DB-as-bus (rtp-proxy-ADR-011). The proxy does not own a JDBC
+  #   pool by default, so picking `sql` here will fall back to `in-memory`
+  #   for this session with a WARN. Operators who want cross-process state
+  #   should use `redis` on the proxy and either `redis` or `sql` on the
+  #   backends.
+  type: redis
+  redis:
+    # Required when `type: redis`. Hostname or IP of the Redis instance
+    # shared by every backend and proxy in the network.
+    host: localhost
+    # Default Redis port. Override if your deployment uses a non-standard one.
+    port: 6379
+    # Optional. Leave empty / omitted for unauthenticated Redis (dev/test);
+    # set when Redis ACL or `requirepass` is configured.
+    password: ""
+heartbeat:
+  # How often this proxy publishes its state row. 1000ms is the default
+  # used by both proxy-side and backend-side publishers; peers must
+  # observe rows within `staleAfterMs` to consider them live.
+  intervalMs: 1000
+  staleAfterMs: 5000

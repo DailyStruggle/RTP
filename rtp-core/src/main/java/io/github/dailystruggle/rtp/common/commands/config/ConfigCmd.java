@@ -42,6 +42,15 @@ public class ConfigCmd extends BaseRTPCmdImpl {
       addSubCommand(new LanguageCmd(this));
     }
 
+    // PROPOSAL-rtp-menu-config-search.md §6 Q4 Decision A — register the
+    // submit-landing leaf for the menu config-search anvil prompt. The
+    // handler is filled in later by the platform wiring (e.g. RTPCmdBukkit)
+    // once a renderer is available; without a handler the leaf is a no-op
+    // with WARN log, which is also the disabled-state contract.
+    if (!getCommandLookup().containsKey("search")) {
+      addSubCommand(new ConfigSearchSubCmd(this));
+    }
+
     final Configs configs = RTP.configs;
     for (ConfigParser<?> value : configs.configParserMap.values()) {
       String name = value.name.replace(".yml", "");

@@ -49,6 +49,57 @@ public class InfoCmd extends BaseRTPCmdImpl {
     return String.format(java.util.Locale.ROOT, "%.2f", v);
   }
 
+  /**
+   * Routes a raw line to {@link RTP#messageTap} if one is installed for this
+   * thread (book-mirroring path; see PROPOSAL-info-as-book.md section 4.6),
+   * or otherwise to {@link RTP#serverAccessor} for the normal chat path. When
+   * the tap is installed the line is run through
+   * {@link PlaceholderProvider#fillPlaceholders(String, UUID)} first so it
+   * arrives at the sink in the same fully-substituted form the chat path
+   * would have produced.
+   */
+  private static void emit(UUID callerId, String line) {
+    java.util.function.Consumer<String> tap = RTP.messageTap.get();
+    if (tap != null) {
+      tap.accept(PlaceholderProvider.fillPlaceholders(line, callerId));
+      return;
+    }
+    RTP.serverAccessor.sendMessage(callerId, line);
+  }
+
+  /**
+   * {@link MessagesKeys}-keyed variant of {@link #emit(UUID, String)}. When the
+   * tap is active the key is resolved from the language parser, substituted,
+   * and forwarded; otherwise the call is delegated to the normal accessor.
+   */
+  private static void emit(UUID callerId, MessagesKeys key) {
+    java.util.function.Consumer<String> tap = RTP.messageTap.get();
+    if (tap != null) {
+      ConfigParser<MessagesKeys> lang =
+          (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+      String raw = lang == null ? "" : lang.getConfigValue(key, "").toString();
+      if (!raw.isEmpty()) tap.accept(PlaceholderProvider.fillPlaceholders(raw, callerId));
+      return;
+    }
+    RTP.serverAccessor.sendMessage(callerId, key);
+  }
+
+  /**
+   * {@code sendMessageAndSuggest} variant of {@link #emit(UUID, String)}. The
+   * book path has no chat-click affordance to attach a suggestion to, so the
+   * suggestion is discarded when the tap is active (the book renderer mints
+   * its own click events independently). Falls through to the normal accessor
+   * otherwise.
+   */
+  private static void emitAndSuggest(UUID callerId, String line, String suggestion) {
+    java.util.function.Consumer<String> tap = RTP.messageTap.get();
+    if (tap != null) {
+      tap.accept(PlaceholderProvider.fillPlaceholders(line, callerId));
+      return;
+    }
+    RTP.serverAccessor.sendMessageAndSuggest(callerId, line, suggestion);
+  }
+
   private void sendWorldInfo(UUID callerId, RTPWorld world, ConfigParser<MessagesKeys> lang) {
     Object worldInfoObj = lang.getConfigValue(MessagesKeys.worldInfo, "");
     if (!(worldInfoObj instanceof List)) return;
@@ -57,7 +108,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
     try {
       RTP.worldContext.set(world);
-      worldInfo.forEach(s -> RTP.serverAccessor.sendMessage(callerId, s));
+      worldInfo.forEach(s -> emit(callerId, s));
     } finally {
       RTP.worldContext.remove();
     }
@@ -71,7 +122,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
     try {
       RTP.regionContext.set(region);
-      regionInfo.forEach(s -> RTP.serverAccessor.sendMessage(callerId, s));
+      regionInfo.forEach(s -> emit(callerId, s));
     } finally {
       RTP.regionContext.remove();
     }
@@ -98,31 +149,31 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
     if (parameterValues.isEmpty()) {
       if (callerId.equals(RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, MessagesKeys.infoTitle);
-        RTP.serverAccessor.sendMessage(callerId, MessagesKeys.infoConsoleWorldHeader);
+        emit(callerId, MessagesKeys.infoTitle);
+        emit(callerId, MessagesKeys.infoConsoleWorldHeader);
         for (RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
           sendWorldInfo(callerId, world, lang);
         }
 
-        RTP.serverAccessor.sendMessage(callerId, "");
-        RTP.serverAccessor.sendMessage(callerId, MessagesKeys.infoConsoleRegionHeader);
+        emit(callerId, "");
+        emit(callerId, MessagesKeys.infoConsoleRegionHeader);
         RTP.selectionAPI.permRegionLookup.values().forEach(region -> {
           sendRegionInfo(callerId, region, lang);
         });
       } else {
-        RTP.serverAccessor.sendMessage(callerId, MessagesKeys.infoTitle);
-        RTP.serverAccessor.sendMessage(callerId, MessagesKeys.infoWorldHeader);
+        emit(callerId, MessagesKeys.infoTitle);
+        emit(callerId, MessagesKeys.infoWorldHeader);
         String worlds = lang.getConfigValue(MessagesKeys.infoWorld, "").toString();
         for (RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
           try {
             RTP.worldContext.set(world);
-            RTP.serverAccessor.sendMessageAndSuggest(callerId, worlds, "rtp info world:" + world.name());
+            emitAndSuggest(callerId, worlds, "/rtp info world:" + world.name());
           } finally {
             RTP.worldContext.remove();
           }
         }
 
-        RTP.serverAccessor.sendMessage(callerId, MessagesKeys.infoRegionHeader);
+        emit(callerId, MessagesKeys.infoRegionHeader);
         String regions = lang.getConfigValue(MessagesKeys.infoRegion, "").toString();
         RTP.selectionAPI
                 .permRegionLookup
@@ -131,8 +182,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
                         region -> {
                           try {
                             RTP.regionContext.set(region);
-                            RTP.serverAccessor.sendMessageAndSuggest(
-                                    callerId, regions, "rtp info region:" + region.name);
+                            emitAndSuggest(
+                                    callerId, regions, "/rtp info region:" + region.name);
                           } finally {
                             RTP.regionContext.remove();
                           }
@@ -162,24 +213,24 @@ public class InfoCmd extends BaseRTPCmdImpl {
       String infoDisclaimerHeader = lang.getConfigValue(MessagesKeys.infoDisclaimerHeader, "").toString();
       String infoDisclaimer = lang.getConfigValue(MessagesKeys.infoDisclaimer, "").toString();
 
-      if (!infoTickets.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTickets);
-      if (!infoTeleports.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTeleports);
-      if (!infoMSPT.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoMSPT);
-      if (!infoTotalLoads.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTotalLoads);
-      if (!infoLoadsByOrigin.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoLoadsByOrigin);
-      if (!infoLeakRate.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoLeakRate);
+      if (!infoTickets.isEmpty()) emit(callerId, infoTickets);
+      if (!infoTeleports.isEmpty()) emit(callerId, infoTeleports);
+      if (!infoMSPT.isEmpty()) emit(callerId, infoMSPT);
+      if (!infoTotalLoads.isEmpty()) emit(callerId, infoTotalLoads);
+      if (!infoLoadsByOrigin.isEmpty()) emit(callerId, infoLoadsByOrigin);
+      if (!infoLeakRate.isEmpty()) emit(callerId, infoLeakRate);
       // Health — pipeline group (METRICS_PLAN.md > /rtp info Surface). Header line
       // is rendered ahead of the metrics group so operators can visually anchor it.
       if (!infoHealthPipelineHeader.isEmpty())
-        RTP.serverAccessor.sendMessage(callerId, infoHealthPipelineHeader);
-      if (!infoTps.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTps);
-      if (!infoMSPTLive.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoMSPTLive);
-      if (!infoSoftCap.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoSoftCap);
-      if (!infoQueueDepth.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoQueueDepth);
-      if (!infoPendingTeleports.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoPendingTeleports);
-      if (!infoAvgPipelineMs.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoAvgPipelineMs);
-      if (!infoHeap.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoHeap);
-      if (!infoDatabaseLatencyMs.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDatabaseLatencyMs);
+        emit(callerId, infoHealthPipelineHeader);
+      if (!infoTps.isEmpty()) emit(callerId, infoTps);
+      if (!infoMSPTLive.isEmpty()) emit(callerId, infoMSPTLive);
+      if (!infoSoftCap.isEmpty()) emit(callerId, infoSoftCap);
+      if (!infoQueueDepth.isEmpty()) emit(callerId, infoQueueDepth);
+      if (!infoPendingTeleports.isEmpty()) emit(callerId, infoPendingTeleports);
+      if (!infoAvgPipelineMs.isEmpty()) emit(callerId, infoAvgPipelineMs);
+      if (!infoHeap.isEmpty()) emit(callerId, infoHeap);
+      if (!infoDatabaseLatencyMs.isEmpty()) emit(callerId, infoDatabaseLatencyMs);
 
       // Section C / METRICS_PLAN.md > Folia Aggregation — render the per-region
       // table when the active MetricsBinding publishes per-region detail (Folia).
@@ -192,7 +243,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
         String infoFoliaRegionsHeader = lang.getConfigValue(MessagesKeys.infoFoliaRegionsHeader, "").toString();
         String infoFoliaRegion = lang.getConfigValue(MessagesKeys.infoFoliaRegion, "").toString();
         if (!infoFoliaRegionsHeader.isEmpty())
-          RTP.serverAccessor.sendMessage(callerId, infoFoliaRegionsHeader);
+          emit(callerId, infoFoliaRegionsHeader);
         if (!infoFoliaRegion.isEmpty()) {
           for (io.github.dailystruggle.metrics.api.FoliaRegionSample sample : foliaRegions) {
             String row = infoFoliaRegion
@@ -202,13 +253,13 @@ public class InfoCmd extends BaseRTPCmdImpl {
                 .replace("[playerCount]", Integer.toString(sample.playerCount))
                 .replace("[queueDepth]", Integer.toString(sample.queueDepth))
                 .replace("[tickBudgetUtilisation]", formatDouble(sample.tickBudgetUtilisation()));
-            RTP.serverAccessor.sendMessage(callerId, row);
+            emit(callerId, row);
           }
         }
       }
 
-      if (!infoDisclaimerHeader.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDisclaimerHeader);
-      if (!infoDisclaimer.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDisclaimer);
+      if (!infoDisclaimerHeader.isEmpty()) emit(callerId, infoDisclaimerHeader);
+      if (!infoDisclaimer.isEmpty()) emit(callerId, infoDisclaimer);
     }
 
     List<String> worldNames = parameterValues.get("world");
@@ -231,13 +282,13 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
     if (sender.hasPermission("rtp.admin") || sender.hasPermission("rtp.support")) {
-      RTP.serverAccessor.sendMessage(callerId, "&7--- DRM Information ---");
-      RTP.serverAccessor.sendMessage(callerId, "&7Source: &f" + DownloadInfo.source());
-      RTP.serverAccessor.sendMessage(callerId, "&7Downloader ID: &f" + DownloadInfo.userId());
-      RTP.serverAccessor.sendMessage(callerId, "&7Download Nonce: &f" + DownloadInfo.nonce());
+      emit(callerId, "&7--- DRM Information ---");
+      emit(callerId, "&7Source: &f" + DownloadInfo.source());
+      emit(callerId, "&7Downloader ID: &f" + DownloadInfo.userId());
+      emit(callerId, "&7Download Nonce: &f" + DownloadInfo.nonce());
       if (DownloadInfo.source() == DownloadInfo.Source.BUILTBYBIT) {
-        RTP.serverAccessor.sendMessage(callerId, "&7BBB Resource: &f" + DownloadInfo.resourceId());
-        RTP.serverAccessor.sendMessage(callerId, "&7BBB Timestamp: &f" + DownloadInfo.timestamp());
+        emit(callerId, "&7BBB Resource: &f" + DownloadInfo.resourceId());
+        emit(callerId, "&7BBB Timestamp: &f" + DownloadInfo.timestamp());
       }
     }
 

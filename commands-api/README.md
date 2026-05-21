@@ -46,22 +46,22 @@ parameter map (`getParameterLookup()`), and a subcommand map
 | Form           | Meaning                     | Example          |
 |----------------|-----------------------------|------------------|
 | `name`         | subcommand (positional)     | `reload`         |
-| `name=value`   | parameter (canonical)       | `player=steve`   |
-| `name:value`   | parameter (legacy, accepted)| `player:steve`   |
+| `name=value`   | parameter                   | `player=steve`   |
 | `name=v1,v2`   | parameter, multi-value      | `player=a,b`     |
 
-Delimiters: `CommandsAPI.parameterDelimiter` (`=`, canonical — used in
-tab-complete) and `CommandsAPI.parameterDelimiterAlt` (`:`, accepted on
-input for backward compatibility). Multi-value delimiter:
-`multiParameterDelimiter` (`,`).
+Delimiter: `CommandsAPI.parameterDelimiter` (`=`) is the sole parameter
+separator (input and tab-complete). Multi-value delimiter:
+`multiParameterDelimiter` (`,`). The legacy `:` separator is no longer
+accepted; tokens like `player:steve` are treated as a bare subcommand
+name and produce `msgInvalidCommand`.
 
-> **A bare token (no `=` or `:`) is _always_ a subcommand name.** It is
+> **A bare token (no `=`) is _always_ a subcommand name.** It is
 > never treated as a "default" parameter value. Unknown bare token →
 > `msgInvalidCommand`.
 
-> **Tip:** if a parameter *value* contains `:` (e.g. a namespaced Minecraft
-> ID like `iris:volcanic_ash_plains`), use `=` as the separator to avoid
-> ambiguity: `biome=iris:volcanic_ash_plains`.
+> **Note:** a `:` inside a parameter *value* is preserved (e.g. namespaced
+> Minecraft IDs like `biome=iris:volcanic_ash_plains`); only the parameter
+> name/value separator is restricted to `=`.
 
 ### 2.3 Parameters
 
@@ -146,8 +146,8 @@ Failures go through callbacks, never a magic boolean return.
 - **`msgInvalidCommand(callerId, arg[, msg])`** — bare token matching no
   visible subcommand (`/rtp frobnicate`). Platform adapters requiring
   auditing (RTP REQ-RTP-S-004) log at `WARNING`.
-- **`msgBadParameter(callerId, name, value[, msg])`** — `key=value` (or
-  `key:value`) where key is unknown, value is empty, or
+- **`msgBadParameter(callerId, name, value[, msg])`** — `key=value`
+  where key is unknown, value is empty, or
   `isRelevant(callerId, value)` is false.
 
 Consequences:
@@ -224,7 +224,7 @@ w.subParamMap.put("world_nether", Map.of("portal", new BooleanParameter(...)));
 ## 8. Common pitfalls
 
 - **Bare token ≠ default parameter.** `/rtp steve` is subcommand `steve`,
-  not `player:steve`. Add shorthand at the adapter layer before handing
+  not `player=steve`. Add shorthand at the adapter layer before handing
   `args` to `TreeCommand`.
 - **Blocking on the parser's future on the main thread** — the pipeline
   runs on `execute()`; awaiting inline deadlocks the tick meant to run it.

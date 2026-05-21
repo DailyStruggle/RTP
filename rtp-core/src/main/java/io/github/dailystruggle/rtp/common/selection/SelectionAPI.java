@@ -194,6 +194,7 @@ public class SelectionAPI {
     boolean requirePermission = (boolean) regionParams.getOrDefault(RegionKeys.requirePermission.name(), baseSettings.requirePermission());
     long cacheCap = ((Number) regionParams.getOrDefault(RegionKeys.cacheCap.name(), baseSettings.cacheCap())).longValue();
     long backlogCacheCap = ((Number) regionParams.getOrDefault(RegionKeys.backlogCacheCap.name(), baseSettings.backlogCacheCap())).longValue();
+    long networkReserveSize = ((Number) regionParams.getOrDefault(RegionKeys.networkReserveSize.name(), baseSettings.networkReserveSize())).longValue();
     int activeChunkCap = ((Number) regionParams.getOrDefault(RegionKeys.activeChunkCap.name(), baseSettings.activeChunkCap())).intValue();
     double price = ((Number) regionParams.getOrDefault(RegionKeys.price.name(), baseSettings.price())).doubleValue();
     long spatialResolution = ((Number) regionParams.getOrDefault(RegionKeys.spatialResolution.name(), baseSettings.spatialResolution())).longValue();
@@ -208,6 +209,7 @@ public class SelectionAPI {
             requirePermission,
             cacheCap,
             backlogCacheCap,
+            networkReserveSize,
             activeChunkCap,
             price,
             spatialResolution,

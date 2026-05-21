@@ -13,10 +13,23 @@ import java.util.concurrent.TimeUnit;
  *          events?
  */
 public class CommandsAPI {
-    public static char parameterDelimiter = '=';
-    /** Legacy delimiter accepted on input for backward compatibility. */
-    public static final char parameterDelimiterAlt = ':';
-    public static char multiParameterDelimiter = ',';
+    /**
+     * Single-character separator between a parameter name and its value
+     * (e.g. {@code worldid=overworld}). Fixed at {@code '='} since the
+     * {@code ':'} -> {@code '='} migration; previously mutable for embedders
+     * that wanted a different grammar, now {@code final} because the
+     * configurability layer is no longer load-bearing. Kept as a named
+     * constant so call sites and the Brigadier bridge can reference one
+     * symbol rather than scattering {@code '='} literals across modules.
+     */
+    public static final char parameterDelimiter = '=';
+
+    /**
+     * Single-character separator between multiple values bound to one
+     * parameter (e.g. {@code biome=plains,forest}). Fixed at {@code ','}
+     * for the same reason as {@link #parameterDelimiter}.
+     */
+    public static final char multiParameterDelimiter = ',';
     public static final UUID serverId = new UUID(0,0);
 
     //todo: use these somehow?

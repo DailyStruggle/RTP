@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.bukkit;
 
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.database.BukkitDatabaseHandler;
+import io.github.dailystruggle.rtp.bukkit.network.NetworkModeBootstrap;
 import io.github.dailystruggle.rtp.bukkit.effects.BukkitEffectsHandler;
 import io.github.dailystruggle.rtp.bukkit.events.*;
 import io.github.dailystruggle.rtp.bukkit.bukkitListeners.*;
@@ -34,6 +35,8 @@ import java.util.stream.Collectors;
 public final class RTPBukkitPlugin extends JavaPlugin {
   private static RTPBukkitPlugin instance = null;
   private static Metrics metrics;
+  /** Phase 2e-SQL: backend-side network mode lifecycle holder; never null after onLoad. */
+  private final NetworkModeBootstrap networkBootstrap = new NetworkModeBootstrap();
   public BukkitTask commandTimer = null;
   public BukkitTask commandProcessing = null;
 
@@ -137,6 +140,19 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable BukkitDatabaseHandler.setupDatabase");
         BukkitDatabaseHandler.setupDatabase(rtp);
         RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable database setup complete");
+        // Phase 2e-SQL: boot backend-side network mode AFTER the DB is up
+        // (the SQL transport reuses the same accessor's DataSource). Strict
+        // REQ-RTP-NET-002 parity: no-op when network.yml is absent or
+        // network.enabled=false. Failure here is logged but never aborts
+        // plugin enable (network mode is strictly optional).
+        try {
+          java.io.File networkYml = NetworkModeBootstrap.ensureNetworkYml(
+              getDataFolder(), RTPBukkitPlugin.class);
+          networkBootstrap.boot(networkYml);
+        } catch (Throwable t) {
+          RTP.log(java.util.logging.Level.WARNING,
+              "[LIFECYCLE] onEnable network-mode boot failed; continuing without it: " + t.getMessage(), t);
+        }
       } catch (Exception e) {
         RTP.log(java.util.logging.Level.WARNING,
             "[LIFECYCLE] onEnable database setup failure -- bailing out via onDisable", e);
@@ -172,6 +188,21 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // regions configured for a late-loaded world to never rebind.
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable setupBukkitEvents (synchronous)");
     setupBukkitEvents();
+    // CHECKLIST-maps-api.md Stage 2.6 - install the Bukkit-family MapBinding
+    // so that MapDispatch (ADR-047 / REQ-RTP-MAP-006) can satisfy chart
+    // requests issued from /rtp info etc. Folia override (Stage 2.3) and
+    // bindLive (Stage 3 of CHECKLIST-metrics-to-maps) remain deferred; this
+    // binding's bindLive throws UnsupportedOperationException by contract.
+    try {
+      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(
+          new io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding());
+      RTP.log(java.util.logging.Level.FINE,
+          "[LIFECYCLE] onEnable installed BukkitMapBinding via MapDispatch");
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[LIFECYCLE] onEnable BukkitMapBinding install failed; MapDispatch will fall back to NoopMapBinding",
+          t);
+    }
     // Catch worlds that were already loaded by the time the listener registered
     // (either before RTP enabled, or between region config load and listener
     // registration), so dormant regions for those worlds are activated without
@@ -305,6 +336,17 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   @Override
   public void onDisable() {
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onDisable ENTER -- cancelling command timers");
+    // Phase 2e-SQL: stop the backend heartbeat publisher + close the network
+    // transport BEFORE any DB shutdown. Reverse-order teardown - publisher
+    // first (so it cannot enqueue more upserts), then transport (releases
+    // any subscribers / poll thread). Idempotent; safe if network mode was
+    // never enabled this lifecycle.
+    try {
+      networkBootstrap.shutdown();
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[LIFECYCLE] onDisable network-mode shutdown failed (continuing): " + t.getMessage(), t);
+    }
     // CHECKLIST-metrics-and-multiserver.md row B9: tear down the metrics
     // binding and cancel the Spigot tick sampler (if installed) so a
     // /reload cycle reinstalls cleanly. Idempotent.
@@ -442,6 +484,18 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     Bukkit.getPluginManager().registerEvents(new OnPlayerRespawn(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerTeleport(), this);
     Bukkit.getPluginManager().registerEvents(new OnWorldLoadUnload(), this);
+
+    // L2 of CHECKLIST-cross-server-rtp.md: hand the network-mode bootstrap a
+    // plugin reference so it can register its JoinTriggerSource alongside
+    // the other listeners. No-op when network mode is disabled (boot() left
+    // joinTriggerSource null).
+    try {
+      networkBootstrap.registerJoinTriggerSource(this);
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[LIFECYCLE] setupBukkitEvents JoinTriggerSource registration failed; continuing: "
+              + t.getMessage(), t);
+    }
 
     EffectsAPI.init(this);
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] setupBukkitEvents EXIT -- listeners registered");

@@ -52,7 +52,7 @@ public class RegionQueueManagerTest {
                 "qm_region", world,
                 new Circle(), new LinearAdjustor(new ArrayList<>()),
                 false, false,
-                16L, 1000L, 8,
+                16L, 1000L,  0L, 8,
                 0.0, 1L, "", false);
         region = new Region("qm_region", settings);
         qm = region.queueManager;

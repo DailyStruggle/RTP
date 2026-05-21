@@ -1025,27 +1025,41 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     public boolean isChunkGenerated(int cx, int cz) {
         try {
             ServerChunkCache cache = world.getChunkSource();
-            if (cache == null) return true;
-            // Loaded chunk → unambiguously generated.
-            if (cache.hasChunk(cx, cz)) return true;
+            // Loaded chunk -> unambiguously generated. Cheapest answer.
+            if (cache != null && cache.hasChunk(cx, cz)) return true;
+        } catch (Throwable ignored) {
+            // Fall through to the data-side probe.
+        }
+        ServerLevel level = world;
+        if (level == null) return true;
+        MinecraftServer server = level.getServer();
+        if (server == null) return true;
 
-            resolveReflectionOnce(cache);
-            if (!REFLECTION_AVAILABLE) return true;
-
-            Object chunkMap = CHUNK_MAP_FIELD.get(cache);
-            if (chunkMap == null) return true;
-            Object result = CHUNK_MAP_READ_METHOD.invoke(
-                chunkMap, new net.minecraft.world.level.ChunkPos(cx, cz));
-            if (!(result instanceof CompletableFuture<?> future)) return true;
-            // IOWorker-backed: completes from the IO executor without touching
-            // the chunk system. Bounded (single region-file header lookup).
-            Object payload = future.join();
-            if (!(payload instanceof java.util.Optional<?> optional)) return true;
-            return optional.isPresent();
+        final java.nio.file.Path worldFolder;
+        try {
+            worldFolder = server.getWorldPath(LevelResource.ROOT);
         } catch (Throwable t) {
-            // Conservative default: assume generated. Per RTPWorld javadoc, a
-            // false-positive only forfeits a perf fast path; a false-negative
-            // could re-introduce the ADR-016 §13.3 palette-drift bug.
+            return true;
+        }
+        try {
+            String dim = dimensionRegionSubpath(level);
+            java.nio.file.Path regionFile =
+                io.github.dailystruggle.rtp.anvil.AnvilPrefilter
+                    .regionFileFor(worldFolder, dim, cx, cz);
+            // Missing region file = no chunk on disk for this 32x32 tile.
+            if (regionFile == null || !java.nio.file.Files.exists(regionFile)) {
+                return false;
+            }
+            // Binned fast path: a 1024-bit per-region-file occupancy bitmap
+            // amortises GENSCAN's per-chunk slot lookup across the entire 32x32
+            // tile. Built once per region file at first touch, reused until the
+            // .mca mtime advances. Parity with v26_1_R1.
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionOccupancyCache
+                .isOccupied(regionFile, cx, cz);
+        } catch (Throwable t) {
+            // Conservative default per RTPWorld javadoc: a false-positive only
+            // forfeits a perf fast path; a false-negative could re-introduce
+            // the ADR-016 §13.3 palette-drift bug.
             return true;
         }
     }
@@ -1266,9 +1280,15 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
             net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> holder =
                     world.getBiome(new BlockPos(x, y, z));
             // Holder#unwrapKey()'s ResourceKey on 26.1.2 exposes identifier() (was location()).
-            return holder.unwrapKey()
+            // Normalise through PaletteIdentifierNormalizer to match the form ScanTask /
+            // FabricServerAccessor.defaultBiomesFor / FabricAnvilColumnProbeAdapter use
+            // (namespace-stripped, upper-cased). Without normalisation FULLSCAN's
+            // physical-biome check compares "MINECRAFT:PLAINS" against the
+            // namespace-stripped "PLAINS" in defaultBiomes and rejects every candidate
+            // -- visible as fullLoadOutcome.physBiome consuming 100% of FULLSCAN load.
+            String raw = holder.unwrapKey()
                     .map(k -> {
-                        try { return k.identifier().toString().toUpperCase(java.util.Locale.ROOT); }
+                        try { return k.identifier().toString(); }
                         catch (Throwable t) { return ""; }
                     })
                     .orElseGet(() -> {
@@ -1277,11 +1297,14 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                             Identifier id = world.registryAccess()
                                     .lookupOrThrow(net.minecraft.core.registries.Registries.BIOME)
                                     .getKey(holder.value());
-                            return (id == null) ? "" : id.toString().toUpperCase(java.util.Locale.ROOT);
+                            return (id == null) ? "" : id.toString();
                         } catch (Throwable t) {
                             return "";
                         }
                     });
+            String n = io.github.dailystruggle.rtp.api.configuration
+                    .PaletteIdentifierNormalizer.normalize(raw);
+            return n == null ? "" : n;
         } catch (Throwable t) {
             return "";
         }

@@ -95,7 +95,7 @@ public class Configs {
     }
 
     if (detailed_reload) {
-      RTP.log(Level.INFO, "&00FFFF[RTP] loaded " + name);
+      RTP.log(Level.INFO, "&#00FFFF[RTP] loaded " + name);
     }
   }
 
@@ -368,7 +368,7 @@ public class Configs {
       if (detailed_region_init) {
         RTP.log(
                 Level.INFO,
-                "&00FFFF[RTP] [" + name + "] successfully created teleport region - " + region.name);
+                "&#00FFFF[RTP] [" + name + "] successfully created teleport region - " + region.name);
       }
       RTP.getInstance()
               .miscAsyncTasks

@@ -59,7 +59,7 @@ import java.util.function.Predicate;
 public final class CommandTreeMenuBuilder {
 
     /** Default TTL for tokens minted by the reflector when the config knob is unset. */
-    public static final java.time.Duration DEFAULT_TOKEN_TTL = java.time.Duration.ofSeconds(60);
+    public static final java.time.Duration DEFAULT_TOKEN_TTL = java.time.Duration.ofHours(6);
 
     /**
      * Stage A.6 — number of suggestion value rows packed onto a single
@@ -445,12 +445,19 @@ public final class CommandTreeMenuBuilder {
                 .replace("[command]", assembledStr);
         MenuLine headerLine = MenuLine.of(new MenuFragment(headerLabel, null, null));
 
-        // Resolve the parameter on the parent node. commands-api stores the
-        // parameter lookup keyed by upper-case name (see TreeCommand wiring).
+        // Resolve the parameter on the parent node. commands-api's
+        // TreeCommand#addParameter stores under the lowercased name (see
+        // localCommands/TreeCommand.java line 26), but historic callers
+        // have used both raw and upper-case keys; try all three so a
+        // mixed-case enum-derived paramName (e.g. "teleportDelay" from
+        // ConfigKeys.teleportDelay.name()) resolves correctly.
         Map<String, CommandParameter> paramLookup = parent.getParameterLookup();
         CommandParameter param = null;
         if (paramLookup != null) {
             param = paramLookup.get(paramName);
+            if (param == null) {
+                param = paramLookup.get(paramName.toLowerCase(java.util.Locale.ROOT));
+            }
             if (param == null) {
                 param = paramLookup.get(paramName.toUpperCase(java.util.Locale.ROOT));
             }
@@ -464,36 +471,48 @@ public final class CommandTreeMenuBuilder {
         // command label; mirror what build() does (root.name() at the head).
         chatPath.addLast(parent.name() == null ? "" : parent.name());
         // The actual node's name is already the last segment of parentPath,
-        // so suggestPrefix will produce "/rtp <parentPath...> <paramName>:".
+        // so suggestPrefix will produce "/rtp <parentPath...> <paramName>=".
         String typePrefix = profile.suggestPrefix(chatPath, paramName);
         // Compose with the upstream args so the prefill includes the assembled
         // command, not just the leaf node. profile.suggestPrefix is expected
-        // to emit the full "/rtp ... <paramName>:" form when given the full
+        // to emit the full "/rtp ... <paramName>=" form when given the full
         // chat path; if our parent context drops upstream segments we have to
         // splice them in. We delegate to the profile but augment when needed.
         if (!assembledStr.isEmpty() && !typePrefix.contains(assembledStr)) {
             // Fallback composition: parentPath is the full path from /rtp; the
             // profile didn't carry it. Build the canonical prefill ourselves.
-            typePrefix = "/rtp " + assembledStr + " " + paramName + ":";
+            // '=' separator matches commands-api parameter parsing.
+            typePrefix = "/rtp " + assembledStr + " " + paramName + "=";
         }
         String typeLabel = lookupMsg(MessagesKeys.menuTypeValue,
                 "✎ type a custom value...");
         // ADR-045 — on renderers that support it (Paper/Folia BookMenuRenderer),
         // this row opens an anvil GUI; the renderer mints a token bound to a
         // sibling subcommand which opens the anvil server-side and submits
-        // `/rtp <parentPath...> <paramName>:<typed>` on confirm. Renderers
+        // `/rtp <parentPath...> <paramName>=<typed>` on confirm. Renderers
         // that don't support anvil input fall back to chat-prefill semantics
         // by re-rendering this action as a `SuggestInput(typePrefix)` click.
         String[] parentPathArr = parentPath.toArray(new String[0]);
+        // PROPOSAL-config-staging-cart §6 — when the picker is rendered from a
+        // /rtp config <file> context, mint the anvil prompt in STAGE mode so
+        // anvil-confirm pushes (file, key, value) into the per-player staging
+        // cart and reopens /rtp config <file> instead of running the single
+        // assignment immediately. Non-config contexts (regular command param
+        // pickers) keep the legacy RUN behavior via the 3-arg constructor.
+        MenuAction.Mode promptMode =
+                (!parentPath.isEmpty()
+                        && "config".equalsIgnoreCase(parentPath.get(0)))
+                        ? MenuAction.Mode.STAGE
+                        : MenuAction.Mode.RUN;
         MenuLine typeLine = MenuLine.of(new MenuFragment(typeLabel, null,
-                new MenuAction.PromptAnvilInput(parentPathArr, paramName, "")));
+                new MenuAction.PromptAnvilInput(parentPathArr, paramName, "", promptMode)));
 
         // Build value rows — Stage A.3: clicking a suggested value *stages*
         // the assignment into the assembled path (re-opens the parent command
-        // page with `paramName:value` appended) rather than executing
+        // page with `paramName=value` appended) rather than executing
         // immediately. Execution is then explicit via the parent page's
         // Execute row. This allows multi-parameter compose statelessly:
-        // each subsequent picker click appends another `name:value` segment.
+        // each subsequent picker click appends another `name=value` segment.
         List<MenuLine> valueLines = new ArrayList<>();
         if (param != null) {
             Set<String> suggestions = safeSuggestions(param, callerId);
@@ -507,7 +526,7 @@ public final class CommandTreeMenuBuilder {
                     for (int i = 0; i < parentPath.size(); i++) {
                         openArgs[i] = parentPath.get(i);
                     }
-                    openArgs[parentPath.size()] = paramName + ":" + value;
+                    openArgs[parentPath.size()] = paramName + "=" + value;
                     valueLines.add(MenuLine.of(new MenuFragment(value, null,
                             new MenuAction.OpenMenu(openArgs))));
                 }
@@ -571,6 +590,373 @@ public final class CommandTreeMenuBuilder {
 
         String title = (parent.name() == null ? "" : parent.name()) + ":" + paramName;
         return new MenuModel(title, pages);
+    }
+
+    /**
+     * Build the curated config-selector page (PROPOSAL-config-view-as-book.md
+     * v3.7 — checklist step 3).
+     *
+     * <p>Layout: a Back row (to the {@code /rtp} root, i.e. empty path), a
+     * non-clickable header row, and one row per entry in {@code fileNames}.
+     * Each file row carries {@link MenuAction.OpenConfigFile} whose redeem
+     * (server-side, deferred to checklist step 5) shall render the per-file
+     * key list page via {@link #buildConfigFile}.
+     *
+     * <p>The caller supplies the file-name list explicitly (rather than the
+     * builder reaching into {@link RTP#configs}) so this method stays unit-
+     * testable without a fully-wired runtime. Production callers shall pass
+     * the keys of {@code RTP.configs.configParserMap} translated to their
+     * baseline file names. The list is iterated in encounter order — the
+     * caller is responsible for stable ordering.
+     *
+     * <p>This builder is platform-neutral plumbing. It does <em>not</em>
+     * enforce the {@code rtp.config.view} permission: gating happens (a) at
+     * the row that opens the selector from the root page and (b) in the
+     * redeem dispatch (checklist step 5).
+     */
+    public MenuModel buildConfigSelector(UUID callerId, List<String> fileNames) {
+        Objects.requireNonNull(callerId, "callerId");
+        Objects.requireNonNull(fileNames, "fileNames");
+
+        List<MenuLine> lines = new ArrayList<>();
+
+        // Back row → /rtp menu root page (empty path).
+        String backLabel = lookupMsg(MessagesKeys.menuBack, "« back");
+        lines.add(MenuLine.of(new MenuFragment(backLabel, null,
+                new MenuAction.OpenMenu(new String[0]))));
+
+        // Search row — opens an anvil-input prompt for a cross-config substring
+        // search (PROPOSAL-rtp-menu-config-search.md §10 item 6). English-only
+        // fallback label; locale lift deferred to checklist step 7.
+        lines.add(MenuLine.of(new MenuFragment("&b&l⚲ search configs", null,
+                new MenuAction.OpenConfigSearchPrompt())));
+
+        // Header — non-clickable orientation row. Locale key deferred to
+        // checklist step 8 (locale TSV pipeline); use a sensible English
+        // fallback in the meantime.
+        lines.add(MenuLine.of(new MenuFragment("&1&lconfig files", null, null)));
+
+        // One row per known config file.
+        for (String fileName : fileNames) {
+            if (fileName == null || fileName.isEmpty()) continue;
+            lines.add(MenuLine.of(new MenuFragment("&2" + fileName, null,
+                    new MenuAction.OpenConfigFile(fileName))));
+        }
+
+        // Mint a token per clickable action (mirrors buildParamPicker).
+        MenuPage page = new MenuPage(lines);
+        for (MenuLine line : page.lines()) {
+            for (MenuFragment fragment : line.fragments()) {
+                MenuAction action = fragment.action();
+                if (action != null) {
+                    tokenRegistry.mint(callerId, action, tokenTtl);
+                }
+            }
+        }
+
+        return new MenuModel("config", List.of(page));
+    }
+
+    /**
+     * Build the per-file config page (PROPOSAL-config-view-as-book.md v3.7
+     * — checklist step 3).
+     *
+     * <p>Layout: a Back row (to the config selector), a non-clickable header
+     * row, and one row per enum key in {@code parser}'s {@code myClass}.
+     * Each key row carries {@link MenuAction.OpenConfigKey} whose redeem
+     * (server-side, deferred to checklist step 5) shall delegate to
+     * {@link #buildParamPicker} over the typed {@code CommandParameter}.
+     *
+     * <p>The row label is {@code "<key>: <currentValue>"} where the current
+     * value is read via {@link ConfigParser#getConfigValue(Enum, Object)}
+     * with a {@code null} default. Keys whose current value is {@code null}
+     * render with an English fallback placeholder; the localized form is
+     * deferred to checklist step 8.
+     *
+     * <p>If the parser has zero enum constants (degenerate case, kept for
+     * v3.7.4 empty-file handling parity) the page contains Back + header +
+     * a non-clickable empty-state hint row.
+     */
+    public <E extends Enum<E>> MenuModel buildConfigFile(UUID callerId,
+                                                         String fileName,
+                                                         ConfigParser<E> parser) {
+        Objects.requireNonNull(callerId, "callerId");
+        Objects.requireNonNull(fileName, "fileName");
+        Objects.requireNonNull(parser, "parser");
+        if (fileName.isEmpty()) {
+            throw new IllegalArgumentException("fileName must not be empty");
+        }
+
+        // Back row → selector page. Encoded as an OpenConfigSelector action
+        // (not OpenMenu) so the redeem path re-renders the curated selector
+        // rather than reflecting an arbitrary command tree node.
+        String backLabel = lookupMsg(MessagesKeys.menuBack, "« back");
+        MenuLine backRow = MenuLine.of(new MenuFragment(backLabel, null,
+                new MenuAction.OpenConfigSelector()));
+        // Header — locale key deferred to step 8; English fallback only.
+        MenuLine headerRow = MenuLine.of(new MenuFragment("&1&l" + fileName, null, null));
+
+        // Source of truth for visible keys is the loaded parser data, NOT the
+        // raw enum declaration. The two diverge whenever a packaging variant
+        // omits a key from its shipped YAML on purpose (e.g. the lite jar
+        // intentionally drops `backlogCacheCap` from `regions/default.yml`
+        // per ADR-024 / ADR-028 — the in-code default still works at runtime,
+        // but admins are not meant to discover or edit the knob through the
+        // menu). Iterating `myClass.getEnumConstants()` would re-expose every
+        // such key just because it exists in the Java enum, which is the bug
+        // this branch fixes. Enum declaration order is preserved by walking
+        // the constants and gating on `data.containsKey`.
+        E[] enumValues = parser.myClass.getEnumConstants();
+        java.util.EnumMap<E, Object> loaded = parser.getData();
+        List<E> visibleKeys = new ArrayList<>();
+        if (enumValues != null) {
+            for (E key : enumValues) {
+                if (key == null) continue;
+                if (loaded.containsKey(key)) {
+                    visibleKeys.add(key);
+                }
+            }
+        }
+        List<MenuPage> pages = new ArrayList<>();
+        if (visibleKeys.isEmpty()) {
+            List<MenuLine> lines = new ArrayList<>();
+            lines.add(backRow);
+            lines.add(headerRow);
+            // v3.7.4 empty-file handling: header + hint + back already present.
+            // Same hint applies whether the enum itself is empty or the YAML
+            // simply did not configure any of the declared keys.
+            lines.add(MenuLine.of(new MenuFragment(
+                    "&7(no editable keys in this file)", null, null)));
+            pages.add(new MenuPage(lines));
+        } else {
+            // Paginate to avoid Paper's 32767-char-per-page limit. A book page
+            // realistically fits ~12 rich-text rows before scrolling; use that
+            // as the page budget. Back + header consume 2 rows per page.
+            final int rowsPerPage = 12;
+            List<MenuLine> lines = new ArrayList<>();
+            lines.add(backRow);
+            lines.add(headerRow);
+            for (E key : visibleKeys) {
+                Object current = loaded.get(key);
+                String currentStr = current == null
+                        ? "&8(unset)"
+                        : String.valueOf(current);
+                String label = "&2" + key.name() + "&7: &0" + currentStr;
+                lines.add(MenuLine.of(new MenuFragment(label, null,
+                        new MenuAction.OpenConfigKey(fileName, key.name()))));
+                if (lines.size() - 2 >= rowsPerPage) {
+                    pages.add(new MenuPage(lines));
+                    lines = new ArrayList<>();
+                    lines.add(backRow);
+                    lines.add(headerRow);
+                }
+            }
+            if (lines.size() > 2) {
+                pages.add(new MenuPage(lines));
+            }
+        }
+
+        // Mint tokens for clickable rows across all pages.
+        for (MenuPage page : pages) {
+            for (MenuLine line : page.lines()) {
+                for (MenuFragment fragment : line.fragments()) {
+                    MenuAction action = fragment.action();
+                    if (action != null) {
+                        tokenRegistry.mint(callerId, action, tokenTtl);
+                    }
+                }
+            }
+        }
+
+        return new MenuModel("config:" + fileName, pages);
+    }
+
+    /**
+     * Build the shape/vert type-picker page (PROPOSAL-config-view-as-book.md
+     * v3.7.5 — checklist step 4, page 3a).
+     *
+     * <p>Layout: a Back row (to the per-file config page, via
+     * {@link MenuAction.OpenConfigFile}), a non-clickable header row, and one
+     * row per known type name in {@code typeNames} (factory keys such as
+     * {@code SQUARE}, {@code CIRCLE} for {@code shape}; {@code DEFAULT_VERT},
+     * {@code SOFT_PLATFORMS}, etc. for {@code vert}).
+     *
+     * <p>Clicking a type row writes the type name to the parser via
+     * {@link MenuAction.OpenMenu} of {@code writeCommandPath} extended with
+     * {@code "name:<typeName>"} (the user-confirmed discriminator key — see
+     * PROPOSAL-config-view-as-book.md v3.7.5 / Q4-2). The parser's
+     * {@code SubConfigCmd.onCommand} shape/vert merge path (lines 158-203)
+     * handles the rest. After the write completes, the player can re-issue
+     * {@link MenuAction.OpenConfigKey} to re-render this page with the new
+     * current type shown in the header.
+     *
+     * <p>{@code currentTypeName} is rendered in the header for orientation
+     * and may be {@code null} (parser has no stored type yet); the row list
+     * does <em>not</em> filter it out (the user can re-pick the same type to
+     * reset orphan sub-params if needed, matching the stateless contract).
+     *
+     * <p>The caller (the production {@code MenuConfigSubtreeBuilder} impl, to
+     * be authored in checklist step 6) supplies {@code typeNames} and
+     * {@code writeCommandPath} explicitly so the builder stays unit-testable
+     * without a live {@link RTP#factoryMap}.
+     *
+     * <p>Permission gating ({@code rtp.config.view}) belongs in the redeem
+     * dispatch arm (checklist step 5 ext), not in the builder.
+     */
+    public MenuModel buildShapeVertTypePicker(UUID callerId,
+                                              String fileName,
+                                              String paramName,
+                                              String currentTypeName,
+                                              List<String> typeNames,
+                                              List<String> writeCommandPath) {
+        Objects.requireNonNull(callerId, "callerId");
+        Objects.requireNonNull(fileName, "fileName");
+        Objects.requireNonNull(paramName, "paramName");
+        Objects.requireNonNull(typeNames, "typeNames");
+        Objects.requireNonNull(writeCommandPath, "writeCommandPath");
+        if (fileName.isEmpty()) {
+            throw new IllegalArgumentException("fileName must not be empty");
+        }
+        if (paramName.isEmpty()) {
+            throw new IllegalArgumentException("paramName must not be empty");
+        }
+
+        List<MenuLine> lines = new ArrayList<>();
+
+        // Back row → per-file config page.
+        String backLabel = lookupMsg(MessagesKeys.menuBack, "« back");
+        lines.add(MenuLine.of(new MenuFragment(backLabel, null,
+                new MenuAction.OpenConfigFile(fileName))));
+
+        // Header — English fallback only; locale key deferred to step 8.
+        String currentLabel = currentTypeName == null ? "&8(unset)" : "&0" + currentTypeName;
+        lines.add(MenuLine.of(new MenuFragment(
+                "&1&l" + paramName + " type &7(current: " + currentLabel + "&7)",
+                null, null)));
+
+        // One row per known type. Clicking writes name:<typeName> through the
+        // reflected command tree (OpenMenu redeem path). Per Q4-2, `name` is
+        // the canonical discriminator key for both shape and vert in the
+        // existing SubConfigCmd grammar.
+        for (String typeName : typeNames) {
+            if (typeName == null || typeName.isEmpty()) continue;
+            String[] writeArgs = new String[writeCommandPath.size() + 1];
+            for (int i = 0; i < writeCommandPath.size(); i++) {
+                writeArgs[i] = writeCommandPath.get(i);
+            }
+            writeArgs[writeCommandPath.size()] = "name:" + typeName;
+            String marker = typeName.equalsIgnoreCase(currentTypeName) ? "&a* " : "&2";
+            lines.add(MenuLine.of(new MenuFragment(marker + typeName, null,
+                    new MenuAction.OpenMenu(writeArgs))));
+        }
+
+        // Mint a token per clickable action.
+        MenuPage page = new MenuPage(lines);
+        for (MenuLine line : page.lines()) {
+            for (MenuFragment fragment : line.fragments()) {
+                MenuAction action = fragment.action();
+                if (action != null) {
+                    tokenRegistry.mint(callerId, action, tokenTtl);
+                }
+            }
+        }
+
+        return new MenuModel("config:" + fileName + ":" + paramName + ":type", List.of(page));
+    }
+
+    /**
+     * Build the shape/vert sub-parameter page (PROPOSAL-config-view-as-book.md
+     * v3.7.5 — checklist step 4, page 3b).
+     *
+     * <p>Layout: a Back row (to the type-picker, via
+     * {@link MenuAction.OpenConfigKey} which re-renders page 3a), a non-
+     * clickable header row, and one row per entry in {@code subParamValues}.
+     * The {@code name} discriminator is intentionally <em>not</em> rendered
+     * as a row on this page — it lives on the type-picker (page 3a). Each
+     * sub-parameter row carries a {@link MenuAction.OpenParamPicker} whose
+     * redeem opens {@link #buildParamPicker} over the sub-parameter's typed
+     * {@code CommandParameter}, with {@code parentPath = writeCommandPath}
+     * and the sub-parameter name as the picker target.
+     *
+     * <p>Writes are stateless (Q13): every sub-parameter write targets the
+     * flat key {@code <subParamName>:<value>}, e.g.
+     * {@code /rtp config regions set default radius:1000}. The parser's
+     * currently-stored type discriminates which sub-parameters are valid
+     * (handled by {@code SubConfigCmd.onCommand} lines 158-203). The page
+     * shows the activated type's <em>current state as-is</em> per the user-
+     * confirmed Q4-2 reframing.
+     *
+     * <p>If {@code subParamValues} is empty (factory type with no tunables,
+     * or pre-load defensive state) the page degrades to Back + header + a
+     * non-clickable hint row (mirrors {@link #buildConfigFile}'s empty-enum
+     * branch).
+     */
+    public MenuModel buildShapeVertSubParamPage(UUID callerId,
+                                                String fileName,
+                                                String paramName,
+                                                String typeName,
+                                                Map<String, ?> subParamValues,
+                                                List<String> writeCommandPath) {
+        Objects.requireNonNull(callerId, "callerId");
+        Objects.requireNonNull(fileName, "fileName");
+        Objects.requireNonNull(paramName, "paramName");
+        Objects.requireNonNull(typeName, "typeName");
+        Objects.requireNonNull(subParamValues, "subParamValues");
+        Objects.requireNonNull(writeCommandPath, "writeCommandPath");
+        if (fileName.isEmpty()) {
+            throw new IllegalArgumentException("fileName must not be empty");
+        }
+        if (paramName.isEmpty()) {
+            throw new IllegalArgumentException("paramName must not be empty");
+        }
+        if (typeName.isEmpty()) {
+            throw new IllegalArgumentException("typeName must not be empty");
+        }
+
+        List<MenuLine> lines = new ArrayList<>();
+
+        // Back row → re-open type picker (page 3a) via the OpenConfigKey
+        // redeem, which dispatches back to the shape/vert subtree entry.
+        String backLabel = lookupMsg(MessagesKeys.menuBack, "« back");
+        lines.add(MenuLine.of(new MenuFragment(backLabel, null,
+                new MenuAction.OpenConfigKey(fileName, paramName))));
+
+        // Header — English fallback only; locale key deferred to step 8.
+        lines.add(MenuLine.of(new MenuFragment(
+                "&1&l" + paramName + " &7/ &0" + typeName, null, null)));
+
+        if (subParamValues.isEmpty()) {
+            lines.add(MenuLine.of(new MenuFragment(
+                    "&7(no sub-parameters for this type)", null, null)));
+        } else {
+            String[] parentPathArr = writeCommandPath.toArray(new String[0]);
+            for (Map.Entry<String, ?> entry : subParamValues.entrySet()) {
+                String subParamName = entry.getKey();
+                if (subParamName == null || subParamName.isEmpty()) continue;
+                Object current = entry.getValue();
+                String currentStr = current == null
+                        ? "&8(unset)"
+                        : String.valueOf(current);
+                String label = "&2" + subParamName + "&7: &0" + currentStr;
+                lines.add(MenuLine.of(new MenuFragment(label, null,
+                        new MenuAction.OpenParamPicker(parentPathArr, subParamName))));
+            }
+        }
+
+        // Mint tokens for clickable rows.
+        MenuPage page = new MenuPage(lines);
+        for (MenuLine line : page.lines()) {
+            for (MenuFragment fragment : line.fragments()) {
+                MenuAction action = fragment.action();
+                if (action != null) {
+                    tokenRegistry.mint(callerId, action, tokenTtl);
+                }
+            }
+        }
+
+        return new MenuModel(
+                "config:" + fileName + ":" + paramName + ":" + typeName,
+                List.of(page));
     }
 
     private static String lookupMsg(MessagesKeys key, String fallback) {

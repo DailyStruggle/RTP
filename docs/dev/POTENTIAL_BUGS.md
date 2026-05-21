@@ -37,6 +37,33 @@ Append to the *Open* section below using the template. Keep entries short — on
 
 ## Open
 
+
+### 2026-05-21 — `network*` messages.yml keys lack `MessagesKeys` enum entries; Spanish parity test fails
+
+- **Discovered during:** `CHECKLIST-metrics-to-maps.md` Stage 2 (path B: ChartSpecTokens-only landing) — full `gradlew build` failure surfaced on `:rtp-plugin:test` running `ReqRtpF013SpanishLocaleContentTest.spanishLocaleHasNoUnknownKeys`.
+- **Location:** `rtp-plugin/src/main/resources/messages.yml` lines ~371-395 (the `# --- Cross-server network mode messages (L6 / rtp-proxy-ADR-014) ---` block) defines eight keys — `networkQueued`, `networkRouting`, `networkReserved`, `networkTransferring`, `networkFallback`, `networkFailed`, `networkRegionUnavailable`, `networkRegionAmbiguous` — none of which appear in `rtp-api/src/main/java/.../configuration/enums/MessagesKeys.java`.
+- **Symptom / hypothesis:** `ReqRtpF013SpanishLocaleContentTest` reverse-resolves every key in `lang/es/messages.yml` back to a `MessagesKeys` enum entry via `messages.lang.yml`. Because the eight `network*` keys have no enum entry, the Spanish file (which also carries those keys via the locale TSV pipeline) fails the reverse-resolve. Pre-existing from the in-flight network-mode WIP; the same defect should also surface for any other locale that runs the same content guard, but only the Spanish suite is currently REQ-traceable per AGENTS.md.
+- **Impact:** `:rtp-plugin:test` is red on every full multi-module build, masking unrelated regressions in the rtp-plugin module. The `network*` strings still function at runtime (they are read by string key, not by enum), so the user-visible network-mode message flow is unaffected.
+- **Suggested next step:** Add the eight `network*` constants to `MessagesKeys.java` with Javadoc mirroring the comments in `messages.yml`. Re-run `:rtp-plugin:test`. Owns the cleanup: the network-mode subproject (`rtp-proxy-*`) since these are its message keys.
+
+
+### 2026-05-20 — `&c` color code leaks into console on `invalid command` dispatch failure
+
+- **Discovered during:** `/rtp test network all` grammar-fix landing (this session). The original symptom was the bare-token dispatch bug (`invalid command - all`), now fixed by promoting probe modes to real subcommands; but the operator-visible log line was double-emitted with a raw color code: `&c[P0] invalid command - all` followed by `[RTP] invalid command - all`.
+- **Location:** the `msgInvalidCommand` / `msgBadParameter` path on the Bukkit base command (likely `rtp-bukkit/.../BukkitBaseRTPCmd` or the `SendMessage.log` console branch). Format string presumably contains `&c[P0]` and is logged through `RTP.log(Level.WARNING, ...)` without running it through the `SendMessage` color translator first.
+- **Symptom / hypothesis:** The `&c` legacy color code is translated when sent to a player but logged verbatim when routed through `RTP.log` -> `Bukkit.getConsoleSender().sendMessage` (or similar). The double emission (one with `&c[P0]` prefix, one without) suggests two log paths fire for the same failure: one through `SendMessage.log` and one through a plain `RTP.log`.
+- **Impact:** Cosmetic / log-noise. Operators see a raw `&c` in their console on every dispatch failure, which both looks broken and makes log scraping for `invalid command` brittle. The duplicate line also makes audit grep return double-counts.
+- **Suggested next step:** Inspect `BukkitBaseRTPCmd.msgInvalidCommand` (and its `msgBadParameter` sibling, REQ-RTP-S-004 auditing surface): either run the message through `ChatColor.translateAlternateColorCodes('&', msg)` before `RTP.log`, or drop the `&c[P0]` prefix from the format and rely on the log handler to colorize. Then de-dupe the dual log path so only one line emits.
+
+### 2026-05-19 — `YamlFileDatabaseTest.setValue_flatRow_isNestedUnderPrimaryKey` fails on full build
+
+- **Discovered during:** Phase 2 reservation-token TTL reaper landing (`rtp-proxy-common` work, REQ-RTP-NET-011). Full `gradlew build` ran green for every module except `rtp-core:test`.
+- **Location:** `rtp-core/src/test/java/io/github/dailystruggle/rtp/common/database/YamlFileDatabaseTest.java:395` (`setValue_flatRow_isNestedUnderPrimaryKey`).
+- **Symptom / hypothesis:** Test fails with `org.opentest4j.AssertionFailedError` at line 395. The test file is unmodified in the working tree; the failure was already present in the working-tree state at the start of this session and is unrelated to the reaper changes (which touched only `rtp-proxy/rtp-proxy-common`). Likely caused by an earlier, unrelated `rtp-core` flat-row / primary-key refactor whose corresponding test update did not land.
+- **Impact:** `:rtp-core:test` is red on every full multi-module build, masking unrelated regressions. No production code path is affected by the test itself.
+- **Suggested next step:** Re-run the test in isolation (`.\gradlew :rtp-core:test --tests "*YamlFileDatabaseTest.setValue_flatRow_isNestedUnderPrimaryKey"`), open the test source at line 395, and compare its expected nesting shape against the current `YamlFileDatabase.setValue` implementation. Most likely a one-line fixture / expected-value adjustment.
+
+
 ### 2026-05-16 — `economy-isolation` Vault debit running on caller thread (real isolation breach)
 
 - **Discovered during:** Phase-M1 Paper devstack smoke for the B → C gate in `docs/dev/scratch/CHECKLIST-metrics-and-multiserver.md` (Paper 26.1.2, 23:01 transcript).

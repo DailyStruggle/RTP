@@ -1,0 +1,278 @@
+package io.github.dailystruggle.rtp.common.commands.prefab;
+
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Session 4b on-disk side of the prefab pipeline. Pure static helpers; no
+ * dependency on {@link io.github.dailystruggle.rtp.common.RTP} so each
+ * method is unit-testable against a {@code @TempDir} plugin directory.
+ *
+ * <p>File-id convention (matches {@link PrefabApplier}):
+ * <ul>
+ *   <li>{@code "performance"} -> {@code <pluginDir>/performance.yml}</li>
+ *   <li>{@code "regions/<id>"} -> {@code <pluginDir>/regions/<id>.yml}</li>
+ * </ul>
+ *
+ * <p>Backup naming: {@code <originalFileName>.bak.<epochMillis>} as a sibling
+ * of the original file. Rotation is FIFO by epoch (lexicographic on the
+ * fixed-width suffix), oldest pruned first once the count exceeds the
+ * retention cap.
+ */
+public final class PrefabDiskIO {
+
+    /** Default bak retention if the {@code prefab.bakRetention} knob is absent. */
+    public static final int DEFAULT_BAK_RETENTION = 3;
+
+    /** Sibling suffix prefix: {@code <file>.bak.<epochMillis>}. */
+    public static final String BAK_INFIX = ".bak.";
+
+    private PrefabDiskIO() {
+    }
+
+    /**
+     * Read the live YAML tree for a single file id. Returns an empty map if
+     * the file does not exist (so prefabs introducing a brand-new
+     * {@code regions/<id>.yml} can still diff cleanly).
+     */
+    public static Map<String, Object> readLive(File pluginDirectory, String fileId) {
+        Objects.requireNonNull(pluginDirectory, "pluginDirectory");
+        Objects.requireNonNull(fileId, "fileId");
+        File f = resolveFile(pluginDirectory, fileId);
+        if (!f.exists() || !f.isFile()) {
+            return new LinkedHashMap<>();
+        }
+        RtpYamlConfig cfg = new RtpYamlConfig(f);
+        try {
+            cfg.load();
+        } catch (IOException ioe) {
+            // Treat unreadable as empty; the apply diff will then describe a
+            // full file write rather than masking the failure mode.
+            return new LinkedHashMap<>();
+        }
+        return deepCopy(cfg.getMapValues(true));
+    }
+
+    /**
+     * Snapshot every file id touched by {@code prefab} (its performance
+     * overlay and each region overlay) into a {@code fileId -> tree} map
+     * suitable as the {@code currentTrees} argument to
+     * {@link PrefabApplier#apply}.
+     */
+    public static Map<String, Map<String, Object>> snapshotLive(File pluginDirectory, Prefab prefab) {
+        Objects.requireNonNull(prefab, "prefab");
+        Map<String, Map<String, Object>> snapshot = new LinkedHashMap<>();
+        if (!prefab.performanceOverlay().isEmpty()) {
+            snapshot.put("performance", readLive(pluginDirectory, "performance"));
+        }
+        for (String regionId : prefab.regionOverlays().keySet()) {
+            String fileId = "regions/" + regionId;
+            snapshot.put(fileId, readLive(pluginDirectory, fileId));
+        }
+        return snapshot;
+    }
+
+    /**
+     * Write the new tree to disk for a single file id. Behaviour:
+     * <ol>
+     *   <li>If the original file exists, copy it sideways as
+     *       {@code <name>.bak.<epochMillis>} via {@link Files#copy} with
+     *       {@link StandardCopyOption#REPLACE_EXISTING}.</li>
+     *   <li>Load the original with comments preserved (or create an empty
+     *       config when the file is brand-new) so structural comments survive.</li>
+     *   <li>Apply each diff entry via {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection#set}
+     *       (dot-delimited key paths).</li>
+     *   <li>Save with comments preserved.</li>
+     *   <li>Prune sibling backups beyond {@code bakRetention}, oldest first.</li>
+     * </ol>
+     *
+     * @param bakRetention number of {@code .bak.<ts>} siblings to keep
+     *                     <strong>after</strong> the new backup is written.
+     *                     Clamped to {@code >= 1}; pass at least 1 so the
+     *                     just-written backup survives.
+     * @return the path of the freshly-written backup file, or {@code null}
+     *         if the original did not exist (new-file prefab).
+     */
+    public static Path writeWithBackup(File pluginDirectory,
+                                       String fileId,
+                                       Map<String, Object> newTree,
+                                       List<PrefabApplier.Change> changes,
+                                       int bakRetention) throws IOException {
+        Objects.requireNonNull(pluginDirectory, "pluginDirectory");
+        Objects.requireNonNull(fileId, "fileId");
+        Objects.requireNonNull(newTree, "newTree");
+        Objects.requireNonNull(changes, "changes");
+        int retention = Math.max(1, bakRetention);
+        File target = resolveFile(pluginDirectory, fileId);
+
+        Path bakPath = null;
+        if (target.exists() && target.isFile()) {
+            String suffix = BAK_INFIX + System.currentTimeMillis();
+            bakPath = target.toPath().resolveSibling(target.getName() + suffix);
+            // Tight loop guard for sub-millisecond consecutive writes (test scaffolds).
+            int collisionGuard = 0;
+            while (Files.exists(bakPath) && collisionGuard++ < 1000) {
+                suffix = BAK_INFIX + (System.currentTimeMillis() + collisionGuard);
+                bakPath = target.toPath().resolveSibling(target.getName() + suffix);
+            }
+            Files.copy(target.toPath(), bakPath, StandardCopyOption.REPLACE_EXISTING);
+        } else {
+            // Parent directory may not exist (regions/<new>.yml).
+            File parent = target.getParentFile();
+            if (parent != null && !parent.exists()) {
+                if (!parent.mkdirs() && !parent.exists()) {
+                    throw new IOException("could not create parent directory: " + parent);
+                }
+            }
+        }
+
+        RtpYamlConfig cfg;
+        if (target.exists() && target.isFile()) {
+            cfg = new RtpYamlConfig(target);
+            cfg.loadWithComments();
+        } else {
+            // New file: write a fresh empty config bound to the target path.
+            cfg = new RtpYamlConfig(target);
+        }
+        for (PrefabApplier.Change c : changes) {
+            cfg.set(c.keyPath(), c.newValue());
+        }
+        cfg.saveWithComments();
+
+        pruneBaks(pluginDirectory, fileId, retention);
+        return bakPath;
+    }
+
+    /**
+     * List the {@code .bak.<ts>} sibling files for {@code fileId}, newest
+     * first (highest epoch ms). Non-bak files are filtered out. Returns an
+     * empty list if the parent directory does not exist.
+     */
+    public static List<Path> listBaks(File pluginDirectory, String fileId) {
+        Objects.requireNonNull(pluginDirectory, "pluginDirectory");
+        Objects.requireNonNull(fileId, "fileId");
+        File target = resolveFile(pluginDirectory, fileId);
+        File parent = target.getParentFile();
+        if (parent == null || !parent.isDirectory()) return new ArrayList<>();
+        String prefix = target.getName() + BAK_INFIX;
+        File[] kids = parent.listFiles((dir, name) -> name.startsWith(prefix) && parseEpoch(name, prefix) >= 0);
+        if (kids == null || kids.length == 0) return new ArrayList<>();
+        List<Path> out = new ArrayList<>(kids.length);
+        for (File k : kids) out.add(k.toPath());
+        out.sort(Comparator.comparingLong((Path p) -> parseEpoch(p.getFileName().toString(), prefix)).reversed());
+        return out;
+    }
+
+    /**
+     * Restore the newest {@code .bak.<ts>} sibling over the live file for
+     * {@code fileId}, atomically when the filesystem supports it. The chosen
+     * backup is then removed (consumed) so a subsequent rollback walks to
+     * the next-newest. Returns {@code null} when no backups exist.
+     */
+    public static Path restoreLatest(File pluginDirectory, String fileId) throws IOException {
+        List<Path> baks = listBaks(pluginDirectory, fileId);
+        if (baks.isEmpty()) return null;
+        Path newest = baks.get(0);
+        File target = resolveFile(pluginDirectory, fileId);
+        try {
+            Files.move(newest, target.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (UnsupportedOperationException uoe) {
+            // Filesystem can't do ATOMIC_MOVE (Windows across volumes, some
+            // CI containers). Fall back to copy+delete which preserves the
+            // restore semantic at the cost of a non-atomic window.
+            Files.copy(newest, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            Files.deleteIfExists(newest);
+        }
+        return newest;
+    }
+
+    /**
+     * Retention sweep: keep at most {@code keep} backups for {@code fileId},
+     * deleting the oldest. Exposed for tests; {@link #writeWithBackup}
+     * invokes it automatically.
+     */
+    public static int pruneBaks(File pluginDirectory, String fileId, int keep) {
+        if (keep < 0) keep = 0;
+        List<Path> baks = listBaks(pluginDirectory, fileId); // newest first
+        if (baks.size() <= keep) return 0;
+        int pruned = 0;
+        for (int i = keep; i < baks.size(); i++) {
+            try {
+                Files.deleteIfExists(baks.get(i));
+                pruned++;
+            } catch (IOException ignored) {
+                // Best-effort prune; surfacing a checked exception per
+                // file would force the write path to roll back the new
+                // backup, which is worse than leaving an extra stale file.
+            }
+        }
+        return pruned;
+    }
+
+    /** Resolve a file id to an absolute {@link File} under {@code pluginDirectory}. */
+    public static File resolveFile(File pluginDirectory, String fileId) {
+        Objects.requireNonNull(pluginDirectory, "pluginDirectory");
+        Objects.requireNonNull(fileId, "fileId");
+        String fid = fileId.trim();
+        if (fid.isEmpty()) throw new IllegalArgumentException("empty fileId");
+        // Reject path-traversal attempts; file ids are always simple slash-segmented relpaths.
+        if (fid.contains("..") || fid.startsWith("/") || fid.startsWith("\\")) {
+            throw new IllegalArgumentException("invalid fileId: " + fileId);
+        }
+        String relPath = fid.replace('/', File.separatorChar) + ".yml";
+        return new File(pluginDirectory, relPath);
+    }
+
+    private static long parseEpoch(String fileName, String prefix) {
+        if (!fileName.startsWith(prefix)) return -1L;
+        String tail = fileName.substring(prefix.length());
+        // Tolerate test-only sub-millisecond disambiguators tacked onto the
+        // epoch (see writeWithBackup): everything must still be ASCII digits.
+        if (tail.isEmpty()) return -1L;
+        for (int i = 0; i < tail.length(); i++) {
+            char c = tail.charAt(i);
+            if (c < '0' || c > '9') return -1L;
+        }
+        try {
+            return Long.parseLong(tail);
+        } catch (NumberFormatException nfe) {
+            return -1L;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> deepCopy(Map<String, Object> in) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (in == null) return out;
+        for (Map.Entry<String, Object> e : in.entrySet()) {
+            Object v = e.getValue();
+            if (v instanceof Map<?, ?>) {
+                out.put(e.getKey(), deepCopy((Map<String, Object>) v));
+            } else if (v instanceof List<?>) {
+                out.put(e.getKey(), new ArrayList<>((List<Object>) v));
+            } else {
+                out.put(e.getKey(), v);
+            }
+        }
+        return out;
+    }
+
+    // Defensive: keep imports tidy / used.
+    @SuppressWarnings("unused")
+    private static String describeLocale() {
+        return Locale.ROOT.toString();
+    }
+}

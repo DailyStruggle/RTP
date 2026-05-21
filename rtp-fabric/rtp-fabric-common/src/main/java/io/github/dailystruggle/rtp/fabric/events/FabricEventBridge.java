@@ -415,10 +415,14 @@ public final class FabricEventBridge {
      */
     private void dispatchJoinRtp(Object player) {
         try {
-            if (!(player instanceof net.minecraft.server.level.ServerPlayer sp)) return;
+            if (player == null) return;
             MinecraftServer server = accessor.getServer();
             if (server == null) return;
-            FabricOnEventTeleports.onJoin(server, sp);
+            // Pass the player as Object — FabricOnEventTeleports.onJoin resolves
+            // UUID via the FabricVersionAdapter SPI and display name reflectively.
+            // Naming ServerPlayer here would pin intermediary class_3222 into the
+            // obf-carrier bytecode and fail to link on MC 26.1 deobf runtimes.
+            FabricOnEventTeleports.onJoin(server, player);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP] FabricEventBridge.dispatchJoinRtp failed: "

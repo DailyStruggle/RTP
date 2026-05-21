@@ -1,0 +1,19 @@
+# Devstack backend-b network.yml.
+network:
+  enabled: true
+  schemaVersion: 1
+  serverId: "backend-b"
+  role: backend
+  secretEnv: RTP_NET_SECRET
+transport:
+  type: redis
+  redis:
+    host: redis
+    port: 6379
+    password: ""
+heartbeat:
+  intervalMs: 1000
+  staleAfterMs: 5000
+reservation:
+  ttlMs: 30000
+  reapIntervalMs: 5000

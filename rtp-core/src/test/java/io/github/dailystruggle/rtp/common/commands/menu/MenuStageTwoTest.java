@@ -365,7 +365,7 @@ public class MenuStageTwoTest {
         path.addLast("rtp");
         path.addLast("config");
         path.addLast("performance");
-        assertEquals("/rtp config performance ASYNC:",
+        assertEquals("/rtp config performance ASYNC=",
                 profile.suggestPrefix(path, "ASYNC"));
     }
 

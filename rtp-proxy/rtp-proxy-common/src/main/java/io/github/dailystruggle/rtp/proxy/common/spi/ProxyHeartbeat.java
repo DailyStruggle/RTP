@@ -14,15 +14,34 @@ import java.util.Objects;
  * @param lastSeenEpochMs   publication epoch milliseconds
  * @param playerCount       online player count seen by this proxy
  * @param inFlightRequests  RTP requests currently in dispatcher.dispatch()
+ * @param killSwitch        operator-asserted kill switch (rtp-proxy-ADR-010 §Kill
+ *                          Switch); when {@code true}, peers reject this proxy's
+ *                          published RTP requests and return
+ *                          {@link DispatchOutcome.Failed} with reason
+ *                          {@code KILL_SWITCH}. Default {@code false}.
  */
 public record ProxyHeartbeat(
         String proxyId,
         int schemaVersion,
         long lastSeenEpochMs,
         int playerCount,
-        int inFlightRequests
+        int inFlightRequests,
+        boolean killSwitch
 ) {
     public ProxyHeartbeat {
         Objects.requireNonNull(proxyId, "proxyId");
+    }
+
+    /**
+     * Convenience constructor for callers that have not opted into the kill
+     * switch field; defaults {@code killSwitch} to {@code false}. Retained for
+     * source compatibility while transport bindings learn the new field.
+     */
+    public ProxyHeartbeat(String proxyId,
+                          int schemaVersion,
+                          long lastSeenEpochMs,
+                          int playerCount,
+                          int inFlightRequests) {
+        this(proxyId, schemaVersion, lastSeenEpochMs, playerCount, inFlightRequests, false);
     }
 }

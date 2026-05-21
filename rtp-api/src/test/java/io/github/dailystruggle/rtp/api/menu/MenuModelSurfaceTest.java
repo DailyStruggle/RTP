@@ -37,22 +37,33 @@ class MenuModelSurfaceTest {
     // ---- MenuAction ----
 
     @Test
-    @DisplayName("MenuAction is sealed to exactly the ten declared variants")
+    @DisplayName("MenuAction is sealed to exactly the twenty-one declared variants")
     void menuActionSealedShape() {
         Class<?>[] permitted = MenuAction.class.getPermittedSubclasses();
-        assertEquals(10, permitted.length);
+        assertEquals(21, permitted.length);
         List<String> names = Arrays.stream(permitted).map(Class::getSimpleName).sorted().toList();
         assertEquals(List.of(
+                "ApplyStagedConfig",
                 "ChangePage",
+                "DiscardStagedConfig",
+                "OpenAdminPanel",
                 "OpenConfigFile",
                 "OpenConfigKey",
+                "OpenConfigSearchPrompt",
+                "OpenConfigSearchResults",
                 "OpenConfigSelector",
+                "OpenConfigSubParamPage",
                 "OpenExternalUrl",
+                "OpenFrontPage",
+                "OpenInfo",
                 "OpenMenu",
                 "OpenParamPicker",
                 "PromptAnvilInput",
                 "RunRtpCommand",
-                "SuggestInput"), names);
+                "StageConfigValue",
+                "SuggestInput",
+                "SwitchInfoToText",
+                "UnstageConfigValue"), names);
     }
 
     @Test
@@ -169,8 +180,111 @@ class MenuModelSurfaceTest {
             case MenuAction.OpenConfigSelector cs -> "cfgsel";
             case MenuAction.OpenConfigFile cf -> "cfgfile:" + cf.fileName();
             case MenuAction.OpenConfigKey ck -> "cfgkey:" + ck.fileName() + ":" + ck.paramName();
+            case MenuAction.OpenConfigSubParamPage sp -> "cfgsub:" + sp.fileName() + ":" + sp.paramName() + ":" + sp.typeName();
+            case MenuAction.OpenConfigSearchPrompt sp -> "cfgsearchprompt";
+            case MenuAction.OpenConfigSearchResults sr -> "cfgsearch:" + sr.query() + ":" + sr.page();
+            case MenuAction.OpenAdminPanel ap -> "admin";
+            case MenuAction.OpenFrontPage fp -> "front";
+            case MenuAction.OpenInfo oi -> "info:" + oi.scope().kind() + ":" + oi.scope().name();
+            case MenuAction.SwitchInfoToText sit -> "info-text:" + sit.scope().kind() + ":" + sit.scope().name();
+            case MenuAction.StageConfigValue sv -> "stage:" + sv.fileName() + ":" + sv.paramName() + "=" + sv.value();
+            case MenuAction.UnstageConfigValue uv -> "unstage:" + uv.fileName() + ":" + uv.paramName();
+            case MenuAction.ApplyStagedConfig ac -> "apply:" + ac.fileName();
+            case MenuAction.DiscardStagedConfig dc -> "discard:" + dc.fileName();
         };
         assertEquals("run:1", tag);
+    }
+
+    @Test
+    @DisplayName("PromptAnvilInput.mode defaults to RUN via 3-arg ctor; STAGE distinguishes equality")
+    void promptAnvilInputModeBackCompat() {
+        MenuAction.PromptAnvilInput legacy = new MenuAction.PromptAnvilInput(
+                new String[]{"config"}, "key", "");
+        assertEquals(MenuAction.Mode.RUN, legacy.mode());
+        MenuAction.PromptAnvilInput stage = new MenuAction.PromptAnvilInput(
+                new String[]{"config"}, "key", "", MenuAction.Mode.STAGE);
+        assertEquals(MenuAction.Mode.STAGE, stage.mode());
+        assertFalse(legacy.equals(stage));
+        assertThrows(NullPointerException.class,
+                () -> new MenuAction.PromptAnvilInput(new String[]{"config"}, "key", "", null));
+    }
+
+    @Test
+    @DisplayName("InfoScopeToken / OpenInfo / SwitchInfoToText reject nulls and enforce GLOBAL has empty name")
+    void infoScopeTokenValidation() {
+        MenuAction.InfoScopeToken global = MenuAction.InfoScopeToken.global();
+        assertEquals(MenuAction.InfoScopeToken.Kind.GLOBAL, global.kind());
+        assertEquals("", global.name());
+
+        MenuAction.InfoScopeToken world = MenuAction.InfoScopeToken.world("the_end");
+        assertEquals(MenuAction.InfoScopeToken.Kind.WORLD, world.kind());
+        assertEquals("the_end", world.name());
+
+        MenuAction.InfoScopeToken region = MenuAction.InfoScopeToken.region("default");
+        assertEquals(MenuAction.InfoScopeToken.Kind.REGION, region.kind());
+        assertEquals("default", region.name());
+
+        assertThrows(NullPointerException.class,
+                () -> new MenuAction.InfoScopeToken(null, ""));
+        assertThrows(NullPointerException.class,
+                () -> new MenuAction.InfoScopeToken(MenuAction.InfoScopeToken.Kind.GLOBAL, null));
+        // GLOBAL must have empty name
+        assertThrows(IllegalArgumentException.class,
+                () -> new MenuAction.InfoScopeToken(MenuAction.InfoScopeToken.Kind.GLOBAL, "bogus"));
+        // Non-GLOBAL must have non-empty name
+        assertThrows(IllegalArgumentException.class,
+                () -> new MenuAction.InfoScopeToken(MenuAction.InfoScopeToken.Kind.WORLD, ""));
+        assertThrows(IllegalArgumentException.class,
+                () -> new MenuAction.InfoScopeToken(MenuAction.InfoScopeToken.Kind.REGION, ""));
+
+        // OpenInfo / SwitchInfoToText reject null scope.
+        assertThrows(NullPointerException.class, () -> new MenuAction.OpenInfo(null));
+        assertThrows(NullPointerException.class, () -> new MenuAction.SwitchInfoToText(null));
+
+        MenuAction.OpenInfo a = new MenuAction.OpenInfo(global);
+        MenuAction.OpenInfo b = new MenuAction.OpenInfo(MenuAction.InfoScopeToken.global());
+        assertEquals(a, b);
+        assertEquals(a.hashCode(), b.hashCode());
+        assertFalse(a.equals(new MenuAction.OpenInfo(world)));
+    }
+
+    @Test
+    @DisplayName("Staging-cart records validate fileName/paramName/value and reject empties")
+    void stagingCartRecordValidation() {
+        MenuAction.StageConfigValue stage = new MenuAction.StageConfigValue(
+                "performance", "teleportDelay", "5");
+        assertEquals("performance", stage.fileName());
+        assertEquals("teleportDelay", stage.paramName());
+        assertEquals("5", stage.value());
+        assertThrows(NullPointerException.class,
+                () -> new MenuAction.StageConfigValue(null, "k", "v"));
+        assertThrows(NullPointerException.class,
+                () -> new MenuAction.StageConfigValue("f", null, "v"));
+        assertThrows(NullPointerException.class,
+                () -> new MenuAction.StageConfigValue("f", "k", null));
+        assertThrows(IllegalArgumentException.class,
+                () -> new MenuAction.StageConfigValue("", "k", "v"));
+        assertThrows(IllegalArgumentException.class,
+                () -> new MenuAction.StageConfigValue("f", "", "v"));
+        // value is allowed to be empty (it's a legitimate "set to blank" gesture).
+        MenuAction.StageConfigValue blank = new MenuAction.StageConfigValue("f", "k", "");
+        assertEquals("", blank.value());
+
+        MenuAction.UnstageConfigValue unstage = new MenuAction.UnstageConfigValue("safety", "checkRadius");
+        assertEquals("safety", unstage.fileName());
+        assertEquals("checkRadius", unstage.paramName());
+        assertThrows(IllegalArgumentException.class,
+                () -> new MenuAction.UnstageConfigValue("", "k"));
+        assertThrows(IllegalArgumentException.class,
+                () -> new MenuAction.UnstageConfigValue("f", ""));
+
+        MenuAction.ApplyStagedConfig apply = new MenuAction.ApplyStagedConfig("performance");
+        assertEquals("performance", apply.fileName());
+        assertThrows(IllegalArgumentException.class, () -> new MenuAction.ApplyStagedConfig(""));
+
+        MenuAction.DiscardStagedConfig discard = new MenuAction.DiscardStagedConfig("performance");
+        assertEquals("performance", discard.fileName());
+        assertThrows(IllegalArgumentException.class, () -> new MenuAction.DiscardStagedConfig(""));
     }
 
     @Test
@@ -279,17 +393,17 @@ class MenuModelSurfaceTest {
     }
 
     @Test
-    @DisplayName("Default MenuConsumerProfile builds /<path…> <param>: prefix and uses empty comment lookup")
+    @DisplayName("Default MenuConsumerProfile builds /<path…> <param>= prefix and uses empty comment lookup")
     void defaultProfilePrefix() {
         MenuConsumerProfile p = MenuConsumerProfile.defaultProfile();
         Deque<String> path = new ArrayDeque<>();
         path.add("rtp");
         path.add("config");
         path.add("performance");
-        assertEquals("/rtp config performance ASYNC:", p.suggestPrefix(path, "ASYNC"));
+        assertEquals("/rtp config performance ASYNC=", p.suggestPrefix(path, "ASYNC"));
 
-        // Empty path produces "/<param>:"
-        assertEquals("/ASYNC:", p.suggestPrefix(new ArrayDeque<>(), "ASYNC"));
+        // Empty path produces "/<param>="
+        assertEquals("/ASYNC=", p.suggestPrefix(new ArrayDeque<>(), "ASYNC"));
 
         assertEquals(YamlCommentLookup.EMPTY, p.commentLookup());
         assertThrows(NullPointerException.class, () -> p.suggestPrefix(null, "X"));

@@ -1,10 +1,18 @@
 # rtp-proxy-ADR-002 — Canonical `network.yml` Schema
 
 **Status:** Accepted
-**Accepted:** 2026-05-14
+**Accepted:** 2026-05-14 (amended 2026-05-18)
 **Date:** 2026-05-13
-**Refines:** [ADR-036 — Network Mode (Multi-Server, Multi-Proxy)](../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md)
+**Refines:** [ADR-036 - Network Mode (Multi-Server, Multi-Proxy)](../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md)
 **Depends on:** [rtp-proxy-ADR-001](rtp-proxy-ADR-001-spi-shape.md)
+
+## Amendments
+
+- **2026-05-18** - Validation Rules tightened:
+  - `role: auto` no longer probes the classpath via `Class.forName`. Resolution is delegated to the registered `RTPProxyAccessor` (see [rtp-proxy-ADR-013](rtp-proxy-ADR-013-proxy-accessor-registration.md)).
+  - `network.proxyId` empty or missing when role resolves to proxy is now an explicit `fail-fast`.
+  - `network.role` is declared proxy-side-only; backend `network.yml` ignores the key.
+  - Authority for picking participant-vs-router wiring split out to [rtp-proxy-ADR-012](rtp-proxy-ADR-012-proxy-role-participant-default.md).
 
 ## Context
 
@@ -84,10 +92,10 @@ triggers:
 ### Validation Rules
 
 1. `enabled: false` (default) → every other key is **structurally validated** (so a later flip to `true` cannot fail silently) but no listener, transport, or heartbeat is opened (REQ-RTP-PROXY-008).
-2. `role`:
-   - `auto` → detect via classpath (`com.velocitypowered.api.proxy.ProxyServer` → proxy/velocity; `net.md_5.bungee.api.ProxyServer` → proxy/bungee; otherwise backend).
+2. `role` (**proxy-side-only**; on a backend the key is read but ignored, `role` is fixed to `backend` by which jar got loaded):
+   - `auto` -> resolved by consulting the registered `RTPProxyAccessor.role()` (rtp-proxy-ADR-013). Each proxy adapter (`rtp-proxy-velocity`, future `rtp-proxy-bungee`) registers a hard-coded `Role` during its bootstrap event BEFORE the config loader runs. `rtp-proxy-common` performs no classpath probing. This mirrors the `RTPServerAccessor` registration pattern in `rtp-core`.
    - `backend` requires `serverId`, forbids `proxyId`.
-   - `proxy` requires `proxyId`, forbids `serverId`.
+   - `proxy` requires `proxyId`, forbids `serverId`. Empty or missing `proxyId` when role resolves to proxy is a `fail-fast`: refuse to enable network mode, log a configurable WARNING, leave the proxy running.
 3. `schemaVersion` must equal a value the running binary supports; mismatches refuse to enable network mode (REQ-RTP-NET-009).
 4. `transport.type: plugin-message` shall emit a startup `WARNING` on every host and shall refuse to enable outside a developer profile (REQ-RTP-PROXY-BUNGEE-005; mirrored for Velocity).
 5. `secretEnv` names an environment variable. If unset while `enabled: true`, startup fails with a configurable message (D4, REQ-RTP-PROXY-007).

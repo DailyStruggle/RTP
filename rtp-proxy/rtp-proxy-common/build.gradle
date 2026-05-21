@@ -14,4 +14,14 @@ plugins {
 
 dependencies {
     api project(':rtp-api')
+    // Phase 2e-SQL slice: SqlNetworkStateBinding uses JDBC + standard DataSource.
+    // Production JDBC drivers (MySQL / Postgres) are supplied by the deploying
+    // host's database accessor pool (AbstractSQLDatabaseAccessor in rtp-core);
+    // we never bundle them. H2 ships as test-only so SqlNetworkStateBindingH2Test
+    // can exercise two-instance fan-out without a real DB.
+    testRuntimeOnly 'com.h2database:h2:2.2.224'
+    // Phase 2e-Redis A1 slice: RedisNetworkStateBinding uses Jedis (already
+    // pulled in by rtp-core for RedisManager); pinned to the same version
+    // to avoid classpath conflicts when both modules ship in the unified jar.
+    implementation 'redis.clients:jedis:5.1.2'
 }

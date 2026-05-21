@@ -173,6 +173,16 @@ dependencies {
     implementation project(':commands-api')
     implementation project(':effects-api')
 
+    // Unified single-JAR per MULTI_SERVER_PLAN.md > Intended Usage & Deployment
+    // Model: the same artifact loads on Bukkit/Paper/Folia (plugin.yml),
+    // Fabric (fabric.mod.json), and Velocity (velocity-plugin.json). Velocity's
+    // JavaPluginLoader.getSerializedPluginInfo returns on the first matching
+    // descriptor entry, so co-existing plugin.yml is harmless. The Velocity API
+    // stays compileOnly in :rtp-proxy:rtp-proxy-velocity and is provided by the
+    // proxy host at runtime; on a Bukkit/Fabric runtime the Velocity entry-point
+    // classes are simply never loaded.
+    implementation project(':rtp-proxy:rtp-proxy-velocity')
+
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     // Test classpath: declare folia-api / paper-api (via MockBukkit) BEFORE
     // spigot-api so that javac resolves the `org.bukkit.Bukkit` class

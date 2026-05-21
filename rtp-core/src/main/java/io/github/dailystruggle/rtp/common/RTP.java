@@ -109,6 +109,22 @@ public class RTP {
   public static final ThreadLocal<RTPWorld> worldContext = new ThreadLocal<>();
   public static final ThreadLocal<Region> regionContext = new ThreadLocal<>();
 
+  /**
+   * Optional per-thread message interceptor used by {@code /rtp info} when its
+   * output is being mirrored into a book renderer (PROPOSAL-info-as-book.md
+   * section 4.6). When non-null, {@code InfoCmd} routes every line it would
+   * have sent to {@code RTP.serverAccessor.sendMessage(callerId, …)} into this
+   * consumer instead — the chat path is skipped while the tap is installed so
+   * the player is not double-served. Code outside {@code InfoCmd} ignores this
+   * field; only paths that opt in via the helper consult it.
+   *
+   * <p>Always {@code null} on the chat-output path. The tap is set on the
+   * dispatching thread, the {@code InfoCmd} body executes synchronously on the
+   * same thread, and the tap is cleared in a {@code finally} block — so no
+   * cross-invocation leakage is possible. Tests verify this invariant.
+   */
+  public static final ThreadLocal<java.util.function.Consumer<String>> messageTap = new ThreadLocal<>();
+
   public static TreeCommand baseCommand;
   public static AtomicBoolean reloading = new AtomicBoolean(false);
 

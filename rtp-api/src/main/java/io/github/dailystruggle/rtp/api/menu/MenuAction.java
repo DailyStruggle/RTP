@@ -49,7 +49,41 @@ public sealed interface MenuAction
                 MenuAction.OpenExternalUrl,
                 MenuAction.OpenConfigSelector,
                 MenuAction.OpenConfigFile,
-                MenuAction.OpenConfigKey {
+                MenuAction.OpenConfigKey,
+                MenuAction.OpenConfigSearchPrompt,
+                MenuAction.OpenConfigSearchResults,
+                MenuAction.OpenConfigSubParamPage,
+                MenuAction.OpenAdminPanel,
+                MenuAction.OpenFrontPage,
+                MenuAction.OpenInfo,
+                MenuAction.SwitchInfoToText,
+                MenuAction.StageConfigValue,
+                MenuAction.UnstageConfigValue,
+                MenuAction.ApplyStagedConfig,
+                MenuAction.DiscardStagedConfig {
+
+    /**
+     * Discriminator for {@link PromptAnvilInput}: controls what the platform
+     * anvil renderer does with the typed value on confirm.
+     *
+     * <ul>
+     *   <li>{@link #RUN} (legacy default) - synthesize and execute
+     *       {@code /rtp <parentPath...> <paramName>=<typed>} as the player.
+     *       Used by the parameter-picker free-form "type a value" row.</li>
+     *   <li>{@link #STAGE} - do not execute; instead the typed value is
+     *       routed into the player's config-menu staging cart on this
+     *       backend so the curated {@code /rtp config <file>} page can
+     *       surface it under "Pending changes" and an explicit Apply row
+     *       runs the batched command. The renderer reads {@code parentPath}
+     *       as {@code ["config", "<fileName>", ...]}; {@code paramName} is
+     *       the staged key. See the config staging-cart redesign tracked
+     *       at {@code docs/dev/scratch/CHECKLIST-config-staging-cart.md}.</li>
+     * </ul>
+     */
+    enum Mode {
+        RUN,
+        STAGE
+    }
 
     /**
      * Invoke {@code /rtp <args>} as the clicking player. {@code args} is the
@@ -220,11 +254,12 @@ public sealed interface MenuAction
      * open an anvil GUI (Spigot without Adventure, Fabric) shall fall back to
      * the {@link SuggestInput} chat-prefill behavior. See ADR-045.
      */
-    record PromptAnvilInput(String[] parentPath, String paramName, String prefill) implements MenuAction {
+    record PromptAnvilInput(String[] parentPath, String paramName, String prefill, Mode mode) implements MenuAction {
         public PromptAnvilInput {
             Objects.requireNonNull(parentPath, "parentPath");
             Objects.requireNonNull(paramName, "paramName");
             Objects.requireNonNull(prefill, "prefill");
+            Objects.requireNonNull(mode, "mode");
             parentPath = parentPath.clone();
             for (int i = 0; i < parentPath.length; i++) {
                 Objects.requireNonNull(parentPath[i], "parentPath[" + i + "]");
@@ -232,6 +267,18 @@ public sealed interface MenuAction
             if (paramName.isEmpty()) {
                 throw new IllegalArgumentException("paramName must not be empty");
             }
+        }
+
+        /**
+         * Back-compatible 3-arg constructor: defaults {@link #mode()} to
+         * {@link Mode#RUN}, matching the historical behavior where every
+         * anvil confirm synthesized and executed
+         * {@code /rtp <parentPath...> <paramName>=<typed>}. New STAGE-mode
+         * call sites (config-key clicks routed through the staging cart)
+         * shall use the 4-arg form explicitly.
+         */
+        public PromptAnvilInput(String[] parentPath, String paramName, String prefill) {
+            this(parentPath, paramName, prefill, Mode.RUN);
         }
 
         @Override
@@ -242,6 +289,7 @@ public sealed interface MenuAction
         @Override
         public boolean equals(Object o) {
             return o instanceof PromptAnvilInput other
+                    && mode == other.mode
                     && paramName.equals(other.paramName)
                     && prefill.equals(other.prefill)
                     && Arrays.equals(parentPath, other.parentPath);
@@ -252,12 +300,13 @@ public sealed interface MenuAction
             int h = Arrays.hashCode(parentPath);
             h = 31 * h + paramName.hashCode();
             h = 31 * h + prefill.hashCode();
+            h = 31 * h + mode.hashCode();
             return h;
         }
 
         @Override
         public String toString() {
-            return "PromptAnvilInput[" + paramName + "=" + prefill
+            return "PromptAnvilInput[" + mode + " " + paramName + "=" + prefill
                     + "@" + Arrays.toString(parentPath) + "]";
         }
     }
@@ -313,6 +362,255 @@ public sealed interface MenuAction
             }
             if (paramName.isEmpty()) {
                 throw new IllegalArgumentException("paramName must not be empty");
+            }
+        }
+    }
+
+    /**
+     * Open the anvil-input prompt for the cross-config search flow. Resolved
+     * renderer-side by translating to
+     * {@link PromptAnvilInput}{@code (["menu","config","search"], "query", "")};
+     * on submit, the synthesized {@code /rtp menu config search query:<text>}
+     * command is parsed by the {@code search} {@code TreeCommand} leaf under
+     * the {@code menu config} branch, which routes to the same builder that
+     * {@link OpenConfigSearchResults} uses. Permission-gated by
+     * {@code rtp.config.view}. See
+     * docs/dev/scratch/PROPOSAL-rtp-menu-config-search.md §6 Q4 Decision (A).
+     */
+    record OpenConfigSearchPrompt() implements MenuAction {
+    }
+
+    /**
+     * Open page {@code page} (0-indexed) of cross-config search results for
+     * {@code query}. Server-resolved by
+     * {@code MenuRedeemSubcommand.dispatchOpenConfigSearchResults}; walks every
+     * loaded {@code ConfigParser} and {@code MultiConfigParser}, color-strips
+     * keys and values via {@code LegacyColorStrip}, performs a case-insensitive
+     * substring match, and renders one row per hit with the raw (literal,
+     * un-rendered) value text and an off-blue highlight projected onto the
+     * matched substring. Each row carries an {@link OpenConfigKey} action so
+     * clicking jumps to the per-key page that already manages that file/key.
+     * Permission-gated by {@code rtp.config.view}. See
+     * docs/dev/scratch/PROPOSAL-rtp-menu-config-search.md.
+     */
+    record OpenConfigSearchResults(String query, int page) implements MenuAction {
+        public OpenConfigSearchResults {
+            Objects.requireNonNull(query, "query");
+            if (page < 0) {
+                throw new IllegalArgumentException("page must be >= 0");
+            }
+        }
+    }
+
+    /**
+     * Open the sub-parameter page (page 3b) for a shape/vert-typed config key
+     * whose currently-stored discriminator is {@code typeName} (e.g.
+     * {@code "SQUARE"} for a {@code shape} key). The page renders the activated
+     * type's {@code name} plus its sub-parameters as clickable rows; writes are
+     * stateless and target flat keys per Q13 (the parser's stored type
+     * discriminates). Server-resolved by
+     * {@code MenuRedeemSubcommand.dispatchOpenConfigSubParamPage};
+     * permission-gated by {@code rtp.config.view}. See
+     * PROPOSAL-config-view-as-book.md v3.7.5.
+     */
+    record OpenConfigSubParamPage(String fileName, String paramName, String typeName) implements MenuAction {
+        public OpenConfigSubParamPage {
+            Objects.requireNonNull(fileName, "fileName");
+            Objects.requireNonNull(paramName, "paramName");
+            Objects.requireNonNull(typeName, "typeName");
+            if (fileName.isEmpty()) {
+                throw new IllegalArgumentException("fileName must not be empty");
+            }
+            if (paramName.isEmpty()) {
+                throw new IllegalArgumentException("paramName must not be empty");
+            }
+            if (typeName.isEmpty()) {
+                throw new IllegalArgumentException("typeName must not be empty");
+            }
+        }
+    }
+
+    /**
+     * Open the curated admin panel page. Server-resolved by
+     * {@code MenuRedeemSubcommand.dispatchOpenAdminPanel}; permission-gated by
+     * {@code rtp.menu.admin}. The panel hosts operator-facing rows (config
+     * editor, diagnostics, lifecycle, browse) previously inlined onto the
+     * front page. See PROPOSAL-admin-panel.md v2.
+     */
+    record OpenAdminPanel() implements MenuAction {
+    }
+
+    /**
+     * Open the curated front page built by {@code FrontPageBuilder}. Used by
+     * the admin panel's back row and wherever a curated-front-page return is
+     * needed. Distinct from {@link OpenMenu} with an empty path, which targets
+     * the reflected {@code TreeCommand} root rather than the curated builder.
+     * Server-resolved by {@code MenuRedeemSubcommand.dispatchOpenFrontPage};
+     * no permission gate (the front page is the default landing for any menu
+     * viewer). See PROPOSAL-admin-panel.md v2.
+     */
+    record OpenFrontPage() implements MenuAction {
+    }
+
+    /**
+     * Identifier for the scope of an {@link OpenInfo} or
+     * {@link SwitchInfoToText} action (PROPOSAL-info-as-book.md §4.4).
+     *
+     * <ul>
+     *   <li>{@link Kind#GLOBAL} — render the unscoped {@code /rtp info}
+     *       output. {@link #name()} must be {@code ""}.</li>
+     *   <li>{@link Kind#WORLD} — render the {@code worldInfo} block for a
+     *       specific world. {@link #name()} carries the world name.</li>
+     *   <li>{@link Kind#REGION} — render the {@code regionInfo} block for
+     *       a specific region. {@link #name()} carries the region name.</li>
+     * </ul>
+     *
+     * <p>{@code name} is never {@code null}; for {@link Kind#GLOBAL} it is
+     * the empty string (validated in the canonical constructor).
+     */
+    record InfoScopeToken(Kind kind, String name) {
+        public enum Kind { GLOBAL, WORLD, REGION }
+
+        public InfoScopeToken {
+            Objects.requireNonNull(kind, "kind");
+            Objects.requireNonNull(name, "name");
+            if (kind == Kind.GLOBAL && !name.isEmpty()) {
+                throw new IllegalArgumentException("GLOBAL scope must have empty name");
+            }
+            if (kind != Kind.GLOBAL && name.isEmpty()) {
+                throw new IllegalArgumentException(kind + " scope requires non-empty name");
+            }
+        }
+
+        /** Convenience: the unscoped {@code /rtp info} target. */
+        public static InfoScopeToken global() {
+            return new InfoScopeToken(Kind.GLOBAL, "");
+        }
+
+        /** Convenience: a {@code /rtp info world:<name>} target. */
+        public static InfoScopeToken world(String name) {
+            return new InfoScopeToken(Kind.WORLD, Objects.requireNonNull(name, "name"));
+        }
+
+        /** Convenience: a {@code /rtp info region:<name>} target. */
+        public static InfoScopeToken region(String name) {
+            return new InfoScopeToken(Kind.REGION, Objects.requireNonNull(name, "name"));
+        }
+    }
+
+    /**
+     * Open (or re-open) the {@code /rtp info} book at the given scope
+     * (PROPOSAL-info-as-book.md §4.4). Server-resolved by
+     * {@code MenuRedeemSubcommand.dispatchOpenInfo}; permission-gated by
+     * {@code rtp.info}. Used by the {@code 🔄 Refresh} row and by per-world
+     * / per-region drill-down rows inside the info book.
+     */
+    record OpenInfo(InfoScopeToken scope) implements MenuAction {
+        public OpenInfo {
+            Objects.requireNonNull(scope, "scope");
+        }
+    }
+
+    /**
+     * Switch the {@code /rtp info} presentation from book to chat for the
+     * remainder of the current invocation (PROPOSAL-info-as-book.md §4.4).
+     * Server-resolved by {@code MenuRedeemSubcommand.dispatchSwitchInfoToText};
+     * permission-gated by {@code rtp.info}. The chat path is invoked with
+     * the supplied scope; no new book token is minted.
+     *
+     * <p>The session-only viewer pref flip described in the proposal is
+     * deferred to v2 (the minimal cut keeps presentation per-invocation,
+     * not per-viewer). See {@code PROPOSAL-info-as-book.md} §9 "Notes".
+     */
+    record SwitchInfoToText(InfoScopeToken scope) implements MenuAction {
+        public SwitchInfoToText {
+            Objects.requireNonNull(scope, "scope");
+        }
+    }
+
+    /**
+     * Stage a single {@code key=value} edit into the player's per-backend
+     * config-menu staging cart for {@code fileName}. The cart is scoped to
+     * one config file at a time: dispatching {@code StageConfigValue} for a
+     * {@code fileName} that does not match the player's existing cart file
+     * replaces the cart entirely. The cart is dropped when the player
+     * returns to the file-selector page (via {@link OpenConfigSelector}) or
+     * disconnects; it is never persisted across sessions or backends.
+     *
+     * <p>Server-resolved by
+     * {@code MenuRedeemSubcommand.dispatchStageConfigValue}; permission-gated
+     * by {@code rtp.config.view}. Re-renders the curated
+     * {@link OpenConfigFile} page so the staged entry surfaces under the
+     * "Pending changes" list. See
+     * {@code docs/dev/scratch/CHECKLIST-config-staging-cart.md}.
+     */
+    record StageConfigValue(String fileName, String paramName, String value) implements MenuAction {
+        public StageConfigValue {
+            Objects.requireNonNull(fileName, "fileName");
+            Objects.requireNonNull(paramName, "paramName");
+            Objects.requireNonNull(value, "value");
+            if (fileName.isEmpty()) {
+                throw new IllegalArgumentException("fileName must not be empty");
+            }
+            if (paramName.isEmpty()) {
+                throw new IllegalArgumentException("paramName must not be empty");
+            }
+        }
+    }
+
+    /**
+     * Remove a previously-staged {@code paramName} from the player's cart
+     * for {@code fileName}. No-op when the cart is empty, the cart is
+     * scoped to a different file, or {@code paramName} is not staged.
+     * Server-resolved by
+     * {@code MenuRedeemSubcommand.dispatchUnstageConfigValue}; permission-
+     * gated by {@code rtp.config.view}. Re-renders the curated
+     * {@link OpenConfigFile} page.
+     */
+    record UnstageConfigValue(String fileName, String paramName) implements MenuAction {
+        public UnstageConfigValue {
+            Objects.requireNonNull(fileName, "fileName");
+            Objects.requireNonNull(paramName, "paramName");
+            if (fileName.isEmpty()) {
+                throw new IllegalArgumentException("fileName must not be empty");
+            }
+            if (paramName.isEmpty()) {
+                throw new IllegalArgumentException("paramName must not be empty");
+            }
+        }
+    }
+
+    /**
+     * Apply the player's current staging cart for {@code fileName} as a
+     * single batched command:
+     * {@code /rtp config <fileName> <k1>=<v1> <k2>=<v2> ...}, then clear the
+     * cart and close the menu. No-op (with a warning log) when the cart is
+     * empty or scoped to a different file. Server-resolved by
+     * {@code MenuRedeemSubcommand.dispatchApplyStagedConfig}; permission-
+     * gated by {@code rtp.config.view}.
+     */
+    record ApplyStagedConfig(String fileName) implements MenuAction {
+        public ApplyStagedConfig {
+            Objects.requireNonNull(fileName, "fileName");
+            if (fileName.isEmpty()) {
+                throw new IllegalArgumentException("fileName must not be empty");
+            }
+        }
+    }
+
+    /**
+     * Clear the player's current staging cart for {@code fileName} without
+     * applying any edits, then re-render the curated {@link OpenConfigFile}
+     * page. No-op when the cart is empty or scoped to a different file.
+     * Server-resolved by
+     * {@code MenuRedeemSubcommand.dispatchDiscardStagedConfig}; permission-
+     * gated by {@code rtp.config.view}.
+     */
+    record DiscardStagedConfig(String fileName) implements MenuAction {
+        public DiscardStagedConfig {
+            Objects.requireNonNull(fileName, "fileName");
+            if (fileName.isEmpty()) {
+                throw new IllegalArgumentException("fileName must not be empty");
             }
         }
     }

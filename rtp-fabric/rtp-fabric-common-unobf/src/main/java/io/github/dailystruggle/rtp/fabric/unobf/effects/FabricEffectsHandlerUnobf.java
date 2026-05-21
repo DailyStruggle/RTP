@@ -68,15 +68,15 @@ public final class FabricEffectsHandlerUnobf {
      * lifecycle-hook lambdas are added once via the {@link AlreadyHooked} flag).
      */
     public static void setupEffects(MinecraftServer server) {
-        RTP.log(Level.INFO, "[RTP][FX-trace] setupEffects ENTER server=" + (server == null ? "null" : server.getClass().getSimpleName()));
+        RTP.log(Level.FINE, "[RTP][FX-trace] setupEffects ENTER server=" + (server == null ? "null" : server.getClass().getSimpleName()));
         FabricEffectRuntimeUnobf.bindServer(server);
         FabricEffectsInitializer.registerAll();
 
         if (!AlreadyHooked.flip()) {
-            RTP.log(Level.INFO, "[RTP][FX-trace] setupEffects: hooks already attached on previous start, skipping re-attach");
+            RTP.log(Level.FINE, "[RTP][FX-trace] setupEffects: hooks already attached on previous start, skipping re-attach");
             return; // already attached on a previous start
         }
-        RTP.log(Level.INFO, "[RTP][FX-trace] setupEffects: attaching lifecycle hooks");
+        RTP.log(Level.FINE, "[RTP][FX-trace] setupEffects: attaching lifecycle hooks");
 
         Configs configs = RTP.configs;
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
@@ -105,7 +105,7 @@ public final class FabricEffectsHandlerUnobf {
         TeleportPipelineTask.teleportPostActions.add(task -> {
             boolean enabled = effectParsingEnabled(parser);
             boolean hasPlayer = task.player() != null;
-            RTP.log(Level.INFO, "[RTP][FX-trace] hook postteleport fired enabled=" + enabled + " hasPlayer=" + hasPlayer);
+            RTP.log(Level.FINE, "[RTP][FX-trace] hook postteleport fired enabled=" + enabled + " hasPlayer=" + hasPlayer);
             if (!enabled || !hasPlayer) return;
             dispatch("rtp.effect.postteleport", task.player(), runtime);
         });
@@ -154,10 +154,10 @@ public final class FabricEffectsHandlerUnobf {
 
     private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntimeUnobf runtime) {
         try {
-            RTP.log(Level.INFO, "[RTP][FX-trace] dispatch ENTER prefix=" + prefix
+            RTP.log(Level.FINE, "[RTP][FX-trace] dispatch ENTER prefix=" + prefix
                     + " playerClass=" + (player == null ? "null" : player.getClass().getSimpleName()));
             if (player == null) {
-                RTP.log(Level.INFO, "[RTP][FX-trace] dispatch SKIP prefix=" + prefix + " reason=player-null");
+                RTP.log(Level.FINE, "[RTP][FX-trace] dispatch SKIP prefix=" + prefix + " reason=player-null");
                 return;
             }
             // The platform-versioned RTPPlayer (e.g. V26_1_R1FabricRTPPlayer) does NOT
@@ -171,7 +171,7 @@ public final class FabricEffectsHandlerUnobf {
                 java.lang.reflect.Method handleM = player.getClass().getMethod("handle");
                 Object h = handleM.invoke(player);
                 if (!(h instanceof ServerPlayer sp)) {
-                    RTP.log(Level.INFO, "[RTP][FX-trace] dispatch SKIP prefix=" + prefix
+                    RTP.log(Level.FINE, "[RTP][FX-trace] dispatch SKIP prefix=" + prefix
                             + " reason=handle-not-ServerPlayer(actual=" + (h == null ? "null" : h.getClass().getName()) + ")");
                     return;
                 }
@@ -180,7 +180,7 @@ public final class FabricEffectsHandlerUnobf {
                 Set<String> p = (Set<String>) player.getClass().getMethod("getEffectivePermissions").invoke(player);
                 perms = (p == null) ? java.util.Collections.emptySet() : p;
             } catch (NoSuchMethodException nsme) {
-                RTP.log(Level.INFO, "[RTP][FX-trace] dispatch SKIP prefix=" + prefix
+                RTP.log(Level.FINE, "[RTP][FX-trace] dispatch SKIP prefix=" + prefix
                         + " reason=incompatible-RTPPlayer(class=" + player.getClass().getName() + ")");
                 return;
             } catch (ReflectiveOperationException roe) {
@@ -189,7 +189,7 @@ public final class FabricEffectsHandlerUnobf {
                 return;
             }
             if (handle == null) {
-                RTP.log(Level.INFO, "[RTP][FX-trace] dispatch SKIP prefix=" + prefix + " reason=handle-null(disconnected)");
+                RTP.log(Level.FINE, "[RTP][FX-trace] dispatch SKIP prefix=" + prefix + " reason=handle-null(disconnected)");
                 return; // disconnected
             }
             // Re-resolve every dispatch so /rtp reload (which atomically swaps
@@ -200,7 +200,7 @@ public final class FabricEffectsHandlerUnobf {
             // primary path on this platform per ADR-005.
             RTPPlayer fp = player;
             String stage = stageOf(prefix);
-            RTP.log(Level.INFO, "[RTP][FX-trace] resolving prefix=" + prefix + " stage=" + stage
+            RTP.log(Level.FINE, "[RTP][FX-trace] resolving prefix=" + prefix + " stage=" + stage
                     + " permsCount=" + (perms == null ? -1 : perms.size()));
             // EffectsResolver lives in rtp-plugin (not on this module's classpath —
             // common-unobf must not depend on rtp-plugin). Reflective dispatch keeps
@@ -220,22 +220,22 @@ public final class FabricEffectsHandlerUnobf {
                         + " err=" + e.getClass().getSimpleName() + ": " + e.getMessage());
                 return;
             }
-            RTP.log(Level.INFO, "[RTP][FX-trace] resolved prefix=" + prefix + " unionSize=" + union.size()
+            RTP.log(Level.FINE, "[RTP][FX-trace] resolved prefix=" + prefix + " unionSize=" + union.size()
                     + " tokens=" + union);
             if (union.isEmpty()) {
-                RTP.log(Level.INFO, "[RTP][FX-trace] dispatch SKIP prefix=" + prefix + " reason=empty-union");
+                RTP.log(Level.FINE, "[RTP][FX-trace] dispatch SKIP prefix=" + prefix + " reason=empty-union");
                 return;
             }
 
             List<Effect<?>> effects = EffectFactory.buildEffects(prefix, union);
-            RTP.log(Level.INFO, "[RTP][FX-trace] built effects prefix=" + prefix + " count=" + effects.size());
+            RTP.log(Level.FINE, "[RTP][FX-trace] built effects prefix=" + prefix + " count=" + effects.size());
             for (Effect<?> effect : effects) {
                 effect.setTarget(handle);
                 runtime.schedule(effect, 0);
-                RTP.log(Level.INFO, "[RTP][FX-trace] scheduled prefix=" + prefix
+                RTP.log(Level.FINE, "[RTP][FX-trace] scheduled prefix=" + prefix
                         + " effectClass=" + effect.getClass().getSimpleName());
             }
-            RTP.log(Level.INFO, "[RTP][FX-trace] dispatch DONE prefix=" + prefix + " scheduled=" + effects.size());
+            RTP.log(Level.FINE, "[RTP][FX-trace] dispatch DONE prefix=" + prefix + " scheduled=" + effects.size());
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP] Fabric effect dispatch failed for " + prefix + ": "

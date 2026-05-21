@@ -1,10 +1,14 @@
 package io.github.dailystruggle.rtp.fabric.v26_1_R1;
 
+import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.fabric.unobf.anvil.FabricAnvilColumnProbeAdapter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.Identifier;
@@ -14,9 +18,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.storage.LevelResource;
 
 import java.util.Collections;
-import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,8 +36,11 @@ import java.util.logging.Level;
  * constant pool contains intermediary aliases ({@code class_3218} etc.) that
  * don't exist on that runtime.
  *
- * <p>Live-mode chunk-system implementation only — no anvil-prefilter integration
- * yet (tracked in {@code docs/dev/scratch/CHECKLIST-fabric-26-1-2-bringup.md}).
+ * <p>Includes an ADR-016 anvil pre-filter override of {@code probeChunkColumn}
+ * (parity with {@code FabricRTPWorldUnobf}) so {@code ScanTask} / {@code PregenTask}
+ * / {@code QueueTask} can cheaply reject ungenerated chunks via {@code .mca}
+ * reads instead of falling back to {@code runFullLoadPath} and tripping the
+ * 2s chunk-ticket budget.
  */
 public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
 
@@ -203,6 +210,201 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         chunkCache.clear();
     }
 
+    // ---------------------------------------------------------------------------
+    // ADR-016 anvil pre-filter -- column probe (parity with FabricRTPWorldUnobf)
+    //
+    // Without this override, RTPWorld's default probeChunkColumn returns a
+    // completed-null future, which the ScanTask / PregenTask / QueueTask
+    // probe-first fast paths treat as UNKNOWN and fall back to runFullLoadPath.
+    // On a fresh 26.1 world that means every prescan candidate force-loads its
+    // chunk, blows past the 2s ticket-apply budget, and emits the symptom in
+    // the bug report ("Chunk ticket application did not complete within 2s ...
+    // rejecting candidate"). Mirroring the unobf carrier's implementation
+    // gates the cheap reject on .mca-read-only data and reserves chunk loads
+    // for genuine accept candidates.
+    // ---------------------------------------------------------------------------
+    @Override
+    public CompletableFuture<ChunkColumnProbe> probeChunkColumn(
+            int cx, int cz, int minY, int maxY) {
+        if (minY > maxY) return CompletableFuture.completedFuture(null);
+        if (!shouldPrefilter(cx, cz)) return CompletableFuture.completedFuture(null);
+        ServerLevel level = world;
+        if (level == null) return CompletableFuture.completedFuture(null);
+        MinecraftServer server = level.getServer();
+        if (server == null) return CompletableFuture.completedFuture(null);
+
+        final java.nio.file.Path worldFolder;
+        try {
+            worldFolder = server.getWorldPath(LevelResource.ROOT);
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][v26_1_R1] probeChunkColumn: getWorldPath threw for world="
+                            + name + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return CompletableFuture.completedFuture(null);
+        }
+        final String dim = dimensionRegionSubpath(worldFolder, level);
+        final int finalMinY = minY;
+        final int finalMaxY = maxY;
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                java.nio.file.Path regionFile =
+                        io.github.dailystruggle.rtp.anvil.AnvilPrefilter
+                                .regionFileFor(worldFolder, dim, cx, cz);
+                byte[] regionBytes =
+                        io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
+                if (regionBytes == null) return null;
+                int rx = Math.floorMod(cx, 32);
+                int rz = Math.floorMod(cz, 32);
+                io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
+                        io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
+                                regionBytes, rx, rz, finalMinY, finalMaxY);
+                if (probe == null) return null;
+                return (ChunkColumnProbe) new FabricAnvilColumnProbeAdapter(probe, cx, cz);
+            } catch (Throwable t) {
+                RTP.log(Level.FINE,
+                        "[RTP][v26_1_R1] probeChunkColumn failed for world=" + name
+                                + " chunk=(" + cx + "," + cz + "): "
+                                + t.getClass().getSimpleName() + ": " + t.getMessage());
+                return null;
+            }
+        }, io.github.dailystruggle.rtp.anvil.AnvilIoPool.get());
+    }
+
+    // ---------------------------------------------------------------------------
+    // isChunkGenerated -- DATA-side region-file header probe.
+    //
+    // We must answer "will PRESCAN's anvil probe see anything for this chunk?"
+    // The previous server-side approach (ServerChunkCache#hasChunk +
+    // reflective ChunkMap#read) consulted live engine state, which on a fresh
+    // 26.1 world disagreed with what's actually on disk: many candidates were
+    // reported generated, prescan then returned null from the .mca read, and
+    // the pipeline fell back to runFullLoadPath one-by-one (2s ticket-budget
+    // warnings).
+    //
+    // This implementation consults the exact same bytes PRESCAN reads:
+    // AnvilPrefilter.regionFileFor + AnvilRegionByteCache.get + the Anvil
+    // location-table entry at index (cx&31) + ((cz&31) << 5). A zero
+    // sectorOffset/sectorCount means the chunk slot is empty -> not generated,
+    // so GENSCAN can route it through runFullLoadPath up front and PRESCAN
+    // is never asked about it. No JVM reflection, no engine state.
+    // ---------------------------------------------------------------------------
+    @Override
+    public boolean isChunkGenerated(int cx, int cz) {
+        ServerLevel level = world;
+        if (level == null) return true;
+        MinecraftServer server = level.getServer();
+        if (server == null) return true;
+
+        final java.nio.file.Path worldFolder;
+        try {
+            worldFolder = server.getWorldPath(LevelResource.ROOT);
+        } catch (Throwable t) {
+            return true;
+        }
+        try {
+            String dim = dimensionRegionSubpath(worldFolder, level);
+            java.nio.file.Path regionFile =
+                    io.github.dailystruggle.rtp.anvil.AnvilPrefilter
+                            .regionFileFor(worldFolder, dim, cx, cz);
+            // Missing region file = no chunk on disk for this 32x32 tile.
+            if (regionFile == null || !java.nio.file.Files.exists(regionFile)) {
+                return false;
+            }
+            // Binned fast path: a 1024-bit per-region-file occupancy bitmap
+            // amortises GENSCAN's per-chunk slot lookup across the entire 32x32
+            // tile. Built once per region file at first touch, reused until the
+            // .mca mtime advances. Avoids reparsing the location table on every
+            // sibling-chunk call.
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionOccupancyCache
+                    .isOccupied(regionFile, cx, cz);
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][v26_1_R1] isChunkGenerated anvil probe failed for world="
+                            + name + " chunk=(" + cx + "," + cz + "): "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+            // Conservative default per RTPWorld javadoc.
+            return true;
+        }
+    }
+
+    /**
+     * Applicability gate for the column probe -- parity with
+     * {@code FabricRTPWorldUnobf#shouldPrefilter}. Returns {@code true} only
+     * when the chunk is not currently loaded and
+     * {@code SafetyKeys.anvilPrefilterEnabled} is truthy. Any failure defaults
+     * to "skip prefilter" so the pipeline always has a safe fall-through.
+     */
+    private boolean shouldPrefilter(int cx, int cz) {
+        if (world == null) return false;
+        try {
+            if (isChunkLoaded(cx, cz)) return false;
+        } catch (Throwable ignored) {
+            return false;
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            ConfigParser<SafetyKeys> safety =
+                    (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+            if (safety == null) return true;
+            Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
+            if (raw instanceof Boolean b) return b;
+            if (raw != null) return Boolean.parseBoolean(raw.toString());
+            return true;
+        } catch (Throwable ignored) {
+            return true;
+        }
+    }
+
+    /**
+     * Map a {@link ServerLevel}'s dimension {@link Identifier} to the list of
+     * candidate on-disk region subdirectories used by vanilla, in priority
+     * order. MC 26.1 unified all dimensions under
+     * {@code <world>/dimensions/<ns>/<path>/region/}; pre-26 layouts still use
+     * the legacy roots ({@code "" for overworld, "DIM-1"/"DIM1"} for the
+     * nether/end). We return both so the probe can pick whichever exists on
+     * disk -- no need to know the engine's version a priori.
+     */
+    private static java.util.List<String> dimensionRegionSubpaths(ServerLevel level) {
+        if (level == null) return java.util.List.of("");
+        try {
+            Identifier loc = level.dimension().identifier();
+            String ns = loc.getNamespace();
+            String path = loc.getPath();
+            String unified = "dimensions/" + ns + "/" + path;
+            if ("minecraft".equals(ns)) {
+                if ("overworld".equals(path))  return java.util.List.of(unified, "");
+                if ("the_nether".equals(path)) return java.util.List.of(unified, "DIM-1");
+                if ("the_end".equals(path))    return java.util.List.of(unified, "DIM1");
+            }
+            return java.util.List.of(unified);
+        } catch (Throwable ignored) {
+            return java.util.List.of("");
+        }
+    }
+
+    /**
+     * Resolve the actual on-disk region subpath for {@code level}, preferring
+     * the first candidate from {@link #dimensionRegionSubpaths} whose
+     * {@code region/} directory exists. Falls back to the first candidate so
+     * callers always have a path to probe (and probes naturally miss for
+     * ungenerated tiles).
+     */
+    private static String dimensionRegionSubpath(java.nio.file.Path worldFolder, ServerLevel level) {
+        java.util.List<String> candidates = dimensionRegionSubpaths(level);
+        for (String c : candidates) {
+            java.nio.file.Path regionDir = c.isEmpty()
+                    ? worldFolder.resolve("region")
+                    : worldFolder.resolve(c).resolve("region");
+            try {
+                if (java.nio.file.Files.isDirectory(regionDir)) return c;
+            } catch (Throwable ignored) {
+                // try next
+            }
+        }
+        return candidates.get(0);
+    }
+
     @Override
     public String getBiome(int x, int y, int z) {
         ServerLevel level = world;
@@ -210,9 +412,14 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         try {
             Holder<Biome> holder = level.getBiome(new BlockPos(x, y, z));
             // Holder#unwrapKey()'s ResourceKey on 26.1.2 exposes identifier() (was location()).
-            return holder.unwrapKey()
+            // Normalise through PaletteIdentifierNormalizer to match the form ScanTask /
+            // FabricServerAccessor.defaultBiomesFor / FabricAnvilColumnProbeAdapter use
+            // (namespace-stripped, upper-cased). Without normalisation FULLSCAN's
+            // physical-biome check compares "MINECRAFT:PLAINS" against the
+            // namespace-stripped "PLAINS" in defaultBiomes and rejects every candidate.
+            String raw = holder.unwrapKey()
                     .map(k -> {
-                        try { return k.identifier().toString().toUpperCase(Locale.ROOT); }
+                        try { return k.identifier().toString(); }
                         catch (Throwable t) { return ""; }
                     })
                     .orElseGet(() -> {
@@ -221,11 +428,14 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                             Identifier id = level.registryAccess()
                                     .lookupOrThrow(net.minecraft.core.registries.Registries.BIOME)
                                     .getKey(holder.value());
-                            return (id == null) ? "" : id.toString().toUpperCase(Locale.ROOT);
+                            return (id == null) ? "" : id.toString();
                         } catch (Throwable t) {
                             return "";
                         }
                     });
+            String n = io.github.dailystruggle.rtp.api.configuration
+                    .PaletteIdentifierNormalizer.normalize(raw);
+            return n == null ? "" : n;
         } catch (Throwable t) {
             return "";
         }

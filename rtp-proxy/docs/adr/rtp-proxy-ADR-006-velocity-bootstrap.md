@@ -1,7 +1,7 @@
 # rtp-proxy-ADR-006 — Velocity Adapter Bootstrap
 
-**Status:** Proposed
-**Date:** 2026-05-13
+**Status:** Accepted
+**Date:** 2026-05-13 (Accepted 2026-05-18)
 **Refines:** [ADR-036](../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md)
 **Depends on:** [rtp-proxy-ADR-001](rtp-proxy-ADR-001-spi-shape.md), [rtp-proxy-ADR-002](rtp-proxy-ADR-002-network-yml-schema.md), [rtp-proxy-ADR-005](rtp-proxy-ADR-005-redis-binding.md)
 

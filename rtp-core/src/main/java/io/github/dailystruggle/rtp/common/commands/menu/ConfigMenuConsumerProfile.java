@@ -80,10 +80,13 @@ public final class ConfigMenuConsumerProfile implements MenuConsumerProfile {
         //   [ "rtp", "config" ]
         //   [ "rtp", "config", "<file>" ]
         // For a parameter under /rtp config <file>, we want:
-        //   "/rtp config <file> <key>:"
+        //   "/rtp config <file> <key>="
         // For a parameter directly under /rtp config (file selector itself),
         // we degrade to:
-        //   "/rtp config <key>:"
+        //   "/rtp config <key>="
+        // Separator is '=' to match commands-api parameter parsing (which
+        // accepts only '=' for <param>=<value> pairs). The earlier ':' form
+        // was a stale carry-over from a pre-= commands-api revision.
         StringBuilder sb = new StringBuilder("/");
         boolean first = true;
         for (String segment : commandPath) {
@@ -93,7 +96,7 @@ public final class ConfigMenuConsumerProfile implements MenuConsumerProfile {
             first = false;
         }
         if (!first) sb.append(' ');
-        sb.append(parameterName).append(':');
+        sb.append(parameterName).append('=');
         return sb.toString();
     }
 

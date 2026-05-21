@@ -24,7 +24,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -142,82 +141,44 @@ final class FrontPageBuilderTest {
     }
 
     // ------------------------------------------------------------------------
-    // Admin view
+    // Admin view (PROPOSAL-admin-panel.md v2: collapsed to a single entry row)
     // ------------------------------------------------------------------------
 
     @Test
-    @DisplayName("Admin view: replaces player picker block with admin row catalogue")
-    void adminView_emitsAdminRows() {
+    @DisplayName("Admin view: replaces player picker block with a single OpenAdminPanel entry row")
+    void adminView_emitsSingleAdminEntryRow() {
         LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
+        // Subcommand registration is irrelevant for the front-page collapse:
+        // the panel-entry row is unconditional in admin view.
         root.getCommandLookup().put("config", new LeafSub("config"));
-        root.getCommandLookup().put("scan", new LeafSub("scan"));
-        root.getCommandLookup().put("test", new LeafSub("test"));
         root.getCommandLookup().put("reload", new LeafSub("reload"));
-        root.getCommandLookup().put("info", new LeafSub("info"));
         // Even with region/biome params present, the admin view does NOT
-        // render the picker rows — it renders the admin catalogue instead.
+        // render the picker rows — admin viewers descend into the panel.
         root.getParameterLookup().put("region", new FixedParam("", Set.of("default")));
 
         MenuModel model = new FrontPageBuilder(registry)
                 .build(root, UUID.randomUUID(),
                         perm -> "rtp.menu.admin".equals(perm));
 
-        // Admin rows present.
-        assertNotNull(findRunWithArgs(model, "info"), "Info row must appear in admin view");
-        assertNotNull(findOpenMenuTo(model, "config"), "Config row must appear in admin view");
-        assertNotNull(findOpenMenuTo(model, "scan"), "Scan row must appear in admin view");
-        assertNotNull(findRunWithArgs(model, "test", "full"),
-                "Full diagnostics row must appear in admin view");
-        assertNotNull(findRunWithArgs(model, "reload"),
-                "Reload row must appear in admin view");
+        // The single panel-entry row must be present.
+        assertNotNull(findOpenAdminPanel(model),
+                "Admin view must emit an OpenAdminPanel entry row");
+
+        // The inline admin rows must NOT appear on the front page any more
+        // (they live on the admin panel itself now).
+        assertNull(findOpenConfigSelector(model),
+                "Config selector must NOT appear inline on the front page (panel-owned)");
+        assertNull(findRunWithArgs(model, "info"),
+                "Info row must NOT appear inline on the front page (panel-owned)");
+        assertNull(findRunWithArgs(model, "test", "full"),
+                "Diagnostics row must NOT appear inline on the front page (panel-owned)");
+        assertNull(findRunWithArgs(model, "reload"),
+                "Reload row must NOT appear inline on the front page (panel-owned)");
 
         // Player picker rows must NOT appear (admin view replaces them).
         assertNull(findOpenParamPicker(model, "region"),
                 "region picker must be absent in admin view");
-    }
-
-    @Test
-    @DisplayName("Admin view: rows for unregistered subcommands drop silently")
-    void adminView_dropsRows_forMissingSubcommands() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        TestableRoot root = new TestableRoot();
-        // Only `info` is registered; all other admin verbs are missing.
-        root.getCommandLookup().put("info", new LeafSub("info"));
-
-        MenuModel model = new FrontPageBuilder(registry)
-                .build(root, UUID.randomUUID(),
-                        perm -> "rtp.menu.admin".equals(perm));
-
-        assertNotNull(findRunWithArgs(model, "info"),
-                "Info row present (subcommand registered)");
-        assertNull(findOpenMenuTo(model, "config"),
-                "Config row must drop when /rtp config is unregistered");
-        assertNull(findOpenMenuTo(model, "scan"),
-                "Scan row must drop when /rtp scan is unregistered");
-        assertNull(findRunWithArgs(model, "test", "full"),
-                "Diagnostics row must drop when /rtp test is unregistered");
-        assertNull(findRunWithArgs(model, "reload"),
-                "Reload row must drop when /rtp reload is unregistered");
-    }
-
-    @Test
-    @DisplayName("Admin view: reload row carries a non-null warning hover")
-    void adminView_reloadRow_hasWarningHover() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        TestableRoot root = new TestableRoot();
-        root.getCommandLookup().put("reload", new LeafSub("reload"));
-
-        MenuModel model = new FrontPageBuilder(registry)
-                .build(root, UUID.randomUUID(),
-                        perm -> "rtp.menu.admin".equals(perm));
-
-        MenuFragment reload = findFragmentWithRunArgs(model, "reload");
-        assertNotNull(reload, "reload fragment must exist");
-        assertNotNull(reload.hover(),
-                "reload row must carry a non-null hover (Stage B redline #2 warning hover)");
-        assertFalse(reload.hover().isEmpty(),
-                "reload row hover must be non-empty");
     }
 
     // ------------------------------------------------------------------------
@@ -225,11 +186,10 @@ final class FrontPageBuilderTest {
     // ------------------------------------------------------------------------
 
     @Test
-    @DisplayName("A throwing permission probe degrades to player view (no admin rows)")
+    @DisplayName("A throwing permission probe degrades to player view (no admin entry row)")
     void throwingPermissionProbe_yieldsPlayerView() {
         LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
-        root.getCommandLookup().put("reload", new LeafSub("reload"));
 
         MenuModel model = new FrontPageBuilder(registry).build(
                 root, UUID.randomUUID(),
@@ -238,9 +198,9 @@ final class FrontPageBuilderTest {
         // Page must still render with at least Teleport + Help.
         assertNotNull(findRunWithArgs(model), "Teleport row must still render");
         assertNotNull(findRunWithArgs(model, "help"), "Help row must still render");
-        // Admin probe threw, so admin rows must be hidden.
-        assertNull(findRunWithArgs(model, "reload"),
-                "admin rows must be hidden when the admin permission probe throws");
+        // Admin probe threw, so the admin entry row must be hidden.
+        assertNull(findOpenAdminPanel(model),
+                "Admin entry row must be hidden when the admin permission probe throws");
     }
 
     @Test
@@ -271,38 +231,32 @@ final class FrontPageBuilderTest {
     // Helpers
     // ------------------------------------------------------------------------
 
+    private static MenuAction findOpenAdminPanel(MenuModel model) {
+        for (MenuLine line : model.pages().get(0).lines()) {
+            for (MenuFragment frag : line.fragments()) {
+                MenuAction a = frag.action();
+                if (a instanceof MenuAction.OpenAdminPanel) return a;
+            }
+        }
+        return null;
+    }
+
+    private static MenuAction findOpenConfigSelector(MenuModel model) {
+        for (MenuLine line : model.pages().get(0).lines()) {
+            for (MenuFragment frag : line.fragments()) {
+                MenuAction a = frag.action();
+                if (a instanceof MenuAction.OpenConfigSelector) return a;
+            }
+        }
+        return null;
+    }
+
     private static MenuAction findRunWithArgs(MenuModel model, String... expected) {
         for (MenuLine line : model.pages().get(0).lines()) {
             for (MenuFragment frag : line.fragments()) {
                 MenuAction a = frag.action();
                 if (a instanceof MenuAction.RunRtpCommand run) {
                     if (argsMatch(run.args(), expected)) return a;
-                }
-            }
-        }
-        return null;
-    }
-
-    private static MenuFragment findFragmentWithRunArgs(MenuModel model, String... expected) {
-        for (MenuLine line : model.pages().get(0).lines()) {
-            for (MenuFragment frag : line.fragments()) {
-                MenuAction a = frag.action();
-                if (a instanceof MenuAction.RunRtpCommand run) {
-                    if (argsMatch(run.args(), expected)) return frag;
-                }
-            }
-        }
-        return null;
-    }
-
-    private static MenuAction findOpenMenuTo(MenuModel model, String firstSegment) {
-        for (MenuLine line : model.pages().get(0).lines()) {
-            for (MenuFragment frag : line.fragments()) {
-                MenuAction a = frag.action();
-                if (a instanceof MenuAction.OpenMenu open) {
-                    if (open.path().length >= 1 && firstSegment.equals(open.path()[0])) {
-                        return a;
-                    }
                 }
             }
         }

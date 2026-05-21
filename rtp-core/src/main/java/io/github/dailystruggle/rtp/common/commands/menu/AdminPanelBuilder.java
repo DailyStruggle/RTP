@@ -1,0 +1,339 @@
+package io.github.dailystruggle.rtp.common.commands.menu;
+
+import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
+import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.menu.MenuAction;
+import io.github.dailystruggle.rtp.api.menu.MenuFragment;
+import io.github.dailystruggle.rtp.api.menu.MenuLine;
+import io.github.dailystruggle.rtp.api.menu.MenuModel;
+import io.github.dailystruggle.rtp.api.menu.MenuPage;
+import io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Predicate;
+
+/**
+ * Curated admin-panel page builder for {@code /rtp menu} (PROPOSAL-admin-panel.md v2).
+ *
+ * <p>Sibling to {@link FrontPageBuilder}: produces a curated {@link MenuModel}
+ * dedicated to operator tooling, reached from the front page's single
+ * {@code Admin panel} entry row (which emits a {@link MenuAction.OpenAdminPanel}
+ * token). The panel collects every row that previously lived inline on the
+ * front-page admin block plus a {@code Browse all commands} reflected-tree
+ * fallback, organised into named sections so the page can grow without
+ * pushing player-facing chrome off page 1 of the book.
+ *
+ * <p>Sections (top-to-bottom):
+ * <ul>
+ *   <li><b>Configuration</b> &mdash; {@link MenuAction.OpenConfigSelector}, gated on
+ *       {@code rtp.config.view}.</li>
+ *   <li><b>Diagnostics</b> &mdash; {@code /rtp info}, {@code /rtp test full},
+ *       {@code /rtp test memory} (if registered), and the scan sub-menu.</li>
+ *   <li><b>Lifecycle</b> &mdash; {@code /rtp reload}, gated on {@code rtp.reload}.</li>
+ *   <li><b>Browse</b> &mdash; reflected-tree fallback via {@link MenuAction.OpenMenu}
+ *       with an empty path, equivalent to today's {@code /rtp menu} pre-Stage-B
+ *       behaviour.</li>
+ * </ul>
+ *
+ * <p>Per-row self-hide rules:
+ * <ul>
+ *   <li>A row is suppressed when its underlying subcommand is not registered on
+ *       the live {@code /rtp} tree (matches {@link FrontPageBuilder}'s defensive
+ *       contract).</li>
+ *   <li>A row is suppressed when the viewer lacks the row's permission.</li>
+ *   <li>A section divider whose entire body is hidden is also suppressed, so a
+ *       partial admin never sees a {@code Lifecycle} header with nothing under
+ *       it.</li>
+ * </ul>
+ *
+ * <p>The admin gate ({@link FrontPageBuilder#ADMIN_PERMISSION}) is enforced
+ * upstream at the dispatch arm ({@code MenuRedeemSubcommand#dispatchOpenAdminPanel});
+ * this builder trusts that contract and does not re-probe it. Each clickable
+ * fragment mints one token, mirroring {@link FrontPageBuilder} for ADR-035 §3
+ * book-renderer compatibility.
+ */
+public final class AdminPanelBuilder {
+
+    /** Permission required to act on the {@code Reload} lifecycle row. */
+    public static final String RELOAD_PERMISSION = "rtp.reload";
+
+    /** Permission required to act on the {@code Scan control} row. */
+    public static final String SCAN_PERMISSION = "rtp.scan";
+
+    /**
+     * Permission required to act on the {@code Config editor} row. Mirrors
+     * {@link FrontPageBuilder#CONFIG_VIEW_PERMISSION} and the dispatch-side
+     * gate on {@link MenuAction.OpenConfigSelector}.
+     */
+    public static final String CONFIG_VIEW_PERMISSION =
+            FrontPageBuilder.CONFIG_VIEW_PERMISSION;
+
+    /** Token TTL aligned with the rest of the curated menu surface. */
+    public static final Duration DEFAULT_TOKEN_TTL = FrontPageBuilder.DEFAULT_TOKEN_TTL;
+
+    private final MenuTokenRegistry tokenRegistry;
+    private final Duration tokenTtl;
+
+    public AdminPanelBuilder(MenuTokenRegistry tokenRegistry) {
+        this(tokenRegistry, DEFAULT_TOKEN_TTL);
+    }
+
+    public AdminPanelBuilder(MenuTokenRegistry tokenRegistry, Duration tokenTtl) {
+        this.tokenRegistry = Objects.requireNonNull(tokenRegistry, "tokenRegistry");
+        this.tokenTtl = Objects.requireNonNull(tokenTtl, "tokenTtl");
+    }
+
+    /**
+     * Build the curated admin-panel {@link MenuModel} for {@code viewer}. The
+     * caller is responsible for enforcing the
+     * {@link FrontPageBuilder#ADMIN_PERMISSION} gate before invocation; this
+     * builder will happily produce a (possibly empty-body) model if invoked
+     * without admin rights.
+     *
+     * @param rtpRoot    the {@code /rtp} root {@link TreeCommand}; used to
+     *                   probe for subcommand availability.
+     * @param viewer     the calling player UUID.
+     * @param permission permission probe for {@code viewer}; consulted per
+     *                   row, never for the admin gate (that is the dispatch
+     *                   arm's responsibility).
+     */
+    public MenuModel build(TreeCommand rtpRoot, UUID viewer, Predicate<String> permission) {
+        Objects.requireNonNull(rtpRoot, "rtpRoot");
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(permission, "permission");
+
+        List<MenuLine> lines = new ArrayList<>();
+
+        // Title + hint.
+        String title = lookupMsg(MessagesKeys.menuAdminPanelTitle, "&6&l\u2699 Admin panel");
+        if (title != null && !title.isEmpty()) {
+            lines.add(MenuLine.of(new MenuFragment(title, null, null)));
+        }
+        String hint = lookupMsg(
+                MessagesKeys.menuAdminPanelHint,
+                "&7click an option below");
+        if (hint != null && !hint.isEmpty()) {
+            lines.add(MenuLine.of(new MenuFragment(hint, null, null)));
+        }
+        // blank spacer line between header and first section
+        lines.add(new MenuLine(List.of()));
+
+        // --- Configuration section ---
+        List<MenuLine> configRows = new ArrayList<>();
+        if (hasSubcommand(rtpRoot, "config") && safeTest(permission, CONFIG_VIEW_PERMISSION)) {
+            addRow(
+                    configRows,
+                    lookupMsg(MessagesKeys.menuAdminPanelRowConfig, "&b\u2699 Config editor"),
+                    lookupMsg(
+                            MessagesKeys.menuAdminPanelHoverConfig,
+                            "Open the curated config selector."),
+                    new MenuAction.OpenConfigSelector());
+        }
+        appendSection(
+                lines,
+                MessagesKeys.menuAdminPanelSectionConfig,
+                "&8\u00bb &7configuration",
+                configRows);
+
+        // --- Diagnostics section ---
+        List<MenuLine> diagRows = new ArrayList<>();
+        if (hasSubcommand(rtpRoot, "info")) {
+            // PROPOSAL-info-as-book.md section 4.6: the admin-panel "server
+            // info" row now opens the curated info book (mirrors the chat
+            // output of /rtp info page-by-page) instead of dumping the same
+            // lines into chat. Falls back transparently when the dispatch
+            // arm's MenuInfoBookBuilder is unwired: the dispatch arm logs WARN
+            // + reject with menuInvalid (S-004), which is the same shape every
+            // other curated builder uses when its SAM is missing.
+            addRow(
+                    diagRows,
+                    lookupMsg(MessagesKeys.menuAdminPanelRowInfo, "&b\u2139 Server info"),
+                    lookupMsg(
+                            MessagesKeys.menuAdminPanelHoverInfo,
+                            "Show plugin version, region counts, and queue state."),
+                    new MenuAction.OpenInfo(MenuAction.InfoScopeToken.global()));
+        }
+        if (hasSubcommand(rtpRoot, "test")) {
+            addRow(
+                    diagRows,
+                    lookupMsg(
+                            MessagesKeys.menuAdminPanelRowDiagnostics, "&b\u26a1 Full diagnostics"),
+                    lookupMsg(
+                            MessagesKeys.menuAdminPanelHoverDiagnostics,
+                            "Runs the full diagnostic suite."),
+                    new MenuAction.RunRtpCommand(new String[]{"test", "full"}));
+            // /rtp test memory: an optional subcommand on the test subtree.
+            // We can only probe the live tree; hidden if not registered.
+            if (hasTestSubcommand(rtpRoot, "memory")) {
+                addRow(
+                        diagRows,
+                        lookupMsg(
+                                MessagesKeys.menuAdminPanelRowMemory,
+                                "&b\u26ed Memory tracker snapshot"),
+                        lookupMsg(
+                                MessagesKeys.menuAdminPanelHoverMemory,
+                                "Dump active chunk-ticket and pipeline allocations."),
+                        new MenuAction.RunRtpCommand(new String[]{"test", "memory"}));
+            }
+        }
+        if (hasSubcommand(rtpRoot, "scan") && safeTest(permission, SCAN_PERMISSION)) {
+            addRow(
+                    diagRows,
+                    lookupMsg(MessagesKeys.menuAdminPanelRowScan, "&b\u21bb Scan control"),
+                    lookupMsg(
+                            MessagesKeys.menuAdminPanelHoverScan,
+                            "Open the scan submenu (start / pause / cancel)."),
+                    new MenuAction.OpenMenu(new String[]{"scan"}));
+        }
+        appendSection(
+                lines,
+                MessagesKeys.menuAdminPanelSectionDiagnostics,
+                "&8\u00bb &7diagnostics",
+                diagRows);
+
+        // --- Lifecycle section ---
+        List<MenuLine> lifecycleRows = new ArrayList<>();
+        if (hasSubcommand(rtpRoot, "reload") && safeTest(permission, RELOAD_PERMISSION)) {
+            addRow(
+                    lifecycleRows,
+                    lookupMsg(MessagesKeys.menuAdminPanelRowReload, "&c\u26a0 Reload"),
+                    lookupMsg(
+                            MessagesKeys.menuAdminPanelHoverReload,
+                            "Reloads all config files."),
+                    new MenuAction.RunRtpCommand(new String[]{"reload"}));
+        }
+        appendSection(
+                lines,
+                MessagesKeys.menuAdminPanelSectionLifecycle,
+                "&8\u00bb &7lifecycle",
+                lifecycleRows);
+
+        // --- Browse section ---
+        // Reflected-tree fallback. Always available; OpenMenu([]) walks the
+        // /rtp root via MenuRedeemSubcommand.dispatchOpen, which is independent
+        // of the curated front-page builder routing.
+        List<MenuLine> browseRows = new ArrayList<>();
+        addRow(
+                browseRows,
+                lookupMsg(MessagesKeys.menuAdminPanelRowBrowse, "&b\u2630 Browse all commands"),
+                lookupMsg(
+                        MessagesKeys.menuAdminPanelHoverBrowse,
+                        "Open the reflected /rtp command tree."),
+                new MenuAction.OpenMenu(new String[0]));
+        appendSection(
+                lines,
+                MessagesKeys.menuAdminPanelSectionBrowse,
+                "&8\u00bb &7browse",
+                browseRows);
+
+        // blank spacer line before the back row.
+        lines.add(new MenuLine(List.of()));
+        // Back row -> curated front page.
+        addRow(
+                lines,
+                lookupMsg(MessagesKeys.menuAdminPanelRowBack, "&7\u21a9 Back"),
+                null,
+                new MenuAction.OpenFrontPage());
+
+        MenuPage page = new MenuPage(lines);
+        List<MenuPage> pages = List.of(page);
+
+        // Mint a token per clickable fragment so the renderer can emit
+        // menu:<token> click payloads (ADR-035 §3). Mirrors FrontPageBuilder.
+        for (MenuLine line : page.lines()) {
+            for (MenuFragment fragment : line.fragments()) {
+                MenuAction action = fragment.action();
+                if (action != null) {
+                    tokenRegistry.mint(viewer, action, tokenTtl);
+                }
+            }
+        }
+
+        return new MenuModel(title == null ? "" : title, pages);
+    }
+
+    // ---- helpers ----------------------------------------------------------
+
+    /**
+     * Append a section divider followed by its body rows, but only when the
+     * body has at least one visible row. An empty body short-circuits the
+     * divider so a partial admin never sees a header with no rows under it.
+     */
+    private static void appendSection(List<MenuLine> dest,
+                                      MessagesKeys dividerKey,
+                                      String dividerFallback,
+                                      List<MenuLine> body) {
+        if (body == null || body.isEmpty()) return;
+        // blank spacer line between sections (skipped if this is the first section)
+        if (!dest.isEmpty()) {
+            MenuLine last = dest.get(dest.size() - 1);
+            if (last != null && !last.fragments().isEmpty()) {
+                dest.add(new MenuLine(List.of()));
+            }
+        }
+        String divider = lookupMsg(dividerKey, dividerFallback);
+        if (divider != null && !divider.isEmpty()) {
+            dest.add(MenuLine.of(new MenuFragment(divider, null, null)));
+        }
+        dest.addAll(body);
+    }
+
+    private static void addRow(List<MenuLine> lines, String label, String hover, MenuAction action) {
+        if (label == null || label.isEmpty()) return;
+        lines.add(MenuLine.of(new MenuFragment(label, hover, action)));
+    }
+
+    private static boolean safeTest(Predicate<String> permission, String perm) {
+        if (perm == null || perm.isEmpty()) return true;
+        try {
+            return permission.test(perm);
+        } catch (RuntimeException e) {
+            RTP.log(java.util.logging.Level.WARNING,
+                    "admin-panel permission probe threw for '" + perm + "': " + e.getMessage(), e);
+            return false;
+        }
+    }
+
+    private static boolean hasSubcommand(TreeCommand root, String name) {
+        Map<String, CommandsAPICommand> lookup = root.getCommandLookup();
+        if (lookup == null || name == null) return false;
+        return lookup.containsKey(name)
+                || lookup.containsKey(name.toUpperCase(Locale.ROOT));
+    }
+
+    /**
+     * Probes the {@code /rtp test} subtree for {@code childName}. Returns
+     * {@code false} when the {@code test} subtree itself is missing or is
+     * not a {@link TreeCommand}, or when no matching child is registered.
+     */
+    private static boolean hasTestSubcommand(TreeCommand root, String childName) {
+        Map<String, CommandsAPICommand> lookup = root.getCommandLookup();
+        if (lookup == null || childName == null) return false;
+        CommandsAPICommand test = lookup.get("test");
+        if (test == null) test = lookup.get("TEST");
+        if (!(test instanceof TreeCommand testTree)) return false;
+        Map<String, CommandsAPICommand> children = testTree.getCommandLookup();
+        if (children == null) return false;
+        return children.containsKey(childName)
+                || children.containsKey(childName.toUpperCase(Locale.ROOT));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String lookupMsg(MessagesKeys key, String fallback) {
+        if (RTP.configs == null) return fallback;
+        ConfigParser<MessagesKeys> lang =
+                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+        if (lang == null) return fallback;
+        Object v = lang.getConfigValue(key, fallback);
+        return v == null ? fallback : v.toString();
+    }
+}

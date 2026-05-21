@@ -1,0 +1,103 @@
+{
+  "world": "world",
+  "scanStride": -1,
+  "spatialResolution": 3,
+  "badLocations": [
+    {
+      "start": 32060,
+      "length": 1
+    },
+    {
+      "start": 36057,
+      "length": 1
+    },
+    {
+      "start": 44260,
+      "length": 1
+    },
+    {
+      "start": 44832,
+      "length": 1
+    },
+    {
+      "start": 45628,
+      "length": 1
+    },
+    {
+      "start": 54418,
+      "length": 1
+    },
+    {
+      "start": 65337,
+      "length": 1
+    },
+    {
+      "start": 70168,
+      "length": 1
+    },
+    {
+      "start": 98090,
+      "length": 1
+    },
+    {
+      "start": 99410,
+      "length": 2
+    },
+    {
+      "start": 102049,
+      "length": 2
+    },
+    {
+      "start": 133255,
+      "length": 1
+    },
+    {
+      "start": 166116,
+      "length": 1
+    },
+    {
+      "start": 170361,
+      "length": 1
+    },
+    {
+      "start": 173304,
+      "length": 1
+    }
+  ],
+  "biomeLocations": {
+    "SNOWY_SLOPES": [
+      {
+        "start": 152604,
+        "length": 3
+      }
+    ],
+    "PLAINS": [
+      {
+        "start": 40399,
+        "length": 3
+      }
+    ],
+    "SPARSE_JUNGLE": [
+      {
+        "start": 25300,
+        "length": 3
+      }
+    ],
+    "SNOWY_TAIGA": [
+      {
+        "start": 74143,
+        "length": 3
+      },
+      {
+        "start": 95373,
+        "length": 3
+      }
+    ],
+    "SNOWY_PLAINS": [
+      {
+        "start": 68076,
+        "length": 3
+      }
+    ]
+  }
+}

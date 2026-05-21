@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.proxy.common.spi;
 
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -26,4 +27,30 @@ public interface BackendSelector {
      *         no candidate qualified
      */
     Optional<String> choose(RtpRequest request, NetworkSnapshot snapshot);
+
+    /**
+     * Choose a backend with an optional pin to a specific {@code serverId}
+     * (L6 D6/D7 (B) plumbing for qualified {@code <server>=<region>} parsing;
+     * never set by L6 callers, but the SPI carries the parameter so the
+     * downstream rollout does not require an API break).
+     *
+     * <p>When {@code serverIdFilter} is present, the resulting candidate set is
+     * intersected with backends whose {@code serverId} equals the filter value
+     * (case-sensitive, exact match) before scoring proceeds.</p>
+     *
+     * <p>The default implementation delegates to
+     * {@link #choose(RtpRequest, NetworkSnapshot)} and discards the filter, so
+     * existing selectors remain functional until they override this method.
+     * Selectors that wish to honour the filter must override.</p>
+     *
+     * @param serverIdFilter optional pin to a specific {@code serverId}; when
+     *                       absent, behaviour is identical to
+     *                       {@link #choose(RtpRequest, NetworkSnapshot)}
+     */
+    default Optional<String> choose(RtpRequest request,
+                                    NetworkSnapshot snapshot,
+                                    Optional<String> serverIdFilter) {
+        Objects.requireNonNull(serverIdFilter, "serverIdFilter");
+        return choose(request, snapshot);
+    }
 }

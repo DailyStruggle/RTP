@@ -1,0 +1,139 @@
+{
+  "world": "world",
+  "scanStride": -1,
+  "spatialResolution": 3,
+  "badLocations": [
+    {
+      "start": 6430,
+      "length": 1
+    },
+    {
+      "start": 9221,
+      "length": 1
+    },
+    {
+      "start": 13005,
+      "length": 1
+    },
+    {
+      "start": 22616,
+      "length": 1
+    },
+    {
+      "start": 31903,
+      "length": 1
+    },
+    {
+      "start": 51365,
+      "length": 1
+    },
+    {
+      "start": 61261,
+      "length": 1
+    },
+    {
+      "start": 72223,
+      "length": 1
+    },
+    {
+      "start": 101070,
+      "length": 1
+    },
+    {
+      "start": 105109,
+      "length": 1
+    },
+    {
+      "start": 116518,
+      "length": 1
+    },
+    {
+      "start": 127693,
+      "length": 1
+    },
+    {
+      "start": 143695,
+      "length": 1
+    },
+    {
+      "start": 147589,
+      "length": 2
+    },
+    {
+      "start": 151017,
+      "length": 1
+    },
+    {
+      "start": 153199,
+      "length": 1
+    },
+    {
+      "start": 156807,
+      "length": 1
+    },
+    {
+      "start": 169492,
+      "length": 1
+    },
+    {
+      "start": 181826,
+      "length": 2
+    },
+    {
+      "start": 184733,
+      "length": 1
+    },
+    {
+      "start": 188898,
+      "length": 1
+    }
+  ],
+  "biomeLocations": {
+    "PLAINS": [
+      {
+        "start": 3863,
+        "length": 3
+      },
+      {
+        "start": 60067,
+        "length": 3
+      }
+    ],
+    "TAIGA": [
+      {
+        "start": 58072,
+        "length": 3
+      }
+    ],
+    "OLD_GROWTH_PINE_TAIGA": [
+      {
+        "start": 57418,
+        "length": 3
+      }
+    ],
+    "BIRCH_FOREST": [
+      {
+        "start": 56611,
+        "length": 3
+      }
+    ],
+    "FOREST": [
+      {
+        "start": 13367,
+        "length": 3
+      },
+      {
+        "start": 71698,
+        "length": 3
+      },
+      {
+        "start": 103014,
+        "length": 3
+      },
+      {
+        "start": 167548,
+        "length": 3
+      }
+    ]
+  }
+}

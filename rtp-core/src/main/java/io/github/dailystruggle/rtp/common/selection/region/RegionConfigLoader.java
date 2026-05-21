@@ -105,6 +105,7 @@ public class RegionConfigLoader {
         boolean requirePermission = getBoolean(regionParser.getConfigValue(RegionKeys.requirePermission, false));
         long cacheCap = getNumber(regionParser.getConfigValue(RegionKeys.cacheCap, 10L)).longValue();
         long backlogCacheCap = getNumber(regionParser.getConfigValue(RegionKeys.backlogCacheCap, 0L)).longValue();
+        long networkReserveSize = getNumber(regionParser.getConfigValue(RegionKeys.networkReserveSize, 0L)).longValue();
         int activeChunkCap = getNumber(regionParser.getConfigValue(RegionKeys.activeChunkCap, 3)).intValue();
         double price = getNumber(regionParser.getConfigValue(RegionKeys.price, 0.0)).doubleValue();
         long spatialResolution = getNumber(regionParser.getConfigValue(RegionKeys.spatialResolution, 1L)).longValue();
@@ -133,6 +134,7 @@ public class RegionConfigLoader {
                 requirePermission,
                 cacheCap,
                 backlogCacheCap,
+                networkReserveSize,
                 activeChunkCap,
                 price,
                 spatialResolution,

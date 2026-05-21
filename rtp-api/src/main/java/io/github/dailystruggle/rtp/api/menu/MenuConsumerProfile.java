@@ -16,7 +16,7 @@ import java.util.Objects;
  * <ul>
  *   <li>How a leaf parameter maps to a chat suggestion prefix
  *       ({@link #suggestPrefix}); e.g. for {@code /rtp config} the prefix is
- *       {@code "/rtp config <file> <key>:"} matching CONFIG_COMMAND_SPEC §2.4.</li>
+ *       {@code "/rtp config <file> <key>="} matching CONFIG_COMMAND_SPEC §2.4.
  *   <li>Which {@link YamlCommentLookup} feeds the hover-text resolver
  *       ({@link #commentLookup}); consumers without YAML backing return
  *       {@link YamlCommentLookup#EMPTY} and the reflector falls back to
@@ -50,9 +50,10 @@ public interface MenuConsumerProfile {
     YamlCommentLookup commentLookup();
 
     /**
-     * Trivial profile: prefixes are {@code "/rtp <path…> <param>:"} and the
+     * Trivial profile: prefixes are {@code "/rtp <path…> <param>="} and the
      * comment lookup is empty. Useful for tests and for command surfaces that
-     * are not YAML-backed.
+     * are not YAML-backed. The {@code =} separator matches commands-api's
+     * parameter parser (which accepts only {@code =} for {@code k=v} pairs).
      */
     static MenuConsumerProfile defaultProfile() {
         return new MenuConsumerProfile() {
@@ -68,7 +69,7 @@ public interface MenuConsumerProfile {
                     first = false;
                 }
                 if (!first) sb.append(' ');
-                sb.append(parameterName).append(':');
+                sb.append(parameterName).append('=');
                 return sb.toString();
             }
 

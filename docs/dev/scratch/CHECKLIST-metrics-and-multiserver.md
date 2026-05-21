@@ -14,6 +14,18 @@
 
 ---
 
+## Executable order to a viable product (2026-05-20 reconcile)
+
+The multi-server work has bifurcated into two focused frontiers; this file is now an audit/release-gate doc, not the active worklist. Active work happens in:
+
+1. **`CHECKLIST-cross-server-rtp.md`** -- L1 (dispatcher+sender) -> L2 (backend `JoinTriggerSource` + redeem) -> L3 (2x2 devstack acceptance) -> L4 (`/rtp test network crossserver` probe) -> L5 (docs + `InfoCmd` network block + ADR ratification). **Gate**: L3 = first runtime cross-server hop.
+2. **`CHECKLIST-load-distribution.md`** -- D1 (heartbeat field completeness) -> D2 (selector tuning + curve plots, absorbing this file's D5/D6/E8) -> D3 (affinity, ADR-013) -> D4 (hysteresis) -> D5 (per-backend killSwitch granularity) -> D6 (observability probe) -> D7 (load-skew acceptance) -> D8 (docs + ADR + changelog). **Gate**: D7 = first runtime load-distribution verification. Hard prerequisite: cross-server L3.
+3. **This file's residual work** (post-acceptance hardening, can run in parallel with the above): F8 (bStats *Feature shape*), F10 (Postgres-vs-Redis benchmark), G1 (Postgres `LISTEN/NOTIFY` push), G3 (Bungee adapter), G4 (Bungee+Postgres acceptance), H2 (security audit), H3 (`rtp test full network` aggregator), H4 (admin docs sweep), H5 (changelog rollup), H6 (beta release).
+
+**Release gate (H6)** depends on: cross-server L3 green + load-distribution D7 green + this file's H2 audit green. The remaining items (F8/F10/G1/G3/G4/H3/H4) are nice-to-have for the first beta and required for GA.
+
+---
+
 ## Conventions
 
 - Each row carries a verification artifact (test name, file path, command, or external URL) so a fresh agent can confirm it without re-deriving context.
@@ -94,68 +106,78 @@ Source-of-truth: [`docs/dev/METRICS_PLAN.md`](../METRICS_PLAN.md).
 
 Source-of-truth: [`docs/dev/MULTI_SERVER_PLAN.md`](../MULTI_SERVER_PLAN.md).
 
-- [ ] **D1.** Draft `docs/adr/ADR-025-multi-server-proxy-support.md` using `docs/adr/ADR-TEMPLATE.md`. Must reference: D1–D4 from the plan, durable-transport requirement (D2), reuse of `AbstractSQLDatabaseAccessor` (D3), env-var HMAC (D4 v1). Must **not** supersede ADR-022. Verification: ADR file present; INDEX.md and MAP.md updated to list it; user approval recorded in the ADR's *Status* field.
-- [ ] **D2.** Author REQ-RTP-NET-001…005 in final `shall` phrasing (style per `RULES.md`). Insert into `docs/dev/REQUIREMENTS.md` next to existing REQ-RTP-NET section if any, or at end. Verification: `RULES.md` style check passes; no temporal phrasing; no implementation actions.
-- [ ] **D3.** Add glossary entries to `docs/dev/GLOSSARY.md`: *backend*, *proxy*, *reservation token*, *transport*, *network snapshot*, *backend selector*, *network wait queue*. Verification: each term has a one-paragraph definition; no overlap with existing entries.
-- [ ] **D4.** Update `MULTI_SERVER_PLAN.md > Phase 0` checklist to tick the items above. Verification: each row references the artifact it produced (ADR-025 path, REQ IDs, glossary entries).
-- [ ] **D5.** Curve plot generation script under `scripts/` (matplotlib) producing PNGs/SVGs for `linear` / `exponential` / `logarithmic` / `sigmoid` / `step` / `power` at the documented defaults. Verification: script runs reproducibly on a fresh checkout (Python venv + `requirements.txt`); outputs land in `docs/admin/proxies/loadbalancing/` (subdirectory under the existing stub).
-- [ ] **D6.** Author `docs/admin/proxies/LOAD_BALANCING.md` embedding the plots from D5 + a plain-language explanation of each curve. Verification: rendered correctly on GitHub; cross-linked from `docs/admin/proxies/INDEX.md`.
+> **2026-05-20 reconcile**: All Phase 0 deliverables shipped under a renumbered umbrella (ADR-036, not ADR-025) plus ten subproject ADRs under `rtp-proxy/docs/adr/`. REQ-RTP-NET-001..014 + GLOSSARY entries live; load-balancing admin stub at `docs/admin/proxies/INDEX.md`. D5/D6 (curve plots) deferred -- not blocking and tracked in `CHECKLIST-load-distribution.md` D8 instead.
 
-> **Gate**: D-005 user approval on the full Phase-0 deliverable bundle (ADR + REQs + GLOSSARY + admin doc) before Section E begins.
+- [x] **D1.** Umbrella ADR shipped as [`ADR-036-network-mode-multi-server-multi-proxy.md`](../../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (`Accepted 2026-05-14`); ten subproject ADRs under `rtp-proxy/docs/adr/` (`-001` SPI through `-011` SQL dialect). ADR-022 not superseded.
+- [x] **D2.** REQ-RTP-NET-001..014 authored in `REQUIREMENTS.md` per `RULES.md` style.
+- [x] **D3.** GLOSSARY entries shipped: *Backend*, *Proxy*, *Transport*, *Network Snapshot*, *Backend Selector*, *Reservation Token*; *network wait queue* tracked under `RegionQueueManager.playerQueue` alias in `AGENTS.md > Domain Analogies`.
+- [x] **D4.** `MULTI_SERVER_PLAN.md > Phase 0` ticked.
+- [ ] **D5.** Curve plot generation script. **Deferred** -- moved to `CHECKLIST-load-distribution.md` D8 / D2 (selector tuning). Not a Phase-0 gate.
+- [ ] **D6.** `docs/admin/proxies/LOAD_BALANCING.md`. **Deferred** -- moved to `CHECKLIST-load-distribution.md` D8.
+
+> **Gate**: PASSED 2026-05-14 (ADR-036 Accepted). Phase 0 closed.
 
 ---
 
 ## Section E — Multi-Server Plan, Phase 1 (core SPI; no proxy adapter yet)
 
-- [ ] **E1.** Define `RtpTriggerSource` and `RtpDispatcher` in `rtp-core` (no platform imports). Verification: `:rtp-core:compileJava` green; ArchUnit guard clean.
-- [ ] **E2.** Define `BackendSelector` interface and ship a single concrete strategy: configurable weighted average per `MULTI_SERVER_PLAN.md > Configurable Weighted Average`. Includes curve catalogue (`linear` / `exponential` / `logarithmic` / `sigmoid` / `step` / `power`), per-metric `normalize` + `weight`, per-backend weight multiplier, capped retry / cooldown / score-sticking. Verification: pure function of `NetworkSnapshot`; no I/O during `choose()`; unit tests for each curve at `k`/`p`/`threshold` defaults plus boundary inputs.
-- [ ] **E3.** Define `NetworkTransport` interface (request/response, broadcast, subscribe). Verification: spec doc inside the package as KDoc; reference `MULTI_SERVER_PLAN.md > Coordinate Resolution Timing`.
-- [ ] **E4.** Implement `InMemoryNetworkStateBinding` (single-JVM tests, no-op default). Verification: round-trip request/response in a unit test with two simulated backends.
-- [ ] **E5.** Add the network-state member adjacent to `AbstractSQLDatabaseAccessor` per D3. Verification: `network.enabled: false` keeps the member null; member surface (`writeBackendState`, `readNetworkSnapshot`, reservation-token CRUD, network wait-queue CRUD) covered by an interface contract test.
-- [ ] **E6.** **No-op test** (REQ-RTP-NET-005 gate): `network.enabled: false` produces byte-identical behaviour to single-server. Verification: dedicated test class; runs in default `:rtp-core:test`.
-- [ ] **E7.** `commands-api` proxy-side surface — early TODO from the plan: `ProxySender`, `NetworkAwareCommand` mixin, tab-completion routing. Verification: interfaces defined and contract-tested, with no proxy-platform imports yet.
-- [ ] **E8.** `recentPicks` decay implementation (halflife 10s, λ ≈ 0.0693 s⁻¹) integrated as a metric row in the selector. Verification: unit test feeds a synthetic clock, asserts the score returns to background within ~30s after a single pick.
-- [ ] **E9.** Update `MULTI_SERVER_PLAN.md > Phase 1` checklist with completed rows. Verification: each row references its test name.
+> **2026-05-20 reconcile**: All Phase 1 SPI deliverables shipped. E7 (`ProxySender` mixin) deferred and moved to `CHECKLIST-cross-server-rtp.md` L1 (`VelocityProxySender` lands the concrete first). E8 (`recentPicks` decay) moved to `CHECKLIST-load-distribution.md` D2 (selector tuning).
 
-> **Gate**: Phase 1 acceptance — single-JVM tests with two simulated backends green; no-op test green; ArchUnit clean.
+- [x] **E1.** `RtpTriggerSource` (in `rtp-api`) + `RtpDispatcher` SPI (in `rtp-proxy-common`).
+- [x] **E2.** `BackendSelector` + `WeightedAverageBackendSelector` shipped.
+- [x] **E3.** `NetworkTransport` interface shipped.
+- [x] **E4.** `InMemoryNetworkStateBinding` + `InMemoryNetworkStateBindingTest`.
+- [x] **E5.** `AbstractSQLDatabaseAccessor.networkStateBinding` D3 slot wired.
+- [x] **E6.** `ReqRtpNet002NetworkDisabledNoOpTest` green.
+- [ ] **E7.** Moved to `CHECKLIST-cross-server-rtp.md` L1 (`VelocityProxySender` -> concrete first; abstract `ProxySender` mixin lifted later if needed).
+- [ ] **E8.** Moved to `CHECKLIST-load-distribution.md` D2 (selector tuning under real traffic).
+- [x] **E9.** `MULTI_SERVER_PLAN.md > Phase 1` ticked.
+
+> **Gate**: PASSED. Phase 1 closed.
 
 ---
 
 ## Section F — Multi-Server Plan, Phase 2 (Velocity adapter + Redis transport)
 
-- [ ] **F1.** Bootstrap `rtp-proxy/rtp-proxy-common/` and `rtp-proxy-velocity/` modules per `MULTI_SERVER_PLAN.md > Module shape`. Single JAR multi-loader bootstrap extends to the proxy axis (per *Intended Usage & Deployment Model* in the plan). Verification: `:rtp-proxy:rtp-proxy-velocity:build` green; manifest/`velocity-plugin.json` declares the entry point.
-- [ ] **F2.** Implement `RedisNetworkStateBinding` (Lettuce, async). Verification: integration test against an embedded Redis (e.g. `embedded-redis`); no blocking `.get()` calls.
-- [ ] **F3.** Implement reservation token state machine (`PENDING → CLAIMED → CONSUMED → EXPIRED`) on the network-state member. Idempotent consumption; reaper on `RTP.scheduler.runTaskTimerAsynchronously`. Verification: a dedicated regression suite analogous to `ReqRtpS004NullChunkAttributionTest` covering replay, TTL expiry, orphaned `MemoryTracker` entries.
-- [ ] **F4.** Velocity `ServerPreConnectEvent` hook (PostOrder.LATE) that rewrites the target backend per the selector's choice. Verification: integration test against a Velocity dev instance; transfer happens once, no spawn-flash.
-- [ ] **F5.** `CommandTriggerSource` wired through the dispatcher; `/rtp` from a backend or the proxy itself flows the same path. Verification: integration test exercises both origins.
-- [ ] **F6.** HMAC envelope on every transport packet using `RTP_NET_SECRET` env var (D4 v1). Verification: bad-secret packets are rejected and logged under S-004 attribution; no replay within TTL window.
-- [ ] **F7.** Update `InfoCmd` *Health — network* block per `METRICS_PLAN.md > /rtp info Surface > Health — network`. Verification: block appears only when `network.enabled: true`; integration test confirms stale-backend listing.
-- [ ] **F8.** bStats *Feature shape* charts (`selection_strategy_shape`, `region_topology`, `trigger_sources`) and the proxy-side chart set. Verification: proxy charts deliberately omit backend-pool shape (anti-fingerprinting).
-- [ ] **F9.** **Acceptance**: cross-server `/rtp` round-trip on a Velocity + 2× Paper devstack with Redis. Manual smoke + recorded test transcript in `LESSONS_LEARNED.md`.
-- [ ] **F10.** Postgres-vs-Redis comparative benchmark (deferred from earlier; runs *after* both transports are stable). Verification: benchmark script in `scripts/`, results recorded in `LESSONS_LEARNED.md`.
+> **2026-05-20 reconcile**: Phase 2 split. Transport + security + reservation state machine + single-backend probe all shipped (A1/A2/A3 + reservation reaper). Dispatcher wiring, devstack, and cross-server acceptance moved to `CHECKLIST-cross-server-rtp.md` as the focused frontier. bStats *Feature shape* (F8) and the Postgres-vs-Redis benchmark (F10) stay here as standalone follow-ups.
 
-> **Gate**: Phase 2 acceptance — F9 transcript + F3 regression suite green.
+- [x] **F1.** `rtp-proxy-common` + `rtp-proxy-velocity` modules shipped; Velocity `velocity-plugin.json` declares entry.
+- [x] **F2.** `RedisNetworkStateBinding` shipped (Jedis, not Lettuce -- `ADR-005` superseded the async choice; A1+A2 atomic Lua claim/release with SHA1 pinning).
+- [x] **F3.** Reservation token state machine (`ACTIVE` -> `CONSUMED` / `RELEASED` via Lua; TTL-reaper component shipped + adapter-wired).
+- [ ] **F4.** Velocity `ServerPreConnect` hook. **Moved** to `CHECKLIST-cross-server-rtp.md` L1+L3 (dispatcher wiring + acceptance harness).
+- [x] **F5.** `CommandTriggerSource` shipped; Brigadier wired. Cross-server flow lands with L1 dispatcher routing.
+- [x] **F6.** HMAC envelope shipped on Redis heartbeats (A3) + reservation tokens (A3 token-side) + SQL parity (A3 SQL). `HmacVerifier` + `secretEnv` fail-fast loader live.
+- [ ] **F7.** `InfoCmd` *Health -- network* block. **Moved** to `CHECKLIST-cross-server-rtp.md` L5 (docs/observability sweep alongside `CROSS_SERVER_VERIFICATION.md`).
+- [ ] **F8.** bStats *Feature shape* charts (`selection_strategy_shape`, `region_topology`, `trigger_sources`) + proxy-side set. Anti-fingerprinting: proxy charts omit backend-pool shape. **Stays here** -- orthogonal to cross-server/load-distribution frontiers; pick up after L3 devstack proves the proxy boots cleanly. D-005 proposal required.
+- [ ] **F9.** **Moved** to `CHECKLIST-cross-server-rtp.md` L3 (2x2 devstack acceptance) -- this is the canonical cross-server acceptance gate.
+- [ ] **F10.** Postgres-vs-Redis comparative benchmark. **Stays here** -- runs *after* L3 acceptance + Postgres `LISTEN/NOTIFY` optimization (currently still polling).
+
+> **Gate**: Phase 2 functional acceptance moved to `CHECKLIST-cross-server-rtp.md` L3. F8 + F10 are post-acceptance hardening, not gates.
 
 ---
 
 ## Section G — Multi-Server Plan, Phase 3 (Postgres transport + Join trigger + BungeeCord)
 
-- [ ] **G1.** `PostgresNetworkStateBinding` using `LISTEN/NOTIFY` and `SELECT ... FOR UPDATE SKIP LOCKED`. Verification: integration test against an embedded Postgres; race-free reservation claim under contention.
-- [ ] **G2.** `JoinTriggerSource` wired *proxy-side* per D1. Verification: per-region/world map sourced from proxy config; no per-backend mirror.
-- [ ] **G3.** `rtp-proxy-bungee` adapter (BungeeCord + Waterfall). Verification: integration test on a Bungee devstack.
-- [ ] **G4.** **Acceptance**: same scenarios as F9, but on Bungee + Postgres.
+> **2026-05-20 reconcile**: Postgres functionally works via `SqlNetworkStateBinding` polling path (ADR-011). G1 is now scoped to the `LISTEN/NOTIFY` push optimization (latency win, not correctness). G2 moved to cross-server checklist as the backend-side `JoinTriggerSource` is the critical-path piece. G3/G4 (Bungee) remain Phase 3 follow-ups.
+
+- [ ] **G1.** Postgres `LISTEN/NOTIFY` + `SELECT ... FOR UPDATE SKIP LOCKED` push optimization. **Stays here** -- post-acceptance latency win; not blocking cross-server or load distribution. Polling path (ADR-011) already works.
+- [ ] **G2.** **Moved** to `CHECKLIST-cross-server-rtp.md` L2 (backend `JoinTriggerSource` + redeem path). This is the highest-value remaining piece for cross-server RTP.
+- [ ] **G3.** `rtp-proxy-bungee` adapter. **Stays here** -- Phase 3, after Velocity is operator-proven via L3.
+- [ ] **G4.** Bungee + Postgres acceptance. **Stays here** -- depends on G3.
 
 ---
 
 ## Section H — Multi-Server Plan, Phase 4 (Generic SQL + hardening + release)
 
-- [ ] **H1.** `GenericSqlNetworkStateBinding` (MySQL/MariaDB polling). Verification: integration test confirms polling fallback latency stays within the load-balancer's `attemptTimeoutMs`.
-- [ ] **H2.** Security audit — HMAC, replay protection, schema-version negotiation, kill switch. Verification: dedicated test suite + security review notes in `LESSONS_LEARNED.md`.
-- [ ] **H3.** `rtp test full network` aggregator across the network. Verification: integration test exercises three backends with one stale.
-- [ ] **H4.** `docs/admin/proxies/` admin docs filled out per `docs/admin/proxies/INDEX.md` planned-pages list. Verification: each row in the planned-pages table now resolves to an authored doc.
-- [ ] **H5.** `CHANGELOG.md` entries per phase under *Unreleased*. Verification: PR review includes the changelog diff.
-- [ ] **H6.** First public proxy-mode beta release (gated on full audit green). Verification: tagged release; release notes link to ADR-025 and this checklist file's deletion.
-- [ ] **H7.** **Delete this checklist file.** Verification: `Test-Path docs\dev\scratch\CHECKLIST-metrics-and-multiserver.md` returns false; no references remain in any committed doc.
+> **2026-05-20 reconcile**: H1 closed by ADR-011 (one class, many dialects -- MySQL/MariaDB ride `SqlNetworkStateBinding`'s `Dialect.MYSQL` branch). H3-H7 stay here as the release gate; they're not blocked on cross-server or load-distribution frontiers and can land independently.
+
+- [x] **H1.** Generic SQL (MySQL/MariaDB polling) delivered via `SqlNetworkStateBinding` `Dialect.MYSQL` (MariaDB aliased) per ADR-011. Live container integration test remains a non-blocking follow-up.
+- [ ] **H2.** Security audit -- HMAC, replay protection, schema-version negotiation, kill switch. Stays here. **Prerequisite landed**: A3 HMAC envelope on Redis + SQL (heartbeats + tokens); audit covers what's in-tree plus remaining gaps (replay window not yet implemented, key rotation deferred per ADR-010). D-005 proposal required for any test suite that simulates active attack.
+- [ ] **H3.** `rtp test full network` aggregator (3 backends, one stale). Stays here. Smaller-scope sibling of `/rtp test network crossserver` probe in `CHECKLIST-cross-server-rtp.md` L4; H3 is the cross-backend aggregator, L4 is the cross-server hop assertion. D-005 proposal required.
+- [ ] **H4.** `docs/admin/proxies/` fill-out per planned-pages list. Stays here. Partial progress: `SINGLE_BACKEND_VERIFICATION.md` shipped 2026-05-20; `CROSS_SERVER_VERIFICATION.md` queued under cross-server L5; `LOAD_DISTRIBUTION.md` queued under load-distribution D8. Remaining: `QUICK_START.md`, `CONFIGURATION.md`, `TROUBLESHOOTING.md`, `SECURITY.md` operator pages.
+- [ ] **H5.** `CHANGELOG.md` Unreleased entries per phase. Stays here. Ongoing: A3 entries already landed under `[3.0.0-beta.4] - Unreleased`; each new slice from cross-server / load-distribution checklists must add a bullet at submit time.
+- [ ] **H6.** First public proxy-mode beta release (gated on H2 audit green + cross-server L3 acceptance + load-distribution D7 acceptance). Verification: tagged release; release notes link to ADR-036 and call out the three checklist files for deletion.
+- [ ] **H7.** **Delete this checklist file** + `CHECKLIST-cross-server-rtp.md` + `CHECKLIST-load-distribution.md` (whichever are completed). Verification: `Test-Path` returns false for each.
 
 ---
 

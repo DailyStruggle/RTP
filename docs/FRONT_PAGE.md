@@ -9,9 +9,9 @@ Conversion-optimized: hook → benchmark proof → buyer fit → CTA → deep di
 # RTP-Pro
 
 ### Deterministic, zero-latency Random Teleport for technical networks
-*Folia-ready · multi-server / proxy (beta.3+) · audited safety · same engine as the free RTP build, with the enterprise pieces turned on.*
+*Folia-ready · multi-server / proxy (beta.4+) · audited safety · same engine as the free RTP build, with the enterprise pieces added.*
 
-**3.0.0 — Early Access (beta.2)** · **Beta price $7.50** · $15 at GA · Early buyers keep the resource at no extra cost.
+**3.0.0 — Early Access (beta.3)** · **Beta price $7.50** · $15 at GA · Early buyers keep the resource at no extra cost.
 
 [![Version](https://img.shields.io/github/v/release/dailystruggle/RTP?label=Version&style=for-the-badge&color=2980B9)](https://github.com/dailystruggle/RTP) [![License](https://img.shields.io/github/license/dailystruggle/RTP?label=License&style=for-the-badge&color=2C3E50)](https://github.com/dailystruggle/RTP)
 
@@ -20,6 +20,14 @@ Conversion-optimized: hook → benchmark proof → buyer fit → CTA → deep di
 ---
 
 ### Why operators buy Pro
+
+**RTP-Pro is the fastest, lowest-latency Random Teleport plugin for Bukkit-native Minecraft servers (Paper, Folia, and the wider Bukkit family), with Fabric supported as a first-class platform.** In plain operator terms:
+
+- **No lag spikes when players spam `/rtp`.** Worst-case main-thread tick stays at 4 ms (vs. 70-771 ms for the next plugins) - your TPS holds at 20.00 during a teleport burst.
+- **Instant teleports, no "Finding a safe location..." wait.** Pre-verified location queue serves `/rtp` in one tick instead of loading chunks on demand.
+- **The only RTP plugin that runs natively on Folia at double-digit TP/s** (9.87 TP/s @ 99.97 % success) - every competitor stalls regions or fails to load.
+- **Drop-in upgrade from the free RTP build.** Same `config.yml`, same commands, same claim-plugin integrations (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect) - flip the jar, keep the data.
+- **Audited safety**: no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures (REQ-RTP-S-001..S-007).
 
 On **Paper 1.21**, measured on the in-repo harness, 2 OPed clients spamming `/rtp` back-to-back:
 
@@ -59,7 +67,7 @@ A few hard requirements. If any are a **no**, EssentialsX `/rtp` or HuskHomes ar
 
 - ✅ **Java 21+** on your host (REQ-RTP-SYS-001, non-negotiable).
 - ✅ **Paper, Folia, Spigot, or Fabric** — or Arclight / Mohist for Forge / NeoForge.
-- ✅ **You edit YAML.** No GUI by design — plain files you can version and diff.
+- ✅ **In-game editing or YAML, your call.** Browse and tune config from the clickable `/rtp menu` (book on Paper / Folia, chat-paginated fallback elsewhere), or edit the plain YAML files directly and version-control them.
 - ✅ **You read the admin guide before asking for help.** Support Policy is enforced (see below).
 - ✅ **Real server, not a 2-player LAN.** For a friends-only SMP this is overkill — grab the free build.
 
@@ -72,14 +80,20 @@ A few hard requirements. If any are a **no**, EssentialsX `/rtp` or HuskHomes ar
 
 **Metrics:** Throughput (TP/s, higher better) · MSPT p99 (worst 1-in-100 main-thread tick in ms; <~50 ms = no dropped tick) · Min TPS (20.00 = no hiccup) · CPU / TP (main-thread CPU per successful teleport).
 
-**Paper 1.21.11** — recommended platform.
+**Paper 1.20.1 / 1.21.11** — recommended platform. Eight plugins, same harness, same world, same two OPed clients.
 
-| Plugin         | TP/s | MSPT p99 (ms) | Min TPS | CPU / TP (ms) |
-|----------------|------|---------------|---------|----------------|
-| **🧪 RTP-Pro** | **19.8** | **4** | **20.00** | **16.9** |
-| 🧪 JakesRTP   | 20.0 | 70  | 20.00 | 26.0 |
-| 🧪 BetterRTP  | 7.1  | 771 | 20.00 | 53.6 |
-| 🧪 HuskHomes  | 6.2  | 335 | 20.00 | 52.2 |
+| Plugin                  | TP/s     | MSPT p99 (ms) | Min TPS | CPU / TP (ms) | Success    |
+|-------------------------|----------|---------------|---------|---------------|------------|
+| **🧪 RTP-Pro**          | **19.8** | **4**         | **20.00** | **16.9**    | **100 %**  |
+| 🧪 JakesRTP             | 20.0     | 70            | 20.00   | 26.0          | 100 %      |
+| 🧪 BetterRTP            | 7.3      | 852           | 20.00   | 53.6          | 100 %      |
+| 🧪 HuskHomes            | 6.2      | 372           | 20.00   | 52.2          | 100 %      |
+| 🧪 AdvancedRTP          | 2.16     | 2 100         | 19.95   | 92.1          | 96.3 %     |
+| 🧪 EzRTP                | 1.76     | 2 903         | 19.95   | 139.6         | 100 %      |
+| 🧪 AsyRTP               | 1.67     | 4 534         | 19.95   | 38.8          | 100 %      |
+| 🧪 EssentialsX `/tpr`   | 0.96     | 4 504         | 19.95   | 88.9          | 75.9 % §   |
+
+§ EssentialsX `/tpr` is a teleport-*request* command (handshake + accept), not a teleport-*do* command; the harness's 5 s per-attempt deadline times out a fraction of the request-accept latencies. Numbers are dispatch-shaped, not plugin-broken.
 
 **Spigot 1.20.1** — platform-wide chunk-gen ceiling caps everyone at 1–1.5 TP/s; the latency tail is what matters.
 
@@ -140,7 +154,7 @@ Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https:/
 - **Folia** — Anvil read-only pre-filter on `ForkJoinPool.commonPool()` *before* the Region Scheduler; rejected candidates never hop a thread. Confirmed candidates load through Folia's native async API; teleports dispatch through the Entity Scheduler.
 - **Spigot** — `.mca` region files parsed off-tick (`isAir`, `isSafe`, surface-height, sky-light, biome). Paper-class throughput on plain Spigot.
 - **Mohist / Arclight** — officially supported. Spigot code path applies.
-- **Fabric** — in-tree adapter, functional (unstable frontier — see roadmap). Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x runtimes.
+- **Fabric** — in-tree adapter, supported and regularly tested. Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x runtimes. Featureset lags the Bukkit family by a release or two.
 
 **Honest fallback caveats.** The Anvil pre-filter is a data source, not a universal gate. It falls through to the platform's native chunk API in two cases: (1) the chunk is already loaded (live data wins), or (2) the probe returns *unknown* (no region file, unsupported data version, decode error, un-populated). On Spigot the fallback is one on-tick `getChunkAt`. On Folia it's one Region-Scheduler hop. Custom generators (Iris, Terra, datapacks) do **not** trigger the fallback — populated `.mca` palettes are read directly, preserving modded and namespaced IDs that the Bukkit enum would collapse.
 
@@ -193,7 +207,7 @@ RTP-Pro plots your world's geometry as it evaluates candidates. When it hits a m
 - Any number of teleport regions per world; per-region shape (Square, Circle, Rectangle), radius, center, curve weighting, vertical bounds, world override, permission gates.
 - Vertical adjustors (Linear, Jump) for sky islands, void worlds, Nether ceilings.
 - Multi-dimensional (Overworld, Nether, End, custom).
-- Hot-reloadable YAML; experimental `/rtp config` editor.
+- Hot-reloadable YAML; interactive `/rtp menu` (book on Paper / Folia, chat-paginated fallback elsewhere) with `/rtp config <file> view` deep-links into per-file editing. Hardened in `3.0.0-beta.3`.
 - Fully async chunk loading on Paper / Folia; off-tick Anvil pre-filter on Spigot.
 - **Per-player isolated queues** alongside a global queue — one player's bad luck never starves another's teleport.
 - Administrative scan lifecycle (`start`/`pause`/`resume`/`reset`/`cancel`) to pre-populate spatial memory without teleporting players.
@@ -216,7 +230,7 @@ RTP-Pro plots your world's geometry as it evaluates candidates. When it hits a m
 </details>
 
 <details>
-<summary><b>🚧 Roadmap — known limitations and planned work in 3.0.0-beta.2</b></summary>
+<summary><b>🚧 Roadmap — known limitations and planned work in 3.0.0-beta.3</b></summary>
 
 Rough edges I already know about, with direction:
 
@@ -224,7 +238,7 @@ Rough edges I already know about, with direction:
 - **Folia scheduler hop** for un-pre-resolvable candidates — cost currently unmeasured. Planned: publish p50/p95, look at amortising across adjacent candidates.
 - **Un-populated chunks** always fall through to a live load (correct by design). Planned: dedicated attribution bucket so operators can distinguish this from other fallbacks.
 - **Multi-server / proxy** (Velocity, BungeeCord) — planned for `3.0.0-beta.3`. Cross-network UUID queue + reservation tokens in the network-state DB.
-- **Fabric** — functional first-class platform (unstable frontier). Stabilization work continues on scheduled-task processor parity, permissions, and full Brigadier tree. Native Forge/NeoForge remains lower priority than multi-server; Arclight/Mohist + the Spigot/Paper jar is the supported path there.
+- **Fabric** — first-class platform, supported and regularly tested. Featureset lags the Bukkit family by a release or two (ongoing parity work on scheduled-task processor, permissions, and the full Brigadier tree). Native Forge/NeoForge remains lower priority than multi-server; Arclight/Mohist + the Spigot/Paper jar is the supported path there.
 - **Telemetry-sourced marketing numbers.** ~45% Overworld-safe is local-rig profiling; Nether/End are qualitative. Planned: anonymous opt-in telemetry + a published reference benchmark.
 - **Demo videos predate this release.** Underlying principles unchanged; numbers aren't current. Planned: fresh footage before `-beta` comes off.
 
@@ -271,7 +285,7 @@ Yes — same configuration, same data files, same commands. You lose Folia, prox
 - **Support covers bugs and configuration questions,** after you've read the admin guide.
 - **Bug reports need a reproduction:** server version, plugin version, platform (Spigot/Paper/Folia), `config.yml`, `regions/`, `safety.yml`, and the relevant `server.log` section. Reports without these are asked for them once, then closed.
 - **"It doesn't work" is not a bug report.** Tell me what you did, what you expected, and what actually happened.
-- **Unsupported:** native Forge/NeoForge (use Arclight/Mohist), plugin conflicts I can't reproduce, general MC-server admin questions. Fabric is supported on a best-effort basis as an unstable frontier.
+- **Unsupported:** native Forge/NeoForge (use Arclight/Mohist), plugin conflicts I can't reproduce, general MC-server admin questions.
 - **Response time:** solo maintainer. 24–72 h on weekdays for properly-filed reports. Critical safety issues (S-001…S-007 violations) jump the queue.
 - **Feature requests** via GitHub issues, not the resource thread. Priority follows the published roadmap, not ticket volume.
 

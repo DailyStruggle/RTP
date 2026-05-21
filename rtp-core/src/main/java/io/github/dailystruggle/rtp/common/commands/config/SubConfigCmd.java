@@ -371,6 +371,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
     if (factoryValue instanceof ConfigParser) {
       ConfigParser<?> configParser = (ConfigParser<?>) this.factoryValue;
       addSubCommand(new ViewSubConfigCmd(this, configParser));
+      addSubCommand(new ViewRawSubConfigCmd(this, configParser));
       // Resolve the in-memory yaml backing this parser so that the per-key
       // block comment can drive the parameter description (first comment line).
       RtpYamlConfig parserYaml = null;

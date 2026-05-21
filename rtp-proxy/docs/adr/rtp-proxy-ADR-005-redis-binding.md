@@ -1,9 +1,16 @@
 # rtp-proxy-ADR-005 — `RedisNetworkStateBinding` (Lettuce)
 
-**Status:** Proposed
+**Status:** Accepted
+**Accepted:** 2026-05-18
 **Date:** 2026-05-13
 **Refines:** [ADR-036](../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md)
 **Depends on:** [rtp-proxy-ADR-001](rtp-proxy-ADR-001-spi-shape.md), [rtp-proxy-ADR-002](rtp-proxy-ADR-002-network-yml-schema.md)
+
+## Amendments
+
+- **2026-05-18** - Two clarifications added prior to acceptance:
+  - **HMAC-stays-on-wire.** The `hmac` column on `rtp:tok:<tokenId>` is a wire-layer concern, computed and verified inside `RedisNetworkStateBinding` when assembling or parsing the HASH. The `ReservationToken` SPI value class (rtp-proxy-ADR-001) does NOT carry an `hmac` or `schemaVersion` field; host-side code never handles the signature directly.
+  - **Lua script SHA1 verify-on-load.** Each Lua script under `rtp-proxy-common/src/main/resources/redis/` ships with a checked-in expected SHA1 sidecar (`<script>.sha1`). On `transport.open()` the binding computes the SHA1 of the loaded script bytes and compares against the sidecar; mismatch is a **build-time defect** (refuse to enable, log WARNING) rather than a runtime fallback. This pins script identity across binary upgrades so a whitespace edit cannot invalidate the cached Redis SHA at runtime.
 
 ## Context
 
@@ -25,7 +32,7 @@
 | Backend heartbeat | `rtp:backend:<serverId>` | HASH | `heartbeat.staleAfterMs * 3` |
 | Proxy heartbeat | `rtp:proxy:<proxyId>` | HASH | `heartbeat.staleAfterMs * 3` |
 | Heartbeat fan-out | `rtp:hb` | PUBSUB channel | — |
-| Reservation token | `rtp:tok:<tokenId>` | HASH (fields: state, serverId, playerId, location, schemaVersion, hmac) | `reservation.ttlMs` |
+| Reservation token | `rtp:tok:<tokenId>` | HASH (fields: state, serverId, playerId, location, schemaVersion, hmac; last two are **wire-only**, not on the SPI value class - see Amendment 2026-05-18) | `reservation.ttlMs` |
 | Token state index | `rtp:tok:state:<state>` | SET | aligned to token |
 | Wait queue | `rtp:wait` | LIST (LPUSH/RPOP) | — |
 | Config hash check | `rtp:config:hash` | STRING | — |
@@ -99,7 +106,7 @@ Parity is validated by **running the Phase 2 reservation regression suite** agai
 ## Consequences
 
 - **Positive:** lowest-latency option; satisfies the "DragonflyDB drop-in" promise; small binding (Lettuce only).
-- **Negative:** Lua scripts add an opaque-to-operator step; mitigated by shipping the scripts in plaintext under `rtp-proxy-common/src/main/resources/redis/` and documenting them in `docs/admin/proxies/TRANSPORTS.md`.
+- **Negative:** Lua scripts add an opaque-to-operator step; mitigated by shipping the scripts in plaintext under `rtp-proxy-common/src/main/resources/redis/` (each paired with a checked-in `<script>.sha1` sidecar; see Amendment 2026-05-18) and documenting them in `docs/admin/proxies/TRANSPORTS.md`.
 
 ## References
 

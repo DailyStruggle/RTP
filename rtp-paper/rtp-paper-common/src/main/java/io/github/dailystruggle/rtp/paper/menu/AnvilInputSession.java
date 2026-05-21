@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.paper.menu;
 
+import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.menu.MenuRedeemSubcommand;
 import org.bukkit.Bukkit;
@@ -67,16 +68,28 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
     private static final class Session {
         final List<String> parentPath;
         final String paramName;
+        final MenuAction.Mode mode;
         boolean confirmed;
 
-        Session(List<String> parentPath, String paramName) {
+        Session(List<String> parentPath, String paramName, MenuAction.Mode mode) {
             this.parentPath = parentPath;
             this.paramName = paramName;
+            this.mode = mode;
         }
     }
 
     /** Active sessions keyed by player UUID. */
     private final Map<UUID, Session> active = new ConcurrentHashMap<>();
+
+    /**
+     * Bound on-demand by {@code RTPCmdBukkit} after {@link MenuRedeemSubcommand}
+     * is constructed; invoked on STAGE-mode confirm to push the typed value
+     * into the player's per-backend config staging cart instead of running
+     * a command. {@code null} when no cart sink has been wired (test
+     * scaffolds, pre-staging legacy callers); STAGE-mode opens degrade to
+     * a logged no-op in that case.
+     */
+    private volatile @Nullable MenuRedeemSubcommand.CartSink cartSink;
 
     /** {@code true} once {@link #register(Plugin)} has been called. */
     private volatile boolean registered;
@@ -98,10 +111,34 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
     }
 
     @Override
+    public void setCartSink(@Nullable MenuRedeemSubcommand.CartSink sink) {
+        this.cartSink = sink;
+    }
+
+    @Override
+    public boolean open(UUID viewer,
+                        List<String> parentPath,
+                        String paramName,
+                        String prefill,
+                        MenuAction.Mode mode,
+                        @Nullable MenuRedeemSubcommand.CartSink sink) {
+        if (sink != null) this.cartSink = sink;
+        return openInternal(viewer, parentPath, paramName, prefill, mode);
+    }
+
+    @Override
     public boolean open(UUID viewer,
                         List<String> parentPath,
                         String paramName,
                         String prefill) {
+        return openInternal(viewer, parentPath, paramName, prefill, MenuAction.Mode.RUN);
+    }
+
+    private boolean openInternal(UUID viewer,
+                                 List<String> parentPath,
+                                 String paramName,
+                                 String prefill,
+                                 MenuAction.Mode mode) {
         Player player;
         try {
             player = Bukkit.getPlayer(viewer);
@@ -156,7 +193,7 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
                     "menu anvil-input seed item failed for " + viewer + ": " + t.getMessage());
         }
 
-        active.put(viewer, new Session(List.copyOf(parentPath), paramName));
+        active.put(viewer, new Session(List.copyOf(parentPath), paramName, mode));
         return true;
     }
 
@@ -166,6 +203,14 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
         Session session = active.get(player.getUniqueId());
         if (session == null) return;
         InventoryView view = event.getView();
+        // Diagnostic: log every click that arrives for a player with an
+        // active anvil-input session, so we can see exactly which guard the
+        // event hit when the user reports "no command was issued".
+        RTP.log(Level.FINE,
+                "menu anvil-input onClick: player=" + player.getUniqueId()
+                        + " viewType=" + view.getType()
+                        + " rawSlot=" + event.getRawSlot()
+                        + " action=" + event.getAction());
         if (view.getType() != InventoryType.ANVIL) return;
         if (!(view.getTopInventory() instanceof AnvilInventory anvil)) return;
         // Result slot is index 2 on the top inventory; reject anything else.
@@ -179,7 +224,10 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
         String typed = null;
         try {
             typed = anvil.getRenameText();
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "menu anvil-input onClick: getRenameText() threw "
+                            + t.getClass().getName() + ": " + t.getMessage());
             // Fallback: read display name off the result slot item.
             try {
                 ItemStack out = view.getTopInventory().getItem(2);
@@ -200,24 +248,7 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
 
         session.confirmed = true;
         active.remove(player.getUniqueId());
-
-        // Close the inventory on the next tick so the click handler can
-        // return cleanly before the close event fires.
-        final String command = buildCommand(session.parentPath, session.paramName, typed);
-        Bukkit.getScheduler().runTask(getRtpPlugin(), () -> {
-            try {
-                player.closeInventory();
-            } catch (Throwable ignored) {
-                // best-effort close
-            }
-            try {
-                player.performCommand(command);
-            } catch (Throwable t) {
-                RTP.log(Level.WARNING,
-                        "menu anvil-input performCommand failed for " + player.getUniqueId()
-                                + " cmd='" + command + "': " + t.getMessage(), t);
-            }
-        });
+        dispatchConfirm(player, session, typed, true);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -225,19 +256,194 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
         if (!(event.getPlayer() instanceof Player player)) return;
         Session session = active.remove(player.getUniqueId());
         if (session == null) return;
+        RTP.log(Level.FINE,
+                "menu anvil-input onClose: player=" + player.getUniqueId()
+                        + " confirmed=" + session.confirmed);
         // confirmed=true means onClick already scheduled the dispatch; nothing
-        // more to do. confirmed=false means the player cancelled (closed the
-        // inventory without clicking the result slot) — drop the session.
+        // more to do.
+        if (session.confirmed) return;
+        // confirmed=false: the player closed the inventory without clicking
+        // the result slot. Vanilla anvils do not always render a clickable
+        // result item (no XP, no item-change, server cost rules), so the
+        // expected gesture from a player who has typed a value and pressed
+        // Esc / closed is "submit what I typed". Read the current rename
+        // text; if non-empty, treat it as a confirm and reopen the menu at
+        // the parent path with the staged paramName=value segment. If empty,
+        // drop the session silently (true cancel).
+        InventoryView view = event.getView();
+        if (view.getType() != InventoryType.ANVIL) return;
+        if (!(view.getTopInventory() instanceof AnvilInventory anvil)) return;
+        String typed = null;
+        try {
+            typed = anvil.getRenameText();
+        } catch (Throwable ignored) {
+            // give up; typed stays null.
+        }
+        if (typed == null) typed = "";
+        typed = typed.trim();
+        if (typed.isEmpty()) return;
+
+        dispatchConfirm(player, session, typed, false);
     }
 
-    /** Assemble {@code /rtp <parentPath...> <paramName>:<typed>}. */
+    /**
+     * Final-stage confirm handler shared by {@link #onClick} (clicked the
+     * anvil result slot) and {@link #onClose} (closed the inventory with
+     * non-empty typed text). Honors {@link Session#mode}:
+     * <ul>
+     *   <li>{@link MenuAction.Mode#RUN} (legacy / param-picker free-form
+     *       row) -> submit {@code /rtp <parentPath...> <paramName>=<typed>}
+     *       via {@link Player#performCommand(String)}, after closing the
+     *       inventory on the next tick.</li>
+     *   <li>{@link MenuAction.Mode#STAGE} (curated config-key click) ->
+     *       resolve the file name from {@code parentPath[1]} when
+     *       {@code parentPath[0]} is {@code config}, then push
+     *       {@code (paramName=typed)} into the player's cart via
+     *       {@link #cartSink}. After staging, the player is reopened on
+     *       {@code /rtp config <file>} so the curated page can surface
+     *       the new "Pending" entry. The cart sink is invoked
+     *       synchronously inside the click / close handler; it is a pure
+     *       in-memory mutation and is safe from any region thread that
+     *       owns the player (REQ-RTP-S-005 unaffected).</li>
+     * </ul>
+     */
+    private void dispatchConfirm(Player player, Session session, String typed, boolean closeInventory) {
+        if (session.mode == MenuAction.Mode.STAGE) {
+            MenuRedeemSubcommand.CartSink sink = cartSink;
+            // file name lives at parentPath[1] for /rtp config <file> paths.
+            String fileName = null;
+            if (session.parentPath.size() >= 2
+                    && "config".equalsIgnoreCase(session.parentPath.get(0))) {
+                fileName = session.parentPath.get(1);
+            }
+            if (sink == null || fileName == null) {
+                RTP.log(Level.WARNING,
+                        "menu anvil-input STAGE confirm dropped for " + player.getUniqueId()
+                                + " (sink=" + (sink != null ? "set" : "null")
+                                + ", parentPath=" + session.parentPath + "); falling through to RUN.");
+                dispatchRun(player, session, typed, closeInventory);
+                return;
+            }
+            try {
+                sink.stage(player.getUniqueId(), fileName, session.paramName, typed);
+            } catch (RuntimeException e) {
+                RTP.log(Level.WARNING,
+                        "menu anvil-input STAGE sink threw for " + player.getUniqueId()
+                                + " file=" + fileName + " key=" + session.paramName
+                                + ": " + e.getMessage(), e);
+                return;
+            }
+            // Reopen the curated file page so the new "Pending" entry is visible.
+            final String reopen = "/rtp config " + fileName;
+            Plugin plugin = getRtpPlugin();
+            if (plugin == null) {
+                RTP.log(Level.WARNING,
+                        "menu anvil-input STAGE reopen skipped for " + player.getUniqueId()
+                                + ": plugin unavailable");
+                return;
+            }
+            scheduleForPlayer(plugin, player, () -> {
+                if (closeInventory) {
+                    try { player.closeInventory(); } catch (Throwable ignored) { /* best-effort */ }
+                }
+                try {
+                    player.performCommand(reopen.startsWith("/") ? reopen.substring(1) : reopen);
+                } catch (Throwable t) {
+                    RTP.log(Level.WARNING,
+                            "menu anvil-input STAGE reopen failed for " + player.getUniqueId()
+                                    + " cmd='" + reopen + "': " + t.getMessage(), t);
+                }
+            });
+            return;
+        }
+        dispatchRun(player, session, typed, closeInventory);
+    }
+
+    /** RUN-mode confirm: submit the assembled command via {@code performCommand}. */
+    private void dispatchRun(Player player, Session session, String typed, boolean closeInventory) {
+        final String command = buildCommand(session.parentPath, session.paramName, typed);
+        RTP.log(Level.FINE,
+                "menu anvil-input RUN confirm: dispatching '" + command + "' for "
+                        + player.getUniqueId());
+        Plugin plugin = getRtpPlugin();
+        if (plugin == null) {
+            RTP.log(Level.WARNING,
+                    "menu anvil-input RUN dispatch skipped for "
+                            + player.getUniqueId() + ": plugin unavailable");
+            return;
+        }
+        scheduleForPlayer(plugin, player, () -> {
+            if (closeInventory) {
+                try { player.closeInventory(); } catch (Throwable ignored) { /* best-effort */ }
+            }
+            try {
+                player.performCommand(command.startsWith("/") ? command.substring(1) : command);
+            } catch (Throwable t) {
+                RTP.log(Level.WARNING,
+                        "menu anvil-input RUN performCommand failed for " + player.getUniqueId()
+                                + " cmd='" + command + "': " + t.getMessage(), t);
+            }
+        });
+    }
+
+    /**
+     * Schedule {@code task} on the next tick on a thread that legally owns
+     * {@code player}. Routes through {@link RTP#scheduler}'s
+     * {@code scheduleTeleport} entry point, which on Folia dispatches via the
+     * player's per-entity scheduler and on Paper/Spigot falls through to the
+     * global / main-thread scheduler. The name is a historical artifact - the
+     * underlying method is a generic "run this Runnable on a thread that owns
+     * the player after N ticks", not specifically a teleport submission. We
+     * use it here to defer command dispatch out of the InventoryClick /
+     * InventoryClose handlers exactly like a Bukkit {@code runTask} would,
+     * but in a way that is legal on Folia (REQ-RTP-S-005, Folia threading).
+     */
+    private static void scheduleForPlayer(Plugin plugin, Player player, Runnable task) {
+        try {
+            io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer =
+                    (RTP.serverAccessor != null)
+                            ? RTP.serverAccessor.getPlayer(player.getUniqueId())
+                            : null;
+            if (RTP.scheduler != null && rtpPlayer != null) {
+                RTP.scheduler.scheduleTeleport(
+                        rtpPlayer,
+                        new io.github.dailystruggle.rtp.common.tasks.RTPRunnable(task),
+                        1L);
+                return;
+            }
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "menu anvil-input scheduleForPlayer: RTP.scheduler path failed ("
+                            + t.getClass().getName() + ": " + t.getMessage() + "); falling back");
+        }
+        try {
+            Bukkit.getScheduler().runTask(plugin, task);
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "menu anvil-input scheduleForPlayer: both RTP.scheduler and legacy"
+                            + " scheduler failed for " + player.getUniqueId() + ": " + t.getMessage(), t);
+        }
+    }
+
+    /**
+     * Assemble {@code /rtp menu <parentPath...> <paramName>=<typed>}.
+     *
+     * <p>The leading {@code menu} re-routes to the menu open-path so the
+     * player lands back in the menu at the parent node with the typed value
+     * staged in the assembled path (surfaced by the Execute row). The
+     * Execute row click is what actually runs the constructed command;
+     * confirm-from-anvil does not auto-execute the underlying subcommand.
+     *
+     * <p>The {@code =} separator matches commands-api's parameter parser
+     * (which accepts only {@code =} for {@code k=v} pairs).
+     */
     private static String buildCommand(List<String> parentPath, String paramName, String typed) {
-        StringBuilder sb = new StringBuilder("/rtp");
+        StringBuilder sb = new StringBuilder("/rtp menu");
         for (String seg : parentPath) {
             if (seg == null || seg.isEmpty()) continue;
             sb.append(' ').append(seg);
         }
-        sb.append(' ').append(paramName).append(':').append(typed);
+        sb.append(' ').append(paramName).append('=').append(typed);
         return sb.toString();
     }
 

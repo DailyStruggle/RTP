@@ -68,6 +68,7 @@ public class ReqRtpObservationalCacheTaskTest {
                 false,
                 3L,          // cacheCap: small for fast fill-up
                 1000L,
+                 0L,
                 5,
                 0.0,
                 1L,

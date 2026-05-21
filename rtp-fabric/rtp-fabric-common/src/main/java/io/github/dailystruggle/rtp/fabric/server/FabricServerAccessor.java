@@ -26,9 +26,7 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
-import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -657,10 +655,11 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     //
     // Defensive: any failure here (e.g. mapping drift on the chat-event
     // constructors in 1.21.5+, see FabricLegacyText#parseInteractive) MUST
-    // NOT truncate callers that loop over multiple lines (InfoCmd /
-    // HelpCmd dispatch each row via forEach — a propagated exception
-    // aborts the whole iteration and leaves the user with a half-printed
-    // /rtp info). On any error, fall back to the plain-string sink.
+    // NOT truncate callers that loop over multiple lines (InfoCmd and
+    // the commands-api built-in TreeCommand#help() dispatch each row via
+    // forEach — a propagated exception aborts the whole iteration and
+    // leaves the user with a half-printed /rtp info or /rtp help). On
+    // any error, fall back to the plain-string sink.
     if (target == null || message == null) return;
     String formattedMsg = format(target, message);
     try {
@@ -721,7 +720,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     String suggestion     = click;
     // Defensive: see sendMessageAndSuggest. Mapping drift on 1.21.5+
     // HoverEvent/ClickEvent constructors must not abort the per-line
-    // forEach loop in InfoCmd / HelpCmd.
+    // forEach loop in InfoCmd or the commands-api built-in
+    // TreeCommand#help() dispatch.
     try {
       RTPPlayer player = getPlayer(target.uuid());
       if (player instanceof FabricRTPPlayer fp && fp.isOnline()) {
@@ -1790,10 +1790,131 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   private Set<String> defaultBiomesFor(@Nullable RTPWorld<?> rtpWorld) {
     MinecraftServer s = server;
     if (s == null) return Collections.emptySet();
-    Registry<net.minecraft.world.level.biome.Biome> biomes =
-        s.registryAccess().registryOrThrow(Registries.BIOME);
+    // Both MinecraftServer.registryAccess() and Registry.registryOrThrow are
+    // baked as Yarn-intermediary descriptors (method_30611, method_29107) in
+    // common-module bytecode by Loom + officialMojangMappings. Those aliases
+    // don't exist on MC 26.1.2's deobf runtime, where the equivalents are
+    // MinecraftServer.registryAccess()/reloadableRegistries() and
+    // Registry.lookupOrThrow(ResourceKey). Resolve both reflectively from the
+    // live class instance so descriptors are computed at lookup time, not
+    // pinned in the constant pool. Same fix family as the getCommands/
+    // createCommandSourceStack path below.
+    Object registryAccess = null;
+    try {
+      java.lang.reflect.Method m;
+      try {
+        m = s.getClass().getMethod("registryAccess");
+      } catch (NoSuchMethodException nsme) {
+        m = s.getClass().getMethod("reloadableRegistries");
+      }
+      registryAccess = m.invoke(s);
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP] defaultBiomesFor: failed to resolve registryAccess reflectively", t);
+      return Collections.emptySet();
+    }
+    if (registryAccess == null) return Collections.emptySet();
+    Object biomesRegistry = null;
+    try {
+      // Avoid ALL compile-time references to `net.minecraft.core.registries.Registries`
+      // (Yarn intermediary `class_7924`) and `net.minecraft.resources.ResourceKey`
+      // (intermediary `class_5321`). Both are absent on MC 26.1.2's deobf runtime
+      // when this carrier was Loom-remapped against an older mapping set. Build
+      // the biome ResourceKey by name via Class.forName + reflective factory,
+      // then call lookupOrThrow/registryOrThrow by name+arity.
+      Class<?> resourceKeyCls = Class.forName("net.minecraft.resources.ResourceKey");
+      // MC 26.1.2 deobf runtime renames `ResourceLocation` to `Identifier`
+      // (see V26_1_R1FabricRTPWorld which imports net.minecraft.resources.Identifier).
+      // Try both names so this carrier works against either runtime.
+      Class<?> resourceLocationCls;
+      try {
+        resourceLocationCls = Class.forName("net.minecraft.resources.ResourceLocation");
+      } catch (ClassNotFoundException cnfe) {
+        resourceLocationCls = Class.forName("net.minecraft.resources.Identifier");
+      }
+      // ResourceLocation.parse("minecraft:worldgen/biome") - fall back to fromNamespaceAndPath / of.
+      Object biomeRegistryId = null;
+      NoSuchMethodException lastNsme = null;
+      for (String mName : new String[]{"parse", "tryParse"}) {
+        try {
+          biomeRegistryId = resourceLocationCls.getMethod(mName, String.class)
+              .invoke(null, "minecraft:worldgen/biome");
+          if (biomeRegistryId != null) break;
+        } catch (NoSuchMethodException nsme) {
+          lastNsme = nsme;
+        }
+      }
+      if (biomeRegistryId == null) {
+        for (String mName : new String[]{"fromNamespaceAndPath", "of"}) {
+          try {
+            biomeRegistryId = resourceLocationCls.getMethod(mName, String.class, String.class)
+                .invoke(null, "minecraft", "worldgen/biome");
+            break;
+          } catch (NoSuchMethodException nsme) {
+            lastNsme = nsme;
+          }
+        }
+      }
+      if (biomeRegistryId == null) {
+        throw (lastNsme != null) ? lastNsme : new NoSuchMethodException("ResourceLocation/Identifier factory not found");
+      }
+      // ResourceKey.createRegistryKey(ResourceLocation) returns a ResourceKey<Registry<T>>.
+      java.lang.reflect.Method createRegistryKey = null;
+      for (java.lang.reflect.Method cand : resourceKeyCls.getMethods()) {
+        if (cand.getName().equals("createRegistryKey") && cand.getParameterCount() == 1) {
+          createRegistryKey = cand;
+          break;
+        }
+      }
+      if (createRegistryKey == null) {
+        RTP.log(Level.WARNING,
+            "[RTP] defaultBiomesFor: no ResourceKey.createRegistryKey on runtime");
+        return Collections.emptySet();
+      }
+      Object biomeRegistryKey = createRegistryKey.invoke(null, biomeRegistryId);
+
+      java.lang.reflect.Method lookup = null;
+      for (java.lang.reflect.Method cand : registryAccess.getClass().getMethods()) {
+        String n = cand.getName();
+        if ((n.equals("lookupOrThrow") || n.equals("registryOrThrow"))
+            && cand.getParameterCount() == 1) {
+          lookup = cand;
+          break;
+        }
+      }
+      if (lookup == null) {
+        RTP.log(Level.WARNING,
+            "[RTP] defaultBiomesFor: no lookupOrThrow/registryOrThrow on " + registryAccess.getClass());
+        return Collections.emptySet();
+      }
+      biomesRegistry = lookup.invoke(registryAccess, biomeRegistryKey);
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP] defaultBiomesFor: failed to resolve biome registry reflectively", t);
+      return Collections.emptySet();
+    }
+    if (biomesRegistry == null) {
+      return Collections.emptySet();
+    }
+    // Avoid a compile-time cast/instanceof to net.minecraft.core.Registry
+    // (Yarn intermediary `class_2378`) which is absent on MC 26.1.2's deobf
+    // runtime. Call keySet() reflectively instead.
+    Iterable<?> keys;
+    try {
+      Object ks = biomesRegistry.getClass().getMethod("keySet").invoke(biomesRegistry);
+      if (!(ks instanceof Iterable<?> it)) return Collections.emptySet();
+      keys = it;
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP] defaultBiomesFor: failed to invoke keySet() on biome registry reflectively", t);
+      return Collections.emptySet();
+    }
     Set<String> out = new HashSet<>();
-    for (ResourceLocation key : biomes.keySet()) {
+    for (Object rawKey : keys) {
+      if (rawKey == null) continue;
+      // Accept either ResourceLocation or 26.1.2's Identifier — both render
+      // `namespace:path` via toString(). Avoid an instanceof on a class literal
+      // (would re-introduce the intermediary class dependency we just removed).
       // Normalise to the same shape ScanTask / probe comparisons use:
       // namespace-stripped, upper-cased (e.g. "minecraft:plains" -> "PLAINS").
       // FabricAnvilColumnProbeAdapter reconciles probe biomes through
@@ -1803,7 +1924,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       // raw registry form ("minecraft:plains"), causing the anvil prefilter
       // to falsely reject the vast majority of scanned locations on Fabric.
       String n = io.github.dailystruggle.rtp.api.configuration
-          .PaletteIdentifierNormalizer.normalize(key.toString());
+          .PaletteIdentifierNormalizer.normalize(rawKey.toString());
       if (n != null && !n.isEmpty()) out.add(n);
     }
     return out;

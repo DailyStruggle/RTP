@@ -1,0 +1,33 @@
+// rtp-proxy-velocity — Velocity 3.3.x proxy adapter.
+//
+// Phase 2a (no-op shell): entry-point only. Honors network.enabled:false
+// as a strict no-op (REQ-RTP-NET-002 parity, REQ-RTP-PROXY-VELOCITY-001).
+// No ServerPreConnectEvent, no Brigadier, no transport wiring yet —
+// those land in Phase 2b/2c per rtp-proxy-ADR-006.
+//
+// Architecture (rtp-proxy-ADR-001 §Package Boundary Rules + ADR-006):
+//   - May depend on: rtp-api, rtp-proxy-common, Velocity API, JDK.
+//   - Velocity API stays compileOnly — the host provides it at runtime.
+//
+// Toolchain, java-library, JUnit, Checker-qual inherited from root subprojects { }.
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    api project(':rtp-api')
+    api project(':rtp-proxy:rtp-proxy-common')
+
+    // Velocity API - provided by the proxy at runtime.
+    compileOnly 'com.velocitypowered:velocity-api:3.3.0-SNAPSHOT'
+    annotationProcessor 'com.velocitypowered:velocity-api:3.3.0-SNAPSHOT'
+    // Tests instantiate / reflect on annotations from the Velocity API, so it must be on
+    // the test runtime classpath too. The host still provides it in production.
+    testImplementation 'com.velocitypowered:velocity-api:3.3.0-SNAPSHOT'
+
+    // network.yml is parsed via the project's in-house YAML substrate (ADR-025).
+    // Velocity does not export org.yaml.snakeyaml to plugins, so we deliberately
+    // do NOT add a SnakeYAML dependency here; rtp-core's RtpYamlConfig is the
+    // single supported parser across all platforms (including this proxy).
+    implementation project(':rtp-core')
+}
