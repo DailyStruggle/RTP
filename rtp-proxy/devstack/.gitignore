@@ -15,6 +15,10 @@ backend-a/plugins/*.jar
 backend-b/plugins/*.jar
 backend-a/plugins/.paper-remapped/
 backend-b/plugins/.paper-remapped/
+# Paper remap caches for lobby containers (same rationale as backend-*).
+lobby-a/plugins/.paper-remapped/
+lobby-b/plugins/.paper-remapped/
+**/plugins/.paper-remapped/
 shared/forwarding.secret
 # itzg images write world/cache/log dirs into mounts if you bind them locally.
 **/world/
@@ -22,3 +26,22 @@ shared/forwarding.secret
 **/world_the_end/
 **/logs/
 **/cache/
+# Plugin runtime data dirs (bStats opt-in configs, spark profiler scratch,
+# RTP's own runtime data dir under each container). These are per-container
+# runtime artifacts, not source.
+**/plugins/bStats/
+**/plugins/spark/
+**/plugins/RTP/
+# Proxy 'rtp/' plugin config dir IS source (Velocity lowercases the plugin
+# name; on case-insensitive filesystems the rule above matches it too, so
+# explicitly unignore it). Backend 'RTP/' stays ignored as runtime data.
+!proxy-a/plugins/rtp/
+!proxy-b/plugins/rtp/
+!proxy-a/plugins/rtp/**
+!proxy-b/plugins/rtp/**
+# Acceptance / smoke-test evidence logs written by run-acceptance.ps1.
+acceptance-evidence.log
+*.evidence.log
+# Synced jars fanned out into jars/plugin/<pluginName>/ subdirs by sync step.
+jars/plugin/*/
+jars/velocity/*/
