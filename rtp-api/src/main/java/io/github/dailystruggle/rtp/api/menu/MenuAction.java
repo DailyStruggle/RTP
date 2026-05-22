@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.api.menu;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Sealed action attached to a {@link MenuFragment}'s click.
@@ -60,7 +61,8 @@ public sealed interface MenuAction
                 MenuAction.StageConfigValue,
                 MenuAction.UnstageConfigValue,
                 MenuAction.ApplyStagedConfig,
-                MenuAction.DiscardStagedConfig {
+                MenuAction.DiscardStagedConfig,
+                MenuAction.OpenMap {
 
     /**
      * Discriminator for {@link PromptAnvilInput}: controls what the platform
@@ -612,6 +614,30 @@ public sealed interface MenuAction
             if (fileName.isEmpty()) {
                 throw new IllegalArgumentException("fileName must not be empty");
             }
+        }
+    }
+
+    /**
+     * Open a server-side rendered cartography map for the chart described by
+     * the {@code chartSpecToken} (ADR-047, REQ-RTP-MAP-006). The token is a
+     * single-use, TTL-bound handle into the {@code rtp-core}
+     * {@code ChartSpecTokens} registry, minted at fragment-build time and
+     * consumed exactly once by
+     * {@code MenuRedeemSubcommand.dispatchOpenMap}.
+     *
+     * <p>The renderer never sees the {@code ChartSpec} itself; the token is
+     * the only authority over which chart the click paints. This mirrors the
+     * ADR-035 {@code MenuTokenRegistry} security boundary: a malicious or
+     * buggy renderer cannot smuggle a different chart through the click.
+     *
+     * <p>Server-resolved by {@code MenuRedeemSubcommand.dispatchOpenMap};
+     * permission-gated by {@code rtp.admin} (matching the {@code /rtp info}
+     * admin gate) and additionally gated on the installed {@code MapBinding}
+     * not being the {@code NoopMapBinding} placeholder.
+     */
+    record OpenMap(UUID chartSpecToken) implements MenuAction {
+        public OpenMap {
+            Objects.requireNonNull(chartSpecToken, "chartSpecToken");
         }
     }
 }

@@ -1,12 +1,10 @@
 package io.github.dailystruggle.rtp.common.network;
 
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
 
 import java.util.Objects;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -25,6 +23,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * {@link #stop()} during {@code onDisable} BEFORE the transport is closed.
  * Re-entrant {@code start} is a no-op; {@code stop} is idempotent.</p>
  *
+ * <p>Scheduling is delegated to {@link RTP#scheduler} via
+ * {@code runTaskTimerAsynchronously}. This is the only Folia-safe
+ * scheduling path; do NOT replace it with a raw
+ * {@link java.util.concurrent.ScheduledExecutorService} or
+ * {@code new Thread(...)} - see {@code .junie/AGENTS.md} "Scheduler Usage".</p>
+ *
  * <p>Failure isolation: a thrown exception from the sampler or transport is
  * logged once via {@link io.github.dailystruggle.rtp.common.RTP#log} and the
  * loop continues; one bad tick must not kill heartbeat publication.</p>
@@ -35,9 +39,14 @@ public final class BackendStatePublisher {
     private final BackendStateSampler sampler;
     private final String serverId;
     private final long intervalMs;
-    private final ScheduledExecutorService scheduler;
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final AtomicBoolean stopped = new AtomicBoolean(false);
+
+    /**
+     * Platform-scheduler task handle for the periodic tick.
+     * Stored so {@link #stop()} can cancel via {@code RTP.scheduler.cancelTask}.
+     */
+    private volatile Object task;
 
     public BackendStatePublisher(NetworkTransport transport,
                                  BackendStateSampler sampler,
@@ -50,23 +59,47 @@ public final class BackendStatePublisher {
             throw new IllegalArgumentException("intervalMs must be > 0, got " + intervalMs);
         }
         this.intervalMs = intervalMs;
-        this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "rtp-backend-heartbeat-" + serverId);
-            t.setDaemon(true);
-            return t;
-        });
     }
 
     /** Start the periodic tick. Idempotent. */
     public void start() {
         if (!started.compareAndSet(false, true)) return;
-        scheduler.scheduleAtFixedRate(this::tick, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
+        if (RTP.scheduler == null) {
+            // No scheduler installed (e.g. early boot path on an adapter that
+            // wires the publisher before RTP.scheduler is assigned). Caller
+            // can drive tick() manually; do not silently no-op forever.
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[NETWORK] BackendStatePublisher.start(): RTP.scheduler is null; "
+                            + "periodic tick disabled for server=" + serverId);
+            return;
+        }
+        // Convert intervalMs to server ticks (1 tick == 50 ms), clamped >= 1.
+        long periodTicks = Math.max(1L, intervalMs / 50L);
+        this.task = RTP.scheduler.runTaskTimerAsynchronously(this::tick, periodTicks, periodTicks);
     }
 
-    /** Stop the periodic tick and release the scheduler. Idempotent. */
+    /** Stop the periodic tick and release the scheduler handle. Idempotent. */
     public void stop() {
         if (!stopped.compareAndSet(false, true)) return;
-        scheduler.shutdownNow();
+        Object t = this.task;
+        this.task = null;
+        if (t != null && RTP.scheduler != null) {
+            try { RTP.scheduler.cancelTask(t); }
+            catch (Throwable ignored) { /* best-effort */ }
+        }
+    }
+
+    /**
+     * Force an immediate, off-cadence heartbeat publish. Used by the
+     * lobby-mode no-arg {@code /rtp} hook after a cross-server dispatch so
+     * the transport's snapshot reflects the local optimistic decrement (a
+     * lower {@code keptCount} for the chosen peer) without waiting for the
+     * next scheduled {@link #tick()}. Safe to call from any thread; the
+     * transport binding handles its own thread affinity. Failure-isolated
+     * the same way {@link #tick()} is.
+     */
+    public void publishNow() {
+        tick();
     }
 
     /** Visible for tests. Publishes one heartbeat now; never throws. */

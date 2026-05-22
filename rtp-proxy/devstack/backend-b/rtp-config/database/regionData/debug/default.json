@@ -4,134 +4,84 @@
   "spatialResolution": 3,
   "badLocations": [
     {
-      "start": 6430,
-      "length": 1
-    },
-    {
-      "start": 9221,
-      "length": 1
-    },
-    {
-      "start": 13005,
-      "length": 1
-    },
-    {
-      "start": 22616,
-      "length": 1
-    },
-    {
-      "start": 31903,
-      "length": 1
-    },
-    {
-      "start": 51365,
-      "length": 1
-    },
-    {
-      "start": 61261,
-      "length": 1
-    },
-    {
-      "start": 72223,
-      "length": 1
-    },
-    {
-      "start": 101070,
-      "length": 1
-    },
-    {
-      "start": 105109,
-      "length": 1
-    },
-    {
-      "start": 116518,
-      "length": 1
-    },
-    {
-      "start": 127693,
-      "length": 1
-    },
-    {
-      "start": 143695,
-      "length": 1
-    },
-    {
-      "start": 147589,
+      "start": 34775,
       "length": 2
     },
     {
-      "start": 151017,
+      "start": 41225,
       "length": 1
     },
     {
-      "start": 153199,
+      "start": 49883,
       "length": 1
     },
     {
-      "start": 156807,
+      "start": 57006,
       "length": 1
     },
     {
-      "start": 169492,
+      "start": 103379,
       "length": 1
     },
     {
-      "start": 181826,
+      "start": 114113,
+      "length": 1
+    },
+    {
+      "start": 131657,
+      "length": 1
+    },
+    {
+      "start": 133278,
+      "length": 1
+    },
+    {
+      "start": 161485,
+      "length": 1
+    },
+    {
+      "start": 168195,
       "length": 2
     },
     {
-      "start": 184733,
-      "length": 1
+      "start": 168214,
+      "length": 2
     },
     {
-      "start": 188898,
-      "length": 1
+      "start": 181823,
+      "length": 2
     }
   ],
   "biomeLocations": {
-    "PLAINS": [
+    "TAIGA": [
       {
-        "start": 3863,
+        "start": 57255,
         "length": 3
       },
       {
-        "start": 60067,
+        "start": 175067,
         "length": 3
       }
     ],
-    "TAIGA": [
+    "PLAINS": [
       {
-        "start": 58072,
+        "start": 94170,
+        "length": 3
+      },
+      {
+        "start": 161334,
         "length": 3
       }
     ],
     "OLD_GROWTH_PINE_TAIGA": [
       {
-        "start": 57418,
+        "start": 84770,
         "length": 3
       }
     ],
-    "BIRCH_FOREST": [
+    "WINDSWEPT_HILLS": [
       {
-        "start": 56611,
-        "length": 3
-      }
-    ],
-    "FOREST": [
-      {
-        "start": 13367,
-        "length": 3
-      },
-      {
-        "start": 71698,
-        "length": 3
-      },
-      {
-        "start": 103014,
-        "length": 3
-      },
-      {
-        "start": 167548,
+        "start": 116151,
         "length": 3
       }
     ]

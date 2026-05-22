@@ -16,9 +16,17 @@ enable-player-address-logging = true
 forced-hosts = {}
 
 [servers]
+	# Lobbies have NO local /rtp region (see devstack/lobby-{a,b}/rtp-config/regions/README.md).
+	# Running /rtp on a lobby is the cross-server dispatch test: the request is
+	# routed via the network transport to a real destination backend.
+	lobby-a = "lobby-a:25565"
+	lobby-b = "lobby-b:25565"
 	backend-a = "backend-a:25565"
 	backend-b = "backend-b:25565"
-	try = ["backend-a", "backend-b"]
+	# Lobbies first: fresh client connections land on a lobby, which is the
+	# intended UX for the lobby use case (the player must /rtp out, not start on
+	# a destination backend by accident).
+	try = ["lobby-a", "lobby-b", "backend-a", "backend-b"]
 
 [advanced]
 	compression-threshold = 256

@@ -418,6 +418,45 @@ public enum MessagesKeys {
   menuAdminPanelHoverBrowse,
   /** Admin-panel row: return to the curated front page. No placeholders. */
   menuAdminPanelRowBack,
+  // --- Admin panel Setup section: curated prefabs (PROPOSAL-admin-panel-prefabs.md v3.1) ---
+  /** Section divider above the Setup (quick start) block on the admin panel. */
+  menuAdminPanelSectionSetup,
+  /** Setup row: apply the survival-default identity overlay (reset to shipped defaults). No placeholders. */
+  menuPrefabSurvivalDefaultRow,
+  /** Hover text for the survival-default prefab row. No placeholders. */
+  menuPrefabSurvivalDefaultHover,
+  /** Setup row: apply the low-performance prefab (longer pulse, smaller caches, login cache off). No placeholders. */
+  menuPrefabLowPerformanceRow,
+  /** Hover text for the low-performance prefab row. No placeholders. */
+  menuPrefabLowPerformanceHover,
+  /** Setup row: apply the high-performance prefab (short pulse, large caches, login cache on). No placeholders. */
+  menuPrefabHighPerformanceRow,
+  /** Hover text for the high-performance prefab row. No placeholders. */
+  menuPrefabHighPerformanceHover,
+  /** Setup row: apply the folia-tuned prefab (regional scheduler tuning). No placeholders. */
+  menuPrefabFoliaTunedRow,
+  /** Hover text for the folia-tuned prefab row. No placeholders. */
+  menuPrefabFoliaTunedHover,
+  /** Setup row: apply the lightweight prefab (small servers, shrunken footprint). No placeholders. */
+  menuPrefabLightweightRow,
+  /** Hover text for the lightweight prefab row. No placeholders. */
+  menuPrefabLightweightHover,
+  /** Setup row: apply the fast-paced prefab (snappier teleports, opposite axis to lightweight). No placeholders. */
+  menuPrefabFastPacedRow,
+  /** Hover text for the fast-paced prefab row. No placeholders. */
+  menuPrefabFastPacedHover,
+  /** Setup row: apply the multi-world prefab (one region per world synthesised from the current default). No placeholders. */
+  menuPrefabMultiWorldRow,
+  /** Hover text for the multi-world prefab row. No placeholders. */
+  menuPrefabMultiWorldHover,
+  /** Confirmation-menu title row. Placeholder: {@code [prefab]} (prefab id or display name). */
+  menuPrefabConfirmTitle,
+  /** Confirmation-menu non-clickable hint row below the title. No placeholders. */
+  menuPrefabConfirmHint,
+  /** Confirmation-menu footer row: confirm and write the prefab to disk. No placeholders. */
+  menuPrefabConfirmRow,
+  /** Confirmation-menu footer row: cancel and return to the admin panel. No placeholders. */
+  menuPrefabCancelRow,
   // --- Info book (PROPOSAL-info-as-book.md section 4.7) ---
   /**
    * Clickable row label for the {@code Refresh} affordance at the bottom of the
@@ -491,6 +530,37 @@ public enum MessagesKeys {
   configViewRawHint,
   /** Placeholder text rendered in place of a config value that has not been set. */
   configValueUnsetPlaceholder,
+  /**
+   * Non-clickable header row separating the "Changeable" list from the
+   * "Pending" staging-cart list on a config-file page when the viewer has
+   * staged one or more uncommitted edits. No placeholders. Configurable per
+   * REQ-RTP-F-013.
+   */
+  configPendingHeader,
+  /**
+   * Per-row label for a staged (pending) {@code key=value} entry on a
+   * config-file page. Clicking the row dispatches
+   * {@link io.github.dailystruggle.rtp.api.menu.MenuAction.UnstageConfigValue}
+   * to remove it from the cart. Placeholders: {@code [key]}, {@code [value]}.
+   * Configurable per REQ-RTP-F-013.
+   */
+  configPendingRowFormat,
+  /**
+   * Clickable label for the "apply staged changes" row on a config-file
+   * page. Dispatches
+   * {@link io.github.dailystruggle.rtp.api.menu.MenuAction.ApplyStagedConfig}
+   * which runs the assembled {@code /rtp config <file> k1=v1 ...} command
+   * and clears the cart. No placeholders. Configurable per REQ-RTP-F-013.
+   */
+  configApplyRow,
+  /**
+   * Clickable label for the "discard staged changes" row on a config-file
+   * page. Dispatches
+   * {@link io.github.dailystruggle.rtp.api.menu.MenuAction.DiscardStagedConfig}
+   * which clears the cart without applying. No placeholders. Configurable
+   * per REQ-RTP-F-013.
+   */
+  configDiscardRow,
   // --- ADR-047 declarative chart composition bridge (REQ-RTP-MAP-006) ---
   /**
    * Sent to the viewer when an {@code OPEN_MAP} menu action fires but no
@@ -532,5 +602,56 @@ public enum MessagesKeys {
    * Stage 2 of {@code CHECKLIST-metrics-to-maps.md}). Configurable per
    * REQ-RTP-F-013; surfaces ADR-047 / REQ-RTP-MAP-006. No placeholders.
    */
-  menuInfoBadPointsLabel
+  menuInfoBadPointsLabel,
+  // --- L6 cross-server network mode (rtp-proxy-ADR-014) ---
+  /**
+   * Sent to the player when {@code /rtp} (optionally with {@code region=<name>})
+   * is enrolled on the cross-server wait queue. Placeholder {@code [position]}
+   * carries the FIFO position (0 == head). Configurable per REQ-RTP-F-013.
+   */
+  networkQueued,
+  /**
+   * Sent when the proxy has picked a backend for this request and the
+   * reservation is being claimed. No placeholders. Configurable per REQ-RTP-F-013.
+   */
+  networkRouting,
+  /**
+   * Sent when a coordinate has been reserved on the destination backend
+   * and the player is about to be transferred. Placeholder {@code [server]}
+   * carries the destination server id. Configurable per REQ-RTP-F-013.
+   */
+  networkReserved,
+  /**
+   * Sent immediately before the cross-server hop fires. Placeholder
+   * {@code [server]} carries the destination server id. Configurable per
+   * REQ-RTP-F-013.
+   */
+  networkTransferring,
+  /**
+   * Sent when the network router declines a cross-server hop and falls back
+   * to the local pipeline (kill-switch, queue full, rate limit, no live peer,
+   * etc.). Placeholder {@code [reason]} carries a short reason code.
+   * Configurable per REQ-RTP-F-013.
+   */
+  networkFallback,
+  /**
+   * Sent when an enrolled cross-server teleport ultimately failed at a
+   * terminal stage. Placeholder {@code [reason]} carries the failure reason
+   * code. Configurable per REQ-RTP-F-013.
+   */
+  networkFailed,
+  /**
+   * Sent when the player explicitly asked for {@code region=<name>} but no
+   * live backend in the network snapshot advertises that region. Placeholder
+   * {@code [region]} carries the requested region name. Configurable per
+   * REQ-RTP-F-013.
+   */
+  networkRegionUnavailable,
+  /**
+   * Sent when {@code region=<name>} is advertised by multiple backends and
+   * the operator's collision policy requires a pinned server. Placeholder
+   * {@code [region]} carries the requested region name. Configurable per
+   * REQ-RTP-F-013.
+   */
+  networkRegionAmbiguous
 }

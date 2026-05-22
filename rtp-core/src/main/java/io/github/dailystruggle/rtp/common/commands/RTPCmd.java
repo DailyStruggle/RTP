@@ -190,6 +190,77 @@ public interface RTPCmd extends BaseRTPCmd {
       return true;
     }
 
+    // --- L6 cross-server pre-dispatch hook (rtp-proxy-ADR-014) ----------------
+    // Consult the platform-installed NetworkCommandHook BEFORE the local
+    // pipeline runs. Default install (LOCAL_ONLY) is a zero-cost no-op for
+    // single-server deployments. Network-mode adapters return CrossServer
+    // (enrol + short-circuit), Reject (localized message + short-circuit),
+    // or Local (fall through unchanged). S-004: hook throws degrade to
+    // local fall-through with a WARNING log, never silent-swallow.
+    if (!senderId.equals(new java.util.UUID(0, 0))) {
+      io.github.dailystruggle.rtp.api.network.NetworkCommandHook hook = RTP.networkCommandHook;
+      if (hook != null && hook != io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY) {
+        io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult decision;
+        try {
+          decision = hook.route(senderId, rtpArgs);
+        } catch (Throwable t) {
+          RTP.log(Level.WARNING,
+                  "[NETWORK] command hook threw; falling back to local pipeline: " + t.getMessage(), t);
+          decision = io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.local();
+        }
+        if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.CrossServer cross) {
+          ConfigParser<MessagesKeys> langParser =
+                  (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+          String tmpl = (String) langParser.getConfigValue(MessagesKeys.networkQueued, "");
+          String msg = tmpl == null ? "" : tmpl
+                  .replace("[position]", "0")
+                  .replace("[region]", cross.regionKey().orElse(""))
+                  .replace("[server]", cross.serverHint().orElse(""));
+          if (!msg.isEmpty()) {
+            if (messageMethod != null) messageMethod.accept(msg);
+            else RTP.serverAccessor.sendMessage(senderId, msg);
+          }
+          // Release the processingPlayers lock that the outer onCommand
+          // acquired at dispatch time. The local pipeline owns its own
+          // remove() on every exit path; this short-circuit branch must
+          // do the same, otherwise a player who triggered a cross-server
+          // /rtp on this JVM stays "busy" forever from this JVM's POV
+          // (the actual teleport completes on the destination backend,
+          // which has no way to clear this JVM's processingPlayers set).
+          // Symptom prior to this remove: subsequent /rtp on the same
+          // JVM (e.g. a lobby the player returns to) silently short-
+          // circuits at RTPCmd.onCommand's alreadyTeleporting guard
+          // without ever reaching the network hook.
+          if (!senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.remove(senderId);
+          return true;
+        }
+        if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.Reject reject) {
+          ConfigParser<MessagesKeys> langParser =
+                  (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+          MessagesKeys key;
+          try {
+            key = MessagesKeys.valueOf(reject.messageKey());
+          } catch (IllegalArgumentException ex) {
+            key = MessagesKeys.networkRegionUnavailable;
+          }
+          String tmpl = (String) langParser.getConfigValue(key, "");
+          String msg = tmpl == null ? "" : tmpl
+                  .replace("[region]", reject.placeholder())
+                  .replace("[reason]", reject.placeholder());
+          if (!msg.isEmpty()) {
+            if (messageMethod != null) messageMethod.accept(msg);
+            else RTP.serverAccessor.sendMessage(senderId, msg);
+          }
+          // Release the processingPlayers lock acquired by the outer
+          // onCommand. See CrossServer branch comment above.
+          if (!senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.remove(senderId);
+          return true;
+        }
+        // RoutingResult.Local -> fall through to local pipeline
+      }
+    }
+    // --- end L6 hook ---------------------------------------------------------
+
     RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
     RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute ENTER senderId=" + senderId
             + " senderName=" + (sender != null ? sender.name() : "null")

@@ -37,10 +37,10 @@ class MenuModelSurfaceTest {
     // ---- MenuAction ----
 
     @Test
-    @DisplayName("MenuAction is sealed to exactly the twenty-one declared variants")
+    @DisplayName("MenuAction is sealed to exactly the twenty-two declared variants")
     void menuActionSealedShape() {
         Class<?>[] permitted = MenuAction.class.getPermittedSubclasses();
-        assertEquals(21, permitted.length);
+        assertEquals(22, permitted.length);
         List<String> names = Arrays.stream(permitted).map(Class::getSimpleName).sorted().toList();
         assertEquals(List.of(
                 "ApplyStagedConfig",
@@ -56,6 +56,7 @@ class MenuModelSurfaceTest {
                 "OpenExternalUrl",
                 "OpenFrontPage",
                 "OpenInfo",
+                "OpenMap",
                 "OpenMenu",
                 "OpenParamPicker",
                 "PromptAnvilInput",
@@ -191,6 +192,7 @@ class MenuModelSurfaceTest {
             case MenuAction.UnstageConfigValue uv -> "unstage:" + uv.fileName() + ":" + uv.paramName();
             case MenuAction.ApplyStagedConfig ac -> "apply:" + ac.fileName();
             case MenuAction.DiscardStagedConfig dc -> "discard:" + dc.fileName();
+            case MenuAction.OpenMap om -> "map:" + om.chartSpecToken();
         };
         assertEquals("run:1", tag);
     }

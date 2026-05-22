@@ -39,6 +39,21 @@ import java.util.logging.Level;
  */
 public final class NetworkModeBootstrap {
 
+    /**
+     * Most-recently-booted instance, or {@code null} when network mode is
+     * disabled / not yet booted / has been shut down. Set as a side effect
+     * of a successful {@link #boot(File)} that reaches command-hook wiring,
+     * cleared by {@link #shutdown()}. Read by callers outside the bootstrap
+     * (e.g. {@code RTPCmdBukkit}'s {@code RegionParameter} validator) that
+     * need the live {@link PeerRegionRegistry} but cannot hold a direct
+     * field reference because they were constructed before the bootstrap
+     * finished. Volatile so the publish happens-before relationship is
+     * tight.
+     *
+     * @since L6 Slice H2
+     */
+    public static volatile NetworkModeBootstrap LIVE;
+
     private NetworkTransport transport;
     private BackendStatePublisher publisher;
     private ReservationTokenReaper reservationReaper;
@@ -52,6 +67,27 @@ public final class NetworkModeBootstrap {
     // in-memory binding is wired (D4/D5 still pending); for any other
     // transport kind this stays null and the Slice C no-op sinks remain.
     private NetworkRequestQueue requestQueue;
+    // L6 Slice H2 (rtp-proxy-ADR-014): peer-region registry view over the
+    // cached snapshot + Bukkit-platform NetworkCommandHook installed into
+    // RTP.networkCommandHook. Null when network mode is disabled or
+    // boot() did not complete past router wiring.
+    private PeerRegionRegistry peerRegionRegistry;
+    private BukkitNetworkCommandHook commandHook;
+
+    // Snapshot refresher (fix 2026-05-21): NetworkTransport.readSnapshot() is
+    // async (Redis SCAN, SQL poll, etc.) and the previous suppliers used
+    // future.getNow(null), which returns null on the calling thread until
+    // the async completes. That meant PeerRegionRegistry.peerEntries() and
+    // NetworkRouter's snapshot lookup almost always observed a null snapshot,
+    // so tab-completion never surfaced peer 'server:region' entries even
+    // though heartbeats were landing in Redis correctly. We now refresh a
+    // volatile cached snapshot on a small dedicated scheduler at the same
+    // cadence as the heartbeat publisher; both suppliers read the cache
+    // synchronously without blocking the calling thread.
+    private volatile NetworkSnapshot cachedSnapshot;
+    // Platform-scheduler task handle for the periodic snapshot refresh.
+    // Stored so shutdown() can cancel via RTP.scheduler.cancelTask.
+    private Object snapshotRefreshTask;
 
     /**
      * Run boot logic. Idempotent for the disabled-mode path; calling
@@ -113,9 +149,30 @@ public final class NetworkModeBootstrap {
         long reapMs = reservation == null ? 30_000L : reservation.getLong("reapIntervalMs", 30_000L);
         if (reapMs <= 0) reapMs = 30_000L;
 
+        // L6 HMAC envelope wiring (REQ-RTP-PROXY-007 / ADR-010): load the shared
+        // HMAC verifier the same way NetworkBindings.open does on the Velocity
+        // proxy. Without this the backend constructs RedisNetworkStateBinding
+        // with verifier=null and publishes UNSIGNED heartbeat rows; the proxy
+        // (which DOES configure a verifier via NetworkBindings.open) then
+        // rejects every row with "decodeBackend: HMAC verification failed".
+        // Symmetric verifier wiring is required for cross-server `/rtp` to work.
+        String secretEnv = network.getString("secretEnv", "RTP_NET_SECRET");
+        int schemaVersion = (int) network.getLong("schemaVersion", 1L);
+        io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier verifier = null;
+        try {
+            verifier = io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier
+                    .loadFromEnv(secretEnv, schemaVersion, schemaVersion);
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[NETWORK] HMAC verifier load failed (secretEnv='" + secretEnv
+                            + "'): " + t.getMessage()
+                            + " - heartbeat rows will be unsigned and the proxy "
+                            + "will reject them. Set the env var to a 32+ byte secret.", t);
+        }
+
         NetworkTransport selected;
         try {
-            selected = openTransport(transportType, intervalMs, transportSec);
+            selected = openTransport(transportType, intervalMs, transportSec, verifier, schemaVersion);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[NETWORK] Failed to open transport.type=" + transportType
@@ -137,9 +194,50 @@ public final class NetworkModeBootstrap {
             // The D3 slot is a convenience; absence does not block heartbeat publishing.
         }
 
-        BukkitBackendStateSampler sampler = new BukkitBackendStateSampler();
+        // L6 Slice I: read routing.lobbyMode early so the sampler can be
+        // constructed with the right advertisement profile from heartbeat-tick 1.
+        // Re-read inside the router-wiring try-block below for the command-hook
+        // ctor; the two reads are intentionally separated by the publisher
+        // start so even a partial wiring failure still produces correctly-
+        // suppressed heartbeats.
+        boolean lobbyMode = false;
+        try {
+            RtpYamlSection routingPre = cfg.getConfigurationSection("routing");
+            if (routingPre != null) {
+                lobbyMode = routingPre.getBoolean("lobbyMode", false);
+            }
+        } catch (Throwable ignored) {
+            // Defensive: malformed routing section degrades to non-lobby.
+        }
+
+        BukkitBackendStateSampler sampler = new BukkitBackendStateSampler(lobbyMode);
         BackendStatePublisher pub = new BackendStatePublisher(selected, sampler, serverId, intervalMs);
         pub.start();
+
+        // Fix 2026-05-21: start the cached-snapshot refresher BEFORE wiring
+        // PeerRegionRegistry / NetworkRouter so the first tab-complete call
+        // already has a non-null snapshot to read (modulo the initial
+        // intervalMs delay before the first refresh tick lands). Kicks off
+        // an initial async refresh immediately so we are not waiting a full
+        // intervalMs for the first cache fill.
+        // Use RTP.scheduler (Folia-safe async path) instead of a raw
+        // ScheduledExecutorService. Period is converted from ms to server
+        // ticks (1 tick == 50 ms), clamped to >=1 tick.
+        final NetworkTransport refresherTransport = selected;
+        Runnable refresh = () -> {
+            try {
+                NetworkSnapshot snap = refresherTransport.readSnapshot()
+                        .get(2000L, java.util.concurrent.TimeUnit.MILLISECONDS);
+                if (snap != null) this.cachedSnapshot = snap;
+            } catch (Throwable ignored) {
+                // Defensive: a flaky transport must not crash the refresher.
+            }
+        };
+        long refreshTicks = Math.max(1L, intervalMs / 50L);
+        // Initial fill so we are not waiting a full intervalMs for the first cache value.
+        RTP.scheduler.runTaskAsynchronously(refresh);
+        this.snapshotRefreshTask =
+                RTP.scheduler.runTaskTimerAsynchronously(refresh, refreshTicks, refreshTicks);
 
         // Reservation-token TTL reaper (REQ-RTP-NET-011). On backends in proxy-
         // aware mode the reaper sweeps tokens this backend (or any peer) issued,
@@ -182,7 +280,7 @@ public final class NetworkModeBootstrap {
             // read, join redeem) keeps working.
             NetworkRequestQueue rq;
             try {
-                rq = openRequestQueue(transportType);
+                rq = openRequestQueue(transportType, transportSec);
             } catch (UnsupportedOperationException notReady) {
                 RTP.log(Level.INFO,
                         "[NETWORK] NetworkRequestQueue for transport=" + transportType
@@ -276,10 +374,7 @@ public final class NetworkModeBootstrap {
             this.router = new NetworkRouter(
                     serverId,
                     routerMode,
-                    () -> {
-                        try { return selected.readSnapshot().getNow(null); }
-                        catch (Throwable ignored) { return null; }
-                    },
+                    () -> this.cachedSnapshot,
                     NetworkModeBootstrap::sumLocalKeptCount,
                     this.enrolmentBuffer::pendingDepth,
                     queueMaxDepth,
@@ -292,13 +387,41 @@ public final class NetworkModeBootstrap {
             this.enrolmentBuffer.start(flushTicks);
             this.statusCache.start(pollTicks);
 
+            // L6 Slice H2 (rtp-proxy-ADR-014): install the cross-server
+            // command hook into RTP.networkCommandHook so /rtp consults
+            // the router on every invocation. The hook also drives
+            // RegionParameter's extras supplier (the snapshot-adapter
+            // PeerRegionRegistry) so tab-completion lists peer-qualified
+            // server:region entries.
+            this.peerRegionRegistry = new PeerRegionRegistry(
+                    () -> this.cachedSnapshot,
+                    serverId);
+            // L6 Slice I: pass lobbyMode through so a no-arg /rtp on a
+            // lobby backend auto-routes to the "most kept" remote region.
+            // Slice I follow-up: pass the backend state publisher so
+            // cross-server dispatches force an immediate heartbeat publish
+            // (propagating the local PeerRegionRegistry.recordDispatch
+            // decrement to peers before the next 1s tick).
+            this.commandHook = new BukkitNetworkCommandHook(
+                    this.router, this.enrolmentBuffer,
+                    this.peerRegionRegistry, lobbyMode,
+                    this.publisher);
+            RTP.networkCommandHook = this.commandHook;
+            // Publish self so RTPCmdBukkit's RegionParameter validator and
+            // extras supplier can pick up the live PeerRegionRegistry at
+            // call time. Single-process / single-bootstrap invariant: only
+            // one live instance per JVM (the static field is volatile so
+            // the publish happens-before any subsequent read).
+            LIVE = this;
+
             // C3 (D6 C-warn): one-shot startup audit. The transport may not
             // have assembled a non-empty snapshot yet; in that case the
             // helper logs nothing now and a future heartbeat cycle will
             // expose any overlap on the next operator invocation of
             // /rtp test network. (A scheduled re-audit is a deferred follow-up.)
             try {
-                NetworkSnapshot bootSnap = selected.readSnapshot().getNow(null);
+                NetworkSnapshot bootSnap = selected.readSnapshot()
+                        .get(2000L, java.util.concurrent.TimeUnit.MILLISECONDS);
                 NetworkRegionCollisionWarner.auditAndWarn(
                         bootSnap, serverId, NetworkRegionCollisionWarner.Policy.WARN);
             } catch (Throwable warnFail) {
@@ -316,6 +439,13 @@ public final class NetworkModeBootstrap {
             this.router = null;
             if (this.enrolmentBuffer != null) { try { this.enrolmentBuffer.shutdown(); } catch (Throwable ignored) {} this.enrolmentBuffer = null; }
             if (this.statusCache != null) { try { this.statusCache.shutdown(); } catch (Throwable ignored) {} this.statusCache = null; }
+            // H2: unwind the hook so single-server pipeline is restored.
+            if (RTP.networkCommandHook == this.commandHook) {
+                RTP.networkCommandHook = io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY;
+            }
+            this.commandHook = null;
+            this.peerRegionRegistry = null;
+            if (LIVE == this) LIVE = null;
         }
 
         // L6 Slice F row F1 (one-shot boot reconcile, per user-confirmed
@@ -373,6 +503,16 @@ public final class NetworkModeBootstrap {
 
     /** Reverse-order teardown. Idempotent. */
     public void shutdown() {
+        // L6 Slice H2: unwire the global command hook FIRST so any in-flight
+        // /rtp call from this point on takes the local-only pipeline. This
+        // must come before the enrolment buffer / router teardown so a
+        // late command thread doesn't NPE on a half-shut router.
+        if (RTP.networkCommandHook == this.commandHook) {
+            RTP.networkCommandHook = io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY;
+        }
+        this.commandHook = null;
+        this.peerRegionRegistry = null;
+        if (LIVE == this) LIVE = null;
         // L6 Slice D: tear down the queue after the buffer/cache stop
         // firing into it but before the transport closes (so any in-flight
         // flush/poll futures complete first).
@@ -403,6 +543,12 @@ public final class NetworkModeBootstrap {
             try { reservationReaper.close(); } catch (Throwable ignored) { /* best-effort */ }
             reservationReaper = null;
         }
+        if (snapshotRefreshTask != null) {
+            try { RTP.scheduler.cancelTask(snapshotRefreshTask); }
+            catch (Throwable ignored) { /* best-effort */ }
+            snapshotRefreshTask = null;
+        }
+        cachedSnapshot = null;
         if (publisher != null) {
             try { publisher.stop(); } catch (Throwable ignored) { /* best-effort */ }
             publisher = null;
@@ -435,16 +581,26 @@ public final class NetworkModeBootstrap {
      *  is {@code sql} or {@code redis} (D4/D5 not yet wired). */
     public NetworkRequestQueue requestQueue() { return requestQueue; }
 
+    /** Visible for tests / {@code RTPCmdBukkit} validator wiring (H2). Null
+     *  when network mode is disabled or wiring failed. */
+    public PeerRegionRegistry peerRegionRegistry() { return peerRegionRegistry; }
+
+    /** Visible for tests (H2). Null when network mode is disabled or
+     *  wiring failed; otherwise also installed at {@code RTP.networkCommandHook}. */
+    public BukkitNetworkCommandHook commandHook() { return commandHook; }
+
     /**
      * Slice D row D6 hook: open a {@link NetworkRequestQueue} matching the
-     * configured transport kind. {@code in-memory} (D2) and {@code sql}
-     * (D5) are wired; {@code redis} (D4) still throws
-     * {@link UnsupportedOperationException} from this local helper and the
-     * caller falls back to the Slice C no-op sinks. The static factory
+     * configured transport kind. {@code in-memory} (D2), {@code sql} (D5)
+     * and {@code redis} (D4) are all wired. The static factory
      * {@link io.github.dailystruggle.rtp.proxy.common.transport.NetworkBindings#openRequestQueue}
-     * supports all three kinds.
+     * is the canonical entry point for vendor-free callers; this local
+     * helper mirrors its dispatch but sources connection settings from
+     * the backend's {@code network.yml} {@code transport} section (the
+     * same one {@link #openTransport} reads) so a single config drives
+     * both the state binding and the request queue.
      */
-    private static NetworkRequestQueue openRequestQueue(String transportType) {
+    private static NetworkRequestQueue openRequestQueue(String transportType, RtpYamlSection transportSec) {
         String t = transportType == null ? "in-memory"
                 : transportType.toLowerCase(java.util.Locale.ROOT);
         switch (t) {
@@ -464,9 +620,22 @@ public final class NetworkModeBootstrap {
                 return new io.github.dailystruggle.rtp.proxy.common.transport.sql.SqlNetworkRequestQueue(
                         accessor.asDataSource());
             }
-            case "redis":
-                throw new UnsupportedOperationException(
-                        "RedisNetworkRequestQueue is Slice D row D4; not yet wired.");
+            case "redis": {
+                // Slice D row D4: source host/port/password from the same
+                // {@code transport.redis.*} section that {@link #openTransport}
+                // reads for the state binding, so the queue and binding both
+                // connect to the same Redis instance from one config block.
+                // ttlSeconds = 0 disables EXPIRE - terminal transitions in
+                // the D3 atomic-claim scripts already delete per-envelope and
+                // per-status HASHes (mirrors {@code NetworkBindings.openRequestQueue}).
+                RtpYamlSection redis = transportSec == null
+                        ? null : transportSec.getConfigurationSection("redis");
+                String host = redis == null ? "localhost" : redis.getString("host", "localhost");
+                int port = redis == null ? 6379 : redis.getInt("port", 6379);
+                String password = redis == null ? null : redis.getString("password", null);
+                return new io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisNetworkRequestQueue(
+                        host, port, password, 0);
+            }
             default:
                 throw new IllegalArgumentException(
                         "NetworkModeBootstrap.openRequestQueue: unrecognised transport.type '"
@@ -602,7 +771,9 @@ public final class NetworkModeBootstrap {
      * {@code redis} surfaces a clear "not yet" message rather than failing
      * silently.
      */
-    private NetworkTransport openTransport(String type, long intervalMs, RtpYamlSection transportSec) {
+    private NetworkTransport openTransport(String type, long intervalMs, RtpYamlSection transportSec,
+                                           io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier verifier,
+                                           int schemaVersion) {
         String t = type == null ? "in-memory" : type.toLowerCase(java.util.Locale.ROOT);
         switch (t) {
             case "in-memory":
@@ -621,12 +792,22 @@ public final class NetworkModeBootstrap {
             }
             case "redis": {
                 // Phase 2e-Redis A1: heartbeats + snapshot + pub/sub fan-out.
-                // Atomic claim / HMAC / reconnect-hardening land in A2-A4.
+                // A3 (L6): HMAC envelope verifier MUST be passed through so the
+                // backend publishes signed rows that the Velocity proxy (which
+                // configures its own verifier via NetworkBindings.open) can
+                // verify. Passing null here silently disables signing and
+                // causes the proxy to reject every snapshot read.
                 RtpYamlSection redis = transportSec == null ? null : transportSec.getConfigurationSection("redis");
                 String host = redis == null ? "localhost" : redis.getString("host", "localhost");
                 int port = redis == null ? 6379 : redis.getInt("port", 6379);
                 String password = redis == null ? null : redis.getString("password", null);
-                return new RedisNetworkStateBinding(host, port, password, intervalMs);
+                if (verifier == null) {
+                    // Fall back to the legacy 4-arg ctor only when verifier
+                    // load failed - logged at WARNING above. Both ends will be
+                    // unsigned in that case, so verify() short-circuits true.
+                    return new RedisNetworkStateBinding(host, port, password, intervalMs);
+                }
+                return new RedisNetworkStateBinding(host, port, password, intervalMs, verifier, schemaVersion);
             }
             default:
                 throw new IllegalArgumentException("Unrecognised transport.type='" + type + "'");
@@ -643,6 +824,46 @@ public final class NetworkModeBootstrap {
             // Defensive.
         }
         return null;
+    }
+
+    /**
+     * L6 Slice J: read {@code routing.lobbyMode} from {@code network.yml}
+     * without booting anything else. Called by the host plugin (e.g.
+     * {@code RTPBukkitPlugin.onEnable}) BEFORE
+     * {@link io.github.dailystruggle.rtp.bukkit.database.BukkitDatabaseHandler#setupDatabase}
+     * (which constructs {@code Region} instances and would otherwise schedule
+     * pre-fill / hydrate work). The host writes the result to
+     * {@link RTP#lobbyMode} so the gates in {@code Region} are armed before
+     * any region is built.
+     *
+     * <p>Strictly defensive: any failure (missing file, malformed YAML,
+     * {@code network.enabled=false}, missing {@code routing} section) returns
+     * {@code false}. Single-server deployments and network-disabled backends
+     * therefore behave byte-identically to pre-Slice-J builds.
+     *
+     * @param networkYml the {@code network.yml} file under the plugin's data
+     *                   folder; may be {@code null} or absent
+     * @return {@code true} iff {@code network.enabled=true} AND
+     *         {@code routing.lobbyMode=true}
+     * @since L6 Slice J
+     */
+    public static boolean readLobbyModeEarly(File networkYml) {
+        if (networkYml == null || !networkYml.isFile()) return false;
+        try {
+            RtpYamlConfig cfg = RtpYamlConfig.load(networkYml);
+            RtpYamlSection network = cfg.getConfigurationSection("network");
+            boolean enabled = network != null && network.getBoolean("enabled", false);
+            if (!enabled) return false;
+            RtpYamlSection routing = cfg.getConfigurationSection("routing");
+            if (routing == null) return false;
+            return routing.getBoolean("lobbyMode", false);
+        } catch (Throwable t) {
+            // Defensive: any failure means "not a lobby" so the backend keeps
+            // its existing pre-Slice-J behaviour.
+            RTP.log(Level.FINE,
+                    "[NETWORK] readLobbyModeEarly degraded to non-lobby: " + t.getMessage());
+            return false;
+        }
     }
 
     /**

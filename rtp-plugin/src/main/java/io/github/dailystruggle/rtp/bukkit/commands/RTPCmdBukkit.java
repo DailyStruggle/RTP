@@ -59,14 +59,54 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
         sender -> msg -> io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(sender, msg);
 
     // region name parameter
-    // filter by region exists and sender permission
+    // filter by region exists and sender permission. L6 Slice H2: validator
+    // also accepts qualified `server:region` syntax when the named peer is
+    // reachable per the live PeerRegionRegistry (looked up dynamically via
+    // NetworkModeBootstrap.LIVE so this code path works whether network
+    // mode boots before or after command registration). Extras supplier
+    // surfaces peer-qualified entries in tab-completion.
     RegionParameter regionParameter =
         new RegionParameter(
             "rtp.region",
             "select a region to teleport to",
-            (uuid, s) ->
-                RTP.selectionAPI.regionNames().contains(s)
-                    && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.regions." + s));
+            (uuid, s) -> {
+              if (s == null) return false;
+              RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
+              // Path 1: bare local region name (pre-H2 behaviour).
+              if (RTP.selectionAPI.regionNames().contains(s)) {
+                return sender.hasPermission("rtp.regions." + s);
+              }
+              // Path 2: qualified `server:region` (H2). Parse strictly; on
+              // any malformed input fall through to reject.
+              io.github.dailystruggle.rtp.bukkit.network.NetworkRouter.ParsedRegion parsed;
+              try {
+                parsed = io.github.dailystruggle.rtp.bukkit.network.NetworkRouter.parseRegionArgQualified(s);
+              } catch (IllegalArgumentException malformed) {
+                return false;
+              }
+              if (parsed == null || parsed.serverHint() == null) return false;
+              io.github.dailystruggle.rtp.bukkit.network.NetworkModeBootstrap live =
+                  io.github.dailystruggle.rtp.bukkit.network.NetworkModeBootstrap.LIVE;
+              if (live == null) return false;
+              io.github.dailystruggle.rtp.bukkit.network.PeerRegionRegistry registry =
+                  live.peerRegionRegistry();
+              if (registry == null) return false;
+              if (!registry.isReachableHardPin(parsed.serverHint(), parsed.regionKey())) {
+                return false;
+              }
+              // Permission is keyed on the bare region name, not the
+              // qualified form, so an operator's existing
+              // `rtp.regions.default` grant covers `backend-a:default`.
+              return sender.hasPermission("rtp.regions." + parsed.regionKey());
+            },
+            () -> {
+              io.github.dailystruggle.rtp.bukkit.network.NetworkModeBootstrap live =
+                  io.github.dailystruggle.rtp.bukkit.network.NetworkModeBootstrap.LIVE;
+              if (live == null) return java.util.Set.of();
+              io.github.dailystruggle.rtp.bukkit.network.PeerRegionRegistry registry =
+                  live.peerRegionRegistry();
+              return registry == null ? java.util.Set.<String>of() : registry.peerEntries();
+            });
     regionParameter.put(
         "world",
         new io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter(
@@ -270,7 +310,27 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
             ConfigParser<?> parser = resolveParserByFileName(fileName);
             if (parser == null) return null;
             return new CommandTreeMenuBuilder(menuTokenRegistry)
-                .buildConfigFile(viewer, stripYml(fileName), parser);
+                .buildConfigFile(viewer, stripYml(fileName), parser,
+                    new java.util.LinkedHashMap<>());
+          }
+
+          @Override
+          public io.github.dailystruggle.rtp.api.menu.MenuModel buildFile(
+              UUID viewer, String fileName,
+              java.util.LinkedHashMap<String, String> cartSnapshot) {
+            // Item 6 of the staging-cart redesign: cart-aware rendering of
+            // /rtp config <file>. cartSnapshot is the viewer's currently
+            // staged (paramName -> typed value) pairs for this file; empty
+            // when no cart is active. Forwarded into buildConfigFile so the
+            // Changeable list filters staged keys and Pending + Apply +
+            // Discard rows are appended.
+            ConfigParser<?> parser = resolveParserByFileName(fileName);
+            if (parser == null) return null;
+            return new CommandTreeMenuBuilder(menuTokenRegistry)
+                .buildConfigFile(viewer, stripYml(fileName), parser,
+                    cartSnapshot == null
+                        ? new java.util.LinkedHashMap<>()
+                        : cartSnapshot);
           }
 
           @Override

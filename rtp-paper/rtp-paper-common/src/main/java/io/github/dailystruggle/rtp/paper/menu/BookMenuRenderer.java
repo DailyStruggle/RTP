@@ -376,6 +376,18 @@ public final class BookMenuRenderer implements MenuRenderer {
                 String token = tokenRegistry.mint(playerId, discardAction, tokenTtl);
                 yield ClickEvent.runCommand("/rtp menu token=" + token);
             }
+            case MenuAction.OpenMap openMap -> {
+                // ADR-047 / REQ-RTP-MAP-006 declarative chart bridge. The
+                // OpenMap action's payload is a UUID into the rtp-core
+                // ChartSpecTokens registry; that is the only authority over
+                // which chart the click paints. Server-resolved through the
+                // same /rtp menu token:<token> redeem path the other curated
+                // actions use; MenuRedeemSubcommand.dispatchOpenMap consumes
+                // the ChartSpec token, looks up the resolver, and calls
+                // MapDispatch.paint(spec, viewer) to deliver the map item.
+                String token = tokenRegistry.mint(playerId, openMap, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
         };
     }
 

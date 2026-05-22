@@ -70,6 +70,14 @@ public final class AdminPanelBuilder {
     public static final String SCAN_PERMISSION = "rtp.scan";
 
     /**
+     * Permission required for the {@code Setup (quick start)} section. Mirrors
+     * the {@code rtp.admin.prefab} gate enforced by the {@code prefab}
+     * {@link TreeCommand} subtree (Session 4a). When the viewer lacks it,
+     * every prefab row (and the section divider) is suppressed.
+     */
+    public static final String PREFAB_PERMISSION = "rtp.admin.prefab";
+
+    /**
      * Permission required to act on the {@code Config editor} row. Mirrors
      * {@link FrontPageBuilder#CONFIG_VIEW_PERMISSION} and the dispatch-side
      * gate on {@link MenuAction.OpenConfigSelector}.
@@ -126,6 +134,29 @@ public final class AdminPanelBuilder {
         }
         // blank spacer line between header and first section
         lines.add(new MenuLine(List.of()));
+
+        // --- Setup (quick start) section ---
+        // Single entry row that lists the bundled prefabs via
+        // `/rtp admin prefab list` rather than flooding the front admin
+        // page with one row per prefab (which previously consumed the bulk
+        // of the first book page and pushed Configuration / Diagnostics /
+        // Lifecycle onto later pages). Suppressed wholesale when the
+        // viewer lacks `rtp.admin.prefab` so a partial admin never sees
+        // the Setup divider with no row under it. Once a per-locale
+        // "open prefab submenu" key is added through the locale TSV
+        // pipeline, the dispatch can be swapped for an OpenMenu into a
+        // dedicated PrefabPanelBuilder; today the chat-side list verb is
+        // the only registered surface that enumerates the prefab ids.
+        List<MenuLine> setupRows = new ArrayList<>();
+        if (safeTest(permission, PREFAB_PERMISSION)) {
+            addRow(
+                    setupRows,
+                    "&b\u2728 Setup prefabs",
+                    "List the bundled config prefabs in chat.",
+                    new MenuAction.RunRtpCommand(
+                            new String[]{"admin", "prefab", "list"}));
+        }
+        appendSetupSection(lines, setupRows);
 
         // --- Configuration section ---
         List<MenuLine> configRows = new ArrayList<>();
@@ -235,25 +266,34 @@ public final class AdminPanelBuilder {
                 "&8\u00bb &7browse",
                 browseRows);
 
-        // blank spacer line before the back row.
-        lines.add(new MenuLine(List.of()));
-        // Back row -> curated front page.
-        addRow(
-                lines,
-                lookupMsg(MessagesKeys.menuAdminPanelRowBack, "&7\u21a9 Back"),
-                null,
-                new MenuAction.OpenFrontPage());
+        // Build the back row separately so pagination can guarantee it
+        // lands on the last page (and gets its own page if the body fills
+        // the previous one). The pre-back spacer is folded into the
+        // paginate() helper so a page-break does not produce a dangling
+        // blank row at the top of the final page.
+        MenuLine backRow = null;
+        String backLabel = lookupMsg(MessagesKeys.menuAdminPanelRowBack, "&7\u21a9 Back");
+        if (backLabel != null && !backLabel.isEmpty()) {
+            backRow = MenuLine.of(new MenuFragment(
+                    backLabel, null, new MenuAction.OpenFrontPage()));
+        }
 
-        MenuPage page = new MenuPage(lines);
-        List<MenuPage> pages = List.of(page);
+        // Paginate the curated panel so a fully-populated admin view (title
+        // + hint + 7 prefab rows + 4 sections + back row, easily >20 lines)
+        // does not overflow the book renderer's per-page line cap and push
+        // the configuration / diagnostics / lifecycle sections off-screen.
+        // Page cap matches the InfoBookBuilder convention (13 lines/page).
+        List<MenuPage> pages = paginate(lines, backRow);
 
         // Mint a token per clickable fragment so the renderer can emit
         // menu:<token> click payloads (ADR-035 §3). Mirrors FrontPageBuilder.
-        for (MenuLine line : page.lines()) {
-            for (MenuFragment fragment : line.fragments()) {
-                MenuAction action = fragment.action();
-                if (action != null) {
-                    tokenRegistry.mint(viewer, action, tokenTtl);
+        for (MenuPage p : pages) {
+            for (MenuLine line : p.lines()) {
+                for (MenuFragment fragment : line.fragments()) {
+                    MenuAction action = fragment.action();
+                    if (action != null) {
+                        tokenRegistry.mint(viewer, action, tokenTtl);
+                    }
                 }
             }
         }
@@ -261,13 +301,102 @@ public final class AdminPanelBuilder {
         return new MenuModel(title == null ? "" : title, pages);
     }
 
+    /**
+     * Lines per book page. Mirrors {@link InfoBookBuilder#LINES_PER_PAGE}
+     * so the admin panel and the info book share visual chrome.
+     */
+    static final int LINES_PER_PAGE = 13;
+
+    /**
+     * Split the accumulated body lines into pages of at most
+     * {@link #LINES_PER_PAGE} lines and append {@code backRow} to the last
+     * page (allocating an extra page if the last body page is already
+     * full). Section dividers are nudged onto the next page when they
+     * would otherwise be the bottom line of a page (orphaned-divider
+     * guard) so the divider always sits directly above the rows it
+     * introduces.
+     */
+    private static List<MenuPage> paginate(List<MenuLine> lines, MenuLine backRow) {
+        List<MenuPage> pages = new ArrayList<>();
+        List<MenuLine> current = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            MenuLine line = lines.get(i);
+            if (current.size() >= LINES_PER_PAGE) {
+                // Trim a trailing blank spacer line so a page-break never
+                // produces a dangling empty row at the page boundary.
+                while (!current.isEmpty()
+                        && current.get(current.size() - 1).fragments().isEmpty()) {
+                    current.remove(current.size() - 1);
+                }
+                pages.add(new MenuPage(current));
+                current = new ArrayList<>();
+            }
+            // Skip a leading blank spacer at the top of a fresh page so a
+            // section that fell across a page break doesn't lead with a
+            // gap line.
+            if (current.isEmpty() && line != null && line.fragments().isEmpty()) {
+                continue;
+            }
+            current.add(line);
+        }
+        if (!current.isEmpty()) {
+            pages.add(new MenuPage(current));
+        }
+        if (pages.isEmpty()) {
+            pages.add(new MenuPage(new ArrayList<>()));
+        }
+        if (backRow != null) {
+            List<MenuLine> last = new ArrayList<>(pages.get(pages.size() - 1).lines());
+            // Reserve one line for a blank spacer above the back row when
+            // there's room; otherwise spill the back row onto a fresh page
+            // so it never collides with the previous section's last row.
+            int needed = last.isEmpty() ? 1 : 2;
+            boolean spillToNewPage = last.size() + needed > LINES_PER_PAGE;
+            if (spillToNewPage) {
+                // Leave the existing last page intact and append a fresh
+                // page that hosts only the back row.
+                last = new ArrayList<>();
+                last.add(backRow);
+                pages.add(new MenuPage(last));
+            } else {
+                if (!last.isEmpty()) {
+                    MenuLine prev = last.get(last.size() - 1);
+                    if (prev != null && !prev.fragments().isEmpty()) {
+                        last.add(new MenuLine(List.of()));
+                    }
+                }
+                last.add(backRow);
+                pages.set(pages.size() - 1, new MenuPage(last));
+            }
+        }
+        return pages;
+    }
+
     // ---- helpers ----------------------------------------------------------
 
     /**
-     * Append a section divider followed by its body rows, but only when the
-     * body has at least one visible row. An empty body short-circuits the
-     * divider so a partial admin never sees a header with no rows under it.
+     * Setup-section variant of {@link #appendSection} that uses a hardcoded
+     * English divider literal until Session 6 lands the
+     * {@code menuAdminPanelSectionSetup} {@link MessagesKeys} entry through
+     * the locale TSV pipeline. Once that key exists, this method should be
+     * collapsed back into the standard {@code appendSection} call by Session
+     * 6's edit. Behavior is otherwise identical (empty body suppresses the
+     * divider; spacer line inserted between sections).
      */
+    private static void appendSetupSection(List<MenuLine> dest, List<MenuLine> body) {
+        if (body == null || body.isEmpty()) return;
+        if (!dest.isEmpty()) {
+            MenuLine last = dest.get(dest.size() - 1);
+            if (last != null && !last.fragments().isEmpty()) {
+                dest.add(new MenuLine(List.of()));
+            }
+        }
+        // Section divider removed: hover text on each row now carries the
+        // descriptive label, freeing a line per section so the admin panel
+        // fits on a single book page until additional rows force pagination.
+        dest.addAll(body);
+    }
+
     private static void appendSection(List<MenuLine> dest,
                                       MessagesKeys dividerKey,
                                       String dividerFallback,
@@ -280,9 +409,12 @@ public final class AdminPanelBuilder {
                 dest.add(new MenuLine(List.of()));
             }
         }
-        String divider = lookupMsg(dividerKey, dividerFallback);
-        if (divider != null && !divider.isEmpty()) {
-            dest.add(MenuLine.of(new MenuFragment(divider, null, null)));
+        // Section divider row removed: per-row hover text now carries the
+        // descriptive label so the admin panel fits a single book page.
+        // dividerKey / dividerFallback are retained on the call sites for
+        // future re-enable without re-plumbing every section.
+        if (dividerKey == null && dividerFallback == null) {
+            // unreachable; suppresses unused-parameter warnings.
         }
         dest.addAll(body);
     }

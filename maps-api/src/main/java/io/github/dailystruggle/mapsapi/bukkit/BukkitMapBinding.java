@@ -3,6 +3,7 @@ package io.github.dailystruggle.mapsapi.bukkit;
 import io.github.dailystruggle.mapsapi.Cancellation;
 import io.github.dailystruggle.mapsapi.MapAllocationRequest;
 import io.github.dailystruggle.mapsapi.MapBinding;
+import io.github.dailystruggle.mapsapi.MapBindingLifecycle;
 import io.github.dailystruggle.mapsapi.MapCanvas;
 import io.github.dailystruggle.mapsapi.MapHandle;
 import io.github.dailystruggle.mapsapi.model.ChartModel;
@@ -64,7 +65,7 @@ import java.util.function.Supplier;
  * {@code CHECKLIST-maps-api.md} Stage 2.3 will replace this when
  * region-affinity matters (live charts and per-viewer pixel commits).
  */
-public final class BukkitMapBinding implements MapBinding {
+public class BukkitMapBinding implements MapBinding, MapBindingLifecycle {
 
     /** Cached palette translation table: logical index 0..31 -> vanilla map byte. */
     private static final byte[] PALETTE = buildPalette();
@@ -72,9 +73,25 @@ public final class BukkitMapBinding implements MapBinding {
     /** Live handles indexed by chartId for idempotent allocation. */
     private final ConcurrentHashMap<String, MapHandle> handlesByChartId = new ConcurrentHashMap<>();
 
+    /**
+     * Secondary index: viewer UUID -> chartIds, so {@link #onPlayerQuit}
+     * can release every cached handle scoped to that viewer without
+     * scanning the entire {@link #handlesByChartId} map. Both maps share a
+     * single write contract: every mutation of one mutates the other.
+     */
+    private final ConcurrentHashMap<UUID, java.util.Set<String>> chartIdsByViewer = new ConcurrentHashMap<>();
+
+    /** Set to {@code true} on {@link #onDisable}; subsequent {@link #allocate} calls throw. */
+    private volatile boolean disabled = false;
+
     @Override
     public MapHandle allocate(MapAllocationRequest request) {
         Objects.requireNonNull(request, "request");
+        if (disabled) {
+            throw new IllegalStateException(
+                    "BukkitMapBinding.allocate: binding is disabled (host plugin onDisable fired);"
+                            + " install a fresh BukkitMapBinding via MapDispatch.setMapBinding(...).");
+        }
         // Idempotency hint: if we have already allocated a handle for this
         // chartId, return it. The caller (MapDispatch) is responsible for
         // honouring the request.locking() write policy on subsequent use.
@@ -102,6 +119,12 @@ public final class BukkitMapBinding implements MapBinding {
         }
         MapHandle handle = new MapHandle(request.chartId(), request.viewer(), view.getId());
         handlesByChartId.put(request.chartId(), handle);
+        if (request.viewer() != null) {
+            chartIdsByViewer
+                    .computeIfAbsent(request.viewer(),
+                            k -> java.util.concurrent.ConcurrentHashMap.newKeySet())
+                    .add(request.chartId());
+        }
         return handle;
     }
 
@@ -184,6 +207,37 @@ public final class BukkitMapBinding implements MapBinding {
             table[i] = MapPalette.matchColor(r, g, b);
         }
         return table;
+    }
+
+    /**
+     * {@link MapBindingLifecycle#onPlayerQuit} implementation: drop every
+     * cached {@link MapHandle} keyed to {@code viewer}. The underlying
+     * vanilla {@link MapView} objects are owned by Bukkit's persistent map
+     * registry and intentionally not deleted here (Bukkit has no public API
+     * for that); only the in-memory caches that allowed idempotent
+     * re-allocation are released. A no-op if the binding never allocated
+     * anything for {@code viewer}.
+     */
+    @Override
+    public void onPlayerQuit(UUID viewer) {
+        if (viewer == null) return;
+        java.util.Set<String> chartIds = chartIdsByViewer.remove(viewer);
+        if (chartIds == null) return;
+        for (String chartId : chartIds) {
+            handlesByChartId.remove(chartId);
+        }
+    }
+
+    /**
+     * {@link MapBindingLifecycle#onDisable} implementation: clear every
+     * cached handle and refuse subsequent {@link #allocate} calls until a
+     * fresh instance is installed via {@code MapDispatch.setMapBinding}.
+     */
+    @Override
+    public void onDisable() {
+        disabled = true;
+        handlesByChartId.clear();
+        chartIdsByViewer.clear();
     }
 
     /** Translate a logical-palette byte (0..31) to a vanilla map-colour byte. */

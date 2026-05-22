@@ -4,98 +4,40 @@
   "spatialResolution": 3,
   "badLocations": [
     {
-      "start": 32060,
+      "start": 77160,
       "length": 1
     },
     {
-      "start": 36057,
+      "start": 95415,
       "length": 1
     },
     {
-      "start": 44260,
-      "length": 1
-    },
-    {
-      "start": 44832,
-      "length": 1
-    },
-    {
-      "start": 45628,
-      "length": 1
-    },
-    {
-      "start": 54418,
-      "length": 1
-    },
-    {
-      "start": 65337,
-      "length": 1
-    },
-    {
-      "start": 70168,
-      "length": 1
-    },
-    {
-      "start": 98090,
-      "length": 1
-    },
-    {
-      "start": 99410,
-      "length": 2
-    },
-    {
-      "start": 102049,
-      "length": 2
-    },
-    {
-      "start": 133255,
-      "length": 1
-    },
-    {
-      "start": 166116,
-      "length": 1
-    },
-    {
-      "start": 170361,
-      "length": 1
-    },
-    {
-      "start": 173304,
+      "start": 161096,
       "length": 1
     }
   ],
   "biomeLocations": {
-    "SNOWY_SLOPES": [
-      {
-        "start": 152604,
-        "length": 3
-      }
-    ],
     "PLAINS": [
       {
-        "start": 40399,
+        "start": 129850,
         "length": 3
       }
     ],
-    "SPARSE_JUNGLE": [
+    "OLD_GROWTH_PINE_TAIGA": [
       {
-        "start": 25300,
+        "start": 148859,
         "length": 3
       }
     ],
-    "SNOWY_TAIGA": [
+    "BIRCH_FOREST": [
       {
-        "start": 74143,
-        "length": 3
-      },
-      {
-        "start": 95373,
+        "start": 70454,
         "length": 3
       }
     ],
     "SNOWY_PLAINS": [
       {
-        "start": 68076,
+        "start": 42014,
         "length": 3
       }
     ]

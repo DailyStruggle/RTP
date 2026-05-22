@@ -1,14 +1,17 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
+import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -16,6 +19,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 
 import org.jetbrains.annotations.Nullable;
@@ -53,6 +59,41 @@ public class PrefabRollbackCmd extends BaseRTPCmdImpl {
     @Override
     public String description() {
         return "restore the most recent .bak siblings produced by a prefab confirm";
+    }
+
+    /**
+     * Capture the {@code <id>} positional from the args-form dispatch path -
+     * mirrors {@link PrefabApplyCmd}'s override (see its javadoc for the full
+     * rationale). Without this, a chat or menu-redeem dispatch of
+     * {@code /rtp admin prefab rollback <id>} would fall through TreeCommand's
+     * default parser which routes the unknown id as a (missing) subcommand
+     * and triggers {@code msgInvalidCommand}.
+     */
+    @Override
+    public CompletableFuture<Boolean> onCommand(@NotNull UUID callerId,
+                                                @NotNull Predicate<String> permissionCheckMethod,
+                                                @NotNull Consumer<String> messageMethod,
+                                                @NotNull String[] args,
+                                                int i,
+                                                @Nullable Map<String, CommandParameter> tempParameters) {
+        if (!permissionCheckMethod.test(permission())) {
+            return CompletableFuture.completedFuture(false);
+        }
+        Map<String, List<String>> parameterValues = new HashMap<>();
+        for (; i < args.length; i++) {
+            String arg = args[i];
+            if (arg == null || arg.isEmpty()) continue;
+            int eq = arg.indexOf('=');
+            if (eq < 0) {
+                parameterValues.computeIfAbsent(arg, k -> new ArrayList<>());
+            } else {
+                String key = arg.substring(0, eq).toLowerCase(Locale.ROOT);
+                String val = arg.substring(eq + 1);
+                parameterValues.computeIfAbsent(key, k -> new ArrayList<>()).add(val);
+            }
+        }
+        return CompletableFuture.completedFuture(
+                onCommand(callerId, parameterValues, null, messageMethod));
     }
 
     @Override

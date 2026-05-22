@@ -644,22 +644,29 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
     // ---- encode / decode -------------------------------------------------
 
     private String encodeBackend(BackendHeartbeat r) {
-        StringBuilder sb = new StringBuilder(256);
-        sb.append("serverId=").append(r.serverId()).append('\n');
-        sb.append("schemaVersion=").append(r.schemaVersion()).append('\n');
-        sb.append("pluginState=").append(r.pluginState().name()).append('\n');
-        sb.append("acceptingRequests=").append(r.acceptingRequests()).append('\n');
-        sb.append("lastSeenEpochMs=").append(r.lastSeenEpochMs()).append('\n');
-        sb.append("mspt=").append(r.mspt()).append('\n');
-        sb.append("queueDepth=").append(r.queueDepth()).append('\n');
-        sb.append("softCap=").append(r.softCap()).append('\n');
-        sb.append("heapUsedBytes=").append(r.heapUsedBytes()).append('\n');
-        sb.append("heapMaxBytes=").append(r.heapMaxBytes()).append('\n');
-        sb.append("playerCount=").append(r.playerCount()).append('\n');
-        sb.append("regionsAvailable=").append(joinList(r.regionsAvailable())).append('\n');
-        sb.append("worldsLoaded=").append(joinList(r.worldsLoaded())).append('\n');
-        sb.append("killSwitch=").append(r.killSwitch());
-        String canonical = sb.toString();
+        // Build the field map in canonical insertion order. Both encode (sign)
+        // and decode (verify) MUST reconstruct the canonical byte sequence in
+        // exactly this order - HSET-read via j.hgetAll() returns a plain
+        // HashMap with arbitrary iteration order, so deriving canonical bytes
+        // from the parsed map's iteration order would break HMAC verification
+        // on every snapshot read (REQ-RTP-S-004, fix 2026-05-21).
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("serverId", r.serverId());
+        m.put("schemaVersion", Integer.toString(r.schemaVersion()));
+        m.put("pluginState", r.pluginState().name());
+        m.put("acceptingRequests", Boolean.toString(r.acceptingRequests()));
+        m.put("lastSeenEpochMs", Long.toString(r.lastSeenEpochMs()));
+        m.put("mspt", Double.toString(r.mspt()));
+        m.put("queueDepth", Integer.toString(r.queueDepth()));
+        m.put("softCap", Integer.toString(r.softCap()));
+        m.put("heapUsedBytes", Long.toString(r.heapUsedBytes()));
+        m.put("heapMaxBytes", Long.toString(r.heapMaxBytes()));
+        m.put("playerCount", Integer.toString(r.playerCount()));
+        m.put("regionsAvailable", joinList(r.regionsAvailable()));
+        m.put("worldsLoaded", joinList(r.worldsLoaded()));
+        m.put("killSwitch", Boolean.toString(r.killSwitch()));
+        String canonical = canonicalBackend(m);
+        StringBuilder sb = new StringBuilder(256).append(canonical);
         if (verifier != null) {
             // A3: append the HMAC line last so decode can strip the 'hmac' key
             // cleanly. Sign covers schemaVersion || '|' || canonical (the rest
@@ -669,21 +676,54 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         return sb.toString();
     }
 
+    /**
+     * Reconstructs the canonical byte sequence for a backend heartbeat in the
+     * fixed field order {@link #encodeBackend(BackendHeartbeat)} signs over.
+     * Used by both encode and decode so HMAC sign/verify operate on identical
+     * bytes regardless of how the source map was populated (publisher's
+     * deterministic LinkedHashMap vs. Jedis's arbitrary-order HashMap from
+     * {@code HGETALL}). Missing fields are emitted as empty values to keep
+     * the line count fixed; the surrounding decoder rejects malformed rows.
+     */
+    static String canonicalBackend(Map<String, String> m) {
+        StringBuilder sb = new StringBuilder(256);
+        appendField(sb, m, "serverId", true);
+        appendField(sb, m, "schemaVersion", false);
+        appendField(sb, m, "pluginState", false);
+        appendField(sb, m, "acceptingRequests", false);
+        appendField(sb, m, "lastSeenEpochMs", false);
+        appendField(sb, m, "mspt", false);
+        appendField(sb, m, "queueDepth", false);
+        appendField(sb, m, "softCap", false);
+        appendField(sb, m, "heapUsedBytes", false);
+        appendField(sb, m, "heapMaxBytes", false);
+        appendField(sb, m, "playerCount", false);
+        appendField(sb, m, "regionsAvailable", false);
+        appendField(sb, m, "worldsLoaded", false);
+        appendField(sb, m, "killSwitch", false);
+        return sb.toString();
+    }
+
+    private static void appendField(StringBuilder sb, Map<String, String> m, String key, boolean first) {
+        if (!first) sb.append('\n');
+        sb.append(key).append('=').append(m.getOrDefault(key, ""));
+    }
+
     private BackendHeartbeat decodeBackend(String payload) {
         if (payload == null || payload.isEmpty()) return null;
         Map<String, String> m = parseFlat(payload);
         if (verifier != null) {
             String hmacHex = m.remove("hmac");
-            // Rebuild the canonical payload from the surviving keys in their
-            // original LinkedHashMap insertion order, matching encodeBackend's
-            // deterministic key sequence.
             int sv;
             try {
                 sv = Integer.parseInt(m.getOrDefault("schemaVersion", "1"));
             } catch (NumberFormatException e) {
                 sv = 1;
             }
-            if (!verifier.verify(sv, flatten(m), hmacHex)) {
+            // Reconstruct canonical bytes in the SAME fixed field order
+            // encodeBackend signs over - never from the parsed map's
+            // iteration order (HSET-read returns arbitrary-order HashMap).
+            if (!verifier.verify(sv, canonicalBackend(m), hmacHex)) {
                 LOG.log(Level.WARNING,
                         "decodeBackend: HMAC verification failed; dropping row (REQ-RTP-S-004)");
                 return null;

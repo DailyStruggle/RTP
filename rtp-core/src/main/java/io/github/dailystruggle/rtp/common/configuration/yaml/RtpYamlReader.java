@@ -74,6 +74,14 @@ public final class RtpYamlReader {
     }
 
     public static RtpYamlMapping parse(String source) {
+        // Strip a UTF-8 BOM (U+FEFF) if present at position 0. Files written
+        // by PowerShell `Add-Content -Encoding utf8` (and several other
+        // common Windows tools) prepend a BOM by default; without this
+        // strip, the BOM lands as a literal character at line 1, column 0
+        // and the lexer rejects it as "missing ':' in mapping entry".
+        if (source != null && !source.isEmpty() && source.charAt(0) == '\uFEFF') {
+            source = source.substring(1);
+        }
         List<RawLine> raw = lex(source);
         RtpYamlReader r = new RtpYamlReader(raw);
         RtpYamlMapping root = new RtpYamlMapping();

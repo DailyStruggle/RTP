@@ -1,4 +1,9 @@
-# rtp-proxy devstack: 1 Redis + 2 Velocity + 2 Paper.
+# rtp-proxy devstack: 1 Redis + 2 Velocity proxies + 2 Paper lobbies + 2 Paper backends.
+#
+# The two "lobby" Paper servers have an empty `regions/` directory: they are
+# valid network participants (role: backend, unique serverId) but cannot serve
+# /rtp locally. Running /rtp on a lobby exercises the cross-server dispatch
+# path to backend-a / backend-b. See `README.md` ("Lobbies").
 #
 # First runtime verification of the cross-server `/rtp` round-trip
 # (CHECKLIST-cross-server-rtp.md L3, rows 21-29).
@@ -82,8 +87,25 @@ services:
       EULA: "TRUE"
       TYPE: PAPER
       VERSION: "1.21.8"
-      MEMORY: 1G
+      # Devstack backends run with 6G heap: Paper 1.21.8 + RTP-Pro + remap cache
+      # routinely peak at 2-3G during world-gen on the first run, and tighter
+      # caps (1G) caused OOM-driven GC thrash that pushed first-boot heartbeat
+      # past the harness budget. 6G sits in the 4-8G band tested locally and
+      # leaves headroom for /rtp pre-fill bursts without bloating host RAM.
+      MEMORY: 6G
       ONLINE_MODE: "FALSE"        # proxies front auth; backends trust forwarding-secret
+      # OPS: comma-separated list of player names or UUIDs to seed into ops.json
+      # on container start. itzg/minecraft-server reads this and writes ops.json
+      # before the server boots, so the listed accounts are op on first join.
+      # Defaulted to empty so a missing OPS in .env is a no-op (no devstack regression);
+      # set OPS=YourIGN in .env (or export OPS=YourIGN before run-acceptance.ps1) to
+      # grant op for command testing. Devstack convenience only; do NOT use in prod.
+      OPS: ${OPS:-}
+      # OVERRIDE_OPS=TRUE forces itzg to re-write ops.json on every boot from
+      # the OPS env var, instead of only seeding it once on a fresh world.
+      # Without this, changing OPS in .env after the first run is a silent
+      # no-op because ops.json already exists in the persistent world volume.
+      OVERRIDE_OPS: "TRUE"
       # Run as root (UID 0) to sidestep the named-volume ownership problem:
       # Docker creates fresh named volumes root-owned, and itzg's entrypoint
       # chowns /data but NOT nested mountpoints like /data/world (a separate
@@ -109,13 +131,13 @@ services:
       CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET:?set CFG_VELOCITY_FORWARDING_SECRET (harness does this automatically)}
     user: "0:0"
     volumes:
-      # Plugin jars: bind ./jars/plugin DIRECTLY to /data/plugins (writable).
-      # We deliberately skip mc-image-helper's /plugins -> /data/plugins sync because
-      # Paper writes its remap cache to /data/plugins/.paper-remapped/ on boot, and
-      # subsequent syncs fail with AccessDeniedException trying to overwrite it.
-      # Direct bind avoids the sync entirely; Paper manages .paper-remapped/ in-place.
-      # Writable mount is required so Paper can create the remap cache + nested RTP/ dir.
-      - ./jars/plugin:/data/plugins
+      # Plugin jars: bind a PER-BACKEND plugins dir into /data/plugins (writable).
+      # We MUST NOT share ./jars/plugin between backend-a and backend-b: Paper writes
+      # its remap cache to /data/plugins/.paper-remapped/ on boot, and two backends
+      # racing on the same host directory corrupt that cache (ZipException: invalid
+      # LOC header). Each backend gets its own plugins dir; drop new plugin jars into
+      # both ./backend-a/plugins/ and ./backend-b/plugins/ before `up`.
+      - ./backend-a/plugins:/data/plugins
       # RTP per-backend config dir nested inside /data/plugins; Docker handles the
       # nested directory bind cleanly (same pattern proxy-side uses successfully).
       - ./backend-a/rtp-config:/data/plugins/RTP
@@ -136,6 +158,73 @@ services:
       redis:
         condition: service_healthy
 
+  # Lobbies: Paper backends whose RTP install ships NO local destination region
+  # (`./lobby-{a,b}/rtp-config/regions/` is intentionally empty). They participate
+  # in the network as `role: backend` with unique `serverId`s so they can dispatch
+  # /rtp to backend-a/backend-b via the cross-server pipeline. This exercises the
+  # lobby use case: a player joins a lobby, runs /rtp, and the request is routed
+  # to whichever real backend the BackendSelector picks (or one named explicitly).
+  # Each velocity.toml lists the lobby first in `try`, so fresh connections land
+  # on a lobby by default.
+  lobby-a:
+    # See backend-a for Java 25 / Paper 1.21.8 rationale.
+    image: itzg/minecraft-server:java25
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.21.8"
+      # Lobbies do no world-gen and no /rtp pre-fill; 2G is plenty.
+      MEMORY: 2G
+      ONLINE_MODE: "FALSE"
+      OPS: ${OPS:-}
+      OVERRIDE_OPS: "TRUE"
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+      RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
+      PATCH_DEFINITIONS: /paper-patches
+      REPLACE_ENV_VARIABLES: "TRUE"
+      ENV_VARIABLE_PREFIX: "CFG_"
+      CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET:?set CFG_VELOCITY_FORWARDING_SECRET (harness does this automatically)}
+    user: "0:0"
+    volumes:
+      - ./lobby-a/plugins:/data/plugins
+      - ./lobby-a/rtp-config:/data/plugins/RTP
+      - ./shared/paper-patches:/paper-patches:ro
+      - ./shared/forwarding.secret:/data/forwarding.secret
+      - ./lobby-a/world:/data/world
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  lobby-b:
+    # See lobby-a / backend-a notes.
+    image: itzg/minecraft-server:java25
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.21.8"
+      MEMORY: 2G
+      ONLINE_MODE: "FALSE"
+      OPS: ${OPS:-}
+      OVERRIDE_OPS: "TRUE"
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+      RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
+      PATCH_DEFINITIONS: /paper-patches
+      REPLACE_ENV_VARIABLES: "TRUE"
+      ENV_VARIABLE_PREFIX: "CFG_"
+      CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET:?set CFG_VELOCITY_FORWARDING_SECRET (harness does this automatically)}
+    user: "0:0"
+    volumes:
+      - ./lobby-b/plugins:/data/plugins
+      - ./lobby-b/rtp-config:/data/plugins/RTP
+      - ./shared/paper-patches:/paper-patches:ro
+      - ./shared/forwarding.secret:/data/forwarding.secret
+      - ./lobby-b/world:/data/world
+    depends_on:
+      redis:
+        condition: service_healthy
+
   backend-b:
     # See backend-a for Java 25 / Paper 1.21.8 rationale.
     image: itzg/minecraft-server:java25
@@ -143,8 +232,15 @@ services:
       EULA: "TRUE"
       TYPE: PAPER
       VERSION: "1.21.8"
-      MEMORY: 1G
+      # See backend-a: 6G heap for first-boot world-gen + RTP pre-fill headroom.
+      MEMORY: 6G
       ONLINE_MODE: "FALSE"
+      # See backend-a OPS note. Same var, applied to both backends so whichever
+      # backend the proxy routes you to first will have you op.
+      OPS: ${OPS:-}
+      # See backend-a OVERRIDE_OPS note - required to re-seed ops.json on
+      # every boot, otherwise itzg only writes ops.json once per world.
+      OVERRIDE_OPS: "TRUE"
       # See backend-a: run as root to sidestep named-volume ownership.
       RUN_AS_UID: "0"
       RUN_AS_GID: "0"
@@ -157,9 +253,9 @@ services:
       CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET:?set CFG_VELOCITY_FORWARDING_SECRET (harness does this automatically)}
     user: "0:0"
     volumes:
-      # See backend-a for the rationale on direct /data/plugins bind (skips the
-      # mc-image-helper sync that conflicts with Paper's .paper-remapped/ cache).
-      - ./jars/plugin:/data/plugins
+      # See backend-a: per-backend plugins dir (shared host bind corrupts the
+      # .paper-remapped cache when both backends race on it).
+      - ./backend-b/plugins:/data/plugins
       - ./backend-b/rtp-config:/data/plugins/RTP
       - ./shared/paper-patches:/paper-patches:ro
       - ./shared/forwarding.secret:/data/forwarding.secret

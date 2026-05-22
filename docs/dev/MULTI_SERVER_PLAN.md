@@ -4,7 +4,7 @@ This document outlines the plan for RTP's multi-server (proxy / network) expansi
 
 > Status: **Phase 0 (Scope Unlock) and Phase 1 (Core SPI) both complete; Phase 2 (Velocity adapter + Redis/SQL transports) in flight as of 2026-05-19.** Requirements authored (REQ-RTP-NET-001â€¦014); GLOSSARY entries (`backend`, `proxy`, `reservation token`, `transport`, `network snapshot`, `backend selector`) live in [`GLOSSARY.md`](GLOSSARY.md); umbrella decision captured in [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (Accepted 2026-05-14) and refined by ten subproject ADRs under [`rtp-proxy/docs/adr/`](../../rtp-proxy/docs/adr/); [`INDEX.md`](INDEX.md) and [`AGENTS.md`](../../.junie/AGENTS.md) updated to co-list network mode as an active frontier. Phase 2 landed slices: 2a (Velocity no-op shell), 2b (participant skeleton + `network.yml` loader), 2c-Î± (`ServerPreConnectEvent` redemption), 2c-Î² / 2d (Brigadier `/rtp` + `CommandTriggerSource`), 2e-SQL (`SqlNetworkStateBinding`), 2e-Redis A1 (heartbeats + snapshot + pub/sub). Open Phase 2 work: Redis A2-A4, reservation-token TTL reaper, D4 HMAC distribution, regression suite, 2-proxy + 2-backend devstack acceptance.
 
-> Cross-references: [rtp-fabric-ADR-002 (Fabric in scope; formerly ADR-022)](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) is **orthogonal** to this plan and is **not** superseded. [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) is the ratified umbrella for multi-server proxy support; subproject refinements live under [`rtp-proxy/docs/adr/`](../../rtp-proxy/docs/adr/).
+> Cross-references: [rtp-fabric-ADR-002 (Fabric in scope; formerly ADR-022)](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) is **orthogonal** to this plan and is **not** superseded. [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) is the ratified umbrella for multi-server proxy support; subproject refinements live under [`rtp-proxy/docs/adr/`](../../rtp-proxy/docs/adr/). Visual companion (mermaid topology / sequence / state-machine diagrams): [`../architecture/12-network-model.md`](../architecture/12-network-model.md).
 
 > L6 update (2026-05-21): Backend-Owned `/rtp` with Network Wait-Queue is **landed** ([rtp-proxy-ADR-014](../../rtp-proxy/docs/adr/rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md), Accepted). Slices A-F complete (backend `networkKeptLocations`/`networkReservedLocations` pools + `NetworkRouter` + `NetworkEnrolmentBuffer` + `NetworkStatusCache`; `NetworkRequestQueue` SPI with InMemory/Redis/SQL impls and 4 Lua scripts; `DefaultRtpDispatcher` `StatusSink`; `ReservationTokenReaper` `ReleaseSink`; Velocity `TransportRequestTriggerSource` BLPOP worker replacing the proxy-side `/rtp` command; backend `JoinTriggerSource` redeem-first with `acceptRedeemedReservation` coord-pin + disconnect release; one-shot boot reconcile via `NetworkTransport.listActiveForServer`). Open follow-ups (Slice G remainder): baseline `network.yml`/`regions.yml`/`messages.yml` additions + locale TSV pipeline run, devstack acceptance (2 proxy + 2 backend), final full build. **Prerequisite for unlocking (B) trigger-config replication**: the project-wide colon-to-equals command-argument migration (separate D-005-gated slice; see L6 checklist row D7 and `NetworkRouter.parseRegionArg`) must land first; until it does, qualified region arguments use `=` rather than `:` to avoid colliding with the legacy parser.
 
@@ -820,6 +820,70 @@ This plan has been reviewed for implementer-sufficiency against `AGENTS.md`, `RU
 - **Player-count weighting** â€” published in telemetry; selector weight stays `0` until live-player testing on the Phase 2 devstack provides evidence either way. No design action required before Phase 2.
 - **`rtp.unqueued` bypass implementation** â€” low priority; expected use is rare. Acceptable to defer past Phase 2 acceptance.
 - **Folia per-region TPS aggregation** â€” owned by [`METRICS_PLAN.md`](METRICS_PLAN.md); this plan consumes whatever the metrics plan publishes.
+
+---
+
+## Lobby Load Balancing v1: Backend-Side No-Arg `/rtp` on Lobbies (Slices I + J, shipped)
+
+Landed in beta.4. Documents the **A** half of lobby load balancing: a player on a lobby (a backend with 0 local regions, advertising `acceptingRequests=false` and an empty `regionsAvailable=[]`) typing bare `/rtp` is dispatched cross-server to the peer backend with the largest `keptCount`. The **B** half (proxy-side `ServerPreConnectEvent` lobby picker on login, which decides *which lobby* a fresh connection lands on) is a separate slot, documented under *Forward Concept: Proxy-Side Join Routing* below, and is sequenced after Phase 2 acceptance + Phase 3 row `D1`.
+
+**Trigger.** `network.yml::routing.lobbyMode: true`. Read twice during boot: once via `NetworkModeBootstrap.readLobbyModeEarly(File)` so the gates in `Region` and the sampler are armed before any `/rtp` can be issued, and once during `NetworkModeBootstrap.boot()` so the same value threads into `BukkitBackendStateSampler` (forces `acceptingRequests=false` and `regionsAvailable=Set.of()` regardless of locally configured regions) and `BukkitNetworkCommandHook` (enables the no-arg interception path). The two reads share the same `RtpYamlConfig.load(networkYml) -> getConfigurationSection("routing") -> getBoolean("lobbyMode", false)` chain; there is no separate `NetworkKeys` enum and no `ConfigParser` / `/rtp config` participation, by design (the value is baked into long-lived field references at boot and is not runtime-mutable).
+
+**Selector v1 (most-kept).** `PeerRegionRegistry.pickMostKept()` returns the peer backend + region with the largest `keptCount`, with:
+
+- Self-exclusion (the lobby never picks itself; an empty `regionsAvailable` would already disqualify it, but the explicit guard is defensive against operator misconfiguration where lobby mode is enabled while regions are still configured).
+- Kill-switch filtering (peers with `killSwitch=true` per [rtp-proxy-ADR-010](../../rtp-proxy/docs/adr/rtp-proxy-ADR-010-security-hardening.md) are excluded).
+- Deterministic tiebreak (lexicographic `serverId` then `region`) so two lobby JVMs picking against the same snapshot agree.
+- Legacy-peer fall-through (peers that publish only the pre-Slice-I `regions: Set<String>` field with no per-region kept counts are not synthesised into a destination by this path; they participate only when the player names them explicitly via `rtp region=<server>:<region>`).
+- Empty-snapshot and no-peers cases return `Optional.empty()`; the hook responds with the configurable `networkRegionUnavailable` message (REQ-RTP-F-013) rather than swallowing the failure (S-004).
+
+**Selector v2 (deferred).** A dynamic weighted-average per-server heuristic will replace `pickMostKept` for the no-arg path. v1 lives behind one named call site (`peerRegionRegistry.pickMostKept()` in `BukkitNetworkCommandHook`), so v2 lands as either (a) an additional method on `PeerRegionRegistry` plus a one-line swap, or (b) a `LobbyBackendSelector` SPI sibling to the existing `BackendSelector` interface, depending on how much shared logic emerges. Input signals already published in `BackendHeartbeat` and available to v2 without a wire-protocol bump: `keptCount`, `unkeptCount`, `playerCount`, `maxPlayers`, `mspt` (when published per `METRICS_PLAN.md`), `acceptingRequests`. No design action required before live evidence on Phase 2 + beta.4 devstack.
+
+**What does not change with lobby mode on.** Explicitly-targeted `rtp region=<server>:<region>` requests still route through the existing `RegionParameter` validator (peer-aware via `PeerRegionRegistry.isReachableHardPin`), bypass `pickMostKept`, and dispatch to the named destination unchanged. Tab-completion still surfaces `peerEntries()` so operators can discover available remote regions. The `JoinTriggerSource` redeem path on the destination backend is unchanged: it consumes whatever `ReservationToken` was claimed (via `pickMostKept` or via explicit name), runs `/rtp` against the local kept/unkept cache, and releases the token.
+
+**Coverage.** `LobbyModeTest` (10 cases on `pickMostKept`: largest-count, self-exclusion, kill-switch exclusion, no-peers, null-snapshot, deterministic tiebreak, legacy-peer fall-through, no-arg synthesises `crossServer` to most-kept, explicit region still routes via `parseRegionArgQualified`, ctor null-registry rejection; plus 2 sampler cases). `LobbyModeEarlyReadTest` (3 cases: absent block, explicit false, true).
+
+**Failure modes.** Per *Failure-Mode Policy* above: a malformed `network.yml::routing.lobbyMode` value degrades-to-disabled (lobby mode off); empty `peerEntries()` after a `pickMostKept` returns the configurable `networkRegionUnavailable` (REQ-RTP-S-007); a kill-switched-only peer set is the same as empty.
+
+---
+
+## Forward Concept: Proxy-Side Join Routing via `rtp.onevent.*` (Lobby Load Balancing)
+
+Not in scope for Phases 1-3 and not on the current critical path. Recorded here so the design is anchored when in-game `/rtp` (Phase 2) and the proxy-side `JoinTriggerSource` slot (Phase 3, row `D1`) have both landed.
+
+**Concept.** Extend the existing backend-side join-RTP gate (the `rtp.onevent.firstjoin` and `rtp.onevent.join` permissions, today consumed by `OnEventTeleports#onPlayerJoin` against the per-player `loginLocations` reserve, see [ADR-023](../adr/ADR-023-login-reserve-cache.md)) into a **proxy-side trigger**: when a player connects to the proxy and would normally be routed to a default lobby, the proxy instead issues an `RtpRequest` through `DefaultRtpDispatcher`, lets `BackendSelector` pick the lowest-loaded backend from the live `NetworkSnapshot`, claims a `ReservationToken` there, and uses the resulting `serverId` as the `ServerPreConnectEvent` target. The `JoinTriggerSource` on the destination backend redeems the token on arrival and runs `/rtp` against the local kept/unkept cache. Net effect: lobby-to-backend balancing and join-time `/rtp` are the same operation, gated by the same permission nodes that already exist.
+
+**Permission semantics carry over.** The proxy-side trigger shall respect the same two permission nodes already shipped in `plugin.yml`:
+
+- `rtp.onevent.firstjoin` - fire for the player's first connection to the network (proxy-observed, not per-backend `hasPlayedBefore`).
+- `rtp.onevent.join` - fire on every subsequent connection.
+
+Both nodes default to the same values as today (`firstjoin` true, `join` opt-in). A player without the relevant node falls through to the proxy's normal initial-server policy unchanged. This preserves operator muscle memory: the lever that today says "auto-RTP this player on join" becomes the lever that says "auto-RTP this player on join, **and** let RTP pick which backend absorbs the load".
+
+**Permission resolution on the proxy.** Proxy-side permission lookup is a known gap (Velocity does not ship a LuckPerms-equivalent by default; BungeeCord is in a similar spot). Options to evaluate when this lands:
+
+1. Read the player's permission set from a network-state row populated by each backend's `LuckPerms` (or equivalent) on join elsewhere in the network. Stale-by-one-session but cheap; matches the existing `backend_state` telemetry pattern.
+2. Defer the decision to the destination backend after a speculative selector pick: claim, route, then have the backend's `JoinTriggerSource` re-check the permission against its local `LuckPerms` and either redeem or release the token. Adds one transport round-trip on permission-miss but keeps the proxy stateless.
+3. Operator-provided proxy-side permission provider via `commands-api`'s proxy surface (`ProxySender` / `NetworkAwareCommand`, see *Open Items / Follow-Ups*). Most flexible; most work.
+
+Choice is deferred until the proxy-side `commands-api` surface is concrete (an existing open item) and the Phase 2 acceptance devstack has live evidence on the permission-resolution latency budget.
+
+**What does not change.**
+
+- `loginLocations` (the backend-side login reserve from ADR-023) remains a backend-local cache; the proxy does not read or write it. The reserve still pre-warms coordinates per *backend* per `rtp.onevent.firstjoin`/`join` slots; the proxy's role is only to pick **which** backend's reserve gets hit.
+- `JoinTriggerSource` stays the single backend-side consumer of redemption (`REDEEMED` -> `/rtp` against the local kept/unkept cache). The proxy-side trigger introduced here is a **producer** that publishes the reservation; it does not duplicate the backend redeem logic.
+- `BackendSelector.choose` contract (pure function of `(RtpRequest, NetworkSnapshot)`, no I/O) is unchanged. Lobby balancing reuses the existing weighted-average selector or any operator-provided implementation without an SPI bump.
+
+**Sequencing.** Land after Phase 2 acceptance (2x Velocity + 2x Paper devstack green for in-game `/rtp`) and after Phase 3 row `D1` (`JoinTriggerSource` wired on proxy-side). At that point this concept is additive: a new `JoinTriggerSource` producer next to the existing `CommandTriggerSource`, plus a small `ServerPreConnectEvent` listener on the Velocity adapter (and the BungeeCord equivalent once Phase 3 lands `rtp-proxy-bungee`).
+
+**Lobby-less topology (primary motivating case).** The concept above is written for networks where a default lobby exists and the proxy-side trigger steals the join away from it. The more interesting deployment, and the one this note is primarily aimed at, is a **lobby-less network**: no hub server, multiple gameplay backends, every fresh login must land somewhere playable. In that topology there is no "normal initial-server policy" to fall through to, so the proxy-side trigger is not an *override* of lobby routing - it **is** the routing decision. Specifics:
+
+- The selector pick is mandatory, not opportunistic. `BackendSelector.choose` returning `Optional.empty()` cannot fall through to a lobby because there is none; the proxy shall instead apply the operator-configured `loadBalancer.onNoCandidate` policy (queue the player on the network wait queue per REQ-RTP-NET-008, or disconnect with a configurable `messages.yml` string per REQ-RTP-F-013 and S-007). Silently dropping the connection is a S-004 violation.
+- `rtp.onevent.firstjoin` / `rtp.onevent.join` still gate whether the join *triggers an `RtpRequest`*, but the backend choice happens regardless. A player without either permission still needs a backend; in lobby-less mode the proxy picks one via `BackendSelector` and routes them there **without** claiming a `ReservationToken`, so the destination backend's `JoinTriggerSource` finds no token to redeem and the player spawns at that backend's normal join point. This keeps load balancing decoupled from the auto-RTP opt-in.
+- The reservation token is therefore only allocated for permission-holders. Non-permission joins are load-balanced by the same `BackendSelector` call but skip the claim path entirely - one less round-trip, no token TTL to reap, no `JoinTriggerSource` redeem on arrival.
+- Operators running this topology should expect the proxy to be the load-balancing bottleneck under join storms (server-list ping spike, restart reconnect). The existing `loadBalancer.recentPicks` hot-spot dampener (see *Hot-Spot Avoidance Across Proxies*) is the relevant lever; the v2 cross-proxy `recentPicks` mode in *Open Items / Follow-Ups* becomes more valuable here than in the lobby-fronted case.
+
+**Out of scope for this note.** Per-region join balancing (which backend hosts which biome / claim-plugin region), join-time queue-vs-fail policy when no backend qualifies, and the proxy telemetry table column list that would feed a richer selector. All three are tracked elsewhere (region filters in `WeightedAverageBackendSelector`, *Failure-Mode Policy* above, *Open Items / Follow-Ups* `proxy_state` row).
 
 ---
 

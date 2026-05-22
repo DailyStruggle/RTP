@@ -136,6 +136,31 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable constructing new RTP() -- wires API instance");
       RTP rtp = new RTP(); // constructor updates API instance
 
+      // L6 Slice J: read routing.lobbyMode from network.yml BEFORE setupDatabase
+      // (which loads regions.yml and constructs Region instances). The flag gates
+      // the per-region ScanTask scheduling, DB hydrate, and steady-state
+      // Region.execute() pulse - all of which would otherwise begin spending CPU
+      // and disk on a backend that should not be holding any local locations.
+      // Defensive: any failure resolves to lobbyMode=false, preserving pre-J
+      // behaviour byte-for-byte on non-lobby deployments.
+      try {
+        java.io.File earlyNetworkYml = NetworkModeBootstrap.ensureNetworkYml(
+            getDataFolder(), RTPBukkitPlugin.class);
+        RTP.lobbyMode = NetworkModeBootstrap.readLobbyModeEarly(earlyNetworkYml);
+        if (RTP.lobbyMode) {
+          RTP.log(java.util.logging.Level.INFO,
+              "[LIFECYCLE] onEnable routing.lobbyMode=true -- local region processing"
+                  + " (ScanTask pre-fill, DB hydrate, Region.execute pulse) will be"
+                  + " skipped; this backend acts as a pure cross-server dispatcher.");
+        }
+      } catch (Throwable t) {
+        // Never block plugin enable on this read.
+        RTP.lobbyMode = false;
+        RTP.log(java.util.logging.Level.FINE,
+            "[LIFECYCLE] onEnable lobbyMode early-read failed; defaulting to false: "
+                + t.getMessage());
+      }
+
       try {
         RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable BukkitDatabaseHandler.setupDatabase");
         BukkitDatabaseHandler.setupDatabase(rtp);
@@ -190,17 +215,22 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     setupBukkitEvents();
     // CHECKLIST-maps-api.md Stage 2.6 - install the Bukkit-family MapBinding
     // so that MapDispatch (ADR-047 / REQ-RTP-MAP-006) can satisfy chart
-    // requests issued from /rtp info etc. Folia override (Stage 2.3) and
-    // bindLive (Stage 3 of CHECKLIST-metrics-to-maps) remain deferred; this
-    // binding's bindLive throws UnsupportedOperationException by contract.
+    // requests issued from /rtp info etc. Stage 2.3 selects FoliaMapBinding
+    // on Folia (per-viewer EntityScheduler hop available for Stage 3 live
+    // charts); other backends get the plain BukkitMapBinding. bindLive
+    // remains deferred on both paths (Stage 3 of CHECKLIST-metrics-to-maps).
     try {
-      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(
-          new io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding());
+      io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding binding =
+          isFolia()
+              ? new io.github.dailystruggle.rtp.folia.maps.FoliaMapBinding()
+              : new io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding();
+      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(binding);
       RTP.log(java.util.logging.Level.FINE,
-          "[LIFECYCLE] onEnable installed BukkitMapBinding via MapDispatch");
+          "[LIFECYCLE] onEnable installed " + binding.getClass().getSimpleName()
+              + " via MapDispatch");
     } catch (Throwable t) {
       RTP.log(java.util.logging.Level.WARNING,
-          "[LIFECYCLE] onEnable BukkitMapBinding install failed; MapDispatch will fall back to NoopMapBinding",
+          "[LIFECYCLE] onEnable MapBinding install failed; MapDispatch will fall back to NoopMapBinding",
           t);
     }
     // Catch worlds that were already loaded by the time the listener registered
@@ -353,6 +383,17 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     try {
       io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.uninstall();
     } catch (NoClassDefFoundError ignored) {
+    }
+    // CHECKLIST-maps-api.md Stage 2.2 / REQ-RTP-MAP-003 - fan out the
+    // host-plugin disable to every registered MapBindingLifecycle so the
+    // active BukkitMapBinding (installed in onEnable) releases its cached
+    // MapHandles and the active-GC tracker no longer sees the binding's
+    // entries. Idempotent; safe if MapDispatch was never used this lifecycle.
+    try {
+      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.fireDisable();
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[LIFECYCLE] onDisable MapDispatch.fireDisable failed (continuing): " + t.getMessage(), t);
     }
     if (commandTimer != null) {
       RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onDisable commandTimer.cancel()");

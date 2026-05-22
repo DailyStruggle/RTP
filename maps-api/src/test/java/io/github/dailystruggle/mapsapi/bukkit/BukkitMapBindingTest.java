@@ -111,4 +111,50 @@ class BukkitMapBindingTest {
                     "logical " + i + " resolved to TRANSPARENT; ramp should be opaque");
         }
     }
+
+    @Test
+    @DisplayName("Stage 2.2: onPlayerQuit drops the viewer's cached chartIds (idempotent re-allocate yields a fresh handle)")
+    void onPlayerQuitReleasesViewerHandles() {
+        java.util.UUID viewer = java.util.UUID.randomUUID();
+        MapAllocationRequest req = new MapAllocationRequest(
+                "bad-points/world/quit", viewer, MapAllocationRequest.Locking.LOCKED);
+        MapHandle first = binding.allocate(req);
+        assertNotNull(first);
+        // Sanity: second allocate dedupes while the viewer is cached.
+        assertSame(first, binding.allocate(req));
+
+        binding.onPlayerQuit(viewer);
+
+        // After quit, the cache entry is gone -> a fresh allocate produces a new handle
+        // (and a new backing MapView). The previous handle is intentionally unreferenced
+        // and eligible for GC; the binding never holds it after onPlayerQuit.
+        MapHandle replacement = binding.allocate(req);
+        assertNotNull(replacement);
+        assertTrue(replacement != first,
+                "onPlayerQuit should release the cached chartId so a fresh allocate produces a new handle");
+    }
+
+    @Test
+    @DisplayName("Stage 2.2: onPlayerQuit on an unknown viewer is a safe no-op")
+    void onPlayerQuitUnknownViewerIsNoop() {
+        binding.onPlayerQuit(java.util.UUID.randomUUID());
+        // Subsequent allocate still works
+        MapHandle handle = binding.allocate(new MapAllocationRequest(
+                "bad-points/world/unknown-quit", null, MapAllocationRequest.Locking.LOCKED));
+        assertNotNull(handle);
+    }
+
+    @Test
+    @DisplayName("Stage 2.2: onDisable clears every cache and subsequent allocate throws IllegalStateException")
+    void onDisableMakesBindingUnusable() {
+        binding.allocate(new MapAllocationRequest(
+                "bad-points/world/disable-1", java.util.UUID.randomUUID(),
+                MapAllocationRequest.Locking.LOCKED));
+        binding.onDisable();
+        assertThrows(IllegalStateException.class,
+                () -> binding.allocate(new MapAllocationRequest(
+                        "bad-points/world/post-disable", null,
+                        MapAllocationRequest.Locking.LOCKED)),
+                "after onDisable, allocate must refuse with IllegalStateException");
+    }
 }
