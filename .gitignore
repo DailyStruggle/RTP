@@ -1,6 +1,10 @@
 # User-specific stuff
 .idea/
 tmp/
+tmp_*/
+**/tmp/
+**/tmp_*/
+*.tmp
 build/
 *.bin
 *.uniqueid*
