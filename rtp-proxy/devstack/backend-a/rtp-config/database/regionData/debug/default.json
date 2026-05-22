@@ -4,40 +4,126 @@
   "spatialResolution": 3,
   "badLocations": [
     {
-      "start": 77160,
+      "start": 5197,
       "length": 1
     },
     {
-      "start": 95415,
+      "start": 5806,
       "length": 1
     },
     {
-      "start": 161096,
+      "start": 8984,
+      "length": 1
+    },
+    {
+      "start": 10842,
+      "length": 1
+    },
+    {
+      "start": 18812,
+      "length": 1
+    },
+    {
+      "start": 33253,
+      "length": 1
+    },
+    {
+      "start": 40396,
+      "length": 1
+    },
+    {
+      "start": 52779,
+      "length": 1
+    },
+    {
+      "start": 54416,
+      "length": 1
+    },
+    {
+      "start": 56748,
+      "length": 1
+    },
+    {
+      "start": 59228,
+      "length": 1
+    },
+    {
+      "start": 78479,
+      "length": 1
+    },
+    {
+      "start": 88332,
+      "length": 1
+    },
+    {
+      "start": 95407,
+      "length": 1
+    },
+    {
+      "start": 97745,
+      "length": 1
+    },
+    {
+      "start": 107503,
+      "length": 1
+    },
+    {
+      "start": 144622,
+      "length": 1
+    },
+    {
+      "start": 163514,
+      "length": 1
+    },
+    {
+      "start": 165317,
+      "length": 2
+    },
+    {
+      "start": 166282,
+      "length": 1
+    },
+    {
+      "start": 171760,
+      "length": 1
+    },
+    {
+      "start": 186401,
       "length": 1
     }
   ],
   "biomeLocations": {
+    "OLD_GROWTH_BIRCH_FOREST": [
+      {
+        "start": 22832,
+        "length": 3
+      }
+    ],
     "PLAINS": [
       {
-        "start": 129850,
+        "start": 17800,
+        "length": 3
+      },
+      {
+        "start": 113514,
         "length": 3
       }
     ],
-    "OLD_GROWTH_PINE_TAIGA": [
+    "TAIGA": [
       {
-        "start": 148859,
+        "start": 137491,
         "length": 3
       }
     ],
-    "BIRCH_FOREST": [
+    "FOREST": [
       {
-        "start": 70454,
+        "start": 22516,
         "length": 3
       }
     ],
-    "SNOWY_PLAINS": [
+    "FLOWER_FOREST": [
       {
-        "start": 42014,
+        "start": 101219,
         "length": 3
       }
     ]
