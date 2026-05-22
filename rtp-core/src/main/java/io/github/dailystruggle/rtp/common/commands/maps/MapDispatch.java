@@ -2,14 +2,18 @@ package io.github.dailystruggle.rtp.common.commands.maps;
 
 import io.github.dailystruggle.mapsapi.MapAllocationRequest;
 import io.github.dailystruggle.mapsapi.MapBinding;
+import io.github.dailystruggle.mapsapi.MapBindingLifecycle;
 import io.github.dailystruggle.mapsapi.MapHandle;
 import io.github.dailystruggle.mapsapi.noop.NoopMapBinding;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
@@ -50,6 +54,23 @@ public final class MapDispatch {
   private static final AtomicReference<MapBinding> BINDING =
       new AtomicReference<>(new NoopMapBinding());
 
+  /**
+   * Lifecycle registry (CHECKLIST-maps-api.md Stage 2.2, REQ-RTP-MAP-003).
+   * Platform bridges (see {@code BukkitMapBindingListener} in
+   * {@code rtp-bukkit-common}) call {@link #firePlayerQuit} / {@link
+   * #fireDisable}; {@link #setMapBinding} additionally auto-registers
+   * any installed {@link MapBindingLifecycle} so the common case
+   * ("install BukkitMapBinding") needs no second call.
+   */
+  private static final List<MapBindingLifecycle> LIFECYCLES =
+      new CopyOnWriteArrayList<>();
+
+  /** Label used for {@link MemoryTracker} entries opened by {@link #paint}. */
+  static final String MEMORY_TRACKER_LABEL = "BukkitMapBinding";
+
+  /** Max lifespan (ms) for a {@link MemoryTracker} entry opened by {@link #paint}. */
+  static final long MEMORY_TRACKER_TTL_MS = 30_000L;
+
   private MapDispatch() {}
 
   /**
@@ -58,10 +79,93 @@ public final class MapDispatch {
    * sentinel before the first call). Intended for platform adapters
    * (Stage 2: {@code BukkitMapBinding}, {@code FoliaMapBinding},
    * {@code FabricMapBinding}) and addon override hooks.
+   *
+   * <p>If {@code binding} additionally implements {@link MapBindingLifecycle},
+   * it is auto-registered with the lifecycle bus so the platform bridge
+   * does not need a second call. The previously-installed binding (if any)
+   * is implicitly retired: {@link #fireDisable} is <em>not</em> invoked on
+   * it here because installation churn is not a server-disable event;
+   * callers that want explicit teardown shall call {@link #fireDisable}
+   * before installing a replacement.
    */
   public static MapBinding setMapBinding(MapBinding binding) {
     Objects.requireNonNull(binding, "binding");
-    return BINDING.getAndSet(binding);
+    MapBinding previous = BINDING.getAndSet(binding);
+    if (binding instanceof MapBindingLifecycle lifecycle) {
+      registerLifecycle(lifecycle);
+    }
+    return previous;
+  }
+
+  /**
+   * Registers a {@link MapBindingLifecycle} with the dispatch lifecycle bus.
+   * Idempotent: a listener already present is not re-registered. Platform
+   * adapters whose {@link MapBinding} implementation also implements
+   * {@link MapBindingLifecycle} are auto-registered via
+   * {@link #setMapBinding}; this entry point exists for tests and for
+   * standalone lifecycle observers that aren't themselves the active
+   * binding.
+   */
+  public static void registerLifecycle(MapBindingLifecycle lifecycle) {
+    Objects.requireNonNull(lifecycle, "lifecycle");
+    if (!LIFECYCLES.contains(lifecycle)) {
+      LIFECYCLES.add(lifecycle);
+    }
+  }
+
+  /**
+   * Deregisters a previously-installed {@link MapBindingLifecycle}. Safe to
+   * call with a listener that was never registered.
+   */
+  public static void unregisterLifecycle(MapBindingLifecycle lifecycle) {
+    if (lifecycle == null) return;
+    LIFECYCLES.remove(lifecycle);
+  }
+
+  /**
+   * Fan-out for the platform {@code PlayerQuitEvent} bridge. Each registered
+   * {@link MapBindingLifecycle} is notified; an exception from one listener
+   * is logged at WARNING and does not block notification of the others.
+   */
+  public static void firePlayerQuit(UUID viewer) {
+    if (viewer == null) return;
+    for (MapBindingLifecycle lifecycle : LIFECYCLES) {
+      try {
+        lifecycle.onPlayerQuit(viewer);
+      } catch (RuntimeException e) {
+        RTP.log(Level.WARNING,
+            "MapDispatch.firePlayerQuit: lifecycle " + lifecycle.getClass().getName()
+                + " threw for viewer " + viewer + ": " + e.getMessage(), e);
+      }
+    }
+  }
+
+  /**
+   * Fan-out for host-plugin {@code onDisable}. Each registered
+   * {@link MapBindingLifecycle} is notified, and the registry is cleared so
+   * a subsequent re-enable starts with a clean slate. An exception from one
+   * listener is logged at WARNING and does not block the rest.
+   */
+  public static void fireDisable() {
+    for (MapBindingLifecycle lifecycle : LIFECYCLES) {
+      try {
+        lifecycle.onDisable();
+      } catch (RuntimeException e) {
+        RTP.log(Level.WARNING,
+            "MapDispatch.fireDisable: lifecycle " + lifecycle.getClass().getName()
+                + " threw: " + e.getMessage(), e);
+      }
+    }
+    LIFECYCLES.clear();
+  }
+
+  /**
+   * Test-only accessor: the number of currently-registered lifecycle
+   * listeners. Exposed for {@code MapDispatchTest} regression coverage of
+   * REQ-RTP-MAP-003.
+   */
+  public static int registeredLifecycleCount() {
+    return LIFECYCLES.size();
   }
 
   /**
@@ -145,6 +249,12 @@ public final class MapDispatch {
       return false;
     }
 
+    // CHECKLIST-maps-api.md Stage 2.2 / REQ-RTP-MAP-003: register the freshly
+    // allocated handle with the active-GC safety net so a leak from a
+    // renderEphemeral that never returns (platform fault, viewer disconnect
+    // mid-paint, etc.) is reaped by the periodic sweep instead of pinning
+    // the MapView reference forever. Untracked on every exit path below.
+    UUID trackingId = MemoryTracker.track(handle, MEMORY_TRACKER_LABEL, MEMORY_TRACKER_TTL_MS);
     try {
       binding.renderEphemeral(handle, resolution.renderer(), resolution.model());
     } catch (RuntimeException e) {
@@ -153,6 +263,8 @@ public final class MapDispatch {
               + " renderEphemeral failed: " + e.getMessage(), e);
       sendMessage(viewer, MessagesKeys.mapUnavailable);
       return false;
+    } finally {
+      MemoryTracker.untrack(trackingId);
     }
     return true;
   }

@@ -2,29 +2,53 @@
 
 First-class runtime verification fixture for the cross-server `/rtp` slice
 (CHECKLIST-cross-server-rtp.md L3). Boots 1 Redis + 2 Velocity proxies + 2
-Paper backends on a single docker-compose network and exercises the
-round-trip, kill-mid-flight, and kill-switch scenarios.
+Paper lobbies + 2 Paper backends on a single docker-compose network and
+exercises the round-trip, kill-mid-flight, and kill-switch scenarios.
 
 ## Topology
 
 ```
-            +-----------+        +-----------+
-client ---> | proxy-a   |---+--->| backend-a |
-            +-----------+   |    +-----------+
-                            |
-            +-----------+   +--->+-----------+
-client ---> | proxy-b   |------->| backend-b |
-            +-----------+        +-----------+
-                          \             /
-                           \           /
-                            +-> redis <+
+            +-----------+        +-----------+        +-----------+
+client ---> | proxy-a   |---+--->| lobby-a   |---+--->| backend-a |
+            +-----------+   |    +-----------+   |    +-----------+
+                            |                    |
+            +-----------+   +--->+-----------+   +--->+-----------+
+client ---> | proxy-b   |------->| lobby-b   |------->| backend-b |
+            +-----------+        +-----------+        +-----------+
+                          \                                /
+                           \                              /
+                            +----------> redis <---------+
                              (heartbeat, claim/release/redeem)
 ```
 
 - Proxies expose 25577 / 25578 on the host. Connect any Minecraft client to
   `localhost:25577` or `localhost:25578`.
-- Backends are reachable only on the compose network, exactly as in production.
+- Lobbies and backends are reachable only on the compose network, exactly as
+  in production.
 - Redis is published on 6379 for `redis-cli MONITOR` from the host.
+
+### Lobbies (no local RTP region; cross-server dispatch only)
+
+`lobby-a` and `lobby-b` are full Paper servers with the same unified
+`RTP-Pro-<ver>.jar` and `network.yml` (`role: backend`, unique `serverId`) as
+the destination backends, but their `regions/` directory is **intentionally
+empty** (see `lobby-{a,b}/rtp-config/regions/README.md`). This makes them the
+first hop a fresh connection lands on (both `velocity.toml` `try` lists put
+lobbies before backends), and exercises the lobby use case:
+
+- A player joins via `proxy-a` and lands on `lobby-a` (or `lobby-b` on
+  `proxy-b`). The lobby has no local destination region, so running `/rtp`
+  cannot resolve to a same-server coordinate.
+- The cross-server pipeline dispatches the request: either to a named
+  backend (`/rtp <region-on-backend-a>` style usage if the operator wires
+  that up) or to whichever destination the `BackendSelector` load-balances
+  to across `backend-a` / `backend-b`.
+- After redeem, the player is transferred to the chosen backend by the
+  proxy and teleported to the resolved coordinate.
+
+This is the topology to use when verifying that a player on a lobby cannot
+accidentally teleport locally and that the network-mode dispatch is the only
+path to a destination.
 
 ## One-time setup
 
@@ -72,8 +96,8 @@ Each scenario is described in `docs/admin/proxies/CROSS_SERVER_VERIFICATION.md`.
 
 | Scenario           | Headless evidence                                                |
 |--------------------|------------------------------------------------------------------|
-| boot               | `docker compose ps` reports all five services `Up`               |
-| heartbeat          | `redis-cli` lists 2 backend + 2 proxy heartbeat keys             |
+| boot               | `docker compose ps` reports all seven services `Up`              |
+| heartbeat          | `redis-cli` lists 4 backend (incl. 2 lobbies) + 2 proxy keys     |
 | roundtrip          | requires a manual MC client login (see admin doc)                |
 | killmidflight      | reservation row clears within `reservation.ttlMs + reapInterval` |
 | killswitch         | Lua claim returns `KILL_SWITCH`; harness asserts proxy log line  |

@@ -67,6 +67,19 @@ routing:
   # `always` - always enrol into the wait queue (developer / acceptance
   #            harness mode; not recommended for production).
   mode: "local"
+  # Lobby mode (L6 Slice I). When true, this backend becomes a pure dispatch
+  # node:
+  #  - Heartbeats publish an empty `regions` set and `acceptingRequests:false`
+  #    so peers never select this backend as a cross-server destination.
+  #  - A bare `/rtp` (no `region=` argument) auto-routes to the peer +
+  #    region with the largest `regionKeptCounts` value across the snapshot
+  #    ("most-kept" policy, v1). Explicit `rtp region=<server>:<region>`
+  #    still works as in Slice H2.
+  #  - When no peer advertises any region, bare `/rtp` rejects with the
+  #    localized `networkRegionUnavailable` message instead of silently
+  #    falling through to the (empty) local pipeline.
+  # Default false preserves pre-Slice-I behaviour.
+  lobbyMode: false
 # Cross-server wait queue (L6 / rtp-proxy-ADR-014). All keys here are
 # ignored when `network.enabled: false` or `routing.mode: local`.
 queue:

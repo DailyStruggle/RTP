@@ -1,16 +1,23 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
+import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 
 import org.jetbrains.annotations.Nullable;
@@ -55,6 +62,51 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
     @Override
     public String description() {
         return "preview a prefab and mint a confirmation token";
+    }
+
+    /**
+     * Capture the {@code <id>} positional from the args-form dispatch path.
+     *
+     * <p>TreeCommand's default parser routes any non-{@code key=value} token
+     * through subcommand lookup; an unknown token (e.g. a hyphenated prefab
+     * id like {@code low-performance}) hits {@code msgInvalidCommand} and
+     * never reaches the map-form {@link #onCommand(UUID, Map, CommandsAPICommand)}.
+     * Both the menu redeem path ({@code /rtp admin prefab apply <id>}) and
+     * a player typing the verb in chat surface this bug; this override
+     * captures the first free positional into {@code parameterValues}
+     * (under its own value as key, the shape
+     * {@link #extractFirstPositional(Map)} already accepts) and invokes the
+     * map form directly. Subcommand-style suffixes (none today) would still
+     * be routed by the super impl; this verb has no children so a free
+     * positional is unambiguously the prefab id.
+     */
+    @Override
+    public CompletableFuture<Boolean> onCommand(@NotNull UUID callerId,
+                                                @NotNull Predicate<String> permissionCheckMethod,
+                                                @NotNull Consumer<String> messageMethod,
+                                                @NotNull String[] args,
+                                                int i,
+                                                @Nullable Map<String, CommandParameter> tempParameters) {
+        if (!permissionCheckMethod.test(permission())) {
+            return CompletableFuture.completedFuture(false);
+        }
+        Map<String, List<String>> parameterValues = new HashMap<>();
+        for (; i < args.length; i++) {
+            String arg = args[i];
+            if (arg == null || arg.isEmpty()) continue;
+            int eq = arg.indexOf('=');
+            if (eq < 0) {
+                // Free positional: stash under the value as key with an empty
+                // list, matching what extractFirstPositional() accepts.
+                parameterValues.computeIfAbsent(arg, k -> new ArrayList<>());
+            } else {
+                String key = arg.substring(0, eq).toLowerCase(Locale.ROOT);
+                String val = arg.substring(eq + 1);
+                parameterValues.computeIfAbsent(key, k -> new ArrayList<>()).add(val);
+            }
+        }
+        return CompletableFuture.completedFuture(
+                onCommand(callerId, parameterValues, null, messageMethod));
     }
 
     @Override

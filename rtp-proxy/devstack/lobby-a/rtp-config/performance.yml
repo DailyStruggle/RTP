@@ -1,0 +1,128 @@
+# --- RTP Performance Settings ---
+# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/PERFORMANCE.md
+# Maximum search attempts per /rtp invocation before giving up.
+# @type: integer
+# @range: [1, null]
+# @default: 32
+maxAttempts: 32
+
+# Chunk radius loaded around a candidate location during selection.
+# 0 loads only the candidate chunk.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+viewDistanceSelect: 0
+
+# Chunk radius loaded around the final location immediately before
+# teleport. 0 loads only the destination chunk.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+viewDistanceTeleport: 0
+
+# Ticks between background cache cycles (region pre-fill, queue refill).
+# @type: integer
+# @range: [1, null]
+# @unit: ticks
+# @default: 20
+period: 20
+
+# Maximum milliseconds per tick spent in synchronous tasks.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+syncAllottedTime: 50
+
+# Maximum milliseconds per tick spent in asynchronous tasks.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+asyncAllottedTime: 50
+
+# Minimum server TPS required to continue background queueing.
+# Background work pauses when TPS drops below this threshold.
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+minTPS: 19.0
+
+# Refill the region cache immediately after a successful teleport.
+# @type: boolean
+# @default: false
+postTeleportQueueing: false
+
+# Use synchronous chunk loading. NOT RECOMMENDED. Violates S-005 spirit
+# on Folia and will block the main thread on Paper/Spigot.
+# @type: boolean
+# @default: false
+syncLoading: false
+
+# Re-parse permission nodes on every event instead of caching.
+# @type: boolean
+# @default: false
+onEventParsing: false
+
+# Parse effect permission nodes at startup.
+# @type: boolean
+# @default: true
+effectParsing: true
+
+# Reuse previously-found biome-matched locations from cache.
+# @type: boolean
+# @default: true
+biomeRecall: true
+
+# When set, only serve biome-filtered requests from cache (never
+# generate new biome searches). Requires biomeRecall.
+# @type: boolean
+# @default: false
+biomeRecallForced: false
+
+# Scan for safe landing spots in all loaded chunks (opportunistic
+# pre-fill).
+# @type: boolean
+# @default: false
+checkOnChunkLoads: false
+
+# Enable background data gathering for visitor analytics.
+# @type: boolean
+# @default: false
+visitorEnabled: false
+
+# Maintain a reserved cache of locations for join-time teleports
+# (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty
+# player slots.
+# @type: boolean
+# @default: false
+loginCacheEnabled: false
+
+# Hard cap for the login cache. 0 = auto (server max-players,
+# snapshotted at startup).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+loginCacheCap: 0
+
+# Probability of rejecting an ungenerated chunk per selection attempt.
+# 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land.
+# Generated chunks always pass.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+pregeneratedPreference: 0.0
+
+# Fraction of L3 backlog capacity at which refill resumes (hysteresis).
+# 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill
+# continuously. Higher values group .mca-bin checks for better
+# CPU/memory efficiency.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+backlogRefillThreshold: 0.5
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

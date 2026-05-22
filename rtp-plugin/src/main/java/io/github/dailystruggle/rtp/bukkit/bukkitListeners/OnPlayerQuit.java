@@ -35,6 +35,20 @@ public final class OnPlayerQuit implements Listener {
 
     new RTPTeleportCancel(uuid).run();
 
+    // CHECKLIST-maps-api.md Stage 2.2 / REQ-RTP-MAP-003 — bridge the
+    // PlayerQuitEvent into the MapDispatch lifecycle bus so any registered
+    // MapBindingLifecycle (e.g. BukkitMapBinding) can release per-viewer
+    // cached MapHandles. Mirrors the registration pattern used by
+    // commands-api / effects-api: maps-api defines the SPI, rtp-core owns
+    // the registry, the platform listener forwards the event. Best-effort,
+    // guarded — the quit listener must never throw.
+    try {
+      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.firePlayerQuit(uuid);
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP] MapDispatch.firePlayerQuit failed for " + uuid + ": " + t, t);
+    }
+
     // ADR-043 — Close the player's personal coordinate bucket on every
     // region. The bucket was opened by OnPlayerJoin / OnPlayerRespawn /
     // OnPlayerChangeWorld under the `rtp.personalqueue` opt-in, and

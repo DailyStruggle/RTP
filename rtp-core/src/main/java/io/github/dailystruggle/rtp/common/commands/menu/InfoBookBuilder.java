@@ -9,8 +9,12 @@ import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry;
+import io.github.dailystruggle.mapsapi.noop.NoopMapBinding;
+import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
+import io.github.dailystruggle.rtp.common.commands.maps.ChartSpecTokens;
+import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
 import java.time.Duration;
@@ -200,7 +204,9 @@ public final class InfoBookBuilder {
         List<MenuLine> lines = new ArrayList<>(last.lines());
 
         // If the last page is already at the cap, push the footer to a new page.
-        int footerRows = 4; // blank spacer + refresh + switch-to-text + note
+        // ADR-047 row (bad-points map) is conditional and may add one more line;
+        // size for the worst case so an overflow does not push the note off-page.
+        int footerRows = 5; // blank spacer + refresh + switch-to-text + (optional map) + note
         if (lines.size() + footerRows > LINES_PER_PAGE) {
             out.set(out.size() - 1, new MenuPage(lines));
             lines = new ArrayList<>();
@@ -232,6 +238,32 @@ public final class InfoBookBuilder {
         MenuAction switchAction = new MenuAction.SwitchInfoToText(scope);
         tokenRegistry.mint(viewer, switchAction, tokenTtl);
         lines.add(MenuLine.of(new MenuFragment(switchLabel, switchHover, switchAction)));
+
+        // ADR-047 / REQ-RTP-MAP-006 declarative chart bridge: bad-points
+        // heatmap row. Only rendered when (a) a real MapBinding is installed
+        // (the NoopMapBinding sentinel means the binding slot is empty, so
+        // clicking would only produce the configurable mapBindingMissing
+        // message) and (b) the scope is REGION (BadPointsHeatmapResolver
+        // needs a region name; the GLOBAL / WORLD scopes have no canonical
+        // region to project). The dispatch arm
+        // (MenuRedeemSubcommand.dispatchOpenMap) enforces the rtp.menu.admin
+        // permission server-side, so the row only acts as a discoverability
+        // affordance: a non-admin who somehow clicks it will be denied with
+        // the standard menuInvalid path.
+        if (scope.kind() == MenuAction.InfoScopeToken.Kind.REGION
+                && !(MapDispatch.getMapBinding() instanceof NoopMapBinding)) {
+            String mapLabel = lookupMsg(
+                    MessagesKeys.menuInfoBadPointsLabel,
+                    "&b\u2316 View bad-points map");
+            if (mapLabel != null && !mapLabel.isEmpty()) {
+                UUID chartToken = ChartSpecTokens.instance().mint(
+                        viewer,
+                        ChartSpec.of(ChartSpec.Kind.BAD_POINTS_HEATMAP, scope.name()));
+                MenuAction mapAction = new MenuAction.OpenMap(chartToken);
+                tokenRegistry.mint(viewer, mapAction, tokenTtl);
+                lines.add(MenuLine.of(new MenuFragment(mapLabel, null, mapAction)));
+            }
+        }
 
         // Non-clickable note row about auto-refresh being deferred. Empty
         // template skips silently so locales without the new key keep

@@ -129,13 +129,26 @@ class NetworkRouterTest {
     }
 
     @Test
-    void parseRegionArg_rejects_equals_and_colon_per_D7() {
+    void parseRegionArg_rejects_equals_but_accepts_server_colon_region_H2() {
+        // H2 (rtp-proxy-ADR-014): `=` is still reserved (D7 future-separator)
+        // but `:` now splits `server:region` so `region=backend-a:default`
+        // works. Backward-compat alias `parseRegionArg` returns just the
+        // regionKey half; `parseRegionArgQualified` returns both halves.
         assertThrows(IllegalArgumentException.class, () -> NetworkRouter.parseRegionArg("east=safe"));
-        assertThrows(IllegalArgumentException.class, () -> NetworkRouter.parseRegionArg("east:safe"));
         assertEquals("safe", NetworkRouter.parseRegionArg("safe"));
         assertEquals("safe", NetworkRouter.parseRegionArg("  safe  "));
         assertSame(null, NetworkRouter.parseRegionArg(null));
         assertSame(null, NetworkRouter.parseRegionArg("   "));
+        // H2 server:region:
+        assertEquals("safe", NetworkRouter.parseRegionArg("backend-a:safe"));
+        var qualified = NetworkRouter.parseRegionArgQualified("backend-a:safe");
+        assertNotNull(qualified);
+        assertEquals("backend-a", qualified.serverHint());
+        assertEquals("safe", qualified.regionKey());
+        // Malformed colons reject.
+        assertThrows(IllegalArgumentException.class, () -> NetworkRouter.parseRegionArgQualified("a:b:c"));
+        assertThrows(IllegalArgumentException.class, () -> NetworkRouter.parseRegionArgQualified(":safe"));
+        assertThrows(IllegalArgumentException.class, () -> NetworkRouter.parseRegionArgQualified("backend-a:"));
     }
 
     @Test

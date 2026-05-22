@@ -153,7 +153,7 @@ function Show-LogWindows {
   # server in real time without juggling `docker compose logs` tabs by hand.
   # Idempotent: each window is tagged with a unique title; re-running this
   # function spawns fresh windows (old ones can be closed by the operator).
-  $services = @('redis', 'proxy-a', 'proxy-b', 'backend-a', 'backend-b')
+  $services = @('redis', 'proxy-a', 'proxy-b', 'lobby-a', 'lobby-b', 'backend-a', 'backend-b')
   Write-Host "[logs] opening per-service log windows ($($services -join ', '))..." -ForegroundColor Cyan
   foreach ($svc in $services) {
     $title = "rtp-devstack: $svc"
@@ -219,12 +219,34 @@ function Invoke-GradleBuild {
     Write-Host "[build] WARN - gradlew.bat not found at $gradlew; skipping auto-build" -ForegroundColor Yellow
     return
   }
-  Write-Host '[build] running gradle (rtp-proxy-velocity:jar + rtp-plugin:shadowJar) (typical: cold 1-3 min, incremental 5-20s)...' -ForegroundColor Cyan
+  Write-Host '[build] running gradle (clean + rtp-proxy-velocity:jar + rtp-plugin:shadowJar) (typical: cold 1-3 min, incremental 30-60s with clean)...' -ForegroundColor Cyan
   Push-Location $root
   try {
     # rtp-proxy-velocity is a plain java-library (no shadow plugin) - its `jar` task
-    # produces the runtime artifact. rtp-plugin uses shadowJar for the fat Paper jar.
-    $out = Invoke-Native { & $gradlew ':rtp-proxy:rtp-proxy-velocity:jar' ':rtp-plugin:shadowJar' '--console=plain' }
+    # produces the runtime artifact. rtp-plugin uses shadowJar for the fat Paper jar
+    # (RTP-Pro-<ver>.jar) which transitively shades rtp-proxy-common -> the actual
+    # runtime path used by both proxy-a/proxy-b AND backend-a/backend-b (the unified
+    # uber-jar carries the Velocity entrypoint AND the Bukkit entrypoint side by side
+    # per the velocity-plugin.json + plugin.yml descriptors).
+    #
+    # We `clean` the three modules in the dependency chain before building so a
+    # source edit in rtp-proxy-common (e.g. HMAC envelope fix 2026-05-21) is
+    # guaranteed to re-shade into the RTP-Pro jar. Without `clean`, Gradle will
+    # rebuild only the changed module and rely on the cached shaded jar - leaving
+    # proxies and backends running yesterday's bytes. This is the safe default for
+    # an acceptance harness; iteration speed is not a concern here.
+    # `:rtp-plugin:remapJar` (not shadowJar) is the task that produces the
+    # deployable `RTP-Pro-<ver>.jar`: shadowJar builds the intermediate, Loom's
+    # remapJar consumes it and renames to RTP-Pro (rtp-plugin/build.gradle:377).
+    # Calling shadowJar alone after `clean` leaves no RTP-Pro artifact on disk,
+    # and the staging step downstream then warns "Pro jar not found".
+    $out = Invoke-Native { & $gradlew `
+      ':rtp-proxy:rtp-proxy-common:clean' `
+      ':rtp-proxy:rtp-proxy-velocity:clean' `
+      ':rtp-plugin:clean' `
+      ':rtp-proxy:rtp-proxy-velocity:jar' `
+      ':rtp-plugin:remapJar' `
+      '--console=plain' }
     Write-Evidence 'build' $out
     if ($LASTEXITCODE -ne 0) {
       Write-Host "[build] FAIL - gradle exited $LASTEXITCODE (see acceptance-evidence.log)" -ForegroundColor Red
@@ -258,9 +280,28 @@ function Invoke-GradleBuild {
   # is not appropriate for cross-server verification - see ADR-024). Prefer
   # RTP-Pro-<ver>.jar; fall back to the plain RTP-<ver>.jar only if Pro is absent.
   # Always exclude -dev / -sources / -javadoc artifacts.
+  #
+  # Each backend MUST have its own plugins dir (./backend-a/plugins,
+  # ./backend-b/plugins) - they cannot share a host bind because Paper writes
+  # /data/plugins/.paper-remapped/ on boot and two backends racing on the same
+  # host directory corrupt that cache (ZipException: invalid LOC header).
+  # ./jars/plugin is retained as the staging source for Sync-ProxyJars, which
+  # fans the same uber-jar into each Velocity plugins dir.
   $pluginLibs = Join-Path $root 'rtp-plugin\build\libs'
-  $pluginDst = Join-Path $PSScriptRoot 'jars\plugin'
-  if (-not (Test-Path $pluginDst)) { New-Item -ItemType Directory -Path $pluginDst -Force | Out-Null }
+  $pluginStage = Join-Path $PSScriptRoot 'jars\plugin'
+  # Lobbies receive the SAME unified RTP-Pro jar as backends: they participate
+  # in the network (role: backend) but have no local destination region
+  # (see devstack/lobby-{a,b}/rtp-config/regions/README.md). The jar must be
+  # present so /rtp on a lobby can dispatch cross-server.
+  $backendDsts = @(
+    (Join-Path $PSScriptRoot 'backend-a\plugins'),
+    (Join-Path $PSScriptRoot 'backend-b\plugins'),
+    (Join-Path $PSScriptRoot 'lobby-a\plugins'),
+    (Join-Path $PSScriptRoot 'lobby-b\plugins')
+  )
+  foreach ($d in @($pluginStage) + $backendDsts) {
+    if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+  }
   if (Test-Path $pluginLibs) {
     $allJars = Get-ChildItem -Path $pluginLibs -Filter 'RTP-*.jar' -File |
       Where-Object { $_.Name -notmatch '-dev\.jar$|-sources\.jar$|-javadoc\.jar$' }
@@ -273,14 +314,21 @@ function Invoke-GradleBuild {
       $variant = 'lite (Pro jar not found - falling back)'
       Write-Host '[build] WARN - RTP-Pro-<ver>.jar not found; falling back to plain RTP jar. Build Pro via the Pro Gradle profile to match the devstack.' -ForegroundColor Yellow
     }
-    Get-ChildItem -Path $pluginDst -Filter '*.jar' -File -ErrorAction SilentlyContinue | Remove-Item -Force
-    foreach ($j in $pJars) {
-      Copy-Item -Path $j.FullName -Destination (Join-Path $pluginDst $j.Name) -Force
+    foreach ($dst in @($pluginStage) + $backendDsts) {
+      Get-ChildItem -Path $dst -Filter '*.jar' -File -ErrorAction SilentlyContinue | Remove-Item -Force
+      foreach ($j in $pJars) {
+        Copy-Item -Path $j.FullName -Destination (Join-Path $dst $j.Name) -Force
+      }
     }
-    Write-Host "[build] staged $($pJars.Count) Paper plugin jar(s) [$variant] -> jars/plugin" -ForegroundColor Cyan
+    Write-Host "[build] staged $($pJars.Count) Paper plugin jar(s) [$variant] -> jars/plugin + backend-{a,b}/plugins" -ForegroundColor Cyan
   }
   # See note above: backend's mc-image-helper AccessDeniedException on dotfiles.
-  Get-ChildItem -Path $pluginDst -Filter '.gitkeep' -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+  foreach ($dst in @($pluginStage) + $backendDsts) {
+    Get-ChildItem -Path $dst -Filter '.gitkeep' -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+    # Wipe any leftover Paper remap cache from a prior (shared-bind) boot.
+    $remap = Join-Path $dst '.paper-remapped'
+    if (Test-Path $remap) { Remove-Item -Recurse -Force $remap -ErrorAction SilentlyContinue }
+  }
 }
 
 function Sync-ProxyJars {
@@ -323,7 +371,7 @@ function Get-CrashedMcServices {
   # exited shortly after `up`. We check ~8s after the up call so first-boot
   # init scripts have had a chance to either start the JVM (Up <state>) or
   # bail out (Exited). Anything in 'exited' here is a crash, not a slow boot.
-  $services = @('backend-a', 'backend-b', 'proxy-a', 'proxy-b')
+  $services = @('backend-a', 'backend-b', 'lobby-a', 'lobby-b', 'proxy-a', 'proxy-b')
   $crashed = @()
   foreach ($svc in $services) {
     $state = Invoke-Native { docker compose ps --status exited --services } 2>$null
@@ -340,7 +388,7 @@ function Clear-StaleWorldDirs {
   # on Windows/Docker-Desktop). Removing the dirs entirely on every `up` is the
   # cheapest correct fix: Paper regenerates the world from scratch each run.
   # Idempotent; silent on first run (dirs don't exist yet).
-  foreach ($b in @('backend-a', 'backend-b')) {
+  foreach ($b in @('backend-a', 'backend-b', 'lobby-a', 'lobby-b')) {
     $dir = Join-Path $PSScriptRoot "$b\world"
     if (Test-Path $dir) {
       try {
@@ -447,7 +495,7 @@ function Test-Boot {
   Write-Host '[boot] checking docker compose ps (typical: <2s)...' -ForegroundColor Cyan
   $ps = Invoke-Native { docker compose ps --format json }
   Write-Evidence 'boot' $ps
-  $expected = @('rtp-devstack-redis', 'proxy-a', 'proxy-b', 'backend-a', 'backend-b')
+  $expected = @('rtp-devstack-redis', 'proxy-a', 'proxy-b', 'lobby-a', 'lobby-b', 'backend-a', 'backend-b')
   $missing = @()
   foreach ($name in $expected) {
     if ($ps -notmatch [Regex]::Escape($name)) { $missing += $name }
@@ -482,7 +530,7 @@ function Show-FullServiceLogs {
   param([int]$Lines = 200)
   Write-Host ''
   Write-Host "[heartbeat] ==== FULL LOG DUMP (last $Lines lines per service) ====" -ForegroundColor Magenta
-  foreach ($svc in @('redis','backend-a','backend-b','proxy-a','proxy-b')) {
+  foreach ($svc in @('redis','backend-a','backend-b','lobby-a','lobby-b','proxy-a','proxy-b')) {
     $body = Invoke-Native { docker compose logs --tail=$Lines --no-log-prefix $svc }
     if (-not $body) { $body = '(no logs)' }
     Write-Host ''
@@ -507,7 +555,7 @@ function Show-HeartbeatDiagnostics {
   Write-Host "[heartbeat] ---- diagnostic snapshot at ${ElapsedSec}s ----" -ForegroundColor Yellow
   Write-Host '[heartbeat] container states:' -ForegroundColor Yellow
   Write-Host ("  " + (Get-ContainerLiveness)) -ForegroundColor Gray
-  foreach ($svc in @('backend-a','backend-b','proxy-a','proxy-b')) {
+  foreach ($svc in @('backend-a','backend-b','lobby-a','lobby-b','proxy-a','proxy-b')) {
     Write-Host "[heartbeat] last log lines for ${svc}:" -ForegroundColor Yellow
     Write-Host ("    " + (Get-RecentLogTail -Service $svc -Lines 4)) -ForegroundColor Gray
   }
@@ -538,7 +586,10 @@ function Test-Heartbeat {
     $proxies = Invoke-RedisCli KEYS 'rtp:net:proxy:*'
     $bCount = (@($backends) | Where-Object { $_ -match '\S' }).Count
     $pCount = (@($proxies) | Where-Object { $_ -match '\S' }).Count
-    if ($bCount -ge 2 -and $pCount -ge 2) {
+    # 4 backend heartbeats expected: backend-a, backend-b, lobby-a, lobby-b
+    # (lobbies publish as role=backend too; their absence of a regions/ dir is
+    # a runtime config concern, not a network-participation concern).
+    if ($bCount -ge 4 -and $pCount -ge 2) {
       $body = "backend keys: $bCount`n$backends`nproxy keys: $pCount`n$proxies"
       Write-Evidence 'heartbeat' $body
       $elapsed = [int]((Get-Date) - $pollStart).TotalSeconds
@@ -546,7 +597,7 @@ function Test-Heartbeat {
       return $true
     }
     $elapsed = [int]((Get-Date) - $pollStart).TotalSeconds
-    Write-Host "[heartbeat]   ${elapsed}s elapsed: backends=$bCount/2 proxies=$pCount/2 (still waiting)" -ForegroundColor DarkGray
+    Write-Host "[heartbeat]   ${elapsed}s elapsed: backends=$bCount/4 proxies=$pCount/2 (still waiting)" -ForegroundColor DarkGray
     # Diagnostic snapshot every 30s so the operator can decide whether it's genuinely stuck.
     if (($elapsed - $lastDiagAt) -ge 30) {
       Show-HeartbeatDiagnostics -ElapsedSec $elapsed
@@ -682,14 +733,26 @@ $plan = if ($Scenario -eq 'all') {
   @($Scenario)
 }
 
-foreach ($s in $plan) {
-  switch ($s) {
-    'boot'          { $results[$s] = Test-Boot }
-    'heartbeat'     { $results[$s] = Test-Heartbeat }
-    'roundtrip'     { $results[$s] = Test-Roundtrip }
-    'killmidflight' { $results[$s] = Test-KillMidFlight }
-    'killswitch'    { $results[$s] = Test-KillSwitch }
+# All scenario helpers shell out to `docker compose ...` without an explicit
+# `-f` argument, so they require the working directory to contain
+# docker-compose.yml. The user may invoke this script from anywhere
+# (e.g. repo root). Pin cwd to $PSScriptRoot for the duration of scenario
+# execution; otherwise diagnostic helpers like Get-ContainerLiveness and
+# Get-RecentLogTail fail with "no configuration file provided: not found"
+# and the heartbeat poll appears to hang silently.
+Push-Location $PSScriptRoot
+try {
+  foreach ($s in $plan) {
+    switch ($s) {
+      'boot'          { $results[$s] = Test-Boot }
+      'heartbeat'     { $results[$s] = Test-Heartbeat }
+      'roundtrip'     { $results[$s] = Test-Roundtrip }
+      'killmidflight' { $results[$s] = Test-KillMidFlight }
+      'killswitch'    { $results[$s] = Test-KillSwitch }
+    }
   }
+} finally {
+  Pop-Location
 }
 
 Write-Host ''

@@ -8,8 +8,14 @@ import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat.PluginState
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 
+import io.github.dailystruggle.rtp.common.selection.region.Region;
+
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Bukkit/Paper/Folia implementation of {@link BackendStateSampler}.
@@ -31,6 +37,44 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
 
     /** Schema version emitted into heartbeats; pinned by REQ-RTP-NET-009. */
     private static final int SCHEMA_VERSION = 1;
+
+    /**
+     * L6 Slice I lobby-mode flag. When {@code true}, heartbeats publish an
+     * empty {@code regions} set and {@code acceptingRequests = false} so
+     * peers never select this backend as a cross-server destination. The
+     * local {@code RTP.selectionAPI.permRegionLookup} contents are ignored
+     * for advertisement purposes; the backend still serves local
+     * {@code /rtp} calls when an operator-defined region exists, but the
+     * network treats it as "dispatch-only".
+     */
+    private volatile boolean lobbyMode;
+
+    /** Default ctor. Lobby mode off (pre-Slice-I behaviour). */
+    public BukkitBackendStateSampler() {
+        this.lobbyMode = false;
+    }
+
+    /**
+     * Slice I ctor. {@code lobbyMode == true} flips the suppression
+     * described on {@link #lobbyMode}.
+     */
+    public BukkitBackendStateSampler(boolean lobbyMode) {
+        this.lobbyMode = lobbyMode;
+    }
+
+    /**
+     * Toggle lobby mode at runtime. Used by {@code NetworkModeBootstrap} to
+     * re-arm the sampler when {@code routing.lobbyMode} is flipped on
+     * reload. Volatile write; next heartbeat tick observes the new value.
+     */
+    public void setLobbyMode(boolean lobbyMode) {
+        this.lobbyMode = lobbyMode;
+    }
+
+    /** @return current lobby-mode flag. Visible for tests. */
+    public boolean isLobbyMode() {
+        return lobbyMode;
+    }
 
     @Override
     public BackendHeartbeat sample(String serverId) {
@@ -87,21 +131,65 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
         // For Phase 2e this is intentionally a coarse snapshot - the proxy
         // selector only uses it for filtering "can this backend satisfy a
         // request for region X?", not for fine-grained matching.
+        //
+        // L6 Slice I: lobby-mode backends publish an empty regions list and
+        // acceptingRequests=false so peers never select them. The local
+        // permRegionLookup is intentionally NOT consulted - even if the
+        // operator left a default region defined locally, the network
+        // should treat the lobby as dispatch-only.
         List<String> regions = new ArrayList<>();
-        try {
-            RTP r = RTP.getInstance();
-            if (r != null) {
-                regions.addAll(io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.keySet());
+        boolean accepting = true;
+        // Per-region kept-cache size + total. Populated only outside lobby
+        // mode; lobby backends ship empty maps so peer pickers exclude them.
+        // NOTE on field semantics: BackendHeartbeat.regionKeptCounts is
+        // documented as "per-region count of locations in networkKeptLocations".
+        // For L6 Slice I lobby load balancing v1 we deliberately also publish
+        // local keptLocations.size() into the same map because the lobby's
+        // pickMostKept() needs *any* fresh signal of cached coordinate depth
+        // and networkKeptLocations is empty on backends not yet running the
+        // cross-server promotion loop. Sum is keptLocations + networkKeptLocations
+        // so a network-aware backend's data is not under-counted.
+        int keptCountTotal = 0;
+        int networkReservedTotal = 0;
+        Map<String, Integer> regionKeptCounts = new HashMap<>();
+        Set<String> regionSet = new HashSet<>();
+        if (lobbyMode) {
+            accepting = false;
+        } else {
+            try {
+                RTP r = RTP.getInstance();
+                if (r != null) {
+                    for (Region region : io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.values()) {
+                        if (region == null || region.name == null) continue;
+                        regions.add(region.name);
+                        regionSet.add(region.name);
+                        int per = 0;
+                        try {
+                            if (region.queueManager != null) {
+                                if (region.queueManager.keptLocations != null) {
+                                    per += region.queueManager.keptLocations.size();
+                                }
+                                if (region.queueManager.networkKeptLocations != null) {
+                                    per += region.queueManager.networkKeptLocations.size();
+                                }
+                            }
+                        } catch (Throwable ignored) {
+                            // Defensive: a region mid-shutdown may NPE on its buffers.
+                        }
+                        regionKeptCounts.put(region.name, per);
+                        keptCountTotal += per;
+                    }
+                }
+            } catch (Throwable ignored) {
+                // Defensive.
             }
-        } catch (Throwable ignored) {
-            // Defensive.
         }
 
         return new BackendHeartbeat(
                 serverId,
                 SCHEMA_VERSION,
                 PluginState.READY,
-                /* acceptingRequests */ true,
+                accepting,
                 now,
                 mspt,
                 queueDepth,
@@ -111,6 +199,10 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
                 playerCount,
                 regions,
                 worlds,
-                /* killSwitch */ false);
+                /* killSwitch */ false,
+                keptCountTotal,
+                networkReservedTotal,
+                regionSet,
+                regionKeptCounts);
     }
 }

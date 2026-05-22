@@ -142,6 +142,17 @@ public class Region extends FactoryValue<RegionKeys> {
 
     if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = settings.spatialResolution();
 
+    // L6 Slice J: lobby backends never serve teleports to local coords -
+    // peers see regions=[] / acceptingRequests=false (BukkitBackendStateSampler)
+    // and the no-arg /rtp path is intercepted by BukkitNetworkCommandHook to
+    // dispatch to a peer. Skip the per-region ScanTask pre-fill crawler and
+    // the DB hydrate entirely; both are pure waste on a lobby. Region objects
+    // are still constructed so /rtp info, config menus, and tab-completion
+    // keep working.
+    if (RTP.lobbyMode) {
+      return;
+    }
+
     // Skip the MemoryShape scan-task bootstrap for dormant regions: the shape's data file
     // was not loaded (world not available yet) so getLoadFuture() has no backing load. The
     // scan-task wiring happens implicitly when rebindWorld(...) swaps in freshly-loaded
@@ -228,6 +239,12 @@ public class Region extends FactoryValue<RegionKeys> {
     setSettings(newSettings);
     this.worldFallbackBound = false;
     this.configuredWorldName = null;
+
+    // L6 Slice J: lobby backends skip local region processing - no scan-task
+    // bootstrap, no DB hydrate. Same rationale as the constructor gate above.
+    if (RTP.lobbyMode) {
+      return;
+    }
 
     // Re-run the MemoryShape scan-task bootstrap that was skipped at construction because
     // the region was dormant. The new shape (from newSettings) has been loaded against the
@@ -402,6 +419,13 @@ public class Region extends FactoryValue<RegionKeys> {
    */
   public void execute(long availableTime) {
     io.github.dailystruggle.rtp.common.tools.CfDiag.regionExecute.increment();
+    // L6 Slice J: lobby backends advertise regions=[]/acceptingRequests=false
+    // and route every /rtp to a peer (BukkitNetworkCommandHook). The local
+    // pulse - cold->hot promotion, backlog drain, ticket validation, chunk
+    // I/O - is pure waste on a lobby. Region objects are still constructed so
+    // /rtp info, config menus, and tab-completion keep working, but their
+    // queues stay empty.
+    if (RTP.lobbyMode) return;
     // Dormant regions (configured world not yet loaded) must not attempt chunk I/O,
     // ticket validation, or cache generation — they activate via rebindWorld once
     // WorldLoadEvent delivers the configured world.

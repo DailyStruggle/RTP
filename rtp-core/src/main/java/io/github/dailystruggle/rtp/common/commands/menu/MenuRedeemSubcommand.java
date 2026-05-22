@@ -11,8 +11,11 @@ import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuOpenRequest;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry;
+import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.maps.ChartSpecTokens;
+import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -450,6 +453,21 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
          * treats {@code null} as an S-004 reject path.
          */
         @Nullable MenuModel buildFile(UUID viewer, String fileName);
+
+        /**
+         * Cart-aware overload (item 6 of the staging-cart redesign). Delegates
+         * to the 2-arg {@link #buildFile(UUID, String)} by default so legacy
+         * impls (notably the test scaffolds) compile and behave unchanged.
+         * Production impls override this overload to filter staged keys out
+         * of the Changeable list and append Pending + Apply + Discard rows
+         * driven by the {@code cartSnapshot} (insertion-ordered, may be
+         * empty; never {@code null}).
+         */
+        default @Nullable MenuModel buildFile(UUID viewer,
+                                              String fileName,
+                                              java.util.LinkedHashMap<String, String> cartSnapshot) {
+            return buildFile(viewer, fileName);
+        }
 
         /**
          * Build the per-key value picker page for {@code (fileName, paramName)}
@@ -995,6 +1013,14 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (action instanceof MenuAction.DiscardStagedConfig discard) {
             return dispatchDiscardStagedConfig(senderId, discard, messageMethod);
         }
+        // ADR-047 / REQ-RTP-MAP-006 declarative chart bridge. OpenMap routes
+        // through ChartSpecTokens (consume on the dispatch thread) and
+        // MapDispatch.paint to deliver a cartography map item to the viewer.
+        // Permission-gated by rtp.admin in the dispatch arm; the inert-binding
+        // gate (NoopMapBinding active) is enforced inside MapDispatch.paint.
+        if (action instanceof MenuAction.OpenMap openMap) {
+            return dispatchOpenMap(senderId, openMap, messageMethod);
+        }
         // Renderer click effects (SuggestInput / ChangePage / OpenExternalUrl)
         // must never reach redeem per ADR-035 §3. If one does, the renderer
         // is buggy — refuse and log.
@@ -1263,8 +1289,17 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         }
         boolean opened;
         try {
+            // Mode-aware overload: STAGE-mode prompts (config staging-cart)
+            // must reach the opener's STAGE branch so the typed value lands
+            // in the per-player cart and the curated /rtp config <file> page
+            // reopens with the new entry. Calling the legacy 4-arg form here
+            // silently demoted every STAGE prompt to RUN, which executed the
+            // /rtp config write immediately and closed the menu - the exact
+            // regression this fix addresses ("failed last time to fully
+            // apply this change").
             opened = anvilInputOpener.open(senderId,
-                    java.util.List.of(parentPath), paramName, prompt.prefill());
+                    java.util.List.of(parentPath), paramName, prompt.prefill(),
+                    prompt.mode(), cartSink());
         } catch (RuntimeException e) {
             RTP.log(Level.WARNING,
                     "menu anvil-input opener failed for " + senderId
@@ -1399,7 +1434,14 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         String fileName = open.fileName();
         MenuModel model;
         try {
-            model = configSubtreeBuilder.buildFile(senderId, fileName);
+            // Item 6 of the staging-cart redesign: pass the viewer's current
+            // cart snapshot (file-scoped; empty when no cart or scoped to a
+            // different file) so the curated page can filter staged keys out
+            // of the Changeable list and append Pending + Apply + Discard
+            // rows. Snapshot is read live on every render so post-stage and
+            // post-unstage re-renders surface the new cart state.
+            LinkedHashMap<String, String> cartSnap = snapshotCart(senderId, fileName);
+            model = configSubtreeBuilder.buildFile(senderId, fileName, cartSnap);
         } catch (RuntimeException e) {
             RTP.log(Level.WARNING,
                     "menu config-file builder failed for " + senderId
@@ -1431,19 +1473,90 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
     }
 
     /**
-     * Dispatch for {@link MenuAction.OpenConfigKey} (v3.7 §3.3). Gates on
-     * {@link #CONFIG_VIEW_PERMISSION}, then routes through
-     * {@link #configSubtreeBuilder}'s {@code buildKey}. A {@code null}
-     * return from the builder (unknown file/param) is an S-004 reject path.
+     * Dispatch for {@link MenuAction.OpenConfigKey} (v3.7 §3.3, updated
+     * 2026-05-21). Gates on {@link #CONFIG_VIEW_PERMISSION}, resolves the
+     * canonical {@code <file>.yml} segment under the live {@code config}
+     * subcommand, then short-circuits directly to
+     * {@link #dispatchPromptAnvilInput} in {@link MenuAction.Mode#STAGE}
+     * mode. The previous behavior rendered an intermediate per-key value
+     * picker page (suggested values + "type a custom value" anvil row),
+     * which forced the operator through a redundant click before the
+     * anvil opened. Per the user request 2026-05-21 ("immediately jump
+     * from clicking a value to update to anvil menu and remove the
+     * intermediate step and return to the config menu with the updated
+     * value set at the top"), clicking a key row now opens the anvil
+     * immediately; the STAGE-mode anvil confirm reopens
+     * {@code /rtp config <file>} with the new entry surfaced in the
+     * Pending list (see {@link CommandTreeMenuBuilder#buildConfigFile}).
+     *
+     * <p>Path resolution mirrors the production
+     * {@code MenuConfigSubtreeBuilder.buildKey} walk: probe
+     * {@code config.<file>.yml} first (the canonical registration form),
+     * fall back to {@code config.<file>} for legacy registrations that
+     * omit the suffix. Failure to resolve either form is an S-004 reject
+     * with {@code menuInvalid}.
      */
+    /**
+     * Best-effort lookup of the current configured value for {@code paramName}
+     * under the config file named {@code bareFileName} (no {@code .yml}
+     * suffix), formatted as a plain string for use as the prefill of a
+     * STAGE-mode anvil prompt. Walks {@link RTP#configs}' registered
+     * {@link io.github.dailystruggle.rtp.common.configuration.ConfigParser}s
+     * by their {@code name} (case-insensitive, suffix-tolerant) and returns
+     * the matching enum entry's value via {@code String.valueOf}. Returns
+     * {@code ""} when no parser, no enum constant, or no stored value
+     * matches; this preserves the previous empty-prefill behaviour as a
+     * safe fallback rather than corrupting the anvil with garbage.
+     */
+    private static String resolveCurrentConfigValueAsString(
+            String bareFileName, String paramName) {
+        if (paramName == null || paramName.isEmpty()) return "";
+        if (bareFileName == null || bareFileName.isEmpty()) return "";
+        if (RTP.configs == null) return "";
+        String target = bareFileName.toLowerCase(java.util.Locale.ROOT);
+        if (target.endsWith(".yml")) target = target.substring(0, target.length() - 4);
+        io.github.dailystruggle.rtp.common.factory.FactoryValue<?> match = null;
+        try {
+            for (io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> p
+                    : RTP.configs.configParserMap.values()) {
+                if (p == null || p.name == null) continue;
+                String pn = p.name.toLowerCase(java.util.Locale.ROOT);
+                if (pn.endsWith(".yml")) pn = pn.substring(0, pn.length() - 4);
+                if (pn.equals(target)) {
+                    match = p;
+                    break;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            return "";
+        }
+        if (match == null) return "";
+        java.util.EnumMap<?, Object> data;
+        try {
+            data = match.getData();
+        } catch (RuntimeException ignored) {
+            return "";
+        }
+        if (data == null || data.isEmpty()) return "";
+        for (java.util.Map.Entry<?, Object> e : data.entrySet()) {
+            Enum<?> k = (Enum<?>) e.getKey();
+            if (k == null) continue;
+            if (k.name().equalsIgnoreCase(paramName)) {
+                Object v = e.getValue();
+                return v == null ? "" : String.valueOf(v);
+            }
+        }
+        return "";
+    }
+
     private boolean dispatchOpenConfigKey(UUID senderId,
                                           MenuAction.OpenConfigKey open,
                                           @Nullable Consumer<String> messageMethod) {
-        if (renderer == null || configSubtreeBuilder == null) {
+        if (anvilInputOpener == null) {
             RTP.log(Level.WARNING,
-                    "menu config-key received with config-subtree disabled for " + senderId);
+                    "menu config-key received with anvil-input disabled for " + senderId);
             reject(senderId, MessagesKeys.menuInvalid,
-                    "menu config-key rejected: config-subtree disabled", messageMethod);
+                    "menu config-key rejected: anvil-input disabled", messageMethod);
             return false;
         }
         if (!hasConfigViewPermission(senderId)) {
@@ -1456,39 +1569,60 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         }
         String fileName = open.fileName();
         String paramName = open.paramName();
-        MenuModel model;
-        try {
-            model = configSubtreeBuilder.buildKey(senderId, fileName, paramName);
-        } catch (RuntimeException e) {
+
+        // Resolve the live `config` subtree and the per-file SubConfigCmd.
+        // Both forms (`<file>.yml` and bare `<file>`) are accepted so the
+        // dispatcher does not reject on baseline registrations that omit
+        // the `.yml` suffix - mirrors the production buildKey path walk.
+        CommandsAPICommand configCmd = rtpRoot.getCommandLookup()
+                .get("CONFIG");
+        if (!(configCmd instanceof TreeCommand configTree)) {
             RTP.log(Level.WARNING,
-                    "menu config-key builder failed for " + senderId
-                            + " file=" + fileName + " param=" + paramName
-                            + ": " + e.getMessage(), e);
+                    "menu config-key cannot resolve 'config' subcommand for " + senderId);
             reject(senderId, MessagesKeys.menuInvalid,
-                    "menu config-key rejected: builder failure", messageMethod);
+                    "menu config-key rejected: config subcommand unavailable",
+                    messageMethod);
             return false;
         }
-        if (model == null) {
+        String bare = fileName;
+        if (bare.toLowerCase(java.util.Locale.ROOT).endsWith(".yml")) {
+            bare = bare.substring(0, bare.length() - 4);
+        }
+        String subSegment = bare + ".yml";
+        CommandsAPICommand subCmd = configTree.getCommandLookup()
+                .get(subSegment.toUpperCase(java.util.Locale.ROOT));
+        if (subCmd == null) {
+            // Fallback to bare-name registration.
+            subCmd = configTree.getCommandLookup()
+                    .get(bare.toUpperCase(java.util.Locale.ROOT));
+            if (subCmd != null) {
+                subSegment = bare;
+            }
+        }
+        if (!(subCmd instanceof TreeCommand)) {
             RTP.log(Level.WARNING,
-                    "menu config-key unknown (file=" + fileName
-                            + ", param=" + paramName + ") for " + senderId);
+                    "menu config-key unknown file=" + fileName
+                            + " for " + senderId);
             reject(senderId, MessagesKeys.menuInvalid,
-                    "menu config-key rejected: unknown (file=" + fileName
-                            + ", param=" + paramName + ")", messageMethod);
+                    "menu config-key rejected: unknown file '" + fileName + "'",
+                    messageMethod);
             return false;
         }
-        try {
-            renderer.render(senderId, model);
-            return true;
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu config-key render failed for " + senderId
-                            + " file=" + fileName + " param=" + paramName
-                            + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
-                    "menu config-key rejected: renderer failure", messageMethod);
-            return false;
-        }
+
+        // STAGE-mode anvil prompt: anvil-confirm routes through the cart
+        // sink (see AnvilInputSession on Paper/Folia) which stages the
+        // typed value into the per-player cart and reopens
+        // /rtp menu config <file>. Prefill is the current configured
+        // value (best-effort string form) so the operator sees what they
+        // are replacing rather than the previous empty-space placeholder;
+        // anything unresolvable falls back to empty string.
+        String prefill = resolveCurrentConfigValueAsString(bare, paramName);
+        MenuAction.PromptAnvilInput prompt = new MenuAction.PromptAnvilInput(
+                new String[]{"config", subSegment},
+                paramName,
+                prefill,
+                MenuAction.Mode.STAGE);
+        return dispatchPromptAnvilInput(senderId, prompt, messageMethod);
     }
 
     // ------------------------------------------------------------------------
@@ -1832,6 +1966,72 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         return dispatchRun(senderId,
                 new MenuAction.RunRtpCommand(args),
                 messageMethod);
+    }
+
+    /**
+     * Dispatch for {@link MenuAction.OpenMap} (ADR-047 / REQ-RTP-MAP-006).
+     *
+     * <ol>
+     *   <li>Gates on {@link #ADMIN_MENU_PERMISSION}: charts surface admin-
+     *       facing data ({@code MemoryShape.badKeysSnapshot} today; broader
+     *       {@code MetricsSnapshot} integration in Stage 3 of
+     *       {@code CHECKLIST-metrics-to-maps.md}). Denial logs WARN +
+     *       rejects with {@code menuInvalid} (S-004).</li>
+     *   <li>Consumes the {@link ChartSpec} from the process-local
+     *       {@link ChartSpecTokens#instance() ChartSpecTokens singleton}.
+     *       Unknown / expired / mismatched-player tokens collapse to
+     *       {@code menuInvalid} (S-004), matching the stale-menu-redeem
+     *       behaviour.</li>
+     *   <li>Hands off to {@link MapDispatch#paint(ChartSpec, UUID)}, which
+     *       owns the {@link MessagesKeys#mapBindingMissing} /
+     *       {@code mapResolverMissing} / {@code mapUnavailable} /
+     *       {@code mapBusy} viewer-facing surfaces. We return {@code true} on
+     *       a successful paint and {@code false} otherwise; the viewer has
+     *       already been notified through {@code MapDispatch} in the failure
+     *       case.</li>
+     * </ol>
+     */
+    private boolean dispatchOpenMap(UUID senderId,
+                                    MenuAction.OpenMap action,
+                                    @Nullable Consumer<String> messageMethod) {
+        if (!hasAdminMenuPermission(senderId)) {
+            RTP.log(Level.WARNING,
+                    "menu open-map denied: " + senderId
+                            + " lacks " + ADMIN_MENU_PERMISSION);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu open-map rejected: permission denied",
+                    messageMethod);
+            return false;
+        }
+        Optional<ChartSpec> resolved =
+                ChartSpecTokens.instance().consume(senderId, action.chartSpecToken());
+        if (resolved.isEmpty()) {
+            RTP.log(Level.WARNING,
+                    "menu open-map rejected: unknown / expired / mismatched ChartSpec token "
+                            + action.chartSpecToken() + " for " + senderId);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu open-map rejected: unknown ChartSpec token",
+                    messageMethod);
+            return false;
+        }
+        try {
+            // MapDispatch.paint owns the configurable viewer-facing failure
+            // surfaces (mapBindingMissing / mapResolverMissing /
+            // mapUnavailable / mapBusy) and returns false after notifying the
+            // viewer through MessagesKeys. We do not reject() on its false
+            // return: that would double-message the player.
+            return MapDispatch.paint(resolved.get(), senderId);
+        } catch (RuntimeException e) {
+            // Defensive S-004: MapDispatch.paint is supposed to catch its
+            // own RuntimeExceptions, but if a downstream binding leaks one
+            // we still surface it through the configurable channel.
+            RTP.log(Level.WARNING,
+                    "menu open-map MapDispatch.paint threw for " + senderId
+                            + ": " + e.getMessage(), e);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu open-map rejected: dispatch failure", messageMethod);
+            return false;
+        }
     }
 
     /**

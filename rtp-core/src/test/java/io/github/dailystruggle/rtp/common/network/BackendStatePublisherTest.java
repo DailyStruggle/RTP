@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.network;
 
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat.PluginState;
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkStateBinding;
@@ -10,7 +12,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -80,19 +81,40 @@ class BackendStatePublisherTest {
     }
 
     @Test
-    @DisplayName("start/stop is idempotent and uses a daemon thread")
-    void startStopIdempotent() throws InterruptedException {
-        BackendStateSampler sampler = sid -> new BackendHeartbeat(
-                sid, 1, PluginState.READY, true, System.currentTimeMillis(),
-                18.0, 0, 20, 1L, 2L, 0, List.of(), List.of(), false);
-        BackendStatePublisher pub = new BackendStatePublisher(transport, sampler, "server-3", 100L);
-        pub.start();
-        pub.start(); // re-entrant no-op
-        // Let a few ticks fire; 350 ms / 100 ms interval >= 3 ticks.
-        TimeUnit.MILLISECONDS.sleep(350);
-        pub.stop();
-        pub.stop(); // idempotent
-        // No assertion on tick count (timing-dependent), just that we cleanly start and stop.
-        assertTrue(true, "start/stop cycle completed without exception");
+    @DisplayName("start/stop is idempotent and drives the configured scheduler")
+    void startStopIdempotent() {
+        // Install a mock scheduler so start() can register a timer task without
+        // spinning up a real ScheduledExecutorService (Folia-safe path per
+        // .junie/AGENTS.md "Scheduler Usage").
+        MockRTPScheduler scheduler = new MockRTPScheduler();
+        RTP.scheduler = scheduler;
+        try {
+            AtomicInteger calls = new AtomicInteger();
+            BackendStateSampler sampler = sid -> {
+                calls.incrementAndGet();
+                return new BackendHeartbeat(
+                        sid, 1, PluginState.READY, true, System.currentTimeMillis(),
+                        18.0, 0, 20, 1L, 2L, 0, List.of(), List.of(), false);
+            };
+            BackendStatePublisher pub = new BackendStatePublisher(transport, sampler, "server-3", 100L);
+            pub.start();
+            pub.start(); // re-entrant no-op
+            // 100 ms interval -> max(1, 100/50) = 2 ticks period. MockRTPScheduler
+            // fires at most one occurrence per tick() call, so step the clock
+            // forward in slices to exercise multiple fires.
+            for (int i = 0; i < 3; i++) {
+                scheduler.tick(2);
+            }
+            assertTrue(calls.get() >= 3, "expected >=3 ticks after advancing scheduler, got " + calls.get());
+            pub.stop();
+            int afterStop = calls.get();
+            for (int i = 0; i < 5; i++) {
+                scheduler.tick(2);
+            }
+            assertEquals(afterStop, calls.get(), "no further ticks after stop()");
+            pub.stop(); // idempotent
+        } finally {
+            RTP.scheduler = null;
+        }
     }
 }

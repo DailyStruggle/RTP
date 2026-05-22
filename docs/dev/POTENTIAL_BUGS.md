@@ -38,6 +38,22 @@ Append to the *Open* section below using the template. Keep entries short — on
 ## Open
 
 
+### 2026-05-21 — `:rtp-plugin:test` full-suite run dies in Gradle test writer (`in-progress-results-generic.bin` NoSuchFileException)
+
+- **Discovered during:** Slice D row D4 wiring follow-up (attempted fix for the original `NoClassDefFoundError` diagnosis below). Initial hypothesis (missing `testImplementation` dep) was **wrong** — corrected here.
+- **Location:** Task `:rtp-plugin:test`. Failure surfaces as `java.nio.file.NoSuchFileException: ...\rtp-plugin\build\test-results\test\binary\in-progress-results-generic.bin`. When the writer crashes, every test class in the suite then reports `ClassNotFoundException: <FQN>` ("Could not execute test class ...") even though `:rtp-plugin:compileTestJava` is green and `.class` files exist on disk under `build/classes/java/test/`.
+- **Symptom / hypothesis:** Two-part upstream/infra issue, not a project defect:
+  1. PaperMC snapshot repo intermittently returns HTTP 409 for Loom-remapped fabric-api transitives (`repo.papermc.io/repository/maven-snapshots/remapped/net/fabricmc/fabric-api/...`) and `loom/mappings/layered+hash.2198/...`. When this happens mid-build, Gradle marks dependent tasks UP-TO-DATE on a partial classpath.
+  2. Gradle 9.5.0 ships a known regression in the test-results binary writer (related family: gradle/gradle#36601, `results-generic.bin` permission bug introduced 9.3.0). On Windows the binary file is created then disappears before the result aggregator reads it, raising `NoSuchFileException` on `in-progress-results-generic.bin` and aborting the task.
+- **Repro shape:**
+  - Filtered runs (`.\gradlew :rtp-plugin:test --tests "*TestApiCompatCmdTest"`, `*Network*`, etc.) **pass consistently** on the same classpath.
+  - Full-suite `.\gradlew :rtp-plugin:test` (or any combined `--tests` filter spanning roughly half the 36 test classes) **fails deterministically** with the writer error.
+  - `:rtp-plugin:assemble` and every production `:<module>:build` is green.
+- **Impact:** `:rtp-plugin:test` is red on every full multi-module `gradlew build`, masking real regressions in the rtp-plugin test surface. No production artifact is affected.
+- **Suggested next step:** Try (in order) (a) `.\gradlew --refresh-dependencies :rtp-plugin:test` once PaperMC is healthy, (b) pin Gradle wrapper down to 9.2.1 in `gradle/wrapper/gradle-wrapper.properties` (last release before the `results-generic.bin` regression) and re-run, (c) if 9.2.1 is green, leave wrapper pinned until Gradle ships the fix tracked in gradle/gradle#36601 and the related Windows writer issue.
+- **2026-05-21 attempt log:** Pinned wrapper to 9.2.1 with user approval. 9.2.1 downloads with many `malformed Jar URL` notes on its own distribution jars, and the Loom cache needed manual eviction (`%USERPROFILE%\.gradle\caches\fabric-loom\minecraftMaven`, kill stray `java.exe`, `--stop`) to clear a `FileSystemException` on `minecraft-merged-intermediary-...layered+hash.2198-v2.jar`. After that `:effects-api:jar` is green, but `:rtp-core:compileJava` still fails resolving `io.github.dailystruggle.effectsapi.common.EffectsGroupKeys` via `api project(':effects-api')` — suggests 9.2.1's project-dep resolution picks a different effects-api artifact (likely the empty root thin jar instead of the `:effects-api` `main` compile output) than 9.5.0 does. Reverted the pin to 9.5.0 to keep the rest of the project buildable. Cleanest next try is probably to leave 9.5.0 in place and instead chase the Gradle test-writer regression via the upstream fix or a `--no-daemon` / `org.gradle.workers.max=1` workaround, rather than downgrading the wrapper.
+
+
 ### 2026-05-21 — `network*` messages.yml keys lack `MessagesKeys` enum entries; Spanish parity test fails
 
 - **Discovered during:** `CHECKLIST-metrics-to-maps.md` Stage 2 (path B: ChartSpecTokens-only landing) — full `gradlew build` failure surfaced on `:rtp-plugin:test` running `ReqRtpF013SpanishLocaleContentTest.spanishLocaleHasNoUnknownKeys`.

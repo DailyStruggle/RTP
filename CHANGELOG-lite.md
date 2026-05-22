@@ -38,6 +38,13 @@ Initial public release of rtp-lite on Modrinth.
     Towny, HuskTowns, Factions, Lands, RedProtect, WorldGuard (ADR-019
     amendment, 2026-05-11).
   - Anvil pre-filter (kept in lite for performance parity).
+  - Admin-panel curated prefabs: `/rtp admin` opens the curated panel with a
+    Setup section listing seven bundled prefabs (`survival-default`,
+    `low-performance`, `high-performance`, `folia-tuned`, `lightweight`,
+    `fast-paced`, `multi-world`); confirmation-menu preview, `.bak.<ts>`
+    rollback chain, and `prefab.bakRetention` knob in `performance.yml`. The
+    `backlogCacheCap` (Pro-only L3 backlog cache, ADR-028) is intentionally
+    untouched by every prefab. See `docs/admin/PREFABS.md`.
 - Automated release pipeline: `.github/workflows/release.yml` publishes the
   lite jar to Modrinth on every `lite-v*` tag.
 

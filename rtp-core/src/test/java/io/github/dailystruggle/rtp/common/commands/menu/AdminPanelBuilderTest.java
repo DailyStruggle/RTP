@@ -22,7 +22,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -162,8 +161,10 @@ final class AdminPanelBuilderTest {
 
         assertNotNull(findOpenMenuEmpty(model),
                 "Browse row must render even when every other section is empty");
-        assertTrue(hasFragmentContaining(model, "browse"),
-                "Browse divider must render alongside its row");
+        // Section divider rows were removed so the admin panel fits one
+        // book page; descriptive context now lives on each row's hover.
+        assertFalse(hasFragmentContaining(model, "browse"),
+                "Browse divider must not render (dividers removed)");
     }
 
     // ------------------------------------------------------------------------
@@ -305,16 +306,81 @@ final class AdminPanelBuilderTest {
     }
 
     @Test
-    @DisplayName("Single-page output: panel fits on one book page")
-    void panelFitsSinglePage() {
+    @DisplayName("Pagination: every page respects LINES_PER_PAGE and the Back row is the last clickable")
+    void panelPagination_respectsPageCapAndPlacesBackLast() {
         LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
         MenuModel model = new AdminPanelBuilder(registry)
                 .build(root, UUID.randomUUID(), perm -> true);
 
-        assertEquals(1, model.pages().size(),
-                "Admin panel must fit on a single book page in the v2 layout");
+        // After the Setup-section collapse (one row that dispatches
+        // `/rtp admin prefab list` instead of seven inline prefab rows)
+        // a fully-populated admin panel comfortably fits within a single
+        // book page, but the pagination invariants must still hold: no
+        // page may exceed LINES_PER_PAGE, and the Back row must always
+        // be the final clickable line so the operator can return to the
+        // front page from whichever page they end on.
+        assertFalse(model.pages().isEmpty(),
+                "Admin panel must produce at least one page");
+        for (io.github.dailystruggle.rtp.api.menu.MenuPage p : model.pages()) {
+            assertTrue(p.lines().size() <= AdminPanelBuilder.LINES_PER_PAGE,
+                    "each page must respect LINES_PER_PAGE");
+        }
+        MenuAction last = lastClickable(model);
+        assertInstanceOf(MenuAction.OpenFrontPage.class, last,
+                "Back row must remain the last clickable line");
+    }
+
+    // ------------------------------------------------------------------------
+    // Setup section (PROPOSAL-admin-panel-prefabs.md v3.1, Session 5)
+    // ------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("Setup section: single RunRtpCommand row dispatching /rtp admin prefab list")
+    void setupSection_emitsSinglePrefabListRow() {
+        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
+        TestableRoot root = withAllAdminSubcommands();
+
+        MenuModel model = new AdminPanelBuilder(registry)
+                .build(root, UUID.randomUUID(), perm -> true);
+
+        assertNotNull(
+                findRunWithArgs(model, "admin", "prefab", "list"),
+                "Setup section must emit a single RunRtpCommand({admin,prefab,list}) row");
+    }
+
+    @Test
+    @DisplayName("Setup section: suppressed wholesale when viewer lacks rtp.admin.prefab")
+    void setupSection_suppressed_whenLackingPermission() {
+        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
+        TestableRoot root = withAllAdminSubcommands();
+
+        MenuModel model = new AdminPanelBuilder(registry)
+                .build(root, UUID.randomUUID(),
+                        perm -> !AdminPanelBuilder.PREFAB_PERMISSION.equals(perm));
+
+        assertNull(
+                findRunWithArgs(model, "admin", "prefab", "list"),
+                "Setup row must be hidden without rtp.admin.prefab");
+        // Setup divider literal must not leak either.
+        assertFalse(hasFragmentContaining(model, "setup (quick start)"),
+                "Setup divider must also be suppressed when the entire section is hidden");
+    }
+
+    @Test
+    @DisplayName("Setup section: throwing permission probe hides the entire section")
+    void setupSection_hidden_whenProbeThrows() {
+        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
+        TestableRoot root = withAllAdminSubcommands();
+
+        MenuModel model = new AdminPanelBuilder(registry)
+                .build(root, UUID.randomUUID(),
+                        perm -> { throw new RuntimeException("boom"); });
+
+        assertNull(
+                findRunWithArgs(model, "admin", "prefab", "list"),
+                "Setup row must be hidden when probe throws");
     }
 
     // ------------------------------------------------------------------------
@@ -332,9 +398,11 @@ final class AdminPanelBuilderTest {
     }
 
     private static MenuAction findOpenConfigSelector(MenuModel model) {
-        for (MenuLine line : model.pages().get(0).lines()) {
-            for (MenuFragment frag : line.fragments()) {
-                if (frag.action() instanceof MenuAction.OpenConfigSelector) return frag.action();
+        for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {
+            for (MenuLine line : page.lines()) {
+                for (MenuFragment frag : line.fragments()) {
+                    if (frag.action() instanceof MenuAction.OpenConfigSelector) return frag.action();
+                }
             }
         }
         return null;
@@ -346,11 +414,13 @@ final class AdminPanelBuilderTest {
      * the legacy {@code RunRtpCommand(["info"])}.
      */
     private static MenuAction findOpenInfoGlobal(MenuModel model) {
-        for (MenuLine line : model.pages().get(0).lines()) {
-            for (MenuFragment frag : line.fragments()) {
-                if (frag.action() instanceof MenuAction.OpenInfo open
-                        && open.scope().kind() == MenuAction.InfoScopeToken.Kind.GLOBAL) {
-                    return open;
+        for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {
+            for (MenuLine line : page.lines()) {
+                for (MenuFragment frag : line.fragments()) {
+                    if (frag.action() instanceof MenuAction.OpenInfo open
+                            && open.scope().kind() == MenuAction.InfoScopeToken.Kind.GLOBAL) {
+                        return open;
+                    }
                 }
             }
         }
@@ -358,11 +428,13 @@ final class AdminPanelBuilderTest {
     }
 
     private static MenuAction findRunWithArgs(MenuModel model, String... expected) {
-        for (MenuLine line : model.pages().get(0).lines()) {
-            for (MenuFragment frag : line.fragments()) {
-                if (frag.action() instanceof MenuAction.RunRtpCommand run
-                        && argsMatch(run.args(), expected)) {
-                    return run;
+        for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {
+            for (MenuLine line : page.lines()) {
+                for (MenuFragment frag : line.fragments()) {
+                    if (frag.action() instanceof MenuAction.RunRtpCommand run
+                            && argsMatch(run.args(), expected)) {
+                        return run;
+                    }
                 }
             }
         }
@@ -370,11 +442,13 @@ final class AdminPanelBuilderTest {
     }
 
     private static MenuFragment findFragmentWithRunArgs(MenuModel model, String... expected) {
-        for (MenuLine line : model.pages().get(0).lines()) {
-            for (MenuFragment frag : line.fragments()) {
-                if (frag.action() instanceof MenuAction.RunRtpCommand run
-                        && argsMatch(run.args(), expected)) {
-                    return frag;
+        for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {
+            for (MenuLine line : page.lines()) {
+                for (MenuFragment frag : line.fragments()) {
+                    if (frag.action() instanceof MenuAction.RunRtpCommand run
+                            && argsMatch(run.args(), expected)) {
+                        return frag;
+                    }
                 }
             }
         }
@@ -382,12 +456,14 @@ final class AdminPanelBuilderTest {
     }
 
     private static MenuAction findOpenMenuTo(MenuModel model, String firstSegment) {
-        for (MenuLine line : model.pages().get(0).lines()) {
-            for (MenuFragment frag : line.fragments()) {
-                if (frag.action() instanceof MenuAction.OpenMenu open
-                        && open.path().length >= 1
-                        && firstSegment.equals(open.path()[0])) {
-                    return open;
+        for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {
+            for (MenuLine line : page.lines()) {
+                for (MenuFragment frag : line.fragments()) {
+                    if (frag.action() instanceof MenuAction.OpenMenu open
+                            && open.path().length >= 1
+                            && firstSegment.equals(open.path()[0])) {
+                        return open;
+                    }
                 }
             }
         }
@@ -395,11 +471,13 @@ final class AdminPanelBuilderTest {
     }
 
     private static MenuAction findOpenMenuEmpty(MenuModel model) {
-        for (MenuLine line : model.pages().get(0).lines()) {
-            for (MenuFragment frag : line.fragments()) {
-                if (frag.action() instanceof MenuAction.OpenMenu open
-                        && open.path().length == 0) {
-                    return open;
+        for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {
+            for (MenuLine line : page.lines()) {
+                for (MenuFragment frag : line.fragments()) {
+                    if (frag.action() instanceof MenuAction.OpenMenu open
+                            && open.path().length == 0) {
+                        return open;
+                    }
                 }
             }
         }
@@ -408,19 +486,23 @@ final class AdminPanelBuilderTest {
 
     private static MenuAction lastClickable(MenuModel model) {
         MenuAction last = null;
-        for (MenuLine line : model.pages().get(0).lines()) {
-            for (MenuFragment frag : line.fragments()) {
-                if (frag.action() != null) last = frag.action();
+        for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {
+            for (MenuLine line : page.lines()) {
+                for (MenuFragment frag : line.fragments()) {
+                    if (frag.action() != null) last = frag.action();
+                }
             }
         }
         return last;
     }
 
     private static boolean hasFragmentContaining(MenuModel model, String needle) {
-        for (MenuLine line : model.pages().get(0).lines()) {
-            for (MenuFragment frag : line.fragments()) {
-                String text = frag.text();
-                if (text != null && text.contains(needle)) return true;
+        for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {
+            for (MenuLine line : page.lines()) {
+                for (MenuFragment frag : line.fragments()) {
+                    String text = frag.text();
+                    if (text != null && text.contains(needle)) return true;
+                }
             }
         }
         return false;

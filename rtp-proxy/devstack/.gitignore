@@ -8,6 +8,13 @@ jars/velocity/*
 # plugins dir (compose binds proxy-{a,b}/plugins -> /server/plugins).
 proxy-a/plugins/*.jar
 proxy-b/plugins/*.jar
+# Per-backend plugin dirs (compose binds backend-{a,b}/plugins -> /data/plugins).
+# Each backend needs its own copy so Paper's .paper-remapped/ cache does not
+# race across containers.
+backend-a/plugins/*.jar
+backend-b/plugins/*.jar
+backend-a/plugins/.paper-remapped/
+backend-b/plugins/.paper-remapped/
 shared/forwarding.secret
 # itzg images write world/cache/log dirs into mounts if you bind them locally.
 **/world/

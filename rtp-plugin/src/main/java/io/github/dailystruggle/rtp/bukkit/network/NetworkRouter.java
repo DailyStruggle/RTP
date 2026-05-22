@@ -103,6 +103,26 @@ public final class NetworkRouter {
      *                  treated as "no constraint"
      */
     public RoutingDecision route(UUID playerId, String regionKey) {
+        return route(playerId, regionKey, null);
+    }
+
+    /**
+     * Decide routing with an optional hard-pin to a specific peer
+     * {@code serverHint}. L6 Slice H2: when the player typed
+     * {@code rtp region=<server>:<region>}, the {@code serverHint} is the
+     * parsed server id and the semantics are <strong>hard-pin</strong> -
+     * if the named server is missing from the snapshot, {@code killSwitch},
+     * or does not advertise the requested {@code regionKey}, the router
+     * returns {@link RoutingDecision.LocalFallback} with reason
+     * {@link RoutingDecision.FallbackReason#REGION_UNAVAILABLE} so the caller
+     * can emit the localized {@code networkRegionUnavailable} message.
+     *
+     * @param serverHint optional pinned backend server id; {@code null}/empty
+     *                   for "selector picks per snapshot"
+     */
+    public RoutingDecision route(UUID playerId, String regionKey, String serverHint) {
+        String hint = (serverHint == null || serverHint.isEmpty()) ? null : serverHint;
+
         // Gate 1: snapshot must be present (bootstrap finished, transport open).
         NetworkSnapshot snap = snapshotSupplier.get();
         if (snap == null) {
@@ -110,49 +130,75 @@ public final class NetworkRouter {
         }
 
         // Gate 2: routing.mode locked to local (D2 default).
-        if (mode == Mode.LOCAL) {
+        // Hard-pin override (H2): when the player explicitly named a peer
+        // server in `rtp region=<server>:<region>`, we cannot just silently
+        // serve locally even under mode=LOCAL; the operator's intent was
+        // unambiguous. Fall through to the gates below so the request
+        // either routes or REJECTs with a typed reason.
+        if (mode == Mode.LOCAL && hint == null) {
             return RoutingDecision.Local.INSTANCE;
         }
 
         // Gate 3 (D6 A: implicit local-first). When mode == AUTO and the local
         // backend can satisfy this request, do not cross the network.
-        if (mode == Mode.AUTO) {
+        // Skipped under hard-pin: a named server hint MUST be honoured exactly.
+        if (mode == Mode.AUTO && hint == null) {
             if (localCanServe(snap, regionKey) && localKeptCountSupplier.getAsInt() > 0) {
                 return RoutingDecision.Local.INSTANCE;
             }
         }
 
-        // Gate 4: at least one live, non-killSwitch peer in the snapshot.
-        boolean anyLivePeer = false;
-        for (BackendHeartbeat hb : snap.all()) {
-            if (hb == null) continue;
-            if (hb.killSwitch()) continue;
-            if (hb.serverId() != null && hb.serverId().equals(localServerId)) {
-                // local is allowed to count as a peer only when mode==CROSS_SERVER;
-                // under AUTO we already handled local above.
-                if (mode == Mode.CROSS_SERVER) { anyLivePeer = true; break; }
-                continue;
+        // Hard-pin gate (H2, before generic peer-liveness check): if the
+        // player named a specific server, it must exist, be alive, non-
+        // killSwitch, and advertise the requested region (when supplied).
+        if (hint != null) {
+            BackendHeartbeat pinned = snap.backend(hint).orElse(null);
+            if (pinned == null || pinned.killSwitch()) {
+                return new RoutingDecision.LocalFallback(RoutingDecision.FallbackReason.REGION_UNAVAILABLE);
             }
-            anyLivePeer = true;
-            break;
-        }
-        if (!anyLivePeer) {
-            return new RoutingDecision.LocalFallback(RoutingDecision.FallbackReason.NO_LIVE_PEER);
-        }
-
-        // Gate 5: regionKey must be advertised somewhere reachable.
-        if (regionKey != null && !regionKey.isEmpty()) {
-            boolean advertised = false;
-            for (BackendHeartbeat hb : snap.all()) {
-                if (hb == null || hb.killSwitch()) continue;
-                if (hb.regions() != null && hb.regions().contains(regionKey)) { advertised = true; break; }
-                // Pre-L6 peer back-compat: legacy regionsAvailable list.
-                if (hb.regionsAvailable() != null && hb.regionsAvailable().contains(regionKey)) {
-                    advertised = true; break;
+            if (regionKey != null && !regionKey.isEmpty()) {
+                boolean hostsRegion = (pinned.regions() != null && pinned.regions().contains(regionKey))
+                        || (pinned.regionsAvailable() != null && pinned.regionsAvailable().contains(regionKey));
+                if (!hostsRegion) {
+                    return new RoutingDecision.LocalFallback(RoutingDecision.FallbackReason.REGION_UNAVAILABLE);
                 }
             }
-            if (!advertised) {
-                return new RoutingDecision.LocalFallback(RoutingDecision.FallbackReason.REGION_UNAVAILABLE);
+        }
+
+        // Gate 4: at least one live, non-killSwitch peer in the snapshot.
+        // (Hard-pin already proved one above; this is the unpinned path.)
+        if (hint == null) {
+            boolean anyLivePeer = false;
+            for (BackendHeartbeat hb : snap.all()) {
+                if (hb == null) continue;
+                if (hb.killSwitch()) continue;
+                if (hb.serverId() != null && hb.serverId().equals(localServerId)) {
+                    // local is allowed to count as a peer only when mode==CROSS_SERVER;
+                    // under AUTO we already handled local above.
+                    if (mode == Mode.CROSS_SERVER) { anyLivePeer = true; break; }
+                    continue;
+                }
+                anyLivePeer = true;
+                break;
+            }
+            if (!anyLivePeer) {
+                return new RoutingDecision.LocalFallback(RoutingDecision.FallbackReason.NO_LIVE_PEER);
+            }
+
+            // Gate 5: regionKey must be advertised somewhere reachable.
+            if (regionKey != null && !regionKey.isEmpty()) {
+                boolean advertised = false;
+                for (BackendHeartbeat hb : snap.all()) {
+                    if (hb == null || hb.killSwitch()) continue;
+                    if (hb.regions() != null && hb.regions().contains(regionKey)) { advertised = true; break; }
+                    // Pre-L6 peer back-compat: legacy regionsAvailable list.
+                    if (hb.regionsAvailable() != null && hb.regionsAvailable().contains(regionKey)) {
+                        advertised = true; break;
+                    }
+                }
+                if (!advertised) {
+                    return new RoutingDecision.LocalFallback(RoutingDecision.FallbackReason.REGION_UNAVAILABLE);
+                }
             }
         }
 
@@ -171,7 +217,8 @@ public final class NetworkRouter {
         Optional<String> rk = (regionKey == null || regionKey.isEmpty())
                 ? Optional.empty()
                 : Optional.of(regionKey);
-        return new RoutingDecision.CrossServer(Optional.empty(), rk);
+        Optional<String> sh = (hint == null) ? Optional.empty() : Optional.of(hint);
+        return new RoutingDecision.CrossServer(sh, rk);
     }
 
     private boolean localCanServe(NetworkSnapshot snap, String regionKey) {
@@ -186,29 +233,74 @@ public final class NetworkRouter {
     }
 
     /**
-     * Parser stub for the region argument. L6 ships row C4: only
-     * unqualified region names are accepted; any input containing {@code =}
-     * or {@code :} is rejected as a syntax error. Qualified
-     * {@code <server>=<region>} (D7) is gated on the project-wide
-     * colon-to-equals param migration shipping first.
+     * Parsed region argument carrying an optional {@code serverHint} and a
+     * {@code regionKey}. L6 Slice H2 syntax:
+     *
+     * <ul>
+     *   <li>{@code default} -&gt; {@code (serverHint=null, regionKey="default")}</li>
+     *   <li>{@code backend-a:default} -&gt; {@code (serverHint="backend-a", regionKey="default")}</li>
+     * </ul>
+     *
+     * <p>The {@code =} character remains reserved per D7 (project-wide
+     * colon-to-equals param migration); it is rejected outright. The
+     * {@code :} character now splits {@code server:region} exactly once;
+     * additional colons (e.g. {@code a:b:c}) are a syntax error.</p>
+     */
+    public record ParsedRegion(String serverHint, String regionKey) {
+        public ParsedRegion {
+            if (serverHint != null && serverHint.isEmpty()) serverHint = null;
+            // regionKey may be null when the player just typed `region=` with
+            // no value; caller treats that as "no constraint".
+        }
+    }
+
+    /**
+     * Backward-compat parser stub: extracts just the {@code regionKey} from
+     * the argument, dropping any {@code serverHint}. Existing
+     * non-network-mode callers can stay on this signature; H2 hooks should
+     * prefer {@link #parseRegionArgQualified(String)}.
      *
      * @return the unqualified region key, or {@code null} when the argument
      *         is null/empty
-     * @throws IllegalArgumentException when the input contains the L6-disabled
-     *         qualified-region separators
+     * @throws IllegalArgumentException when the input contains the still-
+     *         disabled {@code =} separator or a malformed colon sequence
      */
     public static String parseRegionArg(String arg) {
+        ParsedRegion parsed = parseRegionArgQualified(arg);
+        return parsed == null ? null : parsed.regionKey();
+    }
+
+    /**
+     * Parse an optionally-qualified region argument. Returns {@code null}
+     * when {@code arg} is null or whitespace-only. L6 Slice H2.
+     *
+     * @throws IllegalArgumentException when {@code arg} contains the
+     *         reserved {@code =} character (D7) or more than one colon
+     */
+    public static ParsedRegion parseRegionArgQualified(String arg) {
         if (arg == null) return null;
         String trimmed = arg.trim();
         if (trimmed.isEmpty()) return null;
-        // D7: qualified syntax disabled in L6. The '=' check is the future
-        // separator; ':' is the pre-migration separator; both are rejected
-        // here so a stray input does not silently disable the region filter.
-        if (trimmed.indexOf('=') >= 0 || trimmed.indexOf(':') >= 0) {
+        if (trimmed.indexOf('=') >= 0) {
             throw new IllegalArgumentException(
-                    "qualified <server>=<region> syntax is not enabled in L6 (D7): " + trimmed);
+                    "'=' is reserved (D7); use '<server>:<region>': " + trimmed);
         }
-        return trimmed;
+        int firstColon = trimmed.indexOf(':');
+        if (firstColon < 0) {
+            return new ParsedRegion(null, trimmed);
+        }
+        int lastColon = trimmed.lastIndexOf(':');
+        if (firstColon != lastColon) {
+            throw new IllegalArgumentException(
+                    "malformed '<server>:<region>' (more than one ':'): " + trimmed);
+        }
+        String server = trimmed.substring(0, firstColon).trim();
+        String region = trimmed.substring(firstColon + 1).trim();
+        if (server.isEmpty() || region.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "malformed '<server>:<region>' (empty half): " + trimmed);
+        }
+        return new ParsedRegion(server, region);
     }
 
     /** Visible for tests. */

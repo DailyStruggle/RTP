@@ -85,6 +85,45 @@ public class RTP {
   public static RTPEconomy economy = null;
 
   /**
+   * Pre-dispatch hook consulted at the top of {@code RTPCmd.compute(...)}
+   * to decide whether a {@code /rtp} call should be served locally,
+   * enrolled on the cross-server wait queue, or rejected with a localized
+   * message. Defaults to {@link io.github.dailystruggle.rtp.api.network.NetworkCommandHook#LOCAL_ONLY}
+   * so plain single-server deployments incur zero behavioural change.
+   * Network-mode adapters (Bukkit's {@code NetworkModeBootstrap}) install
+   * a richer impl during startup and revert to {@code LOCAL_ONLY} on
+   * shutdown. See {@code rtp-proxy-ADR-014}.
+   */
+  public static volatile io.github.dailystruggle.rtp.api.network.NetworkCommandHook
+      networkCommandHook =
+          io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY;
+
+  /**
+   * L6 Slice J: when {@code true}, this backend is configured as a pure
+   * cross-server lobby and skips all local region processing - the per-region
+   * pre-fill ({@link io.github.dailystruggle.rtp.common.tasks.ScanTask}
+   * scheduling), the per-region DB hydrate, and the steady-state
+   * {@code Region.execute()} pulse all short-circuit. The lobby still owns
+   * {@link io.github.dailystruggle.rtp.common.selection.region.Region}
+   * instances (so {@code /rtp info} and config menus keep working), but those
+   * regions never fill their {@code keptLocations}/{@code unkeptLocations}
+   * pools and never accept reservations from peers (see
+   * {@link io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler}
+   * which advertises {@code regions=[]} + {@code acceptingRequests=false}
+   * under the same flag).
+   *
+   * <p>Read from {@code routing.lobbyMode} in {@code network.yml} by
+   * {@code NetworkModeBootstrap.readLobbyModeEarly(File)} BEFORE the region
+   * config is loaded, so the gate is in effect when regions are first
+   * constructed. Defaults to {@code false} so non-lobby deployments incur
+   * zero behavioural change. Volatile so the early-startup publish
+   * happens-before the construction reads.
+   *
+   * @since L6 Slice J
+   */
+  public static volatile boolean lobbyMode = false;
+
+  /**
    * Platform-supplied carrier for the {@code /rtp test ...} umbrella SPI
    * (sender + deferred scheduler + audit sink). Populated by each platform
    * plugin during startup; remains {@code null} until then. Callers inside

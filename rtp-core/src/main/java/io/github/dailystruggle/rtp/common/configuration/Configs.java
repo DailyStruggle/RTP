@@ -335,6 +335,18 @@ public class Configs {
       }
     }
 
+    // L6 Slice J: lobby backends never serve teleports to local coords - they only
+    // dispatch players to peer backends via cross-server /rtp. Registering the
+    // default (or any) local region here would advertise a local destination via
+    // BackendStateSampler.regions and let /rtp resolve a no-arg request to the
+    // local region instead of routing it through the network. Skip the entire
+    // per-region instantiation loop; permRegionLookup stays empty on a lobby.
+    if (RTP.lobbyMode) {
+      RTP.log(Level.FINE,
+          "[RTP] reloadRegions(): lobbyMode=true, skipping local region registration");
+      return;
+    }
+
     int regionCount = 0;
     int dormantCount = 0;
     for (ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {

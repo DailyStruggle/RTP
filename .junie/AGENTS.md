@@ -178,6 +178,34 @@ Related functional requirement: **REQ-RTP-F-013** — all user-facing messages a
 
 ---
 
+## Scheduler Usage (no raw threads on backend JVMs)
+
+Backend plugin JVMs (Bukkit / Paper / Folia / Fabric) shall schedule **all** periodic, delayed, or asynchronous work through `RTP.scheduler` (the `RTPScheduler` SPI installed by the platform adapter). The platform adapter is the *only* layer allowed to know what kind of thread the work lands on (region thread, async pool, Folia entity scheduler, Fabric server-thread executor, etc.). Raw `java.util.concurrent.Executors.newSingleThreadScheduledExecutor(...)`, `Executors.newFixedThreadPool(...)`, `Executors.newCachedThreadPool(...)`, and `new Thread(...).start()` in backend code are a red flag and shall be replaced.
+
+Why: a raw `ScheduledExecutorService` or hand-rolled `Thread` bypasses the Folia region-ownership model (a region thread that touches another region throws `ThreadAccessException`), bypasses task tracking / `MemoryTracker` accounting, ignores the `RTPRunnable` shutdown drain, and leaks across `/reload`. It also makes the same code untestable through `MockRTPScheduler` (the project-wide test fixture for deterministic tick-driven advancement).
+
+Canonical conversion pattern (period in **server ticks**, 1 tick == 50 ms; clamp to `>= 1`):
+
+```java
+long periodTicks = Math.max(1L, intervalMs / 50L);
+Object task = RTP.scheduler.runTaskTimerAsynchronously(this::tick, periodTicks, periodTicks);
+// ...later:
+RTP.scheduler.cancelTask(task);
+```
+
+For a single deferred async fire, use `RTP.scheduler.runTaskAsynchronously(runnable)`; for main-thread / region-thread work use `runTask(...)` / `runTask(RTPLocation, ...)` per `RTPScheduler`.
+
+**Carve-outs (where raw executors / threads remain legitimate):**
+
+- **Proxy JVMs** (`rtp-proxy-common`, `rtp-proxy-velocity`, `rtp-proxy-bungee`). Velocity / BungeeCord do not host `RTP.scheduler`; transport bindings (`RedisNetworkStateBinding`, `SqlNetworkStateBinding`, `InMemoryNetworkRequestQueue`, `ReservationTokenReaper`, etc.) own their own executors by design.
+- **Scheduler implementations themselves** (`FabricScheduler`, future platform schedulers). The implementation has to create threads, that is the whole point. Architecture-test guard: `RTPArchitectureTest.scheduler_implementations_must_not_reside_in_core` keeps these out of `rtp-core`.
+- **Dedicated I/O subsystems with a documented contract**, currently only `rtp-anvil/AnvilIoPool` (NBT prefilter worker pool, justified in ADR-016). A new pool of this shape requires an ADR.
+- **Test code** (`src/test/`, `src/testFixtures/`). Tests may spin up `Executors.newFixedThreadPool` for concurrency exercisers, `Thread` for race-window reproducers, etc.
+
+Anything outside those carve-outs is a regression. When in doubt, file the discovery in `POTENTIAL_BUGS.md` rather than silently leaving a raw executor in place.
+
+---
+
 ## Architecture Boundaries
 
 Place new code following this decision order:
@@ -268,6 +296,12 @@ Rules:
 7. **Prefer ASCII punctuation over em/en dashes.** Em dashes (`—`, U+2014) and en dashes (`–`, U+2013) are an AI stylistic artifact, not a project convention; do not introduce them into new docs, ADRs, CHANGELOG entries, `messages.yml` values, code comments, or commit messages. Use ASCII hyphen (`-`), colon (`:`), or parentheses instead. This rule is **forward-only**: do not sweep existing occurrences just to swap punctuation — replace naturally as files are edited for substantive reasons. Rationale: ASCII punctuation is immune to the YAML-`\u2014`-literal bug (unquoted/single-quoted YAML scalars do not decode `\u….` escapes), survives every console encoding, and produces clean diffs regardless of editor settings.
 
 Common origin of these regressions: copying rendered text out of a terminal that displayed a UTF-8 file as if it were Windows-1252, then pasting that already-corrupted text back into a tool call. The fix is always to read the file's real bytes (via `open`) and re-type the canonical character, not to copy from the rendered view.
+
+---
+
+## Book Menu Color Contrast
+
+Adventure / Paper `Book` pages render on a parchment-yellow background. Yellow (`&e`, `&6`) and white (`&f`) text washes out and ruins contrast — never use them for any text rendered into a book menu (config menu pending/apply/discard rows, headers, hover text, anvil-input echoed labels, paginator nav, etc.). Prefer dark colors against the parchment: `&0` (black), `&1` / `&9` (dark/light blue), `&2` / `&a` (dark/light green) used sparingly, `&4` / `&c` (dark/light red) for destructive rows, `&5` (dark purple), `&8` (dark gray) for muted hints. Bold (`&l`) is fine on any non-yellow/non-white color. When in doubt, copy an existing row in `CommandTreeMenuBuilder` that already renders correctly. This rule does NOT apply to chat-channel messages (`SendMessage`) where the renderer is the chat background, not parchment.
 
 ---
 

@@ -636,10 +636,15 @@ public final class CommandTreeMenuBuilder {
         // fallback in the meantime.
         lines.add(MenuLine.of(new MenuFragment("&1&lconfig files", null, null)));
 
-        // One row per known config file.
+        // One row per known config file. Hover surfaces an "edit <file>"
+        // affordance hint so clicking the row reads as an edit entry-point
+        // rather than a bare navigation jump. English-only fallback for now;
+        // locale lift is deferred to the locale TSV pipeline pass (mirrors
+        // the "config files" header above).
         for (String fileName : fileNames) {
             if (fileName == null || fileName.isEmpty()) continue;
-            lines.add(MenuLine.of(new MenuFragment("&2" + fileName, null,
+            String hover = "edit " + fileName;
+            lines.add(MenuLine.of(new MenuFragment("&2" + fileName, hover,
                     new MenuAction.OpenConfigFile(fileName))));
         }
 
@@ -680,9 +685,28 @@ public final class CommandTreeMenuBuilder {
     public <E extends Enum<E>> MenuModel buildConfigFile(UUID callerId,
                                                          String fileName,
                                                          ConfigParser<E> parser) {
+        return buildConfigFile(callerId, fileName, parser, new java.util.LinkedHashMap<>());
+    }
+
+    /**
+     * Cart-aware overload (item 6 of the staging-cart redesign). Renders the
+     * per-file curated page with the viewer's currently staged
+     * {@code (paramName -> typed value)} pairs surfaced as a "Pending changes"
+     * list (each row clickable to {@link MenuAction.UnstageConfigValue}) and
+     * with an Apply ({@link MenuAction.ApplyStagedConfig}) and Discard
+     * ({@link MenuAction.DiscardStagedConfig}) row appended after the
+     * Changeable list when the cart is non-empty. Keys present in
+     * {@code cartSnapshot} are removed from the Changeable list so the same
+     * key never appears twice on the page.
+     */
+    public <E extends Enum<E>> MenuModel buildConfigFile(UUID callerId,
+                                                         String fileName,
+                                                         ConfigParser<E> parser,
+                                                         java.util.LinkedHashMap<String, String> cartSnapshot) {
         Objects.requireNonNull(callerId, "callerId");
         Objects.requireNonNull(fileName, "fileName");
         Objects.requireNonNull(parser, "parser");
+        Objects.requireNonNull(cartSnapshot, "cartSnapshot");
         if (fileName.isEmpty()) {
             throw new IllegalArgumentException("fileName must not be empty");
         }
@@ -708,17 +732,29 @@ public final class CommandTreeMenuBuilder {
         // the constants and gating on `data.containsKey`.
         E[] enumValues = parser.myClass.getEnumConstants();
         java.util.EnumMap<E, Object> loaded = parser.getData();
+        // Item 6 of the staging-cart redesign: keys present in cartSnapshot
+        // move from the Changeable list into the Pending list, so the same
+        // key never renders twice on the page. cartSnapshot keys are matched
+        // case-insensitively against enum names (the cart stores raw param
+        // names as typed/dispatched, which the AnvilInputSession lifts from
+        // the live CommandParameter -- they match enum names exactly in
+        // practice, but tolerate case drift defensively).
+        java.util.Set<String> stagedKeys = new java.util.HashSet<>();
+        for (String k : cartSnapshot.keySet()) {
+            if (k != null) stagedKeys.add(k.toUpperCase(java.util.Locale.ROOT));
+        }
         List<E> visibleKeys = new ArrayList<>();
         if (enumValues != null) {
             for (E key : enumValues) {
                 if (key == null) continue;
-                if (loaded.containsKey(key)) {
-                    visibleKeys.add(key);
-                }
+                if (!loaded.containsKey(key)) continue;
+                if (stagedKeys.contains(key.name().toUpperCase(java.util.Locale.ROOT))) continue;
+                visibleKeys.add(key);
             }
         }
+        boolean hasCart = !cartSnapshot.isEmpty();
         List<MenuPage> pages = new ArrayList<>();
-        if (visibleKeys.isEmpty()) {
+        if (visibleKeys.isEmpty() && !hasCart) {
             List<MenuLine> lines = new ArrayList<>();
             lines.add(backRow);
             lines.add(headerRow);
@@ -736,8 +772,84 @@ public final class CommandTreeMenuBuilder {
             List<MenuLine> lines = new ArrayList<>();
             lines.add(backRow);
             lines.add(headerRow);
+            // Pending + Apply / Discard rows now render *before* the
+            // Changeable list (updated 2026-05-21 per user request "return
+            // to the config menu with the updated value set at the top").
+            // Previously appended after the Changeable list, which buried
+            // the freshly-staged entry below ~12 rows on the first page
+            // and forced the operator to scroll or paginate to confirm
+            // their edit landed. Cart entries are insertion-ordered, so
+            // the most-recently-staged entry naturally sits at the top of
+            // the pending list. The Pending header is non-clickable; each
+            // pending row is UnstageConfigValue; Apply / Discard rows close
+            // the section before the Changeable list begins.
+            if (hasCart) {
+                // Book parchment contrast: avoid yellow (&e/&6) and white
+                // (&f) per .junie/AGENTS.md 'Book Menu Color Contrast'.
+                String pendingHeader = lookupMsg(MessagesKeys.configPendingHeader,
+                        "&1&l-- pending changes --");
+                String pendingRowTmpl = lookupMsg(MessagesKeys.configPendingRowFormat,
+                        "&9[key]&8 = &0[value] &8(click to unstage)");
+                String applyLabel = lookupMsg(MessagesKeys.configApplyRow, "&a&l[apply]");
+                String discardLabel = lookupMsg(MessagesKeys.configDiscardRow, "&c&l[discard]");
+                lines.add(MenuLine.of(new MenuFragment(pendingHeader, null, null)));
+                // Iterate in reverse insertion order so the freshest entry
+                // is the first row under the Pending header. cartSnapshot
+                // is a LinkedHashMap; capture its entries into a list and
+                // walk it tail-first.
+                List<Map.Entry<String, String>> entries =
+                        new ArrayList<>(cartSnapshot.entrySet());
+                for (int i = entries.size() - 1; i >= 0; i--) {
+                    Map.Entry<String, String> e = entries.get(i);
+                    String label = pendingRowTmpl
+                            .replace("[key]", e.getKey())
+                            .replace("[value]", e.getValue());
+                    lines.add(MenuLine.of(new MenuFragment(label, null,
+                            new MenuAction.UnstageConfigValue(fileName, e.getKey()))));
+                    if (lines.size() - 2 >= rowsPerPage) {
+                        pages.add(new MenuPage(lines));
+                        lines = new ArrayList<>();
+                        lines.add(backRow);
+                        lines.add(headerRow);
+                    }
+                }
+                lines.add(MenuLine.of(new MenuFragment(
+                        applyLabel, null, new MenuAction.ApplyStagedConfig(fileName))));
+                lines.add(MenuLine.of(new MenuFragment(
+                        discardLabel, null, new MenuAction.DiscardStagedConfig(fileName))));
+                if (lines.size() - 2 >= rowsPerPage) {
+                    pages.add(new MenuPage(lines));
+                    lines = new ArrayList<>();
+                    lines.add(backRow);
+                    lines.add(headerRow);
+                }
+            }
             for (E key : visibleKeys) {
                 Object current = loaded.get(key);
+                // Nested config values (e.g. database/network/menu under
+                // config.yml whose stored value is an RtpYamlSection or
+                // Map) render via String.valueOf as garbage like
+                // "RtpYamlSection@1a2b3c". Flatten them into one row per
+                // scalar leaf with a dotted path label (database.dbType,
+                // database.connectionPool.maxPoolSize, ...). Nested rows
+                // are non-clickable because the staging cart only accepts
+                // flat enum-keyed params; in-menu editing of nested
+                // leaves is out of scope for this fix.
+                java.util.List<String[]> flattened = flattenNestedConfigValue(current);
+                if (flattened != null) {
+                    for (String[] kv : flattened) {
+                        String nestedLabel = "&2" + key.name() + "." + kv[0]
+                                + "&7: &0" + kv[1];
+                        lines.add(MenuLine.of(new MenuFragment(nestedLabel, null, null)));
+                        if (lines.size() - 2 >= rowsPerPage) {
+                            pages.add(new MenuPage(lines));
+                            lines = new ArrayList<>();
+                            lines.add(backRow);
+                            lines.add(headerRow);
+                        }
+                    }
+                    continue;
+                }
                 String currentStr = current == null
                         ? "&8(unset)"
                         : String.valueOf(current);
@@ -957,6 +1069,69 @@ public final class CommandTreeMenuBuilder {
         return new MenuModel(
                 "config:" + fileName + ":" + paramName + ":" + typeName,
                 List.of(page));
+    }
+
+    /**
+     * Flatten a nested config value (an {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection}
+     * or a generic {@link Map}) into an ordered list of
+     * {@code [dottedSubPath, scalarValue]} pairs whose dotted path is suitable
+     * for rendering as nested {@code parent.a}, {@code parent.a.b.c} rows on a
+     * config book page. Returns {@code null} for scalar inputs (caller renders
+     * them as a single editable row); returns an empty list when the value is
+     * a nested container but has no leaves.
+     */
+    private static java.util.List<String[]> flattenNestedConfigValue(Object value) {
+        if (value == null) return null;
+        boolean isSection = value instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+        boolean isMap = value instanceof Map;
+        if (!isSection && !isMap) return null;
+        java.util.List<String[]> out = new ArrayList<>();
+        Map<String, Object> level = isSection
+                ? ((io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) value).getValues(false)
+                : coerceMapKeysToString((Map<?, ?>) value);
+        if (level == null || level.isEmpty()) return out;
+        Deque<Object[]> stack = new ArrayDeque<>();
+        java.util.List<Map.Entry<String, Object>> entries = new ArrayList<>(level.entrySet());
+        for (int i = entries.size() - 1; i >= 0; i--) {
+            stack.push(new Object[]{entries.get(i).getKey(), entries.get(i).getValue()});
+        }
+        while (!stack.isEmpty()) {
+            Object[] frame = stack.pop();
+            String path = (String) frame[0];
+            Object node = frame[1];
+            if (node instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) {
+                Map<String, Object> children = ((io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) node).getValues(false);
+                if (children == null || children.isEmpty()) {
+                    out.add(new String[]{path, "&8(empty)"});
+                    continue;
+                }
+                java.util.List<Map.Entry<String, Object>> kids = new ArrayList<>(children.entrySet());
+                for (int i = kids.size() - 1; i >= 0; i--) {
+                    stack.push(new Object[]{path + "." + kids.get(i).getKey(), kids.get(i).getValue()});
+                }
+            } else if (node instanceof Map) {
+                Map<String, Object> children = coerceMapKeysToString((Map<?, ?>) node);
+                if (children.isEmpty()) {
+                    out.add(new String[]{path, "&8(empty)"});
+                    continue;
+                }
+                java.util.List<Map.Entry<String, Object>> kids = new ArrayList<>(children.entrySet());
+                for (int i = kids.size() - 1; i >= 0; i--) {
+                    stack.push(new Object[]{path + "." + kids.get(i).getKey(), kids.get(i).getValue()});
+                }
+            } else {
+                out.add(new String[]{path, node == null ? "&8(unset)" : String.valueOf(node)});
+            }
+        }
+        return out;
+    }
+
+    private static Map<String, Object> coerceMapKeysToString(Map<?, ?> in) {
+        java.util.LinkedHashMap<String, Object> out = new java.util.LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : in.entrySet()) {
+            out.put(String.valueOf(e.getKey()), e.getValue());
+        }
+        return out;
     }
 
     private static String lookupMsg(MessagesKeys key, String fallback) {

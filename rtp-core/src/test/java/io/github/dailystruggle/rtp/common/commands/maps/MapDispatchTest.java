@@ -186,6 +186,126 @@ class MapDispatchTest {
     assertNotNull(prior);
   }
 
+  @Test
+  @DisplayName("Stage 2.2: setMapBinding auto-registers a MapBindingLifecycle implementer")
+  void setMapBinding_autoRegistersLifecycle() {
+    int before = MapDispatch.registeredLifecycleCount();
+    LifecycleAwareBinding aware = new LifecycleAwareBinding();
+    MapDispatch.setMapBinding(aware);
+    try {
+      assertTrue(MapDispatch.registeredLifecycleCount() >= before + 1,
+          "setMapBinding shall auto-register a MapBindingLifecycle binding");
+      // Idempotent: second setMapBinding of the same instance does not re-register.
+      MapDispatch.setMapBinding(aware);
+      int afterSecond = MapDispatch.registeredLifecycleCount();
+      MapDispatch.setMapBinding(aware);
+      assertEquals(afterSecond, MapDispatch.registeredLifecycleCount(),
+          "registerLifecycle shall be idempotent");
+    } finally {
+      MapDispatch.unregisterLifecycle(aware);
+    }
+  }
+
+  @Test
+  @DisplayName("Stage 2.2: firePlayerQuit fans out to every registered lifecycle; an exception in one does not block others")
+  void firePlayerQuit_fanOutAndIsolation() {
+    LifecycleAwareBinding healthy = new LifecycleAwareBinding();
+    ThrowingLifecycle thrower = new ThrowingLifecycle();
+    MapDispatch.registerLifecycle(healthy);
+    MapDispatch.registerLifecycle(thrower);
+    try {
+      UUID viewer = UUID.randomUUID();
+      MapDispatch.firePlayerQuit(viewer);
+      assertEquals(1, healthy.playerQuitCalls,
+          "healthy lifecycle shall observe the quit even when a peer throws");
+      assertEquals(viewer, healthy.lastQuitViewer);
+      assertEquals(1, thrower.playerQuitCalls);
+      // Null viewer is a no-op (no UUID exists for an unknown player).
+      MapDispatch.firePlayerQuit(null);
+      assertEquals(1, healthy.playerQuitCalls);
+    } finally {
+      MapDispatch.unregisterLifecycle(healthy);
+      MapDispatch.unregisterLifecycle(thrower);
+    }
+  }
+
+  @Test
+  @DisplayName("Stage 2.2: fireDisable invokes onDisable on every registered lifecycle and clears the registry")
+  void fireDisable_clearsRegistry() {
+    LifecycleAwareBinding a = new LifecycleAwareBinding();
+    LifecycleAwareBinding b = new LifecycleAwareBinding();
+    MapDispatch.registerLifecycle(a);
+    MapDispatch.registerLifecycle(b);
+    int sizeBefore = MapDispatch.registeredLifecycleCount();
+    assertTrue(sizeBefore >= 2);
+
+    MapDispatch.fireDisable();
+
+    assertEquals(1, a.disableCalls);
+    assertEquals(1, b.disableCalls);
+    assertEquals(0, MapDispatch.registeredLifecycleCount(),
+        "fireDisable shall clear the lifecycle registry");
+  }
+
+  // -----------------------------------------------------------------------
+  // Stage 2.2 fixtures: minimal lifecycle observers. The "aware" binding
+  // doubles as a MapBinding (extends the inert CountingMapBinding) so it can
+  // exercise the setMapBinding auto-registration code path.
+  // -----------------------------------------------------------------------
+
+  private static final class LifecycleAwareBinding
+      implements MapBinding, io.github.dailystruggle.mapsapi.MapBindingLifecycle {
+    int playerQuitCalls = 0;
+    int disableCalls = 0;
+    UUID lastQuitViewer = null;
+
+    @Override
+    public MapHandle allocate(MapAllocationRequest request) {
+      return new MapHandle(request.chartId(), request.viewer(), 0);
+    }
+
+    @Override
+    public <M extends ChartModel> void renderEphemeral(MapHandle handle,
+                                                       ChartRenderer<M> renderer,
+                                                       M model) {
+      // no-op
+    }
+
+    @Override
+    public <M extends ChartModel> Cancellation bindLive(MapHandle handle,
+                                                        ChartRenderer<M> renderer,
+                                                        Supplier<M> modelSupplier) {
+      throw new UnsupportedOperationException("not under test");
+    }
+
+    @Override
+    public void onPlayerQuit(UUID viewer) {
+      playerQuitCalls++;
+      lastQuitViewer = viewer;
+    }
+
+    @Override
+    public void onDisable() {
+      disableCalls++;
+    }
+  }
+
+  private static final class ThrowingLifecycle
+      implements io.github.dailystruggle.mapsapi.MapBindingLifecycle {
+    int playerQuitCalls = 0;
+
+    @Override
+    public void onPlayerQuit(UUID viewer) {
+      playerQuitCalls++;
+      throw new RuntimeException("test-injected");
+    }
+
+    @Override
+    public void onDisable() {
+      throw new RuntimeException("test-injected");
+    }
+  }
+
   // -----------------------------------------------------------------------
   // Local fake binding: counts allocate / renderEphemeral, supports failure
   // injection. Does NOT import org.bukkit / net.minecraft (rtp-core test

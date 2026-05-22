@@ -315,6 +315,14 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
             if (session.parentPath.size() >= 2
                     && "config".equalsIgnoreCase(session.parentPath.get(0))) {
                 fileName = session.parentPath.get(1);
+                // Normalize: the TreeCommand walk uses the suffixed segment
+                // ("performance.yml"), but buildConfigFile / ApplyStagedConfig
+                // address the cart by the bare basename ("performance"). Stage
+                // under the bare form so Apply finds the entries.
+                if (fileName != null
+                        && fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".yml")) {
+                    fileName = fileName.substring(0, fileName.length() - 4);
+                }
             }
             if (sink == null || fileName == null) {
                 RTP.log(Level.WARNING,
@@ -334,7 +342,10 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
                 return;
             }
             // Reopen the curated file page so the new "Pending" entry is visible.
-            final String reopen = "/rtp config " + fileName;
+            // Must route through the menu mirror (`/rtp menu config <file>`),
+            // not the text-mode config-reload command (`/rtp config <file>`),
+            // which would just reload configs without re-rendering the menu.
+            final String reopen = "/rtp menu config " + fileName;
             Plugin plugin = getRtpPlugin();
             if (plugin == null) {
                 RTP.log(Level.WARNING,

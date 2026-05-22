@@ -63,6 +63,26 @@ public final class ChartSpecTokens {
 
     private final ConcurrentHashMap<UUID, Entry> entries = new ConcurrentHashMap<>();
 
+    /**
+     * Process-local singleton used by the menu redeem pipeline. The mint side
+     * ({@code InfoCmd} footer row builder) and the consume side
+     * ({@code MenuRedeemSubcommand.dispatchOpenMap}) both route through this
+     * instance so that {@code MenuRedeemSubcommand}'s constructor surface
+     * does not need to grow a new parameter for ADR-047 wiring. Direct
+     * construction remains supported for tests and for callers that prefer
+     * isolated registries (the unit suite uses dedicated instances).
+     */
+    private static final ChartSpecTokens INSTANCE = new ChartSpecTokens();
+
+    /**
+     * Process-local singleton accessor. Never {@code null}. Tests that need
+     * isolation should construct their own {@link ChartSpecTokens} via
+     * {@link #ChartSpecTokens()} rather than mutating the singleton.
+     */
+    public static ChartSpecTokens instance() {
+        return INSTANCE;
+    }
+
     public ChartSpecTokens() {
     }
 

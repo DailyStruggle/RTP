@@ -1,0 +1,10 @@
+# --- Language Mapping: worlds/*.yml ---
+# Maps internal world-config keys (left) to the user-visible key names used
+# in every file under `worlds/` (right). Edit only the right-hand side to
+# rename or translate a config option; the left-hand side is a code constant
+# and must not change. If this file is missing, the plugin regenerates it
+# with identical left/right pairs (the English defaults).
+region: "region"
+requirePermission: "requirePermission"
+override: "override"
+version: "version"
