@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -196,6 +197,32 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * player disconnect via {@link #clearCart(UUID)}.
      */
     private final Map<UUID, Cart> carts = new ConcurrentHashMap<>();
+
+    /**
+     * CHECKLIST-multiconfig-menu step 7: per-viewer remove-mode flag set,
+     * keyed by viewer UUID, value is the set of {@code parserKind} strings
+     * the viewer currently has remove-mode toggled on for. Mutated only by
+     * {@link #dispatchOpenMultiConfigSelector} when the toggle row is
+     * clicked. Cleared on a successful REMOVE / ADD mutation and on viewer
+     * disconnect (best-effort - the registry's TTL evict eventually drops
+     * stale entries even if disconnect is missed).
+     */
+    private final Map<UUID, Set<String>> removeModeKinds = new ConcurrentHashMap<>();
+
+    /**
+     * CHECKLIST-multiconfig-menu step 7 (optional): builder for the three
+     * MultiConfig submenu pages (selector / per-entry / confirm-remove).
+     * Different from the other builder SAMs above because the builder is a
+     * concrete class living in {@code rtp-core} (no platform indirection
+     * needed); injected via {@link #setMultiConfigBuilder} so we do not
+     * grow the constructor overload chain by another arm. When {@code null},
+     * the three new {@link MenuAction.OpenMultiConfigSelector} /
+     * {@link MenuAction.OpenMultiConfigEntry} /
+     * {@link MenuAction.MultiConfigMutate} arms reject with
+     * {@code menuInvalid} + WARN (S-004), matching the absent-builder
+     * fallback shape of {@link #configSubtreeBuilder} and friends.
+     */
+    private volatile io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigMenuBuilder multiConfigBuilder;
 
     /**
      * In-memory record of one player's pending config edits for a single
@@ -1031,6 +1058,20 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         }
         if (action instanceof MenuAction.DiscardStagedConfig discard) {
             return dispatchDiscardStagedConfig(senderId, discard, messageMethod);
+        }
+        // CHECKLIST-multiconfig-menu step 7 - three new arms for the generic
+        // MultiConfig submenu (regions, worlds, future kinds). All three
+        // gate on rtp.config.view in the dispatch arm. Path Z scope: the
+        // entry page is browse-only; per-key staging is deferred to a
+        // later slice.
+        if (action instanceof MenuAction.OpenMultiConfigSelector openSel) {
+            return dispatchOpenMultiConfigSelector(senderId, openSel, messageMethod);
+        }
+        if (action instanceof MenuAction.OpenMultiConfigEntry openEntry) {
+            return dispatchOpenMultiConfigEntry(senderId, openEntry, messageMethod);
+        }
+        if (action instanceof MenuAction.MultiConfigMutate mutate) {
+            return dispatchMultiConfigMutate(senderId, mutate, messageMethod);
         }
         // ADR-047 / REQ-RTP-MAP-006 declarative chart bridge. OpenMap routes
         // through ChartSpecTokens (consume on the dispatch thread) and
@@ -2095,6 +2136,27 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             if (assembledPath.size() == 1) {
                 return dispatchOpenConfigSelector(senderId, messageMethod);
             }
+            // `/rtp menu config search query=<typed>` lands here via the
+            // anvil-input submit from OpenConfigSearchPrompt (see
+            // PROPOSAL-rtp-menu-config-search.md §6 Q4 Decision A). Route
+            // to the search-results dispatcher instead of falling through
+            // to the config-file/key dispatchers, which would treat
+            // `search` as a config file name and re-open the per-key
+            // anvil editor for `query`.
+            if (assembledPath.size() >= 2
+                    && "search".equalsIgnoreCase(assembledPath.get(1))) {
+                String query = "";
+                if (parameterValues != null) {
+                    java.util.List<String> qArgs = parameterValues.get(
+                            io.github.dailystruggle.rtp.common.commands.config.ConfigSearchSubCmd.PARAM_QUERY);
+                    if (qArgs != null && !qArgs.isEmpty() && qArgs.get(0) != null) {
+                        query = qArgs.get(0);
+                    }
+                }
+                return dispatchOpenConfigSearchResults(senderId,
+                        new MenuAction.OpenConfigSearchResults(query, 0),
+                        messageMethod);
+            }
             String fileName = assembledPath.get(1);
             String stagedParam = null;
             if (parameterValues != null) {
@@ -2303,6 +2365,368 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         applyCart(senderId, discard.fileName());
         return dispatchOpenConfigFile(senderId,
                 new MenuAction.OpenConfigFile(discard.fileName()), messageMethod);
+    }
+
+    // ------------------------------------------------------------------------
+    // CHECKLIST-multiconfig-menu step 7 (Path Z scope):
+    // three dispatch arms for the generic MultiConfig submenu surface.
+    // Entry page is browse-only this slice; per-key staging deferred.
+    // ------------------------------------------------------------------------
+
+    /**
+     * Inject (or replace) the {@link io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigMenuBuilder}
+     * used by the three new dispatch arms. Pass {@code null} to disable the
+     * MultiConfig submenu surface; in that state, inbound tokens for the
+     * three new {@link MenuAction} variants reject with {@code menuInvalid}
+     * + WARN (S-004), matching the absent-builder fallback shape used by
+     * the other curated submenus.
+     */
+    public void setMultiConfigBuilder(
+            @Nullable io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigMenuBuilder builder) {
+        this.multiConfigBuilder = builder;
+    }
+
+    /**
+     * Resolve a {@link io.github.dailystruggle.rtp.common.configuration.MultiConfigParser}
+     * by its case-insensitive {@code name}. Returns {@code null} when no
+     * registered multi-config parser matches; the dispatch arms treat that
+     * as an S-004 reject path (token forged with an unknown kind, or the
+     * matching parser has been unregistered since the token was minted).
+     */
+    private static @Nullable io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> resolveMultiConfigParser(
+            String parserKind) {
+        if (parserKind == null || parserKind.isEmpty()) return null;
+        if (RTP.configs == null) return null;
+        String target = parserKind.toLowerCase(java.util.Locale.ROOT);
+        try {
+            for (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> p
+                    : RTP.configs.multiConfigParserMap.values()) {
+                if (p == null || p.name == null) continue;
+                if (p.name.toLowerCase(java.util.Locale.ROOT).equals(target)) {
+                    return p;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    /**
+     * Dispatch for {@link MenuAction.OpenMultiConfigSelector}. Gates on
+     * {@link #CONFIG_VIEW_PERMISSION}. When the consumed token carries the
+     * "toggle remove-mode" sentinel ({@code parserKind} is prefixed with
+     * {@code "!toggle:"}), the per-viewer flag for the underlying kind is
+     * flipped before the selector is re-rendered. All failure paths log
+     * WARN + reject with {@code menuInvalid} (S-004).
+     */
+    private boolean dispatchOpenMultiConfigSelector(UUID senderId,
+                                                    MenuAction.OpenMultiConfigSelector open,
+                                                    @Nullable Consumer<String> messageMethod) {
+        if (renderer == null || multiConfigBuilder == null) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-selector received with multiconfig disabled for " + senderId);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-selector rejected: multiconfig disabled", messageMethod);
+            return false;
+        }
+        if (!hasConfigViewPermission(senderId)) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-selector denied: " + senderId
+                            + " lacks " + CONFIG_VIEW_PERMISSION);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-selector rejected: permission denied", messageMethod);
+            return false;
+        }
+        String rawKind = open.parserKind();
+        String effectiveKind = rawKind;
+        boolean isToggle = false;
+        if (rawKind != null && rawKind.startsWith("!toggle:")) {
+            effectiveKind = rawKind.substring("!toggle:".length());
+            isToggle = true;
+        }
+        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser =
+                resolveMultiConfigParser(effectiveKind);
+        if (parser == null) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-selector unknown parserKind '"
+                            + effectiveKind + "' for " + senderId);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-selector rejected: unknown parser kind", messageMethod);
+            return false;
+        }
+        // Apply the toggle flip (if any) before computing removeMode for
+        // the render so the user sees the new state in the same click.
+        final String fk = effectiveKind;
+        if (isToggle) {
+            removeModeKinds.compute(senderId, (id, s) -> {
+                Set<String> set = (s != null) ? s : ConcurrentHashMap.newKeySet();
+                String k = fk.toLowerCase(java.util.Locale.ROOT);
+                if (!set.add(k)) {
+                    set.remove(k);
+                }
+                return set.isEmpty() ? null : set;
+            });
+        }
+        boolean removeMode = isRemoveMode(senderId, effectiveKind);
+        MenuModel model;
+        try {
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            MenuModel m = multiConfigBuilder.buildSelector(
+                    effectiveKind, (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser) parser,
+                    removeMode, senderId);
+            model = m;
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-selector builder failed for " + senderId
+                            + " kind=" + effectiveKind + ": " + e.getMessage(), e);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-selector rejected: builder failure", messageMethod);
+            return false;
+        }
+        if (model == null) {
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-selector rejected: builder returned null model",
+                    messageMethod);
+            return false;
+        }
+        try {
+            renderer.render(senderId, model);
+            return true;
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-selector render failed for " + senderId
+                            + " kind=" + effectiveKind + ": " + e.getMessage(), e);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-selector rejected: renderer failure", messageMethod);
+            return false;
+        }
+    }
+
+    /**
+     * Read the per-viewer remove-mode flag for {@code parserKind} (case-
+     * insensitive). Package-private for the dispatch tests.
+     */
+    boolean isRemoveMode(UUID viewer, String parserKind) {
+        if (viewer == null || parserKind == null) return false;
+        Set<String> set = removeModeKinds.get(viewer);
+        if (set == null) return false;
+        return set.contains(parserKind.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /**
+     * Dispatch for {@link MenuAction.OpenMultiConfigEntry}. Gates on
+     * {@link #CONFIG_VIEW_PERMISSION}. Resolves the parser by kind, then
+     * routes through {@link io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigMenuBuilder#buildEntry}.
+     * An unknown kind or unknown entry name is an S-004 reject path.
+     */
+    private boolean dispatchOpenMultiConfigEntry(UUID senderId,
+                                                 MenuAction.OpenMultiConfigEntry open,
+                                                 @Nullable Consumer<String> messageMethod) {
+        if (renderer == null || multiConfigBuilder == null) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-entry received with multiconfig disabled for " + senderId);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-entry rejected: multiconfig disabled", messageMethod);
+            return false;
+        }
+        if (!hasConfigViewPermission(senderId)) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-entry denied: " + senderId
+                            + " lacks " + CONFIG_VIEW_PERMISSION);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-entry rejected: permission denied", messageMethod);
+            return false;
+        }
+        String kind = open.parserKind();
+        String entry = open.entryName();
+        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser =
+                resolveMultiConfigParser(kind);
+        if (parser == null) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-entry unknown parserKind '" + kind + "' for " + senderId);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-entry rejected: unknown parser kind", messageMethod);
+            return false;
+        }
+        MenuModel model;
+        try {
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            MenuModel m = multiConfigBuilder.buildEntry(
+                    kind, entry,
+                    (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser) parser,
+                    senderId);
+            model = m;
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-entry builder failed for " + senderId
+                            + " kind=" + kind + " entry=" + entry + ": " + e.getMessage(), e);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-entry rejected: builder failure", messageMethod);
+            return false;
+        }
+        if (model == null) {
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-entry rejected: builder returned null model",
+                    messageMethod);
+            return false;
+        }
+        try {
+            renderer.render(senderId, model);
+            return true;
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-entry render failed for " + senderId
+                            + " kind=" + kind + " entry=" + entry + ": " + e.getMessage(), e);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-entry rejected: renderer failure", messageMethod);
+            return false;
+        }
+    }
+
+    /**
+     * Dispatch for {@link MenuAction.MultiConfigMutate}. Gates on
+     * {@link #CONFIG_VIEW_PERMISSION}. Mutates the parser:
+     * <ul>
+     *   <li>ADD: {@link io.github.dailystruggle.rtp.common.configuration.MultiConfigParser#addParser(String)}
+     *       (no-op if the entry already exists), then invokes
+     *       {@link io.github.dailystruggle.rtp.common.commands.menu.multiconfig.NetherEndConfigAmender}
+     *       when the entry name ends with {@code _nether} or {@code _the_end}
+     *       (regions kind only). The nether/end amender is currently region-
+     *       specific by design (it lives in {@code SubConfigCmd}); for other
+     *       kinds (worlds, future) it is a no-op call site.</li>
+     *   <li>REMOVE: re-checks the registered
+     *       {@link io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigRemovalGuard}
+     *       server-side. Locked entries are an S-004 reject path even if
+     *       the client sent a forged token. Otherwise calls
+     *       {@link io.github.dailystruggle.rtp.common.configuration.MultiConfigParser#removeParser(String)}.</li>
+     * </ul>
+     * On success, re-renders the selector page for the same kind so the
+     * mutation is visible. The per-viewer remove-mode flag is cleared on a
+     * successful REMOVE (so the next click is a normal navigation by
+     * default).
+     */
+    private boolean dispatchMultiConfigMutate(UUID senderId,
+                                              MenuAction.MultiConfigMutate mutate,
+                                              @Nullable Consumer<String> messageMethod) {
+        if (renderer == null || multiConfigBuilder == null) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-mutate received with multiconfig disabled for " + senderId);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-mutate rejected: multiconfig disabled", messageMethod);
+            return false;
+        }
+        if (!hasConfigViewPermission(senderId)) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-mutate denied: " + senderId
+                            + " lacks " + CONFIG_VIEW_PERMISSION);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-mutate rejected: permission denied", messageMethod);
+            return false;
+        }
+        String kind = mutate.parserKind();
+        String entry = mutate.entryName();
+        MenuAction.MultiConfigMutate.Op op = mutate.op();
+        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser =
+                resolveMultiConfigParser(kind);
+        if (parser == null) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-mutate unknown parserKind '" + kind + "' for " + senderId);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu multiconfig-mutate rejected: unknown parser kind", messageMethod);
+            return false;
+        }
+        if (op == MenuAction.MultiConfigMutate.Op.REMOVE) {
+            // Server-side guard re-check: never trust the client to honour
+            // the locked-row UI suppression.
+            io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigRemovalGuard guard =
+                    io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigRemovalGuards.get(kind);
+            if (guard.isLocked(entry)) {
+                RTP.log(Level.WARNING,
+                        "menu multiconfig-mutate REMOVE rejected: '" + entry
+                                + "' is locked under kind '" + kind + "' for " + senderId
+                                + " (reason: " + guard.reason(entry) + ")");
+                reject(senderId, MessagesKeys.menuInvalid,
+                        "menu multiconfig-mutate rejected: entry locked", messageMethod);
+                return false;
+            }
+            try {
+                parser.removeParser(entry);
+            } catch (RuntimeException e) {
+                RTP.log(Level.WARNING,
+                        "menu multiconfig-mutate REMOVE failed for " + senderId
+                                + " kind=" + kind + " entry=" + entry + ": " + e.getMessage(), e);
+                reject(senderId, MessagesKeys.menuInvalid,
+                        "menu multiconfig-mutate rejected: remove failure", messageMethod);
+                return false;
+            }
+            // Clear remove-mode for this kind so the next click is normal nav.
+            removeModeKinds.computeIfPresent(senderId, (id, s) -> {
+                s.remove(kind.toLowerCase(java.util.Locale.ROOT));
+                return s.isEmpty() ? null : s;
+            });
+        } else {
+            // ADD
+            try {
+                parser.addParser(entry);
+            } catch (RuntimeException e) {
+                RTP.log(Level.WARNING,
+                        "menu multiconfig-mutate ADD failed for " + senderId
+                                + " kind=" + kind + " entry=" + entry + ": " + e.getMessage(), e);
+                reject(senderId, MessagesKeys.menuInvalid,
+                        "menu multiconfig-mutate rejected: add failure", messageMethod);
+                return false;
+            }
+            // Region-specific nether/end seed amendment: mirror SubConfigCmd's
+            // post-create amend so a newly added region for a _nether /
+            // _the_end world gets the LINEAR/maxY=128/!skylight defaults
+            // applied. The amender is a no-op for non-matching world names.
+            // For kinds other than "regions" this branch is a no-op call.
+            String lowerKind = kind.toLowerCase(java.util.Locale.ROOT);
+            if (lowerKind.equals("regions")) {
+                tryAmendNetherEndSeed(parser, entry);
+            }
+        }
+        // Re-render the selector so the user sees the new entry list.
+        return dispatchOpenMultiConfigSelector(senderId,
+                new MenuAction.OpenMultiConfigSelector(kind), messageMethod);
+    }
+
+    /**
+     * Best-effort post-ADD amendment for a region whose name matches the
+     * vanilla nether / the-end suffix conventions. Delegates to the
+     * {@link io.github.dailystruggle.rtp.common.commands.menu.multiconfig.NetherEndConfigAmender}
+     * helper (extracted in step 3 of CHECKLIST-multiconfig-menu) using an
+     * empty {@code parameterValues} map - we just want the LINEAR / maxY=128
+     * / !requireskylight seed defaults applied, not a user-supplied override.
+     * Failures are logged but not propagated; the region row still appears
+     * in the selector after a failed amend.
+     */
+    private static void tryAmendNetherEndSeed(
+            io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser,
+            String entry) {
+        if (entry == null) return;
+        String lower = entry.toLowerCase(java.util.Locale.ROOT);
+        if (!lower.endsWith("_nether") && !lower.endsWith("_the_end")) return;
+        try {
+            io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> region =
+                    parser.getParser(entry);
+            if (region == null) return;
+            io.github.dailystruggle.rtp.api.world.RTPWorld world = null;
+            try {
+                world = RTP.serverAccessor.getRTPWorld(entry);
+            } catch (RuntimeException ignored) {
+                // serverAccessor null in tests; amender tolerates null world
+            }
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            io.github.dailystruggle.rtp.common.configuration.ConfigParser raw = region;
+            io.github.dailystruggle.rtp.common.commands.menu.multiconfig.NetherEndConfigAmender
+                    .amend(new java.util.HashMap<>(), raw, world);
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-mutate ADD post-amend failed for entry="
+                            + entry + ": " + e.getMessage(), e);
+        }
     }
 
     private boolean dispatchRun(UUID senderId, MenuAction.RunRtpCommand run,

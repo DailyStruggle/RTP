@@ -103,9 +103,11 @@ heartbeat:
 # 2) Legacy flat weights (msptWeight, queueDepthWeight, heapWeight,
 #    playerCountWeight) are synthesized to linear terms for back-compat.
 #
-# The block below is commented out so the proxy uses bundled defaults
-# (linear curves on mspt + queueDepth + heap; playerCount weight 0). Uncomment
-# and tune for your deployment.
+# The block below ships ACTIVE so operator support is "edit values" not
+# "first uncomment, then edit". The defaults mirror the lobby-side block
+# in rtp-plugin/network.yml so a single tuned schema covers both code
+# paths (proxy WeightedAverageBackendSelector + lobby/proxy
+# RegionAwareSelector).
 # Five terms, one per metric (no doubled constraints). The curve carries
 # the soft-vs-hard expression: `step` near the top of its range acts as a
 # gate that only fires when the metric is critical, but the candidate can
@@ -116,42 +118,44 @@ heartbeat:
 #   - region: step at keptRegion >= 0.95, weight 5.0 (effective gate)
 #   - kept:   logarithmic, weight 0.25 (gentle tie-breaker)
 # regionScarcityWeight is 0 because the explicit `region` term below owns
-# the kept-region signal.
-#loadBalancer:
-#  staleAfterMs: 30000
-#  regionScarcityWeight: 0
-#  terms:
-#    mspt:
-#      input: mspt
-#      weight: 1.0
-#      curve:
-#        type: sigmoid
-#        k: 8.0
-#        x0: 0.6
-#    queue:
-#      input: queueDepth
-#      weight: 1.0
-#      curve:
-#        type: exponential
-#        k: 3.0
-#    heap:
-#      input: heapUsed
-#      weight: 5.0
-#      curve:
-#        type: step
-#        threshold: 0.85
-#    region:
-#      input: keptRegion
-#      weight: 5.0
-#      curve:
-#        type: step
-#        threshold: 0.95
-#    kept:
-#      input: keptCount
-#      weight: 0.25
-#      curve:
-#        type: logarithmic
-#        k: 9.0
+# the kept-region signal. The `backends:` block is optional per-server
+# weight overrides; uncomment and adjust to bias the selector toward a
+# specific backend without re-running the curve math.
+loadBalancer:
+  staleAfterMs: 30000
+  regionScarcityWeight: 0
+  terms:
+    mspt:
+      input: mspt
+      weight: 1.0
+      curve:
+        type: sigmoid
+        k: 8.0
+        x0: 0.6
+    queue:
+      input: queueDepth
+      weight: 1.0
+      curve:
+        type: exponential
+        k: 3.0
+    heap:
+      input: heapUsed
+      weight: 5.0
+      curve:
+        type: step
+        threshold: 0.85
+    region:
+      input: keptRegion
+      weight: 5.0
+      curve:
+        type: step
+        threshold: 0.95
+    kept:
+      input: keptCount
+      weight: 0.25
+      curve:
+        type: logarithmic
+        k: 9.0
 #  backends:
 #    backend-a:
 #      weight: 1.0

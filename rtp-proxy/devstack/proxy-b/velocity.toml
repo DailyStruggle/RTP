@@ -24,7 +24,9 @@ forced-hosts = {}
 	lobby-b = "lobby-b:25565"
 	backend-a = "backend-a:25565"
 	backend-b = "backend-b:25565"
-	try = ["lobby-b", "lobby-a", "backend-b", "backend-a"]
+	# backend-c: Fabric 1.21.11 (see proxy-a/velocity.toml for rationale).
+	backend-c = "backend-c:25565"
+	try = ["lobby-b", "lobby-a", "backend-b", "backend-a", "backend-c"]
 
 [advanced]
 	compression-threshold = 256

@@ -19,8 +19,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Guards:
  * <ul>
- *   <li>Curated seven-prefab list and panel ordering from the locked
- *       decisions in {@code CHECKLIST-admin-panel-prefabs.md} (2026-05-20).</li>
+ *   <li>Curated five-prefab list and panel ordering, per
+ *       {@code PROPOSAL-prefab-cleanup.md} (2026-05-22 trim of the original
+ *       seven-prefab lock; Lightweight and FastPaced removed as redundant
+ *       with LowPerformance on the low-end-server axis).</li>
  *   <li>Ids are unique and stable.</li>
  *   <li>Overlay maps are non-null and immutable (defends against accidental
  *       mutation in later sessions).</li>
@@ -38,16 +40,14 @@ class PrefabRegistryTest {
             "low-performance",
             "high-performance",
             "folia-tuned",
-            "lightweight",
-            "fast-paced",
             "multi-world"
     );
 
     @Test
-    @DisplayName("registry ships exactly seven prefabs in the curated panel order")
+    @DisplayName("registry ships exactly five prefabs in the curated panel order")
     void registryOrderAndSize() {
         List<Prefab> prefabs = PrefabRegistry.list();
-        assertEquals(7, prefabs.size(), "expected exactly seven bundled prefabs");
+        assertEquals(5, prefabs.size(), "expected exactly five bundled prefabs");
         assertEquals(EXPECTED_ORDER, prefabs.stream().map(Prefab::id).toList(),
                 "panel order does not match the locked curated ordering");
     }

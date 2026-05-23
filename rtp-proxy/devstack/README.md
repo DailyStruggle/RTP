@@ -2,23 +2,38 @@
 
 First-class runtime verification fixture for the cross-server `/rtp` slice
 (CHECKLIST-cross-server-rtp.md L3). Boots 1 Redis + 2 Velocity proxies + 2
-Paper lobbies + 2 Paper backends on a single docker-compose network and
-exercises the round-trip, kill-mid-flight, and kill-switch scenarios.
+Paper lobbies + 3 platform-asymmetric backends (Paper / Folia / Fabric) on a
+single docker-compose network and exercises the round-trip, kill-mid-flight,
+and kill-switch scenarios.
+
+The backend trio is deliberately heterogeneous: `backend-a` runs Paper,
+`backend-b` runs Folia, and `backend-c` runs Fabric. Matched-pair Paper
+backends would only exercise one scheduler family, so a Paper-compiles-but-
+Folia-blows-up (or `rtp-fabric`-adapter) regression would not surface until a
+user reported it. Asymmetric backends route every `/rtp` round-trip through
+the `BackendSelector` against three platform adapters at once.
+
+> `backend-c` (Fabric) intentionally exercises the `rtp-fabric` adapter while
+> it is still stabilizing (see `docs/dev/MULTI_PLATFORM_PLAN.md`). Expect
+> failures here to be common until the adapter lands its outstanding work;
+> that is the point of including it - stability cannot be verified without
+> testing.
 
 ## Topology
 
 ```
             +-----------+        +-----------+        +-----------+
-client ---> | proxy-a   |---+--->| lobby-a   |---+--->| backend-a |
+client ---> | proxy-a   |---+--->| lobby-a   |---+--->| backend-a | (Paper)
             +-----------+   |    +-----------+   |    +-----------+
-                            |                    |
-            +-----------+   +--->+-----------+   +--->+-----------+
-client ---> | proxy-b   |------->| lobby-b   |------->| backend-b |
-            +-----------+        +-----------+        +-----------+
-                          \                                /
-                           \                              /
-                            +----------> redis <---------+
-                             (heartbeat, claim/release/redeem)
+                            |                    +--->+-----------+
+                            |                    |    | backend-b | (Folia)
+            +-----------+   +--->+-----------+   |    +-----------+
+client ---> | proxy-b   |------->| lobby-b   |---+--->+-----------+
+            +-----------+        +-----------+        | backend-c | (Fabric)
+                                                      +-----------+
+                                       \                  /
+                                        +---> redis <----+
+                                  (heartbeat, claim/release/redeem)
 ```
 
 - Proxies expose 25577 / 25578 on the host. Connect any Minecraft client to
@@ -42,7 +57,7 @@ lobbies before backends), and exercises the lobby use case:
 - The cross-server pipeline dispatches the request: either to a named
   backend (`/rtp <region-on-backend-a>` style usage if the operator wires
   that up) or to whichever destination the `BackendSelector` load-balances
-  to across `backend-a` / `backend-b`.
+  to across `backend-a` (Paper) / `backend-b` (Folia) / `backend-c` (Fabric).
 - After redeem, the player is transferred to the chosen backend by the
   proxy and teleported to the resolved coordinate.
 
@@ -96,8 +111,8 @@ Each scenario is described in `docs/admin/proxies/CROSS_SERVER_VERIFICATION.md`.
 
 | Scenario           | Headless evidence                                                |
 |--------------------|------------------------------------------------------------------|
-| boot               | `docker compose ps` reports all seven services `Up`              |
-| heartbeat          | `redis-cli` lists 4 backend (incl. 2 lobbies) + 2 proxy keys     |
+| boot               | `docker compose ps` reports all eight services `Up`             |
+| heartbeat          | `redis-cli` lists 5 backend (3 backends + 2 lobbies) + 2 proxy keys |
 | roundtrip          | requires a manual MC client login (see admin doc)                |
 | killmidflight      | reservation row clears within `reservation.ttlMs + reapInterval` |
 | killswitch         | Lua claim returns `KILL_SWITCH`; harness asserts proxy log line  |

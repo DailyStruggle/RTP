@@ -81,6 +81,11 @@ final class AdminPanelBuilderTest {
         // Configuration
         assertNotNull(findOpenConfigSelector(model),
                 "Config row must appear when /rtp config is registered and viewer has rtp.config.view");
+        // CHECKLIST-multiconfig-menu step 10: Regions / Worlds submenu rows.
+        assertNotNull(findOpenMultiConfigSelector(model, "regions"),
+                "Regions submenu row must appear with /rtp config registered + rtp.config.view");
+        assertNotNull(findOpenMultiConfigSelector(model, "worlds"),
+                "Worlds submenu row must appear with /rtp config registered + rtp.config.view");
 
         // Diagnostics: per PROPOSAL-info-as-book.md section 4.6, the info
         // row now opens the curated info book via OpenInfo(global) rather
@@ -143,11 +148,34 @@ final class AdminPanelBuilderTest {
 
         assertNull(findOpenConfigSelector(model),
                 "Config row must be hidden when /rtp config is unregistered");
+        assertNull(findOpenMultiConfigSelector(model, "regions"),
+                "Regions submenu row must be hidden when /rtp config is unregistered");
+        assertNull(findOpenMultiConfigSelector(model, "worlds"),
+                "Worlds submenu row must be hidden when /rtp config is unregistered");
         assertFalse(hasFragmentContaining(model, "configuration"),
                 "Configuration divider must auto-suppress when its only row is hidden");
         // Other sections still render. The info row is now OpenInfo (book).
         assertNotNull(findOpenInfoGlobal(model));
         assertNotNull(findRunWithArgs(model, "reload"));
+    }
+
+    @Test
+    @DisplayName("Regions / Worlds rows hidden when viewer lacks rtp.config.view")
+    void regionsWorldsRows_hidden_whenConfigViewMissing() {
+        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
+        TestableRoot root = withAllAdminSubcommands();
+
+        // Viewer holds everything *except* rtp.config.view.
+        MenuModel model = new AdminPanelBuilder(registry)
+                .build(root, UUID.randomUUID(),
+                        perm -> !AdminPanelBuilder.CONFIG_VIEW_PERMISSION.equals(perm));
+
+        assertNull(findOpenConfigSelector(model),
+                "Config row must be hidden when rtp.config.view is missing");
+        assertNull(findOpenMultiConfigSelector(model, "regions"),
+                "Regions submenu row must be hidden when rtp.config.view is missing");
+        assertNull(findOpenMultiConfigSelector(model, "worlds"),
+                "Worlds submenu row must be hidden when rtp.config.view is missing");
     }
 
     @Test
@@ -417,6 +445,26 @@ final class AdminPanelBuilderTest {
             for (MenuLine line : page.lines()) {
                 for (MenuFragment frag : line.fragments()) {
                     if (frag.action() instanceof MenuAction.OpenConfigSelector) return frag.action();
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * CHECKLIST-multiconfig-menu step 10: locates an
+     * {@link MenuAction.OpenMultiConfigSelector} row whose {@code parserKind}
+     * matches the requested string (case-sensitive on the wire; kind is
+     * normalised to lower-case at construction).
+     */
+    private static MenuAction findOpenMultiConfigSelector(MenuModel model, String parserKind) {
+        for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {
+            for (MenuLine line : page.lines()) {
+                for (MenuFragment frag : line.fragments()) {
+                    if (frag.action() instanceof MenuAction.OpenMultiConfigSelector sel
+                            && parserKind.equals(sel.parserKind())) {
+                        return frag.action();
+                    }
                 }
             }
         }

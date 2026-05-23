@@ -159,7 +159,7 @@ function Show-LogWindows {
   # server in real time without juggling `docker compose logs` tabs by hand.
   # Idempotent: each window is tagged with a unique title; re-running this
   # function spawns fresh windows (old ones can be closed by the operator).
-  $services = @('redis', 'proxy-a', 'proxy-b', 'lobby-a', 'lobby-b', 'backend-a', 'backend-b')
+  $services = @('redis', 'proxy-a', 'proxy-b', 'lobby-a', 'lobby-b', 'backend-a', 'backend-b', 'backend-c')
   Write-Host "[logs] opening per-service log windows ($($services -join ', '))..." -ForegroundColor Cyan
   foreach ($svc in $services) {
     $title = "rtp-devstack: $svc"
@@ -384,7 +384,10 @@ function Get-CrashedMcServices {
   # exited shortly after `up`. We check ~8s after the up call so first-boot
   # init scripts have had a chance to either start the JVM (Up <state>) or
   # bail out (Exited). Anything in 'exited' here is a crash, not a slow boot.
-  $services = @('backend-a', 'backend-b', 'lobby-a', 'lobby-b', 'proxy-a', 'proxy-b')
+  # backend-c (Fabric) is included so a crashed Fabric boot is detected and
+  # auto-recovered along with the Paper/Folia backends. rtp-fabric is explicitly
+  # unstable today; expect crashes here to be common until it stabilizes.
+  $services = @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b', 'proxy-a', 'proxy-b')
   $crashed = @()
   foreach ($svc in $services) {
     $state = Invoke-Native { docker compose ps --status exited --services } 2>$null
@@ -401,7 +404,7 @@ function Clear-StaleWorldDirs {
   # on Windows/Docker-Desktop). Removing the dirs entirely on every `up` is the
   # cheapest correct fix: Paper regenerates the world from scratch each run.
   # Idempotent; silent on first run (dirs don't exist yet).
-  foreach ($b in @('backend-a', 'backend-b', 'lobby-a', 'lobby-b')) {
+  foreach ($b in @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b')) {
     $dir = Join-Path $PSScriptRoot "$b\world"
     if (Test-Path $dir) {
       try {
@@ -527,7 +530,7 @@ function Test-Boot {
   Write-Host '[boot] checking docker compose ps (typical: <2s)...' -ForegroundColor Cyan
   $ps = Invoke-Native { docker compose ps --format json }
   Write-Evidence 'boot' $ps
-  $expected = @('rtp-devstack-redis', 'proxy-a', 'proxy-b', 'lobby-a', 'lobby-b', 'backend-a', 'backend-b')
+  $expected = @('rtp-devstack-redis', 'proxy-a', 'proxy-b', 'lobby-a', 'lobby-b', 'backend-a', 'backend-b', 'backend-c')
   $missing = @()
   foreach ($name in $expected) {
     if ($ps -notmatch [Regex]::Escape($name)) { $missing += $name }
@@ -562,7 +565,7 @@ function Show-FullServiceLogs {
   param([int]$Lines = 200)
   Write-Host ''
   Write-Host "[heartbeat] ==== FULL LOG DUMP (last $Lines lines per service) ====" -ForegroundColor Magenta
-  foreach ($svc in @('redis','backend-a','backend-b','lobby-a','lobby-b','proxy-a','proxy-b')) {
+  foreach ($svc in @('redis','backend-a','backend-b','backend-c','lobby-a','lobby-b','proxy-a','proxy-b')) {
     $body = Invoke-Native { docker compose logs --tail=$Lines --no-log-prefix $svc }
     if (-not $body) { $body = '(no logs)' }
     Write-Host ''
@@ -587,7 +590,7 @@ function Show-HeartbeatDiagnostics {
   Write-Host "[heartbeat] ---- diagnostic snapshot at ${ElapsedSec}s ----" -ForegroundColor Yellow
   Write-Host '[heartbeat] container states:' -ForegroundColor Yellow
   Write-Host ("  " + (Get-ContainerLiveness)) -ForegroundColor Gray
-  foreach ($svc in @('backend-a','backend-b','lobby-a','lobby-b','proxy-a','proxy-b')) {
+  foreach ($svc in @('backend-a','backend-b','backend-c','lobby-a','lobby-b','proxy-a','proxy-b')) {
     Write-Host "[heartbeat] last log lines for ${svc}:" -ForegroundColor Yellow
     Write-Host ("    " + (Get-RecentLogTail -Service $svc -Lines 4)) -ForegroundColor Gray
   }
@@ -618,10 +621,14 @@ function Test-Heartbeat {
     $proxies = Invoke-RedisCli KEYS 'rtp:net:proxy:*'
     $bCount = (@($backends) | Where-Object { $_ -match '\S' }).Count
     $pCount = (@($proxies) | Where-Object { $_ -match '\S' }).Count
-    # 4 backend heartbeats expected: backend-a, backend-b, lobby-a, lobby-b
-    # (lobbies publish as role=backend too; their absence of a regions/ dir is
-    # a runtime config concern, not a network-participation concern).
-    if ($bCount -ge 4 -and $pCount -ge 2) {
+    # 5 backend heartbeats expected: backend-a (Paper), backend-b (Folia),
+    # backend-c (Fabric), lobby-a, lobby-b (lobbies publish as role=backend
+    # too; their absence of a regions/ dir is a runtime config concern, not
+    # a network-participation concern). Requiring >=5 means a missing Fabric
+    # heartbeat from backend-c is a real failure rather than a silent
+    # degradation - if rtp-fabric is broken enough that backend-c cannot reach
+    # heartbeat publish, the harness fails loudly.
+    if ($bCount -ge 5 -and $pCount -ge 2) {
       $body = "backend keys: $bCount`n$backends`nproxy keys: $pCount`n$proxies"
       Write-Evidence 'heartbeat' $body
       $elapsed = [int]((Get-Date) - $pollStart).TotalSeconds
@@ -629,7 +636,7 @@ function Test-Heartbeat {
       return $true
     }
     $elapsed = [int]((Get-Date) - $pollStart).TotalSeconds
-    Write-Host "[heartbeat]   ${elapsed}s elapsed: backends=$bCount/4 proxies=$pCount/2 (still waiting)" -ForegroundColor DarkGray
+    Write-Host "[heartbeat]   ${elapsed}s elapsed: backends=$bCount/5 proxies=$pCount/2 (still waiting)" -ForegroundColor DarkGray
     # Diagnostic snapshot every 30s so the operator can decide whether it's genuinely stuck.
     if (($elapsed - $lastDiagAt) -ge 30) {
       Show-HeartbeatDiagnostics -ElapsedSec $elapsed
@@ -657,12 +664,12 @@ function Test-Heartbeat {
 function Test-Roundtrip {
   Write-Host '[roundtrip] manual checkpoint - a live Minecraft client is required.' -ForegroundColor Yellow
   Write-Host '  1. Connect a 1.21.1 client to localhost:25577 (proxy-a).' -ForegroundColor Yellow
-  Write-Host '  2. The default backend is backend-a. Run `/server backend-b` once to seed both backends.' -ForegroundColor Yellow
+  Write-Host '  2. The default backend is backend-a. Run `/server backend-b` then `/server backend-c` once each to seed all backends.' -ForegroundColor Yellow
   Write-Host '  3. From the client, run `/rtp` and observe a cross-server teleport.' -ForegroundColor Yellow
   Write-Host '  4. Press <Enter> AFTER the redeem completes to capture evidence.' -ForegroundColor Yellow
   [void](Read-Host 'Press Enter to continue')
   $tokens = Invoke-RedisCli KEYS 'rtp:net:reservation:*'
-  $audit = & docker compose logs --tail=100 backend-a backend-b 2>&1 | Select-String -Pattern 'redeem|JoinTriggerSource' -SimpleMatch
+  $audit = & docker compose logs --tail=100 backend-a backend-b backend-c 2>&1 | Select-String -Pattern 'redeem|JoinTriggerSource' -SimpleMatch
   Write-Evidence 'roundtrip' "tokens at sample time:`n$tokens`naudit lines:`n$audit"
   Write-Host '[roundtrip] EVIDENCE CAPTURED (operator must visually confirm)' -ForegroundColor Green
   return $true

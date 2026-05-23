@@ -37,15 +37,16 @@ class MenuModelSurfaceTest {
     // ---- MenuAction ----
 
     @Test
-    @DisplayName("MenuAction is sealed to exactly the twenty-two declared variants")
+    @DisplayName("MenuAction is sealed to exactly the twenty-five declared variants")
     void menuActionSealedShape() {
         Class<?>[] permitted = MenuAction.class.getPermittedSubclasses();
-        assertEquals(22, permitted.length);
+        assertEquals(25, permitted.length);
         List<String> names = Arrays.stream(permitted).map(Class::getSimpleName).sorted().toList();
         assertEquals(List.of(
                 "ApplyStagedConfig",
                 "ChangePage",
                 "DiscardStagedConfig",
+                "MultiConfigMutate",
                 "OpenAdminPanel",
                 "OpenConfigFile",
                 "OpenConfigKey",
@@ -58,6 +59,8 @@ class MenuModelSurfaceTest {
                 "OpenInfo",
                 "OpenMap",
                 "OpenMenu",
+                "OpenMultiConfigEntry",
+                "OpenMultiConfigSelector",
                 "OpenParamPicker",
                 "PromptAnvilInput",
                 "RunRtpCommand",
@@ -193,6 +196,9 @@ class MenuModelSurfaceTest {
             case MenuAction.ApplyStagedConfig ac -> "apply:" + ac.fileName();
             case MenuAction.DiscardStagedConfig dc -> "discard:" + dc.fileName();
             case MenuAction.OpenMap om -> "map:" + om.chartSpecToken();
+            case MenuAction.OpenMultiConfigSelector mcs -> "mcsel:" + mcs.parserKind();
+            case MenuAction.OpenMultiConfigEntry mce -> "mcentry:" + mce.parserKind() + ":" + mce.entryName();
+            case MenuAction.MultiConfigMutate mcm -> "mcmut:" + mcm.parserKind() + ":" + mcm.entryName() + ":" + mcm.op();
         };
         assertEquals("run:1", tag);
     }

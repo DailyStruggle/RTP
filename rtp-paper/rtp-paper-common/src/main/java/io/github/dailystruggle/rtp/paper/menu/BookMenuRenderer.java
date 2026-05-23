@@ -376,6 +376,23 @@ public final class BookMenuRenderer implements MenuRenderer {
                 String token = tokenRegistry.mint(playerId, discardAction, tokenTtl);
                 yield ClickEvent.runCommand("/rtp menu token=" + token);
             }
+            // CHECKLIST-multiconfig-menu step 7/11 - three new MultiConfig
+            // submenu variants. All server-resolved through the same
+            // /rtp menu token:<token> redeem path; MenuRedeemSubcommand
+            // dispatches to dispatchOpenMultiConfigSelector /
+            // dispatchOpenMultiConfigEntry / dispatchMultiConfigMutate.
+            case MenuAction.OpenMultiConfigSelector mcSelector -> {
+                String token = tokenRegistry.mint(playerId, mcSelector, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
+            case MenuAction.OpenMultiConfigEntry mcEntry -> {
+                String token = tokenRegistry.mint(playerId, mcEntry, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
+            case MenuAction.MultiConfigMutate mcMutate -> {
+                String token = tokenRegistry.mint(playerId, mcMutate, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token=" + token);
+            }
             case MenuAction.OpenMap openMap -> {
                 // ADR-047 / REQ-RTP-MAP-006 declarative chart bridge. The
                 // OpenMap action's payload is a UUID into the rtp-core

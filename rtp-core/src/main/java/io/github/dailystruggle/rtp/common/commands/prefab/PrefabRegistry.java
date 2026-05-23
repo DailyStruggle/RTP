@@ -1,9 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.FastPaced;
 import io.github.dailystruggle.rtp.common.commands.prefab.builtin.FoliaTuned;
 import io.github.dailystruggle.rtp.common.commands.prefab.builtin.HighPerformance;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.Lightweight;
 import io.github.dailystruggle.rtp.common.commands.prefab.builtin.LowPerformance;
 import io.github.dailystruggle.rtp.common.commands.prefab.builtin.MultiWorld;
 import io.github.dailystruggle.rtp.common.commands.prefab.builtin.SurvivalDefault;
@@ -14,12 +12,15 @@ import java.util.Optional;
 /**
  * Sealed in-code registry of the prefabs shipped in v1. The set is fixed at
  * compile time; changing it requires a code edit and a release. See
- * {@code docs/dev/scratch/PROPOSAL-admin-panel-prefabs.md} v3.1.
+ * {@code docs/dev/scratch/PROPOSAL-admin-panel-prefabs.md} v3.1 (original
+ * seven-prefab lock) and {@code docs/dev/scratch/PROPOSAL-prefab-cleanup.md}
+ * (2026-05-22 trim to five).
  *
- * <p>Listing order is the curated panel order from the locked decisions
- * (2026-05-20): identity, then the two performance axes, then the Folia
- * tuning, then the lightweight/fast-paced opposite-axis pair, then the
- * one-region-per-world expander.
+ * <p>Listing order is the curated panel order: identity, the two
+ * performance axes, the Folia tuning, then the one-region-per-world
+ * expander. The earlier {@code Lightweight} / {@code FastPaced} pair was
+ * dropped on 2026-05-22 as redundant with {@code LowPerformance} on the
+ * low-end-server axis.
  */
 public final class PrefabRegistry {
 
@@ -28,8 +29,6 @@ public final class PrefabRegistry {
             LowPerformance.INSTANCE,
             HighPerformance.INSTANCE,
             FoliaTuned.INSTANCE,
-            Lightweight.INSTANCE,
-            FastPaced.INSTANCE,
             MultiWorld.INSTANCE
     );
 

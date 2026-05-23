@@ -37,6 +37,14 @@ Append to the *Open* section below using the template. Keep entries short — on
 
 ## Open
 
+### 2026-05-22 - locale TSV pipeline doubles backslash-heavy values on every round-trip
+
+- **Discovered during:** CHECKLIST-multiconfig-menu step 14. The `menuInfoBadPointsLabel` value in `messages.yml` had grown to ~2 MB at HEAD - a single line of `\\\\\\\\...\u2691 bad-points map`. The TSV round-trip (`locale-files-to-csv` -> `locale-files-from-csv`) re-escaped every `\` to `\\` on write, doubling the value's size each pass. This session's pipeline run pushed the value from 2 MB to 16.7 MB and broke snakeyaml's 3 MB document cap. The runaway seed value itself was replaced with a clean `"#9D7CD8&l# bad-points map"` in baseline and every locale; the underlying escape-doubling bug in the TSV scripts remains.
+- **Location:** `scripts/locale-files-to-csv.ps1` and `scripts/locale-files-from-csv.ps1` - their YAML-value escape rule for backslashes is not idempotent. Any string value containing a literal backslash will double in length on every full pipeline round-trip.
+- **Symptom / hypothesis:** The from-csv writer is emitting `\` -> `\\` (correct YAML double-quoted-string escape) but the to-csv reader is treating the resulting `\\` as a literal `\\` (two chars) rather than collapsing it back to `\` on the next read. After N round-trips a value with K backslashes becomes K * 2^N chars long. The `menuInfoBadPointsLabel` value almost certainly started as a single escape sequence that grew unnoticed across ~22 prior pipeline runs.
+- **Impact:** Any future baseline string containing a literal `\` (Windows paths in examples, regex patterns, etc.) will silently grow on every pipeline run. The 3 MB snakeyaml cap eventually hard-breaks `LocaleParityTest`. Current shipped values appear to be safe because no other key uses `\`.
+- **Suggested next step:** Decide whether the canonical TSV value column should hold (a) the YAML-encoded form (with `\\`) or (b) the decoded form (with `\`); fix one of the two scripts so they round-trip identically. Add a regression test that runs the pipeline twice and asserts byte-equality of the locale tree between passes.
+
 
 
 

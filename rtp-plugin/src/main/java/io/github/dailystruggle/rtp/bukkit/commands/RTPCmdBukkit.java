@@ -585,6 +585,18 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     if (anvilOpener != null) {
       anvilOpener.setCartSink(menuRedeem.cartSink());
     }
+    // CHECKLIST-multiconfig-menu step 12: wire the MultiConfigMenuBuilder
+    // and register the two default removal guards (regions: lock "default";
+    // worlds: lock any server-loaded world). Must run before the first
+    // /rtp menu dispatch so the submenu surface is reachable from the
+    // admin panel's Regions / Worlds rows (step 10).
+    final io.github.dailystruggle.rtp.common.commands.menu.multiconfig
+            .MultiConfigMenuBuilder multiConfigBuilder =
+        new io.github.dailystruggle.rtp.common.commands.menu.multiconfig
+            .MultiConfigMenuBuilder(menuTokenRegistry);
+    menuRedeem.setMultiConfigBuilder(multiConfigBuilder);
+    io.github.dailystruggle.rtp.common.commands.menu.multiconfig
+        .DefaultMultiConfigRemovalGuards.registerDefaults();
     addSubCommand(menuRedeem);
 
     // PROPOSAL-admin-panel-prefabs.md v3.1 (Session 4b D1) — register the
@@ -664,10 +676,10 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     // registers ConfigSearchSubCmd via its own 5-tick deferred addCommands;
     // schedule our handler attachment at 8 ticks so it lands after ConfigCmd
     // but before the menu mirror seeds at 10 ticks. The handler runs the
-    // search builder and renders the resulting MenuModel directly (the
-    // anvil opener submits "/rtp menu config search query:<typed>" which
-    // walks through MenuMirrorSubcommand to this leaf rather than the
-    // MenuRedeemSubcommand dispatch path).
+    // search builder and renders the resulting MenuModel directly. NOTE:
+    // the menu/anvil submit path lands in MenuRedeemSubcommand.renderForPath
+    // (which short-circuits ["config","search"] to dispatchOpenConfigSearchResults).
+    // This handler covers the direct `/rtp config search query:<text>` entry.
     final MenuRedeemSubcommand.MenuConfigSearchBuilder finalSearchBuilder = configSearchBuilder;
     final MenuRenderer finalRenderer = menuRenderer;
     RTP.getInstance()
