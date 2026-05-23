@@ -171,6 +171,27 @@ public final class AdminPanelBuilder {
                             "Open the curated config selector."),
                     new MenuAction.OpenConfigSelector());
         }
+        // CHECKLIST-multiconfig-menu step 10: Regions / Worlds submenu rows.
+        // Gated identically to the Config editor row (rtp.config.view +
+        // /rtp config registered) so the Configuration section auto-
+        // suppresses uniformly; submenu mutation actions are additionally
+        // gated on rtp.config.edit at the dispatcher.
+        if (hasSubcommand(rtpRoot, "config") && safeTest(permission, CONFIG_VIEW_PERMISSION)) {
+            addRow(
+                    configRows,
+                    lookupMsg(MessagesKeys.menuAdminPanelRowRegions, "&b\u2699 Regions"),
+                    lookupMsg(
+                            MessagesKeys.menuAdminPanelHoverRegions,
+                            "Add, remove, or edit per-region configs."),
+                    new MenuAction.OpenMultiConfigSelector("regions"));
+            addRow(
+                    configRows,
+                    lookupMsg(MessagesKeys.menuAdminPanelRowWorlds, "&b\u2699 Worlds"),
+                    lookupMsg(
+                            MessagesKeys.menuAdminPanelHoverWorlds,
+                            "Add, remove, or edit per-world configs."),
+                    new MenuAction.OpenMultiConfigSelector("worlds"));
+        }
         appendSection(
                 lines,
                 MessagesKeys.menuAdminPanelSectionConfig,

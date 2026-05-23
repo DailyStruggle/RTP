@@ -23,10 +23,14 @@ forced-hosts = {}
 	lobby-b = "lobby-b:25565"
 	backend-a = "backend-a:25565"
 	backend-b = "backend-b:25565"
+	# backend-c: Fabric 1.21.11. Listed in `try` so the BackendSelector / failover
+	# path can pick it; while rtp-fabric stabilizes, expect /rtp on backend-c
+	# to surface adapter bugs - that's the point of including it.
+	backend-c = "backend-c:25565"
 	# Lobbies first: fresh client connections land on a lobby, which is the
 	# intended UX for the lobby use case (the player must /rtp out, not start on
 	# a destination backend by accident).
-	try = ["lobby-a", "lobby-b", "backend-a", "backend-b"]
+	try = ["lobby-a", "lobby-b", "backend-a", "backend-b", "backend-c"]
 
 [advanced]
 	compression-threshold = 256

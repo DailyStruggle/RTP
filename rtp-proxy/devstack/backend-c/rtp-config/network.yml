@@ -1,0 +1,58 @@
+# Devstack backend-c network.yml. Fabric 1.21.11.
+network:
+  enabled: true
+  schemaVersion: 1
+  serverId: "backend-c"
+  role: backend
+  secretEnv: RTP_NET_SECRET
+transport:
+  type: redis
+  redis:
+    host: redis
+    port: 6379
+    password: ""
+heartbeat:
+  intervalMs: 1000
+  staleAfterMs: 5000
+reservation:
+  ttlMs: 30000
+  reapIntervalMs: 5000
+
+# Load balancer scoring table. Mirrors backend-a / backend-b so the
+# BackendSelector treats all three backends with the same curve weights;
+# differences in observed score will then come from real platform behavior
+# (Paper vs Folia vs Fabric) rather than from config asymmetry.
+loadBalancer:
+  regionScarcityWeight: 0
+  terms:
+    mspt:
+      input: mspt
+      weight: 1.0
+      curve:
+        type: sigmoid
+        k: 8.0
+        x0: 0.4
+    queue:
+      input: queueDepth
+      weight: 1.0
+      curve:
+        type: exponential
+        k: 3.0
+    heap:
+      input: heapUsed
+      weight: 5.0
+      curve:
+        type: step
+        threshold: 0.85
+    region:
+      input: keptRegion
+      weight: 5.0
+      curve:
+        type: step
+        threshold: 0.95
+    kept:
+      input: keptCount
+      weight: 0.25
+      curve:
+        type: logarithmic
+        k: 9.0

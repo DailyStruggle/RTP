@@ -392,6 +392,14 @@ public enum MessagesKeys {
   menuAdminPanelRowConfig,
   /** Hover text for the admin-panel config-editor row. No placeholders. */
   menuAdminPanelHoverConfig,
+  /** Admin-panel row: open the regions multi-config submenu. No placeholders. */
+  menuAdminPanelRowRegions,
+  /** Hover text for the admin-panel regions row. No placeholders. */
+  menuAdminPanelHoverRegions,
+  /** Admin-panel row: open the worlds multi-config submenu. No placeholders. */
+  menuAdminPanelRowWorlds,
+  /** Hover text for the admin-panel worlds row. No placeholders. */
+  menuAdminPanelHoverWorlds,
   /** Admin-panel row: run /rtp info. No placeholders. */
   menuAdminPanelRowInfo,
   /** Hover text for the admin-panel info row. No placeholders. */
@@ -437,14 +445,6 @@ public enum MessagesKeys {
   menuPrefabFoliaTunedRow,
   /** Hover text for the folia-tuned prefab row. No placeholders. */
   menuPrefabFoliaTunedHover,
-  /** Setup row: apply the lightweight prefab (small servers, shrunken footprint). No placeholders. */
-  menuPrefabLightweightRow,
-  /** Hover text for the lightweight prefab row. No placeholders. */
-  menuPrefabLightweightHover,
-  /** Setup row: apply the fast-paced prefab (snappier teleports, opposite axis to lightweight). No placeholders. */
-  menuPrefabFastPacedRow,
-  /** Hover text for the fast-paced prefab row. No placeholders. */
-  menuPrefabFastPacedHover,
   /** Setup row: apply the multi-world prefab (one region per world synthesised from the current default). No placeholders. */
   menuPrefabMultiWorldRow,
   /** Hover text for the multi-world prefab row. No placeholders. */
@@ -678,5 +678,81 @@ public enum MessagesKeys {
    * {@code [region]} carries the requested region name. Configurable per
    * REQ-RTP-F-013.
    */
-  networkRegionAmbiguous
+  networkRegionAmbiguous,
+  // --- MultiConfig submenu (CHECKLIST-multiconfig-menu / PROPOSAL-multiconfig-menu.md §4) ---
+  /**
+   * Generic header fallback for the multi-config selector page when the kind
+   * has no dedicated header key. Placeholder {@code [parserKind]} carries the
+   * raw kind name. Configurable per REQ-RTP-F-013.
+   */
+  multiconfigHeaderDefault,
+  /** Header row label for the regions multi-config selector page. No placeholders. */
+  multiconfigHeaderRegions,
+  /** Header row label for the worlds multi-config selector page. No placeholders. */
+  multiconfigHeaderWorlds,
+  /** Toggle-row label when remove-mode is OFF. No placeholders. */
+  multiconfigToggleRemoveModeOff,
+  /** Toggle-row label when remove-mode is ON. No placeholders. */
+  multiconfigToggleRemoveModeOn,
+  /** Selector row label for the "+ Add new..." entry. No placeholders. */
+  multiconfigRowAdd,
+  /**
+   * Hover text for the Add row. Placeholder {@code [name]} carries the
+   * prefilled default name (e.g. {@code default1}). Configurable per REQ-RTP-F-013.
+   */
+  multiconfigRowAddHover,
+  /**
+   * Hover text for an entry row in normal mode. Placeholder {@code [name]}
+   * carries the entry name. Configurable per REQ-RTP-F-013.
+   */
+  multiconfigRowEditHover,
+  /**
+   * Hover text for an entry row in remove-mode. Placeholder {@code [name]}
+   * carries the entry name. Configurable per REQ-RTP-F-013.
+   */
+  multiconfigRowRemoveHover,
+  /**
+   * Confirm-delete page title row. Placeholder {@code [name]} carries the
+   * entry name. Configurable per REQ-RTP-F-013.
+   */
+  multiconfigConfirmTitle,
+  /** Confirm-delete page Yes-row label. No placeholders. */
+  multiconfigConfirmYes,
+  /** Confirm-delete page Cancel-row label. No placeholders. */
+  multiconfigConfirmNo,
+  /**
+   * Hover text shown on a locked (grayed) default-region row explaining why
+   * removal is blocked. No placeholders. Configurable per REQ-RTP-F-013.
+   */
+  multiconfigLockRegionDefault,
+  /**
+   * Hover text shown on a locked (grayed) world row explaining that the
+   * world is still loaded on the server. Placeholder {@code [name]} carries
+   * the world name. Configurable per REQ-RTP-F-013.
+   */
+  multiconfigLockWorldLoaded,
+  /** Result message after a successful ADD. Placeholder {@code [name]}. */
+  multiconfigResultAdded,
+  /** Result message after a successful REMOVE. Placeholder {@code [name]}. */
+  multiconfigResultRemoved,
+  /**
+   * Result message when ADD failed. Placeholders {@code [name]} and
+   * {@code [reason]}. Configurable per REQ-RTP-F-013.
+   */
+  multiconfigResultAddFailed,
+  /**
+   * Result message when REMOVE failed. Placeholders {@code [name]} and
+   * {@code [reason]}. Configurable per REQ-RTP-F-013.
+   */
+  multiconfigResultRemoveFailed,
+  /**
+   * Result message when the proposed entry name is rejected by the
+   * {@code MULTICONFIG_ENTRY_NAME_REGEX} sanitiser. Placeholder {@code [name]}.
+   */
+  multiconfigResultNameInvalid,
+  /**
+   * Result message when an ADD collides with an existing entry name.
+   * Placeholder {@code [name]}.
+   */
+  multiconfigResultNameTaken
 }

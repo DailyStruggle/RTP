@@ -77,17 +77,17 @@ services:
       redis:
         condition: service_healthy
   backend-a:
-    # Java 25 image + Paper 1.21.8: required because RTP-Pro ships a Fabric
+    # Java 25 image + Paper 1.21.11: required because RTP-Pro ships a Fabric
     # unobf-carrier compiled with Java 25 toolchain (class file v69). Paper's
     # plugin remapper (AutoRenamingTool / ASM) on Java 21 + Paper 1.21.1 throws
-    # `Unsupported class file major version 69` and aborts the boot. Paper 1.21.8
+    # `Unsupported class file major version 69` and aborts the boot. Paper 1.21.11
     # ships ASM 9.8+ and runs on Java 25, which reads v69 cleanly.
     image: itzg/minecraft-server:java25
     environment:
       EULA: "TRUE"
       TYPE: PAPER
-      VERSION: "1.21.8"
-      # Devstack backends run with 6G heap: Paper 1.21.8 + RTP-Pro + remap cache
+      VERSION: "1.21.11"
+      # Devstack backends run with 6G heap: Paper 1.21.11 + RTP-Pro + remap cache
       # routinely peak at 2-3G during world-gen on the first run, and tighter
       # caps (1G) caused OOM-driven GC thrash that pushed first-boot heartbeat
       # past the harness budget. 6G sits in the 4-8G band tested locally and
@@ -190,12 +190,12 @@ services:
   # Each velocity.toml lists the lobby first in `try`, so fresh connections land
   # on a lobby by default.
   lobby-a:
-    # See backend-a for Java 25 / Paper 1.21.8 rationale.
+    # See backend-a for Java 25 / Paper 1.21.11 rationale.
     image: itzg/minecraft-server:java25
     environment:
       EULA: "TRUE"
       TYPE: PAPER
-      VERSION: "1.21.8"
+      VERSION: "1.21.11"
       # Lobbies do no world-gen and no /rtp pre-fill; 2G is plenty.
       MEMORY: 2G
       ONLINE_MODE: "FALSE"
@@ -253,7 +253,7 @@ services:
     environment:
       EULA: "TRUE"
       TYPE: PAPER
-      VERSION: "1.21.8"
+      VERSION: "1.21.11"
       MEMORY: 2G
       ONLINE_MODE: "FALSE"
       # See lobby-a: creative mode for demo differentiation from backends.
@@ -290,12 +290,23 @@ services:
         condition: service_healthy
 
   backend-b:
-    # See backend-a for Java 25 / Paper 1.21.8 rationale.
+    # Folia 1.21.11 (asymmetric backend pair). backend-a stays on Paper so the
+    # acceptance harness exercises the cross-platform dispatch path: one Paper
+    # backend + one Folia backend through the same Velocity proxies. Folia's
+    # region-thread model is where RTP's S-005 / threading rules actually bite
+    # (entity scheduler for teleports, region-owned writes, ThreadAccessException
+    # on cross-region work); without a Folia node in devstack nothing here
+    # catches a Paper-compiles-but-Folia-blows-up regression before users do.
+    #
+    # Same itzg image and Java 25 / 1.21.11 toolchain as backend-a (see backend-a
+    # for the v69-class-file rationale). Folia honors the same paper-global.yml
+    # velocity-forwarding patch, so PATCH_DEFINITIONS works unchanged. RTP-Pro
+    # ships rtp-folia shaded into the same plugin jar, so no jar swap is needed.
     image: itzg/minecraft-server:java25
     environment:
       EULA: "TRUE"
-      TYPE: PAPER
-      VERSION: "1.21.8"
+      TYPE: FOLIA
+      VERSION: "1.21.11"
       # See backend-a: 6G heap for first-boot world-gen + RTP pre-fill headroom.
       MEMORY: 6G
       ONLINE_MODE: "FALSE"
@@ -333,6 +344,67 @@ services:
       - mc-image-cache:/data/.cache
       # See backend-a: world dir as a host bind, not a named volume.
       - ./backend-b/world:/data/world
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  backend-c:
+    # Fabric 1.21.11. Third backend that intentionally tests the rtp-fabric
+    # adapter under the same Velocity + Redis topology as the Paper / Folia
+    # backends. rtp-fabric is currently marked unstable in
+    # docs/dev/MULTI_PLATFORM_PLAN.md (known S-005 nuance in FabricWorld and a
+    # null stub in FabricServerAccessor.getLocationGenerator); the explicit
+    # purpose of this service is to surface and exercise those issues in
+    # acceptance instead of waiting for them to be reported by users.
+    # Stability cannot be verified without testing - this is the testing.
+    #
+    # Same Java 25 image so the unobf-carrier (Java 25 toolchain, class file
+    # v69) loads cleanly. itzg's TYPE=FABRIC handles Fabric Loader install;
+    # the RTP-Pro Fabric mod jar must be dropped into ./backend-c/mods/
+    # (NOT plugins/) before `up` - see backend-c/mods/README.md.
+    image: itzg/minecraft-server:java25
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      VERSION: "1.21.11"
+      # Same 6G envelope as the Paper/Folia backends: Fabric world-gen plus
+      # RTP pre-fill have the same memory profile as Paper.
+      MEMORY: 6G
+      ONLINE_MODE: "FALSE"
+      OPS: ${OPS:-}
+      OVERRIDE_OPS: "TRUE"
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+      RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
+      # Fabric does NOT use Paper's velocity.enabled toggle - it relies on the
+      # FabricProxy-Lite mod (or equivalent) for modern forwarding. The shared
+      # paper-patches/ JSON is therefore not relevant here and is not mounted.
+      # The forwarding secret is still exposed as a file so the forwarding mod
+      # can read it via the same on-disk contract as the Paper backends.
+    user: "0:0"
+    # Fabric mods live in /data/mods, not /data/plugins. The entrypoint shim
+    # seeds network.yml under /data/config/rtp/ (lowercase): the Fabric build
+    # of rtp-fabric resolves its config dir via
+    # `FabricLoader.getConfigDir().resolve("rtp")` -> `<server>/config/rtp/`
+    # (see FabricDatabaseHandler#resolveConfigDirectory and
+    # rtp-fabric-ADR-013 `FabricNetworkModeBootstrap.ensureNetworkYml`).
+    # Note: the directory name is lowercase `rtp`, NOT `RTP` like the Bukkit
+    # `/data/plugins/RTP/` path - that asymmetry is on the runtime adapter
+    # side, not a typo here.
+    entrypoint:
+      - /bin/bash
+      - -c
+      - 'mkdir -p /data/config/rtp && cp -f /seed/network.yml /data/config/rtp/network.yml && chown -R 1000:1000 /data/config/rtp && exec /start'
+    volumes:
+      # Fabric mods directory (NOT plugins).
+      - ./backend-c/mods:/data/mods
+      # Seed-only (read-only); copied into /data/config/rtp/network.yml at boot.
+      - ./backend-c/rtp-config/network.yml:/seed/network.yml:ro
+      - ./shared/forwarding.secret:/data/forwarding.secret
+      # See backend-a: shared mc-image-helper download cache.
+      - mc-image-cache:/data/.cache
+      # See backend-a: world dir as a host bind, not a named volume.
+      - ./backend-c/world:/data/world
     depends_on:
       redis:
         condition: service_healthy

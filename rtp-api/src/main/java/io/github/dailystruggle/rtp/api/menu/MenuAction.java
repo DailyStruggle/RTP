@@ -62,7 +62,10 @@ public sealed interface MenuAction
                 MenuAction.UnstageConfigValue,
                 MenuAction.ApplyStagedConfig,
                 MenuAction.DiscardStagedConfig,
-                MenuAction.OpenMap {
+                MenuAction.OpenMap,
+                MenuAction.OpenMultiConfigSelector,
+                MenuAction.OpenMultiConfigEntry,
+                MenuAction.MultiConfigMutate {
 
     /**
      * Discriminator for {@link PromptAnvilInput}: controls what the platform
@@ -638,6 +641,123 @@ public sealed interface MenuAction
     record OpenMap(UUID chartSpecToken) implements MenuAction {
         public OpenMap {
             Objects.requireNonNull(chartSpecToken, "chartSpecToken");
+        }
+    }
+
+    /**
+     * Regex applied to {@code entryName} in
+     * {@link OpenMultiConfigEntry} and {@link MultiConfigMutate}. Rejects
+     * YAML path traversal, slashes, whitespace, and anything that could
+     * destabilise the on-disk {@code <kind>/<entryName>.yml} layout
+     * managed by {@code MultiConfigParser}. Kept conservative on purpose:
+     * letters, digits, underscore, dash, dot. See
+     * {@code docs/dev/scratch/PROPOSAL-multiconfig-menu.md} §3.1.
+     */
+    String MULTICONFIG_ENTRY_NAME_REGEX = "[A-Za-z0-9_.\\-]+";
+
+    /**
+     * Open the list page for a {@code MultiConfigParser} kind (today:
+     * {@code "regions"}, {@code "worlds"}; tomorrow: {@code "effects"} and
+     * any further kinds). Rows enumerate the parser's existing entries
+     * plus an Add row and a remove-mode toggle row; locked entries (per
+     * the kind's registered {@code MultiConfigRemovalGuard}) appear as
+     * grayed, non-clickable rows in remove mode. Server-resolved by
+     * {@code MenuRedeemSubcommand.dispatchOpenMultiConfigSelector};
+     * permission-gated by {@code rtp.config.view}.
+     *
+     * <p>{@code parserKind} is normalised to lowercase on construction and
+     * must be non-empty. The remove-mode toggle is per-viewer state held
+     * by {@code MenuRedeemSubcommand}; it is intentionally not encoded
+     * into the sealed action so that a token cannot smuggle ephemeral UI
+     * state across viewers. See
+     * {@code docs/dev/scratch/PROPOSAL-multiconfig-menu.md} §3.1.
+     */
+    record OpenMultiConfigSelector(String parserKind) implements MenuAction {
+        public OpenMultiConfigSelector {
+            Objects.requireNonNull(parserKind, "parserKind");
+            parserKind = parserKind.toLowerCase(java.util.Locale.ROOT);
+            if (parserKind.isEmpty()) {
+                throw new IllegalArgumentException("parserKind must not be empty");
+            }
+        }
+    }
+
+    /**
+     * Open the per-entry staging-cart page for one entry of a
+     * {@code MultiConfigParser} kind. Same UX as
+     * {@link OpenConfigFile} (Changeable + Pending + Apply + Discard) but
+     * scoped to {@code <kind>/<entryName>.yml}. Server-resolved by
+     * {@code MenuRedeemSubcommand.dispatchOpenMultiConfigEntry};
+     * permission-gated by {@code rtp.config.view}.
+     *
+     * <p>{@code parserKind} is normalised to lowercase on construction;
+     * {@code entryName} is trimmed and validated against
+     * {@link #MULTICONFIG_ENTRY_NAME_REGEX} so that a forged token cannot
+     * smuggle a path-traversal or whitespace-bearing name into the
+     * dispatcher. See
+     * {@code docs/dev/scratch/PROPOSAL-multiconfig-menu.md} §3.1.
+     */
+    record OpenMultiConfigEntry(String parserKind, String entryName) implements MenuAction {
+        public OpenMultiConfigEntry {
+            Objects.requireNonNull(parserKind, "parserKind");
+            Objects.requireNonNull(entryName, "entryName");
+            parserKind = parserKind.toLowerCase(java.util.Locale.ROOT);
+            entryName = entryName.trim();
+            if (parserKind.isEmpty()) {
+                throw new IllegalArgumentException("parserKind must not be empty");
+            }
+            if (entryName.isEmpty()) {
+                throw new IllegalArgumentException("entryName must not be empty");
+            }
+            if (!entryName.matches(MULTICONFIG_ENTRY_NAME_REGEX)) {
+                throw new IllegalArgumentException(
+                        "entryName must match " + MULTICONFIG_ENTRY_NAME_REGEX
+                                + " (got '" + entryName + "')");
+            }
+        }
+    }
+
+    /**
+     * Server-resolved mutation against a {@code MultiConfigParser} kind:
+     * either ADD a new entry (clone {@code default}, with nether/end
+     * amendment) or REMOVE an existing entry (subject to the kind's
+     * {@code MultiConfigRemovalGuard} re-check). Dispatched by
+     * {@code MenuRedeemSubcommand.dispatchMultiConfigMutate};
+     * permission-gated by {@code rtp.config.view} <i>and</i>
+     * {@code rtp.config.edit}. On REMOVE the guard is re-checked
+     * server-side: row suppression in the builder is UX hygiene, this
+     * dispatch-side check is the actual invariant per the S-001 /
+     * D-005 "never trust the client" pattern.
+     *
+     * <p>{@code parserKind} is normalised to lowercase on construction;
+     * {@code entryName} is trimmed and validated against
+     * {@link #MULTICONFIG_ENTRY_NAME_REGEX}. See
+     * {@code docs/dev/scratch/PROPOSAL-multiconfig-menu.md} §3.1.
+     */
+    record MultiConfigMutate(String parserKind, String entryName, Op op) implements MenuAction {
+        /** ADD clones {@code default}; REMOVE deletes the entry's YAML file. */
+        public enum Op {
+            ADD,
+            REMOVE
+        }
+
+        public MultiConfigMutate {
+            Objects.requireNonNull(parserKind, "parserKind");
+            Objects.requireNonNull(entryName, "entryName");
+            Objects.requireNonNull(op, "op");
+            parserKind = parserKind.toLowerCase(java.util.Locale.ROOT);
+            entryName = entryName.trim();
+            if (parserKind.isEmpty()) {
+                throw new IllegalArgumentException("parserKind must not be empty");
+            }
+            if (entryName.isEmpty()) {
+                throw new IllegalArgumentException("entryName must not be empty");
+            }
+            if (!entryName.matches(MULTICONFIG_ENTRY_NAME_REGEX)) {
+                throw new IllegalArgumentException(
+                        "entryName must match " + MULTICONFIG_ENTRY_NAME_REGEX
+                                + " (got '" + entryName + "')");
+            }
         }
     }
 }

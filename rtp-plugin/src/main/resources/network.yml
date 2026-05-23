@@ -1,14 +1,11 @@
 # RTP Network Mode (multi-server / multi-proxy)
 #
-# Phase 2e of MULTI_SERVER_PLAN.md. Disabled by default; flipping
-# `network.enabled: true` opts this backend into the cross-server network.
-# See rtp-proxy-ADR-002 for the full schema and rtp-proxy-ADR-011 for the
-# DB-as-bus (`transport.type: sql`) binding documented here.
+# Disabled by default; flipping `network.enabled: true` opts this backend
+# into the cross-server network.
 #
-# REQ-RTP-NET-002 (Behavioural Parity When Disabled): when `enabled: false`
-# this file is read, validated, and otherwise ignored - no threads start,
-# no database tables are created, no transport opens. The backend behaves
-# byte-identically to a pre-Phase-2 build.
+# When `enabled: false` this file is read, validated, and otherwise ignored:
+# no threads start, no database tables are created, no transport opens.
+# The backend behaves identically to a single-server build.
 network:
   enabled: false
   schemaVersion: 1
@@ -23,20 +20,16 @@ network:
   # Environment variable holding the shared HMAC secret. Required when
   # `enabled: true` AND `transport.type: redis`; SQL binding currently
   # treats the env var as optional (DB connection auth + TLS is the
-  # security boundary - rtp-proxy-ADR-011 Q1).
+  # security boundary).
   secretEnv: "RTP_NET_SECRET"
 
 transport:
   # Backing store for cross-process state.
-  # - `in-memory`: development only; nothing leaves the JVM (REQ-RTP-NET-002
-  #   parity-by-construction).
-  # - `sql`: DB-as-bus (rtp-proxy-ADR-011). Reuses the existing RTP database
-  #   accessor pool from `database.yml`. Fallback when redis is not available.
-  # - `redis`: Jedis-backed heartbeats + pub/sub fan-out (rtp-proxy-ADR-005).
-  #   Phase 2e-Redis A1: heartbeats and snapshot work; atomic claim (used for
-  #   cross-backend reservation tokens) lands in A2. Project goal is
-  #   redis-first; flip `type: redis` once you have a Redis instance shared
-  #   across every backend and proxy.
+  # - `in-memory`: development only; nothing leaves the JVM.
+  # - `sql`: DB-as-bus. Reuses the existing RTP database accessor pool from
+  #   `database.yml`. Fallback when redis is not available.
+  # - `redis`: Jedis-backed heartbeats + pub/sub fan-out. Preferred once you
+  #   have a Redis instance shared across every backend and proxy.
   type: "sql"
   redis:
     # Required when `type: redis`. Hostname or IP of the Redis instance
@@ -54,58 +47,55 @@ heartbeat:
   # poll loop must observe rows within `staleAfterMs` to consider them live.
   intervalMs: 1000
   staleAfterMs: 5000
-# Backend-side router (L6 / rtp-proxy-ADR-014). When `routing.mode` is
-# `local` (the default), `/rtp` runs the local pipeline only and the rest
-# of this file is informational. Flip to `auto` to opt this backend into
-# the cross-server wait queue (still local-first when the local backend
-# has the requested region available).
+# Backend-side router. When `routing.mode` is `local` (the default),
+# `/rtp` runs the local pipeline only and the rest of this file is
+# informational. Flip to `auto` to opt this backend into the cross-server
+# wait queue (still local-first when the local backend has the requested
+# region available).
 routing:
-  # `local`  - never enrol into the cross-server wait queue (D2 default;
-  #            zero behaviour change for pre-L6 servers).
+  # `local`  - never enrol into the cross-server wait queue (default;
+  #            zero behaviour change for single-server setups).
   # `auto`   - prefer local when this backend can serve the region; enrol
   #            into the wait queue only when local cannot serve.
   # `always` - always enrol into the wait queue (developer / acceptance
   #            harness mode; not recommended for production).
   mode: "local"
-  # Lobby mode (L6 Slice I). When true, this backend becomes a pure dispatch
-  # node:
+  # Lobby mode. When true, this backend becomes a pure dispatch node:
   #  - Heartbeats publish an empty `regions` set and `acceptingRequests:false`
   #    so peers never select this backend as a cross-server destination.
   #  - A bare `/rtp` (no `region=` argument) auto-routes to the peer +
-  #    region with the largest `regionKeptCounts` value across the snapshot
-  #    ("most-kept" policy, v1). Explicit `rtp region=<server>:<region>`
-  #    still works as in Slice H2.
+  #    region with the largest kept-pool count across the snapshot
+  #    ("most-kept" policy). Explicit `rtp region=<server>:<region>`
+  #    still works.
   #  - When no peer advertises any region, bare `/rtp` rejects with the
   #    localized `networkRegionUnavailable` message instead of silently
   #    falling through to the (empty) local pipeline.
-  # Default false preserves pre-Slice-I behaviour.
   lobbyMode: false
-# Cross-server wait queue (L6 / rtp-proxy-ADR-014). All keys here are
-# ignored when `network.enabled: false` or `routing.mode: local`.
+# Cross-server wait queue. All keys here are ignored when
+# `network.enabled: false` or `routing.mode: local`.
 queue:
   # Maximum number of locally-buffered enrolments before backpressure
   # rejects new `/rtp` calls with `RoutingDecision.FallbackReason.QUEUE_FULL`.
   maxDepth: 50
   # Backend dirty-write flush cadence (ms). Lower = lower end-to-end
-  # latency, higher = fewer round trips to the transport. 250ms is the
-  # PROPOSAL §7 default.
+  # latency, higher = fewer round trips to the transport.
   flushIntervalMs: 250
   # Backend status-cache poll cadence (ms). Drives how often the backend
   # reads `rtp:net:wq:status:<pid>` to refresh per-player progress.
   pollIntervalMs: 1000
   # Optional passive aging of envelope HASHes. `0` disables (terminal
-  # transitions still DEL the env HASH explicitly per D3); set to a
-  # positive value if you want operator-visible TTL on stuck envelopes.
+  # transitions still delete the envelope explicitly); set to a positive
+  # value if you want operator-visible TTL on stuck envelopes.
   entryTtlMs: 0
   # Cross-server `/rtp` enrolment rate limit (token bucket). Operator
   # safety net against runaway clients.
   crossServerRequestsPerSecond: 5
   crossServerRequestsBurst: 10
-  # Proxy-side BLPOP worker count (rtp-proxy-velocity). Increase only when
-  # the proxy is observed to saturate a single worker; the dispatcher and
-  # transport pool are the real bottlenecks.
+  # Proxy-side BLPOP worker count. Increase only when the proxy is observed
+  # to saturate a single worker; the dispatcher and transport pool are the
+  # real bottlenecks.
   workerThreads: 1
-# Reservation-token lifecycle (L6 / REQ-RTP-NET-011).
+# Reservation-token lifecycle.
 reservation:
   # Proxy-side TTL reaper cadence (ms). The reaper sweeps expired tokens
   # and fires `ReleaseSink.onRelease(tokenId, TTL_EXPIRED)` so co-located
@@ -114,17 +104,16 @@ reservation:
   # Per-token TTL (ms). A claimed-but-not-consumed reservation older than
   # this is treated as abandoned and released.
   ttlMs: 60000
-# Region-collision policy (L6 / rtp-proxy-ADR-014 §Region Collisions).
-# Only `warn` is shipped in L6; `rename-local` and `reject-startup` are
-# documented follow-ups. Unknown values silently degrade to `warn`.
+# Region-collision policy. Only `warn` is currently shipped;
+# `rename-local` and `reject-startup` are reserved for future versions.
+# Unknown values silently degrade to `warn`.
 regionCollision:
   policy: "warn"
-# Load balancer scoring table (rtp-proxy-ADR-004 *Region-Pair Scoring*).
-# Consumed by `PeerRegionRegistry.pickMostKept()` on lobby/backend JVMs to
-# drive blank-`/rtp` region selection (and, when `routing.mode: auto`, the
-# fallback region pick for cross-server enrolment). The SAME schema is
-# parsed by the Velocity proxy's `network-proxy.yml`, so curves/weights
-# tuned for one side can be copy-pasted to the other.
+# Load balancer scoring table. Drives blank-`/rtp` region selection on
+# lobby/backend JVMs (and, when `routing.mode: auto`, the fallback region
+# pick for cross-server enrolment). The SAME schema is parsed by the
+# Velocity proxy's `network-proxy.yml`, so curves/weights tuned for one
+# side can be copy-pasted to the other.
 #
 # Per-`(serverId, regionKey)` pair score:
 #   score(b, r) = ( Sigma_i  weight_i * curve_i( normalize_i( metric_i(b) ) ) ) / backendWeight(b)
@@ -132,8 +121,8 @@ regionCollision:
 # Lowest score wins; ties break by serverId then regionKey ascending. The
 # synthesized region-scarcity term sharply prioritises regions whose kept
 # pool is shallow (a region 90% empty contributes ~0.85, one 50% empty
-# only ~0.07) - this is the curve-driven replacement for the legacy
-# "most-kept wins" v1 policy.
+# only ~0.07) - this is the curve-driven replacement for a flat
+# "most-kept wins" policy.
 #
 # Two configuration shapes are accepted; the lobby reads whichever is present.
 #
@@ -153,10 +142,12 @@ regionCollision:
 # explicit `keptRegion` input term and want full control). Adding any
 # explicit `keptRegion` term suppresses the synthesized one automatically.
 #
-# The block below is commented out so lobbies use bundled defaults
-# (synthesized region-scarcity term only; matches the prior "most-kept"
-# behaviour with a smooth fall-off instead of a hard argmax). Uncomment
-# and tune for your deployment.
+# The block below ships ACTIVE so operator support is "edit values" not
+# "first uncomment, then edit". The defaults below mirror the prior
+# "most-kept wins" v1 behaviour with a smooth fall-off (synthesized
+# region-scarcity term disabled because the explicit `region` term owns
+# the signal), but with `step` curves on `heapUsed` and `keptRegion` so
+# overloaded backends are silently skipped without operator action.
 #
 # Five terms, one per metric (no doubled constraints). The curve carries
 # the soft-vs-hard expression: `step` near the top of its range acts as a
@@ -169,37 +160,37 @@ regionCollision:
 #   - kept:   logarithmic, weight 0.25 (gentle tie-breaker)
 # regionScarcityWeight is 0 because the explicit `region` term below owns
 # the kept-region signal.
-#loadBalancer:
-#  regionScarcityWeight: 0
-#  terms:
-#    mspt:
-#      input: mspt
-#      weight: 1.0
-#      curve:
-#        type: sigmoid
-#        k: 8.0
-#        x0: 0.6
-#    queue:
-#      input: queueDepth
-#      weight: 1.0
-#      curve:
-#        type: exponential
-#        k: 3.0
-#    heap:
-#      input: heapUsed
-#      weight: 5.0
-#      curve:
-#        type: step
-#        threshold: 0.85
-#    region:
-#      input: keptRegion
-#      weight: 5.0
-#      curve:
-#        type: step
-#        threshold: 0.95
-#    kept:
-#      input: keptCount
-#      weight: 0.25
-#      curve:
-#        type: logarithmic
-#        k: 9.0
+loadBalancer:
+  regionScarcityWeight: 0
+  terms:
+    mspt:
+      input: "mspt"
+      weight: 1.0
+      curve:
+        type: "sigmoid"
+        k: 8.0
+        x0: 0.6
+        queue:
+          input: "queueDepth"
+          weight: 1.0
+          curve:
+            type: "exponential"
+            k: 3.0
+            heap:
+              input: "heapUsed"
+              weight: 5.0
+              curve:
+                type: "step"
+                threshold: 0.85
+                region:
+                  input: "keptRegion"
+                  weight: 5.0
+                  curve:
+                    type: "step"
+                    threshold: 0.95
+                    kept:
+                      input: "keptCount"
+                      weight: 0.25
+                      curve:
+                        type: "logarithmic"
+                        k: 9.0
