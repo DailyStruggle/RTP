@@ -40,8 +40,13 @@ shared/forwarding.secret
 !proxy-a/plugins/rtp/**
 !proxy-b/plugins/rtp/**
 # Acceptance / smoke-test evidence logs written by run-acceptance.ps1.
+# run-acceptance.ps1 now sorts every run's logs into ./logs/<startup-timestamp>/
+# (per-service files keyed by service id) plus an acceptance-evidence.log in
+# the same dir. The legacy top-level acceptance-evidence.log path is kept
+# ignored for any operator-written one-offs.
 acceptance-evidence.log
 *.evidence.log
+logs/
 # Synced jars fanned out into jars/plugin/<pluginName>/ subdirs by sync step.
 jars/plugin/*/
 jars/velocity/*/

@@ -1,19 +1,29 @@
 # reset-rtp-config.ps1
 #
-# Wipes auto-populatable files out of every devstack instance's rtp-config/
-# directory, keeping ONLY the genuinely per-instance file (network.yml).
-# The plugin re-extracts the baseline (config.yml, messages.yml, lang/,
-# worlds/, regions/, effects/, safety.yml, economy.yml, integrations.yml,
-# language.yml, logging.yml, metrics.yml, performance.yml, docs/) on the
-# next boot, so running this before `docker compose up` guarantees the
-# devstack picks up the current jar's baseline instead of a stale shadow
-# from a prior session.
+# Wipes the plugin-owned config tree out of every devstack instance so the
+# next `docker compose up` lets the freshly-built jar re-extract the baseline
+# (config.yml, messages.yml, lang/, worlds/, regions/, effects/, safety.yml,
+# economy.yml, integrations.yml, language.yml, logging.yml, metrics.yml,
+# performance.yml, docs/) from scratch.
+#
+# Devstack layout reminder (see docker-compose.yml):
+#   ./<instance>/plugins/            -> bind-mounted to /data/plugins
+#   ./<instance>/rtp-config/         -> seed-only dir; today the only file
+#                                       used is network.yml, copied into
+#                                       /data/plugins/RTP/network.yml by the
+#                                       container entrypoint on every boot.
+#
+# So the plugin's runtime config lives entirely under
+# ./<instance>/plugins/RTP/ on the host. Deleting that directory is safe and
+# idempotent: the container's entrypoint shim re-seeds network.yml from
+# ./<instance>/rtp-config/network.yml, and the jar re-extracts every other
+# baseline file the first time the plugin loads.
 #
 # Usage (from repo root or devstack dir):
 #   .\rtp-proxy\devstack\reset-rtp-config.ps1
 #   .\rtp-proxy\devstack\reset-rtp-config.ps1 -IncludeDatabase   # also wipes runtime DB
 #
-# Safe to re-run; idempotent.
+# Safe to re-run; idempotent. Do NOT run while the devstack is up.
 
 param(
     [switch]$IncludeDatabase
@@ -22,54 +32,46 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# Paper/Folia instances wired into docker-compose.yml. backend-c (Fabric)
+# is intentionally excluded: its compose service binds only `mods/` and
+# `world/` from the host, and its RTP runtime config tree lives inside the
+# container at `/data/config/rtp/` (not bind-mounted). That tree is
+# discarded on `docker compose down` + recreate, so backend-c needs no
+# host-side reset to pick up a fresh `messages.yml` etc. - rebuild the
+# Fabric mod jar, drop it into `./backend-c/mods/`, and `docker compose
+# up --force-recreate backend-c` (or a plain `down -v` + `up`) is enough.
 $instances = @('backend-a', 'backend-b', 'lobby-a', 'lobby-b')
 
-# Files at the top level of rtp-config/ that the plugin owns. network.yml
-# is intentionally excluded because it carries per-instance identity
-# (serverId / proxyId / transport host / lobby flag) that the plugin
-# cannot regenerate from baseline.
-$preservedTopLevel = @('network.yml')
-
-# Subdirectories the plugin owns end-to-end. database/ is runtime state
-# (per-container SQLite), only nuked when -IncludeDatabase is passed.
-$pluginOwnedDirs   = @('lang', 'worlds', 'regions', 'effects', 'docs')
-$runtimeDirs       = @('database')
-
 foreach ($name in $instances) {
-    $root = Join-Path $scriptDir "$name\rtp-config"
-    if (-not (Test-Path $root)) {
-        Write-Host "[$name] no rtp-config/ directory; skipping"
+    $pluginRtp = Join-Path $scriptDir "$name\plugins\RTP"
+    if (-not (Test-Path $pluginRtp)) {
+        Write-Host "[$name] no plugins\RTP\ directory; skipping"
         continue
     }
     Write-Host "===== $name ====="
 
-    # Top-level *.yml except preserved
-    Get-ChildItem $root -File -Filter '*.yml' | ForEach-Object {
-        if ($preservedTopLevel -notcontains $_.Name) {
-            Write-Host "  del $($_.Name)"
-            Remove-Item $_.FullName -Force
-        } else {
-            Write-Host "  keep $($_.Name)"
-        }
-    }
-
-    # Plugin-owned subdirs
-    foreach ($d in $pluginOwnedDirs) {
-        $p = Join-Path $root $d
-        if (Test-Path $p) {
-            Write-Host "  del dir $d\"
-            Remove-Item $p -Recurse -Force
-        }
-    }
-
-    # Runtime DB (opt-in)
     if ($IncludeDatabase) {
-        foreach ($d in $runtimeDirs) {
-            $p = Join-Path $root $d
-            if (Test-Path $p) {
-                Write-Host "  del dir $d\ (runtime)"
-                Remove-Item $p -Recurse -Force
+        # Nuke the whole directory; entrypoint will recreate it and re-seed
+        # network.yml on next boot.
+        Write-Host "  del dir plugins\RTP\ (incl. database)"
+        Remove-Item $pluginRtp -Recurse -Force
+        continue
+    }
+
+    # Default behavior: wipe everything under plugins\RTP\ EXCEPT database\,
+    # which holds runtime SQLite state (per-container) that operators usually
+    # want to preserve between resets.
+    Get-ChildItem $pluginRtp -Force | ForEach-Object {
+        if ($_.Name -eq 'database') {
+            Write-Host "  keep $($_.Name)\ (runtime; pass -IncludeDatabase to wipe)"
+        } else {
+            if ($_.PSIsContainer) {
+                Write-Host "  del dir $($_.Name)\"
+            } else {
+                Write-Host "  del $($_.Name)"
             }
+            Remove-Item $_.FullName -Recurse -Force
         }
     }
 }

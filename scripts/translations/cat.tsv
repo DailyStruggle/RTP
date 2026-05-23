@@ -1,0 +1,108 @@
+relpath	parent_path	base_key	index	new_key	new_value	new_comment
+# Smoke-test row 1: idempotency check (already cat-flavored; expect no-op).
+messages.yml		infoTitle			&a======RTP Meow Info======	
+# Smoke-test row 2: a real change. menuHoverFallbackType currently identity in cat.
+messages.yml		menuHoverFallbackType		paw_hint_type	paw-flavour: [type]	
+# --- messages.yml: SAME_VALUE batch (player-visible English prose -> cat dialect) ---
+# Menu execute action: "run" -> "pounce" matches established voice.
+messages.yml		menuExecute			&a▶ pounce [command]	
+# Front page rows: cat-flavor the trailing descriptions only; /rtp invocations stay literal.
+messages.yml		menuFrontPageRowTeleport			&a▶ /rtp &7- pounce to a random warm spot	
+messages.yml		menuFrontPageRowRegion			&a▶ /rtp region:&7... &7- sniff a territory	
+messages.yml		menuFrontPageRowBiome			&a▶ /rtp biome:&7... &7- sniff a flavour of land	
+messages.yml		menuFrontPageRowHelp			&a▶ /rtp help &7- list meows	
+messages.yml		menuFrontPageRowAdmin			#9D7CD8▶ head-kitty panel &7- staff tools	
+messages.yml		menuFrontPageHoverAdmin			&7staff tools: setup, sniffing, hairball checks, grooming	
+# Admin panel hovers: cat-flavor English prose.
+messages.yml		menuAdminPanelHint			&7paw an option; chompy actions show a warning hover	
+messages.yml		menuAdminPanelRowConfig			&b▶ setup editor	
+messages.yml		menuAdminPanelHoverConfig			&7open the curated setup picker	
+messages.yml		menuAdminPanelHoverRegions			&7add, remove, or groom per-territory setups	
+messages.yml		menuAdminPanelHoverWorlds			&7add, remove, or groom per-box setups	
+messages.yml		menuAdminPanelRowInfo			&b▶ box info	
+messages.yml		menuAdminPanelHoverInfo			&7show plugin version, territory counts, and line state	
+messages.yml		menuAdminPanelRowDiagnostics			&c▶ full hairball checks	
+messages.yml		menuAdminPanelHoverDiagnostics			&7runs every hairball check; may be expensive	
+messages.yml		menuAdminPanelRowMemory			&b▶ snack inventory snapshot	
+messages.yml		menuAdminPanelHoverMemory			&7dump active kibble-ticket and pounce-pipeline snacks	
+messages.yml		menuAdminPanelRowScan			&b▶ sniff control	
+messages.yml		menuAdminPanelHoverScan			&7open the sniff submenu (start / pause / cancel)	
+messages.yml		menuAdminPanelRowReload			&c▶ groom (reload)	
+messages.yml		menuAdminPanelHoverReload			&7grooms all setup files; mid-pounce kitties may be jostled	
+messages.yml		menuAdminPanelRowBrowse			&b▶ browse all meows	
+messages.yml		menuAdminPanelHoverBrowse			&7open the reflected /rtp meow tree	
+# Prefab hovers: cat-flavor the explanatory prose; keep prefab ids literal.
+messages.yml		menuPrefabSurvivalDefaultHover			&7reset to the shipped defaults (plain-kibble overlay)	
+messages.yml		menuPrefabLowPerformanceHover			&7sleepy boxes / shared-CPU dens: longer pulse, smaller piles, login warm-spots off	
+messages.yml		menuPrefabHighPerformanceHover			&7dedicated boxes / many kitties: short pulse, big piles, login warm-spots on	
+messages.yml		menuPrefabFoliaTunedHover			&7folia regional scheduler: faster per-den pulses, fewer kibble tickets at once	
+messages.yml		menuPrefabMultiWorldHover			&7synthesise one territory per box from the current default	
+messages.yml		menuPrefabConfirmHint			&7sniff the changes below, then paw confirm or cancel	
+# Info-book affordances.
+messages.yml		infoBookRefreshHover			&7Re-sniff this page against a fresh hairball snapshot.	
+messages.yml		infoBookSwitchToTextHover			&7Re-meow /rtp info in chat instead of the booklet.	
+messages.yml		infoBookOverflowFooter			&7(too many meows for one page - paw to see the rest in chat)	
+# Config selector / file pages.
+messages.yml		configSelectorBackRow			&7« back to the meow menu	
+messages.yml		configFileBackRow			&7« back to setup files	
+messages.yml		configFileEmptyHint			&7(no groomable keys in this file)	
+messages.yml		configKeyHoverFormat			&7paw to groom &7[key] &7(flavour: [type])	
+messages.yml		configViewRawHint			&7[P0] booklet view unavailable; falling back to raw dump.	
+# --- messages.yml: SAME_VALUE batch 2 (menu nav, prefab rows, info-book, map*, multiconfig*) ---
+# Menu navigation rows + page nav.
+messages.yml		menuHoverFallbackBounds			accepted flavours: [values]	
+messages.yml		menuBack			&7« scamper back	
+messages.yml		menuTypeValue			&7✎ type a custom flavour...	
+messages.yml		menuRootTitle			#5FB3B3&l⚡ RTP meow menu	
+messages.yml		menuPagePrev			&7« previous page ([page])	
+messages.yml		menuPageNext			&7next page ([page]) »	
+# Admin panel section/row labels (English nouns like "regions"/"worlds" -> cat vocab).
+messages.yml		menuAdminPanelRowRegions			#5FB3B3▶ territories	
+messages.yml		menuAdminPanelRowWorlds			#5FB3B3▶ boxes	
+messages.yml		menuAdminPanelRowBack			&7« scamper back	
+messages.yml		menuAdminPanelSectionSetup			&8» &7setup (quick paw start)	
+# Prefab row IDs: keep the canonical prefab slug literal (these match enum values),
+# but cat-flavor adjacent prose where possible. Skip these rows by omission.
+# Prefab confirm/cancel: short English commands; cat-flavor.
+messages.yml		menuPrefabConfirmTitle			#9D7CD8&l⚙ confirm flavour: #5FB3B3[prefab]	
+messages.yml		menuPrefabConfirmRow			&a&l[paw to confirm]	
+messages.yml		menuPrefabCancelRow			&c&l[paw to cancel]	
+# Info-book affordance row labels.
+messages.yml		infoBookRefreshRow			&a[re-sniff]	
+messages.yml		infoBookSwitchToTextRow			&7[switch to meow chat]	
+messages.yml		infoBookAutoRefreshDeferredNote			&8(auto-grooming not yet supported; paw re-sniff to update)	
+# Config selector + key page misc.
+messages.yml		configSelectorTitle			#5FB3B3&l⚙ setup files	
+messages.yml		configValueUnsetPlaceholder			&8(unset)	
+messages.yml		configPendingRowHover			paw to unstage	
+messages.yml		configApplyRow			&a&l[apply]	
+messages.yml		configDiscardRow			&c&l[discard]	
+# Map binding / chart messages (player-visible errors).
+messages.yml		mapBindingMissing			&c[P0] map rendering is not available on this box.	
+messages.yml		mapResolverMissing			&c[P0] no chart-sniffer registered for this request.	
+messages.yml		mapUnavailable			&e[P1] chart kibble is not available right now.	
+messages.yml		mapBusy			&e[P1] the map-sniffer is busy; try again in a few licks.	
+messages.yml		menuInfoBadPointsLabel			#9D7CD8&l# bad-spots map	
+# Network region errors (cross-server vocab: neighbour box).
+messages.yml		networkRegionUnavailable			&c[P0] no neighbour box is currently serving territory '[region]'.	
+messages.yml		networkRegionAmbiguous			&c[P0] territory '[region]' is ambiguous across neighbour boxes; please pin a box.	
+# Multiconfig submenu (regions/worlds add-remove-edit prose).
+messages.yml		multiconfigHeaderRegions			#5FB3B3&l territories	
+messages.yml		multiconfigHeaderWorlds			#5FB3B3&l boxes	
+messages.yml		multiconfigToggleRemoveModeOff			&8[ ] chompy mode	
+messages.yml		multiconfigToggleRemoveModeOn			&c[x] chompy mode (paw an entry to chomp it)	
+messages.yml		multiconfigRowAdd			&a+ sniff out a new one...	
+messages.yml		multiconfigRowAddHover			&7type a name in the scratching prompt; prefilled: &f[name]	
+messages.yml		multiconfigRowEditHover			&7groom &f[name]	
+messages.yml		multiconfigRowRemoveHover			&cchomp &f[name]	
+messages.yml		multiconfigConfirmTitle			&c&lchomp [name]?	
+messages.yml		multiconfigConfirmYes			&c&l[paw to chomp]	
+messages.yml		multiconfigConfirmNo			&a&l[scamper away]	
+messages.yml		multiconfigLockRegionDefault			&7the default territory cannot be chomped	
+messages.yml		multiconfigLockWorldLoaded			&7box '[name]' is loaded on the server; unload it before chomping its setup	
+messages.yml		multiconfigResultAdded			&aadded '[name]'.	
+messages.yml		multiconfigResultRemoved			&achomped '[name]'.	
+messages.yml		multiconfigResultAddFailed			&ccould not add '[name]': [reason]	
+messages.yml		multiconfigResultRemoveFailed			&ccould not chomp '[name]': [reason]	
+messages.yml		multiconfigResultNameInvalid			&cname '[name]' is not allowed; use letters, digits, '_', '-', '.'	
+messages.yml		multiconfigResultNameTaken			&can entry named '[name]' already lives here.	

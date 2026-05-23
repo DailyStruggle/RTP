@@ -61,8 +61,9 @@ class MenuConfigSubtreeBuildersTest {
 
         assertEquals(1, model.pages().size(), "selector is single-page");
         List<MenuLine> lines = model.pages().get(0).lines();
-        // 1 Back + 1 Search + 1 header + 3 file rows = 6
-        assertEquals(6, lines.size(), "selector layout: back + search + header + N file rows");
+        // 1 Back + 1 Search + 1 header + 2 multiconfig rows (regions, worlds) + 3 file rows = 8
+        assertEquals(8, lines.size(),
+                "selector layout: back + search + header + regions + worlds + N file rows");
 
         // Row 0 → Back via OpenMenu(empty path) (root /rtp menu page).
         MenuFragment back = lines.get(0).fragments().get(0);
@@ -81,9 +82,23 @@ class MenuConfigSubtreeBuildersTest {
         assertEquals(null, lines.get(2).fragments().get(0).action(),
                 "header row must be non-clickable");
 
-        // Rows 3..5 → one OpenConfigFile per file, in encounter order.
+        // Rows 3..4 → Regions / Worlds multiconfig submenu entry points
+        // (CHECKLIST-multiconfig-menu: these live on the config selector,
+        // not the admin panel).
+        MenuAction regionsAction = lines.get(3).fragments().get(0).action();
+        assertInstanceOf(MenuAction.OpenMultiConfigSelector.class, regionsAction,
+                "row 3 must be the Regions multiconfig submenu entry");
+        assertEquals("regions",
+                ((MenuAction.OpenMultiConfigSelector) regionsAction).parserKind());
+        MenuAction worldsAction = lines.get(4).fragments().get(0).action();
+        assertInstanceOf(MenuAction.OpenMultiConfigSelector.class, worldsAction,
+                "row 4 must be the Worlds multiconfig submenu entry");
+        assertEquals("worlds",
+                ((MenuAction.OpenMultiConfigSelector) worldsAction).parserKind());
+
+        // Rows 5..7 → one OpenConfigFile per file, in encounter order.
         for (int i = 0; i < files.size(); i++) {
-            MenuFragment row = lines.get(3 + i).fragments().get(0);
+            MenuFragment row = lines.get(5 + i).fragments().get(0);
             assertInstanceOf(MenuAction.OpenConfigFile.class, row.action(),
                     "file row " + i + " must be OpenConfigFile");
             assertEquals(files.get(i),
@@ -101,8 +116,9 @@ class MenuConfigSubtreeBuildersTest {
         MenuModel model = builder.buildConfigSelector(UUID.randomUUID(), List.of());
 
         List<MenuLine> lines = model.pages().get(0).lines();
-        assertEquals(3, lines.size(),
-                "empty file list still produces back + search + header (no file rows)");
+        // back + search + header + regions + worlds = 5
+        assertEquals(5, lines.size(),
+                "empty file list still produces back + search + header + regions/worlds rows");
         assertInstanceOf(MenuAction.OpenMenu.class,
                 lines.get(0).fragments().get(0).action());
         assertInstanceOf(MenuAction.OpenConfigSearchPrompt.class,
@@ -126,12 +142,12 @@ class MenuConfigSubtreeBuildersTest {
 
         MenuModel model = builder.buildConfigSelector(UUID.randomUUID(), mixed);
         List<MenuLine> lines = model.pages().get(0).lines();
-        // back + search + header + 2 valid file rows
-        assertEquals(5, lines.size());
+        // back + search + header + regions + worlds + 2 valid file rows = 7
+        assertEquals(7, lines.size());
         assertEquals("real.yml",
-                ((MenuAction.OpenConfigFile) lines.get(3).fragments().get(0).action()).fileName());
+                ((MenuAction.OpenConfigFile) lines.get(5).fragments().get(0).action()).fileName());
         assertEquals("other.yml",
-                ((MenuAction.OpenConfigFile) lines.get(4).fragments().get(0).action()).fileName());
+                ((MenuAction.OpenConfigFile) lines.get(6).fragments().get(0).action()).fileName());
     }
 
     @Test

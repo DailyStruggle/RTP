@@ -86,27 +86,45 @@ public final class VelocityProxySender implements ProxySender {
         Objects.requireNonNull(serverId, "serverId");
         Objects.requireNonNull(token, "token");
 
+        // Phase B trace (2026-05-23): adapter entry. The dispatcher has
+        // claimed a reservation and is now asking us to actually transfer
+        // the player. Each branch (player gone, target unknown, connect
+        // result) is logged at INFO so a devstack repro can pinpoint the
+        // failure mode. Remove or downgrade once root cause is identified.
         Optional<Player> playerOpt = proxyServer.getPlayer(playerId);
         if (playerOpt.isEmpty()) {
+            logger.info("[NETWORK][trace] VelocityProxySender.sendTo: player {} not found on this proxy (PLAYER_DISCONNECTED) targetServerId={}",
+                    playerId, serverId);
             return CompletableFuture.completedFuture(TransferOutcome.PLAYER_DISCONNECTED);
         }
         Optional<RegisteredServer> target = proxyServer.getServer(serverId);
         if (target.isEmpty()) {
             logger.warn("RTP transfer: target server '{}' not registered on this proxy.", serverId);
+            logger.info("[NETWORK][trace] VelocityProxySender.sendTo: target serverId={} not registered on this proxy (BACKEND_REFUSED) player={}",
+                    serverId, playerId);
             return CompletableFuture.completedFuture(TransferOutcome.BACKEND_REFUSED);
         }
+        logger.info("[NETWORK][trace] VelocityProxySender.sendTo: invoking createConnectionRequest player={} targetServerId={} currentServer={}",
+                playerId, serverId,
+                playerOpt.get().getCurrentServer().map(s -> s.getServerInfo().getName()).orElse("<none>"));
         return playerOpt.get().createConnectionRequest(target.get())
                 .connect()
                 .handle((result, err) -> {
                     if (err != null) {
                         logger.warn("RTP transfer to '{}' threw {}: {}",
                                 serverId, err.getClass().getSimpleName(), err.getMessage());
+                        logger.info("[NETWORK][trace] VelocityProxySender.sendTo: connect threw for player={} targetServerId={} -> INTERNAL_ERROR",
+                                playerId, serverId);
                         return TransferOutcome.INTERNAL_ERROR;
                     }
                     if (result == null) {
+                        logger.info("[NETWORK][trace] VelocityProxySender.sendTo: connect returned null result for player={} targetServerId={} -> INTERNAL_ERROR",
+                                playerId, serverId);
                         return TransferOutcome.INTERNAL_ERROR;
                     }
                     ConnectionRequestBuilder.Status status = result.getStatus();
+                    logger.info("[NETWORK][trace] VelocityProxySender.sendTo: connect returned status={} for player={} targetServerId={}",
+                            status, playerId, serverId);
                     if (status == ConnectionRequestBuilder.Status.SUCCESS) {
                         return TransferOutcome.SUCCESS;
                     }

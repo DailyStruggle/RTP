@@ -453,16 +453,18 @@ public final class RtpVelocityPlugin {
         // Rewrite the connect target. ServerPreConnectEvent.ServerResult is final;
         // we set a new allowed result pointing at the token's backend.
         event.setResult(ServerPreConnectEvent.ServerResult.allowed(target.get()));
-        // Consume the token. We deliberately do not block on this future; release
-        // is idempotent and best-effort. A failure here cannot un-do the routing
-        // decision we already made.
-        try {
-            active.release(token.tokenId(), ReleaseReason.CONSUMED);
-        } catch (RuntimeException ex) {
-            logger.warn("RTP token {} release(CONSUMED) failed after routing player {} -> '{}': {}",
-                    token.tokenId(), playerId, token.serverId(), ex.getMessage());
-        }
-        logger.info("RTP routed player {} to backend '{}' via reservation {}.",
+        // DO NOT consume the token here (2026-05-23 fix). The reservation must
+        // remain CLAIMED so the destination backend's JoinTriggerSource can
+        // findReservation(playerId) -> redeem(...) on join, which is what
+        // pins the coord, evicts the local NetworkWaitlistGuard cache row,
+        // and dispatches /rtp to actually teleport the player. Releasing
+        // here transitions the row to CONSUMED and DELs the active-index
+        // key (release.lua), so by the time the player joins the backend,
+        // findReservation returns empty and no teleport runs (the exact
+        // symptom of "player arrives but no /rtp executes"). The
+        // ReservationTokenReaper + 30s TTL handle the edge case where the
+        // player disconnects mid-transfer and never reaches the backend.
+        logger.info("RTP routed player {} to backend '{}' via reservation {} (token remains CLAIMED for backend redeem).",
                 playerId, token.serverId(), token.tokenId());
     }
 

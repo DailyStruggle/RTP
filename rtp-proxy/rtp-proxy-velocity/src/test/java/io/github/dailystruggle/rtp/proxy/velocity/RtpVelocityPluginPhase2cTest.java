@@ -118,7 +118,7 @@ class RtpVelocityPluginPhase2cTest {
     }
 
     @Test
-    @DisplayName("active reservation -> target rewritten to token's backend, token consumed")
+    @DisplayName("active reservation -> target rewritten to token's backend, token remains CLAIMED for backend redeem")
     void activeReservationRewrites(@TempDir Path data) throws Exception {
         RtpVelocityPlugin plugin = newEnabledPlugin(data);
         try {
@@ -139,14 +139,21 @@ class RtpVelocityPluginPhase2cTest {
             assertSame(servers.get("backend-B"), event.getResult().getServer().orElseThrow(),
                     "listener must rewrite target to the token's serverId");
 
-            // Token consumed: subsequent findReservation must report none.
-            // release() is async; wait briefly for the executor.
-            for (int i = 0; i < 50; i++) {
-                if (plugin.transport().findReservation(playerId).get().isEmpty()) break;
-                Thread.sleep(20);
-            }
-            assertTrue(plugin.transport().findReservation(playerId).get().isEmpty(),
-                    "token must be consumed after successful routing");
+            // 2026-05-23 fix: the proxy must NOT consume the token here. The
+            // destination backend's JoinTriggerSource redeems it on join,
+            // which is what pins the coord and dispatches /rtp. If the proxy
+            // releases here, the active-index Redis key is DEL'd and the
+            // backend's findReservation returns empty -> no teleport happens.
+            // Regression guard for the "cross-server arrivals do not teleport"
+            // symptom.
+            Optional<ReservationToken> stillThere = plugin.transport()
+                    .findReservation(playerId).get();
+            assertTrue(stillThere.isPresent(),
+                    "token MUST remain visible to findReservation for the backend to redeem on join");
+            assertEquals(ReservationToken.State.CLAIMED, stillThere.get().state(),
+                    "token MUST remain CLAIMED after proxy preconnect (backend transitions it to CONSUMED on redeem)");
+            assertEquals(token.tokenId(), stillThere.get().tokenId(),
+                    "the same tokenId must still be the active reservation for this player");
         } finally {
             plugin.onProxyShutdown(new ProxyShutdownEvent());
         }

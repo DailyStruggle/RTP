@@ -76,6 +76,18 @@ public final class JoinTriggerSource implements Listener {
     private final String serverId;
 
     /**
+     * Local lobby-side / proxy-poller-seeded status cache. May be
+     * {@code null} when this trigger source is constructed in a context
+     * without a status cache (e.g. older test fixtures, or platforms
+     * that have not yet wired {@code NetworkStatusCache}). When non-null,
+     * {@link #onRedeemed} evicts the arriving player's row before
+     * dispatching {@code /rtp} so {@link NetworkWaitlistGuard} does not
+     * short-circuit the post-arrival teleport with {@code msgAlreadyQueued}
+     * (REQ-RTP-S-004 / REQ-RTP-NET-015).
+     */
+    private volatile NetworkStatusCache statusCache;
+
+    /**
      * Tracks tokens this backend has redeemed but not yet released, keyed by
      * playerId. Populated in {@link #handleRedeem} on a REDEEMED outcome so the
      * {@link PlayerQuitEvent} handler (Slice F row F3) can drive
@@ -90,12 +102,34 @@ public final class JoinTriggerSource implements Listener {
      * @param serverId  this backend's {@code network.serverId} (never null/empty)
      */
     public JoinTriggerSource(NetworkTransport transport, String serverId) {
+        this(transport, serverId, null);
+    }
+
+    /**
+     * @param transport    live backend transport (never null)
+     * @param serverId     this backend's {@code network.serverId} (never null/empty)
+     * @param statusCache  local lobby-side / proxy-poller-seeded status
+     *                     cache for waitlist-guard eviction on REDEEMED;
+     *                     may be {@code null} (no eviction).
+     */
+    public JoinTriggerSource(NetworkTransport transport, String serverId, NetworkStatusCache statusCache) {
         if (transport == null) throw new IllegalArgumentException("transport must not be null");
         if (serverId == null || serverId.isEmpty()) {
             throw new IllegalArgumentException("serverId must not be null/empty");
         }
         this.transport = transport;
         this.serverId = serverId;
+        this.statusCache = statusCache;
+    }
+
+    /**
+     * Late-bind the {@link NetworkStatusCache} after the trigger source has
+     * been constructed. Used by {@code NetworkModeBootstrap} when the
+     * cache is built later in the bootstrap sequence than the trigger
+     * source. Idempotent; null tolerant (clears the binding).
+     */
+    public void setStatusCache(NetworkStatusCache statusCache) {
+        this.statusCache = statusCache;
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -113,14 +147,30 @@ public final class JoinTriggerSource implements Listener {
                             + ": " + err.getMessage(), err);
             return;
         }
-        if (opt == null || opt.isEmpty()) return; // no cross-server reservation; standard join
+        if (opt == null || opt.isEmpty()) {
+            // Phase B trace (2026-05-23): explicit no-reservation path. The
+            // overwhelming majority of joins land here; logged at INFO
+            // because it is the diagnostic anchor for "why did /rtp not run".
+            RTP.log(Level.INFO,
+                    "[NETWORK][trace] JoinTriggerSource.handleLookup: no reservation found for " + id
+                            + " (standard join; no cross-server /rtp will be dispatched)");
+            return;
+        }
         ReservationToken token = opt.get();
         if (!serverId.equals(token.serverId())) {
             // The reservation is for another backend (e.g. the proxy
             // routed by player count and the player landed here via a
             // hub override). Silent: no S-004 attribution warranted.
+            RTP.log(Level.INFO,
+                    "[NETWORK][trace] JoinTriggerSource.handleLookup: reservation token.serverId="
+                            + token.serverId() + " does not match this backend serverId=" + serverId
+                            + " for " + id + " (token=" + token.tokenId() + "); not redeeming on this backend");
             return;
         }
+        RTP.log(Level.INFO,
+                "[NETWORK][trace] JoinTriggerSource.handleLookup: matched reservation for " + id
+                        + " token=" + token.tokenId() + " serverId=" + serverId
+                        + "; calling transport.redeem(...)");
         transport.redeem(token.tokenId(), id, serverId)
                 .whenComplete((outcome, redeemErr) -> handleRedeem(id, token, outcome, redeemErr));
     }
@@ -133,6 +183,9 @@ public final class JoinTriggerSource implements Listener {
             return;
         }
         if (outcome == null) return;
+        RTP.log(Level.INFO,
+                "[NETWORK][trace] JoinTriggerSource.handleRedeem: outcome=" + outcome
+                        + " for " + id + " token=" + token.tokenId());
         switch (outcome) {
             case REDEEMED:
                 onRedeemed(id, token);
@@ -162,25 +215,67 @@ public final class JoinTriggerSource implements Listener {
     }
 
     private void dispatchRtp(UUID id) {
-        // Hop to the main thread: Bukkit.dispatchCommand must run sync.
-        // The local /rtp pipeline applies cooldown / economy / claim / safety
-        // the same way as an in-game invocation; the proxy is the source of
-        // truth for cross-server reservation, the backend is the source of
-        // truth for local policy. Deliberate first-cut design (see L2
-        // proposal §8 OQ2); follow-up will let admins opt the cross-server
-        // arrival path into skipping cooldown+economy.
+        // Hop to the player's owning thread: Bukkit.dispatchCommand must run
+        // on the tick thread that owns the player's entity. On Folia that
+        // is the player's *entity scheduler*, NOT the global region scheduler
+        // (CraftServer.dispatchCommand calls TickThread.ensureTickThread
+        // against the player's region; running on the Global Region thread
+        // throws IllegalStateException "Thread failed main thread check:
+        // Dispatching command async"). On Bukkit/Paper/Spigot the entity
+        // scheduler does not exist and the main-thread runTaskLater path
+        // is correct. We detect Folia by attempting Player#getScheduler
+        // reflectively (added in Paper 1.20.1 / Folia); when present we
+        // use it, otherwise fall through to the legacy main-thread hop.
+        // The local /rtp pipeline applies cooldown / economy / claim /
+        // safety the same way as an in-game invocation; the proxy is the
+        // source of truth for cross-server reservation, the backend is the
+        // source of truth for local policy.
         Runnable hop = () -> {
             Player player = Bukkit.getPlayer(id);
-            if (player == null || !player.isOnline()) return; // disconnected between join and hop
+            if (player == null || !player.isOnline()) {
+                RTP.log(Level.INFO,
+                        "[NETWORK][trace] JoinTriggerSource.dispatchRtp: player offline at hop time for " + id
+                                + "; /rtp NOT dispatched");
+                return; // disconnected between join and hop
+            }
+            RTP.log(Level.INFO,
+                    "[NETWORK][trace] JoinTriggerSource.dispatchRtp: invoking Bukkit.dispatchCommand(player, \"rtp\") for " + id);
             try {
-                Bukkit.dispatchCommand(player, "rtp");
+                boolean dispatched = Bukkit.dispatchCommand(player, "rtp");
+                RTP.log(Level.INFO,
+                        "[NETWORK][trace] JoinTriggerSource.dispatchRtp: Bukkit.dispatchCommand returned " + dispatched
+                                + " for " + id);
             } catch (Throwable t) {
                 RTP.log(Level.WARNING,
                         "[NETWORK] JoinTriggerSource: /rtp dispatch threw for " + id
                                 + ": " + t.getMessage(), t);
             }
         };
+        // RTPScheduler.runTaskForPlayer routes player-owned work to the
+        // correct thread:
+        // - Bukkit / Paper / Spigot: main thread
+        // - Folia: the player's *entity scheduler*, the only thread on which
+        //   CraftServer.dispatchCommand will pass TickThread.ensureTickThread.
+        // The bare runTaskLater overload on Folia lands on the Global Region
+        // Scheduler thread, which trips "Thread failed main thread check:
+        // Dispatching command async". The renamed runTaskForPlayer (formerly
+        // scheduleTeleport - the name was a historical artifact; the method
+        // is a generic "run this on a thread owning the player after N ticks")
+        // is the canonical primitive for any work that touches a player's
+        // owned region on Folia.
         try {
+            io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer =
+                    (RTP.serverAccessor != null) ? RTP.serverAccessor.getPlayer(id) : null;
+            if (rtpPlayer != null) {
+                RTP.scheduler.runTaskForPlayer(
+                        rtpPlayer,
+                        new io.github.dailystruggle.rtp.common.tasks.RTPRunnable(hop),
+                        1L);
+                return;
+            }
+            // No RTPPlayer (quit race / accessor not wired): fall through to
+            // the legacy main-thread hop. The hop's own isOnline guard will
+            // bail out cleanly if the player has gone.
             RTP.scheduler.runTaskLater(hop, 1L);
         } catch (Throwable t) {
             // Scheduler unavailable (shutdown race): best-effort direct call.
@@ -204,11 +299,40 @@ public final class JoinTriggerSource implements Listener {
      * (the L2 baseline).
      */
     private void onRedeemed(UUID id, ReservationToken token) {
+        // REQ-RTP-S-004 / REQ-RTP-NET-015: the proxy token just
+        // transitioned to CONSUMED (terminal), but the local
+        // NetworkStatusCache row for this player is still the lobby-seeded
+        // / poller-seeded non-terminal state (QUEUED / RESERVED /
+        // TRANSFERRING). Without an eviction here, the post-arrival
+        // Bukkit.dispatchCommand(player, "rtp") below would be rejected
+        // by NetworkWaitlistGuard with msgAlreadyQueued and the player
+        // would never be teleported despite the redeem succeeding. The
+        // next supplier poll will reconcile the row authoritatively;
+        // evictLocal is a local-state correction only (does not fire the
+        // terminal listener). Null-tolerant for older test fixtures.
+        RTP.log(Level.INFO,
+                "[NETWORK][trace] JoinTriggerSource.onRedeemed: entered for " + id
+                        + " token=" + token.tokenId() + " statusCache=" + (statusCache != null));
+        if (statusCache != null) {
+            try {
+                statusCache.evictLocal(id);
+                RTP.log(Level.INFO,
+                        "[NETWORK][trace] JoinTriggerSource.onRedeemed: statusCache.evictLocal succeeded for " + id);
+            } catch (Throwable t) {
+                RTP.log(Level.WARNING,
+                        "[NETWORK] JoinTriggerSource: statusCache.evictLocal threw for "
+                                + id + ": " + t.getMessage(), t);
+            }
+        }
         UUID networkTokenId = parseTokenId(token);
         RTPLocation redeemed = null;
         if (networkTokenId != null) {
             redeemed = redeemAcrossRegions(networkTokenId);
         }
+        RTP.log(Level.INFO,
+                "[NETWORK][trace] JoinTriggerSource.onRedeemed: networkTokenId=" + networkTokenId
+                        + " redeemedCoord=" + (redeemed != null ? "present" : "null")
+                        + " for " + id);
         if (redeemed != null && networkTokenId != null) {
             // Record the binding before pinning so a racing quit observed
             // between accept and dispatch still triggers the release path.
@@ -224,6 +348,9 @@ public final class JoinTriggerSource implements Listener {
                                     + id + " token=" + token.tokenId() + ": " + t.getMessage(), t);
                 }
             }
+            RTP.log(Level.INFO,
+                    "[NETWORK][trace] JoinTriggerSource.onRedeemed: acceptRedeemedReservation accepted="
+                            + accepted + " for " + id + " token=" + token.tokenId());
             if (!accepted) {
                 // The coord could not be pinned (region disappeared mid-redeem
                 // or queue rejected it). S-004: do not silently drop the
@@ -241,6 +368,8 @@ public final class JoinTriggerSource implements Listener {
         }
         // Whether or not the coord was pinned, the local /rtp dispatch is
         // the L2 baseline behaviour and must always run on a REDEEMED outcome.
+        RTP.log(Level.INFO,
+                "[NETWORK][trace] JoinTriggerSource.onRedeemed: dispatching /rtp for " + id);
         dispatchRtp(id);
     }
 

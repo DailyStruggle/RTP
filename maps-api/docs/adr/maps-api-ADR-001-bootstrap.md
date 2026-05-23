@@ -1,6 +1,6 @@
 # maps-api-ADR-001 — Module Bootstrap, Package Layout, and Palette Policy
 
-- **Status:** Accepted (2026-05-16)
+- **Status:** Accepted (2026-05-16); §Palette policy and §Package layout amended 2026-05-23 (additive: see *Amendments* below).
 - **Supersedes:** —
 - **Superseded by:** —
 - **Related:**
@@ -34,7 +34,7 @@ These three are scoped to the module's bootstrap, do not affect the umbrella dec
 | Subpackage | Layer | Allowed imports | Notes |
 |------------|-------|-----------------|-------|
 | `mapsapi` (root) | Cross-cutting SPI | `rtp-api`, JDK only | Hosts `MapCanvas`, `MapBinding`, `MapHandle`, `MapAllocationRequest`, `Cancellation`. No platform imports. |
-| `mapsapi.model` | Layer 1 — Models | `rtp-api`, JDK only | Hosts the sealed `ChartModel` and its permitted records (`Heatmap2D`, `CategoryDistribution`, `TimeSeries`, `RegionCoverage`, `MermaidChart`). All records, all defensively copied at construction. |
+| `mapsapi.model` | Layer 1 — Models | `rtp-api`, JDK only | Hosts the sealed `ChartModel` and its permitted records (`Heatmap2D`, `CategoryDistribution`, `TimeSeries`, `RegionCoverage`, `RegionBadLocations` *(amendment, 2026-05-23)*, `MermaidChart`). All records, all defensively copied at construction. |
 | `mapsapi.render` | Layer 2 — Renderers | `rtp-api`, `mapsapi.model`, JDK only | Hosts `ChartRenderer<M extends ChartModel>` plus concrete renderers (`HeatmapRenderer` in Stage 1; `CategoryPieRenderer`, `SparklineRenderer`, `RegionCoverageRenderer`, and the Mermaid subpackage in Stage 4). No platform imports. Enforced by `ReqRtpMap002NoChunkIoTest` (ArchUnit). |
 | `mapsapi.render.mermaid` | Layer 2 — Mermaid renderer | Same as `mapsapi.render` | Hosts `MermaidParser`, `MermaidLayout`, `MermaidRasterizer`, `MermaidRenderer`. Self-contained — no external runtime, no scripting engine, no third-party graph-layout dependency (REQ-RTP-MAP-005). |
 | `mapsapi.noop` | Layer 3 — default binding | `rtp-api`, `mapsapi`, JDK only | Hosts `NoopMapBinding`. Every entry-point throws `IllegalStateException` with the documented message prefix (REQ-RTP-MAP-001). Ships in every assembly variant including Lite. |
@@ -102,6 +102,37 @@ This mirrors the `effects-api` / `commands-api` pattern: one source tree, two as
   - The logical palette commits the project to a 32-symbol vocabulary. Renderers that need a 33rd symbol require an additive amendment to this ADR and a coordinated update to every binding's palette table. The 32-symbol cap was sized for the Stage 1 / Stage 4 renderer catalogue plus a small headroom; emerging chart types may push back on it.
   - Per-binding palette tables mean operator-visible chart colours can differ between Bukkit and Fabric for the same logical symbol. This is acceptable for the v1 scope (each operator deploys one platform) but will require coordination if a future addon ships charts that span both.
   - Lite-jar exclusion patterns must be maintained in lockstep with the package layout. A renamed subpackage that misses the exclusion list ships Pro-only code in Lite. Mitigated by the `liteJarStructureCheck` audit in Stage 2.
+
+## Amendments
+
+### 2026-05-23 — `RegionBadLocations` permit + concrete logical-palette layout
+
+This amendment realises the `PaletteIndex` symbol contract that §Palette policy promised as "the Stage 1 RTP palette index" and adds one new `ChartModel` permit. It is additive: it does not retract or supersede any decision in this ADR, and the slot count remains 32 (logical bytes `0..31`).
+
+**1. `mapsapi.model` (§1):** the sealed `ChartModel` permits clause gains a sixth record, `RegionBadLocations(String regionName, int centerX, int centerZ, int radius, long[] badKeys)`. It carries a snapshot of a region's bad-location set (the same packed-long `chunkKey` encoding used by `MemoryShape.pendingBadLocations`) and is consumed by `RegionBadLocationsRenderer` to paint the admin `Visualizations` -> `Region shape` map: red for bad cells, green for the rest of the inscribed disk, black outside. The biome-overlay variant remains future work (deferred per issue thread, 2026-05-23).
+
+**2. `mapsapi.PaletteIndex` (§2):** the planned 32-symbol logical palette was originally drafted as `BACKGROUND / EDGE / TEXT / HEAT_0..HEAT_15 / PIE_0..PIE_11 / ARROW / GRID / MUTED / SELECTED`. That exact vocabulary was never authored into code; the Stage 1 `HeatmapRenderer` shipped instead with integer constants `RAMP_MIN=0 / RAMP_MAX=31`. The amendment chooses a layout aligned with what is actually used, sized for the renderers shipped (`HeatmapRenderer`) and about to ship (`RegionBadLocationsRenderer`):
+
+| Index | Symbol | Role |
+|------:|--------|------|
+| `0` | `TRANSPARENT` | Unfilled / cleared canvas pixel. Maps to `MapPalette.TRANSPARENT` on Bukkit. |
+| `1..27` | Heat ramp (`RAMP_MIN..RAMP_MAX`) | Walk a black -> red -> yellow -> white gradient. Consumed by `HeatmapRenderer`. |
+| `28` | `BLACK` | Categorical: outside-region / unexplored backdrop. |
+| `29` | `RED` | Categorical: bad / failure / hazard. |
+| `30` | `GREEN` | Categorical: good / success / safe interior. |
+| `31` | `WHITE` | Categorical: high-contrast emphasis, chart frames. |
+
+Rationale for the deviation from the original draft vocabulary:
+
+- The original draft pre-allocated 16 heat tones and 12 pie tones; in practice the heat ramp wants more granularity (27 steps) and pie / categorical renderers want fewer, distinctly-named non-ramp colors. The shipped layout reflects what `BukkitMapBinding.buildPalette()` actually produces and what `MapPalette.matchColor` actually resolves cleanly on vanilla maps.
+- The named categorical slots (`BLACK`, `RED`, `GREEN`, `WHITE`) are exposed as `public static final byte` constants on `mapsapi.PaletteIndex` so renderers reference them by name rather than by integer. The four-slot count is sized for the bad-locations renderer (3 slots used: BLACK/RED/GREEN) plus one headroom slot (`WHITE`) and is intentionally small; adding a fifth (e.g. `YELLOW`, `BLUE`) is itself an additive amendment.
+- The slot count remains 32. The `PALETTE` table in every binding still has exactly 32 entries.
+
+`HeatmapRenderer.RAMP_MIN` / `RAMP_MAX` are retained as renderer-local constants but now delegate to `PaletteIndex.RAMP_MIN` / `PaletteIndex.RAMP_MAX`, preserving the existing `HeatmapRendererTest` call sites and decoupling the renderer from the numeric values.
+
+**3. Future Fabric / Noop / InMemory bindings (§2):** every binding's palette table shall mirror the layout above. Stage 3 `FabricMapBinding` lands the same shape under the obf/unobf carriers; the test-only `InMemoryMapBinding` already writes raw logical bytes (no per-binding remap) and is unaffected.
+
+**4. ADR-046 cross-reference:** the umbrella ADR-046 §Palette policy "renderers must pick a fixed RTP palette mapping to stay deterministic across MC versions" open question is now resolved by the concrete table above. No amendment to ADR-046 itself is required.
 
 ## References
 

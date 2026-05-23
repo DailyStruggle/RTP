@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,13 +98,41 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
             baseline = (pluginDir == null)
                     ? new LinkedHashMap<>()
                     : PrefabDiskIO.snapshotLive(pluginDir, prefab);
+            // expandPerWorld prefabs (MultiWorld) carry no baked region
+            // overlays so snapshotLive() returns nothing for regions/*. The
+            // MultiWorldExpander requires regions/default in currentTrees to
+            // use as the per-world template, so seed it here.
+            if (prefab.expandPerWorld() && pluginDir != null
+                    && !baseline.containsKey("regions/" + MultiWorldExpander.DEFAULT_REGION_ID)) {
+                baseline.put("regions/" + MultiWorldExpander.DEFAULT_REGION_ID,
+                        PrefabDiskIO.readLive(pluginDir,
+                                "regions/" + MultiWorldExpander.DEFAULT_REGION_ID));
+            }
         } catch (RuntimeException re) {
             RTP.log(Level.WARNING,
                     "[prefab] apply: live snapshot failed for " + prefab.id()
                             + " - falling back to empty baseline: " + re.getMessage());
             baseline = new LinkedHashMap<>();
         }
-        PrefabApplier.Result result = PrefabApplier.apply(baseline, prefab);
+        // Collect live world names so MultiWorldExpander can synthesise a
+        // regions/<world>.yml per loaded world. Ignored when the prefab has
+        // expandPerWorld=false (2-arg semantics via the 3-arg overload).
+        List<String> worldNames = new ArrayList<>();
+        if (RTP.serverAccessor != null) {
+            try {
+                for (io.github.dailystruggle.rtp.api.world.RTPWorld<?> w
+                        : RTP.serverAccessor.getRTPWorlds()) {
+                    if (w == null) continue;
+                    String n = w.name();
+                    if (n != null && !n.isEmpty()) worldNames.add(n);
+                }
+            } catch (RuntimeException re) {
+                RTP.log(Level.WARNING,
+                        "[prefab] apply: world enumeration failed for " + prefab.id()
+                                + " - falling back to empty world list: " + re.getMessage());
+            }
+        }
+        PrefabApplier.Result result = PrefabApplier.apply(baseline, prefab, worldNames);
         Map<String, List<PrefabApplier.Change>> diff = result.perFileDiff();
         PrefabNonceStore.Entry entry = nonceStore.mint(callerId, prefab.id(), diff, result.newTrees());
 

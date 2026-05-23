@@ -61,9 +61,27 @@ public final class NetworkWaitlistGuard implements Predicate<CommandSender> {
         }
         UUID uuid = player.getUniqueId();
         Optional<NetworkStatusCache.QueueStatus> snap = statusCache.get(uuid);
-        if (snap.isEmpty()) return true;
+        if (snap.isEmpty()) {
+            // Phase B trace (2026-05-23): the post-arrival /rtp lands here
+            // after JoinTriggerSource.onRedeemed evicts the lobby-seeded
+            // row. Logged at INFO so devstack repros can confirm the
+            // guard did NOT short-circuit the dispatched /rtp.
+            RTP.log(Level.INFO,
+                    "[NETWORK][trace] NetworkWaitlistGuard.test: no cached status for "
+                            + uuid + "; allowing /rtp to proceed");
+            return true;
+        }
         NetworkStatusCache.QueueStatus status = snap.get();
-        if (!status.nonTerminal()) return true;
+        if (!status.nonTerminal()) {
+            RTP.log(Level.INFO,
+                    "[NETWORK][trace] NetworkWaitlistGuard.test: cached status=" + status.state()
+                            + " is terminal for " + uuid + "; allowing /rtp to proceed");
+            return true;
+        }
+        RTP.log(Level.INFO,
+                "[NETWORK][trace] NetworkWaitlistGuard.test: REJECTING /rtp for " + uuid
+                        + " (cached status=" + status.state() + " is non-terminal, position="
+                        + status.positionInQueue() + ")");
 
         String msg = formatMessage(status);
         try {

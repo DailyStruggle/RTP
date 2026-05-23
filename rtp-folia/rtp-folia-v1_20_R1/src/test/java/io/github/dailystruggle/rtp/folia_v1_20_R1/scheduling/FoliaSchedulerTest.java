@@ -171,7 +171,7 @@ class FoliaSchedulerTest {
     });
 
     // This call uses MockFoliaScheduler and executes deterministically
-    RTP.scheduler.scheduleTeleport(player, teleportTask, 20L);
+    RTP.scheduler.runTaskForPlayer(player, teleportTask, 20L);
 
     Assertions.assertFalse(ran.get(), "Task should not have run yet (delayed by 20 ticks)");
 

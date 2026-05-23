@@ -131,6 +131,11 @@ public final class FabricEventBridge {
                                     // class_3222) — see the JOIN proxy
                                     // comment above.
                                     dispatchJoinRtp(player);
+                                    // ADR-049 — fan a UUID join event out to
+                                    // platform-agnostic subscribers (e.g. the
+                                    // network-mode reservation-redeem path).
+                                    accessor.getFabricPlayerLifecycleHook()
+                                            .fireJoinFromPlayer(player);
                                 }
                             }
                         } catch (Throwable t) {
@@ -146,7 +151,16 @@ public final class FabricEventBridge {
                             if (args != null && args.length >= 1 && args[0] != null) {
                                 Object handler = args[0];
                                 Object player = extractPlayerFromHandler(handler);
-                                if (player != null) accessor.unregisterPlayerObject(player);
+                                if (player != null) {
+                                    // ADR-049 — fan UUID quit out before the
+                                    // accessor forgets the player wrapper, so
+                                    // subscribers (network-mode waitlist
+                                    // cleanup, etc.) can still resolve the
+                                    // UUID off the live ServerPlayer.
+                                    accessor.getFabricPlayerLifecycleHook()
+                                            .fireQuitFromPlayer(player);
+                                    accessor.unregisterPlayerObject(player);
+                                }
                             }
                             // ADR-023 — Login Reserve Cache refill on quit.
                             // Mirror of OnPlayerQuit (Bukkit): for every region with a

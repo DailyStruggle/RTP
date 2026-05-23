@@ -487,6 +487,12 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   private Object plugin;
 
+  // ADR-049 — platform-agnostic player join/quit dispatcher. Constructed lazily
+  // and exposed via getPlayerLifecycleHook(); the Bukkit Listener registration
+  // happens in start(Object) once the owning Plugin is known.
+  private final BukkitPlayerLifecycleHook playerLifecycleHook = new BukkitPlayerLifecycleHook();
+  private boolean playerLifecycleHookRegistered = false;
+
   @Override
   public void stop() {
     // Implementation
@@ -510,6 +516,15 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
               + plugin.getClass().getName());
     }
     this.dataFolder = bukkitPlugin.getDataFolder();
+    if (!playerLifecycleHookRegistered) {
+      playerLifecycleHook.register(bukkitPlugin);
+      playerLifecycleHookRegistered = true;
+    }
+  }
+
+  @Override
+  public io.github.dailystruggle.rtp.api.server.PlayerLifecycleHook getPlayerLifecycleHook() {
+    return playerLifecycleHook;
   }
 
   @Override
@@ -592,5 +607,66 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   public void setBiomesGetter(Function<RTPWorld<?>, Set<String>> getter) {
     this.biomes = getter;
     BukkitRTPWorld.setBiomesGetter(getter);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Menu platform surface (ADR-048)
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public java.util.function.Predicate<String> menuPermissionProbe(UUID player) {
+    return node -> {
+      if (player == null || node == null) return false;
+      try {
+        Player p = Bukkit.getPlayer(player);
+        if (p != null) return p.hasPermission(node);
+        // Offline / unresolved: fall back to op-status on the OfflinePlayer.
+        OfflinePlayer off = Bukkit.getOfflinePlayer(player);
+        return off != null && off.isOp();
+      } catch (Throwable t) {
+        return false;
+      }
+    };
+  }
+
+  @Override
+  public Set<String> menuEffectivePermissions(UUID player) {
+    if (player == null) return Collections.emptySet();
+    try {
+      Player p = Bukkit.getPlayer(player);
+      if (p == null) return Collections.emptySet();
+      return p.getEffectivePermissions().stream()
+          .filter(pai -> pai.getValue())
+          .map(pai -> pai.getPermission())
+          .collect(Collectors.toUnmodifiableSet());
+    } catch (Throwable t) {
+      return Collections.emptySet();
+    }
+  }
+
+  @Override
+  public String menuLocale(UUID player) {
+    if (player == null) return "en_us";
+    try {
+      Player p = Bukkit.getPlayer(player);
+      if (p == null) return "en_us";
+      String loc = p.getLocale();
+      return (loc == null || loc.isEmpty()) ? "en_us" : loc;
+    } catch (Throwable t) {
+      return "en_us";
+    }
+  }
+
+  @Override
+  public String menuRegionDescriptor(UUID player) {
+    if (player == null) return "";
+    try {
+      Player p = Bukkit.getPlayer(player);
+      if (p == null) return "";
+      World w = p.getWorld();
+      return (w == null) ? "" : w.getName();
+    } catch (Throwable t) {
+      return "";
+    }
   }
 }

@@ -46,6 +46,8 @@ An ADR captures a significant architectural decision: the context that forced it
 | [ADR-043](ADR-043-personal-queue-permission-semantics.md) | `rtp.personalqueue` Permission Semantics: Bucket-Only Opt-In (supersedes operational details of ADR-007) | Accepted |
 | [ADR-046](ADR-046-maps-api-module.md) | `maps-api` Module for Runtime Cartography Chart Generation | Accepted |
 | [ADR-047](ADR-047-declarative-chart-composition-bridge.md) | Declarative Chart Composition Bridge (`ChartSpec` + `ChartSpecResolver` + `MapDispatch`) | Accepted |
+| [ADR-048](ADR-048-menu-builders-behind-server-accessor.md) | Move menu page builders into `rtp-api` behind `RTPServerAccessor` (four default methods + `MenuPlatformView` snapshot record; no new Gradle module) | Proposed |
+| [ADR-049](ADR-049-network-mode-platform-neutral-lift.md) | Lift network-mode plumbing (`NetworkModeBootstrap` + 12 helpers) from `rtp-plugin/bukkit/network/` to `rtp-core`; new `PlayerLifecycleHook` SPI on `RTPServerAccessor`; supersedes rtp-fabric-ADR-013 | Accepted |
 
 ## Subproject ADRs
 

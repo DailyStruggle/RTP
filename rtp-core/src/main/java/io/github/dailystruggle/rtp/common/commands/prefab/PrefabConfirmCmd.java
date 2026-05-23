@@ -161,15 +161,31 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         }
 
         // Best-effort reload: not fatal if it fails (the files are correct on
-        // disk; the operator can /rtp reload manually).
+        // disk; the operator can /rtp reload manually). Mirror ReloadCmd's
+        // user-facing chatter (MessagesKeys.reloading / reloaded with
+        // [filename] -> "configs") so prefab confirm produces the same
+        // "loading configs..." / "successfully loaded configs." lines the
+        // operator sees on /rtp reload, instead of a silent swap.
         boolean reloaded = false;
         Throwable reloadFailure = null;
         try {
             if (RTP.configs != null) {
-                reloaded = RTP.configs.reload();
+                emitReloadStatus(callerId,
+                        io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.reloading);
+                RTP.reloading.set(true);
+                try {
+                    reloaded = RTP.configs.reload();
+                } finally {
+                    RTP.reloading.set(false);
+                }
+                if (reloaded) {
+                    emitReloadStatus(callerId,
+                            io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.reloaded);
+                }
             }
         } catch (RuntimeException re) {
             reloadFailure = re;
+            RTP.reloading.set(false);
         }
 
         RTP.log(Level.INFO,
@@ -227,6 +243,33 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
             }
         } catch (RuntimeException re) {
             return PrefabDiskIO.DEFAULT_BAK_RETENTION;
+        }
+    }
+
+    private static final java.util.regex.Pattern FILENAME_PATTERN =
+            java.util.regex.Pattern.compile("\\[filename]", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Emit the configurable {@code reloading} / {@code reloaded} message
+     * (with {@code [filename]} resolved to {@code "configs"}) so a prefab
+     * confirm produces the same operator-visible chatter as {@code /rtp
+     * reload}. Mirrors the pattern in {@code ReloadCmd}.
+     */
+    private void emitReloadStatus(UUID callerId,
+                                  io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys key) {
+        String tmpl;
+        try {
+            tmpl = msg(key, "");
+        } catch (RuntimeException re) {
+            return;
+        }
+        if (tmpl == null || tmpl.isEmpty()) return;
+        String resolved = FILENAME_PATTERN.matcher(tmpl).replaceAll("configs");
+        if (RTP.serverAccessor == null) return;
+        try {
+            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, resolved);
+        } catch (RuntimeException ignored) {
+            // Test scaffolds without a real sender are not fatal.
         }
     }
 

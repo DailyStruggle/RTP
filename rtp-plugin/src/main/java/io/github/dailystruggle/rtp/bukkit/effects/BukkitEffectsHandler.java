@@ -103,8 +103,8 @@ public class BukkitEffectsHandler {
             // UnsupportedOperationException and BukkitEffectsInitializer's
             // catch-block then falls back to running the effect directly on
             // the calling async pipeline thread, which is the failure mode
-            // this routes around. We prefer RTP.scheduler.scheduleTeleport
-            // (Folia entity-scheduler aware; "scheduleTeleport" is the
+            // this routes around. We prefer RTP.scheduler.runTaskForPlayer
+            // (Folia entity-scheduler aware; "runTaskForPlayer" is the
             // historic name for a generic "run runnable on a thread owning
             // the player after N ticks" path) and fall back to the legacy
             // runEffect helper when no RTPPlayer is available (Paper/Spigot).
@@ -115,7 +115,7 @@ public class BukkitEffectsHandler {
     /**
      * Run {@code effect} on a thread that legally owns its target player.
      * Folia: routes through {@link RTP#scheduler}'s
-     * {@code scheduleTeleport(RTPPlayer, RTPRunnable, delayTicks)} entry
+     * {@code runTaskForPlayer(RTPPlayer, RTPRunnable, delayTicks)} entry
      * point (per-entity scheduler hop). Paper/Spigot or when the
      * {@link RTPPlayer} view is unavailable: falls back to the legacy
      * {@link BukkitEffectsInitializer#runEffect(org.bukkit.plugin.Plugin, Effect)} helper,
@@ -125,7 +125,7 @@ public class BukkitEffectsHandler {
     private static void dispatchEffectForPlayer(JavaPlugin plugin, Effect<?> effect, RTPPlayer rp) {
         if (RTP.scheduler != null && rp != null) {
             try {
-                RTP.scheduler.scheduleTeleport(
+                RTP.scheduler.runTaskForPlayer(
                         rp,
                         new io.github.dailystruggle.rtp.common.tasks.RTPRunnable((Runnable) effect),
                         1L);

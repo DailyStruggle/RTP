@@ -263,12 +263,20 @@ public final class NetworkWaitlistDrainer {
     }
 
     private CompletableFuture<DispatchOutcome> redispatch(NetworkWaitlist.WaitEnvelope env) {
+        // Preserve the upstream serverHint across the waitlist round trip
+        // (2026-05-23 fix): an envelope parked here because the pinned
+        // backend was momentarily ineligible MUST still arrive at the
+        // dispatcher with its hint, otherwise the drainer silently
+        // load-balances cross-server /rtp that the player had explicitly
+        // pinned. originServerId stays as the genuine origin (it is a
+        // proxy-side metric, distinct from the player-supplied hint).
         RtpRequest request = new RtpRequest(
                 env.playerId(),
                 TriggerType.COMMAND,
                 env.regionKey(),
-                Optional.empty(),
-                Optional.of(env.originServerId()),
+                /*worldKey=*/Optional.empty(),
+                /*serverHint=*/env.serverHint(),
+                /*originServerId=*/Optional.of(env.originServerId()),
                 env.correlationId());
         try {
             return dispatcher.dispatch(request);

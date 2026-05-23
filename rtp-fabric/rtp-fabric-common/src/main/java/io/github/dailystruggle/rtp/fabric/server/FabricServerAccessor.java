@@ -1669,6 +1669,26 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     return scheduler;
   }
 
+  // ADR-049 — platform-agnostic player join/quit dispatcher. The Fabric event
+  // wiring lives in FabricEventBridge (reflective registration of
+  // ServerPlayConnectionEvents.JOIN/DISCONNECT, see rtp-fabric-ADR-009);
+  // the bridge invokes fireJoinFromPlayer / fireQuitFromPlayer on the hook.
+  private final FabricPlayerLifecycleHook playerLifecycleHook = new FabricPlayerLifecycleHook();
+
+  @Override
+  public io.github.dailystruggle.rtp.api.server.PlayerLifecycleHook getPlayerLifecycleHook() {
+    return playerLifecycleHook;
+  }
+
+  /**
+   * Accessor used by {@code FabricEventBridge} to invoke the concrete fan-out
+   * methods that take {@code ServerPlayer}-typed objects without exposing the
+   * native type on the SPI.
+   */
+  public FabricPlayerLifecycleHook getFabricPlayerLifecycleHook() {
+    return playerLifecycleHook;
+  }
+
   @Override
   public double getTPS(int ticks) {
     // C6 (Section C of CHECKLIST-metrics-and-multiserver) — when a
@@ -1928,6 +1948,109 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       if (n != null && !n.isEmpty()) out.add(n);
     }
     return out;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Menu platform surface (ADR-048)
+  //
+  // permissionProbe / effectivePermissions: the SPI defaults already route
+  // through getSender(uuid) -> FabricRTPPlayer.hasPermission /
+  // getEffectivePermissions, which both delegate to
+  // FabricEffectivePermissionsResolver (ADR-011). We override anyway for
+  // explicitness and to short-circuit the sender lookup when the player is
+  // not yet cached.
+  //
+  // locale / regionDescriptor: read reflectively from the bound
+  // MinecraftServer's PlayerList so the bytecode pins no intermediary aliases
+  // (deobf 26.1+ runtime safety, same pattern as lookupOnlineServerPlayerByUuid).
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public java.util.function.Predicate<String> menuPermissionProbe(UUID player) {
+    return node -> {
+      if (player == null || node == null) return false;
+      try {
+        RTPCommandSender sender = getSender(player);
+        return sender != null && sender.hasPermission(node);
+      } catch (Throwable t) {
+        return false;
+      }
+    };
+  }
+
+  @Override
+  public Set<String> menuEffectivePermissions(UUID player) {
+    if (player == null) return Collections.emptySet();
+    try {
+      RTPCommandSender sender = getSender(player);
+      if (sender == null) return Collections.emptySet();
+      Set<String> perms = sender.getEffectivePermissions();
+      return perms == null ? Collections.emptySet() : perms;
+    } catch (Throwable t) {
+      return Collections.emptySet();
+    }
+  }
+
+  @Override
+  public String menuLocale(UUID player) {
+    if (player == null) return "en_us";
+    try {
+      Object sp = lookupOnlineServerPlayerByUuid(player);
+      if (sp == null) return "en_us";
+      // ServerPlayer#clientInformation() -> ClientInformation, then language().
+      // Use reflection so the unobf 26.1 deobf runtime, where the intermediary
+      // descriptor differs, doesn't link-fail.
+      try {
+        java.lang.reflect.Method ci = sp.getClass().getMethod("clientInformation");
+        Object info = ci.invoke(sp);
+        if (info != null) {
+          try {
+            java.lang.reflect.Method lang = info.getClass().getMethod("language");
+            Object loc = lang.invoke(info);
+            if (loc instanceof String s && !s.isEmpty()) return s;
+          } catch (NoSuchMethodException ignored) {
+            // Older 1.20 family exposed a 'language' field on ServerPlayer.
+          }
+        }
+      } catch (NoSuchMethodException ignored) {}
+      // Fallback: 1.20.x ServerPlayer had a public `language` field.
+      try {
+        java.lang.reflect.Field f = sp.getClass().getField("language");
+        Object v = f.get(sp);
+        if (v instanceof String s && !s.isEmpty()) return s;
+      } catch (NoSuchFieldException ignored) {}
+    } catch (Throwable t) {
+      // fall through
+    }
+    return "en_us";
+  }
+
+  @Override
+  public String menuRegionDescriptor(UUID player) {
+    if (player == null) return "";
+    try {
+      Object sp = lookupOnlineServerPlayerByUuid(player);
+      if (sp == null) return "";
+      // ServerPlayer#serverLevel() -> ServerLevel#dimension() -> ResourceKey#location().
+      Object level;
+      try {
+        level = sp.getClass().getMethod("serverLevel").invoke(sp);
+      } catch (NoSuchMethodException nsme) {
+        // Older API: ServerPlayer#getLevel()
+        try {
+          level = sp.getClass().getMethod("getLevel").invoke(sp);
+        } catch (NoSuchMethodException nsme2) {
+          return "";
+        }
+      }
+      if (level == null) return "";
+      Object key = level.getClass().getMethod("dimension").invoke(level);
+      if (key == null) return "";
+      Object loc = key.getClass().getMethod("location").invoke(key);
+      return loc == null ? "" : loc.toString();
+    } catch (Throwable t) {
+      return "";
+    }
   }
 
   // ---------------------------------------------------------------------------

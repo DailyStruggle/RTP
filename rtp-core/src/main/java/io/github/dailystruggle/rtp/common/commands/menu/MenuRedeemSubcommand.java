@@ -90,6 +90,16 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
     public static final String PARAM_TOKEN = "token";
 
     /**
+     * Parameter names used when the anvil-input "+ add new" prompt on the
+     * multiconfig selector page confirms. The platform synthesizes
+     * {@code /rtp menu multiaddKind=<kind> multiadd=<typedName>}; the
+     * {@link #dispatch} early branch detects this pair and routes it to
+     * {@link #dispatchMultiConfigMutate} with op = ADD.
+     */
+    public static final String PARAM_MULTIADD = "multiadd";
+    public static final String PARAM_MULTIADD_KIND = "multiaddKind";
+
+    /**
      * Parameter name used when the user (or a renderer's pagination click)
      * types {@code /rtp menu page:<n>} (CHECKLIST item 5.3.b, D-005 approved
      * 2026-05-15). Values are 1-indexed on the wire and translated to a
@@ -835,6 +845,27 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                 return java.util.Collections.emptySet();
             }
         });
+        // "+ add new" anvil-confirm parameters. The anvil session submits
+        // /rtp menu multiaddKind=<kind> multiadd=<typedName> as the player;
+        // dispatch() routes the pair to dispatchMultiConfigMutate(ADD).
+        // Predicate accepts any non-empty value (the parserKind unknown / the
+        // name-collision path is re-checked server-side in the mutate arm).
+        getParameterLookup().put(PARAM_MULTIADD, new CommandParameter(PERMISSION,
+                "multiconfig add: typed entry name",
+                (uuid, value) -> value != null && !value.isEmpty()) {
+            @Override
+            public java.util.Set<String> values() {
+                return java.util.Collections.emptySet();
+            }
+        });
+        getParameterLookup().put(PARAM_MULTIADD_KIND, new CommandParameter(PERMISSION,
+                "multiconfig add: parser kind",
+                (uuid, value) -> value != null && !value.isEmpty()) {
+            @Override
+            public java.util.Set<String> values() {
+                return java.util.Collections.emptySet();
+            }
+        });
         // Mirror every TreeCommand sibling registered under rtpRoot as a
         // MenuMirrorSubcommand child of this `menu` subcommand, recursively
         // shadowing their parameters/children. This is what makes
@@ -917,6 +948,28 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             reject(null, MessagesKeys.menuUnknownPlayer,
                     "menu redeem rejected: no sender UUID", messageMethod);
             return false;
+        }
+        // "+ add new" anvil-confirm early branch: when the player submits
+        // /rtp menu multiaddKind=<kind> multiadd=<typedName>, route directly
+        // to dispatchMultiConfigMutate(ADD) without minting/consuming a token.
+        // This is the post-anvil-confirm leg of the add-new flow (the builder
+        // mints a PromptAnvilInput, the anvil opens prefilled with
+        // "default<N>", and the confirm command lands here).
+        List<String> multiAddName = parameterValues != null
+                ? parameterValues.get(PARAM_MULTIADD) : null;
+        List<String> multiAddKind = parameterValues != null
+                ? parameterValues.get(PARAM_MULTIADD_KIND) : null;
+        if (multiAddName != null && !multiAddName.isEmpty()
+                && multiAddKind != null && !multiAddKind.isEmpty()) {
+            String typedName = multiAddName.get(0);
+            String kind = multiAddKind.get(0);
+            if (typedName != null && !typedName.isEmpty()
+                    && kind != null && !kind.isEmpty()) {
+                return dispatchMultiConfigMutate(senderId,
+                        new MenuAction.MultiConfigMutate(kind, typedName,
+                                MenuAction.MultiConfigMutate.Op.ADD),
+                        messageMethod);
+            }
         }
         String token = extractToken(parameterValues);
         if (token == null || token.isEmpty()) {
@@ -1597,6 +1650,46 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         return "";
     }
 
+    /**
+     * Multiconfig-aware variant of
+     * {@link #resolveCurrentConfigValueAsString} for entry parsers
+     * reached via {@code <kind>/<entryName>}-shaped synthetic fileNames.
+     * Resolves through {@link #resolveMultiConfigParser} and the entry's
+     * {@link io.github.dailystruggle.rtp.common.configuration.MultiConfigParser#getParser(String)}.
+     */
+    private static String resolveCurrentMultiConfigValueAsString(
+            String kind, String entryName, String paramName) {
+        if (paramName == null || paramName.isEmpty()) return "";
+        if (kind == null || kind.isEmpty()) return "";
+        if (entryName == null || entryName.isEmpty()) return "";
+        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> mcp =
+                resolveMultiConfigParser(kind);
+        if (mcp == null) return "";
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> entry;
+        try {
+            entry = mcp.getParser(entryName);
+        } catch (RuntimeException ignored) {
+            return "";
+        }
+        if (entry == null) return "";
+        java.util.EnumMap<?, Object> data;
+        try {
+            data = entry.getData();
+        } catch (RuntimeException ignored) {
+            return "";
+        }
+        if (data == null || data.isEmpty()) return "";
+        for (java.util.Map.Entry<?, Object> e : data.entrySet()) {
+            Enum<?> k = (Enum<?>) e.getKey();
+            if (k == null) continue;
+            if (k.name().equalsIgnoreCase(paramName)) {
+                Object v = e.getValue();
+                return v == null ? "" : String.valueOf(v);
+            }
+        }
+        return "";
+    }
+
     private boolean dispatchOpenConfigKey(UUID senderId,
                                           MenuAction.OpenConfigKey open,
                                           @Nullable Consumer<String> messageMethod) {
@@ -1624,6 +1717,27 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         }
         String fileName = open.fileName();
         String paramName = open.paramName();
+
+        // Slash-aware short-circuit (2026-05-23): multiconfig entry pages
+        // address themselves as "<parserKind>/<entryName>" (the '/' is
+        // illegal in real config filenames so there is no ambiguity).
+        // The anvil's parentPath becomes ["config", parserKind, entryName]
+        // which matches the existing /rtp config <kind> <entryName> CLI
+        // leaf -- no TreeCommand walk validation needed here because the
+        // dispatchPromptAnvilInput walker re-resolves the path itself.
+        int slash = fileName.indexOf('/');
+        if (slash > 0 && slash < fileName.length() - 1) {
+            String kind = fileName.substring(0, slash);
+            String entryName = fileName.substring(slash + 1);
+            String prefill = resolveCurrentMultiConfigValueAsString(
+                    kind, entryName, paramName);
+            MenuAction.PromptAnvilInput slashPrompt = new MenuAction.PromptAnvilInput(
+                    new String[]{"config", kind, entryName},
+                    paramName,
+                    prefill,
+                    MenuAction.Mode.STAGE);
+            return dispatchPromptAnvilInput(senderId, slashPrompt, messageMethod);
+        }
 
         // Resolve the live `config` subtree and the per-file SubConfigCmd.
         // Both forms (`<file>.yml` and bare `<file>`) are accepted so the
@@ -2013,8 +2127,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         String[] args;
         switch (action.scope().kind()) {
             case GLOBAL -> args = new String[]{"info"};
-            case WORLD  -> args = new String[]{"info", "world:" + action.scope().name()};
-            case REGION -> args = new String[]{"info", "region:" + action.scope().name()};
+            case WORLD  -> args = new String[]{"info", "world=" + action.scope().name()};
+            case REGION -> args = new String[]{"info", "region=" + action.scope().name()};
             default     -> {
                 RTP.log(Level.WARNING,
                         "menu info-switch-to-text: unknown scope kind "
@@ -2191,6 +2305,32 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         return renderAt(senderId, target, assembledPath, pageIndex, messageMethod);
     }
 
+    /**
+     * Re-render helper for stage / unstage / discard / apply paths.
+     * Detects the slash-aware "<kind>/<entryName>" synthetic fileName
+     * introduced 2026-05-23 for multiconfig entry editing and routes
+     * back into {@link #dispatchOpenMultiConfigEntry}; otherwise falls
+     * through to the flat-config {@link #dispatchOpenConfigFile}. Used
+     * so cart operations on a multiconfig entry re-open the entry page
+     * (with the updated cart surfaced) instead of the unrelated flat-
+     * config selector that {@code OpenConfigFile("regions/default")}
+     * would otherwise try to resolve.
+     */
+    private boolean reopenAfterCartOp(UUID senderId,
+                                      String fileName,
+                                      @Nullable Consumer<String> messageMethod) {
+        int slash = fileName == null ? -1 : fileName.indexOf('/');
+        if (slash > 0 && slash < fileName.length() - 1) {
+            String kind = fileName.substring(0, slash);
+            String entryName = fileName.substring(slash + 1);
+            return dispatchOpenMultiConfigEntry(senderId,
+                    new MenuAction.OpenMultiConfigEntry(kind, entryName),
+                    messageMethod);
+        }
+        return dispatchOpenConfigFile(senderId,
+                new MenuAction.OpenConfigFile(fileName), messageMethod);
+    }
+
     boolean renderAt(UUID senderId,
                      TreeCommand target,
                      java.util.List<String> assembledPath,
@@ -2259,9 +2399,11 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     "menu config-stage rejected: cart failure", messageMethod);
             return false;
         }
-        // Re-render the curated file page so the player sees the updated cart.
-        return dispatchOpenConfigFile(senderId,
-                new MenuAction.OpenConfigFile(stage.fileName()), messageMethod);
+        // Re-render the curated file page so the player sees the updated
+        // cart. Slash-aware re-render (2026-05-23): when fileName is a
+        // "<kind>/<entryName>" synthetic for multiconfig entry editing,
+        // route back through dispatchOpenMultiConfigEntry instead.
+        return reopenAfterCartOp(senderId, stage.fileName(), messageMethod);
     }
 
     /**
@@ -2294,8 +2436,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     "menu config-unstage rejected: cart failure", messageMethod);
             return false;
         }
-        return dispatchOpenConfigFile(senderId,
-                new MenuAction.OpenConfigFile(unstage.fileName()), messageMethod);
+        return reopenAfterCartOp(senderId, unstage.fileName(), messageMethod);
     }
 
     /**
@@ -2329,17 +2470,33 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     messageMethod);
             return false;
         }
-        // Build args: ["config", fileName, "k1=v1", "k2=v2", ...]. The
-        // commands-api parameter parser accepts multiple `k=v` pairs on a
-        // single command line (the user confirmed this on 2026-05-20 when
-        // approving the staging-cart proposal), so a single batched
-        // dispatch suffices — no per-key loop required.
-        String[] args = new String[2 + entries.size()];
-        args[0] = "config";
-        args[1] = apply.fileName();
-        int i = 2;
-        for (Map.Entry<String, String> e : entries.entrySet()) {
-            args[i++] = e.getKey() + "=" + e.getValue();
+        // Build args. For flat configs: ["config", fileName, "k=v"...].
+        // For multiconfig entries (slash-aware, 2026-05-23): the fileName
+        // is "<kind>/<entryName>" and the CLI shape is
+        // /rtp config <kind> <entryName> k=v ..., so the slash splits
+        // into two args. The commands-api parameter parser accepts
+        // multiple `k=v` pairs on a single command line, so a single
+        // batched dispatch suffices.
+        String fn = apply.fileName();
+        int applySlash = fn.indexOf('/');
+        String[] args;
+        if (applySlash > 0 && applySlash < fn.length() - 1) {
+            args = new String[3 + entries.size()];
+            args[0] = "config";
+            args[1] = fn.substring(0, applySlash);
+            args[2] = fn.substring(applySlash + 1);
+            int i = 3;
+            for (Map.Entry<String, String> e : entries.entrySet()) {
+                args[i++] = e.getKey() + "=" + e.getValue();
+            }
+        } else {
+            args = new String[2 + entries.size()];
+            args[0] = "config";
+            args[1] = fn;
+            int i = 2;
+            for (Map.Entry<String, String> e : entries.entrySet()) {
+                args[i++] = e.getKey() + "=" + e.getValue();
+            }
         }
         return dispatchRun(senderId, new MenuAction.RunRtpCommand(args), messageMethod);
     }
@@ -2363,8 +2520,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         }
         // applyCart pops and returns; we discard the result.
         applyCart(senderId, discard.fileName());
-        return dispatchOpenConfigFile(senderId,
-                new MenuAction.OpenConfigFile(discard.fileName()), messageMethod);
+        return reopenAfterCartOp(senderId, discard.fileName(), messageMethod);
     }
 
     // ------------------------------------------------------------------------
@@ -2551,11 +2707,20 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         }
         MenuModel model;
         try {
+            // Pass the viewer's cart snapshot scoped to the synthetic
+            // "<kind>/<entry>" fileName so the entry page surfaces
+            // Pending + Apply + Discard rows (the cart-aware
+            // buildEntry overload landed 2026-05-23 to mirror the
+            // flat-config page).
+            String syntheticFileName = kind + "/" + entry;
+            LinkedHashMap<String, String> cartSnap =
+                    snapshotCart(senderId, syntheticFileName);
             @SuppressWarnings({"unchecked", "rawtypes"})
             MenuModel m = multiConfigBuilder.buildEntry(
                     kind, entry,
                     (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser) parser,
-                    senderId);
+                    senderId,
+                    cartSnap);
             model = m;
         } catch (RuntimeException e) {
             RTP.log(Level.WARNING,

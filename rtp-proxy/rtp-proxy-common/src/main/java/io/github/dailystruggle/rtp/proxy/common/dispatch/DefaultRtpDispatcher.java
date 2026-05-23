@@ -248,6 +248,48 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
 
     private CompletableFuture<DispatchAttempt> claimAfterSelect(RtpRequest request,
                                                                 NetworkSnapshot snapshot) {
+        // Hard-pin gate (2026-05-23 fix): when the upstream router carried
+        // a `serverHint` (player typed `region=<server>:<region>`, or the
+        // lobby's pickMostKept() synthesised one), the dispatcher MUST
+        // constrain the BackendSelector to that server and hard-fail if it
+        // is not eligible. Without this gate, every cross-server /rtp was
+        // load-balanced even when the player named a specific backend (the
+        // hint never reached the selector at all). The region-aware
+        // fallback is intentionally bypassed: explicit upstream intent is
+        // never overridden by a proxy-side region pick.
+        if (request.serverHint().isPresent()) {
+            String pinnedServerId = request.serverHint().get();
+            Optional<String> picked = selector.choose(request, snapshot,
+                    Optional.of(pinnedServerId));
+            if (picked.isEmpty()) {
+                // Pinned backend not eligible (killSwitched, offline, does
+                // not advertise the requested region, etc.). The player
+                // explicitly named this backend, so we MUST NOT silently
+                // load-balance them elsewhere. Hard-fail with NO_BACKEND so
+                // they see the localized "that region is not available"
+                // message and can retry with a different target.
+                LOG.log(Level.INFO,
+                        "[NETWORK][dispatch] serverHint pin not eligible: serverId={0}"
+                                + " regionKey={1} player={2} (correlationId={3});"
+                                + " hard-failing rather than load-balancing.",
+                        new Object[]{pinnedServerId, request.regionKey().orElse("-"),
+                                request.playerId(), request.correlationId()});
+                sender.sendMessage(request.playerId(), MSG_NO_BACKEND, Map.of());
+                emitStatus(request.playerId(), QueueState.FAILED,
+                        Optional.of(MSG_NO_BACKEND.key()));
+                return CompletableFuture.completedFuture(
+                        DispatchAttempt.failed(new DispatchOutcome.Failed(
+                                DispatchOutcome.Failed.Reason.NO_BACKEND,
+                                MSG_NO_BACKEND.key())));
+            }
+            LOG.log(Level.INFO,
+                    "[NETWORK][dispatch] serverHint honoured: serverId={0} regionKey={1}"
+                            + " player={2} (correlationId={3})",
+                    new Object[]{picked.get(), request.regionKey().orElse("-"),
+                            request.playerId(), request.correlationId()});
+            return continueAfterPick(request, picked);
+        }
+
         // Region-aware fallback (proxy-side load-balanced region pick).
         // Active iff (a) an operator-tuned RegionAwareSelector is wired AND
         // (b) the incoming request did NOT pre-pin a region. A pre-pinned
@@ -262,12 +304,15 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
                 // downstream BackendSelector treats this exactly like the
                 // "player explicitly typed region=..." path. We do NOT
                 // overwrite playerId / correlationId / triggerType /
-                // worldKey / originServerId - those are caller invariants.
+                // worldKey / serverHint / originServerId - those are
+                // caller invariants. (serverHint stays empty here: this
+                // branch only runs when no upstream pin was supplied.)
                 effectiveRequest = new RtpRequest(
                         request.playerId(),
                         request.triggerType(),
                         Optional.of(pair.get().regionKey()),
                         request.worldKey(),
+                        request.serverHint(),
                         request.originServerId(),
                         request.correlationId());
                 LOG.log(Level.INFO,
@@ -353,6 +398,16 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
                     DispatchOutcome.Failed.Reason.PLAYER_GONE, MSG_PLAYER_GONE.key()));
         }
 
+        // Phase B trace (2026-05-23): claim succeeded, player still
+        // connected, about to ask the proxy adapter (Velocity / BungeeCord)
+        // to actually transfer the player. Logged at INFO so devstack
+        // repros can confirm the dispatcher reached the transfer step
+        // (vs. returning early on sender.isConnected, claim failure, or
+        // never being entered at all). Remove or downgrade once root cause
+        // is identified.
+        LOG.log(Level.INFO,
+                "[NETWORK][trace] DefaultRtpDispatcher.sendAfterClaim: invoking sender.sendTo(player={0}, serverId={1}, token={2}) correlationId={3}",
+                new Object[]{request.playerId(), token.serverId(), token.tokenId(), request.correlationId()});
         return sender.sendTo(request.playerId(), token.serverId(), token)
                 .thenApply(result -> {
                     if (result == TransferOutcome.SUCCESS) {
@@ -438,11 +493,16 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
      * a silent swallow.
      */
     private CompletableFuture<DispatchAttempt> parkOnWaitlist(RtpRequest request) {
+        // Preserve serverHint into the parked envelope (2026-05-23 fix):
+        // if the dispatcher could not place a pinned request right now and
+        // parked it on the waitlist, the drainer must see the hint when it
+        // re-dispatches later. Without this, the parked entry silently
+        // load-balances on re-injection.
         NetworkWaitlist.WaitEnvelope envelope = new NetworkWaitlist.WaitEnvelope(
                 request.playerId(),
                 request.correlationId(),
                 request.regionKey(),
-                Optional.empty(),
+                request.serverHint(),
                 request.originServerId().orElse(proxyServerId),
                 System.currentTimeMillis());
         return waitlist.enrol(envelope)

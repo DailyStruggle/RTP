@@ -152,6 +152,44 @@ class NetworkRouterTest {
     }
 
     @Test
+    void self_pin_coalesces_to_local_under_mode_LOCAL() {
+        // 2026-05-23: `rtp region=<self>:<region>` on the named backend
+        // must be treated as `rtp region=<region>` rather than getting
+        // funnelled into the cross-server pin gates (which would either
+        // bounce the player off-and-back or REJECT with REGION_UNAVAILABLE
+        // if the local heartbeat advertises a different region set).
+        BackendHeartbeat local = hb("local-1", Set.of("default"), Map.of("default", 5), false);
+        BackendHeartbeat peer = hb("peer-1", Set.of("default"), Map.of("default", 5), false);
+        NetworkRouter r = routerWith(NetworkRouter.Mode.LOCAL, snap(local, peer), 5, 0, 50);
+        // Self-pin: must coalesce to LOCAL, not a hard-pin cross-server
+        // route or a REGION_UNAVAILABLE fallback.
+        RoutingDecision d = r.route(UUID.randomUUID(), "default", "local-1");
+        assertSame(RoutingDecision.Local.INSTANCE, d);
+    }
+
+    @Test
+    void self_pin_coalesces_to_local_under_mode_AUTO() {
+        BackendHeartbeat local = hb("local-1", Set.of("default"), Map.of("default", 5), false);
+        BackendHeartbeat peer = hb("peer-1", Set.of("default"), Map.of("default", 5), false);
+        NetworkRouter r = routerWith(NetworkRouter.Mode.AUTO, snap(local, peer), 5, 0, 50);
+        RoutingDecision d = r.route(UUID.randomUUID(), "default", "local-1");
+        assertSame(RoutingDecision.Local.INSTANCE, d);
+    }
+
+    @Test
+    void foreign_pin_still_routes_cross_server() {
+        // Regression guard: the self-pin coalesce must not affect
+        // foreign pins (the user's primary use case for the hint).
+        BackendHeartbeat local = hb("local-1", Set.of("default"), Map.of("default", 5), false);
+        BackendHeartbeat peer = hb("peer-1", Set.of("default"), Map.of("default", 5), false);
+        NetworkRouter r = routerWith(NetworkRouter.Mode.LOCAL, snap(local, peer), 5, 0, 50);
+        RoutingDecision d = r.route(UUID.randomUUID(), "default", "peer-1");
+        var cs = assertInstanceOf(RoutingDecision.CrossServer.class, d);
+        assertEquals("peer-1", cs.serverHint().orElseThrow());
+        assertEquals("default", cs.regionKey().orElseThrow());
+    }
+
+    @Test
     void mode_parse_accepts_dashed_and_underscored_variants() {
         assertSame(NetworkRouter.Mode.LOCAL, NetworkRouter.Mode.parse(null));
         assertSame(NetworkRouter.Mode.LOCAL, NetworkRouter.Mode.parse(""));

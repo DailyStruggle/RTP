@@ -176,14 +176,26 @@ public class BukkitMapBinding implements MapBinding, MapBindingLifecycle {
 
     /**
      * Build the 32-step logical-to-vanilla palette translation table once.
-     * Ramp: index 0 -> transparent; 1..31 walk a black -> red -> yellow ->
-     * white gradient that reads well at the 1-pixel scale vanilla maps use.
+     * Layout per {@link io.github.dailystruggle.mapsapi.PaletteIndex} /
+     * {@code maps-api-ADR-001} §Palette policy:
+     * <ul>
+     *   <li>index 0 ({@code TRANSPARENT}) -> {@link MapPalette#TRANSPARENT};</li>
+     *   <li>indices 1..27 ({@code RAMP_MIN..RAMP_MAX}) walk a black -> red ->
+     *       yellow -> white gradient that reads well at the 1-pixel scale
+     *       vanilla maps use;</li>
+     *   <li>indices 28..31 ({@code BLACK / RED / GREEN / WHITE}) are
+     *       categorical non-ramp slots used by region-shape, category-pie,
+     *       and future overlay renderers.</li>
+     * </ul>
      */
     private static byte[] buildPalette() {
         byte[] table = new byte[32];
         table[0] = MapPalette.TRANSPARENT;
-        for (int i = 1; i < 32; i++) {
-            float t = (i - 1) / 30.0f; // 0..1 across 1..31
+        final int rampLo = io.github.dailystruggle.mapsapi.PaletteIndex.RAMP_MIN;
+        final int rampHi = io.github.dailystruggle.mapsapi.PaletteIndex.RAMP_MAX;
+        final int rampSpan = rampHi - rampLo;
+        for (int i = rampLo; i <= rampHi; i++) {
+            float t = (i - rampLo) / (float) rampSpan; // 0..1 across rampLo..rampHi
             int r, g, b;
             if (t < 0.5f) {
                 // black -> red
@@ -206,6 +218,19 @@ public class BukkitMapBinding implements MapBinding, MapBindingLifecycle {
             }
             table[i] = MapPalette.matchColor(r, g, b);
         }
+        // Named non-ramp slots: stable categorical colors. Slot indices
+        // mirror PaletteIndex.BLACK / RED / GREEN / WHITE; RGBs are chosen
+        // for vanilla-map readability (mid-saturation rather than primary
+        // 0xFF so MapPalette.matchColor lands on a vivid dye-ish vanilla
+        // byte rather than the washed-out near-white bucket).
+        table[io.github.dailystruggle.mapsapi.PaletteIndex.BLACK] =
+                MapPalette.matchColor(0, 0, 0);
+        table[io.github.dailystruggle.mapsapi.PaletteIndex.RED] =
+                MapPalette.matchColor(170, 0, 0);
+        table[io.github.dailystruggle.mapsapi.PaletteIndex.GREEN] =
+                MapPalette.matchColor(0, 170, 0);
+        table[io.github.dailystruggle.mapsapi.PaletteIndex.WHITE] =
+                MapPalette.matchColor(255, 255, 255);
         return table;
     }
 

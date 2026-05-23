@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 
 /**
@@ -162,6 +163,23 @@ public interface RTPServerAccessor {
    * @return the command sender, or {@code null} if not found
    */
   RTPCommandSender getSender(UUID uuid);
+
+  /**
+   * Returns the platform's {@link PlayerLifecycleHook}, used by platform-agnostic
+   * subsystems (e.g. network-mode bootstrap) to subscribe to player join / quit
+   * without importing platform-specific event types.
+   *
+   * <p>The default returns {@link NoopPlayerLifecycleHook#INSTANCE}; platforms
+   * that deliver join / quit events (Bukkit, Fabric) shall override.
+   *
+   * <p>Introduced by ADR-049.
+   *
+   * @return the platform's lifecycle hook; never {@code null}
+   * @since 3.0.0-beta.4
+   */
+  default PlayerLifecycleHook getPlayerLifecycleHook() {
+    return NoopPlayerLifecycleHook.INSTANCE;
+  }
 
   /**
    * Returns the number of milliseconds the current server tick has exceeded its
@@ -534,4 +552,97 @@ public interface RTPServerAccessor {
    * @return average TPS; typically between 0 and 20
    */
   double getTPS(int ticks);
+
+  // ---------------------------------------------------------------------------
+  // Menu platform surface (ADR-048)
+  //
+  // Default implementations are conservative; platform adapters should override
+  // them. The defaults route through {@link #getSender(UUID)} so out-of-tree
+  // implementations gain functional behaviour automatically once the sender is
+  // wired, but they never throw and never block.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Returns a permission probe scoped to the given player. The probe answers
+   * {@code hasPermission(node)} for menu-visibility filtering. Implementations
+   * should respect the same resolution as {@link RTPCommandSender#hasPermission(String)}.
+   *
+   * <p>The default delegates to {@code getSender(player).hasPermission(node)};
+   * if the sender is unresolved (offline / unknown), the returned probe
+   * returns {@code false} for every node.
+   *
+   * @param player the player UUID; the probe is bound to this player's view
+   * @return a non-null predicate; never throws
+   * @see <a href="../../../../../../../../docs/adr/ADR-048-menu-builders-behind-server-accessor.md">ADR-048</a>
+   */
+  default Predicate<String> menuPermissionProbe(UUID player) {
+    return node -> {
+      if (player == null || node == null) {
+        return false;
+      }
+      try {
+        RTPCommandSender sender = getSender(player);
+        return sender != null && sender.hasPermission(node);
+      } catch (Throwable t) {
+        return false;
+      }
+    };
+  }
+
+  /**
+   * Returns the set of effective permissions granted to {@code player} for
+   * the menu-relevant {@code rtp.*} namespaces (effects, on-event, numeric
+   * tails where enumerable). Default delegates to
+   * {@link RTPCommandSender#getEffectivePermissions()}.
+   *
+   * @param player the player UUID
+   * @return an immutable-style snapshot; empty if unresolved
+   * @see <a href="../../../../../../../../docs/adr/ADR-048-menu-builders-behind-server-accessor.md">ADR-048</a>
+   */
+  default Set<String> menuEffectivePermissions(UUID player) {
+    if (player == null) {
+      return java.util.Collections.emptySet();
+    }
+    try {
+      RTPCommandSender sender = getSender(player);
+      if (sender == null) {
+        return java.util.Collections.emptySet();
+      }
+      Set<String> perms = sender.getEffectivePermissions();
+      return perms == null ? java.util.Collections.emptySet() : perms;
+    } catch (Throwable t) {
+      return java.util.Collections.emptySet();
+    }
+  }
+
+  /**
+   * Returns the BCP-47-like locale tag the menu should render in for the
+   * given player (e.g. {@code "en_us"}, {@code "es_es"}). Default returns
+   * the server's configured default locale, currently {@code "en_us"}.
+   *
+   * @param player the player UUID
+   * @return a non-null locale tag
+   * @see <a href="../../../../../../../../docs/adr/ADR-048-menu-builders-behind-server-accessor.md">ADR-048</a>
+   */
+  default String menuLocale(UUID player) {
+    return "en_us";
+  }
+
+  /**
+   * Returns a short descriptor for the player's current region / world,
+   * suitable for the "you are here" line in {@code FrontPageBuilder}.
+   *
+   * <p>On a single-server backend this is typically the world name; on a
+   * network-mode backend (ADR-036) where the player is routed to a different
+   * backend, the implementation may return an empty string. Default returns
+   * an empty string so that builders gracefully omit the descriptor when no
+   * platform override is installed.
+   *
+   * @param player the player UUID
+   * @return a non-null descriptor; empty string if unknown
+   * @see <a href="../../../../../../../../docs/adr/ADR-048-menu-builders-behind-server-accessor.md">ADR-048</a>
+   */
+  default String menuRegionDescriptor(UUID player) {
+    return "";
+  }
 }

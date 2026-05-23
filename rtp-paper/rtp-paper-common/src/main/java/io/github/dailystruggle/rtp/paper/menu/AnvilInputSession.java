@@ -435,7 +435,7 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
     /**
      * Schedule {@code task} on the next tick on a thread that legally owns
      * {@code player}. Routes through {@link RTP#scheduler}'s
-     * {@code scheduleTeleport} entry point, which on Folia dispatches via the
+     * {@code runTaskForPlayer} entry point, which on Folia dispatches via the
      * player's per-entity scheduler and on Paper/Spigot falls through to the
      * global / main-thread scheduler. The name is a historical artifact - the
      * underlying method is a generic "run this Runnable on a thread that owns
@@ -451,7 +451,7 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
                             ? RTP.serverAccessor.getPlayer(player.getUniqueId())
                             : null;
             if (RTP.scheduler != null && rtpPlayer != null) {
-                RTP.scheduler.scheduleTeleport(
+                RTP.scheduler.runTaskForPlayer(
                         rtpPlayer,
                         new io.github.dailystruggle.rtp.common.tasks.RTPRunnable(task),
                         1L);

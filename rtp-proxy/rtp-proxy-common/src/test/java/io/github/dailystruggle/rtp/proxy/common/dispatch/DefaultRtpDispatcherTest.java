@@ -61,6 +61,91 @@ class DefaultRtpDispatcherTest {
                 UUID.randomUUID());
     }
 
+    private static RtpRequest requestWithHint(UUID playerId, String serverHint, String regionKey) {
+        return new RtpRequest(playerId, TriggerType.COMMAND,
+                Optional.ofNullable(regionKey),
+                /*worldKey=*/Optional.empty(),
+                /*serverHint=*/Optional.of(serverHint),
+                /*originServerId=*/Optional.empty(),
+                UUID.randomUUID());
+    }
+
+    /**
+     * 2026-05-23 regression: cross-server /rtp with an explicit
+     * {@code region=<server>:<region>} MUST hard-pin to that backend at
+     * the dispatcher level. Prior to the fix, the {@code serverHint} was
+     * smuggled into the {@code originServerId} slot and the BackendSelector
+     * never saw it - every pinned request silently load-balanced. This
+     * test feeds a hint-bearing request to a selector that requires the
+     * filter to be present and asserts the dispatcher routes only to the
+     * named backend.
+     */
+    @Test
+    void serverHint_is_honoured_and_passed_to_selector_filter() throws Exception {
+        UUID player = UUID.randomUUID();
+        FakeTransport transport = new FakeTransport(List.of(backend("b1"), backend("b2")));
+        FakeSender sender = new FakeSender(player);
+
+        AtomicReference<Optional<String>> filterCapture = new AtomicReference<>();
+        BackendSelector picker = new BackendSelector() {
+            @Override public Optional<String> choose(RtpRequest r, NetworkSnapshot s) {
+                throw new AssertionError("dispatcher must call the 3-arg choose() when a serverHint is present");
+            }
+            @Override public Optional<String> choose(RtpRequest r, NetworkSnapshot s, Optional<String> filter) {
+                filterCapture.set(filter);
+                // Honour the filter; the real WeightedAverageBackendSelector does this.
+                return filter.filter(id -> s.backends().containsKey(id));
+            }
+        };
+        DefaultRtpDispatcher d = new DefaultRtpDispatcher(picker, transport, sender, Runnable::run);
+
+        DispatchOutcome outcome = d.dispatch(requestWithHint(player, "b2", "default")).get();
+
+        assertInstanceOf(DispatchOutcome.Routed.class, outcome);
+        assertEquals("b2", ((DispatchOutcome.Routed) outcome).serverId(),
+                "dispatcher must route to the hinted backend, not load-balance to another peer");
+        assertEquals(Optional.of("b2"), filterCapture.get(),
+                "serverHint must reach BackendSelector.choose(..., serverIdFilter)");
+    }
+
+    /**
+     * 2026-05-23 regression: when the pinned backend is not eligible
+     * (offline, killSwitched, does not advertise the region), the
+     * dispatcher MUST hard-fail with NO_BACKEND rather than silently
+     * load-balancing the player to a different backend. Explicit player
+     * intent ({@code region=<server>:<region>}) is never overridden.
+     */
+    @Test
+    void serverHint_pin_unreachable_hard_fails_NO_BACKEND() throws Exception {
+        UUID player = UUID.randomUUID();
+        FakeTransport transport = new FakeTransport(List.of(backend("b1"), backend("b2")));
+        FakeSender sender = new FakeSender(player);
+
+        BackendSelector picker = new BackendSelector() {
+            @Override public Optional<String> choose(RtpRequest r, NetworkSnapshot s) {
+                // Would happily pick b1 if asked unfiltered - precisely the
+                // load-balancing path we must NOT take when the hint is
+                // unreachable.
+                return Optional.of("b1");
+            }
+            @Override public Optional<String> choose(RtpRequest r, NetworkSnapshot s, Optional<String> filter) {
+                if (filter.isEmpty()) return Optional.of("b1");
+                // Simulate the hinted backend not being eligible.
+                return Optional.empty();
+            }
+        };
+        DefaultRtpDispatcher d = new DefaultRtpDispatcher(picker, transport, sender, Runnable::run);
+
+        DispatchOutcome outcome = d.dispatch(requestWithHint(player, "b3-not-present", "default")).get();
+
+        DispatchOutcome.Failed failed = assertInstanceOf(DispatchOutcome.Failed.class, outcome);
+        assertEquals(DispatchOutcome.Failed.Reason.NO_BACKEND, failed.reason());
+        assertEquals(0, transport.claimCount.get(),
+                "transport.claim must NOT run against any backend when the hinted pin is unreachable");
+        assertEquals(0, sender.sendToCalls.size(),
+                "no transfer may be initiated when the hinted backend is ineligible");
+    }
+
     @Test
     void routes_to_an_eligible_peer_and_signs_token() throws Exception {
         UUID player = UUID.randomUUID();

@@ -117,7 +117,7 @@ public class MockRTPScheduler implements RTPScheduler {
     }
 
     @Override
-    public void scheduleTeleport(RTPPlayer player, RTPRunnable task, long delayTicks) {
+    public void runTaskForPlayer(RTPPlayer player, RTPRunnable task, long delayTicks) {
         String taskId = UUID.randomUUID().toString();
         TrackedRTPTask trackedTask = new TrackedRTPTask(task, taskId);
         if (io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor != null) {

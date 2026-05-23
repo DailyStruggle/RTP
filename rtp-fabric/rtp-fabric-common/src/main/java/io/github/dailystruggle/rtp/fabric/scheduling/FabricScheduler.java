@@ -206,7 +206,7 @@ public class FabricScheduler implements RTPScheduler {
   }
 
   @Override
-  public void scheduleTeleport(RTPPlayer player, RTPRunnable task, long delayTicks) {
+  public void runTaskForPlayer(RTPPlayer player, RTPRunnable task, long delayTicks) {
     String taskId = UUID.randomUUID().toString();
     TrackedRTPTask tracked = new TrackedRTPTask(task, taskId);
     if (RTPAPI.serverAccessor != null) {

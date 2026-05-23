@@ -392,6 +392,15 @@ public final class NetworkModeBootstrap {
 
             this.enrolmentBuffer = new NetworkEnrolmentBuffer(flushSink, 0);
             this.statusCache = new NetworkStatusCache(statusSupplier);
+            // Wire the status cache into the join-time trigger so the
+            // post-arrival /rtp dispatch evicts the (still non-terminal)
+            // lobby-seeded status row before NetworkWaitlistGuard sees it
+            // (REQ-RTP-S-004 / REQ-RTP-NET-015 - without this, a successful
+            // cross-server redeem is followed by msgAlreadyQueued and no
+            // teleport).
+            if (this.joinTriggerSource != null) {
+                this.joinTriggerSource.setStatusCache(this.statusCache);
+            }
             this.router = new NetworkRouter(
                     serverId,
                     routerMode,
