@@ -45,3 +45,36 @@ acceptance-evidence.log
 # Synced jars fanned out into jars/plugin/<pluginName>/ subdirs by sync step.
 jars/plugin/*/
 jars/velocity/*/
+# Optional lobby world (see shared/lobby-world/README.md). Schematics are
+# usually license-restricted (BuiltByBit / marketplace ToS) so they must
+# never be committed; the derived baked world zip is a build artifact.
+shared/lobby-world/*.schem
+shared/lobby-world/*.schematic
+shared/lobby-world.zip
+# Scratch dir used by scripts/bake-lobby-world.ps1 while pasting the schematic.
+shared/lobby-world.bake/
+
+# Backend / lobby rtp-config: only network.yml is genuinely per-instance
+# (serverId, proxyId, transport host/port, lobby designation). Everything
+# else (config.yml, messages.yml, economy.yml, integrations.yml,
+# language.yml, logging.yml, metrics.yml, performance.yml, safety.yml,
+# plus the lang/, worlds/, regions/, effects/ baseline trees, and the
+# auto-extracted docs/ tree) is shipped inside the plugin jar and
+# self-populates on first boot. Committing the extracted copies turns
+# them into stale shadows that block the plugin's own version-bump-driven
+# self-population (see .junie/AGENTS.md "Locale Config TSV Pipeline" and
+# the Slice-5 messages.yml self-population regression). Runtime database
+# files under rtp-config/database/ are also per-container state and
+# never source.
+backend-a/rtp-config/**
+backend-b/rtp-config/**
+lobby-a/rtp-config/**
+lobby-b/rtp-config/**
+!backend-a/rtp-config/
+!backend-b/rtp-config/
+!lobby-a/rtp-config/
+!lobby-b/rtp-config/
+!backend-a/rtp-config/network.yml
+!backend-b/rtp-config/network.yml
+!lobby-a/rtp-config/network.yml
+!lobby-b/rtp-config/network.yml

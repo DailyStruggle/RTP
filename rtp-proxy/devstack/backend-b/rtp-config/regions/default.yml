@@ -5,6 +5,7 @@
 world: "[0]"
 # Use vanilla /worldborder radius if true
 worldBorderOverride: false
+
 shape:
   name: "CIRCLE"
   mode: "ACCUMULATE"
@@ -15,12 +16,14 @@ shape:
   weight: 1.0
   uniquePlacements: false
   expand: false
+
 vert:
   name: "JUMP"
   minY: 32
   maxY: 255
   step: 16
   requireSkyLight: false
+
 # If true, rtp.regions.<name> is required
 requirePermission: false
 # Region to redirect to if no permission
@@ -35,5 +38,6 @@ activeChunkCap: 10
 price: 0.0
 # Precision for bad-location tracking (1-5)
 spatialResolution: 3
+
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

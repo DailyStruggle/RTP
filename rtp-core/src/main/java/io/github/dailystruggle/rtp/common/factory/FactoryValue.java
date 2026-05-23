@@ -351,7 +351,11 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     File langDir = new File(langDirStr);
     if (!langDir.exists()) {
       boolean mkdir = langDir.mkdirs();
-      if (!mkdir) throw new IllegalStateException();
+      if (!mkdir && !langDir.exists()) {
+        throw new IllegalStateException(
+            "Failed to create lang directory: " + langDir.getAbsolutePath()
+                + " (check filesystem permissions for the plugin process)");
+      }
     }
 
     String mapFileName = langDir + File.separator + name.replace(".yml", ".lang.yml");

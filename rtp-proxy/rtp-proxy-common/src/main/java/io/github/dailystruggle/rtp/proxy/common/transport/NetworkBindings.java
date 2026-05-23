@@ -5,10 +5,18 @@ import io.github.dailystruggle.rtp.proxy.common.config.NetworkConfigException;
 import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
+import io.github.dailystruggle.rtp.proxy.common.spi.NetworkWaitlist;
+import io.github.dailystruggle.rtp.proxy.common.spi.PlayerOwnershipTracker;
+import io.github.dailystruggle.rtp.proxy.common.spi.WaitlistLeaderLease;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisPlayerOwnershipTracker;
+import io.github.dailystruggle.rtp.proxy.common.transport.memory.AlwaysLeaderLease;
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkRequestQueue;
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkStateBinding;
+import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkWaitlist;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisLeaderLease;
 import io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisNetworkRequestQueue;
 import io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisNetworkStateBinding;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisNetworkWaitlist;
 import io.github.dailystruggle.rtp.proxy.common.transport.sql.SqlNetworkRequestQueue;
 import io.github.dailystruggle.rtp.proxy.common.transport.sql.SqlNetworkStateBinding;
 
@@ -182,6 +190,131 @@ public final class NetworkBindings {
             default:
                 throw new IllegalArgumentException(
                         "NetworkBindings.openRequestQueue: unrecognised transport.type '"
+                                + cfg.transportType() + "' (expected 'in-memory', 'sql', or 'redis').");
+        }
+    }
+
+    /**
+     * Construct the shared cross-proxy {@link NetworkWaitlist} matching
+     * {@code cfg.transportType()}, or {@code null} when the operator has
+     * disabled the waitlist subsystem via {@code network.waitlist.enabled = false}
+     * (ADR-015 / REQ-RTP-NET-015). {@code sql} transport currently falls
+     * back to in-memory with a WARNING since the SQL waitlist binding is
+     * not yet implemented. {@code redis} open-time failures degrade to
+     * in-memory per {@code MULTI_SERVER_PLAN.md} §Failure-Mode Policy, so
+     * a misconfigured Redis host does not break the proxy boot.
+     *
+     * <p>The returned waitlist is owned by the caller; closing the
+     * Redis-backed waitlist releases its {@link redis.clients.jedis.JedisPool}.
+     * The in-memory waitlist does not implement {@link AutoCloseable} and
+     * needs no teardown.</p>
+     */
+    public static NetworkWaitlist openWaitlist(NetworkConfig cfg, DataSource dataSource) {
+        Objects.requireNonNull(cfg, "cfg");
+        if (!cfg.waitlistEnabled()) {
+            return null;
+        }
+        String t = cfg.transportType() == null ? "in-memory" : cfg.transportType().toLowerCase(Locale.ROOT);
+        switch (t) {
+            case "in-memory":
+            case "memory":
+                return new InMemoryNetworkWaitlist(cfg.waitlistMaxSize());
+            case "sql":
+                LOG.log(Level.WARNING,
+                        "NetworkBindings.openWaitlist: transport.type=sql waitlist not yet implemented; "
+                                + "falling back to in-memory waitlist for this proxy session "
+                                + "(cross-proxy waitlist will not propagate via SQL).");
+                return new InMemoryNetworkWaitlist(cfg.waitlistMaxSize());
+            case "redis":
+                try {
+                    return new RedisNetworkWaitlist(
+                            cfg.redisHost(), cfg.redisPort(), cfg.redisPassword(), cfg.waitlistMaxSize());
+                } catch (RuntimeException e) {
+                    LOG.log(Level.WARNING,
+                            "NetworkBindings.openWaitlist: redis waitlist open failed; "
+                                    + "falling back to in-memory waitlist (cross-proxy waitlist "
+                                    + "will not propagate via Redis): " + e.getMessage());
+                    return new InMemoryNetworkWaitlist(cfg.waitlistMaxSize());
+                }
+            default:
+                throw new IllegalArgumentException(
+                        "NetworkBindings.openWaitlist: unrecognised transport.type '"
+                                + cfg.transportType() + "' (expected 'in-memory', 'sql', or 'redis').");
+        }
+    }
+
+    /**
+     * Construct the {@link WaitlistLeaderLease} matching {@code cfg.transportType()},
+     * or {@code null} when the operator has disabled the waitlist subsystem.
+     * The {@code redis} kind constructs a {@link RedisLeaderLease} so multi-proxy
+     * deployments mutually exclude drain pulses; other kinds fall back to
+     * {@link AlwaysLeaderLease}, which is safe only on single-proxy installs.
+     *
+     * <p>Open-time failures on the Redis path degrade to {@link AlwaysLeaderLease}
+     * with a WARNING log; a misconfigured Redis host therefore continues to
+     * drain locally rather than freezing the waitlist subsystem.</p>
+     */
+    public static WaitlistLeaderLease openLeaderLease(NetworkConfig cfg, DataSource dataSource) {
+        Objects.requireNonNull(cfg, "cfg");
+        if (!cfg.waitlistEnabled()) {
+            return null;
+        }
+        String t = cfg.transportType() == null ? "in-memory" : cfg.transportType().toLowerCase(Locale.ROOT);
+        switch (t) {
+            case "in-memory":
+            case "memory":
+                return new AlwaysLeaderLease();
+            case "sql":
+                LOG.log(Level.WARNING,
+                        "NetworkBindings.openLeaderLease: transport.type=sql leader lease not implemented; "
+                                + "falling back to AlwaysLeaderLease (safe only on single-proxy installs).");
+                return new AlwaysLeaderLease();
+            case "redis":
+                try {
+                    return new RedisLeaderLease(cfg.redisHost(), cfg.redisPort(), cfg.redisPassword());
+                } catch (RuntimeException e) {
+                    LOG.log(Level.WARNING,
+                            "NetworkBindings.openLeaderLease: redis leader lease open failed; "
+                                    + "falling back to AlwaysLeaderLease (safe only on single-proxy "
+                                    + "installs): " + e.getMessage());
+                    return new AlwaysLeaderLease();
+                }
+            default:
+                throw new IllegalArgumentException(
+                        "NetworkBindings.openLeaderLease: unrecognised transport.type '"
+                                + cfg.transportType() + "' (expected 'in-memory', 'sql', or 'redis').");
+        }
+    }
+
+    /**
+     * Construct the {@link PlayerOwnershipTracker} matching {@code cfg.transportType()}
+     * (rtp-proxy-ADR-016 / REQ-RTP-NET-016). Returns {@link PlayerOwnershipTracker#NO_OP}
+     * for single-JVM transports (in-memory, sql) where ownership is implicit;
+     * the trigger source then uses the legacy {@link NetworkRequestQueue#dequeueReady}
+     * codepath. Redis open-time failures degrade to NO_OP with a WARNING.
+     */
+    public static PlayerOwnershipTracker openOwnershipTracker(NetworkConfig cfg) {
+        Objects.requireNonNull(cfg, "cfg");
+        String t = cfg.transportType() == null ? "in-memory" : cfg.transportType().toLowerCase(Locale.ROOT);
+        switch (t) {
+            case "in-memory":
+            case "memory":
+            case "sql":
+                return PlayerOwnershipTracker.NO_OP;
+            case "redis":
+                try {
+                    return new RedisPlayerOwnershipTracker(
+                            cfg.redisHost(), cfg.redisPort(), cfg.redisPassword());
+                } catch (RuntimeException e) {
+                    LOG.log(Level.WARNING,
+                            "NetworkBindings.openOwnershipTracker: redis tracker open failed; "
+                                    + "falling back to NO_OP. Multi-proxy ownership filtering "
+                                    + "will not function this session: " + e.getMessage());
+                    return PlayerOwnershipTracker.NO_OP;
+                }
+            default:
+                throw new IllegalArgumentException(
+                        "NetworkBindings.openOwnershipTracker: unrecognised transport.type '"
                                 + cfg.transportType() + "' (expected 'in-memory', 'sql', or 'redis').");
         }
     }

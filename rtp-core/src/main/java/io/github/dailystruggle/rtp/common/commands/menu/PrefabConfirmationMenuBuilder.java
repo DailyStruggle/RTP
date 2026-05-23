@@ -98,12 +98,15 @@ public final class PrefabConfirmationMenuBuilder {
         // for the Session-6 MessagesKeys entry; until then we fall through to
         // the prefab id as the displayed name.
         String displayName = prefab.id();
-        String title = "&6&l\u2699 confirm prefab: &f" + displayName;
+        // Book parchment contrast: yellow (&6) and white (&f) wash out on
+        // parchment; use dark blue + black per .junie/AGENTS.md 'Book Menu
+        // Color Contrast'.
+        String title = "&1&l\u2699 confirm prefab: &0" + displayName;
         lines.add(MenuLine.of(new MenuFragment(title, null, null)));
 
         // Hint.
         lines.add(MenuLine.of(new MenuFragment(
-                "&7review the changes below; confirm to write, cancel to abort",
+                "&8review the changes below; confirm to write, cancel to abort",
                 null, null)));
         lines.add(new MenuLine(List.of()));
 
@@ -118,16 +121,17 @@ public final class PrefabConfirmationMenuBuilder {
                     lines.add(new MenuLine(List.of()));
                 }
                 first = false;
+                // Avoid yellow on parchment: use bold dark blue for file headers.
                 lines.add(MenuLine.of(new MenuFragment(
-                        "&e" + e.getKey() + ".yml", null, null)));
+                        "&1&l" + e.getKey() + ".yml", null, null)));
                 List<PrefabApplier.Change> changes = e.getValue();
                 int shown = Math.min(changes.size(), MAX_LINES_PER_FILE);
                 for (int i = 0; i < shown; i++) {
                     PrefabApplier.Change c = changes.get(i);
                     lines.add(MenuLine.of(new MenuFragment(
-                            "&7  " + c.keyPath()
+                            "&8  " + c.keyPath()
                                     + ": &c" + safe(c.oldValue())
-                                    + " &7-> &a" + safe(c.newValue()),
+                                    + " &8-> &2" + safe(c.newValue()),
                             null, null)));
                 }
                 if (changes.size() > shown) {

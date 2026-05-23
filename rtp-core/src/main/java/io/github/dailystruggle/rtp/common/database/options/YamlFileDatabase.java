@@ -321,9 +321,19 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
 
   @Override
   public void setValue(String tableName, Map<?, ?> keyValuePairs) {
-    super.setValue(tableName, keyValuePairs);
-
     // Flat-row re-nesting for YAML persistence.
+    //
+    // Note: we deliberately do NOT delegate to super.setValue(tableName, keyValuePairs).
+    // The parent enqueues the caller's map verbatim and asynchronously via
+    // getTable().thenAccept(...). If that completion lands after our own
+    // enqueue below (race observed under full-suite load, see
+    // YamlFileDatabaseTest.setValue_flatRow_isNestedUnderPrimaryKey), the
+    // flat-shape entry is processed by write() AFTER the nested one and
+    // re-creates the top-level `region:` / `x:` / `y:` / ... scalars at
+    // document root - the exact pre-fix mojibake the re-nesting was meant
+    // to prevent. We replicate the parent's localTables update inline below
+    // (with the EFFECTIVE shape) so the in-memory snapshot stays consistent
+    // for read()/getTable() without re-introducing the second enqueue.
     //
     // Callers such as DatabaseAccessor.saveCachedLocation() pass a flat
     // {column -> value} map whose primary-key column ("UUID" or "id") identifies
@@ -357,6 +367,13 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
 
     Map<TableObj, TableObj> writeValues = new HashMap<>();
     effective.forEach((o, o2) -> writeValues.put(new TableObj(o), new TableObj(o2)));
+
+    // Mirror the parent's localTables update (synchronously) so read()/getTable()
+    // see the in-memory snapshot reflecting the effective (re-nested) shape.
+    Map<TableObj, TableObj> table =
+        localTables.computeIfAbsent(tableName, k -> new ConcurrentHashMap<>());
+    table.putAll(writeValues);
+
     Map.Entry<String, Map<TableObj, TableObj>> writeRequest =
         new AbstractMap.SimpleEntry<>(tableName, writeValues);
     writeQueue.add(writeRequest);

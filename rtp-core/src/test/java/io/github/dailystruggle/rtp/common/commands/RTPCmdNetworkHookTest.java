@@ -131,6 +131,44 @@ public class RTPCmdNetworkHookTest {
     // OR was never added because of short-circuit. Either way we just rely on res=true.
   }
 
+  // ── 2b. Empty networkQueued template still emits a hardcoded fallback ───────
+  //
+  // Regression for stale-messages.yml installs (pre-Slice-5 baseline that
+  // lacks the networkQueued key entirely): a missing/empty template
+  // previously caused the CrossServer branch to silently drop the dispatch,
+  // so the player got no feedback and re-typed /rtp. Now we substitute a
+  // hardcoded English fallback so something always reaches the player.
+
+  @Test
+  void crossServerOutcome_emptyTemplate_emitsHardcodedFallback() {
+    UUID playerId = UUID.randomUUID();
+    accessor.addPlayer(new MockRTPPlayer(playerId, "p2b", null));
+    // Wipe the networkQueued template to simulate a stale messages.yml.
+    @SuppressWarnings("unchecked")
+    ConfigParser<MessagesKeys> lang =
+            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+    EnumMap<MessagesKeys, Object> data = new EnumMap<>(MessagesKeys.class);
+    data.put(MessagesKeys.networkQueued, "");
+    data.put(MessagesKeys.networkRegionUnavailable, "UNAVAILABLE region=[region]");
+    data.put(MessagesKeys.networkFallback, "FALLBACK reason=[reason]");
+    data.put(MessagesKeys.consoleCmdNotAllowed, "console disallowed");
+    lang.setData(data);
+
+    RTP.networkCommandHook = (uuid, args) ->
+            NetworkCommandHook.RoutingResult.crossServer(UUID.randomUUID(), "east", "backend-b");
+
+    TestRTPCmd cmd = new TestRTPCmd();
+    AtomicReference<String> msg = new AtomicReference<>();
+    boolean res = cmd.onCommand(playerId, new HashMap<>(), null, msg::set);
+
+    assertTrue(res);
+    assertNotNull(msg.get(),
+            "empty networkQueued template must NOT silently drop the dispatch; "
+                    + "player must always see a fallback message");
+    assertTrue(msg.get().contains("Queued") || msg.get().contains("RTP"),
+            "fallback must mention queue/RTP, got: " + msg.get());
+  }
+
   // ── 3. Reject outcome short-circuits and emits the named message key ─────────
 
   @Test
@@ -183,24 +221,25 @@ public class RTPCmdNetworkHookTest {
   // TeleportData / MemoryTracker entries into adjacent tests. Live coverage
   // is provided by the Slice H2 Bukkit-adapter integration tests.
 
-  // ── 3c. Network short-circuits must release the processingPlayers lock ──────
+  // ── 3c. Network short-circuits and the processingPlayers lock ───────────────
   //
-  // Regression for the lobby symptom "presently teleporting from `lobby`
-  // with unspecified target simply does nothing": the outer
-  // RTPCmd.onCommand(RTPCommandSender,...) adds the player to
-  // RTP.processingPlayers before dispatching to compute(). When compute's
-  // network hook returned CrossServer or Reject the method short-circuited
-  // and returned true WITHOUT removing the player from processingPlayers.
-  // The actual teleport completion is observed on the *destination*
-  // backend, never on the originating JVM, so this JVM's processingPlayers
-  // entry leaked forever and every subsequent /rtp on this JVM silently
-  // tripped the alreadyTeleporting guard at onCommand line 129 - never
-  // reaching the hook again. The fix: remove() on both short-circuit
-  // branches, mirroring the local pipeline's own cleanup on every exit
-  // path.
+  // CrossServer: the lobby's local `processingPlayers` lock is the
+  // anti-spam primitive that prevents the player from re-enrolling a
+  // duplicate envelope on the proxy every time they spam /rtp while
+  // already parked on the cross-proxy waitlist. The lock is released
+  // authoritatively by (a) PlayerQuitEvent (OnPlayerQuit listener),
+  // (b) Slice-4 NetworkStatusCache terminal transitions, or (c) plugin
+  // shutdown. It MUST NOT be released by the CrossServer short-circuit
+  // itself - that was the regression behind "I have to type /rtp twice"
+  // and "spam with no response" (every subsequent /rtp got REJECTED_
+  // DUPLICATE on the proxy silently while still re-emitting networkQueued
+  // here).
+  //
+  // Reject: terminal outcome, no follow-up routing, lock is released
+  // immediately so the player can retry against a different region.
 
   @Test
-  void crossServerOutcome_releasesProcessingPlayersLock() {
+  void crossServerOutcome_retainsProcessingPlayersLockForAntiSpam() {
     UUID playerId = UUID.randomUUID();
     accessor.addPlayer(new MockRTPPlayer(playerId, "leakCheck1", null));
     RTP.getInstance().processingPlayers.add(playerId); // simulate outer onCommand add
@@ -211,9 +250,10 @@ public class RTPCmdNetworkHookTest {
     boolean res = cmd.onCommand(playerId, new HashMap<>(), null, s -> {});
 
     assertTrue(res);
-    assertTrue(!RTP.getInstance().processingPlayers.contains(playerId),
-            "CrossServer short-circuit must remove playerId from processingPlayers; "
-                    + "otherwise subsequent /rtp on this JVM trips alreadyTeleporting forever");
+    assertTrue(RTP.getInstance().processingPlayers.contains(playerId),
+            "CrossServer short-circuit must RETAIN the processingPlayers lock; "
+                    + "otherwise subsequent /rtp re-enrols the player on the proxy "
+                    + "(REJECTED_DUPLICATE) with no visible feedback");
   }
 
   @Test

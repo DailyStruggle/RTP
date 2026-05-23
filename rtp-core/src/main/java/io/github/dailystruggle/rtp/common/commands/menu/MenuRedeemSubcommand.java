@@ -222,6 +222,21 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
     }
 
     /**
+     * Normalize a config file name to the bare lowercase basename used as
+     * the cart key. The selector emits bare names ({@code "config"}) while
+     * the mirror walker / STAGE-confirm reopen carries the suffixed segment
+     * ({@code "config.yml"}); both must resolve to the same cart bucket so
+     * the Pending list survives a STAGE-mode anvil round-trip. Tolerates
+     * {@code null} for callers that pre-checked (returns {@code null}).
+     */
+    private static String normalizeCartFileName(String fileName) {
+        if (fileName == null) return null;
+        String n = fileName.toLowerCase(java.util.Locale.ROOT);
+        if (n.endsWith(".yml")) n = n.substring(0, n.length() - 4);
+        return n;
+    }
+
+    /**
      * Stage (or replace) a single {@code paramName=value} entry in
      * {@code viewer}'s cart for {@code fileName}. If the existing cart was
      * scoped to a different file the entire cart is replaced. Visible to
@@ -232,9 +247,10 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         Objects.requireNonNull(fileName, "fileName");
         Objects.requireNonNull(paramName, "paramName");
         Objects.requireNonNull(value, "value");
+        final String key = normalizeCartFileName(fileName);
         carts.compute(viewer, (k, existing) -> {
-            Cart c = (existing != null && existing.fileName.equals(fileName))
-                    ? existing : new Cart(fileName);
+            Cart c = (existing != null && existing.fileName.equals(key))
+                    ? existing : new Cart(key);
             synchronized (c.entries) {
                 c.entries.put(paramName, value);
             }
@@ -252,8 +268,9 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(fileName, "fileName");
         Objects.requireNonNull(paramName, "paramName");
+        final String key = normalizeCartFileName(fileName);
         carts.computeIfPresent(viewer, (k, c) -> {
-            if (!c.fileName.equals(fileName)) return c;
+            if (!c.fileName.equals(key)) return c;
             synchronized (c.entries) {
                 c.entries.remove(paramName);
                 if (c.entries.isEmpty()) return null;
@@ -279,7 +296,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      */
     public LinkedHashMap<String, String> snapshotCart(UUID viewer, String fileName) {
         Cart c = carts.get(viewer);
-        if (c == null || !c.fileName.equals(fileName)) return new LinkedHashMap<>();
+        final String key = normalizeCartFileName(fileName);
+        if (c == null || !c.fileName.equals(key)) return new LinkedHashMap<>();
         synchronized (c.entries) {
             return new LinkedHashMap<>(c.entries);
         }
@@ -292,7 +310,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      */
     private LinkedHashMap<String, String> applyCart(UUID viewer, String fileName) {
         Cart c = carts.remove(viewer);
-        if (c == null || !c.fileName.equals(fileName)) {
+        final String key = normalizeCartFileName(fileName);
+        if (c == null || !c.fileName.equals(key)) {
             if (c != null) carts.put(viewer, c); // restore: not our cart
             return new LinkedHashMap<>();
         }
@@ -1264,29 +1283,17 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             target = tc;
         }
         String paramName = prompt.paramName();
-        Map<String, CommandParameter> paramLookup = target.getParameterLookup();
-        boolean known = false;
-        if (paramLookup != null) {
-            // TreeCommand#addParameter stores keys lowercased (see
-            // commands-api TreeCommand.java line 26); SubConfigCmd registers
-            // per-key params under the in-file display name (often the raw
-            // enum constant, e.g. "teleportDelay"), which lands in the
-            // lookup as "teleportdelay". Probe all three casings so callers
-            // (CommandTreeMenuBuilder buildKey, addons) can pass whichever
-            // casing they have handy without us rejecting the redeem.
-            if (paramLookup.containsKey(paramName)) known = true;
-            else if (paramLookup.containsKey(paramName.toLowerCase(java.util.Locale.ROOT))) known = true;
-            else if (paramLookup.containsKey(paramName.toUpperCase(java.util.Locale.ROOT))) known = true;
-        }
-        if (!known) {
-            RTP.log(Level.WARNING,
-                    "menu anvil-input unknown parameter '" + paramName
-                            + "' on " + target.name() + " for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
-                    "menu anvil-input rejected: unknown parameter '" + paramName + "'",
-                    messageMethod);
-            return false;
-        }
+        // No parameter-existence gate here: commands-api owns parameter
+        // validation (it discards unknown name=value tokens during parse),
+        // and the curated config registrations expose keys through paths
+        // that getParameterLookup() does not surface uniformly across
+        // ConfigCmd / SubConfigCmd / MultiConfigParser nodes. Defending here
+        // with containsKey() rejects legitimate clicks (the regression that
+        // produced "menu anvil-input unknown parameter 'canceldistance=5'"
+        // when the mirror leaf still re-encoded params into the path). Let
+        // the anvil confirm path submit the resulting /rtp ... key=value
+        // command verbatim; an unknown key will be discarded downstream by
+        // commands-api with its own messaging.
         boolean opened;
         try {
             // Mode-aware overload: STAGE-mode prompts (config staging-cart)
@@ -1552,6 +1559,13 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
     private boolean dispatchOpenConfigKey(UUID senderId,
                                           MenuAction.OpenConfigKey open,
                                           @Nullable Consumer<String> messageMethod) {
+        // [diag-staging-cart] Trace OpenConfigKey dispatch so the operator
+        // log shows whether the click reached the anvil-prompt entry point.
+        RTP.log(Level.INFO,
+                "[diag-staging-cart] dispatchOpenConfigKey entry viewer=" + senderId
+                        + " file=" + open.fileName()
+                        + " key=" + open.paramName()
+                        + " anvilOpener=" + (anvilInputOpener != null ? "set" : "null"));
         if (anvilInputOpener == null) {
             RTP.log(Level.WARNING,
                     "menu config-key received with anvil-input disabled for " + senderId);
@@ -1657,8 +1671,15 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     messageMethod);
             return false;
         }
+        // parentPath is expressed RELATIVE to `/rtp menu` -- the anvil
+        // submit re-prefixes `/rtp menu` in AnvilInputSession.buildCommand,
+        // so prepending "menu" here would synthesize a doubled token
+        // (`/rtp menu menu config search query=<typed>`) and trip the
+        // commands-api `invalidCommand` reject path on the second `menu`.
+        // Every other PromptAnvilInput caller follows this contract; see
+        // e.g. the STAGE-mode arm a few lines above.
         MenuAction.PromptAnvilInput prompt = new MenuAction.PromptAnvilInput(
-                new String[]{"menu", "config", "search"}, "query", "");
+                new String[]{"config", "search"}, "query", "");
         return dispatchPromptAnvilInput(senderId, prompt, messageMethod);
     }
 
@@ -2088,11 +2109,15 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     break;
                 }
             }
-            if (assembledPath.size() >= 3) {
-                return dispatchOpenConfigKey(senderId,
-                        new MenuAction.OpenConfigKey(fileName, assembledPath.get(2)),
-                        messageMethod);
-            }
+            // Per commands-api contract (commands-api/docs/README.md):
+            // `name=value` segments are parameters, not bare path elements.
+            // The mirror leaf hands us a sub-command-only path plus the
+            // parsed parameterValues map; routing to OpenConfigKey must read
+            // the parameter name from the map (the `stagedParam` branch
+            // below), never from assembledPath. Treating assembledPath.get(2)
+            // as a key name surfaced `canceldistance=5` to dispatchOpenConfigKey
+            // as a single opaque token (the regression the user diagnosed
+            // 2026-05-22).
             if (stagedParam != null) {
                 return dispatchOpenConfigKey(senderId,
                         new MenuAction.OpenConfigKey(fileName, stagedParam),

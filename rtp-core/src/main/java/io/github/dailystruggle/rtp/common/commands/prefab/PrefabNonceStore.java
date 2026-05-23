@@ -125,6 +125,39 @@ public final class PrefabNonceStore {
         return ConsumeResult.ok(e);
     }
 
+    /**
+     * Token-less variant of {@link #consume}: locate the newest non-expired
+     * entry minted by {@code callerId} for {@code prefabId} and consume it.
+     * Required by the menu Confirm path, which dispatches
+     * {@code /rtp admin prefab confirm id=&lt;id&gt;} without surfacing the
+     * opaque nonce to the player (the click is already caller-bound through
+     * Bukkit's command sender — the nonce was a chat-path replay defense
+     * only). Returns {@link ConsumeResult#notFound()} when no eligible entry
+     * exists; identical semantics to {@link #consume} otherwise.
+     */
+    public ConsumeResult consumeByCaller(UUID callerId, String prefabId) {
+        Objects.requireNonNull(callerId, "callerId");
+        Objects.requireNonNull(prefabId, "prefabId");
+        sweep();
+        // Iterate to find the newest (latest expiresAtMillis) matching entry.
+        // ConcurrentHashMap iteration is weakly consistent — fine here since
+        // the caller-bound mint -> consume sequence is single-threaded per
+        // player.
+        Entry newest = null;
+        for (Entry e : byToken.values()) {
+            if (!e.callerId.equals(callerId)) continue;
+            if (!e.prefabId.equals(prefabId)) continue;
+            if (newest == null || e.expiresAtMillis > newest.expiresAtMillis) {
+                newest = e;
+            }
+        }
+        if (newest == null) return ConsumeResult.notFound();
+        // Remove via token to preserve the single-use invariant.
+        byToken.remove(newest.token);
+        if (clock.getAsLong() > newest.expiresAtMillis) return ConsumeResult.expired();
+        return ConsumeResult.ok(newest);
+    }
+
     /** Number of currently-outstanding (non-expired) entries. Test-friendly. */
     public int size() {
         sweep();

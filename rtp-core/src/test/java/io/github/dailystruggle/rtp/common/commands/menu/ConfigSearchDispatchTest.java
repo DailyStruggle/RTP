@@ -145,13 +145,13 @@ class ConfigSearchDispatchTest {
     }
 
     @Test
-    @DisplayName("OpenConfigSearchPrompt: permission granted -> synthesizes PromptAnvilInput(menu,config,search)")
+    @DisplayName("OpenConfigSearchPrompt: permission granted -> synthesizes PromptAnvilInput(config,search)")
     void openConfigSearchPrompt_happyPath_synthesizesPrompt() {
         // The synthesized PromptAnvilInput is routed through
         // dispatchPromptAnvilInput, which walks parentPath against the
         // live TreeCommand graph before calling the opener. The minimal
         // TestableRoot stub has no children, so the walk rejects with
-        // "unknown path segment 'menu'" (S-004). That rejection is itself
+        // "unknown path segment 'config'" (S-004). That rejection is itself
         // the proof that synthesis fired with the expected path: a
         // permission-denied prompt rejects earlier and never reaches
         // path-walking, so we'd see a different WARN.
@@ -163,7 +163,7 @@ class ConfigSearchDispatchTest {
                 Duration.ofSeconds(30));
         boolean ok = f.redeem(viewer, token);
 
-        assertFalse(ok, "stub root cannot resolve [menu,config,search] -> reject (expected)");
+        assertFalse(ok, "stub root cannot resolve [config,search] -> reject (expected)");
         assertNull(f.lastAnvilPrefill.get(),
                 "opener must not be reached when path walk rejects");
         // The full happy-path (opener reached) requires a live /rtp tree

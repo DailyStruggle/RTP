@@ -51,7 +51,7 @@ public class PrefabListCmd extends BaseRTPCmdImpl {
         for (Prefab p : PrefabRegistry.list()) {
             send(callerId, "&f  - &a" + p.id() + "&7: " + p.description());
         }
-        send(callerId, "&7Use &f/rtp admin prefab apply <id>&7 to preview changes.");
+        send(callerId, "&7Use &f/rtp admin prefab apply id=<id>&7 to preview changes.");
         return true;
     }
 

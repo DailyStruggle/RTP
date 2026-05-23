@@ -6,6 +6,8 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
 import io.github.dailystruggle.rtp.common.network.BackendStatePublisher;
+import io.github.dailystruggle.rtp.proxy.common.selector.LoadBalancerConfig;
+import io.github.dailystruggle.rtp.proxy.common.selector.LoadBalancerConfigYaml;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
@@ -73,6 +75,25 @@ public final class NetworkModeBootstrap {
     // boot() did not complete past router wiring.
     private PeerRegionRegistry peerRegionRegistry;
     private BukkitNetworkCommandHook commandHook;
+    // Slice 4 (ADR-015 / REQ-RTP-NET-015): lobby-side waitlist UX.
+    // - notifier: periodic player-facing 'queued, position N' message.
+    // - waitlistGuard: sender-check predicate registered on RTPCmdBukkit
+    //   so /rtp* is locked while the player has a non-terminal entry.
+    // - quitListener: PlayerQuitEvent hook that calls
+    //   NetworkRequestQueue.cancel(uuid, PLAYER_DISCONNECT) so a quit
+    //   does not leave a stale slot on the shared waitlist.
+    private NetworkWaitlistNotifier waitlistNotifier;
+    private NetworkWaitlistGuard waitlistGuard;
+    private NetworkWaitlistQuitListener waitlistQuitListener;
+    private boolean waitlistQuitListenerRegistered;
+    /**
+     * Lobby-side auto-retry queue (post-Slice-4 fix for the lobby
+     * "non-processing state" symptom). Non-null only when network mode
+     * is enabled, boot() reached router wiring, AND the local
+     * {@code network.routing.lobbyMode} is true. See
+     * {@link LobbyDispatchRetryQueue}.
+     */
+    private LobbyDispatchRetryQueue lobbyRetryQueue;
 
     // Snapshot refresher (fix 2026-05-21): NetworkTransport.readSnapshot() is
     // async (Redis SCAN, SQL poll, etc.) and the previous suppliers used
@@ -387,25 +408,149 @@ public final class NetworkModeBootstrap {
             this.enrolmentBuffer.start(flushTicks);
             this.statusCache.start(pollTicks);
 
+            // Cross-server terminal-state release of the local
+            // processingPlayers lock. The lock is acquired by RTPCmd.onCommand
+            // on every /rtp and intentionally RETAINED by the CrossServer
+            // branch (anti-spam: prevents the player re-enrolling on every
+            // keystroke). It is therefore the job of the lobby to release
+            // the lock once the proxy reports COMPLETED / FAILED / CANCELLED
+            // or stops reporting the row entirely (eviction). Without this
+            // release the player gets a one-shot "queued" message and is
+            // then permanently in the alreadyTeleporting state until they
+            // disconnect - which is exactly the symptom this hook fixes.
+            // Also clears any LobbyDispatchRetryQueue entry for the player
+            // (defence in depth; the retry queue normally clears itself on
+            // enrolment).
+            this.statusCache.setTerminalListener((uuid, terminalState) -> {
+                // Stuck-after-enrolment auto-retry: when the proxy never
+                // produces a terminal transition the sticky-TTL in
+                // NetworkStatusCache fires terminalState=FAILED. If we
+                // remembered the player's original /rtp args on the
+                // retry queue (recordEnrolment from the hook), re-park
+                // them for a fresh retry pulse INSTEAD of releasing the
+                // lock. For genuine terminal transitions (COMPLETED,
+                // supplier-confirmed FAILED/CANCELLED, eviction), we
+                // clear the recorded enrolment and release the lock as
+                // before. This is the user-approved retry mechanism for
+                // the "queue position 0 forever" symptom.
+                boolean reparked = false;
+                if (this.lobbyRetryQueue != null
+                        && terminalState == NetworkStatusCache.QueueStatus.State.FAILED) {
+                    try {
+                        reparked = this.lobbyRetryQueue.onTerminalFailure(uuid);
+                    } catch (Throwable ignored) {
+                        reparked = false;
+                    }
+                }
+                if (reparked) {
+                    // Re-seed the sticky row so anti-spam guards still
+                    // see the player as non-terminal during the retry
+                    // pulse. The next pulse will either re-enrol (new
+                    // sticky window starts) or terminate via attempts/
+                    // TTL bounds inside the retry queue.
+                    try { this.statusCache.seedLocal(uuid); } catch (Throwable ignored) {}
+                    return;
+                }
+                try {
+                    RTP.getInstance().processingPlayers.remove(uuid);
+                } catch (Throwable ignored) {
+                    // RTP.getInstance() should never be null here, but the
+                    // listener must never propagate.
+                }
+                if (this.lobbyRetryQueue != null) {
+                    try { this.lobbyRetryQueue.cancel(uuid, null); } catch (Throwable ignored) {}
+                }
+            });
+
+            // Slice 4 (ADR-015 / REQ-RTP-NET-015): waitlist UX.
+            // Knobs live under network.waitlist.* with conservative defaults:
+            //   notifyIntervalSeconds: 5  (min re-notify gap per UUID)
+            // The notifier pulse uses the same pollIntervalMs as the status
+            // cache so we never notify ahead of a position change. The
+            // guard + quitListener are no-ops when the cache is empty, so
+            // they cost nothing on single-server installs that still go
+            // through this code path (network.enabled is already true here).
+            RtpYamlSection waitlistSec = cfg.getConfigurationSection("network.waitlist");
+            long notifyIntervalMs = waitlistSec == null
+                    ? 5_000L
+                    : Math.max(0L, waitlistSec.getLong("notifyIntervalSeconds", 5L) * 1000L);
+            this.waitlistNotifier = new NetworkWaitlistNotifier(this.statusCache, notifyIntervalMs);
+            this.waitlistNotifier.start(pollTicks);
+            this.waitlistGuard = new NetworkWaitlistGuard(this.statusCache);
+
+            // Post-Slice-4 lobby auto-retry queue. Instantiated BEFORE
+            // the quit listener (so disconnect can clear the parked
+            // entry) and BEFORE the command hook (so transient
+            // LocalFallbacks park instead of falling through to a dead
+            // local pipeline). Lobby-only by design - on a normal
+            // backend the local pipeline can genuinely serve /rtp, so
+            // the prior graceful-degradation behaviour is preserved.
+            if (lobbyMode) {
+                this.lobbyRetryQueue = new LobbyDispatchRetryQueue(
+                        this.router, this.enrolmentBuffer);
+                this.lobbyRetryQueue.start();
+            }
+
+            if (rq != null) {
+                this.waitlistQuitListener = new NetworkWaitlistQuitListener(rq, this.lobbyRetryQueue);
+            }
+
             // L6 Slice H2 (rtp-proxy-ADR-014): install the cross-server
             // command hook into RTP.networkCommandHook so /rtp consults
             // the router on every invocation. The hook also drives
             // RegionParameter's extras supplier (the snapshot-adapter
             // PeerRegionRegistry) so tab-completion lists peer-qualified
             // server:region entries.
+            // Parse the operator-tuned loadBalancer scoring table from
+            // network.yml so PeerRegionRegistry.pickMostKept() and the
+            // proxy-side selector share one curves/weights definition
+            // (rtp-proxy-ADR-004 *Region-Pair Scoring*). Malformed config
+            // degrades to LoadBalancerConfig.defaults() with a WARNING
+            // rather than disabling lobby mode - the bundled defaults
+            // already produce the prior "most-kept wins" behaviour.
+            LoadBalancerConfig loadBalancerConfig;
+            try {
+                RtpYamlSection lbSec = cfg.getConfigurationSection("loadBalancer");
+                if (lbSec == null) {
+                    loadBalancerConfig = LoadBalancerConfig.defaults();
+                } else {
+                    loadBalancerConfig = LoadBalancerConfigYaml.fromMap(lbSec.getValues(true));
+                }
+            } catch (Throwable lbFail) {
+                RTP.log(Level.WARNING,
+                        "[NETWORK] failed to parse network.yml::loadBalancer: "
+                                + lbFail.getMessage()
+                                + " - falling back to bundled defaults (legacy most-kept behaviour).",
+                        lbFail);
+                loadBalancerConfig = LoadBalancerConfig.defaults();
+            }
             this.peerRegionRegistry = new PeerRegionRegistry(
                     () -> this.cachedSnapshot,
-                    serverId);
+                    serverId,
+                    loadBalancerConfig);
             // L6 Slice I: pass lobbyMode through so a no-arg /rtp on a
             // lobby backend auto-routes to the "most kept" remote region.
             // Slice I follow-up: pass the backend state publisher so
             // cross-server dispatches force an immediate heartbeat publish
             // (propagating the local PeerRegionRegistry.recordDispatch
             // decrement to peers before the next 1s tick).
+            // Post-Slice-4: pass the LobbyDispatchRetryQueue so transient
+            // LocalFallbacks (NETWORK_DISABLED / NO_LIVE_PEER /
+            // QUEUE_FULL / TOKEN_BUCKET_EXHAUSTED) park the player on
+            // the local retry pulse instead of silently falling through
+            // to a dead local pipeline.
             this.commandHook = new BukkitNetworkCommandHook(
                     this.router, this.enrolmentBuffer,
                     this.peerRegionRegistry, lobbyMode,
-                    this.publisher);
+                    this.publisher, this.lobbyRetryQueue);
+            // Wire the enrolment seeder so real cross-server enrolments
+            // pre-seed a sticky QUEUED row in the status cache. This is
+            // what guarantees the lobby observes a non-terminal -> terminal
+            // (or sticky-TTL expiration) transition for every enrolled
+            // player, which in turn releases the processingPlayers lock.
+            // Without this seeding, a never-responding proxy leaves the
+            // player locked until disconnect.
+            this.commandHook.setEnrolmentSeeder(this.statusCache::seedLocal);
             RTP.networkCommandHook = this.commandHook;
             // Publish self so RTPCmdBukkit's RegionParameter validator and
             // extras supplier can pick up the live PeerRegionRegistry at
@@ -438,6 +583,10 @@ public final class NetworkModeBootstrap {
                             + t.getMessage() + " - /rtp stays local for this lifecycle.", t);
             this.router = null;
             if (this.enrolmentBuffer != null) { try { this.enrolmentBuffer.shutdown(); } catch (Throwable ignored) {} this.enrolmentBuffer = null; }
+            if (this.waitlistNotifier != null) { try { this.waitlistNotifier.shutdown(); } catch (Throwable ignored) {} this.waitlistNotifier = null; }
+            if (this.lobbyRetryQueue != null) { try { this.lobbyRetryQueue.shutdown(); } catch (Throwable ignored) {} this.lobbyRetryQueue = null; }
+            this.waitlistGuard = null;
+            this.waitlistQuitListener = null;
             if (this.statusCache != null) { try { this.statusCache.shutdown(); } catch (Throwable ignored) {} this.statusCache = null; }
             // H2: unwind the hook so single-server pipeline is restored.
             if (RTP.networkCommandHook == this.commandHook) {
@@ -499,6 +648,38 @@ public final class NetworkModeBootstrap {
         }
     }
 
+    /**
+     * Slice 4 (ADR-015 / REQ-RTP-NET-015): register the cross-server
+     * waitlist {@code PlayerQuitEvent} hook so a quit cancels any in-flight
+     * enrolment. No-op when network mode is disabled, when boot() did not
+     * reach queue wiring, or when the host plugin is null. Idempotent.
+     */
+    public void registerWaitlistQuitListener(org.bukkit.plugin.Plugin plugin) {
+        if (waitlistQuitListener == null || plugin == null) return;
+        if (waitlistQuitListenerRegistered) return;
+        try {
+            org.bukkit.Bukkit.getPluginManager().registerEvents(waitlistQuitListener, plugin);
+            waitlistQuitListenerRegistered = true;
+            RTP.log(Level.FINE,
+                    "[NETWORK] NetworkWaitlistQuitListener registered.");
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[NETWORK] failed to register NetworkWaitlistQuitListener: "
+                            + t.getMessage(), t);
+        }
+    }
+
+    /**
+     * Slice 4 (ADR-015 / REQ-RTP-NET-015): register the cross-server
+     * waitlist sender-check predicate on the live {@code RTPCmdBukkit} so
+     * any {@code /rtp*} invocation by a player with a non-terminal entry
+     * is short-circuited with a configurable message. No-op when network
+     * mode is disabled or boot() did not reach status-cache wiring.
+     */
+    public java.util.function.Predicate<org.bukkit.command.CommandSender> waitlistCommandGuard() {
+        return waitlistGuard;
+    }
+
     private boolean joinTriggerSourceRegistered;
 
     /** Reverse-order teardown. Idempotent. */
@@ -518,6 +699,19 @@ public final class NetworkModeBootstrap {
         // flush/poll futures complete first).
         // L6 Slice C: tear down the router scaffolding first so its timers
         // stop firing before we yank the transport out from under them.
+        if (waitlistNotifier != null) {
+            try { waitlistNotifier.shutdown(); } catch (Throwable ignored) { /* best-effort */ }
+            waitlistNotifier = null;
+        }
+        if (lobbyRetryQueue != null) {
+            try { lobbyRetryQueue.shutdown(); } catch (Throwable ignored) { /* best-effort */ }
+            lobbyRetryQueue = null;
+        }
+        waitlistGuard = null;
+        // Bukkit unregisters listeners automatically on plugin disable; we
+        // clear the field so a subsequent boot()+register cycle starts clean.
+        waitlistQuitListener = null;
+        waitlistQuitListenerRegistered = false;
         if (statusCache != null) {
             try { statusCache.shutdown(); } catch (Throwable ignored) { /* best-effort */ }
             statusCache = null;

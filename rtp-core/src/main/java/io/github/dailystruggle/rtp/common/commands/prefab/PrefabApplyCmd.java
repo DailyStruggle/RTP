@@ -1,23 +1,15 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
-import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.logging.Level;
 
 import org.jetbrains.annotations.Nullable;
@@ -47,6 +39,14 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
     public PrefabApplyCmd(@Nullable CommandsAPICommand parent, PrefabNonceStore nonceStore) {
         super(parent);
         this.nonceStore = nonceStore;
+        // Register the prefab id as a typed CommandParameter so the parser
+        // accepts the wire form `apply id=<id>` (and tab-completes against the
+        // live PrefabRegistry). Mirrors how InfoCmd registers `world=` /
+        // `region=` parameters - no per-id sub-command, no args-form override.
+        addParameter("id",
+                new PrefabIdParameter(PrefabCommand.PERMISSION,
+                        "bundled prefab id",
+                        (uuid, s) -> true));
     }
 
     @Override
@@ -64,63 +64,19 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
         return "preview a prefab and mint a confirmation token";
     }
 
-    /**
-     * Capture the {@code <id>} positional from the args-form dispatch path.
-     *
-     * <p>TreeCommand's default parser routes any non-{@code key=value} token
-     * through subcommand lookup; an unknown token (e.g. a hyphenated prefab
-     * id like {@code low-performance}) hits {@code msgInvalidCommand} and
-     * never reaches the map-form {@link #onCommand(UUID, Map, CommandsAPICommand)}.
-     * Both the menu redeem path ({@code /rtp admin prefab apply <id>}) and
-     * a player typing the verb in chat surface this bug; this override
-     * captures the first free positional into {@code parameterValues}
-     * (under its own value as key, the shape
-     * {@link #extractFirstPositional(Map)} already accepts) and invokes the
-     * map form directly. Subcommand-style suffixes (none today) would still
-     * be routed by the super impl; this verb has no children so a free
-     * positional is unambiguously the prefab id.
-     */
-    @Override
-    public CompletableFuture<Boolean> onCommand(@NotNull UUID callerId,
-                                                @NotNull Predicate<String> permissionCheckMethod,
-                                                @NotNull Consumer<String> messageMethod,
-                                                @NotNull String[] args,
-                                                int i,
-                                                @Nullable Map<String, CommandParameter> tempParameters) {
-        if (!permissionCheckMethod.test(permission())) {
-            return CompletableFuture.completedFuture(false);
-        }
-        Map<String, List<String>> parameterValues = new HashMap<>();
-        for (; i < args.length; i++) {
-            String arg = args[i];
-            if (arg == null || arg.isEmpty()) continue;
-            int eq = arg.indexOf('=');
-            if (eq < 0) {
-                // Free positional: stash under the value as key with an empty
-                // list, matching what extractFirstPositional() accepts.
-                parameterValues.computeIfAbsent(arg, k -> new ArrayList<>());
-            } else {
-                String key = arg.substring(0, eq).toLowerCase(Locale.ROOT);
-                String val = arg.substring(eq + 1);
-                parameterValues.computeIfAbsent(key, k -> new ArrayList<>()).add(val);
-            }
-        }
-        return CompletableFuture.completedFuture(
-                onCommand(callerId, parameterValues, null, messageMethod));
-    }
-
     @Override
     public boolean onCommand(UUID callerId,
                              Map<String, List<String>> parameterValues,
                              @Nullable CommandsAPICommand nextCommand) {
-        if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
+        if (nextCommand != null) return true;
         if (callerId == null) {
             RTP.log(Level.WARNING, "/rtp admin prefab apply rejected: no caller UUID");
             return false;
         }
-        String prefabId = extractFirstPositional(parameterValues);
+        List<String> idValues = parameterValues == null ? null : parameterValues.get("id");
+        String prefabId = (idValues == null || idValues.isEmpty()) ? null : idValues.get(0);
         if (prefabId == null || prefabId.isEmpty()) {
-            send(callerId, "&cUsage: &f/rtp admin prefab apply <id>&c. Try &f/rtp admin prefab list&c.");
+            send(callerId, "&cUsage: &f/rtp admin prefab apply id=<id>&c. Try &f/rtp admin prefab list&c.");
             return false;
         }
         Optional<Prefab> opt = PrefabRegistry.byId(prefabId);
@@ -180,34 +136,16 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
                 }
             }
         }
-        send(callerId, "&7Confirm with: &f/rtp admin prefab confirm "
-                + prefab.id() + " " + entry.token());
-        send(callerId, "&7Token expires in ~"
+        // Caller-bound confirm: the nonce store resolves the newest entry
+        // for (callerId, prefabId) so the player does not need to copy the
+        // opaque token. Chat path still shows the token as a fallback for
+        // operators who prefer the explicit form.
+        send(callerId, "&7Confirm with: &f/rtp admin prefab confirm id=" + prefab.id());
+        send(callerId, "&8(or with explicit token: &f/rtp admin prefab confirm id="
+                + prefab.id() + " token=" + entry.token() + "&8)");
+        send(callerId, "&7Expires in ~"
                 + (PrefabNonceStore.DEFAULT_TTL_MILLIS / 1000) + "s.");
         return true;
-    }
-
-    /**
-     * Pull the first non-flag positional out of the parameter map. CommandsAPI
-     * surfaces positionals under the {@code name:value} key as values of the
-     * parameter's declared name; in the absence of such a declaration here we
-     * accept any single-element list whose key isn't a known meta-key.
-     */
-    private static @Nullable String extractFirstPositional(Map<String, List<String>> params) {
-        if (params == null || params.isEmpty()) return null;
-        for (Map.Entry<String, List<String>> e : params.entrySet()) {
-            String key = e.getKey();
-            if (key == null) continue;
-            String k = key.toLowerCase(Locale.ROOT);
-            if (k.equals("admin") || k.equals("prefab") || k.equals("apply")) continue;
-            List<String> v = e.getValue();
-            if (v == null || v.isEmpty()) {
-                if (!k.isEmpty()) return key;
-                continue;
-            }
-            return v.get(0);
-        }
-        return null;
     }
 
     private static void send(UUID callerId, String msg) {

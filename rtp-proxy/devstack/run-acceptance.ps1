@@ -55,7 +55,13 @@ param(
   [switch]$SkipBuild,
   # Suppress the auto-spawned per-service log windows (one PowerShell window per
   # container streaming `docker compose logs -f`). Useful for headless CI runs.
-  [switch]$NoLogs
+  [switch]$NoLogs,
+  # On `-Scenario down`, also remove ALL named volumes (including the shared
+  # mc-image-cache that holds the Paper build jar + Mojang server.jar). Without
+  # this, `down` is selective: containers and ephemeral state go away but the
+  # download cache survives so the next `up` doesn't redownload ~110 MB per
+  # service. Use -Purge for a truly fresh-from-scratch reset.
+  [switch]$Purge
 )
 
 $ErrorActionPreference = 'Stop'
@@ -315,7 +321,14 @@ function Invoke-GradleBuild {
       Write-Host '[build] WARN - RTP-Pro-<ver>.jar not found; falling back to plain RTP jar. Build Pro via the Pro Gradle profile to match the devstack.' -ForegroundColor Yellow
     }
     foreach ($dst in @($pluginStage) + $backendDsts) {
-      Get-ChildItem -Path $dst -Filter '*.jar' -File -ErrorAction SilentlyContinue | Remove-Item -Force
+      # Only clear the RTP jars we own here. Operator-dropped jars (e.g.
+      # FastAsyncWorldEdit in lobby-a/plugins/ for the lobby-world bake
+      # workflow - see shared/lobby-world/README.md) must survive a re-run
+      # of the harness. Filter matches RTP-<ver>.jar and RTP-Pro-<ver>.jar
+      # but leaves everything else in place.
+      Get-ChildItem -Path $dst -Filter 'RTP-*.jar' -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notmatch '-dev\.jar$|-sources\.jar$|-javadoc\.jar$' } |
+        Remove-Item -Force
       foreach ($j in $pJars) {
         Copy-Item -Path $j.FullName -Destination (Join-Path $dst $j.Name) -Force
       }
@@ -414,8 +427,12 @@ function Invoke-ComposeUp {
   # Auto-recovery: if any MC service exits within ~8s of `up`, we assume a
   # stale-state failure (typically `session.lock` AccessDeniedException on the
   # world dir from a prior crashed boot, or stale plugin-sync ownership)
-  # and once retry with `docker compose down -v` + world-dir wipe + `up -d`.
-  # Bounded to a single retry to avoid loops on genuine config failures.
+  # and once retry with `docker compose down` + world-dir wipe + `up -d`.
+  # We deliberately do NOT pass -v on auto-recovery: worlds are host binds
+  # (cleared separately by Clear-StaleWorldDirs) and the mc-image-cache named
+  # volume should survive a stale-state recovery so the retry boot doesn't
+  # redownload Paper. Bounded to a single retry to avoid loops on genuine
+  # config failures.
   Invoke-GradleBuild
   Sync-ProxyJars
   Clear-StaleWorldDirs
@@ -443,10 +460,10 @@ function Invoke-ComposeUp {
         break
       }
       Write-Host "[up] detected crashed services: $($crashed -join ', ')" -ForegroundColor Yellow
-      Write-Host '[up] likely stale named-volume state (session.lock / plugin-sync ownership from a prior failed boot)' -ForegroundColor Yellow
-      Write-Host '[up] auto-recovering: docker compose down -v (clears world volumes), then re-up...' -ForegroundColor Yellow
+      Write-Host '[up] likely stale state (session.lock / plugin-sync ownership from a prior failed boot)' -ForegroundColor Yellow
+      Write-Host '[up] auto-recovering: docker compose down (preserves mc-image-cache), then re-up...' -ForegroundColor Yellow
       Write-Evidence 'up' "auto-recover triggered by crashed: $($crashed -join ', ')"
-      $downOut = Invoke-Native { docker compose down -v }
+      $downOut = Invoke-Native { docker compose down }
       Write-Evidence 'up' $downOut
       Clear-StaleWorldDirs
       Start-Sleep -Seconds 2
@@ -468,13 +485,28 @@ function Invoke-ComposeUp {
 }
 
 function Invoke-ComposeDown {
+  param([switch]$IncludeVolumes)
   Push-Location $PSScriptRoot
   try {
-    Write-Host '[down] docker compose down -v ...' -ForegroundColor Cyan
-    $out = Invoke-Native { docker compose down -v }
+    # Selective by default: stop containers + remove networks, but preserve
+    # named volumes (currently just `mc-image-cache`, which holds the Paper
+    # build jar + Mojang server.jar across runs - see docker-compose.yml's
+    # top-level `volumes:` block). Worlds are host bind mounts and are wiped
+    # separately by Clear-StaleWorldDirs regardless of -v, so dropping -v
+    # does NOT leak stale world state into the next boot.
+    #
+    # Pass -Purge (-> -IncludeVolumes here) for a truly fresh reset that also
+    # drops the download cache; that path re-incurs ~110 MB/service on next up.
+    if ($IncludeVolumes) {
+      Write-Host '[down] docker compose down -v (purging named volumes incl. mc-image-cache)...' -ForegroundColor Cyan
+      $out = Invoke-Native { docker compose down -v }
+    } else {
+      Write-Host '[down] docker compose down (preserving mc-image-cache; pass -Purge to also drop it)...' -ForegroundColor Cyan
+      $out = Invoke-Native { docker compose down }
+    }
     Write-Evidence 'down' $out
-    # World dirs are host bind mounts now, so `down -v` doesn't touch them.
-    # Wipe them here so the next boot starts from a clean slate.
+    # World dirs are host bind mounts, so `down` (with or without -v) doesn't
+    # touch them. Wipe them here so the next boot starts from a clean slate.
     Clear-StaleWorldDirs
   } finally {
     Pop-Location
@@ -702,9 +734,41 @@ Write-Evidence 'session' "start scenario=$Scenario waitSeconds=$WaitSeconds"
 # `docker compose` call; compose fails fast on missing variable interpolation.
 Initialize-Secrets
 
+# Optional lobby world overlay. When the operator has baked a lobby world via
+# `scripts/bake-lobby-world.ps1` (see `shared/lobby-world/README.md`), layer
+# `docker-compose.lobby-world.yml` on top of the base compose file so that
+# lobby-a / lobby-b boot from the canned world instead of generating a fresh
+# default world. Implemented via the `COMPOSE_FILE` env var (path-separator
+# delimited) so every existing `docker compose ...` call site in this script
+# picks the override up transparently - no per-call `-f` flag plumbing needed.
+$LobbyWorldZip = Join-Path $PSScriptRoot 'shared\lobby-world.zip'
+$LobbyOverride = Join-Path $PSScriptRoot 'docker-compose.lobby-world.yml'
+if ((Test-Path $LobbyWorldZip) -and (Test-Path $LobbyOverride)) {
+  $env:COMPOSE_FILE = "$(Join-Path $PSScriptRoot 'docker-compose.yml');$LobbyOverride"
+  Write-Host "[init] using baked lobby world: $LobbyWorldZip" -ForegroundColor Cyan
+  Write-Evidence 'init' "lobby-world overlay active: $LobbyWorldZip"
+} else {
+  $LobbySchemDir = Join-Path $PSScriptRoot 'shared\lobby-world'
+  $schems = @()
+  if (Test-Path $LobbySchemDir) {
+    $schems = @(Get-ChildItem -Path $LobbySchemDir -Filter '*.schem' -ErrorAction SilentlyContinue) +
+              @(Get-ChildItem -Path $LobbySchemDir -Filter '*.schematic' -ErrorAction SilentlyContinue)
+  }
+  if ($schems.Count -gt 0) {
+    Write-Host "[init] schematic detected ($($schems[0].Name)) but no shared/lobby-world.zip yet; lobbies will boot vanilla. Paste the schematic in-game and run scripts\bake-lobby-world.ps1 to enable the canned lobby world." -ForegroundColor Yellow
+    Write-Evidence 'init' "lobby-world overlay skipped: schematic present, zip missing"
+  } else {
+    Write-Evidence 'init' 'lobby-world overlay skipped: no schematic, no zip'
+  }
+}
+
 if ($Scenario -eq 'down') {
-  Invoke-ComposeDown
-  Write-Host '[down] stack stopped and volumes removed' -ForegroundColor Green
+  Invoke-ComposeDown -IncludeVolumes:$Purge
+  if ($Purge) {
+    Write-Host '[down] stack stopped; all named volumes removed (including mc-image-cache)' -ForegroundColor Green
+  } else {
+    Write-Host '[down] stack stopped; mc-image-cache preserved (use -Purge to also drop it)' -ForegroundColor Green
+  }
   exit 0
 }
 

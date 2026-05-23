@@ -4,6 +4,8 @@
 
 All configuration files live in `plugins/RTP/` after the first server start. Edit them directly and run `/rtp reload` to apply changes, as this will update settings without a server restart.
 
+> 📎 **How RTP loads, reloads, and upgrades these files** (including what the `.old1`/`.old2` files are, and how your customizations are preserved across version bumps and locale switches): see [CONFIG_LIFECYCLE.md](CONFIG_LIFECYCLE.md).
+
 ---
 
 ## File Overview

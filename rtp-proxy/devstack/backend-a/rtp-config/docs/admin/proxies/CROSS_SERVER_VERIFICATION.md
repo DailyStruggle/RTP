@@ -86,26 +86,56 @@ The end-to-end happy path. Required: a live Minecraft 1.21.x client.
 1. Connect the client to proxy-a (default backend: backend-a).
 2. Run `/server backend-b` once to ensure the client's session is known
    to backend-b's permission map. Then `/server backend-a` again.
-3. From backend-a, run `/rtp`. The proxy intercepts, claims a
-   reservation token against backend-b (or backend-a; the selector picks
-   the least-loaded), and issues a transfer.
+3. From backend-a, run `/rtp`. The backend's `NetworkRouter` enrols the
+   request in the shared wait queue (`rtp:net:wq:ready` LIST + per-player
+   `rtp:net:wq:status:<pid>` HASH). Some proxy worker dequeues the
+   envelope, runs the `BackendSelector` (kept-count + killSwitch +
+   region availability), claims a reservation token against the chosen
+   backend's `networkKeptLocations` pool, and issues the transfer.
 4. On arrival, the destination backend's `JoinTriggerSource` calls
-   `findReservation -> redeem` and dispatches a local `/rtp`.
+   `findReservation -> redeem`, and on REDEEMED pins the pre-warmed
+   coordinate via `RegionQueueManager.acceptRedeemedReservation(...)`
+   so the immediately-following `/rtp` dispatch consumes that exact
+   coord (no second pipeline run).
+
+L6 queue + reservation state transitions an operator can observe:
+
+- `rtp:net:wq:status:<pid>` HASH cycles through `PENDING -> ROUTING ->
+  RESERVED -> COMPLETED` (or `FAILED/CANCELLED` on the failure paths);
+  the HASH is DEL'd by the terminal `transition.lua` script along with
+  the envelope HASH and the `rtp:net:wq:seen` SET entry.
+- `rtp:net:tok:<tokenId>` HASH transitions `PENDING -> CLAIMED ->
+  CONSUMED` (or `RELEASED` on `PLAYER_DISCONNECTED` / `TTL_EXPIRED` /
+  `BACKEND_REJECTED`); CONSUMED/RELEASED rows are removed by the
+  release Lua. The reaper's `ReleaseSink` fires `releaseToNetworkKept`
+  on the owning backend so the coord returns to the pool.
+- Heartbeat HASH `regionKeptCounts` field on the chosen backend drops
+  by 1 at claim time and is replenished on the next pulse.
 
 Pass criteria:
 
 - Client lands on the destination backend at a valid coordinate.
 - Destination backend log contains a `JoinTriggerSource ... redeemed` line.
-- `redis-cli KEYS 'rtp:net:reservation:*'` shows zero entries after the
-  redeem completes (state advanced to `CONSUMED` and the row was deleted
-  by the release Lua).
+- `redis-cli KEYS 'rtp:net:tok:*'` shows zero entries after the redeem
+  completes (terminal `transition.lua` deleted the row).
+- `redis-cli KEYS 'rtp:net:wq:status:*'` shows zero entries for the
+  player UUID (terminal envelope cleanup).
 
 Common failure modes:
 
 - Client lands but no `/rtp` runs: HMAC verify failed (secret mismatch),
   or `JoinTriggerSource` not registered (network bootstrap aborted).
-- `/rtp` runs locally on the source backend: proxy dispatcher fell through
-  to the local pipeline. Check the proxy log for `DispatchOutcome` warnings.
+- `/rtp` runs locally on the source backend: `NetworkRouter` gated to
+  `local` (check `routing.mode` in `network.yml`), token-bucket rate
+  limit exhausted, no backend qualified (all killSwitch / zero
+  `keptCount` / region unavailable), or the dispatcher fell through to
+  the local pipeline. Check the backend log for `RoutingDecision`
+  `FallbackReason` entries and the proxy log for `DispatchOutcome`
+  warnings.
+- Wait-queue envelope stuck in `PENDING`: no proxy worker is draining
+  `rtp:net:wq:ready` (proxy `TransportRequestTriggerSource` not started,
+  or all proxies are down). The reservation TTL reaper will clear stale
+  entries, but the player observes a fallback message.
 
 ## Scenario 4: kill mid-flight
 

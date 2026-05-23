@@ -1,11 +1,18 @@
 package io.github.dailystruggle.rtp.bukkit.network;
 
+import io.github.dailystruggle.rtp.proxy.common.selector.LoadBalancerConfig;
+import io.github.dailystruggle.rtp.proxy.common.selector.RegionAwareSelector;
+import io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
+import io.github.dailystruggle.rtp.proxy.common.spi.RtpRequest;
+import io.github.dailystruggle.rtp.proxy.common.spi.TriggerType;
 
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
@@ -53,6 +60,7 @@ public final class PeerRegionRegistry {
 
     private final Supplier<NetworkSnapshot> snapshotSupplier;
     private final String localServerId;
+    private final RegionAwareSelector selector;
 
     /**
      * Optimistic local decrements applied to peer {@code keptCount} between
@@ -68,9 +76,28 @@ public final class PeerRegionRegistry {
     private final ConcurrentHashMap<ServerRegion, Decrement> localDecrements =
             new ConcurrentHashMap<>();
 
+    /**
+     * Back-compat constructor: builds a registry with the bundled
+     * {@link LoadBalancerConfig#defaults()} so {@link #pickMostKept()}
+     * reproduces the legacy "most-kept" pick byte-identically (default
+     * 1.0 {@code regionScarcityWeight} + {@code exponential(k=5)} curve).
+     */
     public PeerRegionRegistry(Supplier<NetworkSnapshot> snapshotSupplier, String localServerId) {
+        this(snapshotSupplier, localServerId, LoadBalancerConfig.defaults());
+    }
+
+    /**
+     * Full constructor: the operator-tuned {@code loadBalancerConfig} from
+     * {@code network.yml} drives {@link #pickMostKept()}'s scoring. Lobby
+     * and proxy share the exact same scoring table this way.
+     */
+    public PeerRegionRegistry(Supplier<NetworkSnapshot> snapshotSupplier,
+                              String localServerId,
+                              LoadBalancerConfig loadBalancerConfig) {
         this.snapshotSupplier = Objects.requireNonNull(snapshotSupplier, "snapshotSupplier");
         this.localServerId = localServerId; // null-tolerated; matches nothing
+        Objects.requireNonNull(loadBalancerConfig, "loadBalancerConfig");
+        this.selector = new RegionAwareSelector(loadBalancerConfig);
     }
 
     /**
@@ -188,108 +215,72 @@ public final class PeerRegionRegistry {
     }
 
     /**
-     * Lobby-mode target picker (L6 Slice I). Returns the
-     * {@code (serverId, regionKey)} of the peer that currently holds the
-     * largest {@code regionKeptCounts} entry across the snapshot, breaking
-     * ties by lexicographic {@code serverId} then {@code regionKey} for
-     * determinism. Returns {@link java.util.Optional#empty()} when no peer
-     * advertises any region (snapshot null/empty, all peers killSwitch'd,
-     * all peers excluded as self).
+     * Lobby-mode target picker. Delegates to the unified
+     * {@link RegionAwareSelector}, which scores every qualifying
+     * {@code (serverId, regionKey)} candidate with the same weighted-curve
+     * formula the proxy uses for its own {@code BackendSelector} (one
+     * scoring table, two call sites - rtp-proxy-ADR-004).
      *
-     * <p>v1 policy is intentionally fixed to "most kept" - the lobby
-     * dispatch decision uses the same signal the {@code BackendSelector}
-     * already biases on. A configurable weighted-average policy is the
-     * documented next step (per Slice I sign-off "first default will be
-     * most-kept with no config but this will be replaced with a more
-     * complex version of weighted average per docs").</p>
+     * <p>The synthesized {@link
+     * io.github.dailystruggle.rtp.proxy.common.selector.MetricInput#KEPT_REGION}
+     * scarcity term with {@code exponential(k=5)} reproduces the legacy
+     * "most-kept wins" behaviour byte-identically when no other scoring
+     * terms are configured: a region 90% empty contributes ~0.85, a region
+     * 50% empty only ~0.07. Operators wanting MSPT/heap/queue to also
+     * influence the lobby pick add explicit terms to {@code network.yml}'s
+     * {@code loadBalancer.terms} block - same place the proxy reads.</p>
      *
-     * <p>Pre-L6 peers that don't ship {@code regionKeptCounts} are scored
-     * as {@code 0} per region; they're still considered if no L6 peer
-     * exists, so a mixed-version network degrades gracefully rather than
-     * rejecting the lobby request.</p>
+     * <p>Filtering: self ({@code localServerId}) excluded; non-{@code READY},
+     * non-{@code acceptingRequests}, and {@code killSwitch} peers excluded;
+     * stale heartbeats excluded. Optimistic {@link #recordDispatch}
+     * decrements applied per-pair as a post-score adjustment so a recent
+     * burst spreads across peers before the next heartbeat tick.</p>
      */
-    public java.util.Optional<ServerRegion> pickMostKept() {
+    public Optional<ServerRegion> pickMostKept() {
         NetworkSnapshot snap;
         try {
             snap = snapshotSupplier.get();
         } catch (Throwable ignored) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
-        if (snap == null) return java.util.Optional.empty();
+        if (snap == null) return Optional.empty();
 
-        String bestServer = null;
-        String bestRegion = null;
-        int bestCount = -1;
-        for (BackendHeartbeat hb : snap.all()) {
-            if (hb == null) continue;
-            if (hb.killSwitch()) continue;
-            if (hb.serverId() == null || hb.serverId().isEmpty()) continue;
-            if (localServerId != null && hb.serverId().equals(localServerId)) continue;
-            // L6 Slice I follow-up: peers that are not currently accepting
-            // requests (warming caches, draining, pluginState != READY) MUST
-            // be excluded. The proxy-side WeightedAverageBackendSelector
-            // already does this; the lobby-side picker is the analog. Without
-            // this filter, an unready peer with regionKeptCounts={} (which is
-            // a default 0) ties against every other peer at 0 and the lex
-            // tiebreak forces the lexicographically-smallest serverId
-            // (commonly "backend-a") to win forever even when it is unready
-            // and a ready "backend-b" exists.
-            if (!hb.acceptingRequests()) continue;
+        // Synthetic no-region, no-world request: the lobby does not know
+        // ahead of time which region the player wants, so we let the
+        // scoring table choose. TriggerType.COMMAND matches the bare /rtp
+        // entry path.
+        RtpRequest req = new RtpRequest(
+                new UUID(0L, 0L),
+                TriggerType.COMMAND,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                new UUID(0L, 0L));
 
-            Set<String> regions = hb.regions();
-            if (regions == null || regions.isEmpty()) {
-                if (hb.regionsAvailable() != null) {
-                    regions = new HashSet<>(hb.regionsAvailable());
-                } else {
-                    continue;
-                }
-            }
-            for (String region : regions) {
-                if (region == null || region.isEmpty()) continue;
-                int count = 0;
-                Integer mapped = (hb.regionKeptCounts() == null)
-                        ? null : hb.regionKeptCounts().get(region);
-                if (mapped != null) count = mapped;
-                // Apply optimistic local decrement (recordDispatch). If the
-                // peer has published a strictly newer heartbeat since the
-                // decrement was recorded, evict it - ground truth wins.
-                ServerRegion srKey = new ServerRegion(hb.serverId(), region);
-                Decrement d = localDecrements.get(srKey);
-                if (d != null) {
-                    if (hb.lastSeenEpochMs() > d.observedAtMs) {
-                        localDecrements.remove(srKey, d);
-                    } else {
-                        count = Math.max(0, count - d.count);
-                    }
-                }
-                boolean win = (count > bestCount)
-                        || (count == bestCount
-                            && (bestServer == null
-                                || hb.serverId().compareTo(bestServer) < 0
-                                || (hb.serverId().equals(bestServer)
-                                    && (bestRegion == null
-                                        || region.compareTo(bestRegion) < 0))));
-                if (win) {
-                    bestServer = hb.serverId();
-                    bestRegion = region;
-                    bestCount = count;
-                }
-            }
-        }
-        if (bestServer == null || bestRegion == null) return java.util.Optional.empty();
-        return java.util.Optional.of(new ServerRegion(bestServer, bestRegion));
+        return selector.choose(snap, req, localServerId, this::applyLocalDecrement);
     }
 
     /**
-     * Simple value tuple returned by {@link #pickMostKept()}. Not a record
-     * elsewhere because no other call site needs it; lives here so the
-     * surface stays scoped to the registry.
+     * {@link RegionAwareSelector.PostScoreAdjust} hook applying the
+     * optimistic local-decrement bookkeeping. Lazily evicts entries whose
+     * heartbeat anchor has been superseded (ground truth wins). Each
+     * pending decrement nudges the score upward by a small constant so
+     * recently-targeted pairs lose ties without overpowering MSPT/heap/
+     * queue terms that operators may have configured.
      */
-    public record ServerRegion(String serverId, String regionKey) {
-        public ServerRegion {
-            Objects.requireNonNull(serverId, "serverId");
-            Objects.requireNonNull(regionKey, "regionKey");
+    private double applyLocalDecrement(ServerRegion sr, BackendHeartbeat hb, double rawScore) {
+        Decrement d = localDecrements.get(sr);
+        if (d == null) return rawScore;
+        if (hb.lastSeenEpochMs() > d.observedAtMs) {
+            localDecrements.remove(sr, d);
+            return rawScore;
         }
+        // Per-decrement nudge. Scaled so 1 dispatch adds ~the same penalty
+        // as a half-empty kept pool under the default exponential(k=5)
+        // scarcity term; this keeps the local-burst-spreading behaviour
+        // from the legacy implementation while operator-tuned MSPT/heap
+        // terms can still dominate if they are large.
+        return rawScore + (d.count * 0.05);
     }
 
     /**

@@ -64,4 +64,13 @@ public final class FabricDefaultPermissions {
         if (DEFAULT_FALSE.contains(node)) return Verdict.FALSE;
         return Verdict.OP;
     }
+
+    /**
+     * Read-only view of the nodes granted to everyone by default
+     * (mirrors {@code plugin.yml} entries with {@code default: true}).
+     * Consumed by the effective-permissions resolver (rtp-fabric-ADR-011).
+     */
+    public static Set<String> defaultTrue() {
+        return DEFAULT_TRUE;
+    }
 }

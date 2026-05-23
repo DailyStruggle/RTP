@@ -119,3 +119,87 @@ reservation:
 # documented follow-ups. Unknown values silently degrade to `warn`.
 regionCollision:
   policy: "warn"
+# Load balancer scoring table (rtp-proxy-ADR-004 *Region-Pair Scoring*).
+# Consumed by `PeerRegionRegistry.pickMostKept()` on lobby/backend JVMs to
+# drive blank-`/rtp` region selection (and, when `routing.mode: auto`, the
+# fallback region pick for cross-server enrolment). The SAME schema is
+# parsed by the Velocity proxy's `network-proxy.yml`, so curves/weights
+# tuned for one side can be copy-pasted to the other.
+#
+# Per-`(serverId, regionKey)` pair score:
+#   score(b, r) = ( Sigma_i  weight_i * curve_i( normalize_i( metric_i(b) ) ) ) / backendWeight(b)
+#               + regionScarcityWeight * exponential_k5( 1 - keptCount(b, r) / refCount )
+# Lowest score wins; ties break by serverId then regionKey ascending. The
+# synthesized region-scarcity term sharply prioritises regions whose kept
+# pool is shallow (a region 90% empty contributes ~0.85, one 50% empty
+# only ~0.07) - this is the curve-driven replacement for the legacy
+# "most-kept wins" v1 policy.
+#
+# Two configuration shapes are accepted; the lobby reads whichever is present.
+#
+# 1) Sub-configuration `terms` block (preferred). Each term is a map keyed
+#    by a free-form label, with `input`, `weight`, and a nested `curve`
+#    sub-map. Supported inputs: mspt, queueDepth, heapUsed, heapFree,
+#    playerCount, keptCount, tps, keptRegion. Supported curves: linear,
+#    exponential (k), logarithmic (k), sigmoid (k, x0), step (threshold),
+#    power (p). Parameter bounds: k in [0.1, 20], p in [0.1, 8],
+#    x0/threshold in [0, 1].
+#
+# 2) Legacy flat weights (msptWeight, queueDepthWeight, heapWeight,
+#    playerCountWeight) are synthesized to linear terms for back-compat.
+#
+# `regionScarcityWeight` (default 1.0) controls the synthesized
+# region-scarcity term. Set to 0 to disable it (e.g. when you add an
+# explicit `keptRegion` input term and want full control). Adding any
+# explicit `keptRegion` term suppresses the synthesized one automatically.
+#
+# The block below is commented out so lobbies use bundled defaults
+# (synthesized region-scarcity term only; matches the prior "most-kept"
+# behaviour with a smooth fall-off instead of a hard argmax). Uncomment
+# and tune for your deployment.
+#
+# Five terms, one per metric (no doubled constraints). The curve carries
+# the soft-vs-hard expression: `step` near the top of its range acts as a
+# gate that only fires when the metric is critical, but the candidate can
+# still win if every alternative is even worse (graceful degradation).
+#   - mspt:   sigmoid x0=0.6 (production knee; fires when tick is under pressure)
+#   - queue:  exponential (small queues silent, large ones explode)
+#   - heap:   step at heapUsed >= 0.85, weight 5.0 (effective gate)
+#   - region: step at keptRegion >= 0.95, weight 5.0 (effective gate)
+#   - kept:   logarithmic, weight 0.25 (gentle tie-breaker)
+# regionScarcityWeight is 0 because the explicit `region` term below owns
+# the kept-region signal.
+#loadBalancer:
+#  regionScarcityWeight: 0
+#  terms:
+#    mspt:
+#      input: mspt
+#      weight: 1.0
+#      curve:
+#        type: sigmoid
+#        k: 8.0
+#        x0: 0.6
+#    queue:
+#      input: queueDepth
+#      weight: 1.0
+#      curve:
+#        type: exponential
+#        k: 3.0
+#    heap:
+#      input: heapUsed
+#      weight: 5.0
+#      curve:
+#        type: step
+#        threshold: 0.85
+#    region:
+#      input: keptRegion
+#      weight: 5.0
+#      curve:
+#        type: step
+#        threshold: 0.95
+#    kept:
+#      input: keptCount
+#      weight: 0.25
+#      curve:
+#        type: logarithmic
+#        k: 9.0

@@ -107,6 +107,18 @@ final class RedisLuaScriptsTest {
     }
 
     @Test
+    @DisplayName("dequeueReadyOwned.lua sidecar matches LF-normalized script bytes")
+    void dequeueReadyOwnedLuaSidecarMatches() {
+        RedisLuaScripts s = RedisLuaScripts.load("dequeueReadyOwned");
+        assertNotNull(s.body());
+        assertTrue(s.body().length() > 0);
+        assertEquals(40, s.sha1().length());
+        assertTrue(s.sha1().matches("[0-9a-f]{40}"));
+        assertEquals("dequeueReadyOwned", s.name());
+        assertTrue(s.body().indexOf('\r') < 0);
+    }
+
+    @Test
     @DisplayName("load() refuses unknown script names with a clear message")
     void loadMissingScriptFails() {
         IllegalStateException ex = assertThrows(IllegalStateException.class,

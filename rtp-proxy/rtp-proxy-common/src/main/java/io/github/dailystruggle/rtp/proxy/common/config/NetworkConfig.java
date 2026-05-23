@@ -41,6 +41,13 @@ public final class NetworkConfig {
     private final int redisPort;
     private final String redisPassword;
     private final long reservationReapIntervalMs;
+    private final boolean waitlistEnabled;
+    private final int waitlistMaxSize;
+    private final long waitlistDrainIntervalMs;
+    private final long waitlistDrainPauseMs;
+    private final long waitlistLeaderLeaseHoldMs;
+    private final long waitlistReapIntervalMs;
+    private final long waitlistReapMaxAgeMs;
 
     private NetworkConfig(Builder b) {
         this.enabled = b.enabled;
@@ -56,6 +63,13 @@ public final class NetworkConfig {
         this.redisPort = b.redisPort;
         this.redisPassword = b.redisPassword;
         this.reservationReapIntervalMs = b.reservationReapIntervalMs;
+        this.waitlistEnabled = b.waitlistEnabled;
+        this.waitlistMaxSize = b.waitlistMaxSize;
+        this.waitlistDrainIntervalMs = b.waitlistDrainIntervalMs;
+        this.waitlistDrainPauseMs = b.waitlistDrainPauseMs;
+        this.waitlistLeaderLeaseHoldMs = b.waitlistLeaderLeaseHoldMs;
+        this.waitlistReapIntervalMs = b.waitlistReapIntervalMs;
+        this.waitlistReapMaxAgeMs = b.waitlistReapMaxAgeMs;
     }
 
     public boolean enabled() { return enabled; }
@@ -79,6 +93,33 @@ public final class NetworkConfig {
      * reaping silently.
      */
     public long reservationReapIntervalMs() { return reservationReapIntervalMs; }
+
+    /**
+     * ADR-015 / REQ-RTP-NET-015. When {@code true}, the proxy-side dispatcher
+     * parks no-backend envelopes on a shared {@link io.github.dailystruggle.rtp.proxy.common.spi.NetworkWaitlist}
+     * instead of resolving as terminal {@code FAILED}, and a periodic
+     * {@link io.github.dailystruggle.rtp.proxy.common.dispatch.NetworkWaitlistDrainer}
+     * pulse reinjects parked envelopes as capacity appears.
+     */
+    public boolean waitlistEnabled() { return waitlistEnabled; }
+
+    /** Hard cap on the shared waitlist; over-cap enrolments reject as {@code REJECTED_FULL}. */
+    public int waitlistMaxSize() { return waitlistMaxSize; }
+
+    /** Drainer pulse cadence in millis; should track {@link #heartbeatIntervalMs()}. */
+    public long waitlistDrainIntervalMs() { return waitlistDrainIntervalMs; }
+
+    /** Drainer backoff window after a total-failure pulse (ADR-015 Slice 2.4a). */
+    public long waitlistDrainPauseMs() { return waitlistDrainPauseMs; }
+
+    /** Leader-lease TTL in millis; lease is re-extended on every successful pulse. */
+    public long waitlistLeaderLeaseHoldMs() { return waitlistLeaderLeaseHoldMs; }
+
+    /** Reaper pulse cadence in millis; catches orphan entries from crashed proxies. */
+    public long waitlistReapIntervalMs() { return waitlistReapIntervalMs; }
+
+    /** Maximum age before an entry is reaped on quit-event miss. */
+    public long waitlistReapMaxAgeMs() { return waitlistReapMaxAgeMs; }
 
     /**
      * Parse a raw {@code network.yml} document into a {@code NetworkConfig}.
@@ -146,6 +187,24 @@ public final class NetworkConfig {
         Map<String, Object> reservation = asMap(root, "reservation");
         long reapMs = asLong(reservation, "reapIntervalMs", 30_000L);
         b.reservationReapIntervalMs = reapMs > 0 ? reapMs : 30_000L;
+
+        // ADR-015 / REQ-RTP-NET-015: shared cross-proxy waitlist knobs.
+        // Non-positive cadences clamp to the default so a misconfigured zero
+        // cannot silently disable the drainer/reaper.
+        Map<String, Object> waitlist = asMap(network, "waitlist");
+        b.waitlistEnabled = asBool(waitlist, "enabled", true);
+        int maxSize = asInt(waitlist, "maxSize", 1024);
+        b.waitlistMaxSize = maxSize > 0 ? maxSize : 1024;
+        long drainMs = asLong(waitlist, "drainIntervalMs", 1000L);
+        b.waitlistDrainIntervalMs = drainMs > 0 ? drainMs : 1000L;
+        long pauseMs = asLong(waitlist, "drainPauseMs", 2000L);
+        b.waitlistDrainPauseMs = pauseMs >= 0 ? pauseMs : 2000L;
+        long leaseMs = asLong(waitlist, "leaderLeaseHoldMs", 5000L);
+        b.waitlistLeaderLeaseHoldMs = leaseMs > 0 ? leaseMs : 5000L;
+        long reapEveryMs = asLong(waitlist, "reapIntervalMs", 10_000L);
+        b.waitlistReapIntervalMs = reapEveryMs > 0 ? reapEveryMs : 10_000L;
+        long reapMaxMs = asLong(waitlist, "reapMaxAgeMs", 60_000L);
+        b.waitlistReapMaxAgeMs = reapMaxMs > 0 ? reapMaxMs : 60_000L;
 
         // Fail-fast: redis transport requires a host (Phase 2e-Redis A1).
         if (b.enabled && "redis".equalsIgnoreCase(b.transportType)) {
@@ -237,5 +296,12 @@ public final class NetworkConfig {
         int redisPort;
         String redisPassword;
         long reservationReapIntervalMs;
+        boolean waitlistEnabled;
+        int waitlistMaxSize;
+        long waitlistDrainIntervalMs;
+        long waitlistDrainPauseMs;
+        long waitlistLeaderLeaseHoldMs;
+        long waitlistReapIntervalMs;
+        long waitlistReapMaxAgeMs;
     }
 }

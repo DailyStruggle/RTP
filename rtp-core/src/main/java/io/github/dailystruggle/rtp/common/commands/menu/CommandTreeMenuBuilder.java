@@ -527,7 +527,11 @@ public final class CommandTreeMenuBuilder {
                         openArgs[i] = parentPath.get(i);
                     }
                     openArgs[parentPath.size()] = paramName + "=" + value;
-                    valueLines.add(MenuLine.of(new MenuFragment(value, null,
+                    // Book parchment contrast: clickable value rows default to
+                    // vanilla book yellow on Paper Books; prefix &2 (dark
+                    // green) so the row reads cleanly against parchment. Per
+                    // .junie/AGENTS.md 'Book Menu Color Contrast'.
+                    valueLines.add(MenuLine.of(new MenuFragment("&2" + value, null,
                             new MenuAction.OpenMenu(openArgs))));
                 }
             }
@@ -749,6 +753,14 @@ public final class CommandTreeMenuBuilder {
                 if (key == null) continue;
                 if (!loaded.containsKey(key)) continue;
                 if (stagedKeys.contains(key.name().toUpperCase(java.util.Locale.ROOT))) continue;
+                // `version` is a config-file schema marker (the value the
+                // YAML loader stamps so future migrations can detect old
+                // layouts). It is not a user-editable knob: surfacing it in
+                // the staging cart would let an operator stage a bogus
+                // version string and silently break the next reload. Filter
+                // it out of the Changeable list (case-insensitive to cover
+                // both `version` and `VERSION` enum spellings across files).
+                if ("VERSION".equals(key.name().toUpperCase(java.util.Locale.ROOT))) continue;
                 visibleKeys.add(key);
             }
         }
@@ -786,12 +798,20 @@ public final class CommandTreeMenuBuilder {
             if (hasCart) {
                 // Book parchment contrast: avoid yellow (&e/&6) and white
                 // (&f) per .junie/AGENTS.md 'Book Menu Color Contrast'.
+                // Header shortened to "pending" so the &l-bolded label fits
+                // on a single book line (the prior "-- pending changes --"
+                // wrapped to two lines on the parchment width).
                 String pendingHeader = lookupMsg(MessagesKeys.configPendingHeader,
-                        "&1&l-- pending changes --");
+                        "&1&l-- pending --");
                 String pendingRowTmpl = lookupMsg(MessagesKeys.configPendingRowFormat,
-                        "&9[key]&8 = &0[value] &8(click to unstage)");
+                        "&9[key]&8 = &0[value]");
+                String pendingRowHover = lookupMsg(MessagesKeys.configPendingRowHover,
+                        "click to unstage");
                 String applyLabel = lookupMsg(MessagesKeys.configApplyRow, "&a&l[apply]");
-                String discardLabel = lookupMsg(MessagesKeys.configDiscardRow, "&c&l[discard]");
+                // Discard row intentionally removed (2026-05-22 per user
+                // request): clicking any pending row already unstages that
+                // entry, and the Back row leaves the page without applying —
+                // a dedicated Discard button is redundant and noisy.
                 lines.add(MenuLine.of(new MenuFragment(pendingHeader, null, null)));
                 // Iterate in reverse insertion order so the freshest entry
                 // is the first row under the Pending header. cartSnapshot
@@ -804,7 +824,9 @@ public final class CommandTreeMenuBuilder {
                     String label = pendingRowTmpl
                             .replace("[key]", e.getKey())
                             .replace("[value]", e.getValue());
-                    lines.add(MenuLine.of(new MenuFragment(label, null,
+                    // Hover carries the "click to unstage" hint so the row
+                    // label stays compact (single-line) and clean.
+                    lines.add(MenuLine.of(new MenuFragment(label, pendingRowHover,
                             new MenuAction.UnstageConfigValue(fileName, e.getKey()))));
                     if (lines.size() - 2 >= rowsPerPage) {
                         pages.add(new MenuPage(lines));
@@ -815,8 +837,6 @@ public final class CommandTreeMenuBuilder {
                 }
                 lines.add(MenuLine.of(new MenuFragment(
                         applyLabel, null, new MenuAction.ApplyStagedConfig(fileName))));
-                lines.add(MenuLine.of(new MenuFragment(
-                        discardLabel, null, new MenuAction.DiscardStagedConfig(fileName))));
                 if (lines.size() - 2 >= rowsPerPage) {
                     pages.add(new MenuPage(lines));
                     lines = new ArrayList<>();

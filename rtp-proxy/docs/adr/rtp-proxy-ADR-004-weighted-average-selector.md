@@ -3,6 +3,8 @@
 **Status:** Accepted
 **Accepted:** 2026-05-14
 **Date:** 2026-05-13
+**Amended:** 2026-05-22 (curve catalogue + configurable scoring table landed in `rtp-proxy-common.selector`)
+**Amended:** 2026-05-22 (region-pair scoring; lobby and proxy unified on `RegionAwareSelector`)
 **Refines:** [ADR-036](../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md)
 **Depends on:** [rtp-proxy-ADR-001](rtp-proxy-ADR-001-spi-shape.md), [rtp-proxy-ADR-002](rtp-proxy-ADR-002-network-yml-schema.md)
 
@@ -82,6 +84,53 @@ Owned by `ReservationClient` (ADR-001) but parameterised here:
 
 - **Positive:** one selector to test, document, and tune. Operators get full curve control without code changes.
 - **Negative:** more knobs to understand. Mitigation: the bundled defaults (ADR-002) are tuned for the headline goal; the admin docs ship rendered curve plots in Phase 3.
+
+## Implementation (2026-05-22)
+
+The 2026-05-22 amendment landed the full curve catalogue and the configurable scoring table:
+
+- `selector/curve/Curve` SPI + `Curves` catalogue: `linear`, `exponential(k)`, `logarithmic(k)`, `sigmoid(k, x0)`, `step(threshold)`, `power(p)`. Parameter bounds (`k in [0.1, 20]`, `p in [0.1, 8]`, `x0`/`threshold in [0, 1]`) are enforced via clamping; out-of-range inputs are clamped to `[0, 1]`.
+- `selector/MetricInput` enum (one normalized extractor per input). Supersedes the v1 hardcoded four-term sum:
+  - Original ADR set: `mspt` (normalized by 50 ms), `queueDepth` (by `max(1, softCap)`), `heapUsed` (by `heapMax`), `playerCount` (by 100).
+  - Added on 2026-05-22: `heapFree` (alias for the used-ratio expressed as "remaining capacity"), `keptCount` (inverted, normalized by 64), `tps` (derived from `mspt` as `1 - min(20, 1000/mspt) / 20`; `BackendHeartbeat` does not yet publish TPS directly).
+- `selector/ScoringTerm` record `(MetricInput input, double weight, Curve curve)` is the row of the operator-facing scoring table.
+- `LoadBalancerConfig` carries a `List<ScoringTerm> terms` field. When empty (e.g. when constructed via the pre-curve six-arg legacy constructor), the compact constructor synthesizes a `linear` term per non-zero legacy weight, preserving binary and behavioural compatibility for every existing call site (`LoadBalancerConfig.defaults()` and the existing test suite).
+- `LoadBalancerConfigYaml.fromMap(Map<String, Object>)` parses both the new `loadBalancer.terms` sub-configuration block (nested `curve:` sub-map, no inline-brace YAML) and the legacy flat-weight keys. Unknown `input` or `curve.type` values raise `IllegalArgumentException` with a descriptive message instead of silently degrading.
+- Operator documentation: commented-out reference block in `rtp-proxy-velocity/src/main/resources/network-proxy.yml`. The Velocity bootstrap still passes `LoadBalancerConfig.defaults()` at the time of this amendment; wiring the YAML loader through `RtpVelocityPlugin` is a follow-up tracked outside this ADR.
+
+Coverage: `CurvesTest`, `WeightedAverageBackendSelectorCurvesTest`, `LoadBalancerConfigYamlTest` (all in `rtp-proxy-common`). Existing `WeightedAverageBackendSelectorTest`, `BackendSelectorRegionFilteringTest`, `BackendSelectorServerIdFilterTest` remain green via the legacy-weight synthesis path.
+
+## Region-Pair Scoring (2026-05-22)
+
+The original ADR scored backends. In practice the no-region `/rtp` entry point (blank command on a lobby; proxy-side join with no `regionKey` hint) needs `(serverId, regionKey)`, not just `serverId`. Before this amendment that decision lived in a separate "v1 most-kept" picker (`PeerRegionRegistry.pickMostKept`, hardcoded "max `regionKeptCounts` wins, lex tiebreak"). That forked the load-balancing logic across lobby and proxy.
+
+`RegionAwareSelector` unifies both call sites on one scoring path:
+
+- The candidate set is every `(b, r)` pair surfaced by the snapshot (`b.regions()` falling back to `regionsAvailable` falling back to the keys of `regionKeptCounts`).
+- Filtering matches the backend-scoped selector: staleness, `pluginState == READY`, `acceptingRequests`, `!killSwitch`, optional `excludedServerId` (lobby self), optional `worldKey` constraint. A pinned `request.regionKey` collapses the per-backend region loop to that single key.
+- Scoring: `score(b, r) = ( Σ_i weight_i * curve_i( input_i.normalize(b, r) ) ) / backendWeight(b)`. The `Σ_i` runs over `LoadBalancerConfig.terms()` plus, when no explicit `KEPT_REGION` term is present and `regionScarcityWeight > 0`, the *synthesized* region-scarcity term.
+- Tie-break: `score` asc, `serverId` asc, `regionKey` asc.
+
+### Synthesized Region-Scarcity Term
+
+A new `MetricInput.KEPT_REGION` extracts `1 - min(1, regionKeptCounts[r] / 64)`. Operators may add it as an explicit `ScoringTerm` and pick any curve. When they don't, the config synthesizes one with weight `regionScarcityWeight` (default `1.0`) and curve `exponential(k=5)`. The exponential default is deliberate: a region 90% empty contributes ~0.85 to the score while a region only 50% empty contributes ~0.07, "drastically prioritising warm regions when shallow". An operator who wants a different shape adds an explicit `KEPT_REGION` term and the synthesized one steps aside (one knob per axis; no special-case curve config field, every input gets its curve through `ScoringTerm` like all the others).
+
+### Where The Selector Is Used
+
+- **Lobby-side** (`PeerRegionRegistry.pickMostKept`): the blank `/rtp` entry from a lobby. Excludes `localServerId` (so the lobby doesn't pick itself), applies the existing `localDecrements` bookkeeping via the `PostScoreAdjust` hook.
+- **Proxy-side fallback**: when `RtpDispatcher` receives an `RtpRequest` with no `regionKey` (e.g. a join-time RTP that the lobby did not pre-decide), the dispatcher calls `RegionAwareSelector` to produce `(serverId, regionKey)` and uses both for the reservation. The existing `WeightedAverageBackendSelector.choose` path remains the entry point for requests that already carry a `regionKey` or a `serverIdFilter`; the two coexist by design.
+
+### Region == Server Collapse
+
+In typical deployments each backend hosts one region (often named after the server). The pair-wise sum collapses to "per-backend score plus a constant", and the `(serverId asc, regionKey asc)` tiebreak preserves the determinism of the legacy backend-only path. Multi-region backends are handled the same way: each `(b, r)` is scored independently, so a backend with two regions does not unfairly outweigh a peer with one.
+
+### Why Not Fork Lobby And Proxy
+
+Operators tune curves and weights in `network.yml` once. The lobby and proxy disagree only when they observe different snapshots (different Redis read instants), which self-corrects on the next heartbeat tick. Forking would mean two config blocks, two tuning passes, and inevitable divergence.
+
+### Coverage
+
+`RegionAwareSelectorTest` (12 cases): defaults pick the warmest region; empty-pool penalty under the exponential default; pinned regionKey collapse; self-exclusion; killSwitch/STARTING/draining filter; staleness filter; MSPT term overriding scarcity when weighted high; explicit `KEPT_REGION` term suppressing the synthesized one; `regionScarcityWeight=0` disabling the bias; per-(backend, region) pair-wise scoring; `backendWeights` divisor; `PostScoreAdjust` hook (the lobby decrements analog). `LobbyModeTest` (18 cases) covers the lobby integration path through `PeerRegionRegistry.pickMostKept` and remains green byte-identical to the legacy "most-kept" behaviour with default config.
 
 ## References
 

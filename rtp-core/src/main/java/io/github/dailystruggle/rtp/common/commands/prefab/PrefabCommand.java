@@ -74,12 +74,8 @@ public class PrefabCommand extends BaseRTPCmdImpl {
     public boolean onCommand(UUID callerId,
                              Map<String, List<String>> parameterValues,
                              @Nullable CommandsAPICommand nextCommand) {
-        // Delegate to a child if one is selected; otherwise fall through to
-        // the inherited TreeCommand help() listing (mirrors how ReloadCmd
-        // surfaces its child reload-targets when called bare).
-        if (nextCommand != null) {
-            return nextCommand.onCommand(callerId, parameterValues, null);
-        }
+        // CommandsAPI already drives the next command in the sequence; this
+        // bare verb has no work of its own when called as a tree node.
         return true;
     }
 }

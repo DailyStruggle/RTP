@@ -177,6 +177,7 @@ Most rows below are **unimplemented**; the multi-server / proxy subsystem is gov
 | REQ-RTP-NET-012 | Exactly-once reservation claim across the network | MULTI_SERVER_PLAN.md � *Reservation Tokens � Lifecycle ownership matrix*; ADR-036 | � (unimplemented) | � |
 | REQ-RTP-NET-013 | Multi-flavour persistence compatibility (any shipped SQL accessor) | MULTI_SERVER_PLAN.md *Storage - Reuse `AbstractSQLDatabaseAccessor`*; ADR-036 §D3 | `AbstractSQLDatabaseAccessor.networkStateBinding` slot is inherited by every concrete accessor (`H2`, `SQLite`, `MySQL`, `PostgreSQL`) | (covered transitively by accessor tests; binding plumbing exercised by `ReqRtpNet002NetworkDisabledNoOpTest`) |
 | REQ-RTP-NET-014 | Multi-proxy concurrency and reanimation (no singleton proxy assumption) | MULTI_SERVER_PLAN.md � *Multi-Proxy Deployment*; ADR-036 | � (unimplemented) | � |
+| REQ-RTP-NET-015 | Shared network waitlist for cross-server `/rtp` (parks unservable enrolments, per-player point-remove, batch drain sized by per-backend `networkKeptCount`) | `rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch`; `CHECKLIST-network-waitlist.md` | `io.github.dailystruggle.rtp.proxy.common.spi.NetworkWaitlist` (SPI); `InMemoryNetworkWaitlist` (reference impl, Slice 1) | `InMemoryNetworkWaitlistTest` (15/15: lifecycle, idempotency, duplicate-player rejection, full-capacity rejection, FIFO drain, per-backend cap, global cap, point-remove, TTL reap) |
 
 ---
 

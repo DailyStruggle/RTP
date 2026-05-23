@@ -4,126 +4,112 @@
   "spatialResolution": 3,
   "badLocations": [
     {
-      "start": 5197,
+      "start": 3992,
       "length": 1
     },
     {
-      "start": 5806,
+      "start": 19430,
       "length": 1
     },
     {
-      "start": 8984,
+      "start": 53062,
       "length": 1
     },
     {
-      "start": 10842,
+      "start": 66482,
       "length": 1
     },
     {
-      "start": 18812,
+      "start": 69532,
       "length": 1
     },
     {
-      "start": 33253,
+      "start": 73797,
       "length": 1
     },
     {
-      "start": 40396,
-      "length": 1
-    },
-    {
-      "start": 52779,
-      "length": 1
-    },
-    {
-      "start": 54416,
-      "length": 1
-    },
-    {
-      "start": 56748,
-      "length": 1
-    },
-    {
-      "start": 59228,
-      "length": 1
-    },
-    {
-      "start": 78479,
-      "length": 1
-    },
-    {
-      "start": 88332,
-      "length": 1
-    },
-    {
-      "start": 95407,
-      "length": 1
-    },
-    {
-      "start": 97745,
-      "length": 1
-    },
-    {
-      "start": 107503,
-      "length": 1
-    },
-    {
-      "start": 144622,
-      "length": 1
-    },
-    {
-      "start": 163514,
-      "length": 1
-    },
-    {
-      "start": 165317,
+      "start": 80356,
       "length": 2
     },
     {
-      "start": 166282,
+      "start": 83989,
       "length": 1
     },
     {
-      "start": 171760,
+      "start": 100141,
       "length": 1
     },
     {
-      "start": 186401,
+      "start": 116195,
+      "length": 1
+    },
+    {
+      "start": 122059,
+      "length": 1
+    },
+    {
+      "start": 152304,
+      "length": 1
+    },
+    {
+      "start": 157231,
+      "length": 1
+    },
+    {
+      "start": 177651,
+      "length": 2
+    },
+    {
+      "start": 183790,
+      "length": 2
+    },
+    {
+      "start": 190527,
       "length": 1
     }
   ],
   "biomeLocations": {
-    "OLD_GROWTH_BIRCH_FOREST": [
-      {
-        "start": 22832,
-        "length": 3
-      }
-    ],
     "PLAINS": [
       {
-        "start": 17800,
+        "start": 102161,
         "length": 3
       },
       {
-        "start": 113514,
+        "start": 148915,
         "length": 3
       }
     ],
-    "TAIGA": [
+    "SAVANNA": [
       {
-        "start": 137491,
+        "start": 19115,
         "length": 3
       }
     ],
-    "FOREST": [
+    "JUNGLE": [
       {
-        "start": 22516,
+        "start": 90925,
+        "length": 3
+      }
+    ],
+    "SNOWY_TAIGA": [
+      {
+        "start": 134545,
+        "length": 3
+      }
+    ],
+    "BIRCH_FOREST": [
+      {
+        "start": 99461,
         "length": 3
       }
     ],
     "FLOWER_FOREST": [
       {
-        "start": 101219,
+        "start": 79355,
+        "length": 3
+      },
+      {
+        "start": 154821,
         "length": 3
       }
     ]

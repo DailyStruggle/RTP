@@ -57,6 +57,14 @@ public final class TransportRequestTriggerSource {
     private final int workerThreads;
     private final Duration pollTimeout;
     private final Logger logger;
+    /**
+     * Stable id of this proxy node; routed through to ownership-aware
+     * {@link NetworkRequestQueue#dequeueReady(Duration, String)}. When
+     * {@code null} or empty, the worker falls back to the legacy
+     * {@link NetworkRequestQueue#dequeueReady(Duration)} (single-proxy /
+     * in-memory transports). See {@code rtp-proxy-ADR-016}.
+     */
+    private final String thisProxyId;
 
     private final List<Thread> workers = new ArrayList<>();
     private volatile boolean running;
@@ -78,6 +86,21 @@ public final class TransportRequestTriggerSource {
                                          int workerThreads,
                                          Duration pollTimeout,
                                          Logger logger) {
+        this(queue, dispatcher, workerThreads, pollTimeout, logger, null);
+    }
+
+    /**
+     * Ownership-aware constructor (rtp-proxy-ADR-016). When {@code thisProxyId}
+     * is non-null and non-empty the worker uses
+     * {@link NetworkRequestQueue#dequeueReady(Duration, String)} so foreign-
+     * owned envelopes are skipped without losing FIFO order.
+     */
+    public TransportRequestTriggerSource(NetworkRequestQueue queue,
+                                         RtpDispatcher dispatcher,
+                                         int workerThreads,
+                                         Duration pollTimeout,
+                                         Logger logger,
+                                         String thisProxyId) {
         this.queue = Objects.requireNonNull(queue, "queue");
         this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher");
         this.workerThreads = Math.max(1, workerThreads);
@@ -87,6 +110,7 @@ public final class TransportRequestTriggerSource {
         this.pollTimeout = pt;
         this.logger = (logger != null) ? logger
                 : LoggerFactory.getLogger(TransportRequestTriggerSource.class);
+        this.thisProxyId = (thisProxyId == null || thisProxyId.isEmpty()) ? null : thisProxyId;
     }
 
     /**
@@ -167,7 +191,9 @@ public final class TransportRequestTriggerSource {
             Optional<NetworkRequestQueue.QueueEnvelope> popped;
             try {
                 CompletableFuture<Optional<NetworkRequestQueue.QueueEnvelope>> fut =
-                        queue.dequeueReady(pollTimeout);
+                        (thisProxyId != null)
+                                ? queue.dequeueReady(pollTimeout, thisProxyId)
+                                : queue.dequeueReady(pollTimeout);
                 // Bound the await slightly past the poll timeout so stop()
                 // can interrupt quickly even if the queue impl is slow to
                 // honour the deadline.

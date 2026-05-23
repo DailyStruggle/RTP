@@ -631,6 +631,7 @@ The canonical wording for every `REQ-RTP-NET-NNN` requirement lives in [`REQUIRE
 | `REQ-RTP-NET-012` | Exactly-once reservation claim | *Reservation Tokens â€” Lifecycle ownership matrix* (`CLAIMED â†’ CONSUMED` row); *Sufficiency Audit* |
 | `REQ-RTP-NET-013` | Multi-flavour persistence compatibility | *Storage â€” Reuse `AbstractSQLDatabaseAccessor`*; *Sufficiency Audit* |
 | `REQ-RTP-NET-014` | Multi-proxy concurrency and reanimation | *Multi-Proxy Deployment*; *Reservation tokens under multiple proxies*; *Phase 2 acceptance* |
+| `REQ-RTP-NET-015` | Shared network waitlist for cross-server `/rtp` (parks unservable enrolments; per-player point-remove; per-backend `networkKeptCount`-sized batch drain) | [rtp-proxy-ADR-015](../../rtp-proxy/docs/adr/rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md); [`CHECKLIST-network-waitlist.md`](scratch/CHECKLIST-network-waitlist.md). Slice 1 (SPI + in-memory reference impl) landed 2026-05-21; Slices 2-5 (dispatcher rewiring, Redis impl + Lua, lobby-side notify/lock/quit-remove, locale parity) deferred. |
 
 > Authoring rules for any future amendments: see [`docs/dev/RULES.md`](RULES.md) and the *Requirement Documentation Rules* section of [`AGENTS.md`](../../.junie/AGENTS.md) (use `shall` / `shall not`, no implementation actions, no temporal framing).
 

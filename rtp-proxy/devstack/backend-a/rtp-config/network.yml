@@ -1,4 +1,4 @@
-# Devstack backend-a network.yml.
+﻿# Devstack backend-a network.yml.
 network:
   enabled: true
   schemaVersion: 1
@@ -17,3 +17,53 @@ heartbeat:
 reservation:
   ttlMs: 30000
   reapIntervalMs: 5000
+
+# Load balancer scoring table (rtp-proxy-ADR-004 *Region-Pair Scoring*).
+# Devstack uses an active block so acceptance runs exercise the curve
+# pipeline end-to-end. Production baselines ship this commented-out.
+#
+# Five terms, one per metric (no doubled constraints). The curve carries
+# the soft-vs-hard expression: `step` near the top of its range acts as a
+# gate that only fires when the metric is critical, but the candidate can
+# still win if every alternative is even worse (graceful degradation).
+#   - mspt:   sigmoid x0=0.4 (devstack-friendly knee so idle Paper registers)
+#   - queue:  exponential (small queues silent, large ones explode)
+#   - heap:   step at heapUsed >= 0.85, weight 5.0 (effective gate)
+#   - region: step at keptRegion >= 0.95, weight 5.0 (effective gate)
+#   - kept:   logarithmic, weight 0.25 (gentle tie-breaker)
+# regionScarcityWeight is 0 because the explicit `region` term below owns
+# the kept-region signal.
+loadBalancer:
+  regionScarcityWeight: 0
+  terms:
+    mspt:
+      input: mspt
+      weight: 1.0
+      curve:
+        type: sigmoid
+        k: 8.0
+        x0: 0.4
+    queue:
+      input: queueDepth
+      weight: 1.0
+      curve:
+        type: exponential
+        k: 3.0
+    heap:
+      input: heapUsed
+      weight: 5.0
+      curve:
+        type: step
+        threshold: 0.85
+    region:
+      input: keptRegion
+      weight: 5.0
+      curve:
+        type: step
+        threshold: 0.95
+    kept:
+      input: keptCount
+      weight: 0.25
+      curve:
+        type: logarithmic
+        k: 9.0

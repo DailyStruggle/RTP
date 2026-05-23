@@ -12,9 +12,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
 /**
  * Shadow {@link TreeCommand} that mirrors a node from the live {@code /rtp}
  * command tree underneath {@link MenuRedeemSubcommand}.
@@ -109,51 +106,37 @@ public final class MenuMirrorSubcommand extends BaseRTPCmdImpl implements TreeCo
      * Leaf-side dispatch from the args-form walker: when {@code nextCommand
      * != null} the parser is about to descend into a child mirror, so return
      * {@code true} (continuation will fire the child). Otherwise this is the
-     * resolved leaf — assemble the staged {@code name=value} segments from
-     * {@code parameterValues} and render the menu at {@link #target}.
+     * resolved leaf — hand the constructor-supplied sub-command path and the
+     * parsed {@code parameterValues} map to {@link MenuRedeemSubcommand#renderForPath}
+     * verbatim. Per commands-api/docs/README.md, the wire grammar has exactly
+     * two token shapes — bare literal (sub-command) and {@code name=value}
+     * (parameter) — and commands-api has already split them for us. We
+     * deliberately do <strong>not</strong> re-encode parameters back into the
+     * path here: that bypasses the framework's parsing contract and forces
+     * downstream consumers to re-implement the split (the regression that
+     * surfaced staged keys to {@code dispatchOpenConfigKey} as opaque tokens
+     * like {@code "canceldistance=5"}).
      */
     @Override
-    public boolean onCommand(@NotNull UUID senderId,
-                             @NotNull Map<String, List<String>> parameterValues,
-                             @Nullable CommandsAPICommand nextCommand) {
-        return onCommand(senderId, parameterValues, nextCommand, msg -> {});
-    }
-
-    @Override
-    public boolean onCommand(@NotNull UUID senderId,
-                             @NotNull Map<String, List<String>> parameterValues,
-                             @Nullable CommandsAPICommand nextCommand,
-                             @NotNull Consumer<String> messageMethod) {
+    public boolean onCommand(UUID senderId,
+                             Map<String, List<String>> parameterValues,
+                             CommandsAPICommand nextCommand) {
         if (nextCommand != null) {
             // Intermediate node — let the parser descend into the child mirror.
             return true;
         }
-        List<String> assembled = new ArrayList<>(path);
-        if (parameterValues != null) {
-            for (Map.Entry<String, List<String>> entry : parameterValues.entrySet()) {
-                String key = entry.getKey();
-                List<String> vals = entry.getValue();
-                if (key == null || vals == null || vals.isEmpty()) continue;
-                // Skip the `page` parameter — it controls pagination of the
-                // rendered model, not a staged subcommand argument.
-                if (MenuRedeemSubcommand.PARAM_PAGE.equalsIgnoreCase(key)) continue;
-                // Re-encode as `name=value[,value...]` matching commands-api wire form.
-                StringBuilder sb = new StringBuilder(key).append('=');
-                for (int i = 0; i < vals.size(); i++) {
-                    if (i > 0) sb.append(',');
-                    sb.append(vals.get(i));
-                }
-                assembled.add(sb.toString());
-            }
-        }
         int pageIndex = MenuRedeemSubcommand.extractPageIndex(parameterValues);
+        // No messageMethod available on the canonical 3-arg contract; the
+        // commands-api default-method (CommandsAPICommand line 75) delegates
+        // the 4-arg form here and discards the consumer, so renderForPath
+        // receives a no-op sink consistent with the framework's own fallback.
         return redeem.renderForPath(
                 senderId,
                 target,
-                List.copyOf(assembled),
+                path,
                 parameterValues,
                 pageIndex,
-                messageMethod);
+                msg -> {});
     }
 
 }

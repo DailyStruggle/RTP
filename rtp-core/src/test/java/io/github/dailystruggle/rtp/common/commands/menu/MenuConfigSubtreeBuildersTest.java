@@ -200,9 +200,17 @@ class MenuConfigSubtreeBuildersTest {
                 keyFragments.add(f);
             }
         }
-        PerformanceKeys[] expected = PerformanceKeys.values();
+        // `version` is a schema marker, intentionally filtered out of the
+        // editable key list (2026-05-22 polish). Build the expected list by
+        // dropping it.
+        java.util.List<PerformanceKeys> expectedList = new java.util.ArrayList<>();
+        for (PerformanceKeys k : PerformanceKeys.values()) {
+            if ("VERSION".equalsIgnoreCase(k.name())) continue;
+            expectedList.add(k);
+        }
+        PerformanceKeys[] expected = expectedList.toArray(new PerformanceKeys[0]);
         assertEquals(expected.length, keyRows.size(),
-                "aggregate: one OpenConfigKey per enum constant");
+                "aggregate: one OpenConfigKey per editable enum constant (version excluded)");
         for (int i = 0; i < expected.length; i++) {
             assertEquals("performance.yml", keyRows.get(i).fileName());
             assertEquals(expected[i].name(), keyRows.get(i).paramName(),
@@ -292,7 +300,16 @@ class MenuConfigSubtreeBuildersTest {
         // Need at least two keys so that "omit one" is meaningful.
         org.junit.jupiter.api.Assumptions.assumeTrue(all.length >= 2,
                 "PerformanceKeys must have >= 2 constants for this test");
-        PerformanceKeys omitted = all[0];
+        // Pick an omitted key that is *not* the schema-marker `version` —
+        // the builder filters `version` unconditionally (2026-05-22 polish),
+        // so omitting it from the file makes "only version is missing" a
+        // no-op from the menu's perspective.
+        PerformanceKeys omitted = null;
+        for (PerformanceKeys k : all) {
+            if (!"VERSION".equalsIgnoreCase(k.name())) { omitted = k; break; }
+        }
+        org.junit.jupiter.api.Assumptions.assumeTrue(omitted != null,
+                "PerformanceKeys must have at least one non-version key");
         java.util.EnumMap<PerformanceKeys, Object> sparse =
                 new java.util.EnumMap<>(PerformanceKeys.class);
         for (PerformanceKeys k : all) {
@@ -321,8 +338,14 @@ class MenuConfigSubtreeBuildersTest {
             }
             assertEquals(0, rowsForOmitted,
                     "omitted key '" + omitted.name() + "' must not appear in the menu");
-            assertEquals(sparse.size(), totalKeyRows,
-                    "menu must show exactly one row per loaded key, not per enum constant");
+            // The menu also filters the `version` schema marker; exclude it
+            // from the expected loaded-key count.
+            int expectedRows = 0;
+            for (PerformanceKeys k : sparse.keySet()) {
+                if (!"VERSION".equalsIgnoreCase(k.name())) expectedRows++;
+            }
+            assertEquals(expectedRows, totalKeyRows,
+                    "menu must show exactly one row per loaded editable key (version excluded), not per enum constant");
         } finally {
             // Leave the wired parser in a clean state for any other tests
             // sharing this RTP.configs install in the same class.

@@ -51,7 +51,17 @@ class LobbyModeTest {
     private static NetworkSnapshot snap(BackendHeartbeat... rows) {
         LinkedHashMap<String, BackendHeartbeat> m = new LinkedHashMap<>();
         for (BackendHeartbeat r : rows) m.put(r.serverId(), r);
-        return new NetworkSnapshot(System.currentTimeMillis(), m);
+        // Anchor the snapshot timestamp to the max heartbeat lastSeen so
+        // the unified RegionAwareSelector's staleness filter does not
+        // reject test heartbeats that pin lastSeen to deterministic small
+        // values (e.g. 1L for decrement-anchor tests). Falls back to
+        // current millis when no rows are present.
+        long ts = 0L;
+        for (BackendHeartbeat r : rows) {
+            if (r.lastSeenEpochMs() > ts) ts = r.lastSeenEpochMs();
+        }
+        if (ts == 0L) ts = System.currentTimeMillis();
+        return new NetworkSnapshot(ts, m);
     }
 
     private static NetworkRouter routerWith(NetworkSnapshot s) {
@@ -75,7 +85,7 @@ class LobbyModeTest {
                         hb("backend-b", Set.of("default", "east"),
                                 Map.of("default", 1, "east", 9), false)),
                 "lobby-1");
-        Optional<PeerRegionRegistry.ServerRegion> pick = reg.pickMostKept();
+        Optional<io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion> pick = reg.pickMostKept();
         assertTrue(pick.isPresent());
         assertEquals("backend-b", pick.get().serverId());
         assertEquals("east", pick.get().regionKey());
@@ -88,7 +98,7 @@ class LobbyModeTest {
                         hb("lobby-1", Set.of("default"), Map.of("default", 99), false),
                         hb("backend-a", Set.of("default"), Map.of("default", 2), false)),
                 "lobby-1");
-        Optional<PeerRegionRegistry.ServerRegion> pick = reg.pickMostKept();
+        Optional<io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion> pick = reg.pickMostKept();
         assertTrue(pick.isPresent());
         assertEquals("backend-a", pick.get().serverId());
     }
@@ -100,7 +110,7 @@ class LobbyModeTest {
                         hb("backend-a", Set.of("default"), Map.of("default", 99), /*kill=*/true),
                         hb("backend-b", Set.of("default"), Map.of("default", 1), false)),
                 "lobby-1");
-        Optional<PeerRegionRegistry.ServerRegion> pick = reg.pickMostKept();
+        Optional<io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion> pick = reg.pickMostKept();
         assertTrue(pick.isPresent());
         assertEquals("backend-b", pick.get().serverId());
     }
@@ -127,7 +137,7 @@ class LobbyModeTest {
                         hb("backend-z", Set.of("default"), Map.of("default", 5), false),
                         hb("backend-a", Set.of("default"), Map.of("default", 5), false)),
                 "lobby-1");
-        Optional<PeerRegionRegistry.ServerRegion> pick = reg.pickMostKept();
+        Optional<io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion> pick = reg.pickMostKept();
         assertTrue(pick.isPresent());
         assertEquals("backend-a", pick.get().serverId());
     }
@@ -142,7 +152,7 @@ class LobbyModeTest {
                 List.of("default"), List.of(),
                 false, 0, 0, Set.of(), Map.of());
         PeerRegionRegistry reg = new PeerRegionRegistry(() -> snap(legacy), "lobby-1");
-        Optional<PeerRegionRegistry.ServerRegion> pick = reg.pickMostKept();
+        Optional<io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion> pick = reg.pickMostKept();
         assertTrue(pick.isPresent());
         assertEquals("legacy-1", pick.get().serverId());
         assertEquals("default", pick.get().regionKey());
@@ -309,7 +319,7 @@ class LobbyModeTest {
                         hbFull("backend-b", Set.of("default"),
                                 Map.of("default", 1), /*accepting=*/true, 1L)),
                 "lobby-1");
-        Optional<PeerRegionRegistry.ServerRegion> pick = reg.pickMostKept();
+        Optional<io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion> pick = reg.pickMostKept();
         assertTrue(pick.isPresent());
         assertEquals("backend-b", pick.get().serverId(),
                 "unready peer must be excluded even when its kept count is higher");
@@ -329,7 +339,7 @@ class LobbyModeTest {
                         hbFull("backend-b", Set.of("default"),
                                 Map.of(), /*accepting=*/true, 1L)),
                 "lobby-1");
-        Optional<PeerRegionRegistry.ServerRegion> pick = reg.pickMostKept();
+        Optional<io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion> pick = reg.pickMostKept();
         assertTrue(pick.isPresent());
         assertEquals("backend-b", pick.get().serverId());
     }

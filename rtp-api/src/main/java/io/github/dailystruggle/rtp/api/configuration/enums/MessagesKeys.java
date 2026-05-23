@@ -546,6 +546,11 @@ public enum MessagesKeys {
    */
   configPendingRowFormat,
   /**
+   * Hover text shown when the viewer hovers over a pending (staged) row
+   * on a config-file page. No placeholders. Configurable per REQ-RTP-F-013.
+   */
+  configPendingRowHover,
+  /**
    * Clickable label for the "apply staged changes" row on a config-file
    * page. Dispatches
    * {@link io.github.dailystruggle.rtp.api.menu.MenuAction.ApplyStagedConfig}
@@ -610,6 +615,26 @@ public enum MessagesKeys {
    * carries the FIFO position (0 == head). Configurable per REQ-RTP-F-013.
    */
   networkQueued,
+  /**
+   * Sent when a player runs {@code /rtp*} while already holding a non-terminal
+   * cross-server enrolment (ADR-015 / REQ-RTP-NET-015 Slice 4 command-lock).
+   * Placeholder {@code [position]} carries the FIFO position when known;
+   * an empty value indicates the proxy has not yet assigned one.
+   * Configurable per REQ-RTP-F-013.
+   */
+  alreadyQueued,
+  /**
+   * Sent when a cross-server waitlist entry was reaped after exceeding its
+   * configured TTL (ADR-015 Slice 5). No placeholders. Configurable per
+   * REQ-RTP-F-013.
+   */
+  networkTimedOut,
+  /**
+   * Sent when a cross-server waitlist enrolment is rejected because the
+   * shared waitlist has reached its configured maximum size (ADR-015
+   * {@code REJECTED_FULL}). No placeholders. Configurable per REQ-RTP-F-013.
+   */
+  waitlistFull,
   /**
    * Sent when the proxy has picked a backend for this request and the
    * reservation is being claimed. No placeholders. Configurable per REQ-RTP-F-013.
