@@ -314,8 +314,8 @@ final class AdminPanelBuilderTest {
         MenuModel model = new AdminPanelBuilder(registry)
                 .build(root, UUID.randomUUID(), perm -> true);
 
-        // After the Setup-section collapse (one row that dispatches
-        // `/rtp admin prefab list` instead of seven inline prefab rows)
+        // After the Setup-section collapse (one row that opens the
+        // prefab subtree via OpenMenu instead of seven inline prefab rows)
         // a fully-populated admin panel comfortably fits within a single
         // book page, but the pagination invariants must still hold: no
         // page may exceed LINES_PER_PAGE, and the Back row must always
@@ -337,17 +337,32 @@ final class AdminPanelBuilderTest {
     // ------------------------------------------------------------------------
 
     @Test
-    @DisplayName("Setup section: single RunRtpCommand row dispatching /rtp admin prefab list")
-    void setupSection_emitsSinglePrefabListRow() {
+    @DisplayName("Setup section: single OpenParamPicker row opening the prefab id picker")
+    void setupSection_emitsSinglePrefabPickerRow() {
         LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
         MenuModel model = new AdminPanelBuilder(registry)
                 .build(root, UUID.randomUUID(), perm -> true);
 
+        // The Setup section is a single entry-point row that opens the
+        // prefab `id` parameter picker directly (server-resolved by
+        // MenuRedeemSubcommand, rendering one clickable row per value
+        // from PrefabIdParameter.values()), giving the operator the
+        // clickable prefab-selection book menu without flooding the
+        // admin panel page itself with per-prefab rows. The chat-list
+        // dispatch, the one-row-per-prefab inline layout, and the
+        // intermediate OpenMenu({admin,prefab}) subcommand-list page
+        // are all prior regressions.
         assertNotNull(
+                findOpenParamPicker(model, "id", "admin", "prefab", "apply"),
+                "Setup section must emit an OpenParamPicker({admin,prefab,apply}, id) row");
+        assertNull(
                 findRunWithArgs(model, "admin", "prefab", "list"),
-                "Setup section must emit a single RunRtpCommand({admin,prefab,list}) row");
+                "Setup section must not dispatch the chat-list verb (prior regression)");
+        assertNull(
+                findOpenMenuToPath(model, "admin", "prefab"),
+                "Setup section must not open the apply/confirm/rollback/list subcommand-list page (prior regression)");
     }
 
     @Test
@@ -361,7 +376,7 @@ final class AdminPanelBuilderTest {
                         perm -> !AdminPanelBuilder.PREFAB_PERMISSION.equals(perm));
 
         assertNull(
-                findRunWithArgs(model, "admin", "prefab", "list"),
+                findOpenParamPicker(model, "id", "admin", "prefab", "apply"),
                 "Setup row must be hidden without rtp.admin.prefab");
         // Setup divider literal must not leak either.
         assertFalse(hasFragmentContaining(model, "setup (quick start)"),
@@ -379,7 +394,7 @@ final class AdminPanelBuilderTest {
                         perm -> { throw new RuntimeException("boom"); });
 
         assertNull(
-                findRunWithArgs(model, "admin", "prefab", "list"),
+                findOpenParamPicker(model, "id", "admin", "prefab", "apply"),
                 "Setup row must be hidden when probe throws");
     }
 
@@ -463,6 +478,37 @@ final class AdminPanelBuilderTest {
                             && open.path().length >= 1
                             && firstSegment.equals(open.path()[0])) {
                         return open;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private static MenuAction findOpenMenuToPath(MenuModel model, String... expected) {
+        for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {
+            for (MenuLine line : page.lines()) {
+                for (MenuFragment frag : line.fragments()) {
+                    if (frag.action() instanceof MenuAction.OpenMenu open
+                            && argsMatch(open.path(), expected)) {
+                        return open;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private static MenuAction findOpenParamPicker(MenuModel model,
+                                                  String paramName,
+                                                  String... parentPath) {
+        for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {
+            for (MenuLine line : page.lines()) {
+                for (MenuFragment frag : line.fragments()) {
+                    if (frag.action() instanceof MenuAction.OpenParamPicker picker
+                            && paramName.equals(picker.paramName())
+                            && argsMatch(picker.parentPath(), parentPath)) {
+                        return picker;
                     }
                 }
             }

@@ -1,24 +1,17 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
-import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.logging.Level;
 
 import org.jetbrains.annotations.Nullable;
@@ -47,6 +40,14 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
     public PrefabConfirmCmd(@Nullable CommandsAPICommand parent, PrefabNonceStore nonceStore) {
         super(parent);
         this.nonceStore = nonceStore;
+        addParameter("id",
+                new PrefabIdParameter(PrefabCommand.PERMISSION,
+                        "bundled prefab id",
+                        (uuid, s) -> true));
+        addParameter("token",
+                new PrefabTokenParameter(PrefabCommand.PERMISSION,
+                        "confirmation token from /rtp admin prefab apply",
+                        (uuid, s) -> true));
     }
 
     @Override
@@ -64,58 +65,32 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         return "confirm a pending prefab apply by token";
     }
 
-    /**
-     * Capture the {@code <id>} and {@code <token>} positionals from the
-     * args-form dispatch path - mirrors {@link PrefabApplyCmd}'s override.
-     * Both positionals are stashed under their own value as key with an
-     * empty list (the shape {@link #extractTwoPositionals(Map)} already
-     * accepts) so a TreeCommand parse of {@code /rtp admin prefab confirm
-     * <id> <token>} reaches the map form intact.
-     */
-    @Override
-    public CompletableFuture<Boolean> onCommand(@NotNull UUID callerId,
-                                                @NotNull Predicate<String> permissionCheckMethod,
-                                                @NotNull Consumer<String> messageMethod,
-                                                @NotNull String[] args,
-                                                int i,
-                                                @Nullable Map<String, CommandParameter> tempParameters) {
-        if (!permissionCheckMethod.test(permission())) {
-            return CompletableFuture.completedFuture(false);
-        }
-        Map<String, List<String>> parameterValues = new HashMap<>();
-        for (; i < args.length; i++) {
-            String arg = args[i];
-            if (arg == null || arg.isEmpty()) continue;
-            int eq = arg.indexOf('=');
-            if (eq < 0) {
-                parameterValues.computeIfAbsent(arg, k -> new ArrayList<>());
-            } else {
-                String key = arg.substring(0, eq).toLowerCase(Locale.ROOT);
-                String val = arg.substring(eq + 1);
-                parameterValues.computeIfAbsent(key, k -> new ArrayList<>()).add(val);
-            }
-        }
-        return CompletableFuture.completedFuture(
-                onCommand(callerId, parameterValues, null, messageMethod));
-    }
-
     @Override
     public boolean onCommand(UUID callerId,
                              Map<String, List<String>> parameterValues,
                              @Nullable CommandsAPICommand nextCommand) {
-        if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
+        if (nextCommand != null) return true;
         if (callerId == null) {
             RTP.log(Level.WARNING, "/rtp admin prefab confirm rejected: no caller UUID");
             return false;
         }
-        String[] args = extractTwoPositionals(parameterValues);
-        String prefabId = args[0];
-        String token = args[1];
-        if (prefabId == null || prefabId.isEmpty() || token == null || token.isEmpty()) {
-            send(callerId, "&cUsage: &f/rtp admin prefab confirm <id> <token>");
+        List<String> idValues = parameterValues == null ? null : parameterValues.get("id");
+        List<String> tokenValues = parameterValues == null ? null : parameterValues.get("token");
+        String prefabId = (idValues == null || idValues.isEmpty()) ? null : idValues.get(0);
+        String token = (tokenValues == null || tokenValues.isEmpty()) ? null : tokenValues.get(0);
+        if (prefabId == null || prefabId.isEmpty()) {
+            send(callerId, "&cUsage: &f/rtp admin prefab confirm id=<id> [token=<token>]");
             return false;
         }
-        PrefabNonceStore.ConsumeResult cr = nonceStore.consume(token, callerId, prefabId);
+        // Token is optional: when omitted (menu Confirm row dispatch), the
+        // store resolves the newest caller-bound entry. The opaque nonce
+        // was a chat-path replay defense only; clicks in the curated book
+        // menu are already caller-bound by Bukkit's command sender, so
+        // forcing the user to copy a long token into the menu flow is
+        // redundant and was reported as a UX defect (2026-05-22).
+        PrefabNonceStore.ConsumeResult cr = (token == null || token.isEmpty())
+                ? nonceStore.consumeByCaller(callerId, prefabId)
+                : nonceStore.consume(token, callerId, prefabId);
         switch (cr.kind()) {
             case NOT_FOUND:
                 RTP.log(Level.WARNING,
@@ -253,22 +228,6 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         } catch (RuntimeException re) {
             return PrefabDiskIO.DEFAULT_BAK_RETENTION;
         }
-    }
-
-    private static String[] extractTwoPositionals(Map<String, List<String>> params) {
-        String[] out = new String[2];
-        if (params == null || params.isEmpty()) return out;
-        int idx = 0;
-        for (Map.Entry<String, List<String>> e : params.entrySet()) {
-            String key = e.getKey();
-            if (key == null) continue;
-            String k = key.toLowerCase(Locale.ROOT);
-            if (k.equals("admin") || k.equals("prefab") || k.equals("confirm")) continue;
-            List<String> v = e.getValue();
-            String val = (v == null || v.isEmpty()) ? key : v.get(0);
-            if (idx < out.length) out[idx++] = val;
-        }
-        return out;
     }
 
     private static void send(UUID callerId, String msg) {

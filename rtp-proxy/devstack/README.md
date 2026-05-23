@@ -108,11 +108,61 @@ cannot synthesize without re-implementing the protocol. The harness drives
 every other scenario via Redis introspection and `docker exec` Bukkit-console
 commands.
 
+## Lobby world (optional)
+
+By default both lobbies generate a vanilla flat-ish Paper world on first boot.
+For a more presentable lobby (custom build, decorated spawn, etc.) the
+devstack supports a one-time "bake" workflow that turns a WorldEdit schematic
+into a reusable lobby world zip:
+
+1. Drop a `.schem` (or `.schematic`) file into `shared/lobby-world/`. The
+   directory is committed via `.gitkeep`; schematics themselves are gitignored
+   (most marketplace schematics forbid redistribution).
+2. Install FastAsyncWorldEdit into `lobby-a/plugins/` (drop the jar in
+   alongside `RTP-Pro-*.jar`). The compose file auto-mounts
+   `shared/lobby-world/` into FAWE's schematics pickup dir at
+   `/data/plugins/FastAsyncWorldEdit/schematics` (read-only), so any `.schem`
+   you drop into `shared/lobby-world/` is immediately visible to
+   `//schem list` without copying. Bring the stack up, join `lobby-a` from a
+   Minecraft client, then run:
+   ```
+   //schem load <name-without-extension>
+   //paste -a
+   /setworldspawn
+   ```
+3. Disconnect, stop the stack (`docker compose stop lobby-a` is enough), and
+   from the host:
+   ```powershell
+   .\scripts\bake-lobby-world.ps1
+   ```
+   This zips `lobby-a/world/` to `shared/lobby-world.zip`.
+4. From now on, `run-acceptance.ps1` automatically layers
+   `docker-compose.lobby-world.yml` on top of the base compose file when the
+   zip is present, so every `up` boots both lobbies from the canned world
+   (itzg/minecraft-server `WORLD` + `FORCE_WORLD_COPY=TRUE`).
+
+To use the override manually (without `run-acceptance.ps1`):
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.lobby-world.yml up -d
+```
+
+To disable: delete `shared/lobby-world.zip`. Lobbies revert to vanilla on the
+next boot. See `shared/lobby-world/README.md` for the full contract.
+
 ## Teardown
 
 ```powershell
-docker compose down -v   # also removes the per-backend world volume
+.\run-acceptance.ps1 -Scenario down            # selective: preserves the mc-image-cache named volume
+.\run-acceptance.ps1 -Scenario down -Purge     # also drops mc-image-cache (re-downloads Paper + Mojang jar on next up)
 ```
+
+The default selective teardown stops containers and removes the compose
+network, but keeps the shared `mc-image-cache` named volume so the next
+`up` doesn't redownload the Paper build jar and Mojang `server.jar`
+(~110 MB per MC service). World directories are host bind mounts and are
+wiped on every teardown regardless. Pass `-Purge` for a truly fresh
+reset (equivalent to the old `docker compose down -v` behavior).
 
 ## See also
 

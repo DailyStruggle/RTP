@@ -212,26 +212,32 @@ public interface RTPCmd extends BaseRTPCmd {
           ConfigParser<MessagesKeys> langParser =
                   (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
           String tmpl = (String) langParser.getConfigValue(MessagesKeys.networkQueued, "");
-          String msg = tmpl == null ? "" : tmpl
+          // Empty-template fallback: a stale messages.yml (pre-Slice-5
+          // install missing the new key) must NEVER produce silent
+          // dispatch, otherwise the player sees no response and spams
+          // /rtp. Mirror the hardcoded English fallback Slice-5
+          // NetworkWaitlistGuard / NetworkWaitlistNotifier already use.
+          if (tmpl == null || tmpl.isEmpty()) {
+            tmpl = "&7[RTP] Queued for a cross-server destination (position [position])"
+                    + ". You will be teleported when capacity is available.";
+          }
+          String msg = tmpl
                   .replace("[position]", "0")
                   .replace("[region]", cross.regionKey().orElse(""))
                   .replace("[server]", cross.serverHint().orElse(""));
-          if (!msg.isEmpty()) {
-            if (messageMethod != null) messageMethod.accept(msg);
-            else RTP.serverAccessor.sendMessage(senderId, msg);
-          }
-          // Release the processingPlayers lock that the outer onCommand
-          // acquired at dispatch time. The local pipeline owns its own
-          // remove() on every exit path; this short-circuit branch must
-          // do the same, otherwise a player who triggered a cross-server
-          // /rtp on this JVM stays "busy" forever from this JVM's POV
-          // (the actual teleport completes on the destination backend,
-          // which has no way to clear this JVM's processingPlayers set).
-          // Symptom prior to this remove: subsequent /rtp on the same
-          // JVM (e.g. a lobby the player returns to) silently short-
-          // circuits at RTPCmd.onCommand's alreadyTeleporting guard
-          // without ever reaching the network hook.
-          if (!senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.remove(senderId);
+          if (messageMethod != null) messageMethod.accept(msg);
+          else RTP.serverAccessor.sendMessage(senderId, msg);
+          // KEEP the processingPlayers lock for the cross-server branch.
+          // Prior behaviour released it immediately so that the
+          // destination backend's eventual transfer wouldn't be blocked
+          // by this JVM's "busy" set - but the side effect was that the
+          // player could re-run /rtp on the same lobby and re-enrol
+          // duplicates (REJECTED_DUPLICATE on the proxy, no feedback
+          // to the player, looks like nothing happens). The Slice-4
+          // NetworkWaitlistGuard + lobby-side quit/terminal-status
+          // listeners are the correct authoritative releases; until
+          // they fire, this local lock is the anti-spam primitive.
+          // Disconnect / shutdown clears the set via RTP.shutdown().
           return true;
         }
         if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.Reject reject) {

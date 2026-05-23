@@ -71,7 +71,10 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
     private final RedisLuaScripts enqueueBatchScript;
     private final RedisLuaScripts pollStatusScript;
     private final RedisLuaScripts dequeueReadyScript;
+    private final RedisLuaScripts dequeueReadyOwnedScript;
     private final RedisLuaScripts transitionScript;
+    /** Head-scan window for ownership-aware dequeue (rtp-proxy-ADR-016). */
+    private static final int OWNED_DEQUEUE_MAX_SCAN = 16;
 
     /**
      * Production constructor. Opens its own {@link JedisPool} and pre-loads
@@ -122,10 +125,12 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
             this.enqueueBatchScript = RedisLuaScripts.load("enqueue_batch");
             this.pollStatusScript = RedisLuaScripts.load("pollStatus");
             this.dequeueReadyScript = RedisLuaScripts.load("dequeueReady");
+            this.dequeueReadyOwnedScript = RedisLuaScripts.load("dequeueReadyOwned");
             this.transitionScript = RedisLuaScripts.load("transition");
             this.enqueueBatchScript.scriptLoad(pool);
             this.pollStatusScript.scriptLoad(pool);
             this.dequeueReadyScript.scriptLoad(pool);
+            this.dequeueReadyOwnedScript.scriptLoad(pool);
             this.transitionScript.scriptLoad(pool);
         } catch (RuntimeException e) {
             if (ownsPool) pool.close();
@@ -277,6 +282,66 @@ public final class RedisNetworkRequestQueue implements NetworkRequestQueue, Auto
                     // tie up a Jedis connection for the full block window; a
                     // 25ms poll trades a small wake-cost for connection
                     // availability. See PROPOSAL §4.4.
+                    try { Thread.sleep(25L); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return Optional.<QueueEnvelope>empty();
+                    }
+                }
+            }
+        });
+    }
+
+    @Override
+    public CompletableFuture<Optional<QueueEnvelope>> dequeueReady(
+            Duration blockFor, String thisProxyId) {
+        Objects.requireNonNull(blockFor, "blockFor");
+        Objects.requireNonNull(thisProxyId, "thisProxyId");
+        if (thisProxyId.isEmpty()) {
+            // Empty proxyId would match the empty 'owner == ""' branch in the
+            // Lua script, treating every entry as owner-less. Fail loud rather
+            // than silently mis-dispatch.
+            CompletableFuture<Optional<QueueEnvelope>> f = new CompletableFuture<>();
+            f.completeExceptionally(new IllegalArgumentException("thisProxyId must be non-empty"));
+            return f;
+        }
+        return runAsync(() -> {
+            long deadline = System.nanoTime() + Math.max(0L, blockFor.toNanos());
+            try (Jedis j = pool.getResource()) {
+                while (true) {
+                    long now = System.currentTimeMillis();
+                    Object raw = dequeueReadyOwnedScript.evalsha(j,
+                            java.util.Collections.singletonList(READY_KEY),
+                            Arrays.asList(
+                                    thisProxyId,
+                                    Long.toString(now),
+                                    Integer.toString(ttlSeconds),
+                                    Integer.toString(OWNED_DEQUEUE_MAX_SCAN)));
+                    if (raw instanceof List && !((List<?>) raw).isEmpty()) {
+                        Map<String, String> kv = flattenAlternating((List<?>) raw, 0);
+                        UUID pid;
+                        UUID cid;
+                        try {
+                            pid = UUID.fromString(kv.getOrDefault("playerId", ""));
+                            cid = UUID.fromString(kv.getOrDefault("correlationId", ""));
+                        } catch (IllegalArgumentException iae) {
+                            continue;
+                        }
+                        String region = kv.getOrDefault("regionKey", "");
+                        String hint = kv.getOrDefault("serverHint", "");
+                        long createdAt = parseLongSafe(kv.get("createdAtMs"), now);
+                        long dequeuedAt = parseLongSafe(kv.get("dequeuedAtMs"), now);
+                        return Optional.of(new QueueEnvelope(
+                                pid, cid,
+                                region.isEmpty() ? Optional.empty() : Optional.of(region),
+                                hint.isEmpty() ? Optional.empty() : Optional.of(hint),
+                                createdAt,
+                                dequeuedAt));
+                    }
+                    if (System.nanoTime() >= deadline) {
+                        return Optional.<QueueEnvelope>empty();
+                    }
+                    // Same 25ms poll as dequeueReady; no foreign-cid busy-spin
+                    // because the script returns {} when no head is eligible.
                     try { Thread.sleep(25L); } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         return Optional.<QueueEnvelope>empty();

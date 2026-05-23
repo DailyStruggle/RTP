@@ -1965,7 +1965,10 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     @Override public UUID uuid() { return RTPAPI.serverId; }
     @Override public String name() { return "Console"; }
     @Override public boolean hasPermission(String permission) { return true; }
-    @Override public Set<String> getEffectivePermissions() { return java.util.Collections.emptySet(); }
+    @Override public Set<String> getEffectivePermissions() {
+        // rtp-fabric-ADR-011: console returns op-equivalent closed-namespace grants.
+        return io.github.dailystruggle.rtp.fabric.player.FabricEffectivePermissionsResolver.resolveConsole();
+    }
     @Override public long cooldown() { return 0L; }
     @Override public long delay() { return 0L; }
     @Override public void performCommand(@Nullable RTPPlayer player, String command) {

@@ -4,124 +4,136 @@
   "spatialResolution": 3,
   "badLocations": [
     {
-      "start": 11644,
+      "start": 2660,
       "length": 1
     },
     {
-      "start": 21090,
+      "start": 22059,
+      "length": 1
+    },
+    {
+      "start": 30946,
+      "length": 1
+    },
+    {
+      "start": 36821,
+      "length": 1
+    },
+    {
+      "start": 60218,
+      "length": 1
+    },
+    {
+      "start": 66384,
+      "length": 1
+    },
+    {
+      "start": 71503,
+      "length": 1
+    },
+    {
+      "start": 72229,
+      "length": 1
+    },
+    {
+      "start": 79823,
+      "length": 1
+    },
+    {
+      "start": 89628,
+      "length": 1
+    },
+    {
+      "start": 96709,
+      "length": 1
+    },
+    {
+      "start": 106207,
+      "length": 1
+    },
+    {
+      "start": 117669,
+      "length": 1
+    },
+    {
+      "start": 127270,
       "length": 2
     },
     {
-      "start": 25388,
+      "start": 128074,
       "length": 1
     },
     {
-      "start": 26022,
+      "start": 129987,
       "length": 2
     },
     {
-      "start": 27672,
-      "length": 1
-    },
-    {
-      "start": 29226,
-      "length": 1
-    },
-    {
-      "start": 61496,
-      "length": 1
-    },
-    {
-      "start": 71886,
+      "start": 155120,
       "length": 2
     },
     {
-      "start": 75340,
-      "length": 1
-    },
-    {
-      "start": 89184,
+      "start": 155167,
       "length": 2
     },
     {
-      "start": 96838,
+      "start": 165444,
       "length": 1
     },
     {
-      "start": 113277,
+      "start": 166248,
       "length": 1
     },
     {
-      "start": 116692,
-      "length": 2
-    },
-    {
-      "start": 126889,
+      "start": 187147,
       "length": 1
     },
     {
-      "start": 144856,
-      "length": 2
-    },
-    {
-      "start": 149997,
-      "length": 1
-    },
-    {
-      "start": 151183,
-      "length": 1
-    },
-    {
-      "start": 162026,
+      "start": 188094,
       "length": 1
     }
   ],
   "biomeLocations": {
+    "PLAINS": [
+      {
+        "start": 106047,
+        "length": 3
+      }
+    ],
     "DESERT": [
       {
-        "start": 64266,
+        "start": 27757,
         "length": 3
       }
     ],
     "SAVANNA": [
       {
-        "start": 1548,
+        "start": 17185,
+        "length": 3
+      },
+      {
+        "start": 62850,
         "length": 3
       }
     ],
-    "ERODED_BADLANDS": [
+    "SNOWY_TAIGA": [
       {
-        "start": 72491,
-        "length": 3
-      }
-    ],
-    "JUNGLE": [
-      {
-        "start": 157898,
+        "start": 56389,
         "length": 3
       }
     ],
     "BIRCH_FOREST": [
       {
-        "start": 127878,
+        "start": 105445,
         "length": 3
       }
     ],
     "FOREST": [
       {
-        "start": 10703,
+        "start": 141393,
         "length": 3
       },
       {
-        "start": 51013,
-        "length": 3
-      },
-      {
-        "start": 130461,
-        "length": 3
-      },
-      {
-        "start": 192013,
+        "start": 163468,
         "length": 3
       }
     ]

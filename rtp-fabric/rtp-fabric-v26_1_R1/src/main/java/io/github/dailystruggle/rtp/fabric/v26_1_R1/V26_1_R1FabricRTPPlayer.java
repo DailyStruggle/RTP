@@ -137,7 +137,11 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer {
 
     @Override
     public Set<String> getEffectivePermissions() {
-        return Collections.emptySet();
+        // rtp-fabric-ADR-011: LuckPerms-Fabric primary + closed-namespace registry probe.
+        if (handle == null) return Collections.emptySet();
+        boolean isOp = hasPermission("rtp.reload");
+        return io.github.dailystruggle.rtp.fabric.player.FabricEffectivePermissionsResolver
+                .resolve(uuid, isOp, this::hasPermission);
     }
 
     @Override

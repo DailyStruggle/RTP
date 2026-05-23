@@ -1,0 +1,42 @@
+# Optional overlay that boots lobby-a / lobby-b from a pre-baked world zip
+# (shared/lobby-world.zip) instead of generating a fresh default world.
+#
+# Activated automatically by run-acceptance.ps1 when the zip exists. To use
+# manually:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.lobby-world.yml up -d
+#
+# See `shared/lobby-world/README.md` for the schematic -> bake workflow and
+# `scripts/bake-lobby-world.ps1` for the bake step.
+#
+# Mechanism: itzg/minecraft-server's entrypoint inspects the `WORLD` env var
+# on every boot. With `FORCE_WORLD_COPY=TRUE` it re-extracts the source onto
+# /data/world each time, so the lobby is deterministic across `docker compose
+# down` / `up` cycles. Backends are untouched.
+#
+# Note on /data/world: the base docker-compose.yml deliberately does NOT
+# bind-mount /data/world for the lobby services (see comment on the
+# `mc-image-cache` line in the lobby-a service block of the base file).
+# Reason: docker compose v2 *merges* override `volumes:` lists with the
+# base's instead of replacing them, so any base bind on /data/world would
+# survive into this overlay; meanwhile itzg's FORCE_WORLD_COPY=TRUE does
+# `rm -rf /data/world` before re-extracting the zip, and the kernel returns
+# EBUSY when asked to unlink ANY mountpoint directory (host bind OR
+# anonymous/named volume). With no mount on /data/world, the dir lives in
+# the container's writable layer where `rm -rf` succeeds.
+
+services:
+  lobby-a:
+    environment:
+      # Path is inside the container; bind below makes it resolvable.
+      WORLD: /lobby-seed/lobby-world.zip
+      FORCE_WORLD_COPY: "TRUE"
+    volumes:
+      - ./shared/lobby-world.zip:/lobby-seed/lobby-world.zip:ro
+
+  lobby-b:
+    environment:
+      WORLD: /lobby-seed/lobby-world.zip
+      FORCE_WORLD_COPY: "TRUE"
+    volumes:
+      - ./shared/lobby-world.zip:/lobby-seed/lobby-world.zip:ro

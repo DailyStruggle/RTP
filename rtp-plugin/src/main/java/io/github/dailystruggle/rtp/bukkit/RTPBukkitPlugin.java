@@ -538,6 +538,25 @@ public final class RTPBukkitPlugin extends JavaPlugin {
               + t.getMessage(), t);
     }
 
+    // Slice 4 (ADR-015 / REQ-RTP-NET-015): register the cross-server
+    // waitlist PlayerQuitEvent hook + install the command-lock sender
+    // check on the live RTPCmdBukkit. Both are no-ops when network mode
+    // is disabled (waitlistQuitListener / waitlistCommandGuard() are
+    // null on the disabled-mode path) and idempotent on re-register.
+    try {
+      networkBootstrap.registerWaitlistQuitListener(this);
+      java.util.function.Predicate<org.bukkit.command.CommandSender> guard =
+          networkBootstrap.waitlistCommandGuard();
+      if (guard != null
+          && RTP.baseCommand instanceof io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit cmd) {
+        cmd.addSenderCheck(guard);
+      }
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[LIFECYCLE] setupBukkitEvents waitlist wiring failed; continuing: "
+              + t.getMessage(), t);
+    }
+
     EffectsAPI.init(this);
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] setupBukkitEvents EXIT -- listeners registered");
   }

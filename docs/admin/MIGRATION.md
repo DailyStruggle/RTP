@@ -4,6 +4,8 @@
 
 This document provides upgrade instructions for server operators and addon developers when moving between RTP versions.
 
+> 📎 For the **mechanics** of how RTP upgrades on-disk YAML files (what `.old1`/`.old2` files are, how your customizations are read into memory before the file is replaced, and how they are overlaid onto the new defaults), see [CONFIG_LIFECYCLE.md](CONFIG_LIFECYCLE.md).
+
 ---
 
 ## Upgrading to 3.0.0-beta.1

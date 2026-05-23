@@ -37,6 +37,14 @@ public interface NetworkRequestQueue {
     /** Per-player FIFO state used by both producer and consumer paths. */
     enum QueueState {
         QUEUED,
+        /**
+         * Parked on the shared cross-proxy {@link NetworkWaitlist} because no
+         * backend qualifies right now (all kill-switched, starved
+         * {@code networkKeptLocations}, or region not served). The proxy-side
+         * drainer reinjects the envelope into dispatch when capacity appears.
+         * See `rtp-proxy-ADR-015` and REQ-RTP-NET-015.
+         */
+        WAITLISTED,
         ROUTING,
         RESERVED,
         TRANSFERRING,
@@ -152,6 +160,27 @@ public interface NetworkRequestQueue {
      * {@code blockFor}; returns empty on timeout.
      */
     CompletableFuture<Optional<QueueEnvelope>> dequeueReady(Duration blockFor);
+
+    /**
+     * Ownership-aware variant for multi-proxy deployments. Implementations
+     * pop only envelopes whose player is currently owned by {@code thisProxyId}
+     * (see {@code rtp:net:owner:<uuid>} in Redis) or by no live proxy at all
+     * (tag absent -&gt; legitimately disconnected); foreign-owned envelopes
+     * remain in their FIFO slot so the owning proxy can pull them next, which
+     * preserves enrolment order across the cluster.
+     *
+     * <p>Default behaviour falls back to {@link #dequeueReady(Duration)} so
+     * single-proxy and in-memory transports keep working unchanged. The Redis
+     * implementation overrides this with {@code dequeueReadyOwned.lua}; see
+     * {@code rtp-proxy-ADR-016}.</p>
+     *
+     * @param blockFor    max time to wait when the queue is empty
+     * @param thisProxyId stable id of the proxy calling; never {@code null}
+     */
+    default CompletableFuture<Optional<QueueEnvelope>> dequeueReady(
+            Duration blockFor, String thisProxyId) {
+        return dequeueReady(blockFor);
+    }
 
     /**
      * Single-writer state transition (proposal Section 4.4). Returns the

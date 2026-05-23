@@ -136,25 +136,27 @@ public final class AdminPanelBuilder {
         lines.add(new MenuLine(List.of()));
 
         // --- Setup (quick start) section ---
-        // Single entry row that lists the bundled prefabs via
-        // `/rtp admin prefab list` rather than flooding the front admin
-        // page with one row per prefab (which previously consumed the bulk
-        // of the first book page and pushed Configuration / Diagnostics /
-        // Lifecycle onto later pages). Suppressed wholesale when the
-        // viewer lacks `rtp.admin.prefab` so a partial admin never sees
-        // the Setup divider with no row under it. Once a per-locale
-        // "open prefab submenu" key is added through the locale TSV
-        // pipeline, the dispatch can be swapped for an OpenMenu into a
-        // dedicated PrefabPanelBuilder; today the chat-side list verb is
-        // the only registered surface that enumerates the prefab ids.
+        // Single entry-point row that opens the prefab `id` parameter
+        // picker directly, skipping the apply/confirm/rollback/list
+        // subcommand-list page that an OpenMenu({admin,prefab}) would
+        // produce. CommandTreeMenuBuilder's MenuAction.OpenParamPicker
+        // arm (resolved server-side by MenuRedeemSubcommand) renders
+        // one clickable row per value returned by
+        // PrefabIdParameter.values() (live PrefabRegistry); clicking a
+        // row dispatches `/rtp admin prefab apply id=<id>`. This gives
+        // the operator the clickable prefab-selection book menu without
+        // flooding the admin panel page itself with per-prefab rows.
+        // Suppressed wholesale when the viewer lacks `rtp.admin.prefab`
+        // so a partial admin never sees the Setup divider with no row
+        // under it.
         List<MenuLine> setupRows = new ArrayList<>();
         if (safeTest(permission, PREFAB_PERMISSION)) {
             addRow(
                     setupRows,
                     "&b\u2728 Setup prefabs",
-                    "List the bundled config prefabs in chat.",
-                    new MenuAction.RunRtpCommand(
-                            new String[]{"admin", "prefab", "list"}));
+                    "Pick a bundled prefab to apply.",
+                    new MenuAction.OpenParamPicker(
+                            new String[]{"admin", "prefab", "apply"}, "id"));
         }
         appendSetupSection(lines, setupRows);
 

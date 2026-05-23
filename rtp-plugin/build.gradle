@@ -565,10 +565,12 @@ tasks.named('compileLiteJava') {
 // ships plugin.yml with literal `${version}`, causing Bukkit to log
 // `Enabling RTP v${version}` on enable. Mirror the root config here.
 tasks.named('processLiteResources') {
-    // Capture project.version at configuration time so the filesMatching
+    // Capture lite's version at configuration time so the filesMatching
     // closure does not reach Task.project at execution time
     // (deprecated in Gradle 9, fatal in Gradle 10).
-    def projectVersion = project.version
+    // Lite tracks its own version line (`ext.liteVersion`, set in root
+    // build.gradle) independent of Pro's `project.version`.
+    def projectVersion = project.ext.liteVersion
     inputs.property "version", projectVersion
     filesMatching(["plugin.yml", "fabric.mod.json"]) {
         expand "version": projectVersion
@@ -590,7 +592,7 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // `jar` / `remapJar` split.
     archiveBaseName.set('RTP')
     archiveClassifier.set('dev')
-    archiveVersion.set(project.version.toString())
+    archiveVersion.set(project.ext.liteVersion.toString())
 
     // Lite source set first so its plugin.yml/config.yml/etc. win over main's
     // when DuplicatesStrategy.EXCLUDE is applied (Shadow honours first-seen).
@@ -821,7 +823,7 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     inputFile.set(tasks.named('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar).flatMap { it.archiveFile })
     archiveBaseName.set('RTP')
     archiveClassifier.set('')
-    archiveVersion.set(project.version.toString())
+    archiveVersion.set(project.ext.liteVersion.toString())
 
     // Resolve carrier jars and capture the merge closure at configuration time
     // so doLast does not reach Task.project at execution time

@@ -5,23 +5,30 @@ import io.github.dailystruggle.rtp.proxy.common.spi.BackendSelector;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.RtpRequest;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Reference {@link BackendSelector} implementing the weighted-average scoring
  * formula from rtp-proxy-ADR-004:
  *
  * <pre>
- * score(b) = ( Σ_i weight_i * normalize_i(metric_i(b)) ) / backendWeight(b)
+ * score(b) = ( Sigma_i weight_i * curve_i( normalize_i( metric_i(b) ) ) ) / backendWeight(b)
  * </pre>
  *
- * <p>Lowest score wins; ties broken by {@code serverId} ascending. This v1
- * implementation uses the linear curve only; the curve catalogue
- * ({@code exponential}, {@code logarithmic}, {@code sigmoid}, {@code step},
- * {@code power}) is reserved for a later iteration and will plug in via
- * the same scoring entry point without changing the SPI.</p>
+ * <p>Lowest score wins; ties broken by {@code serverId} ascending. The sum
+ * runs over {@link LoadBalancerConfig#terms()}, each a {@link ScoringTerm}
+ * pairing one {@link MetricInput} with a non-negative weight and a curve
+ * drawn from the catalogue (linear, exponential, logarithmic, sigmoid, step,
+ * power). For source compatibility, a {@link LoadBalancerConfig} built from
+ * the four legacy weights (mspt, queueDepth, heap, playerCount) auto-synthesizes
+ * one linear term per non-zero weight.</p>
  *
  * <p><strong>Purity:</strong> {@link #choose} performs no I/O and reads no
  * external state beyond its arguments and the {@link LoadBalancerConfig}
@@ -34,6 +41,8 @@ import java.util.Optional;
  * to the dispatcher / reservation client (they are not pure-function inputs).</p>
  */
 public final class WeightedAverageBackendSelector implements BackendSelector {
+
+    private static final Logger LOG = Logger.getLogger(WeightedAverageBackendSelector.class.getName());
 
     private final LoadBalancerConfig config;
 
@@ -54,29 +63,78 @@ public final class WeightedAverageBackendSelector implements BackendSelector {
         Objects.requireNonNull(snapshot, "snapshot");
         Objects.requireNonNull(serverIdFilter, "serverIdFilter");
 
-        return snapshot.all().stream()
-                .filter(b -> serverIdFilter.isEmpty()
-                        || serverIdFilter.get().equals(b.serverId()))
-                .filter(b -> qualifies(b, request, snapshot.timestampEpochMs()))
+        List<BackendHeartbeat> qualified = new ArrayList<>();
+        for (BackendHeartbeat b : snapshot.all()) {
+            if (!serverIdFilter.isEmpty() && !serverIdFilter.get().equals(b.serverId())) continue;
+            if (!qualifies(b, request, snapshot.timestampEpochMs())) continue;
+            qualified.add(b);
+        }
+        Optional<BackendHeartbeat> winner = qualified.stream()
                 .min(Comparator
                         .comparingDouble((BackendHeartbeat b) -> score(b))
-                        .thenComparing(BackendHeartbeat::serverId))
-                .map(BackendHeartbeat::serverId);
+                        .thenComparing(BackendHeartbeat::serverId));
+        if (LOG.isLoggable(Level.INFO)) {
+            logDecision(request, snapshot, serverIdFilter, qualified, winner);
+        }
+        return winner.map(BackendHeartbeat::serverId);
     }
 
-    /** Debug accessor for golden-file tests (rtp-proxy-ADR-004 §Determinism). */
+    private void logDecision(RtpRequest request,
+                             NetworkSnapshot snapshot,
+                             Optional<String> serverIdFilter,
+                             List<BackendHeartbeat> qualified,
+                             Optional<BackendHeartbeat> winner) {
+        StringBuilder sb = new StringBuilder(256);
+        sb.append("[NETWORK][selector][backend] choose(player=")
+                .append(request.playerId())
+                .append(", region=").append(request.regionKey().orElse("-"))
+                .append(", world=").append(request.worldKey().orElse("-"))
+                .append(", filter=").append(serverIdFilter.orElse("-"))
+                .append(", snapshotTs=").append(snapshot.timestampEpochMs())
+                .append(", candidates=").append(qualified.size())
+                .append(")");
+        if (qualified.isEmpty()) {
+            sb.append(" -> no qualifying backend");
+            LOG.log(Level.INFO, sb.toString());
+            return;
+        }
+        for (BackendHeartbeat b : qualified) {
+            double total = 0.0;
+            sb.append("\n  - serverId=").append(b.serverId());
+            for (ScoringTerm term : config.terms()) {
+                double raw = term.input().normalize(b);
+                double shaped = term.curve().apply(raw);
+                double contrib = term.weight() * shaped;
+                total += contrib;
+                sb.append(" [").append(term.input().configId())
+                        .append(" raw=").append(fmt(raw))
+                        .append(" curve=").append(term.curve().getClass().getSimpleName())
+                        .append("->").append(fmt(shaped))
+                        .append(" *w=").append(fmt(term.weight()))
+                        .append("=").append(fmt(contrib))
+                        .append("]");
+            }
+            double bw = config.backendWeight(b.serverId());
+            double finalScore = total / bw;
+            sb.append(" sum=").append(fmt(total))
+                    .append(" /backendWeight(").append(fmt(bw)).append(")")
+                    .append(" -> score=").append(fmt(finalScore));
+        }
+        winner.ifPresent(w -> sb.append("\n  WINNER serverId=").append(w.serverId())
+                .append(" score=").append(fmt(score(w))));
+        LOG.log(Level.INFO, sb.toString());
+    }
+
+    private static String fmt(double d) {
+        return String.format(Locale.ROOT, "%.4f", d);
+    }
+
+    /** Debug accessor for golden-file tests (rtp-proxy-ADR-004 Determinism). */
     public double score(BackendHeartbeat b) {
-        double msptNorm = b.mspt() / 50.0;
-        double queueNorm = (double) b.queueDepth() / Math.max(1, b.softCap());
-        double heapNorm = (b.heapMaxBytes() <= 0)
-                ? 0.0 : (double) b.heapUsedBytes() / b.heapMaxBytes();
-        double playerNorm = b.playerCount() / 100.0;
-
-        double raw = config.msptWeight()        * msptNorm
-                   + config.queueDepthWeight()  * queueNorm
-                   + config.heapWeight()        * heapNorm
-                   + config.playerCountWeight() * playerNorm;
-
+        double raw = 0.0;
+        for (ScoringTerm term : config.terms()) {
+            raw += term.contribution(b);
+        }
         return raw / config.backendWeight(b.serverId());
     }
 

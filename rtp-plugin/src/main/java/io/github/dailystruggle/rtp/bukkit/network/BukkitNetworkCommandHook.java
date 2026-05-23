@@ -2,12 +2,14 @@ package io.github.dailystruggle.rtp.bukkit.network;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.network.NetworkCommandHook;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.network.BackendStatePublisher;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.logging.Level;
 
 /**
  * Bukkit-platform implementation of the {@link NetworkCommandHook} SPI.
@@ -70,6 +72,39 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
      * test paths and for non-network deployments.
      */
     private final BackendStatePublisher backendStatePublisher;
+    /**
+     * Optional. When non-null AND {@link #lobbyMode} is true, transient
+     * {@link RoutingDecision.LocalFallback} reasons (NETWORK_DISABLED /
+     * NO_LIVE_PEER / QUEUE_FULL / TOKEN_BUCKET_EXHAUSTED) park the player
+     * on this queue instead of silently falling through to the local
+     * pipeline (which is a dead path on a lobby). The hook then returns a
+     * synthetic {@link RoutingResult#crossServer} so {@code RTPCmd}
+     * sends the {@code networkQueued} message and retains the
+     * {@code processingPlayers} lock until the retry succeeds, times
+     * out, or is cancelled on disconnect.
+     */
+    private final LobbyDispatchRetryQueue lobbyRetryQueue;
+    /**
+     * Optional lobby-side enrolment seeder. When set, every real cross-
+     * server enrolment (i.e. {@link RoutingDecision.CrossServer}, not the
+     * synthetic one used for the lobby auto-retry queue) calls this with
+     * the player's UUID so the {@link NetworkStatusCache} can pre-seed a
+     * sticky {@code QUEUED} row. Without this seed the cache only learns
+     * about the player after the proxy round-trips a status row, and if
+     * the proxy never reports back the lobby never observes the
+     * non-terminal -&gt; terminal transition that releases the
+     * {@code processingPlayers} lock. The seeder's sticky TTL provides
+     * the bounded-failure release path. Default: no-op.
+     */
+    private volatile java.util.function.Consumer<UUID> enrolmentSeeder = u -> {};
+
+    /**
+     * Install the lobby-side enrolment seeder. See {@link #enrolmentSeeder}.
+     * Null collapses to a no-op.
+     */
+    public void setEnrolmentSeeder(java.util.function.Consumer<UUID> seeder) {
+        this.enrolmentSeeder = seeder == null ? u -> {} : seeder;
+    }
 
     /**
      * Legacy 2-arg ctor (pre-Slice-I). Equivalent to {@code lobbyMode = false}
@@ -77,7 +112,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
      * lobby target for no-arg {@code /rtp}, preserving Slice H2 behaviour.
      */
     public BukkitNetworkCommandHook(NetworkRouter router, NetworkEnrolmentBuffer enrolmentBuffer) {
-        this(router, enrolmentBuffer, null, false, null);
+        this(router, enrolmentBuffer, null, false, null, null);
     }
 
     /**
@@ -101,7 +136,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
                                     NetworkEnrolmentBuffer enrolmentBuffer,
                                     PeerRegionRegistry peerRegionRegistry,
                                     boolean lobbyMode) {
-        this(router, enrolmentBuffer, peerRegionRegistry, lobbyMode, null);
+        this(router, enrolmentBuffer, peerRegionRegistry, lobbyMode, null, null);
     }
 
     /**
@@ -117,11 +152,30 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
                                     PeerRegionRegistry peerRegionRegistry,
                                     boolean lobbyMode,
                                     BackendStatePublisher backendStatePublisher) {
+        this(router, enrolmentBuffer, peerRegionRegistry, lobbyMode, backendStatePublisher, null);
+    }
+
+    /**
+     * Lobby-auto-retry ctor. Adds the optional {@code lobbyRetryQueue}
+     * so a transient {@link RoutingDecision.LocalFallback} in lobbyMode
+     * parks the player on the queue (which retries on its own pulse)
+     * instead of silently falling through to a dead local pipeline.
+     * Allowed to be {@code null}; when null, the hook preserves the
+     * prior behaviour of returning {@link RoutingResult#local()} for
+     * transient fallbacks.
+     */
+    public BukkitNetworkCommandHook(NetworkRouter router,
+                                    NetworkEnrolmentBuffer enrolmentBuffer,
+                                    PeerRegionRegistry peerRegionRegistry,
+                                    boolean lobbyMode,
+                                    BackendStatePublisher backendStatePublisher,
+                                    LobbyDispatchRetryQueue lobbyRetryQueue) {
         this.router = Objects.requireNonNull(router, "router");
         this.enrolmentBuffer = Objects.requireNonNull(enrolmentBuffer, "enrolmentBuffer");
         this.peerRegionRegistry = peerRegionRegistry;
         this.lobbyMode = lobbyMode;
         this.backendStatePublisher = backendStatePublisher;
+        this.lobbyRetryQueue = lobbyRetryQueue;
         if (lobbyMode && peerRegionRegistry == null) {
             throw new IllegalArgumentException(
                     "lobbyMode=true requires a non-null peerRegionRegistry");
@@ -156,7 +210,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
         // produce an opaque "no regions defined" error from the local
         // pipeline. The localized message is more honest.
         if (lobbyMode && (regionArg == null || regionArg.isEmpty())) {
-            java.util.Optional<PeerRegionRegistry.ServerRegion> pick =
+            java.util.Optional<io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion> pick =
                     peerRegionRegistry.pickMostKept();
             if (pick.isEmpty()) {
                 return RoutingResult.reject(
@@ -184,6 +238,9 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
         RoutingDecision decision = router.route(playerId, regionKey, serverHint);
 
         if (decision instanceof RoutingDecision.Local) {
+            RTP.log(Level.INFO,
+                    "[NETWORK][state] route: playerId=" + playerId
+                            + " regionArg=" + regionArg + " -> LOCAL");
             return RoutingResult.local();
         }
         if (decision instanceof RoutingDecision.CrossServer cs) {
@@ -195,6 +252,24 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
                     cs.regionKey(),
                     cs.serverHint(),
                     now));
+            // Pre-seed the local status cache with a sticky QUEUED row so
+            // anti-spam guards see the player as non-terminal immediately
+            // (before the first proxy roundtrip) AND so a never-responding
+            // proxy times out via the cache's sticky TTL and releases the
+            // processingPlayers lock. Defensive try: a seeder bug must
+            // never break the dispatch.
+            try { enrolmentSeeder.accept(playerId); } catch (Throwable ignored) {}
+            // Record the original (args, messageMethod) on the lobby
+            // retry queue so that if the proxy never produces a
+            // terminal transition (sticky-TTL FAILED), the bootstrap's
+            // terminal listener can auto-re-park the player via
+            // LobbyDispatchRetryQueue.onTerminalFailure(...) instead of
+            // forcing them to retype /rtp. No-op when the queue is null
+            // (non-lobby topology).
+            if (lobbyRetryQueue != null) {
+                try { lobbyRetryQueue.recordEnrolment(playerId, args, null); }
+                catch (Throwable ignored) {}
+            }
             // Slice I follow-up: bump our local view of the chosen peer's
             // kept count so the next pickMostKept() on this JVM does not
             // pile the next /rtp burst onto the same backend before the
@@ -224,6 +299,11 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
             // the `networkQueued` template. We forward whatever the router
             // resolved, NOT the raw player input (so e.g. mode=auto's
             // resolved hint shows up; in v1 these are usually equal).
+            RTP.log(Level.INFO,
+                    "[NETWORK][state] route: playerId=" + playerId
+                            + " -> CROSS_SERVER correlationId=" + correlationId
+                            + " region=" + cs.regionKey().orElse("")
+                            + " server=" + cs.serverHint().orElse(""));
             return RoutingResult.crossServer(
                     correlationId,
                     cs.regionKey().orElse(null),
@@ -234,15 +314,53 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
             // when the player explicitly asked for a region/server that
             // is not reachable, we reject loudly so they don't get
             // silently teleported to a different region than they asked
-            // for. Other fallback reasons (queue full, rate limit, no
-            // peers, network disabled) silently fall through to local
-            // so the teleport "just works" - simple-for-users.
+            // for.
             if (fallback.reason() == RoutingDecision.FallbackReason.REGION_UNAVAILABLE) {
                 String placeholder = formatPlaceholder(serverHint, regionKey, regionArg);
+                RTP.log(Level.INFO,
+                        "[NETWORK][state] route: playerId=" + playerId
+                                + " regionArg=" + regionArg
+                                + " -> REJECT(REGION_UNAVAILABLE)");
                 return RoutingResult.reject(
                         MessagesKeys.networkRegionUnavailable.name(),
                         placeholder);
             }
+            // Lobby auto-retry (user-confirmed, this issue): on a lobby
+            // backend the local pipeline has no RTP regions to fall
+            // back to, so silently returning RoutingResult.local() lands
+            // the player in a "non-processing" state (no message, no
+            // teleport, lock dropped, must retype /rtp). For the
+            // transient gates (NETWORK_DISABLED snapshot warm-up,
+            // NO_LIVE_PEER heartbeat lapse, QUEUE_FULL spike,
+            // TOKEN_BUCKET_EXHAUSTED burst), park the player on the
+            // LobbyDispatchRetryQueue. The queue's pulse will re-invoke
+            // router.route() every ~500ms (bounded by maxAttempts and
+            // maxTotalMs) and either enrol the player on the cross-
+            // server queue (transient cleared) or emit a terminal
+            // rejection (TTL exhausted). We return a synthetic
+            // RoutingResult.crossServer here so RTPCmd.compute sends
+            // the networkQueued message ONCE and retains the
+            // processingPlayers lock for the duration of the retry.
+            // The synthetic correlationId is never sent over the wire;
+            // the queue allocates a real one on success.
+            if (lobbyMode && lobbyRetryQueue != null) {
+                RTP.log(Level.INFO,
+                        "[NETWORK][state] route: playerId=" + playerId
+                                + " regionArg=" + regionArg
+                                + " -> SYNTHETIC_CROSS_SERVER(parked, reason=" + fallback.reason() + ")");
+                lobbyRetryQueue.enqueue(playerId, args, fallback.reason(), null);
+                return RoutingResult.crossServer(
+                        UUID.randomUUID(),
+                        regionKey,
+                        serverHint);
+            }
+            // Non-lobby (dual-role backend) OR retry queue not wired:
+            // graceful silent local fall-through is correct because the
+            // local pipeline genuinely can serve /rtp.
+            RTP.log(Level.INFO,
+                    "[NETWORK][state] route: playerId=" + playerId
+                            + " regionArg=" + regionArg
+                            + " -> LOCAL_FALLBACK(reason=" + fallback.reason() + ")");
             return RoutingResult.local();
         }
 

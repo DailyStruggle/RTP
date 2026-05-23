@@ -194,6 +194,14 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
         }
 
         active.put(viewer, new Session(List.copyOf(parentPath), paramName, mode));
+        // [diag-staging-cart] Trace anvil open so the operator log shows the
+        // mode (RUN vs STAGE) at the point the listener becomes active.
+        RTP.log(Level.INFO,
+                "[diag-staging-cart] AnvilInputSession.open active viewer=" + viewer
+                        + " paramName=" + paramName
+                        + " mode=" + mode
+                        + " parentPath=" + parentPath
+                        + " cartSink=" + (cartSink != null ? "set" : "null"));
         return true;
     }
 
@@ -308,23 +316,36 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
      * </ul>
      */
     private void dispatchConfirm(Player player, Session session, String typed, boolean closeInventory) {
+        // [diag-staging-cart] Trace anvil-confirm entry so the operator log
+        // shows whether the click/close path reached the dispatch branch.
+        RTP.log(Level.INFO,
+                "[diag-staging-cart] AnvilInputSession.dispatchConfirm entry viewer=" + player.getUniqueId()
+                        + " mode=" + session.mode
+                        + " paramName=" + session.paramName
+                        + " parentPath=" + session.parentPath
+                        + " typed='" + typed + "'"
+                        + " cartSink=" + (cartSink != null ? "set" : "null"));
         if (session.mode == MenuAction.Mode.STAGE) {
             MenuRedeemSubcommand.CartSink sink = cartSink;
             // file name lives at parentPath[1] for /rtp config <file> paths.
-            String fileName = null;
+            // The TreeCommand walk uses the suffixed segment ("performance.yml")
+            // and the menu mirror tree mirrors the same SubConfigCmd children
+            // by their full ".yml"-suffixed names, so the reopen command must
+            // preserve that suffix. The staging cart, however, addresses files
+            // by the bare basename ("performance") - buildConfigFile and
+            // ApplyStagedConfig look up the cart that way. Keep both forms.
+            String fileSegment = null;
+            String cartFileName = null;
             if (session.parentPath.size() >= 2
                     && "config".equalsIgnoreCase(session.parentPath.get(0))) {
-                fileName = session.parentPath.get(1);
-                // Normalize: the TreeCommand walk uses the suffixed segment
-                // ("performance.yml"), but buildConfigFile / ApplyStagedConfig
-                // address the cart by the bare basename ("performance"). Stage
-                // under the bare form so Apply finds the entries.
-                if (fileName != null
-                        && fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".yml")) {
-                    fileName = fileName.substring(0, fileName.length() - 4);
+                fileSegment = session.parentPath.get(1);
+                cartFileName = fileSegment;
+                if (cartFileName != null
+                        && cartFileName.toLowerCase(java.util.Locale.ROOT).endsWith(".yml")) {
+                    cartFileName = cartFileName.substring(0, cartFileName.length() - 4);
                 }
             }
-            if (sink == null || fileName == null) {
+            if (sink == null || fileSegment == null || cartFileName == null) {
                 RTP.log(Level.WARNING,
                         "menu anvil-input STAGE confirm dropped for " + player.getUniqueId()
                                 + " (sink=" + (sink != null ? "set" : "null")
@@ -333,11 +354,15 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
                 return;
             }
             try {
-                sink.stage(player.getUniqueId(), fileName, session.paramName, typed);
+                sink.stage(player.getUniqueId(), cartFileName, session.paramName, typed);
+                RTP.log(Level.INFO,
+                        "[diag-staging-cart] STAGE sink.stage ok viewer=" + player.getUniqueId()
+                                + " file=" + cartFileName + " key=" + session.paramName
+                                + " typed='" + typed + "'");
             } catch (RuntimeException e) {
                 RTP.log(Level.WARNING,
                         "menu anvil-input STAGE sink threw for " + player.getUniqueId()
-                                + " file=" + fileName + " key=" + session.paramName
+                                + " file=" + cartFileName + " key=" + session.paramName
                                 + ": " + e.getMessage(), e);
                 return;
             }
@@ -345,7 +370,9 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
             // Must route through the menu mirror (`/rtp menu config <file>`),
             // not the text-mode config-reload command (`/rtp config <file>`),
             // which would just reload configs without re-rendering the menu.
-            final String reopen = "/rtp menu config " + fileName;
+            // Use the suffixed segment so the commands-api walker matches the
+            // mirrored SubConfigCmd child (named e.g. "performance.yml").
+            final String reopen = "/rtp menu config " + fileSegment;
             Plugin plugin = getRtpPlugin();
             if (plugin == null) {
                 RTP.log(Level.WARNING,
@@ -353,12 +380,20 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
                                 + ": plugin unavailable");
                 return;
             }
+            RTP.log(Level.INFO,
+                    "[diag-staging-cart] STAGE scheduling reopen viewer=" + player.getUniqueId()
+                            + " cmd='" + reopen + "' closeInventory=" + closeInventory);
             scheduleForPlayer(plugin, player, () -> {
+                RTP.log(Level.INFO,
+                        "[diag-staging-cart] STAGE scheduled task fired viewer=" + player.getUniqueId());
                 if (closeInventory) {
                     try { player.closeInventory(); } catch (Throwable ignored) { /* best-effort */ }
                 }
                 try {
-                    player.performCommand(reopen.startsWith("/") ? reopen.substring(1) : reopen);
+                    boolean ok = player.performCommand(reopen.startsWith("/") ? reopen.substring(1) : reopen);
+                    RTP.log(Level.INFO,
+                            "[diag-staging-cart] STAGE performCommand returned=" + ok
+                                    + " viewer=" + player.getUniqueId() + " cmd='" + reopen + "'");
                 } catch (Throwable t) {
                     RTP.log(Level.WARNING,
                             "menu anvil-input STAGE reopen failed for " + player.getUniqueId()

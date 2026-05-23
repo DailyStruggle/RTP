@@ -15,15 +15,23 @@ import io.github.dailystruggle.rtp.proxy.common.RtpProxy;
 import io.github.dailystruggle.rtp.proxy.common.config.NetworkConfig;
 import io.github.dailystruggle.rtp.proxy.common.config.NetworkConfigException;
 import io.github.dailystruggle.rtp.proxy.common.dispatch.DefaultRtpDispatcher;
+import io.github.dailystruggle.rtp.proxy.common.dispatch.NetworkWaitlistDrainer;
+import io.github.dailystruggle.rtp.proxy.common.dispatch.RequestQueueStatusSink;
+import io.github.dailystruggle.rtp.proxy.common.dispatch.StatusSink;
 import io.github.dailystruggle.rtp.proxy.common.publisher.ProxyStatePublisher;
 import io.github.dailystruggle.rtp.proxy.common.selector.LoadBalancerConfig;
+import io.github.dailystruggle.rtp.proxy.common.selector.LoadBalancerConfigYaml;
+import io.github.dailystruggle.rtp.proxy.common.selector.RegionAwareSelector;
 import io.github.dailystruggle.rtp.proxy.common.selector.WeightedAverageBackendSelector;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendSelector;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
+import io.github.dailystruggle.rtp.proxy.common.spi.NetworkWaitlist;
+import io.github.dailystruggle.rtp.proxy.common.spi.PlayerOwnershipTracker;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReleaseReason;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.spi.RtpDispatcher;
+import io.github.dailystruggle.rtp.proxy.common.spi.WaitlistLeaderLease;
 import io.github.dailystruggle.rtp.proxy.common.transport.NetworkBindings;
 import io.github.dailystruggle.rtp.proxy.common.transport.ReservationTokenReaper;
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkStateBinding;
@@ -38,6 +46,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -84,6 +93,24 @@ public final class RtpVelocityPlugin {
     private BackendSelector selector;
     private VelocityProxySender sender;
     private RtpDispatcher dispatcher;
+    /** ADR-015 shared cross-proxy waitlist; null when {@code network.waitlist.enabled=false}. */
+    private NetworkWaitlist waitlist;
+    /** ADR-015 leader lease; null when waitlist disabled. */
+    private WaitlistLeaderLease leaderLease;
+    /** ADR-015 drainer pulse logic; null when waitlist disabled. */
+    private NetworkWaitlistDrainer waitlistDrainer;
+    /** ADR-015 scheduled drain pulse; cancelled on shutdown. */
+    private ScheduledFuture<?> waitlistDrainerTask;
+    /** ADR-015 scheduled reap pulse; cancelled on shutdown. */
+    private ScheduledFuture<?> waitlistReaperTask;
+    /** ADR-015 disconnect listener; null when waitlist disabled. */
+    private VelocityWaitlistQuitListener waitlistQuitListener;
+    /** ADR-016 player-ownership tag tracker; {@link PlayerOwnershipTracker#NO_OP} on single-JVM transports. */
+    private PlayerOwnershipTracker ownershipTracker;
+    /** ADR-016 Velocity login/disconnect listener; null when ownership tracker is NO_OP. */
+    private VelocityPlayerOwnershipListener ownershipListener;
+    /** ADR-016 periodic tag-refresh pulse; cancelled on shutdown. */
+    private ScheduledFuture<?> ownershipRefreshTask;
     /** Idempotence guard for {@link #onProxyShutdown} (checklist row 7f). */
     private volatile boolean shutdownStarted;
 
@@ -169,9 +196,37 @@ public final class RtpVelocityPlugin {
             // TransportRequestTriggerSource pops envelopes off the queue and feeds
             // them to the dispatcher. The existing ServerPreConnectEvent listener
             // still redeems the resulting ReservationToken at the connect boundary.
-            this.selector = new WeightedAverageBackendSelector(LoadBalancerConfig.defaults());
+            // Parse loadBalancer: from network.yml so the proxy-side
+            // BackendSelector AND the new region-aware fallback share one
+            // operator-tuned scoring table (rtp-proxy-ADR-004 *Region-Pair
+            // Scoring*). Malformed config degrades to bundled defaults with
+            // a WARNING; we never abort network mode over a curve typo.
+            LoadBalancerConfig loadBalancerConfig;
+            try {
+                Object lbNode = raw.get("loadBalancer");
+                if (lbNode instanceof Map<?, ?> lbMap) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> typed = (Map<String, Object>) lbMap;
+                    loadBalancerConfig = LoadBalancerConfigYaml.fromMap(typed);
+                } else {
+                    loadBalancerConfig = LoadBalancerConfig.defaults();
+                }
+            } catch (RuntimeException lbEx) {
+                logger.warn("Failed to parse network.yml::loadBalancer ({}); falling back to bundled defaults.",
+                        lbEx.getMessage());
+                loadBalancerConfig = LoadBalancerConfig.defaults();
+            }
+            this.selector = new WeightedAverageBackendSelector(loadBalancerConfig);
+            // Region-aware fallback: picks (serverId, regionKey) for bare
+            // /rtp envelopes that arrived without a regionKey hint. Shares
+            // the same LoadBalancerConfig so curves/weights tuned once
+            // affect both code paths.
+            RegionAwareSelector regionAwareSelector = new RegionAwareSelector(loadBalancerConfig);
             this.sender = new VelocityProxySender(proxyServer, logger);
-            this.dispatcher = new DefaultRtpDispatcher(selector, transport, sender, scheduler);
+            // Dispatcher is constructed below, after the waitlist + status sink are
+            // resolved so it can park no-backend envelopes onto the shared waitlist
+            // (ADR-015 Slice 2). Was: `new DefaultRtpDispatcher(selector, transport,
+            // sender, scheduler)` (pre-Slice-2 4-arg ctor with null waitlist).
 
             // Open the cross-server request queue alongside the transport. Failure
             // here logs a WARNING and leaves the trigger source unstarted: the proxy
@@ -181,16 +236,155 @@ public final class RtpVelocityPlugin {
             Duration pollTimeout = readQueuePollTimeout(raw);
             try {
                 this.requestQueue = NetworkBindings.openRequestQueue(config, /* dataSource */ null);
-                this.requestTriggerSource = new TransportRequestTriggerSource(
-                        requestQueue, dispatcher, workerThreads, pollTimeout, logger);
-                this.requestTriggerSource.start();
             } catch (RuntimeException ex) {
-                logger.warn("RTP request queue open/start failed ({}); proxy will not drain "
+                logger.warn("RTP request queue open failed ({}); proxy will not drain "
                         + "cross-server /rtp requests this session.", ex.getMessage());
             }
 
-            logger.info("RTP Velocity adapter active as participant: proxyId='{}', transport='{}', heartbeat={}ms, queueWorkers={}.",
-                    config.proxyId(), config.transportType(), config.heartbeatIntervalMs(), workerThreads);
+            // ADR-015 / REQ-RTP-NET-015: open the shared cross-proxy waitlist + leader
+            // lease. Both are null when network.waitlist.enabled=false; the dispatcher
+            // then resolves no-backend as terminal FAILED (legacy pre-Slice-2 path).
+            // Both open paths degrade-to-in-memory on transport failure per the
+            // NetworkBindings factories; we never propagate the exception so the
+            // proxy stays up for heartbeats / reservation redeem on a partial outage.
+            try {
+                this.waitlist = NetworkBindings.openWaitlist(config, /* dataSource */ null);
+                this.leaderLease = NetworkBindings.openLeaderLease(config, /* dataSource */ null);
+            } catch (RuntimeException ex) {
+                logger.warn("RTP waitlist/lease open failed ({}); no-backend dispatch will fall "
+                        + "back to terminal FAILED this session.", ex.getMessage());
+                this.waitlist = null;
+                this.leaderLease = null;
+            }
+
+            // Status sink: forwards every dispatcher state transition into the
+            // shared NetworkRequestQueue.transition() so the backend-side
+            // NetworkStatusCache picks up WAITLISTED / ROUTING / RESERVED / etc.
+            // Only meaningful when both the waitlist AND the request queue opened
+            // successfully; otherwise we keep StatusSink.NO_OP so nothing tries to
+            // write into a half-initialised transport.
+            StatusSink statusSink = (waitlist != null && requestQueue != null)
+                    ? new RequestQueueStatusSink(requestQueue)
+                    : StatusSink.NO_OP;
+
+            // Slice E (CHECKLIST-cross-server-rtp-L6.md row E2) + ADR-015 Slice 2:
+            // construct the dispatcher with the full 8-arg ctor so the no-backend
+            // branch can park onto the shared waitlist. When waitlist is null the
+            // ctor still accepts the null and the dispatcher behaves pre-Slice-2.
+            this.dispatcher = new DefaultRtpDispatcher(
+                    selector, transport, sender, scheduler,
+                    Duration.ofSeconds(30),
+                    statusSink,
+                    waitlist,
+                    config.proxyId() == null ? "proxy" : config.proxyId(),
+                    regionAwareSelector);
+
+            // ADR-016 / REQ-RTP-NET-016: open the cross-proxy player-ownership
+            // tracker BEFORE the trigger source so the worker loop can consult it
+            // on every dequeue. Returns NO_OP for single-JVM transports (the
+            // trigger source then falls back to legacy dequeueReady). Failure
+            // here degrades to NO_OP with a WARNING; the proxy stays up.
+            String thisProxyId = config.proxyId() == null ? "" : config.proxyId();
+            try {
+                this.ownershipTracker = NetworkBindings.openOwnershipTracker(config);
+            } catch (RuntimeException ex) {
+                logger.warn("RTP ownership tracker open failed ({}); cross-proxy ownership "
+                        + "filtering disabled this session.", ex.getMessage());
+                this.ownershipTracker = PlayerOwnershipTracker.NO_OP;
+            }
+
+            // Register the Velocity login/disconnect listener + schedule a
+            // heartbeat-cadence refresh so the per-uuid tag stays alive while
+            // the player is connected. Only when we have a real (non-NO_OP)
+            // tracker AND a non-empty proxyId; otherwise the trigger source
+            // would not gate on ownership anyway.
+            boolean ownershipActive = ownershipTracker != PlayerOwnershipTracker.NO_OP
+                    && !thisProxyId.isEmpty();
+            if (ownershipActive) {
+                long hbMs = config.heartbeatIntervalMs();
+                int ttlSec = (int) Math.max(2L, ((2L * hbMs) / 1000L) + 1L);
+                this.ownershipListener = new VelocityPlayerOwnershipListener(
+                        ownershipTracker, thisProxyId, ttlSec, logger);
+                proxyServer.getEventManager().register(this, ownershipListener);
+                // Seed for any player already connected (plugin reload, hot
+                // attach) and refresh on every pulse so the TTL never expires.
+                final VelocityPlayerOwnershipListener listenerRef = ownershipListener;
+                this.ownershipRefreshTask = scheduler.scheduleWithFixedDelay(
+                        () -> {
+                            try {
+                                java.util.List<UUID> ids = new java.util.ArrayList<>();
+                                proxyServer.getAllPlayers().forEach(p -> ids.add(p.getUniqueId()));
+                                listenerRef.refreshAll(ids);
+                            } catch (Throwable t) {
+                                logger.warn("RTP ownership refresh pulse failed: {}",
+                                        t.getMessage(), t);
+                            }
+                        },
+                        hbMs, hbMs, TimeUnit.MILLISECONDS);
+            }
+
+            // Start the trigger source AFTER the dispatcher exists; otherwise an
+            // envelope popped from the queue would crash on a null dispatcher
+            // reference. The 6-arg ctor routes through the ownership-aware
+            // dequeueReady overload when a non-empty proxyId is supplied;
+            // single-JVM transports pass an empty string to keep the legacy
+            // dequeueReady codepath.
+            if (requestQueue != null) {
+                try {
+                    String triggerProxyId = ownershipActive ? thisProxyId : null;
+                    this.requestTriggerSource = new TransportRequestTriggerSource(
+                            requestQueue, dispatcher, workerThreads, pollTimeout, logger,
+                            triggerProxyId);
+                    this.requestTriggerSource.start();
+                } catch (RuntimeException ex) {
+                    logger.warn("RTP request trigger source start failed ({}); proxy will not drain "
+                            + "cross-server /rtp requests this session.", ex.getMessage());
+                }
+            }
+
+            // ADR-015 Slice 2 drainer + reaper: pulse cadence tracks heartbeat
+            // interval (the BackendHeartbeat.regionKeptCounts feed is what bounds
+            // the per-backend cap map). scheduleWithFixedDelay (not fixedRate) so a
+            // slow pulse never queues up successors behind itself during a transport
+            // partition. Both null-checked: a deployment with waitlist disabled
+            // (or with the open path having failed above) simply skips this block.
+            if (waitlist != null && leaderLease != null && transport != null) {
+                this.waitlistDrainer = new NetworkWaitlistDrainer(
+                        waitlist, transport, dispatcher, leaderLease,
+                        Duration.ofMillis(config.waitlistLeaderLeaseHoldMs()),
+                        Duration.ofMillis(config.waitlistDrainPauseMs()));
+                long drainMs = config.waitlistDrainIntervalMs();
+                this.waitlistDrainerTask = scheduler.scheduleWithFixedDelay(
+                        () -> {
+                            try { waitlistDrainer.runPulse(); }
+                            catch (Throwable t) {
+                                logger.warn("RTP waitlist drain pulse failed: {}", t.getMessage(), t);
+                            }
+                        },
+                        drainMs, drainMs, TimeUnit.MILLISECONDS);
+
+                long reapEveryMs = config.waitlistReapIntervalMs();
+                Duration reapMaxAge = Duration.ofMillis(config.waitlistReapMaxAgeMs());
+                this.waitlistReaperTask = scheduler.scheduleWithFixedDelay(
+                        () -> {
+                            try { waitlist.reap(reapMaxAge); }
+                            catch (Throwable t) {
+                                logger.warn("RTP waitlist reap failed: {}", t.getMessage(), t);
+                            }
+                        },
+                        reapEveryMs, reapEveryMs, TimeUnit.MILLISECONDS);
+
+                // Multi-proxy correctness: register a per-proxy DisconnectEvent
+                // listener that point-removes the leaving player's UUID. Only the
+                // proxy the player is connected to fires this event, so no inter-
+                // proxy coordination is needed.
+                this.waitlistQuitListener = new VelocityWaitlistQuitListener(waitlist, logger);
+                proxyServer.getEventManager().register(this, waitlistQuitListener);
+            }
+
+            logger.info("RTP Velocity adapter active as participant: proxyId='{}', transport='{}', heartbeat={}ms, queueWorkers={}, waitlist={}.",
+                    config.proxyId(), config.transportType(), config.heartbeatIntervalMs(),
+                    workerThreads, waitlist != null ? "enabled" : "disabled");
         } catch (RuntimeException ex) {
             logger.warn("RTP Velocity adapter init failed; running disabled.", ex);
         }
@@ -318,13 +512,71 @@ public final class RtpVelocityPlugin {
         boolean cleanShutdown = true;
         try {
             step = 1;
+            // ADR-015 Slice 2 teardown: cancel drainer + reaper BEFORE stopping
+            // the request trigger source so a final in-flight pulse cannot try to
+            // dispatch into a half-torn-down pipeline. Future.cancel(false) lets
+            // an in-flight pulse run to completion; the scheduler shutdown below
+            // forces termination after the 2s grace window.
+            if (waitlistDrainerTask != null) {
+                try { waitlistDrainerTask.cancel(false); }
+                catch (RuntimeException ex) {
+                    logger.warn("RTP shutdown step {} (cancel waitlist drainer) threw: {}", step, ex.getMessage());
+                }
+            }
+            if (waitlistReaperTask != null) {
+                try { waitlistReaperTask.cancel(false); }
+                catch (RuntimeException ex) {
+                    logger.warn("RTP shutdown step {} (cancel waitlist reaper) threw: {}", step, ex.getMessage());
+                }
+            }
+            // Release the lease so a peer proxy can pick up drain duty promptly
+            // instead of waiting on the TTL handover.
+            if (leaderLease != null) {
+                try { leaderLease.release(); }
+                catch (RuntimeException ex) {
+                    logger.warn("RTP shutdown step {} (release leader lease) threw: {}", step, ex.getMessage());
+                }
+            }
+            // Close the waitlist when the impl owns external resources (Redis pool).
+            if (waitlist instanceof AutoCloseable wc) {
+                try { wc.close(); }
+                catch (Exception ex) {
+                    logger.warn("RTP shutdown step {} (close waitlist) threw: {}", step, ex.getMessage());
+                }
+            }
+            // Best-effort release on the lease for Redis impls that own a pool.
+            if (leaderLease instanceof AutoCloseable lc) {
+                try { lc.close(); }
+                catch (Exception ex) {
+                    logger.warn("RTP shutdown step {} (close leader lease) threw: {}", step, ex.getMessage());
+                }
+            }
+
+            step = 2;
             if (requestTriggerSource != null) {
                 try { requestTriggerSource.stop(); }
                 catch (RuntimeException ex) {
                     logger.warn("RTP shutdown step {} (stop request trigger source) threw: {}", step, ex.getMessage());
                 }
             }
-            step = 2;
+            // ADR-016 teardown: cancel the ownership refresh pulse and close the
+            // tracker. We deliberately do NOT release per-uuid tags here because
+            // they carry their own TTL; releasing on shutdown would falsely
+            // disown players who are about to be re-routed to the surviving
+            // proxy on Velocity restart.
+            if (ownershipRefreshTask != null) {
+                try { ownershipRefreshTask.cancel(false); }
+                catch (RuntimeException ex) {
+                    logger.warn("RTP shutdown step {} (cancel ownership refresh) threw: {}", step, ex.getMessage());
+                }
+            }
+            if (ownershipTracker != null) {
+                try { ownershipTracker.close(); }
+                catch (RuntimeException ex) {
+                    logger.warn("RTP shutdown step {} (close ownership tracker) threw: {}", step, ex.getMessage());
+                }
+            }
+            step = 3;
             if (requestQueue != null) {
                 try {
                     if (requestQueue instanceof AutoCloseable c) c.close();
@@ -332,21 +584,21 @@ public final class RtpVelocityPlugin {
                     logger.warn("RTP shutdown step {} (close request queue) threw: {}", step, ex.getMessage());
                 }
             }
-            step = 3;
+            step = 4;
             if (reservationReaper != null) {
                 try { reservationReaper.close(); }
                 catch (RuntimeException ex) {
                     logger.warn("RTP shutdown step {} (close reaper) threw: {}", step, ex.getMessage());
                 }
             }
-            step = 4;
+            step = 5;
             if (publisher != null) {
                 try { publisher.stop(); }
                 catch (RuntimeException ex) {
                     logger.warn("RTP shutdown step {} (stop publisher) threw: {}", step, ex.getMessage());
                 }
             }
-            step = 5;
+            step = 6;
             if (scheduler != null) {
                 scheduler.shutdown();
                 try {
@@ -357,7 +609,7 @@ public final class RtpVelocityPlugin {
                     Thread.currentThread().interrupt();
                 }
             }
-            step = 6;
+            step = 7;
             if (transport != null) {
                 if (!closeTransportBounded(transport, SHUTDOWN_TRANSPORT_CLOSE_TIMEOUT_MS)) {
                     cleanShutdown = false;
@@ -510,6 +762,27 @@ public final class RtpVelocityPlugin {
 
     /** @return active cross-server request queue when enabled, else {@code null}. */
     NetworkRequestQueue requestQueue() { return requestQueue; }
+
+    /** @return active shared waitlist when enabled, else {@code null}. ADR-015. */
+    NetworkWaitlist waitlist() { return waitlist; }
+
+    /** @return active leader lease when waitlist enabled, else {@code null}. ADR-015. */
+    WaitlistLeaderLease leaderLease() { return leaderLease; }
+
+    /** @return active drainer when waitlist enabled, else {@code null}. ADR-015. */
+    NetworkWaitlistDrainer waitlistDrainer() { return waitlistDrainer; }
+
+    /** @return scheduled drainer task handle when waitlist enabled, else {@code null}. */
+    ScheduledFuture<?> waitlistDrainerTask() { return waitlistDrainerTask; }
+
+    /** @return scheduled reaper task handle when waitlist enabled, else {@code null}. */
+    ScheduledFuture<?> waitlistReaperTask() { return waitlistReaperTask; }
+
+    /** @return registered disconnect listener when waitlist enabled, else {@code null}. */
+    VelocityWaitlistQuitListener waitlistQuitListener() { return waitlistQuitListener; }
+
+    /** @return active dispatcher when network enabled, else {@code null}. */
+    RtpDispatcher dispatcher() { return dispatcher; }
 
     // ---- Slice E (CHECKLIST-cross-server-rtp-L6.md): network.queue.* config readers ----
 

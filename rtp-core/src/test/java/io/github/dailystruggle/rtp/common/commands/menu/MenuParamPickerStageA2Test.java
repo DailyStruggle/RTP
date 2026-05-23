@@ -139,12 +139,14 @@ class MenuParamPickerStageA2Test {
                     "row " + i + " must be a value row (OpenMenu, staging the assignment)");
             valueRows.put(vf.text(), (MenuAction.OpenMenu) vf.action());
         }
-        assertTrue(valueRows.containsKey("true"), "boolean 'true' row present");
-        assertTrue(valueRows.containsKey("false"), "boolean 'false' row present");
+        // Value rows are color-prefixed with &2 (parchment contrast); strip
+        // the prefix when asserting against the canonical value text.
+        assertTrue(valueRows.containsKey("&2true"), "boolean 'true' row present");
+        assertTrue(valueRows.containsKey("&2false"), "boolean 'false' row present");
         // Each value row's path is <parentPath..., ASYNC=value>.
-        String[] truePath = valueRows.get("true").path();
+        String[] truePath = valueRows.get("&2true").path();
         assertArrayEqualsLocal(new String[]{"config", "performance", "ASYNC=true"}, truePath, "true row path");
-        String[] falsePath = valueRows.get("false").path();
+        String[] falsePath = valueRows.get("&2false").path();
         assertArrayEqualsLocal(new String[]{"config", "performance", "ASYNC=false"}, falsePath, "false row path");
     }
 
@@ -223,6 +225,7 @@ class MenuParamPickerStageA2Test {
 
         // Page 0: 3 scaffold rows + 10 values + 1 next nav row = 14 rows;
         // last row must be ChangePage(1).
+        // Value-row labels are color-prefixed (&2) for parchment contrast.
         List<MenuLine> p0 = model.pages().get(0).lines();
         assertEquals(14, p0.size(), "page 0 row count (3 scaffold + 10 values + 1 next)");
         MenuAction lastP0 = p0.get(p0.size() - 1).fragments().get(0).action();
@@ -252,10 +255,11 @@ class MenuParamPickerStageA2Test {
 
         // Value rows distribute in sorted order across pages: page 0 has
         // v00..v09, page 2 starts at v20.
-        assertEquals("v00", p0.get(3).fragments().get(0).text());
-        assertEquals("v09", p0.get(12).fragments().get(0).text());
-        assertEquals("v20", p2.get(3).fragments().get(0).text());
-        assertEquals("v24", p2.get(7).fragments().get(0).text());
+        // Value-row labels carry the &2 parchment-contrast prefix.
+        assertEquals("&2v00", p0.get(3).fragments().get(0).text());
+        assertEquals("&2v09", p0.get(12).fragments().get(0).text());
+        assertEquals("&2v20", p2.get(3).fragments().get(0).text());
+        assertEquals("&2v24", p2.get(7).fragments().get(0).text());
     }
 
     // ------------------------------------------------------------------------

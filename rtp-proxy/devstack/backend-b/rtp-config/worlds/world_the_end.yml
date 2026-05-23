@@ -7,5 +7,6 @@ region: "default"
 requirePermission: false
 # World to redirect to if no permission
 override: "[0]"
+
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

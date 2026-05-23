@@ -233,9 +233,14 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
 
     @Override
     public Set<String> getEffectivePermissions() {
-        // Step F. Empty until perms-api is wired; op-level players get a true
-        // from hasPermission so command gating still works in the meantime.
-        return Collections.emptySet();
+        // rtp-fabric-ADR-011: LuckPerms-Fabric primary path with closed-namespace
+        // (rtp.effect.*, rtp.onevent.*) registry-probe fallback. Op status is
+        // detected by probing a known default:op node through hasPermission so the
+        // ops.json scan / perms-api verdict is honoured without duplicating logic.
+        if (handle == null) return Collections.emptySet();
+        boolean isOp = hasPermission("rtp.reload");
+        return io.github.dailystruggle.rtp.fabric.player.FabricEffectivePermissionsResolver
+                .resolve(uuid, isOp, this::hasPermission);
     }
 
     @Override

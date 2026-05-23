@@ -1,11 +1,14 @@
 package io.github.dailystruggle.rtp.proxy.common.dispatch;
 
+import io.github.dailystruggle.rtp.proxy.common.selector.RegionAwareSelector;
+import io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendSelector;
 import io.github.dailystruggle.rtp.proxy.common.spi.DispatchOutcome;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue.QueueState;
 import io.github.dailystruggle.rtp.proxy.common.spi.MessageKey;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
+import io.github.dailystruggle.rtp.proxy.common.spi.NetworkWaitlist;
 import io.github.dailystruggle.rtp.proxy.common.spi.ProxySender;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReleaseReason;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
@@ -63,6 +66,13 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
     public static final MessageKey MSG_DISABLED      = new MessageKey("rtp.network.disabled");
     public static final MessageKey MSG_PLAYER_GONE   = new MessageKey("rtp.network.player-gone");
     public static final MessageKey MSG_INTERNAL      = new MessageKey("rtp.network.internal-error");
+    /**
+     * Surfaced when the request was parked on the shared cross-proxy
+     * {@link NetworkWaitlist} instead of being immediately routed. The
+     * lobby-side notifier (Slice 4) renders the player's queue position
+     * against this key.
+     */
+    public static final MessageKey MSG_QUEUED        = new MessageKey("rtp.network.queued");
 
     private final BackendSelector selector;
     private final NetworkTransport transport;
@@ -70,6 +80,25 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
     private final Executor executor;
     private final Duration reservationTtl;
     private final StatusSink statusSink;
+    /** Optional shared waitlist; when non-null the no-backend path enrols instead of failing. Slice 2. */
+    private final NetworkWaitlist waitlist;
+    /** Stable id of the proxy node hosting this dispatcher; persisted in {@link NetworkWaitlist.WaitEnvelope}. */
+    private final String proxyServerId;
+    /**
+     * Optional region-aware fallback selector. When non-null AND the
+     * incoming {@link RtpRequest#regionKey()} is empty (i.e. a bare
+     * {@code /rtp} that no lobby pre-decided), the dispatcher runs this
+     * selector first to pick a {@code (serverId, regionKey)} pair using
+     * the same scoring table operators tune for the lobby-side
+     * {@code PeerRegionRegistry}. The picked region is folded into a
+     * rewritten {@link RtpRequest} which then flows through the existing
+     * {@link BackendSelector#choose(RtpRequest, NetworkSnapshot, Optional)}
+     * + claim path (with the picked {@code serverId} acting as the
+     * filter), so downstream code paths are unchanged. {@code null}
+     * preserves pre-change behaviour: regionless requests fall straight
+     * through to {@link BackendSelector#choose(RtpRequest, NetworkSnapshot)}.
+     */
+    private final RegionAwareSelector regionAwareSelector;
 
     public DefaultRtpDispatcher(BackendSelector selector,
                                 NetworkTransport transport,
@@ -100,12 +129,67 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
                                 Executor executor,
                                 Duration reservationTtl,
                                 StatusSink statusSink) {
+        this(selector, transport, sender, executor, reservationTtl, statusSink, null, "proxy");
+    }
+
+    /**
+     * Slice 2 constructor: in addition to the L6 inputs above, accept an
+     * optional shared {@link NetworkWaitlist}. When {@code waitlist} is
+     * non-null and {@link BackendSelector#choose} returns empty (no
+     * qualifying backend), the dispatcher parks the envelope on the
+     * waitlist and resolves with {@link DispatchOutcome.Queued} +
+     * {@link QueueState#WAITLISTED}, instead of the terminal
+     * {@link DispatchOutcome.Failed} the pre-Slice-2 path produced. The
+     * proxy-side {@link NetworkWaitlistDrainer} reinjects parked
+     * envelopes when capacity appears.
+     *
+     * @param waitlist      shared cross-proxy waitlist, or {@code null}
+     *                      to keep pre-Slice-2 behaviour
+     * @param proxyServerId stable id of this proxy node; persisted in
+     *                      {@link NetworkWaitlist.WaitEnvelope#originServerId()}
+     */
+    public DefaultRtpDispatcher(BackendSelector selector,
+                                NetworkTransport transport,
+                                ProxySender sender,
+                                Executor executor,
+                                Duration reservationTtl,
+                                StatusSink statusSink,
+                                NetworkWaitlist waitlist,
+                                String proxyServerId) {
+        this(selector, transport, sender, executor, reservationTtl, statusSink,
+                waitlist, proxyServerId, null);
+    }
+
+    /**
+     * Slice 6 follow-up: full constructor that also accepts an optional
+     * {@link RegionAwareSelector} for proxy-side load-balanced fallback on
+     * bare {@code /rtp} (no {@code regionKey} hint, e.g. proxy-driven
+     * join-time RTP without a lobby pre-decision). When non-null, the
+     * dispatcher picks a {@code (serverId, regionKey)} pair using the
+     * operator-tuned scoring table from {@code network.yml} before the
+     * existing {@link BackendSelector} claim path runs.
+     *
+     * @param regionAwareSelector pair-wise selector, or {@code null} to
+     *                            skip the region-aware fallback step
+     */
+    public DefaultRtpDispatcher(BackendSelector selector,
+                                NetworkTransport transport,
+                                ProxySender sender,
+                                Executor executor,
+                                Duration reservationTtl,
+                                StatusSink statusSink,
+                                NetworkWaitlist waitlist,
+                                String proxyServerId,
+                                RegionAwareSelector regionAwareSelector) {
         this.selector = Objects.requireNonNull(selector, "selector");
         this.transport = Objects.requireNonNull(transport, "transport");
         this.sender = Objects.requireNonNull(sender, "sender");
         this.executor = Objects.requireNonNull(executor, "executor");
         this.reservationTtl = Objects.requireNonNull(reservationTtl, "reservationTtl");
         this.statusSink = Objects.requireNonNull(statusSink, "statusSink");
+        this.waitlist = waitlist; // optional; null disables the waitlist branch
+        this.proxyServerId = Objects.requireNonNull(proxyServerId, "proxyServerId");
+        this.regionAwareSelector = regionAwareSelector; // optional; null disables the region-aware fallback
         if (reservationTtl.isZero() || reservationTtl.isNegative()) {
             throw new IllegalArgumentException("reservationTtl must be positive");
         }
@@ -117,6 +201,14 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
      * outcome the caller is awaiting.
      */
     private void emitStatus(java.util.UUID playerId, QueueState state, java.util.Optional<String> reason) {
+        // State-transition log: every dispatcher state emission (QUEUED ->
+        // WAITLISTED -> ROUTING -> RESERVED -> TRANSFERRING -> COMPLETED /
+        // FAILED). One line per transition; the sink itself is the
+        // transport-side mirror that the lobby's NetworkStatusCache reads.
+        LOG.log(Level.INFO,
+                "[NETWORK][state][proxy] emit: playerId=" + playerId
+                        + " state=" + state
+                        + (reason != null && reason.isPresent() ? " reason=" + reason.get() : ""));
         try {
             statusSink.emit(playerId, state, reason);
         } catch (Throwable sinkErr) {
@@ -156,8 +248,67 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
 
     private CompletableFuture<DispatchAttempt> claimAfterSelect(RtpRequest request,
                                                                 NetworkSnapshot snapshot) {
-        Optional<String> picked = selector.choose(request, snapshot);
+        // Region-aware fallback (proxy-side load-balanced region pick).
+        // Active iff (a) an operator-tuned RegionAwareSelector is wired AND
+        // (b) the incoming request did NOT pre-pin a region. A pre-pinned
+        // region is honoured verbatim: explicit player intent (or a lobby's
+        // pickMostKept() result) always wins over the proxy-side pick.
+        RtpRequest effectiveRequest = request;
+        if (regionAwareSelector != null && request.regionKey().isEmpty()) {
+            Optional<ServerRegion> pair =
+                    regionAwareSelector.choose(snapshot, request, /*excludedServerId=*/null);
+            if (pair.isPresent()) {
+                // Rewrite the request with the chosen regionKey so the
+                // downstream BackendSelector treats this exactly like the
+                // "player explicitly typed region=..." path. We do NOT
+                // overwrite playerId / correlationId / triggerType /
+                // worldKey / originServerId - those are caller invariants.
+                effectiveRequest = new RtpRequest(
+                        request.playerId(),
+                        request.triggerType(),
+                        Optional.of(pair.get().regionKey()),
+                        request.worldKey(),
+                        request.originServerId(),
+                        request.correlationId());
+                LOG.log(Level.INFO,
+                        "[NETWORK][dispatch] regionAwareSelector picked serverId={0} regionKey={1}"
+                                + " for player {2} (correlationId={3})",
+                        new Object[]{pair.get().serverId(), pair.get().regionKey(),
+                                request.playerId(), request.correlationId()});
+                // Pin the BackendSelector candidate set to the chosen serverId
+                // so a same-snapshot disagreement between the two selectors
+                // cannot route the player to a different backend than the one
+                // whose region we just chose.
+                Optional<String> picked = selector.choose(effectiveRequest, snapshot,
+                        Optional.of(pair.get().serverId()));
+                return continueAfterPick(effectiveRequest, picked);
+            }
+            // No region-aware pick (every backend disqualified). Fall through
+            // to the plain BackendSelector; it will likely also return empty
+            // and trigger the waitlist branch below - the desired terminal
+            // for "no backend is currently serving anything".
+        }
+        Optional<String> picked = selector.choose(effectiveRequest, snapshot);
+        return continueAfterPick(effectiveRequest, picked);
+    }
+
+    /**
+     * Shared tail of {@link #claimAfterSelect}: given a (possibly rewritten)
+     * request and the {@link BackendSelector#choose} result, drive the
+     * waitlist / no-backend / claim path. Factored out so the region-aware
+     * fallback can reuse it without duplicating the claim and waitlist
+     * branching.
+     */
+    private CompletableFuture<DispatchAttempt> continueAfterPick(RtpRequest request,
+                                                                 Optional<String> picked) {
         if (picked.isEmpty()) {
+            // Slice 2: park on the shared waitlist if one is configured, so
+            // the player gets Queued + WAITLISTED rather than a terminal
+            // FAILED. The proxy-side NetworkWaitlistDrainer will reinject
+            // when capacity appears. See rtp-proxy-ADR-015.
+            if (waitlist != null) {
+                return parkOnWaitlist(request);
+            }
             LOG.log(Level.INFO,
                     "RTP dispatch: no eligible backend for player {0} (correlationId={1}).",
                     new Object[]{request.playerId(), request.correlationId()});
@@ -275,6 +426,70 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
                     "RTP dispatch: best-effort release({0}, {1}) threw: {2}",
                     new Object[]{tokenId, reason, ex.getMessage()});
         }
+    }
+
+    /**
+     * Slice 2: park the envelope on the shared cross-proxy waitlist. The
+     * dispatcher emits {@link QueueState#WAITLISTED} via the status sink
+     * and surfaces {@link DispatchOutcome.Queued} to the caller so trigger
+     * sources can update the player UX. Failures from the waitlist
+     * binding (REJECTED_FULL, REJECTED_CLOSED, transport throw) fall
+     * back to the pre-Slice-2 NO_BACKEND outcome so the player never gets
+     * a silent swallow.
+     */
+    private CompletableFuture<DispatchAttempt> parkOnWaitlist(RtpRequest request) {
+        NetworkWaitlist.WaitEnvelope envelope = new NetworkWaitlist.WaitEnvelope(
+                request.playerId(),
+                request.correlationId(),
+                request.regionKey(),
+                Optional.empty(),
+                request.originServerId().orElse(proxyServerId),
+                System.currentTimeMillis());
+        return waitlist.enrol(envelope)
+                .thenApply(outcome -> {
+                    if (outcome == NetworkWaitlist.EnrolOutcome.ACCEPTED
+                            || outcome == NetworkWaitlist.EnrolOutcome.REJECTED_DUPLICATE) {
+                        // REJECTED_DUPLICATE is benign here: the player
+                        // already has a parked entry from a prior request,
+                        // so the waitlist + command-lock UX is already in
+                        // effect. Surface the same Queued + WAITLISTED
+                        // signal so the trigger source converges on one
+                        // pending request per UUID.
+                        LOG.log(Level.INFO,
+                                "RTP dispatch: parked player {0} on cross-proxy waitlist "
+                                        + "(correlationId={1}, outcome={2}).",
+                                new Object[]{request.playerId(), request.correlationId(), outcome});
+                        sender.sendMessage(request.playerId(), MSG_QUEUED, Map.of());
+                        emitStatus(request.playerId(), QueueState.WAITLISTED,
+                                Optional.of(MSG_QUEUED.key()));
+                        return DispatchAttempt.failed(new DispatchOutcome.Queued(0));
+                    }
+                    // REJECTED_FULL or REJECTED_CLOSED: fall back to the
+                    // pre-Slice-2 terminal NO_BACKEND outcome, so the
+                    // player still gets a meaningful S-004 message.
+                    LOG.log(Level.WARNING,
+                            "RTP dispatch: waitlist refused enrol for player {0} ({1}); "
+                                    + "falling back to NO_BACKEND.",
+                            new Object[]{request.playerId(), outcome});
+                    sender.sendMessage(request.playerId(), MSG_NO_BACKEND, Map.of());
+                    emitStatus(request.playerId(), QueueState.FAILED,
+                            Optional.of(MSG_NO_BACKEND.key()));
+                    return DispatchAttempt.failed(new DispatchOutcome.Failed(
+                            DispatchOutcome.Failed.Reason.NO_BACKEND, MSG_NO_BACKEND.key()));
+                })
+                .exceptionally(err -> {
+                    Throwable cause = unwrap(err);
+                    LOG.log(Level.WARNING,
+                            "RTP dispatch: waitlist.enrol threw for player " + request.playerId()
+                                    + " (correlationId=" + request.correlationId() + "); "
+                                    + "falling back to NO_BACKEND.",
+                            cause);
+                    sender.sendMessage(request.playerId(), MSG_NO_BACKEND, Map.of());
+                    emitStatus(request.playerId(), QueueState.FAILED,
+                            Optional.of(MSG_NO_BACKEND.key()));
+                    return DispatchAttempt.failed(new DispatchOutcome.Failed(
+                            DispatchOutcome.Failed.Reason.NO_BACKEND, MSG_NO_BACKEND.key()));
+                });
     }
 
     private static Throwable unwrap(Throwable t) {
