@@ -177,7 +177,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   }
 
   @Override
-  public void scheduleTeleport(
+  public void runTaskForPlayer(
       io.github.dailystruggle.rtp.api.entity.RTPPlayer player,
       io.github.dailystruggle.rtp.common.tasks.RTPRunnable task,
       long delayTicks) {

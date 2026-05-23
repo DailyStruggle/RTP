@@ -84,6 +84,58 @@ class NetworkStatusCacheTest {
     }
 
     @Test
+    void evictLocal_removes_row_without_firing_terminal_listener() {
+        // REQ-RTP-S-004 / REQ-RTP-NET-015: JoinTriggerSource.onRedeemed
+        // calls evictLocal so the post-arrival /rtp dispatch is not
+        // rejected by NetworkWaitlistGuard. The eviction is a local-state
+        // correction (the proxy will report the terminal transition on
+        // its own schedule), so the terminal listener must NOT fire here
+        // (it would double-fire on the next pollOnce).
+        UUID p = UUID.randomUUID();
+        AtomicReference<Collection<NetworkStatusCache.QueueStatus>> supply = new AtomicReference<>(
+                List.of(row(p, NetworkStatusCache.QueueStatus.State.RESERVED, 0)));
+        NetworkStatusCache cache = new NetworkStatusCache(supply::get);
+        cache.pollOnce();
+        assertEquals(1, cache.size());
+        assertTrue(cache.get(p).isPresent());
+
+        java.util.concurrent.atomic.AtomicInteger terminalFires =
+                new java.util.concurrent.atomic.AtomicInteger();
+        cache.setTerminalListener((uuid, state) -> terminalFires.incrementAndGet());
+
+        cache.evictLocal(p);
+        assertEquals(0, cache.size(), "evictLocal must drop the row");
+        assertTrue(cache.get(p).isEmpty());
+        assertEquals(0, terminalFires.get(),
+                "evictLocal must NOT fire the terminal listener (the proxy is "
+                        + "still the source of truth for terminal transitions)");
+
+        // Idempotent + null-tolerant.
+        cache.evictLocal(p);
+        cache.evictLocal(null);
+        assertEquals(0, terminalFires.get());
+    }
+
+    @Test
+    void evictLocal_also_clears_sticky_seed() {
+        // A lobby-side seed must not survive evictLocal, otherwise the
+        // sticky row would re-appear on the next pollOnce and re-block
+        // /rtp on the destination backend.
+        UUID p = UUID.randomUUID();
+        NetworkStatusCache cache = new NetworkStatusCache(java.util.Collections::emptyList);
+        cache.seedLocal(p);
+        assertTrue(cache.get(p).isPresent(), "seedLocal installs a synthetic QUEUED row");
+
+        cache.evictLocal(p);
+        assertEquals(0, cache.size());
+        // Next pollOnce against an empty supplier must NOT bring the
+        // seeded row back.
+        cache.pollOnce();
+        assertEquals(0, cache.size());
+        assertTrue(cache.get(p).isEmpty());
+    }
+
+    @Test
     void shutdown_clears_cache_and_is_idempotent() {
         UUID p = UUID.randomUUID();
         NetworkStatusCache cache = new NetworkStatusCache(() ->

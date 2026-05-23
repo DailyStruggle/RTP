@@ -233,12 +233,30 @@ public final class TransportRequestTriggerSource {
     private void dispatchEnvelope(NetworkRequestQueue.QueueEnvelope env) {
         UUID playerId = env.playerId();
         UUID correlationId = env.correlationId();
+        // Phase B trace (2026-05-23): worker has popped an envelope from the
+        // queue and is about to hand it to the dispatcher. Logged at INFO so
+        // devstack repros can confirm the proxy actually received the
+        // envelope (vs. it never being enqueued, or being claimed by a
+        // sibling proxy worker). Remove or downgrade once root cause known.
+        logger.info(
+                "[NETWORK][trace] TransportRequestTriggerSource.dispatchEnvelope: received envelope correlationId={} player={} serverHint={} regionKey={} thisProxyId={}",
+                correlationId, playerId,
+                env.serverHint().orElse("<none>"),
+                env.regionKey().orElse("<none>"),
+                thisProxyId == null ? "<none>" : thisProxyId);
+        // env.serverHint() must reach the dispatcher in the dedicated
+        // serverHint slot (added 2026-05-23) - previously it was smuggled
+        // into the originServerId slot, which the BackendSelector does
+        // not read, so every cross-server /rtp was load-balanced even
+        // when the player typed `region=<server>:<region>`. The trigger
+        // source is not the request's origin, so originServerId is empty.
         RtpRequest req = new RtpRequest(
                 playerId,
                 TriggerType.COMMAND,
                 env.regionKey(),
-                Optional.empty(),
-                env.serverHint(),
+                /*worldKey=*/Optional.empty(),
+                /*serverHint=*/env.serverHint(),
+                /*originServerId=*/Optional.empty(),
                 correlationId
         );
         CompletableFuture<DispatchOutcome> fut;

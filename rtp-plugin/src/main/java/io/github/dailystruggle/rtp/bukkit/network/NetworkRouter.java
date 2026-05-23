@@ -123,6 +123,20 @@ public final class NetworkRouter {
     public RoutingDecision route(UUID playerId, String regionKey, String serverHint) {
         String hint = (serverHint == null || serverHint.isEmpty()) ? null : serverHint;
 
+        // Self-pin coalesce (2026-05-23): when the player typed
+        // `rtp region=<server>:<region>` and `<server>` IS the local
+        // backend, the prefix is redundant. Drop it so the request
+        // takes the normal local path instead of getting funnelled
+        // through the cross-server pin gates (which would otherwise
+        // either bounce the player off-and-back, or REJECT with
+        // REGION_UNAVAILABLE if the local backend happens to advertise
+        // the region under a different name in its heartbeat). Treating
+        // `region=<self>:<region>` as equivalent to `region=<region>`
+        // is the principle-of-least-surprise behaviour.
+        if (hint != null && hint.equals(localServerId)) {
+            hint = null;
+        }
+
         // Gate 1: snapshot must be present (bootstrap finished, transport open).
         NetworkSnapshot snap = snapshotSupplier.get();
         if (snap == null) {

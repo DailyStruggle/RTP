@@ -157,6 +157,33 @@ public final class NetworkStatusCache {
         return Optional.ofNullable(byPlayer.get(playerId));
     }
 
+    /**
+     * Locally evict any cached row for {@code playerId} (and clear any
+     * sticky local seed). Used by {@code JoinTriggerSource} on a successful
+     * cross-server redeem: once the proxy token has transitioned to
+     * {@code CONSUMED}, the lobby-seeded / proxy-poller-seeded non-terminal
+     * row on this backend is stale and would cause
+     * {@link NetworkWaitlistGuard} to short-circuit the post-arrival
+     * {@code /rtp} dispatch with {@code msgAlreadyQueued}, leaving the
+     * arrival without a teleport (REQ-RTP-S-004, REQ-RTP-NET-008/-015).
+     *
+     * <p>This is a deliberate local-state correction, not a proxy state
+     * change, so the terminal listener is intentionally NOT fired: the
+     * authoritative terminal transition will be observed (and fired) by
+     * {@link #pollOnce} on the next supplier roundtrip. Idempotent; null
+     * tolerant.</p>
+     */
+    public void evictLocal(UUID playerId) {
+        if (playerId == null) return;
+        seededAtMs.remove(playerId);
+        QueueStatus prev = byPlayer.remove(playerId);
+        if (prev != null) {
+            RTP.log(Level.FINE,
+                    "[NETWORK][state] evictLocal: playerId=" + playerId
+                            + " priorState=" + prev.state().name());
+        }
+    }
+
     /** Visible for tests / metrics. */
     public int size() { return byPlayer.size(); }
 

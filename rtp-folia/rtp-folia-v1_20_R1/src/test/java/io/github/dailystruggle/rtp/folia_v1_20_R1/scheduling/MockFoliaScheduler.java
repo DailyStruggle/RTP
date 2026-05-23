@@ -117,7 +117,7 @@ public class MockFoliaScheduler implements RTPScheduler {
     }
 
     @Override
-    public void scheduleTeleport(RTPPlayer player, RTPRunnable task, long delayTicks) {
+    public void runTaskForPlayer(RTPPlayer player, RTPRunnable task, long delayTicks) {
         String taskId = java.util.UUID.randomUUID().toString();
         io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask trackedTask = new io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask(task, taskId);
         if (io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor != null) {

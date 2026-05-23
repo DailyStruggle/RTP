@@ -320,7 +320,8 @@ public interface RTPCmd extends BaseRTPCmd {
         if (p == null) {
           String msg =
               (String)
-                  langParser.getConfigValue(MessagesKeys.badArg, "player:" + playerName);
+                  langParser.getConfigValue(MessagesKeys.badArg, "[P0] bad parameter - [arg]");
+          msg = msg.replace("[arg]", "player=" + playerName);
           if(messageMethod != null) messageMethod.accept(msg);
           else RTP.serverAccessor.sendMessage(senderId, msg);
           RTP.log(Level.WARNING, msg);
@@ -428,7 +429,8 @@ public interface RTPCmd extends BaseRTPCmd {
         ConfigParser<WorldKeys> worldParser = RTP.configs.getWorldParser(worldName);
 
         if (worldParser == null) {
-          String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "world:" + worldName);
+          String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "[P0] bad parameter - [arg]");
+          msg = msg.replace("[arg]", "world=" + worldName);
           if(messageMethod != null) messageMethod.accept(msg);
           else RTP.serverAccessor.sendMessage(senderId, msg);
           RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute REJECT badArg world senderId=" + senderId
@@ -449,7 +451,8 @@ public interface RTPCmd extends BaseRTPCmd {
         RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute region resolved senderId=" + senderId
                 + " requestedRegion=" + regionName + " resolvedRegion=" + region.name);
       } catch (IllegalArgumentException | IllegalStateException exception) {
-        String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "region:" + regionName);
+        String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "[P0] bad parameter - [arg]");
+        msg = msg.replace("[arg]", "region=" + regionName);
         RTP.serverAccessor.sendMessage(senderId, msg);
         RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute REJECT badArg region senderId=" + senderId
                 + " regionName=" + regionName + " cause=" + exception.getClass().getSimpleName());
@@ -461,7 +464,8 @@ public interface RTPCmd extends BaseRTPCmd {
 
       RTPWorld rtpWorld = region.getWorld();
       if (rtpWorld == null) {
-        String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "region:" + regionName);
+        String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "[P0] bad parameter - [arg]");
+        msg = msg.replace("[arg]", "region=" + regionName);
         RTP.serverAccessor.sendMessage(senderId, msg);
         RTP.log(Level.WARNING, msg);
         RTP.getInstance().processingPlayers.remove(senderId);

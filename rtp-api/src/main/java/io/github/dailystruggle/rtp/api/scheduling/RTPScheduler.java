@@ -40,6 +40,7 @@ public interface RTPScheduler {
    */
   void runTaskLater(Runnable task, long delay);
 
+
   /**
    * Executes a repeating task on the main server thread.
    *
@@ -74,7 +75,7 @@ public interface RTPScheduler {
    * @param task the teleport task to run
    * @param delayTicks the delay in server ticks
    */
-  void scheduleTeleport(RTPPlayer player, RTPRunnable task, long delayTicks);
+  void runTaskForPlayer(RTPPlayer player, RTPRunnable task, long delayTicks);
 
   /**
    * Executes a task on the thread associated with the specified location.

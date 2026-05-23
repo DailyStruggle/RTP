@@ -4,6 +4,7 @@ import io.github.dailystruggle.mapsapi.model.CategoryDistribution;
 import io.github.dailystruggle.mapsapi.model.ChartModel;
 import io.github.dailystruggle.mapsapi.model.Heatmap2D;
 import io.github.dailystruggle.mapsapi.model.MermaidChart;
+import io.github.dailystruggle.mapsapi.model.RegionBadLocations;
 import io.github.dailystruggle.mapsapi.model.RegionCoverage;
 import io.github.dailystruggle.mapsapi.model.TimeSeries;
 import org.junit.jupiter.api.DisplayName;
@@ -32,8 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MapsApiSurfaceTest {
 
     @Test
-    @DisplayName("ChartModel is sealed and permits exactly the documented 5 record subtypes")
-    void chartModelIsSealedWithExpected5Permits() {
+    @DisplayName("ChartModel is sealed and permits exactly the documented record subtypes")
+    void chartModelIsSealedWithExpectedPermits() {
         Class<?> sealedRoot = ChartModel.class;
         assertTrue(sealedRoot.isSealed(), "ChartModel shall be sealed");
         Set<String> permitted = Stream.of(sealedRoot.getPermittedSubclasses())
@@ -44,9 +45,10 @@ class MapsApiSurfaceTest {
                 CategoryDistribution.class.getName(),
                 TimeSeries.class.getName(),
                 RegionCoverage.class.getName(),
+                RegionBadLocations.class.getName(),
                 MermaidChart.class.getName());
         assertEquals(expected, permitted,
-                "ChartModel permits clause shall list exactly the 5 Stage-1 record shapes");
+                "ChartModel permits clause shall list exactly the documented record shapes");
     }
 
     @Test
@@ -90,6 +92,42 @@ class MapsApiSurfaceTest {
         assertNotSame(x, y);
         x[1] = (byte) 9;
         assertArrayEquals(new byte[9], rc.states());
+    }
+
+    @Test
+    @DisplayName("RegionBadLocations defensively copies its badKeys array on construction and on accessor read")
+    void regionBadLocationsDefensiveCopy() {
+        long[] external = {1L, 2L, 3L};
+        RegionBadLocations rbl = new RegionBadLocations("region-a", 0, 0, 100, external);
+
+        // Mutating source must not affect snapshot.
+        external[0] = 999L;
+        assertEquals(1L, rbl.badKeys()[0]);
+
+        // Accessor returns a fresh array each call.
+        long[] a = rbl.badKeys();
+        long[] b = rbl.badKeys();
+        assertNotSame(a, b, "badKeys() shall return a defensive copy each call");
+        a[0] = 42L;
+        assertEquals(1L, rbl.badKeys()[0]);
+
+        assertEquals(3, rbl.badCount());
+    }
+
+    @Test
+    @DisplayName("RegionBadLocations constructor rejects null name, null array, and non-positive radius")
+    void regionBadLocationsRejectsBadArgs() {
+        assertThrows(NullPointerException.class,
+                () -> new RegionBadLocations(null, 0, 0, 100, new long[0]));
+        assertThrows(NullPointerException.class,
+                () -> new RegionBadLocations("r", 0, 0, 100, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> new RegionBadLocations("r", 0, 0, 0, new long[0]));
+        assertThrows(IllegalArgumentException.class,
+                () -> new RegionBadLocations("r", 0, 0, -1, new long[0]));
+        // Empty bad set is legal.
+        RegionBadLocations ok = new RegionBadLocations("r", 0, 0, 100, new long[0]);
+        assertEquals(0, ok.badCount());
     }
 
     @Test

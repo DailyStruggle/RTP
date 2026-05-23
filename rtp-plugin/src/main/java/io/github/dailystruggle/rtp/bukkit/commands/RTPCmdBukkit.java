@@ -594,6 +594,14 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
             .MultiConfigMenuBuilder multiConfigBuilder =
         new io.github.dailystruggle.rtp.common.commands.menu.multiconfig
             .MultiConfigMenuBuilder(menuTokenRegistry);
+    // Wire the project-wide CommandTreeMenuBuilder so the per-entry page
+    // (regions / worlds / future multiconfig kinds) reuses the same
+    // clickable-row + pagination + staging-cart machinery as flat
+    // config.yml pages. Without this, buildEntry falls back to the
+    // legacy display-only layout (no clickable rows, no pagination)
+    // which is the bug surfaced by the 2026-05-23 user report.
+    multiConfigBuilder.setCommandTreeMenuBuilder(
+        new CommandTreeMenuBuilder(menuTokenRegistry));
     menuRedeem.setMultiConfigBuilder(multiConfigBuilder);
     io.github.dailystruggle.rtp.common.commands.menu.multiconfig
         .DefaultMultiConfigRemovalGuards.registerDefaults();

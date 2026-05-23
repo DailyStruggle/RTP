@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry;
+import io.github.dailystruggle.rtp.common.commands.menu.CommandTreeMenuBuilder;
 import io.github.dailystruggle.rtp.common.commands.menu.FrontPageBuilder;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -64,6 +65,17 @@ public final class MultiConfigMenuBuilder {
 
     private final MenuTokenRegistry tokenRegistry;
     private final Duration tokenTtl;
+    /**
+     * Optional reference to the project-wide {@link CommandTreeMenuBuilder}.
+     * When wired by the platform adapter (see
+     * {@code RTPCmdBukkit#setupMenuRedeem}), {@link #buildEntry} delegates
+     * to {@link CommandTreeMenuBuilder#buildConfigFile} so multiconfig
+     * entries render with the same per-key clickable rows, pagination,
+     * and staging cart parity as flat configs (e.g. {@code config.yml}).
+     * When {@code null} the builder falls back to the legacy display-only
+     * layout for backward-compat with surface tests that do not wire it.
+     */
+    private volatile @org.jetbrains.annotations.Nullable CommandTreeMenuBuilder commandTreeMenuBuilder;
 
     public MultiConfigMenuBuilder(MenuTokenRegistry tokenRegistry) {
         this(tokenRegistry, DEFAULT_TOKEN_TTL);
@@ -72,6 +84,15 @@ public final class MultiConfigMenuBuilder {
     public MultiConfigMenuBuilder(MenuTokenRegistry tokenRegistry, Duration tokenTtl) {
         this.tokenRegistry = Objects.requireNonNull(tokenRegistry, "tokenRegistry");
         this.tokenTtl = Objects.requireNonNull(tokenTtl, "tokenTtl");
+    }
+
+    /**
+     * Wire (or unwire) the {@link CommandTreeMenuBuilder} used by
+     * {@link #buildEntry} to delegate per-entry rendering. Pass
+     * {@code null} to disable delegation (legacy display-only layout).
+     */
+    public void setCommandTreeMenuBuilder(@org.jetbrains.annotations.Nullable CommandTreeMenuBuilder builder) {
+        this.commandTreeMenuBuilder = builder;
     }
 
     /**
@@ -143,16 +164,24 @@ public final class MultiConfigMenuBuilder {
                 removeMode
                         ? "click an entry to remove it (locked entries are grayed)"
                         : "switch to remove-mode",
-                new MenuAction.OpenMultiConfigSelector(parserKind));
+                new MenuAction.OpenMultiConfigSelector("!toggle:" + parserKind));
 
-        // Add row - mints an ADD token with a synthesized unique name.
-        // The dispatcher (step 7) will prompt the viewer via anvil input
-        // to confirm/override the name before applying.
+        // Add row - opens an anvil-input prompt prefilled with a synthesized
+        // unique name so the admin can type a custom region/world name before
+        // the entry is created. On confirm the anvil session submits
+        //   /rtp menu multiaddKind=<parserKind> multiadd=<typedName>
+        // which the MenuRedeemSubcommand dispatch arm routes through
+        // dispatchMultiConfigMutate(ADD). The parentPath carries the parser
+        // kind as a name=value segment so dispatchPromptAnvilInput's walker
+        // skips it (it does not resolve as a TreeCommand child) while the
+        // platform-side AnvilInputSession#buildCommand still appends it
+        // verbatim to the synthesized /rtp menu ... command.
         String seedName = nextDefaultName(parser.listParsers());
         addRow(lines, "&2&l[+ add new]",
-                "clone default into \"" + seedName + "\"",
-                new MenuAction.MultiConfigMutate(
-                        parserKind, seedName, MenuAction.MultiConfigMutate.Op.ADD));
+                "type a name (default: \"" + seedName + "\")",
+                new MenuAction.PromptAnvilInput(
+                        new String[]{"multiaddKind=" + parserKind},
+                        "multiadd", seedName));
 
         lines.add(new MenuLine(List.of()));
 
@@ -229,16 +258,74 @@ public final class MultiConfigMenuBuilder {
                                 String entryName,
                                 MultiConfigParser<?> parser,
                                 UUID viewer) {
+        return buildEntry(parserKind, entryName, parser, viewer,
+                new java.util.LinkedHashMap<>());
+    }
+
+    /**
+     * Cart-aware overload. When a {@link CommandTreeMenuBuilder} is wired
+     * via {@link #setCommandTreeMenuBuilder}, this delegates per-entry
+     * rendering to {@link CommandTreeMenuBuilder#buildConfigFile} using
+     * the synthetic fileName {@code "<parserKind>/<entryName>"} so that:
+     * (a) each enum key row mints a clickable
+     * {@link MenuAction.OpenConfigKey} (so admins can edit
+     * {@code default.yml} values like {@code radius}),
+     * (b) pagination kicks in past the ~12-row budget, and
+     * (c) the viewer's staged {@code (paramName -> typed value)} pairs
+     * from {@code cartSnapshot} are surfaced as Pending + Apply +
+     * Discard rows. The slash-aware dispatcher branches resolve the
+     * synthetic fileName back into the entry parser and route Apply to
+     * the {@code /rtp config <kind> <entryName> k=v ...} CLI shape.
+     *
+     * <p>Post-processing swaps the delegate's Back row from
+     * {@code OpenConfigSelector} -> {@code OpenMultiConfigSelector} and
+     * appends a Remove row (gray + non-clickable when the registered
+     * {@link MultiConfigRemovalGuard} locks the entry).
+     *
+     * <p>When no {@link CommandTreeMenuBuilder} is wired (surface tests
+     * that omit the setter), falls back to the legacy single-page
+     * display-only layout.
+     */
+    public MenuModel buildEntry(String parserKind,
+                                String entryName,
+                                MultiConfigParser<?> parser,
+                                UUID viewer,
+                                java.util.LinkedHashMap<String, String> cartSnapshot) {
         Objects.requireNonNull(parserKind, "parserKind");
         Objects.requireNonNull(entryName, "entryName");
         Objects.requireNonNull(parser, "parser");
         Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(cartSnapshot, "cartSnapshot");
         if (entryName.isEmpty()) {
             throw new IllegalArgumentException("entryName must not be empty");
         }
 
+        ConfigParser<?> entryParser = resolveEntryParser(parser, entryName);
         MultiConfigRemovalGuard guard = MultiConfigRemovalGuards.get(parserKind);
 
+        // Delegation path. When the platform adapter wired a
+        // CommandTreeMenuBuilder (rtp-plugin RTPCmdBukkit), reuse the
+        // flat-config page builder so every editor feature (clickable
+        // keys, pagination, staging cart) applies uniformly to
+        // multiconfig entries. Post-processing rewrites Back + appends
+        // the Remove row.
+        CommandTreeMenuBuilder delegate = this.commandTreeMenuBuilder;
+        if (delegate != null && entryParser != null) {
+            String syntheticFileName = parserKind + "/" + entryName;
+            MenuModel inner = invokeBuildConfigFile(
+                    delegate, viewer, syntheticFileName, entryParser, cartSnapshot);
+            if (inner != null) {
+                String title = "&1&l\u2699 " + parserKind + " / " + entryName;
+                List<MenuPage> rewritten = rewritePagesForEntry(
+                        inner.pages(), parserKind, entryName, guard);
+                mintTokens(rewritten, viewer);
+                return new MenuModel(title, rewritten);
+            }
+        }
+
+        // Fallback: legacy display-only layout. Surface tests that build
+        // a MultiConfigMenuBuilder without wiring CommandTreeMenuBuilder
+        // exercise this branch.
         List<MenuLine> lines = new ArrayList<>();
 
         // Title + Back. Back returns to the selector page for this kind.
@@ -252,7 +339,7 @@ public final class MultiConfigMenuBuilder {
         // Resolve the per-entry ConfigParser. If the entry is unknown
         // (race / forged token), surface a hint row rather than crashing
         // so the dispatcher's S-004 audit hook is the single reject path.
-        ConfigParser<?> entryParser = resolveEntryParser(parser, entryName);
+        // (entryParser already resolved above the delegation branch.)
         if (entryParser == null) {
             lines.add(MenuLine.of(new MenuFragment(
                     "&8(entry \"" + entryName + "\" not found)", null, null)));
@@ -338,6 +425,97 @@ public final class MultiConfigMenuBuilder {
     }
 
     // ---- helpers ----------------------------------------------------------
+
+    /**
+     * Reflective bridge to
+     * {@link CommandTreeMenuBuilder#buildConfigFile(UUID, String, ConfigParser, java.util.LinkedHashMap)}.
+     * The signature is generic in the parser's enum type {@code <E>};
+     * calling it through reflection avoids forcing this class to be
+     * generic just to satisfy the wildcard {@code ConfigParser<?>} we
+     * obtain from {@link MultiConfigParser#getParser(String)}. Returns
+     * {@code null} on any failure so the caller can fall back to the
+     * legacy display-only layout.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static @org.jetbrains.annotations.Nullable MenuModel invokeBuildConfigFile(
+            CommandTreeMenuBuilder delegate,
+            UUID viewer,
+            String syntheticFileName,
+            ConfigParser<?> entryParser,
+            java.util.LinkedHashMap<String, String> cartSnapshot) {
+        try {
+            return ((CommandTreeMenuBuilder) delegate).buildConfigFile(
+                    viewer, syntheticFileName,
+                    (ConfigParser) entryParser, cartSnapshot);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * Post-process the pages returned by
+     * {@link CommandTreeMenuBuilder#buildConfigFile} for an entry render:
+     * <ol>
+     *   <li>On every page, replace the Back row's
+     *       {@link MenuAction.OpenConfigSelector} action with
+     *       {@link MenuAction.OpenMultiConfigSelector} so the operator
+     *       returns to the per-kind entry list (not the flat-config
+     *       selector).</li>
+     *   <li>On the last page, append a Remove row. Locked entries (per
+     *       the registered {@link MultiConfigRemovalGuard}) render gray
+     *       + non-clickable with the guard's hover reason; otherwise the
+     *       row dispatches a REMOVE {@link MenuAction.MultiConfigMutate}
+     *       which the dispatcher routes through
+     *       {@link #buildConfirmRemove}.</li>
+     * </ol>
+     */
+    private static List<MenuPage> rewritePagesForEntry(List<MenuPage> pages,
+                                                       String parserKind,
+                                                       String entryName,
+                                                       MultiConfigRemovalGuard guard) {
+        List<MenuPage> out = new ArrayList<>(pages.size());
+        int lastIdx = pages.size() - 1;
+        MenuAction backTarget = new MenuAction.OpenMultiConfigSelector(parserKind);
+        for (int i = 0; i < pages.size(); i++) {
+            MenuPage page = pages.get(i);
+            List<MenuLine> rewritten = new ArrayList<>(page.lines().size() + 2);
+            for (MenuLine line : page.lines()) {
+                List<MenuFragment> frags = line.fragments();
+                boolean changed = false;
+                List<MenuFragment> newFrags = new ArrayList<>(frags.size());
+                for (MenuFragment f : frags) {
+                    if (f.action() instanceof MenuAction.OpenConfigSelector) {
+                        newFrags.add(new MenuFragment(
+                                f.text(), f.hover(), backTarget));
+                        changed = true;
+                    } else {
+                        newFrags.add(f);
+                    }
+                }
+                rewritten.add(changed ? new MenuLine(newFrags) : line);
+            }
+            if (i == lastIdx) {
+                rewritten.add(new MenuLine(List.of()));
+                boolean locked = guard.isLocked(entryName);
+                if (locked) {
+                    String reason = guard.reason(entryName);
+                    rewritten.add(MenuLine.of(new MenuFragment(
+                            "&8[remove] (locked)",
+                            reason == null || reason.isEmpty() ? null : reason,
+                            null)));
+                } else {
+                    rewritten.add(MenuLine.of(new MenuFragment(
+                            "&c&l[remove]",
+                            "delete \"" + entryName + "\" (asks for confirmation)",
+                            new MenuAction.MultiConfigMutate(
+                                    parserKind, entryName,
+                                    MenuAction.MultiConfigMutate.Op.REMOVE))));
+                }
+            }
+            out.add(new MenuPage(rewritten));
+        }
+        return out;
+    }
 
     private static void addRow(List<MenuLine> lines,
                                String label,

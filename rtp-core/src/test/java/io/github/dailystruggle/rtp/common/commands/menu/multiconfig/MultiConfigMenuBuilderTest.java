@@ -120,20 +120,36 @@ final class MultiConfigMenuBuilderTest {
             assertTrue(findFirst(model, MenuAction.OpenAdminPanel.class) != null,
                     "Back row must dispatch OpenAdminPanel");
 
-            // Toggle in off-state dispatches OpenMultiConfigSelector for the
-            // same parserKind.
+            // Toggle in off-state dispatches OpenMultiConfigSelector with the
+            // "!toggle:" sentinel prefix so the dispatcher flips remove-mode
+            // for this viewer before re-rendering the selector. Without the
+            // prefix the dispatcher would just re-open the selector with the
+            // current (off) state - exactly the regression this test guards.
             MenuAction.OpenMultiConfigSelector toggle = findFirstByType(
                     model, MenuAction.OpenMultiConfigSelector.class);
             assertNotNull(toggle, "toggle row must mint OpenMultiConfigSelector");
-            assertEquals("regions", toggle.parserKind());
+            assertEquals("!toggle:regions", toggle.parserKind());
 
-            // Add row mints MultiConfigMutate(ADD, default<N>).
-            MenuAction.MultiConfigMutate add = findMutate(
-                    model, MenuAction.MultiConfigMutate.Op.ADD);
-            assertNotNull(add, "Add row must mint MultiConfigMutate(ADD)");
-            assertEquals("regions", add.parserKind());
-            assertTrue(add.entryName().startsWith("default"),
-                    "Add row seed name must start with 'default': " + add.entryName());
+            // Add row mints PromptAnvilInput so the admin can type a custom
+            // name (the synthesized default<N> is just the prefill). On
+            // confirm the anvil session submits
+            //   /rtp menu multiaddKind=regions multiadd=<typedName>
+            // which the dispatcher routes to MultiConfigMutate(ADD).
+            MenuAction.PromptAnvilInput add = findFirstByType(
+                    model, MenuAction.PromptAnvilInput.class);
+            assertNotNull(add, "Add row must mint PromptAnvilInput");
+            assertEquals("multiadd", add.paramName(),
+                    "Add row paramName must be 'multiadd' (matches MenuRedeemSubcommand.PARAM_MULTIADD)");
+            assertTrue(add.prefill().startsWith("default"),
+                    "Add row prefill must start with 'default': " + add.prefill());
+            assertEquals(1, add.parentPath().length,
+                    "Add row parentPath must carry exactly the parserKind segment");
+            assertEquals("multiaddKind=regions", add.parentPath()[0],
+                    "Add row parentPath segment must encode the parserKind as name=value");
+            // No MultiConfigMutate(ADD) row anymore: ADD only happens after
+            // the anvil confirm. Guard against accidental regression.
+            assertNull(findMutate(model, MenuAction.MultiConfigMutate.Op.ADD),
+                    "off-mode selector must not pre-mint a MultiConfigMutate(ADD) row");
 
             // Entry rows dispatch OpenMultiConfigEntry; assert alphabetical
             // order by walking the fragments and collecting entry names.

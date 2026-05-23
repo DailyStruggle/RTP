@@ -58,7 +58,7 @@ public class ScanStartCmd extends ScanSubCmd {
         if (parser == null) continue;
         String msg = String.valueOf(parser.getConfigValue(MessagesKeys.badArg, ""));
         if (msg == null || msg.isEmpty()) continue;
-        msg = msg.replace("[arg]", "region:" + region.name);
+        msg = msg.replace("[arg]", "region=" + region.name);
         RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
         continue;
       }

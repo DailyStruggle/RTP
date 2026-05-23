@@ -81,11 +81,12 @@ final class AdminPanelBuilderTest {
         // Configuration
         assertNotNull(findOpenConfigSelector(model),
                 "Config row must appear when /rtp config is registered and viewer has rtp.config.view");
-        // CHECKLIST-multiconfig-menu step 10: Regions / Worlds submenu rows.
-        assertNotNull(findOpenMultiConfigSelector(model, "regions"),
-                "Regions submenu row must appear with /rtp config registered + rtp.config.view");
-        assertNotNull(findOpenMultiConfigSelector(model, "worlds"),
-                "Worlds submenu row must appear with /rtp config registered + rtp.config.view");
+        // CHECKLIST-multiconfig-menu: Regions / Worlds rows live on the
+        // config selector page, not the admin panel.
+        assertNull(findOpenMultiConfigSelector(model, "regions"),
+                "Regions submenu row must NOT appear on the admin panel");
+        assertNull(findOpenMultiConfigSelector(model, "worlds"),
+                "Worlds submenu row must NOT appear on the admin panel");
 
         // Diagnostics: per PROPOSAL-info-as-book.md section 4.6, the info
         // row now opens the curated info book via OpenInfo(global) rather
@@ -149,9 +150,9 @@ final class AdminPanelBuilderTest {
         assertNull(findOpenConfigSelector(model),
                 "Config row must be hidden when /rtp config is unregistered");
         assertNull(findOpenMultiConfigSelector(model, "regions"),
-                "Regions submenu row must be hidden when /rtp config is unregistered");
+                "Regions submenu row never appears on admin panel");
         assertNull(findOpenMultiConfigSelector(model, "worlds"),
-                "Worlds submenu row must be hidden when /rtp config is unregistered");
+                "Worlds submenu row never appears on admin panel");
         assertFalse(hasFragmentContaining(model, "configuration"),
                 "Configuration divider must auto-suppress when its only row is hidden");
         // Other sections still render. The info row is now OpenInfo (book).
@@ -160,22 +161,18 @@ final class AdminPanelBuilderTest {
     }
 
     @Test
-    @DisplayName("Regions / Worlds rows hidden when viewer lacks rtp.config.view")
-    void regionsWorldsRows_hidden_whenConfigViewMissing() {
+    @DisplayName("Admin panel never surfaces Regions / Worlds rows (config selector owns them)")
+    void regionsWorldsRows_neverOnAdminPanel() {
         LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
-        // Viewer holds everything *except* rtp.config.view.
         MenuModel model = new AdminPanelBuilder(registry)
-                .build(root, UUID.randomUUID(),
-                        perm -> !AdminPanelBuilder.CONFIG_VIEW_PERMISSION.equals(perm));
+                .build(root, UUID.randomUUID(), perm -> true);
 
-        assertNull(findOpenConfigSelector(model),
-                "Config row must be hidden when rtp.config.view is missing");
         assertNull(findOpenMultiConfigSelector(model, "regions"),
-                "Regions submenu row must be hidden when rtp.config.view is missing");
+                "Regions submenu row must live on the config selector page, not the admin panel");
         assertNull(findOpenMultiConfigSelector(model, "worlds"),
-                "Worlds submenu row must be hidden when rtp.config.view is missing");
+                "Worlds submenu row must live on the config selector page, not the admin panel");
     }
 
     @Test

@@ -496,8 +496,69 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void setBiomesGetter(Function<RTPWorld<?>, Set<String>> getter) { // @AnyThread — sets a pure function field
+  public void setBiomesGetter(Function<RTPWorld<?>, Set<String>> getter) { // @AnyThread - sets a pure function field
     this.biomes = getter;
     FoliaRTPWorld.setBiomesGetter(getter);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Menu platform surface (ADR-048) - Bukkit-equivalent overrides (Folia runs
+  // on the Bukkit API so Player#getLocale / Player#getWorld() are available).
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public java.util.function.Predicate<String> menuPermissionProbe(UUID player) {
+    return node -> {
+      if (player == null || node == null) return false;
+      try {
+        Player p = Bukkit.getPlayer(player);
+        if (p != null) return p.hasPermission(node);
+        org.bukkit.OfflinePlayer off = Bukkit.getOfflinePlayer(player);
+        return off != null && off.isOp();
+      } catch (Throwable t) {
+        return false;
+      }
+    };
+  }
+
+  @Override
+  public Set<String> menuEffectivePermissions(UUID player) {
+    if (player == null) return Collections.emptySet();
+    try {
+      Player p = Bukkit.getPlayer(player);
+      if (p == null) return Collections.emptySet();
+      return p.getEffectivePermissions().stream()
+          .filter(pai -> pai.getValue())
+          .map(pai -> pai.getPermission())
+          .collect(Collectors.toUnmodifiableSet());
+    } catch (Throwable t) {
+      return Collections.emptySet();
+    }
+  }
+
+  @Override
+  public String menuLocale(UUID player) {
+    if (player == null) return "en_us";
+    try {
+      Player p = Bukkit.getPlayer(player);
+      if (p == null) return "en_us";
+      String loc = p.getLocale();
+      return (loc == null || loc.isEmpty()) ? "en_us" : loc;
+    } catch (Throwable t) {
+      return "en_us";
+    }
+  }
+
+  @Override
+  public String menuRegionDescriptor(UUID player) {
+    if (player == null) return "";
+    try {
+      Player p = Bukkit.getPlayer(player);
+      if (p == null) return "";
+      World w = p.getWorld();
+      return (w == null) ? "" : w.getName();
+    } catch (Throwable t) {
+      return "";
+    }
   }
 }

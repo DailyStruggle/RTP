@@ -640,6 +640,25 @@ public final class CommandTreeMenuBuilder {
         // fallback in the meantime.
         lines.add(MenuLine.of(new MenuFragment("&1&lconfig files", null, null)));
 
+        // CHECKLIST-multiconfig-menu: Regions / Worlds submenu entry points.
+        // These belong on the config selector page rather than the admin
+        // panel; the per-kind selector pages handle Add/Remove/Edit of
+        // individual entries via MultiConfigMenuBuilder.
+        String regionsLabel = lookupMsg(
+                MessagesKeys.menuAdminPanelRowRegions, "&b\u2699 Regions");
+        String regionsHover = lookupMsg(
+                MessagesKeys.menuAdminPanelHoverRegions,
+                "Add, remove, or edit per-region configs.");
+        lines.add(MenuLine.of(new MenuFragment(regionsLabel, regionsHover,
+                new MenuAction.OpenMultiConfigSelector("regions"))));
+        String worldsLabel = lookupMsg(
+                MessagesKeys.menuAdminPanelRowWorlds, "&b\u2699 Worlds");
+        String worldsHover = lookupMsg(
+                MessagesKeys.menuAdminPanelHoverWorlds,
+                "Add, remove, or edit per-world configs.");
+        lines.add(MenuLine.of(new MenuFragment(worldsLabel, worldsHover,
+                new MenuAction.OpenMultiConfigSelector("worlds"))));
+
         // One row per known config file. Hover surfaces an "edit <file>"
         // affordance hint so clicking the row reads as an edit entry-point
         // rather than a bare navigation jump. English-only fallback for now;

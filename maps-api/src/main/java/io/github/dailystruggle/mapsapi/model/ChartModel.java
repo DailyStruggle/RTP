@@ -11,5 +11,6 @@ package io.github.dailystruggle.mapsapi.model;
  * documented in {@code maps-api-ADR-001} §Chart models.
  */
 public sealed interface ChartModel
-        permits Heatmap2D, CategoryDistribution, TimeSeries, RegionCoverage, MermaidChart {
+        permits Heatmap2D, CategoryDistribution, TimeSeries, RegionCoverage,
+                RegionBadLocations, MermaidChart {
 }

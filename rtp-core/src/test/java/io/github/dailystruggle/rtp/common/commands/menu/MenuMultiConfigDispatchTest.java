@@ -151,6 +151,42 @@ class MenuMultiConfigDispatchTest {
     }
 
     @Test
+    @DisplayName("multiadd=<name> + multiaddKind=<kind> params route to MultiConfigMutate(ADD) without a token")
+    void multiAddParams_routeDirectlyToMutateAdd() {
+        Fixture f = Fixture.withPermission(true);
+        UUID viewer = UUID.randomUUID();
+        // Simulate the anvil-confirm submission:
+        //   /rtp menu multiaddKind=regions multiadd=typedName
+        Map<String, List<String>> params = new HashMap<>();
+        params.put(MenuRedeemSubcommand.PARAM_MULTIADD, List.of("typedName"));
+        params.put(MenuRedeemSubcommand.PARAM_MULTIADD_KIND, List.of("regions"));
+        boolean ok = f.redeem.onCommand(viewer, params, null,
+                (Consumer<String>) f.messages::add);
+        assertTrue(ok, "multiadd+multiaddKind params must dispatch ADD without a token");
+        assertTrue(regions.listParsers().contains("typedName"),
+                "anvil-confirm route must persist the new entry");
+        assertNotNull(f.rendered.get(),
+                "selector should be re-rendered after the ADD path");
+    }
+
+    @Test
+    @DisplayName("multiadd alone (without multiaddKind) falls through to normal token handling")
+    void multiAddWithoutKind_fallsThroughToTokenPath() {
+        Fixture f = Fixture.withPermission(true);
+        UUID viewer = UUID.randomUUID();
+        Map<String, List<String>> params = new HashMap<>();
+        params.put(MenuRedeemSubcommand.PARAM_MULTIADD, List.of("typedName"));
+        f.redeem.onCommand(viewer, params, null,
+                (Consumer<String>) f.messages::add);
+        // No multiaddKind => the early branch must NOT fire. The most
+        // important guarantee is that the entry is not silently created
+        // from a partial param set (return value is not asserted because the
+        // no-token open-page path may succeed independently).
+        assertFalse(regions.listParsers().contains("typedName"),
+                "partial multiadd params must not create the entry");
+    }
+
+    @Test
     @DisplayName("OpenMultiConfigSelector with !toggle: prefix flips remove-mode for the viewer")
     void openSelector_toggleFlipsRemoveMode() {
         Fixture f = Fixture.withPermission(true);

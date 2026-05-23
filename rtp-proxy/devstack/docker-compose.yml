@@ -1,9 +1,11 @@
-# rtp-proxy devstack: 1 Redis + 2 Velocity proxies + 2 Paper lobbies + 2 Paper backends.
+# rtp-proxy devstack: 1 Redis + 2 Velocity proxies + 2 Paper lobbies + 3 backends
+# (backend-a Paper, backend-b Folia, backend-c Fabric). See README.md for the
+# rationale behind the heterogeneous backend trio.
 #
 # The two "lobby" Paper servers have an empty `regions/` directory: they are
 # valid network participants (role: backend, unique serverId) but cannot serve
 # /rtp locally. Running /rtp on a lobby exercises the cross-server dispatch
-# path to backend-a / backend-b. See `README.md` ("Lobbies").
+# path to backend-a / backend-b / backend-c. See `README.md` ("Lobbies").
 #
 # First runtime verification of the cross-server `/rtp` round-trip
 # (CHECKLIST-cross-server-rtp.md L3, rows 21-29).

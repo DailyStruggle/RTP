@@ -411,7 +411,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
                 if (toTicks <= 0 && RTP.serverAccessor.isPrimaryThread()) {
                   this.run();
                 } else {
-                  RTP.scheduler.scheduleTeleport(player(), this, toTicks);
+                  RTP.scheduler.runTaskForPlayer(player(), this, toTicks);
                 }
               });
     } catch (Exception e) {

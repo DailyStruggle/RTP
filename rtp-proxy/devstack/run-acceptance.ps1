@@ -57,15 +57,32 @@ param(
   # container streaming `docker compose logs -f`). Useful for headless CI runs.
   [switch]$NoLogs,
   # On `-Scenario down`, also remove ALL named volumes (including the shared
-  # mc-image-cache that holds the Paper build jar + Mojang server.jar). Without
-  # this, `down` is selective: containers and ephemeral state go away but the
-  # download cache survives so the next `up` doesn't redownload ~110 MB per
-  # service. Use -Purge for a truly fresh-from-scratch reset.
+  # mc-image-cache that holds the Paper build jar + Mojang server.jar).
+  # Without this, `down` is selective: containers and ephemeral state go
+  # away, but the download cache survives so the next `up` doesn't
+  # redownload ~110 MB per service. Either way (`down` or `down -Purge`)
+  # the plugin's runtime config tree AND its runtime SQLite under
+  # plugins/RTP/database/ are wiped, because Clear-StaleWorldDirs also
+  # wipes the bind-mounted worlds and a stale DB pointing at a fresh
+  # world is worse than a fresh DB. Use -Purge for a truly
+  # fresh-from-scratch reset that also re-downloads the server images.
   [switch]$Purge
 )
 
 $ErrorActionPreference = 'Stop'
-$EvidenceLog = Join-Path $PSScriptRoot 'acceptance-evidence.log'
+
+# Per-run log directory. Every invocation of this script gets its own folder
+# under ./logs/, named with the startup timestamp (sortable: yyyyMMdd-HHmmss).
+# All evidence + per-service `docker compose logs -f` streams land here, keyed
+# by service id. The directory tree is gitignored (./logs/ entry in
+# devstack/.gitignore; **/logs/ rule already covers it globally) so devstack
+# runs never pollute the working tree. A `latest` symlink-shaped pointer file
+# (`logs/latest.txt`) records the most recent run dir for convenience.
+$RunStamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
+$RunLogDir = Join-Path $PSScriptRoot "logs\$RunStamp"
+if (-not (Test-Path $RunLogDir)) { New-Item -ItemType Directory -Path $RunLogDir -Force | Out-Null }
+Set-Content -Path (Join-Path $PSScriptRoot 'logs\latest.txt') -Value $RunStamp -Encoding ascii
+$EvidenceLog = Join-Path $RunLogDir 'acceptance-evidence.log'
 
 function Write-Evidence {
   param([string]$Tag, [string]$Body)
@@ -161,8 +178,10 @@ function Show-LogWindows {
   # function spawns fresh windows (old ones can be closed by the operator).
   $services = @('redis', 'proxy-a', 'proxy-b', 'lobby-a', 'lobby-b', 'backend-a', 'backend-b', 'backend-c')
   Write-Host "[logs] opening per-service log windows ($($services -join ', '))..." -ForegroundColor Cyan
+  Write-Host "[logs] also tee'ing per-service streams to $RunLogDir\<service>.log" -ForegroundColor DarkGray
   foreach ($svc in $services) {
     $title = "rtp-devstack: $svc"
+    $svcLogFile = Join-Path $RunLogDir "$svc.log"
     # When `docker compose logs -f` exits (container stopped/removed or the
     # whole compose project went down), we print a clear banner and auto-close
     # the window after a short grace period so the operator's desktop isn't
@@ -176,7 +195,8 @@ function Show-LogWindows {
 `$Host.UI.RawUI.WindowTitle='$title'
 Set-Location -LiteralPath '$PSScriptRoot'
 Write-Host '==== $svc ====' -ForegroundColor Magenta
-docker compose logs -f --tail=100 $svc
+Write-Host 'tee -> $svcLogFile' -ForegroundColor DarkGray
+docker compose logs -f --tail=100 $svc 2>&1 | Tee-Object -FilePath '$svcLogFile' -Append
 `$exit = `$LASTEXITCODE
 Write-Host ''
 Write-Host "==== $svc : docker log stream ended (exit=`$exit) ====" -ForegroundColor Yellow
@@ -202,8 +222,9 @@ for (`$i = 10; `$i -gt 0; `$i--) {
       Write-Host "[logs] WARN - could not spawn log window for $svc : $_" -ForegroundColor Yellow
     }
   }
-  Write-Evidence 'logs' "spawned log windows for: $($services -join ', ')"
+  Write-Evidence 'logs' "spawned log windows for: $($services -join ', '); per-service files under $RunLogDir"
   Write-Host '[logs] tip: windows auto-close 10s after their container stops; press any key in a window during countdown to keep it open. Re-run `.\run-acceptance.ps1 -Scenario logs` to reopen.' -ForegroundColor DarkGray
+  Write-Host "[logs] per-service log files: $RunLogDir" -ForegroundColor DarkGray
 }
 
 function Get-RepoRoot {
@@ -511,6 +532,33 @@ function Invoke-ComposeDown {
     # World dirs are host bind mounts, so `down` (with or without -v) doesn't
     # touch them. Wipe them here so the next boot starts from a clean slate.
     Clear-StaleWorldDirs
+    # The plugin's runtime config tree (plugins/RTP/) is also a host bind
+    # mount on the Paper/Folia/lobby instances, so a stale messages.yml /
+    # config.yml from a prior jar persists across `down` + `up` unless we
+    # explicitly wipe it. Run reset-rtp-config.ps1 so the next `up` lets the
+    # freshly-built jar re-extract baseline. Pass -IncludeDatabase when the
+    # operator asked for -Purge so the semantics match `down -v` (also nukes
+    # runtime SQLite). backend-c (Fabric) needs no host-side reset: its
+    # config lives inside the container's writable layer and is gone once
+    # the container is recreated by the next `up`.
+    $resetScript = Join-Path $PSScriptRoot 'reset-rtp-config.ps1'
+    if (Test-Path $resetScript) {
+      # Always pass -IncludeDatabase: Clear-StaleWorldDirs above has already
+      # wiped the bind-mounted world/ trees, and a stale SQLite DB (cached
+      # keptLocations / unkeptLocations coordinates, playerQueue rows,
+      # reservation tokens) pointing at a freshly-regenerated world is
+      # worse than a fresh DB pointing at a fresh world. The devstack is a
+      # verification harness for a freshly-built jar against a clean
+      # baseline; persisting runtime DB state across down/up defeats that
+      # purpose (schema migrations, region-pool format tweaks, reservation
+      # shape changes all assume a clean start). -Purge still adds value
+      # by also dropping the mc-image-cache named volume via `down -v`.
+      Write-Host '[down] wiping plugins/RTP/ (incl. runtime DB) on bind-mounted instances so next up extracts a fresh baseline...' -ForegroundColor Cyan
+      $resetOut = Invoke-Native { & $resetScript -IncludeDatabase }
+      Write-Evidence 'down.reset-rtp-config' $resetOut
+    } else {
+      Write-Host "[down] WARN - reset-rtp-config.ps1 not found at $resetScript; skipping config reset" -ForegroundColor Yellow
+    }
   } finally {
     Pop-Location
   }
@@ -734,8 +782,9 @@ function Test-KillSwitch {
 
 # ---- entrypoint -------------------------------------------------------------
 
-if (Test-Path $EvidenceLog) { Remove-Item $EvidenceLog -Force }
-Write-Evidence 'session' "start scenario=$Scenario waitSeconds=$WaitSeconds"
+# $EvidenceLog lives inside the per-run dir (created above) so it is never
+# pre-existing; no Remove-Item needed.
+Write-Evidence 'session' "start scenario=$Scenario waitSeconds=$WaitSeconds runDir=$RunLogDir"
 
 # Seed `.env` (RTP_NET_SECRET) and `shared/forwarding.secret` before any
 # `docker compose` call; compose fails fast on missing variable interpolation.
@@ -834,4 +883,5 @@ foreach ($kv in $results.GetEnumerator()) {
   Write-Host ("  {0,-16} {1}" -f $kv.Key, $verdict) -ForegroundColor $color
 }
 Write-Host "Evidence written to: $EvidenceLog" -ForegroundColor Cyan
+Write-Host "Per-run log dir:    $RunLogDir" -ForegroundColor Cyan
 if ($results.Values -contains $false) { exit 1 } else { exit 0 }

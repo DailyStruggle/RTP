@@ -571,9 +571,25 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
 
     private Optional<ReservationToken> findReservationSync(UUID playerId) {
         try (Jedis j = pool.getResource()) {
-            String tokenId = j.get(TOKEN_ACTIVE_PREFIX + playerId);
+            // Phase B trace (2026-05-23): the destination backend's
+            // JoinTriggerSource.handleLookup observed "no reservation found"
+            // ~1s after the proxy successfully claimed a token (well within
+            // 30s TTL, boot reconcile already ran clean, reaper had nothing
+            // to reap). This INFO-level trace exposes the raw Redis state at
+            // the lookup instant so we can disambiguate (a) missing active
+            // index, (b) CONSUMED/RELEASED row, (c) expired row, and (d)
+            // HMAC mismatch dropping a valid row. Remove or downgrade to
+            // FINE once the root cause is identified.
+            String activeKey = TOKEN_ACTIVE_PREFIX + playerId;
+            String tokenId = j.get(activeKey);
+            LOG.log(Level.INFO,
+                    "[NETWORK][trace] findReservationSync: GET " + activeKey
+                            + " -> " + (tokenId == null ? "null" : tokenId));
             if (tokenId == null || tokenId.isEmpty()) return Optional.empty();
             Map<String, String> hash = j.hgetAll(TOKEN_KEY_PREFIX + tokenId);
+            LOG.log(Level.INFO,
+                    "[NETWORK][trace] findReservationSync: HGETALL " + TOKEN_KEY_PREFIX + tokenId
+                            + " -> " + (hash == null ? "null" : hash.toString()));
             if (hash == null || hash.isEmpty()) return Optional.empty();
             String stateStr = hash.get("state");
             if (stateStr == null) return Optional.empty();
@@ -586,6 +602,10 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 return Optional.empty();
             }
             if (state == ReservationToken.State.CONSUMED || state == ReservationToken.State.RELEASED) {
+                LOG.log(Level.INFO,
+                        "[NETWORK][trace] findReservationSync: row in terminal state " + state
+                                + " for player " + playerId + " token " + tokenId
+                                + "; returning empty");
                 return Optional.empty();
             }
             long expires;
@@ -594,7 +614,13 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
             } catch (NumberFormatException ex) {
                 return Optional.empty();
             }
-            if (expires > 0 && expires <= System.currentTimeMillis()) return Optional.empty();
+            if (expires > 0 && expires <= System.currentTimeMillis()) {
+                LOG.log(Level.INFO,
+                        "[NETWORK][trace] findReservationSync: row expired (expiresAtMs="
+                                + expires + " now=" + System.currentTimeMillis()
+                                + ") for player " + playerId + " token " + tokenId);
+                return Optional.empty();
+            }
             // A3 token envelope: verify HMAC on non-terminal rows. Sign covers
             // the same canonical payload claimSync built pre-EVALSHA. A
             // mismatch (forged row, replayed claim, or state tampered from
