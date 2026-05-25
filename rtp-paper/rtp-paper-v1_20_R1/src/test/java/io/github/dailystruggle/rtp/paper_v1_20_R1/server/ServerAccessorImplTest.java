@@ -63,9 +63,16 @@ class ServerAccessorImplTest {
 
         assertNotNull(biomes, "getBiomes() must not return null");
         assertFalse(biomes.isEmpty(), "getBiomes() must return at least one biome under MockBukkit");
-        biomes.forEach(b ->
-                assertEquals(b.toUpperCase(), b,
-                        "Every biome key must be upper-case, got: " + b));
+        // Every entry must be either the bare upper-cased enum name
+        // (`BADLANDS`) or the lower-cased namespaced id (`minecraft:badlands`);
+        // both forms are emitted so Brigadier-suggested namespaced ids pass
+        // the /rtp biome parameter validator.
+        biomes.forEach(b -> {
+            boolean bareUpper = b.equals(b.toUpperCase()) && b.indexOf(':') < 0;
+            boolean namespaced = b.indexOf(':') >= 0 && b.equals(b.toLowerCase());
+            assertTrue(bareUpper || namespaced,
+                    "Every biome key must be either bare upper-cased or lower-cased namespaced, got: " + b);
+        });
     }
 
     /**

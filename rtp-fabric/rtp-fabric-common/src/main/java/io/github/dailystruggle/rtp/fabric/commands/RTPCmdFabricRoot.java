@@ -141,9 +141,25 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
                 "select a biome to teleport to",
                 (uuid, s) -> {
                     RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
-                    return (sender.hasPermission("rtp.biome.*")
-                                || sender.hasPermission("rtp.biome." + s))
-                            && RTP.serverAccessor.getBiomes().contains(s.toUpperCase(Locale.ROOT));
+                    // Accept namespaced biome ids (e.g. `minecraft:badlands`) as well as
+                    // bare enum names. `ServerAccessor#getBiomes()` now emits both forms
+                    // (parity with Bukkit/Folia/Paper), so a single membership probe over
+                    // the user-typed string + its case/namespace variants covers both
+                    // grammars. Downstream `BiomeNames#matches` handles the namespace
+                    // equivalence at filter time.
+                    if (s == null) return false;
+                    int colon = s.indexOf(':');
+                    String bareKey = (colon >= 0) ? s.substring(colon + 1) : s;
+                    String upper = bareKey.toUpperCase(Locale.ROOT);
+                    java.util.Set<String> biomes = RTP.serverAccessor.getBiomes();
+                    boolean known = biomes.contains(s)
+                            || biomes.contains(upper)
+                            || biomes.contains(bareKey.toLowerCase(Locale.ROOT))
+                            || biomes.contains("minecraft:" + bareKey.toLowerCase(Locale.ROOT));
+                    return known
+                            && (sender.hasPermission("rtp.biome.*")
+                                || sender.hasPermission("rtp.biome." + bareKey)
+                                || sender.hasPermission("rtp.biome." + s));
                 }));
 
         // player — target-player parameter. Fabric has no commands-api

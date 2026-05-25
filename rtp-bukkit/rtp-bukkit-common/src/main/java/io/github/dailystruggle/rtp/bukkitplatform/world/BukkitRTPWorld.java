@@ -11,7 +11,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -41,10 +40,18 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       };
 
   private static @NotNull Function<RTPWorld<?>, Set<String>> getBiomes =
-      (rtpWorld) ->
-          Arrays.stream(Biome.values())
-              .map(biome -> biome.name().toUpperCase())
-              .collect(Collectors.toSet());
+      (rtpWorld) -> {
+        // Emit both bare upper-cased enum names (`BADLANDS`) and the raw
+        // namespaced ids (`minecraft:badlands`); Brigadier tab-completion on
+        // modern Paper advertises the namespaced form, so /rtp's biome
+        // parameter validator must accept it as well.
+        Set<String> out = new java.util.HashSet<>();
+        for (Biome b : Biome.values()) {
+          out.add(b.name().toUpperCase());
+          out.add("minecraft:" + b.name().toLowerCase(java.util.Locale.ROOT));
+        }
+        return out;
+      };
 
   private final UUID id;
   private final String name;

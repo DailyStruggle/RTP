@@ -1969,9 +1969,14 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       // normalisation every probed biome (e.g. "PLAINS") fails to match the
       // raw registry form ("minecraft:plains"), causing the anvil prefilter
       // to falsely reject the vast majority of scanned locations on Fabric.
+      String raw = rawKey.toString();
       String n = io.github.dailystruggle.rtp.api.configuration
-          .PaletteIdentifierNormalizer.normalize(rawKey.toString());
+          .PaletteIdentifierNormalizer.normalize(raw);
       if (n != null && !n.isEmpty()) out.add(n);
+      // Also emit the raw namespaced form (`minecraft:badlands`) so that
+      // Brigadier-suggested tab-completion ids pass /rtp's biome parameter
+      // validator on Fabric (parity with Bukkit/Folia/Paper).
+      if (raw != null && !raw.isEmpty()) out.add(raw);
     }
     return out;
   }
