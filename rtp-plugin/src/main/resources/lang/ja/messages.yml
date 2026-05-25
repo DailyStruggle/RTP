@@ -115,7 +115,7 @@ invalidCommand: "&c[P0] 無効なコマンド - [arg]"
 # ###############################################################################
 # セクション 7: 情報コマンド
 # ###############################################################################
-情報タイトル: "&a======RTP 情報======"
+情報タイトル: "&a&l/rtp info"
 情報_チケット: "&7グローバルアクティブチャンクチケット: #7E9CC8[tickets]"
 情報_テレポート: "&7アクティブテレポートステートマシン: #7E9CC8[teleports]"
 情報_MSPT: "&7プラグイン現在の MSPT: #7E9CC8[mspt]"
@@ -200,8 +200,6 @@ rtp_説明: "ランダムな場所にテレポートする"
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 menuInvalid: "&c[P0] that menu link is invalid."
-# Sent when a menu token has expired or was already consumed.
-menuExpired: "&c[P0] that menu link has expired. Please reopen the menu."
 # メニューの引き換え時に呼び出し元プレイヤーの UUID を解決できなかった場合に送信されます。
 menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
 # Hover-fallback template used by the menu reflector when no YAML block-comment
@@ -267,6 +265,8 @@ menuAdminPanelRowRegions: "#5FB3B3▶ regions"
 menuAdminPanelHoverRegions: "&7add, remove, or edit per-region configs"
 menuAdminPanelRowWorlds: "#5FB3B3▶ worlds"
 menuAdminPanelHoverWorlds: "&7add, remove, or edit per-world configs"
+menuAdminPanelRowEffects: "#5FB3B3▶ effects"
+menuAdminPanelHoverEffects: "&7add, remove, or edit per-group teleport effects"
 menuAdminPanelRowInfo: "&b▶ server info"
 menuAdminPanelHoverInfo: "&7show plugin version, region counts, and queue state"
 menuAdminPanelRowDiagnostics: "&c▶ full diagnostics"
@@ -280,6 +280,25 @@ menuAdminPanelHoverReload: "&7reloads all config files; in-flight teleports may 
 menuAdminPanelRowBrowse: "&b▶ browse all commands"
 menuAdminPanelHoverBrowse: "&7open the reflected /rtp command tree"
 menuAdminPanelRowBack: "&7« back"
+# --- Visualizations submenu (admin map of bad locations per region) ---
+# Admin-panel row: open the Visualizations submenu. No placeholders.
+menuAdminPanelRowVisualizations: "#5FB3B3▶ visualizations"
+# Hover text for the admin-panel Visualizations row. No placeholders.
+menuAdminPanelHoverVisualizations: "&7open maps and other operator-facing visualizations"
+# Section divider above the Visualizations block on the admin panel.
+menuAdminPanelSectionVisualizations: "&8» &7visualizations"
+# Non-clickable title row at the top of the Visualizations submenu.
+menuVisualizationsTitle: "#9D7CD8&l⌖ visualizations"
+# Non-clickable hint row below the title.
+menuVisualizationsHint: "&7pick a region to view its bad-locations map"
+# Visualizations row template; [region] - region name.
+menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- region shape map"
+# Hover text for a Visualizations region row; [region] - region name.
+menuVisualizationsHoverRegion: "&7open a map showing bad locations in &b[region]"
+# Non-clickable hint row shown when no regions are configured.
+menuVisualizationsEmpty: "&7(no regions configured)"
+# Visualizations submenu back row (returns to the admin panel).
+menuVisualizationsRowBack: "&7« back"
 # --- Admin panel Setup section: curated prefabs (PROPOSAL-admin-panel-prefabs.md v3.1) ---
 # Section divider above the Setup (quick start) block on the admin panel.
 menuAdminPanelSectionSetup: "&8» &7setup (quick start)"

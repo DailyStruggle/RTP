@@ -272,10 +272,10 @@ public enum MessagesKeys {
   /** Whether to append the developer tag to relevant messages; controls a boolean display flag. */
   showDevTag,
   // --- Generalized menu framework (ADR-035 / ADR-044) ---
-  /** Sent when a menu token is unknown, malformed, or belongs to another player. */
+  /** Sent when a concrete menu command is malformed, refers to an unknown
+   *  path/parameter, or fails its server-side permission gate. ADR-050: menu
+   *  clicks are concrete commands, so there is no token to expire. */
   menuInvalid,
-  /** Sent when a menu token has expired or was already consumed. */
-  menuExpired,
   /** Sent when a menu redeem cannot resolve the calling player UUID. */
   menuUnknownPlayer,
   /**
@@ -400,6 +400,10 @@ public enum MessagesKeys {
   menuAdminPanelRowWorlds,
   /** Hover text for the admin-panel worlds row. No placeholders. */
   menuAdminPanelHoverWorlds,
+  /** Admin-panel row: open the effects multi-config submenu. No placeholders. */
+  menuAdminPanelRowEffects,
+  /** Hover text for the admin-panel effects row. No placeholders. */
+  menuAdminPanelHoverEffects,
   /** Admin-panel row: run /rtp info. No placeholders. */
   menuAdminPanelRowInfo,
   /** Hover text for the admin-panel info row. No placeholders. */
@@ -426,6 +430,25 @@ public enum MessagesKeys {
   menuAdminPanelHoverBrowse,
   /** Admin-panel row: return to the curated front page. No placeholders. */
   menuAdminPanelRowBack,
+  // --- Visualizations submenu (admin map of bad locations per region) ---
+  /** Admin-panel row: open the Visualizations submenu. No placeholders. */
+  menuAdminPanelRowVisualizations,
+  /** Hover text for the admin-panel Visualizations row. No placeholders. */
+  menuAdminPanelHoverVisualizations,
+  /** Section divider above the Visualizations block on the admin panel. */
+  menuAdminPanelSectionVisualizations,
+  /** Non-clickable title row at the top of the Visualizations submenu. No placeholders. */
+  menuVisualizationsTitle,
+  /** Non-clickable hint row below {@link #menuVisualizationsTitle}. No placeholders. */
+  menuVisualizationsHint,
+  /** Visualizations row template; placeholder: {@code [region]} (region name). */
+  menuVisualizationsRowRegion,
+  /** Hover text for a Visualizations region row; placeholder: {@code [region]}. */
+  menuVisualizationsHoverRegion,
+  /** Non-clickable hint row shown when no regions are configured. No placeholders. */
+  menuVisualizationsEmpty,
+  /** Visualizations submenu back row (returns to the admin panel). No placeholders. */
+  menuVisualizationsRowBack,
   // --- Admin panel Setup section: curated prefabs (PROPOSAL-admin-panel-prefabs.md v3.1) ---
   /** Section divider above the Setup (quick start) block on the admin panel. */
   menuAdminPanelSectionSetup,

@@ -150,6 +150,41 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
         // Drop any prior session (only one anvil prompt per player at a time).
         active.remove(viewer);
 
+        // On Folia, Player#openAnvil must run on a thread that owns the
+        // player entity (the player's region/entity scheduler thread). The
+        // command-dispatch path that triggers an anvil open (e.g. the
+        // `/rtp menu multiadd=<...>` ack returning a PromptAnvilInput) does
+        // NOT guarantee that thread context - on Folia, openAnvil silently
+        // succeeded server-side (returned a non-null view) but the inventory
+        // open packets never reached the client. Defer the entire open path
+        // (openAnvil + seed item + session register) onto the player's
+        // entity scheduler via scheduleForPlayer; on Paper/Spigot this
+        // collapses to a 1-tick main-thread runTask which is also safe.
+        Plugin plugin = getRtpPlugin();
+        if (plugin == null) {
+            RTP.log(Level.WARNING,
+                    "menu anvil-input open skipped for " + viewer
+                            + ": RTP plugin unavailable to schedule open");
+            return false;
+        }
+        scheduleForPlayer(plugin, player,
+                () -> doOpen(player, parentPath, paramName, prefill, mode));
+        return true;
+    }
+
+    /**
+     * The actual openAnvil + seed + session-register step, deferred onto a
+     * thread that owns {@code player}. See {@link #openInternal} for the
+     * Folia rationale. Failures here are logged WARN; the boolean return
+     * is intentionally elided because callers can no longer block on the
+     * scheduled completion.
+     */
+    private void doOpen(Player player,
+                        List<String> parentPath,
+                        String paramName,
+                        String prefill,
+                        MenuAction.Mode mode) {
+        UUID viewer = player.getUniqueId();
         InventoryView view;
         try {
             // Paper's Player#openAnvil(Location, boolean): null location uses
@@ -160,9 +195,9 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "menu anvil-input openAnvil failed for " + viewer + ": " + t.getMessage(), t);
-            return false;
+            return;
         }
-        if (view == null) return false;
+        if (view == null) return;
 
         // Seed the rename slot with a paper item whose display name carries
         // the prefill — the anvil rename field initialises from the left
@@ -202,7 +237,6 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
                         + " mode=" + mode
                         + " parentPath=" + parentPath
                         + " cartSink=" + (cartSink != null ? "set" : "null"));
-        return true;
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
@@ -336,16 +370,40 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
             // ApplyStagedConfig look up the cart that way. Keep both forms.
             String fileSegment = null;
             String cartFileName = null;
+            // Reopen-command `file=` value (ADR-050: concrete commands).
+            // For flat configs that's the suffixed file (`performance.yml`);
+            // for multiconfig entries it's the slash-joined synthetic
+            // `<kind>/<entry>` form that ConfigCmd's `reopenAfterCartOp`
+            // path recognises and routes to `dispatchOpenMultiConfigEntry`.
+            String reopenFileArg = null;
             if (session.parentPath.size() >= 2
                     && "config".equalsIgnoreCase(session.parentPath.get(0))) {
-                fileSegment = session.parentPath.get(1);
-                cartFileName = fileSegment;
-                if (cartFileName != null
-                        && cartFileName.toLowerCase(java.util.Locale.ROOT).endsWith(".yml")) {
-                    cartFileName = cartFileName.substring(0, cartFileName.length() - 4);
+                if (session.parentPath.size() >= 3) {
+                    // Multi-config entry: parentPath=[config, <kind>, <entry>].
+                    // Synthetic cart fileName matches the form emitted by
+                    // CommandTreeMenuBuilder.buildConfigFile's slash-aware
+                    // short-circuit and the OpenMultiConfigEntry editor
+                    // (MultiConfigMenuBuilder.buildEntry, syntheticFileName
+                    // = "<kind>/<entry>"). The reopen `file=` argument
+                    // carries the same slash-joined form so ConfigCmd
+                    // routes via `reopenAfterCartOp` -> dispatchOpenMultiConfigEntry.
+                    String kind = session.parentPath.get(1);
+                    String entry = session.parentPath.get(2);
+                    cartFileName = kind + "/" + entry;
+                    fileSegment = kind + "/" + entry;
+                    reopenFileArg = kind + "/" + entry;
+                } else {
+                    fileSegment = session.parentPath.get(1);
+                    cartFileName = fileSegment;
+                    if (cartFileName != null
+                            && cartFileName.toLowerCase(java.util.Locale.ROOT).endsWith(".yml")) {
+                        cartFileName = cartFileName.substring(0, cartFileName.length() - 4);
+                    }
+                    reopenFileArg = fileSegment;
                 }
             }
-            if (sink == null || fileSegment == null || cartFileName == null) {
+            if (sink == null || fileSegment == null || cartFileName == null
+                    || reopenFileArg == null) {
                 RTP.log(Level.WARNING,
                         "menu anvil-input STAGE confirm dropped for " + player.getUniqueId()
                                 + " (sink=" + (sink != null ? "set" : "null")
@@ -366,13 +424,13 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
                                 + ": " + e.getMessage(), e);
                 return;
             }
-            // Reopen the curated file page so the new "Pending" entry is visible.
-            // Must route through the menu mirror (`/rtp menu config <file>`),
-            // not the text-mode config-reload command (`/rtp config <file>`),
-            // which would just reload configs without re-rendering the menu.
-            // Use the suffixed segment so the commands-api walker matches the
-            // mirrored SubConfigCmd child (named e.g. "performance.yml").
-            final String reopen = "/rtp menu config " + fileSegment;
+            // Reopen the curated file page so the new "Pending" entry is
+            // visible. ADR-050: emit the concrete grammar
+            // `/rtp menu config file=<file>`; ConfigCmd dispatches the
+            // slash-bearing multi-config form (`<kind>/<entry>`) via
+            // `reopenAfterCartOp` -> `dispatchOpenMultiConfigEntry`, and
+            // the flat form via `dispatchOpenConfigFile`.
+            final String reopen = "/rtp menu config file=" + reopenFileArg;
             Plugin plugin = getRtpPlugin();
             if (plugin == null) {
                 RTP.log(Level.WARNING,

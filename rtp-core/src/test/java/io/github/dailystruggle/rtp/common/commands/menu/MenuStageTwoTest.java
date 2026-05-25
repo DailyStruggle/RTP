@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,7 +35,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -59,155 +57,15 @@ public class MenuStageTwoTest {
     }
 
     // ------------------------------------------------------------------------
-    // 2.1 — Registry: CAS consume, TTL sweep, per-player cap (oldest-evict)
+    // ADR-050 Stage 3beta.D.1 (2026-05-24): the six token-mechanic tests
+    // (registry CAS/sweep/cap/argcheck, redeemRejectsMissingToken,
+    // redeemRejectsNonRunActionAsProtocolError) were deleted with the
+    // token-redeem dispatch path. They asserted invariants of the
+    // MenuTokenRegistry + the `token=` redeem branch, both of which are
+    // gone. Concrete-command grammar coverage lives in
+    // ReqRtpMenuConcreteCommandsTest (36 cases); renderer command-string
+    // emission lives in BookMenuRendererTest (34 cases).
     // ------------------------------------------------------------------------
-
-    @Test
-    void registryConsumeIsAtomicCAS() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        UUID player = UUID.randomUUID();
-        MenuAction action = new MenuAction.SuggestInput("/rtp config foo:");
-
-        String token = registry.mint(player, action, Duration.ofMinutes(1));
-        assertNotNull(token);
-        assertTrue(token.length() >= 19, "token must encode >= 96 bits (>= 19 base32 chars)");
-        assertEquals(1, registry.outstandingFor(player));
-
-        Optional<MenuAction> first = registry.consume(player, token);
-        Optional<MenuAction> second = registry.consume(player, token);
-
-        assertTrue(first.isPresent(), "first consume must succeed");
-        assertEquals(action, first.get());
-        assertTrue(second.isEmpty(), "second consume must fail (CAS / single-shot)");
-        assertEquals(0, registry.outstandingFor(player));
-    }
-
-    @Test
-    void registrySweepExpiresOldTokens() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        UUID player = UUID.randomUUID();
-        MenuAction action = new MenuAction.SuggestInput("/rtp x:");
-
-        String token = registry.mint(player, action, Duration.ofMillis(1));
-        // Wait until the system clock advances past the TTL.
-        long deadline = System.currentTimeMillis() + 500;
-        while (System.currentTimeMillis() < deadline
-                && registry.sweepExpired(System.currentTimeMillis()) == 0) {
-            try {
-                Thread.sleep(2);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
-        assertTrue(registry.consume(player, token).isEmpty(),
-                "expired token must not be consumable");
-        assertEquals(0, registry.outstandingFor(player));
-    }
-
-    @Test
-    void registryEvictsOldestWhenPerPlayerCapExceeded() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry(3);
-        UUID player = UUID.randomUUID();
-
-        String t1 = registry.mint(player, new MenuAction.SuggestInput("a"), Duration.ofMinutes(1));
-        String t2 = registry.mint(player, new MenuAction.SuggestInput("b"), Duration.ofMinutes(1));
-        String t3 = registry.mint(player, new MenuAction.SuggestInput("c"), Duration.ofMinutes(1));
-        String t4 = registry.mint(player, new MenuAction.SuggestInput("d"), Duration.ofMinutes(1));
-
-        assertEquals(3, registry.outstandingFor(player));
-        assertTrue(registry.consume(player, t1).isEmpty(), "oldest token must be evicted");
-        assertTrue(registry.consume(player, t2).isPresent());
-        assertTrue(registry.consume(player, t3).isPresent());
-        assertTrue(registry.consume(player, t4).isPresent());
-    }
-
-    @Test
-    void registryRejectsBadArguments() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        UUID player = UUID.randomUUID();
-        MenuAction action = new MenuAction.SuggestInput("p");
-
-        assertThrows(NullPointerException.class,
-                () -> registry.mint(null, action, Duration.ofSeconds(1)));
-        assertThrows(NullPointerException.class,
-                () -> registry.mint(player, null, Duration.ofSeconds(1)));
-        assertThrows(IllegalArgumentException.class,
-                () -> registry.mint(player, action, Duration.ZERO));
-    }
-
-    // ------------------------------------------------------------------------
-    // 2.2 — Redeem rejects a foreign UUID (single-shot, owner-only)
-    // ------------------------------------------------------------------------
-
-    @Test
-    void redeemRejectsForeignUuid() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        UUID owner = UUID.randomUUID();
-        UUID attacker = UUID.randomUUID();
-
-        TestableRoot root = new TestableRoot();
-        MenuRedeemSubcommand redeem = new MenuRedeemSubcommand(root, registry);
-
-        String token = registry.mint(owner,
-                new MenuAction.RunRtpCommand(new String[]{"config"}),
-                Duration.ofMinutes(1));
-
-        Map<String, List<String>> args = new HashMap<>();
-        args.put(MenuRedeemSubcommand.PARAM_TOKEN, List.of(token));
-
-        List<String> attackerMessages = new ArrayList<>();
-        boolean attackerOk = redeem.onCommand(attacker, args, null,
-                (Consumer<String>) attackerMessages::add);
-        assertFalse(attackerOk, "foreign UUID must be rejected");
-        assertEquals(0, root.dispatchCount, "no dispatch on foreign-UUID rejection");
-        assertFalse(attackerMessages.isEmpty(), "rejected user must receive a message (S-004)");
-
-        // Owner can still consume the same token: foreign-UUID attempt must not
-        // have advanced the CAS.
-        List<String> ownerMessages = new ArrayList<>();
-        boolean ownerOk = redeem.onCommand(owner, args, null,
-                (Consumer<String>) ownerMessages::add);
-        assertTrue(ownerOk, "owner must succeed after foreign attempt");
-        assertEquals(1, root.dispatchCount);
-        assertArrayEquals(new String[]{"config"}, root.lastArgs);
-    }
-
-    @Test
-    void redeemRejectsMissingToken() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        TestableRoot root = new TestableRoot();
-        MenuRedeemSubcommand redeem = new MenuRedeemSubcommand(root, registry);
-
-        List<String> messages = new ArrayList<>();
-        boolean ok = redeem.onCommand(UUID.randomUUID(),
-                new HashMap<>(), null, (Consumer<String>) messages::add);
-        assertFalse(ok);
-        assertFalse(messages.isEmpty());
-        assertEquals(0, root.dispatchCount);
-    }
-
-    @Test
-    void redeemRejectsNonRunActionAsProtocolError() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        UUID player = UUID.randomUUID();
-        TestableRoot root = new TestableRoot();
-        MenuRedeemSubcommand redeem = new MenuRedeemSubcommand(root, registry);
-
-        // SuggestInput is a renderer-resolved click effect and must never reach
-        // redeem; if a buggy renderer routes one server-side, redeem rejects.
-        String token = registry.mint(player,
-                new MenuAction.SuggestInput("/rtp config foo:"), Duration.ofMinutes(1));
-
-        Map<String, List<String>> args = new HashMap<>();
-        args.put(MenuRedeemSubcommand.PARAM_TOKEN, List.of(token));
-        List<String> messages = new ArrayList<>();
-        boolean ok = redeem.onCommand(player, args, null,
-                (Consumer<String>) messages::add);
-        assertFalse(ok);
-        assertEquals(0, root.dispatchCount);
-        assertFalse(messages.isEmpty());
-    }
 
     // ------------------------------------------------------------------------
     // 2.3 — Reflector hides inaccessible nodes; emits correct fragments
@@ -215,7 +73,6 @@ public class MenuStageTwoTest {
 
     @Test
     void reflectorHidesInaccessibleSubcommandsAndParameters() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         root.getCommandLookup().put("config",
                 new StubSub("rtp.config", "config desc"));
@@ -226,7 +83,7 @@ public class MenuStageTwoTest {
 
         Predicate<String> caller = perm -> perm.equals("rtp.config"); // only config visible
 
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
         MenuModel model = builder.build(root, UUID.randomUUID(), caller,
                 MenuConsumerProfile.defaultProfile());
 
@@ -250,14 +107,13 @@ public class MenuStageTwoTest {
         // IntegerParameter with curated values 1/2/4) opens a value-picker
         // sub-page on click. A parameter without suggestions falls back to
         // the pre-Stage-A.2 SuggestInput chat-prefill (covered separately).
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         root.getCommandLookup().put("config",
                 new StubSub("", "config desc"));
         root.getParameterLookup().put("threadCount",
                 new IntegerParameter("", "thread count", (u, v) -> true, 1, 2, 4));
 
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
         MenuModel model = builder.build(root, UUID.randomUUID(), perm -> true,
                 MenuConsumerProfile.defaultProfile());
 
@@ -289,11 +145,10 @@ public class MenuStageTwoTest {
         // free-form parameter such as `regions add` was "stuck" — clicking
         // it produced no visible prompt under renderers that don't surface
         // chat suggestions inline.
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         root.getParameterLookup().put("freeform", anonParam("", "no suggestions"));
 
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
         MenuModel model = builder.build(root, UUID.randomUUID(), perm -> true,
                 MenuConsumerProfile.defaultProfile());
 
@@ -313,7 +168,6 @@ public class MenuStageTwoTest {
 
     @Test
     void hoverFallbackPrefersYamlCommentThenTypeBoundsThenNull() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         // Three parameters exercising each fallback rung.
         root.getParameterLookup().put("commented",
@@ -333,7 +187,7 @@ public class MenuStageTwoTest {
             public YamlCommentLookup commentLookup() { return lookup; }
         };
 
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
         MenuModel model = builder.build(root, UUID.randomUUID(), perm -> true, profile);
 
         Map<String, MenuFragment> byName = new HashMap<>();
@@ -384,7 +238,6 @@ public class MenuStageTwoTest {
 
     @Test
     void openPageDispatchesToRendererWhenNoTokenAndRendererWired() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         root.getCommandLookup().put("config", new StubSub("", "config desc"));
 
@@ -398,11 +251,11 @@ public class MenuStageTwoTest {
             renderedModel.set(model);
         };
         MenuRedeemSubcommand.MenuPageBuilder pageBuilder =
-                (node, open, assembledPath) -> new CommandTreeMenuBuilder(registry)
+                (node, open, assembledPath) -> new CommandTreeMenuBuilder()
                         .build(node, open.viewer(), perm -> true,
                                 MenuConsumerProfile.defaultProfile(), assembledPath);
 
-        MenuRedeemSubcommand redeem = new MenuRedeemSubcommand(root, registry,
+        MenuRedeemSubcommand redeem = new MenuRedeemSubcommand(root,
                 uuid -> perm -> true, renderer, pageBuilder);
 
         UUID viewer = UUID.randomUUID();
@@ -427,9 +280,8 @@ public class MenuStageTwoTest {
         // Backward-compat: the Stage 3 wire-up uses the 3-arg constructor (no
         // renderer/builder). A token-less invocation must still reject with
         // menuInvalid + WARN, unchanged from pre-Stage-4 behaviour.
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
-        MenuRedeemSubcommand redeem = new MenuRedeemSubcommand(root, registry,
+        MenuRedeemSubcommand redeem = new MenuRedeemSubcommand(root,
                 uuid -> perm -> true);
 
         List<String> messages = new ArrayList<>();
@@ -443,7 +295,6 @@ public class MenuStageTwoTest {
 
     @Test
     void openPageRejectsWithMenuInvalidWhenRendererThrows() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
 
         // Renderer that simulates S-006 (e.g. offline player) by throwing.
@@ -455,7 +306,7 @@ public class MenuStageTwoTest {
                         List.of(new MenuPage(List.of(
                                 MenuLine.of(MenuFragment.plain("anything"))))));
 
-        MenuRedeemSubcommand redeem = new MenuRedeemSubcommand(root, registry,
+        MenuRedeemSubcommand redeem = new MenuRedeemSubcommand(root,
                 uuid -> perm -> true, renderer, pageBuilder);
 
         List<String> messages = new ArrayList<>();
@@ -471,7 +322,6 @@ public class MenuStageTwoTest {
         // CHECKLIST 5.3.b/g: `/rtp menu page:3` must arrive at the page builder
         // as MenuOpenRequest.pageIndex() == 2 (1-indexed wire → 0-indexed model).
         // Missing/invalid values must default to page 1 / index 0.
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
 
         AtomicReference<io.github.dailystruggle.rtp.api.menu.MenuOpenRequest> seen =
@@ -482,7 +332,7 @@ public class MenuStageTwoTest {
             return new MenuModel("t", List.of(new MenuPage(List.of(
                     MenuLine.of(MenuFragment.plain("x"))))));
         };
-        MenuRedeemSubcommand redeem = new MenuRedeemSubcommand(root, registry,
+        MenuRedeemSubcommand redeem = new MenuRedeemSubcommand(root,
                 uuid -> perm -> true, renderer, pageBuilder);
 
         UUID viewer = UUID.randomUUID();

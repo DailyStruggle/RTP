@@ -144,7 +144,6 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
         RTP.log(Level.INFO,
                 "[prefab] apply requested: caller=" + callerId
                         + " prefab=" + prefab.id()
-                        + " token=" + entry.token()
                         + " files=" + diff.size()
                         + " changes=" + changeCount);
 
@@ -165,15 +164,9 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
                 }
             }
         }
-        // Caller-bound confirm: the nonce store resolves the newest entry
-        // for (callerId, prefabId) so the player does not need to copy the
-        // opaque token. Chat path still shows the token as a fallback for
-        // operators who prefer the explicit form.
+        // Token-removal (2026-05-24, mirrors ADR-050): the pending diff is
+        // keyed solely on (callerId, prefabId); no opaque token surfaces.
         send(callerId, "&7Confirm with: &f/rtp admin prefab confirm id=" + prefab.id());
-        send(callerId, "&8(or with explicit token: &f/rtp admin prefab confirm id="
-                + prefab.id() + " token=" + entry.token() + "&8)");
-        send(callerId, "&7Expires in ~"
-                + (PrefabNonceStore.DEFAULT_TTL_MILLIS / 1000) + "s.");
         return true;
     }
 

@@ -222,7 +222,15 @@ public class RtpYamlSection {
     /** Mirrors {@code simpleyaml}'s {@code ConfigurationSection.getValues(deep)}. */
     public Map<String, Object> getValues(boolean deep) {
         LinkedHashMap<String, Object> out = new LinkedHashMap<>();
-        for (var e : node.entries().entrySet()) {
+        // Snapshot the entries before iterating: async reload paths
+        // (Configs.reloadRegions -> ConfigParser.setSection -> getMapValues
+        // -> getValues) can race with concurrent setters mutating the same
+        // backing LinkedHashMap, producing ConcurrentModificationException.
+        // A shallow copy of the entry set is cheap and decouples iteration
+        // from concurrent structural mutations; entry values (RtpYamlNode)
+        // are still shared, which is fine because we only read them.
+        var snapshot = new ArrayList<>(node.entries().entrySet());
+        for (var e : snapshot) {
             String key = e.getKey();
             RtpYamlNode child = e.getValue();
             if (deep && child instanceof RtpYamlMapping) {

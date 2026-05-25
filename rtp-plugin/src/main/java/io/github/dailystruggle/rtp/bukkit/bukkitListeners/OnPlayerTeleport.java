@@ -15,6 +15,17 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerTeleportEvent;
 
+/**
+ * External-teleport interceptor for in-flight RTPs.
+ *
+ * @deprecated The race window this listener guards (between {@code RTPTeleportCancel}-able state
+ *     and the actual {@code teleport} call inside the RTP runnable) is too narrow in practice for
+ *     an external teleport to land in, and the RTP pipeline already pre-checks {@code TeleportData}
+ *     before dispatching. No Fabric equivalent was ported (see {@code MULTI_PLATFORM_PLAN.md} Step
+ *     E-tail). Slated for removal once a release cycle has confirmed no regressions; do not add new
+ *     dependencies on this class.
+ */
+@Deprecated
 public final class OnPlayerTeleport implements Listener {
   @EventHandler(priority = EventPriority.LOWEST)
   public void onPlayerTeleport(PlayerTeleportEvent event) {

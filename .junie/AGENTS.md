@@ -19,6 +19,37 @@ Operational guide for AI agents and human contributors working in the RTP reposi
 9. **Maintain a task checklist** for any multi-step task, and tick items off as you complete them — this preserves state if the session is interrupted (see *Checklist-Based State Tracking*).
 10. **End any runtime-testable progress with a full build** (`.\gradlew build`) before submitting — scoped tests are not a substitute (see *Final Full Build*).
 11. **Write markdown as UTF-8; never emit mojibake.** If you see sequences like `â€”`, `â€™`, `âœ…`, `Â§`, `Ã©`, or the replacement character `�` in a diff you're about to write, stop and re-encode (see *Markdown Encoding Hygiene*).
+12. **Never run destructive git operations** (`git stash`, `git stash drop`, `git checkout -- <path>`, `git reset --hard`, `git restore`, `git revert`, `git clean -fd`, `git rebase`, `git push --force`) on the user's working tree. The working tree may contain uncommitted in-progress work you cannot see; touching it can silently destroy it. See *Git Safety* below.
+
+---
+
+## Git Safety (no destructive operations on the working tree)
+
+The user's working tree is sacred. It routinely contains uncommitted, unstashed, in-progress work you cannot see in the patch you were just shown — partial refactors, scratch experiments, half-finished features in other modules. **Any git operation that rewrites, discards, or hides working-tree changes can silently destroy hours of that work.** This is a recurring, real-world failure mode for AI agents, and it has happened in this repository.
+
+**Hard prohibitions — do NOT run these without explicit, written user approval in the current session (a generic "ok" to an unrelated plan does not count):**
+
+- `git stash`, `git stash push`, `git stash pop`, `git stash apply`, `git stash drop`, `git stash clear` — stashing mixes your changes with the user's; `pop` produces conflict markers that look like file corruption; `drop` and `clear` are unrecoverable from the normal UI (only `git fsck --unreachable` saves you).
+- `git checkout -- <path>`, `git checkout <ref> -- <path>` (when the path has uncommitted changes), `git restore <path>`, `git restore --staged <path>` — overwrites or unstages working-tree edits.
+- `git reset --hard`, `git reset --merge`, `git reset --keep` — discards working-tree state.
+- `git clean -f`, `git clean -fd`, `git clean -fx` — deletes untracked files (the user's scratch work, build outputs they wanted to keep, local config).
+- `git revert`, `git rebase`, `git rebase -i`, `git cherry-pick` on the user's branch — rewrites history.
+- `git push --force`, `git push --force-with-lease`, `git push --delete` — rewrites remote history.
+- `git commit --amend` on a commit you did not author in the current session — rewrites the user's commit.
+- `git branch -D`, `git branch --delete --force`, `git tag -d` — discards refs that may be the only pointer to work.
+- `git filter-branch`, `git filter-repo`, `git update-ref -d`, `git reflog expire`, `git gc --prune=now` — history rewriters and reflog destroyers.
+
+**Allowed read-only / additive git operations** (no approval needed):
+
+- `git status`, `git status --porcelain`, `git diff`, `git diff --stat`, `git diff <ref>`, `git log`, `git log --stat`, `git show <ref>`, `git blame`, `git ls-files`, `git rev-parse`, `git describe`, `git branch --list`, `git tag --list`, `git reflog`, `git fsck --unreachable`.
+- `git add <path>` of files you yourself just created or edited in the current session, **only as a prerequisite to a user-requested commit**. Never `git add -A` / `git add .` — that silently stages the user's uncommitted work alongside yours.
+- `git commit` only when the user explicitly asked for a commit (per *GIT COMMITS* below) and only after the user has approved the diff.
+
+**Recovery is not the policy.** Yes, `git fsck --unreachable` can sometimes recover a dropped stash, and yes, the reflog usually survives for 90 days. **Do not rely on this.** The policy is: don't run the destructive operation in the first place. Recovery costs the user time, breaks trust, and is not always possible (e.g. when the destructive op happens on a branch the agent never sees again).
+
+**If you think you need a destructive op:** stop, describe what you want to do and why, and `ask_user` for explicit approval. The user will either approve, or — far more commonly — point out the additive, non-destructive alternative you missed (e.g. write the new content with `search_replace` instead of reverting; check out a file to a *new path* via `git show <ref>:<path> > <newpath>` instead of `git checkout`; copy a backup before editing instead of stashing).
+
+**If you have already done it:** stop immediately, do not try to "fix it up" with more git commands, tell the user clearly what you ran, and run `git fsck --unreachable` + `git reflog` to enumerate recovery candidates before doing anything else. Hiding the mistake or guessing at recovery makes it worse.
 
 ---
 

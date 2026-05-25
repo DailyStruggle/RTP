@@ -12,7 +12,6 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
-import io.github.dailystruggle.rtp.common.tools.CfDiag;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import org.jetbrains.annotations.Nullable;
 
@@ -150,8 +149,13 @@ final class QueueTask {
                 afterChunkResolved(pair, left, world, cx, cz, cachedChunk, preReservation);
             } else {
                 // Unusual: reservation held but chunk not in cache. Use probe + livefallback.
-                world.getOrLoadChunk(cx, cz)
-                        .orTimeout(5, TimeUnit.SECONDS)
+                // Per-attempt chunk-load: do NOT race with .orTimeout here. The world
+                // adapter is the canonical owner of any per-chunk deadline (it knows when
+                // the server is incapable of loading a particular chunk). Letting the
+                // future complete naturally means slow loads still warm rtpChunkCache for
+                // the next attempt at the same coordinate. Rejection on null/exception
+                // routes through the existing FailTypes.nullChunk attribution path.
+                world.getOrLoadChunk(cx, cz, "QueueTask.preReservedFallback")
                         .whenComplete((chunk, ex) -> afterChunkResolved(pair, left, world, cx, cz,
                                 (ex == null) ? chunk : null, preReservation));
             }
@@ -279,8 +283,9 @@ final class QueueTask {
         // ADR-016 §13.1 probe-first via getOrLoadChunk traffic-cop.
         // Anvil-backed candidates run inline with no reservation; live-backed
         // candidates allocate a reservation and dispatch to the region thread.
-        world.getOrLoadChunk(cx, cz)
-                .orTimeout(5, TimeUnit.SECONDS)
+        // Per-attempt chunk-load: per-chunk deadline lives in the world adapter,
+        // not here. See note in the pre-reserved branch above.
+        world.getOrLoadChunk(cx, cz, "QueueTask.runFullLoadAndResolve")
                 .whenComplete((chunk, ex) -> {
                     if (ex != null || chunk == null) {
                         if (ex != null) {
@@ -299,7 +304,6 @@ final class QueueTask {
                     }
                     // Live branch: allocate reservation, await ticket apply, dispatch to region thread.
                     long chunkKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
-                    CfDiag.chunkSetQueueLive.increment();
                     ChunkSet ticket = new ChunkSet(
                             world, cx, cz,
                             Collections.singletonList(CompletableFuture.completedFuture(chunkKey)),
@@ -355,6 +359,26 @@ final class QueueTask {
             int cz,
             @Nullable RTPChunk<?> chunk,
             @Nullable ChunkReservation reservation) {
+
+        // Defensive re-resolve (Option 2+3, 2026-05-08): a chunk can be unloaded
+        // between getOrLoadChunk completing and this consumer reading block state.
+        // For live-backed chunks (isSelfContained==false) re-fetch the cached
+        // reference and re-check isChunkLoaded — rejection routes through the
+        // existing FailTypes.nullChunk attribution path. Anvil-backed chunks
+        // (isSelfContained==true) are off-disk snapshots that cannot go stale,
+        // so they bypass the guard and proceed unchanged.
+        if (chunk != null && !chunk.isSelfContained()) {
+            long centerKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+            RTPChunk<?> live = world.getCachedChunk(centerKey);
+            if (live == null || !world.isChunkLoaded(cx, cz)) {
+                RTP.log(Level.FINE,
+                        "[RTP] QueueTask center chunk went stale before evaluateSafety ("
+                                + world.name() + " " + cx + "," + cz + "); rejecting.");
+                finishRejected(reservation);
+                return;
+            }
+            chunk = live;
+        }
 
         boolean pass = chunk != null;
 
@@ -446,14 +470,14 @@ final class QueueTask {
 
         List<CompletableFuture<Long>> nFutures = new ArrayList<>();
         for (int[] entry : neighbourIdx) {
+            world.recordChunkLoadOrigin("QueueTask.replenishNeighbours");
             nFutures.add(world.getChunkAt(entry[0], entry[1]));
         }
-        CfDiag.queueAllOfDispatch.increment();
+        // Neighbour-grid load: per-chunk deadlines live inside the world adapter.
+        // We orchestrate via allOf and let it complete naturally.
         CompletableFuture.allOf(nFutures.toArray(new CompletableFuture[0]))
-                .orTimeout(5, TimeUnit.SECONDS)
                 .whenComplete((v, ex) -> {
                     if (ex != null) {
-                        CfDiag.queueAllOfTimeout.increment();
                         finishRejected(reservation);
                         return;
                     }
@@ -633,10 +657,10 @@ final class QueueTask {
                         List<CompletableFuture<Long>> vd = new ArrayList<>();
                         for (int dx = -radius; dx <= radius; dx++) {
                             for (int dz = -radius; dz <= radius; dz++) {
+                                world.recordChunkLoadOrigin("QueueTask.anvilViewDistance");
                                 vd.add(world.getChunkAt(ccx + dx, ccz + dz));
                             }
                         }
-                        CfDiag.chunkSetQueueVd.increment();
                         transferred = new ChunkSet(world, ccx, ccz, vd, new CompletableFuture<>());
                     }
                     result.complete(new GenerationResult(left, fpair.attempts(), transferred, reservation));
@@ -718,11 +742,8 @@ final class QueueTask {
             for (int j = 0; j < Region.onPlayerQueuePush.size(); j++) {
                 Region.onPlayerQueuePush.get(j).accept(region, playerId);
             }
-            // ADR-043: enroll on the teleport waitlist via the named entry
-            // point. Equivalent to the old raw `playerQueue.add` +
-            // `queuedPlayers.add`, but the named method documents the intent
-            // and is the canonical teleport-intent enqueue path.
-            region.queueManager.requestTeleport(playerId);
+            region.queueManager.playerQueue.add(playerId);
+            RTP.getInstance().queuedPlayers.add(playerId);
             data.queueLocation = region.queueManager.playerQueue.size();
             RTP.log(Level.FINE,
                     "[ENQUEUE_TRACE] LocationGenerator ENQUEUED playerId=" + playerId

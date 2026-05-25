@@ -10,18 +10,15 @@ import io.github.dailystruggle.rtp.api.menu.MenuConsumerProfile;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuOpenRequest;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
-import io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.commands.maps.ChartSpecTokens;
 import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,9 +44,9 @@ import org.jetbrains.annotations.Nullable;
  *
  * <ol>
  *   <li>Resolve the token from the parsed parameter values.</li>
- *   <li>Atomic-consume via {@link MenuTokenRegistry#consume(UUID, String)} —
- *       this is the {@code senderUuid == storedPlayerUuid} check (the registry
- *       only returns a value when the caller owns the token).</li>
+ *   <li>(ADR-050 Stage 3β.D.2b) The token consume path is gone; click
+ *       events now carry concrete {@code /rtp menu ...} commands and the
+ *       ownership check is implicit in the leaf's permission gate.</li>
  *   <li>On failure: route the configurable {@code menu.invalid} / {@code menu.expired}
  *       message through {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#sendMessage}
  *       and log a {@link Level#WARNING} entry via {@link RTP#log} per
@@ -86,9 +83,6 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      */
     public static final String ADMIN_MENU_PERMISSION = "rtp.menu.admin";
 
-    /** Parameter name used when the user types {@code /rtp menu token:<value>}. */
-    public static final String PARAM_TOKEN = "token";
-
     /**
      * Parameter names used when the anvil-input "+ add new" prompt on the
      * multiconfig selector page confirms. The platform synthesizes
@@ -97,7 +91,14 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@link #dispatchMultiConfigMutate} with op = ADD.
      */
     public static final String PARAM_MULTIADD = "multiadd";
-    public static final String PARAM_MULTIADD_KIND = "multiaddKind";
+    // Lowercase key: commands-api's TreeCommand parameter parser
+    // lowercases the token name before lookup (TreeCommand.java:277,
+    // `argSplit[0].toLowerCase()`), so the registered key MUST be
+    // all-lowercase. A camelCase key registers fine but is unreachable
+    // -- the lookup returns null and msgBadParameter fires with the
+    // submitted form ("invalid command argument multiaddKind=regions"
+    // observed 2026-05-23). Keep this lowercase to match the parser.
+    public static final String PARAM_MULTIADD_KIND = "multiaddkind";
 
     /**
      * Parameter name used when the user (or a renderer's pagination click)
@@ -108,9 +109,15 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      */
     public static final String PARAM_PAGE = "page";
 
-    private final MenuTokenRegistry tokenRegistry;
     private final TreeCommand rtpRoot;
     private final java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory;
+    /**
+     * ADR-050 menu-package split: shared permission-gate helper. Bound to
+     * {@link #permissionProbeFactory} at construction. The three legacy
+     * {@code hasXxxPermission(UUID)} methods on this class now delegate
+     * here; the menu leaves (under this same package) read it directly.
+     */
+    final MenuPermissionGates permissionGates;
     /** Optional renderer for the no-token open-page path (CHECKLIST item 3.2 / 4.2). */
     private final @Nullable MenuRenderer renderer;
     /**
@@ -234,19 +241,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      */
     private volatile io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigMenuBuilder multiConfigBuilder;
 
-    /**
-     * In-memory record of one player's pending config edits for a single
-     * file. Mutable but always replaced wholesale via the cart map; never
-     * leaked. See {@link #carts}.
-     */
-    private static final class Cart {
-        final String fileName;
-        final LinkedHashMap<String, String> entries = new LinkedHashMap<>();
-
-        Cart(String fileName) {
-            this.fileName = fileName;
-        }
-    }
+    // {@link Cart} moved to its own file as the first step of the
+    // ADR-050 menu-package split. See {@code Cart.java} in this package.
 
     /**
      * Returns the {@link CartSink} bound to this subcommand instance. The
@@ -556,6 +552,18 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
          * back row).
          */
         MenuModel buildFrontPage(UUID viewer);
+
+        /**
+         * Build the curated Visualizations submenu reached from the admin
+         * panel's Visualizations row (PR2b of the admin-Visualizations
+         * feature; see {@link VisualizationsSubmenuBuilder}). Default
+         * returns {@code null} so existing wire-ups that do not yet route
+         * this action keep compiling; the dispatch arm treats {@code null}
+         * as an S-004 reject path with {@code menuInvalid}.
+         */
+        default @Nullable MenuModel buildVisualizations(UUID viewer) {
+            return null;
+        }
     }
 
     /**
@@ -617,12 +625,11 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
     }
 
     /**
-     * @param parent        the {@code /rtp} root command (also used as the
-     *                      dispatch target for {@link MenuAction.RunRtpCommand}).
-     * @param tokenRegistry the registry that minted the inbound token.
+     * @param parent the {@code /rtp} root command (also used as the
+     *               dispatch target for {@link MenuAction.RunRtpCommand}).
      */
-    public MenuRedeemSubcommand(TreeCommand parent, MenuTokenRegistry tokenRegistry) {
-        this(parent, tokenRegistry, uuid -> perm -> true, null, null, null);
+    public MenuRedeemSubcommand(TreeCommand parent) {
+        this(parent, uuid -> perm -> true, null, null, null);
     }
 
     /**
@@ -635,9 +642,9 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      *                               sound because every node in the {@code /rtp}
      *                               tree also gates itself at the adapter layer.
      */
-    public MenuRedeemSubcommand(TreeCommand parent, MenuTokenRegistry tokenRegistry,
+    public MenuRedeemSubcommand(TreeCommand parent,
                                 java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory) {
-        this(parent, tokenRegistry, permissionProbeFactory, null, null, null);
+        this(parent, permissionProbeFactory, null, null, null);
     }
 
     /**
@@ -659,11 +666,11 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      *                    closure must apply the caller's {@link Predicate} +
      *                    {@link MenuConsumerProfile} when reflecting the node.
      */
-    public MenuRedeemSubcommand(TreeCommand parent, MenuTokenRegistry tokenRegistry,
+    public MenuRedeemSubcommand(TreeCommand parent,
                                 java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory,
                                 @Nullable MenuRenderer renderer,
                                 @Nullable MenuPageBuilder pageBuilder) {
-        this(parent, tokenRegistry, permissionProbeFactory, renderer, pageBuilder, null);
+        this(parent, permissionProbeFactory, renderer, pageBuilder, null);
     }
 
     /**
@@ -673,12 +680,12 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * keep the pre-Stage-A.2 behaviour (inbound {@link MenuAction.OpenParamPicker}
      * tokens reject with {@code menuInvalid} + WARN).
      */
-    public MenuRedeemSubcommand(TreeCommand parent, MenuTokenRegistry tokenRegistry,
+    public MenuRedeemSubcommand(TreeCommand parent,
                                 java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory,
                                 @Nullable MenuRenderer renderer,
                                 @Nullable MenuPageBuilder pageBuilder,
                                 @Nullable MenuParamPickerBuilder paramPickerBuilder) {
-        this(parent, tokenRegistry, permissionProbeFactory,
+        this(parent, permissionProbeFactory,
                 renderer, pageBuilder, paramPickerBuilder, null);
     }
 
@@ -688,13 +695,13 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * pre-ADR-045 behaviour (inbound {@link MenuAction.PromptAnvilInput}
      * tokens reject with {@code menuInvalid} + WARN).
      */
-    public MenuRedeemSubcommand(TreeCommand parent, MenuTokenRegistry tokenRegistry,
+    public MenuRedeemSubcommand(TreeCommand parent,
                                 java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory,
                                 @Nullable MenuRenderer renderer,
                                 @Nullable MenuPageBuilder pageBuilder,
                                 @Nullable MenuParamPickerBuilder paramPickerBuilder,
                                 @Nullable AnvilInputOpener anvilInputOpener) {
-        this(parent, tokenRegistry, permissionProbeFactory,
+        this(parent, permissionProbeFactory,
                 renderer, pageBuilder, paramPickerBuilder, anvilInputOpener, null);
     }
 
@@ -706,14 +713,14 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@link MenuAction.OpenConfigKey} tokens reject with {@code menuInvalid} +
      * WARN).
      */
-    public MenuRedeemSubcommand(TreeCommand parent, MenuTokenRegistry tokenRegistry,
+    public MenuRedeemSubcommand(TreeCommand parent,
                                 java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory,
                                 @Nullable MenuRenderer renderer,
                                 @Nullable MenuPageBuilder pageBuilder,
                                 @Nullable MenuParamPickerBuilder paramPickerBuilder,
                                 @Nullable AnvilInputOpener anvilInputOpener,
                                 @Nullable MenuConfigSubtreeBuilder configSubtreeBuilder) {
-        this(parent, tokenRegistry, permissionProbeFactory,
+        this(parent, permissionProbeFactory,
                 renderer, pageBuilder, paramPickerBuilder,
                 anvilInputOpener, configSubtreeBuilder, null);
     }
@@ -725,7 +732,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@link MenuAction.OpenAdminPanel} / {@link MenuAction.OpenFrontPage}
      * tokens reject with {@code menuInvalid} + WARN).
      */
-    public MenuRedeemSubcommand(TreeCommand parent, MenuTokenRegistry tokenRegistry,
+    public MenuRedeemSubcommand(TreeCommand parent,
                                 java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory,
                                 @Nullable MenuRenderer renderer,
                                 @Nullable MenuPageBuilder pageBuilder,
@@ -733,7 +740,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                                 @Nullable AnvilInputOpener anvilInputOpener,
                                 @Nullable MenuConfigSubtreeBuilder configSubtreeBuilder,
                                 @Nullable MenuCuratedPageBuilder curatedPageBuilder) {
-        this(parent, tokenRegistry, permissionProbeFactory,
+        this(parent, permissionProbeFactory,
                 renderer, pageBuilder, paramPickerBuilder,
                 anvilInputOpener, configSubtreeBuilder, curatedPageBuilder,
                 null);
@@ -747,7 +754,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@code menuInvalid} + WARN; {@link MenuAction.OpenConfigSearchPrompt}
      * still works via the existing anvil-input opener wiring).
      */
-    public MenuRedeemSubcommand(TreeCommand parent, MenuTokenRegistry tokenRegistry,
+    public MenuRedeemSubcommand(TreeCommand parent,
                                 java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory,
                                 @Nullable MenuRenderer renderer,
                                 @Nullable MenuPageBuilder pageBuilder,
@@ -756,7 +763,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                                 @Nullable MenuConfigSubtreeBuilder configSubtreeBuilder,
                                 @Nullable MenuCuratedPageBuilder curatedPageBuilder,
                                 @Nullable MenuConfigSearchBuilder configSearchBuilder) {
-        this(parent, tokenRegistry, permissionProbeFactory,
+        this(parent, permissionProbeFactory,
                 renderer, pageBuilder, paramPickerBuilder,
                 anvilInputOpener, configSubtreeBuilder, curatedPageBuilder,
                 configSearchBuilder, null);
@@ -770,7 +777,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * WARN). The companion {@link MenuAction.SwitchInfoToText} variant
      * always works (it re-enters the {@code /rtp info} chat path).
      */
-    public MenuRedeemSubcommand(TreeCommand parent, MenuTokenRegistry tokenRegistry,
+    public MenuRedeemSubcommand(TreeCommand parent,
                                 java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory,
                                 @Nullable MenuRenderer renderer,
                                 @Nullable MenuPageBuilder pageBuilder,
@@ -782,9 +789,9 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                                 @Nullable MenuInfoBookBuilder infoBookBuilder) {
         super(parent);
         this.rtpRoot = Objects.requireNonNull(parent, "parent");
-        this.tokenRegistry = Objects.requireNonNull(tokenRegistry, "tokenRegistry");
         this.permissionProbeFactory =
                 Objects.requireNonNull(permissionProbeFactory, "permissionProbeFactory");
+        this.permissionGates = new MenuPermissionGates(this.permissionProbeFactory);
         // Either both renderer + builder are present (open-page enabled), or
         // both are null (open-page disabled, falls back to menuInvalid). A
         // half-configured state would be ambiguous, so we collapse it.
@@ -815,18 +822,11 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             this.configSearchBuilder = null;
             this.infoBookBuilder = null;
         }
-        // Register a hidden curated parameter so commands-api recognises
-        //   /rtp menu token:<v>    → subcommand "menu" + param "token=<v>"
-        // This is the only valid form on the `/rtp` root: `menu:<token>` at
-        // root level would be parsed as parameter "menu" (which doesn't exist)
-        // and yield msgBadParameter. BookMenuRenderer emits the form above.
-        getParameterLookup().put(PARAM_TOKEN, new CommandParameter(PERMISSION,
-                "menu redeem token (opaque)", (uuid, value) -> true) {
-            @Override
-            public java.util.Set<String> values() {
-                return java.util.Collections.emptySet();
-            }
-        });
+        // ADR-050 Stage 3beta.D.2 (2026-05-24): the legacy `token=<v>`
+        // parameter registration, the PARAM_TOKEN constant, the
+        // MenuTokenRegistry ctor parameter, and the tokenRegistry field
+        // are all gone. The renderer (Stage 2) emits concrete
+        // `/rtp menu ...` commands; no caller sets `token=...` anymore.
         // Page parameter (CHECKLIST 5.3.b): `/rtp menu page:<n>` opens the
         // matching subtree at 1-indexed page n. No curated value list (the
         // valid range depends on the reflected model, not on the parameter
@@ -882,6 +882,54 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         // asynchronously after RTPCmdBukkit construction. An eager mirror
         // walk in this constructor would catch ConfigCmd with zero children
         // and produce a dead `/rtp menu config ...` branch.
+        // ADR-050 Stage 1a (Proposed 2026-05-24): register concrete-command
+        // leaves that coexist with the token-redeem path. Tokens still work;
+        // these leaves provide the self-documenting `/rtp menu open ...`,
+        // `/rtp menu admin`, `/rtp menu front`, and `/rtp menu visualizations`
+        // forms. Each routes into the matching `dispatch*` helper on this
+        // subcommand; no logic is duplicated. See ADR-050.
+        addSubCommand(new MenuConcreteCommandLeaves.OpenMenuConcreteCmd(this));
+        addSubCommand(new MenuConcreteCommandLeaves.OpenAdminPanelConcreteCmd(this));
+        addSubCommand(new MenuConcreteCommandLeaves.OpenFrontPageConcreteCmd(this));
+        addSubCommand(new MenuConcreteCommandLeaves.OpenVisualizationsConcreteCmd(this));
+        // ADR-050 Stage 1b (Proposed 2026-05-24): the remaining concrete leaves.
+        // Names that would collide with /rtp root siblings mirrored by
+        // seedMirrorTree (`config`, `info`) are deliberately NOT registered as
+        // concrete children of `menu` here: the mirror walk already provides
+        // `/rtp menu config file:<file> ...` and `/rtp menu info ...` via the
+        // args-form parser, and registering a same-named concrete child would
+        // pre-empt the mirror walk's `existing.containsKey` skip and break
+        // the existing args-form behaviour. Stage 2 will switch the renderer
+        // to emit the args-form mirror commands directly for those branches.
+        addSubCommand(new MenuConcreteCommandLeavesB.PickerCmd(this));
+        addSubCommand(new MenuConcreteCommandLeavesB.PageCmd(this));
+        addSubCommand(new MenuConcreteCommandLeavesB.StageCmd(this));
+        addSubCommand(new MenuConcreteCommandLeavesB.UnstageCmd(this));
+        addSubCommand(new MenuConcreteCommandLeavesB.ApplyCmd(this));
+        addSubCommand(new MenuConcreteCommandLeavesB.DiscardCmd(this));
+        addSubCommand(new MenuConcreteCommandLeavesB.MultiCmd(this));
+        // ADR-050 Stage 2 (2026-05-24): register `config`, `info`, and
+        // `anvil` concrete leaves. They are registered BEFORE seedMirrorTree
+        // runs (the seed walk is delayed via miscAsyncTasks with a 10-tick
+        // delay), so the mirror walk's `existing.containsKey` check at
+        // seedMirrorTree:962-964 will skip the colliding mirror names
+        // (`config`, `info`) and the concrete leaves win. This is the
+        // intentional cutover: Stage 2's renderer emits concrete commands
+        // that target these leaves; the args-form mirror walk is no longer
+        // needed for these branches.
+        addSubCommand(new MenuConcreteCommandLeavesB.ConfigCmd(this));
+        addSubCommand(new MenuConcreteCommandLeavesB.InfoCmd(this));
+        addSubCommand(new MenuConcreteCommandLeavesB.AnvilCmd(this));
+        // Register `/rtp visualization` as a sibling of `menu` under the
+        // `/rtp` root so the visualizations selector is reachable directly
+        // (not only via `/rtp menu visualizations`). seedMirrorTree below
+        // will additionally surface it as `/rtp menu visualization` via the
+        // mirror walk, which is harmless duplication during Stage 1a; the
+        // canonical home is the root sibling per ADR-050. The temporary
+        // location for this registration is here (inside MenuRedeemSubcommand's
+        // constructor) rather than in RTPCmdImpl; Stage 1b will move it.
+        rtpRoot.addSubCommand(new MenuConcreteCommandLeaves.VisualizationRootCmd(rtpRoot, this));
+
         RTP.getInstance().miscAsyncTasks.add(
                 new io.github.dailystruggle.rtp.common.tasks.RTPRunnable(this::seedMirrorTree, 10));
     }
@@ -940,6 +988,31 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         return dispatch(senderId, parameterValues, nextCommand, messageMethod);
     }
 
+    /**
+     * ADR-050 (Proposed 2026-05-24) Stage 1c/γ2: token-redeem dispatch
+     * deleted. {@code /rtp menu} now serves only two paths:
+     * <ol>
+     *   <li>the "+ add new" anvil-confirm shortcut
+     *       ({@code /rtp menu multiaddKind=&lt;kind&gt; multiadd=&lt;name&gt;}),
+     *       routed directly to {@link #dispatchMultiConfigMutate} with
+     *       op = ADD;</li>
+     *   <li>the no-arg open-page fallback ({@code /rtp menu} bare), which
+     *       reflects the {@code /rtp} root via {@link #openPage} or returns
+     *       {@code true} when the parser is about to descend into a
+     *       {@link MenuMirrorSubcommand} child.</li>
+     * </ol>
+     *
+     * <p>Every other menu navigation is now a concrete child command
+     * (e.g. {@code /rtp menu admin}, {@code /rtp menu open path=...}) under
+     * this subcommand; see {@code MenuConcreteCommandLeaves} and
+     * {@code MenuConcreteCommandLeavesB}. The legacy
+     * {@code MenuTokenRegistry} consume path and its 22-arm
+     * {@code instanceof MenuAction} chain were removed because tokens
+     * conflicted with the "admin-friendly, self-documenting commands"
+     * goal of ADR-050; the {@code MenuTokenRegistry} field is retained
+     * only to keep the ctor signature stable until Stage 3 deletes the
+     * registry outright.
+     */
     private boolean dispatch(UUID senderId,
                              Map<String, List<String>> parameterValues,
                              @Nullable CommandsAPICommand nextCommand,
@@ -951,10 +1024,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         }
         // "+ add new" anvil-confirm early branch: when the player submits
         // /rtp menu multiaddKind=<kind> multiadd=<typedName>, route directly
-        // to dispatchMultiConfigMutate(ADD) without minting/consuming a token.
-        // This is the post-anvil-confirm leg of the add-new flow (the builder
-        // mints a PromptAnvilInput, the anvil opens prefilled with
-        // "default<N>", and the confirm command lands here).
+        // to dispatchMultiConfigMutate(ADD). The anvil opener writes this
+        // form on confirm; it is not a token redeem.
         List<String> multiAddName = parameterValues != null
                 ? parameterValues.get(PARAM_MULTIADD) : null;
         List<String> multiAddKind = parameterValues != null
@@ -971,177 +1042,26 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                         messageMethod);
             }
         }
-        String token = extractToken(parameterValues);
-        if (token == null || token.isEmpty()) {
-            // No token → open-page path (CHECKLIST item 3.2 / 4.2.a). If a
-            // renderer + builder were wired, reflect the targeted node and
-            // hand the resulting MenuModel to the renderer. Otherwise the
-            // existing menuInvalid + WARN fallback applies (backward
-            // compatible with the pre-Stage-4 wire-up).
-            if (renderer != null && pageBuilder != null) {
-                // If the parser is about to descend into a mirror child
-                // (e.g. `/rtp menu config regions default.yml size:500`),
-                // returning `true` here lets the commands-api walker continue
-                // through the mirror tree (TreeCommand.java:267-273). The
-                // leaf mirror's onCommand will fire renderAt() with the full
-                // assembled path including any staged `name:value` segments;
-                // rendering here at depth 1 would only briefly flash a less-
-                // specific menu page that the leaf render then overwrites
-                // (wasteful work and a token-mint pulse on each intermediate
-                // node).
-                if (nextCommand instanceof MenuMirrorSubcommand) {
-                    return true;
-                }
-                int pageIndex = extractPageIndex(parameterValues);
-                return openPage(senderId, nextCommand, pageIndex, messageMethod);
+        // Bare `/rtp menu` (or `/rtp menu page=<n>`): open the root menu
+        // page when a renderer + builder are wired. Token-bearing forms
+        // (`/rtp menu token=<x>`) silently fall through to this branch
+        // now that the consume path is gone; the token parameter is
+        // ignored.
+        if (renderer != null && pageBuilder != null) {
+            // If the parser is about to descend into a mirror child
+            // (e.g. `/rtp menu config regions default.yml size:500`),
+            // returning `true` here lets the commands-api walker continue
+            // through the mirror tree (TreeCommand.java:267-273). The
+            // leaf mirror's onCommand will fire renderAt() with the full
+            // assembled path.
+            if (nextCommand instanceof MenuMirrorSubcommand) {
+                return true;
             }
-            reject(senderId, MessagesKeys.menuInvalid,
-                    "menu redeem rejected: missing token", messageMethod);
-            return false;
+            int pageIndex = extractPageIndex(parameterValues);
+            return openPage(senderId, nextCommand, pageIndex, messageMethod);
         }
-        Optional<MenuAction> consumed;
-        try {
-            consumed = tokenRegistry.consume(senderId, token);
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu redeem failed for " + senderId + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
-                    "menu redeem rejected: registry failure", messageMethod);
-            return false;
-        }
-        if (consumed.isEmpty()) {
-            // Unknown / expired / wrong player — the registry collapses all three
-            // into Optional.empty() per its contract. We surface the "expired" key
-            // when the player still has outstanding tokens (more likely TTL),
-            // otherwise "invalid" (more likely typo / replay / wrong player).
-            MessagesKeys key = tokenRegistry.outstandingFor(senderId) > 0
-                    ? MessagesKeys.menuExpired
-                    : MessagesKeys.menuInvalid;
-            reject(senderId, key,
-                    "menu redeem rejected: token " + token + " not consumable",
-                    messageMethod);
-            return false;
-        }
-        MenuAction action = consumed.get();
-        // RunRtpCommand → execute the assembled /rtp command tail.
-        if (action instanceof MenuAction.RunRtpCommand run) {
-            return dispatchRun(senderId, run, messageMethod);
-        }
-        // OpenMenu → server-side navigation (back / forward-descend). Resolves
-        // the path against the live TreeCommand graph; never re-enters the
-        // commands-api parser, which is what makes /rtp menu config /
-        // /rtp menu config performance / ← back possible despite `config` not
-        // being a parameter of the `menu` subcommand.
-        if (action instanceof MenuAction.OpenMenu open) {
-            return dispatchOpen(senderId, open, messageMethod);
-        }
-        // OpenParamPicker → server-side parameter-value picker page (Stage A.2).
-        // Resolves the parent path against the live TreeCommand graph (same
-        // pattern as OpenMenu) and hands off to paramPickerBuilder.
-        if (action instanceof MenuAction.OpenParamPicker picker) {
-            return dispatchOpenParamPicker(senderId, picker, messageMethod);
-        }
-        // PromptAnvilInput → open an anvil GUI on the clicking player and
-        // let them type a free-form value (ADR-045). Hand off to the
-        // platform-side AnvilInputOpener when wired; otherwise reject as a
-        // protocol error (renderer should have fallen back to SuggestInput
-        // before emitting this action on an unsupported platform).
-        if (action instanceof MenuAction.PromptAnvilInput prompt) {
-            return dispatchPromptAnvilInput(senderId, prompt, messageMethod);
-        }
-        // PROPOSAL-config-view-as-book.md v3.7 — curated config-subtree
-        // pages. All three arms gate on rtp.config.view (S-004 reject path on
-        // miss) and route through configSubtreeBuilder, which is responsible
-        // for reading *live* ConfigParser state on each invocation (v3.6.3
-        // post-write rebuild contract).
-        if (action instanceof MenuAction.OpenConfigSelector) {
-            return dispatchOpenConfigSelector(senderId, messageMethod);
-        }
-        if (action instanceof MenuAction.OpenConfigFile openFile) {
-            return dispatchOpenConfigFile(senderId, openFile, messageMethod);
-        }
-        if (action instanceof MenuAction.OpenConfigKey openKey) {
-            return dispatchOpenConfigKey(senderId, openKey, messageMethod);
-        }
-        // PROPOSAL-rtp-menu-config-search.md — config-search prompt + results.
-        // The prompt arm delegates to the existing PromptAnvilInput dispatch
-        // shape (Q4 Decision A): the renderer is responsible for minting
-        // PromptAnvilInput(["menu","config","search"], "query", "") on the
-        // search button click, so OpenConfigSearchPrompt reaching redeem is
-        // a renderer that wants the server to translate it into the anvil
-        // prompt flow itself.
-        if (action instanceof MenuAction.OpenConfigSearchPrompt) {
-            return dispatchOpenConfigSearchPrompt(senderId, messageMethod);
-        }
-        if (action instanceof MenuAction.OpenConfigSearchResults search) {
-            return dispatchOpenConfigSearchResults(senderId, search, messageMethod);
-        }
-        // PROPOSAL-admin-panel.md v2 — curated admin panel and front page.
-        // OpenAdminPanel gates on rtp.menu.admin in the dispatch arm; the
-        // front-page action is unconditionally callable.
-        if (action instanceof MenuAction.OpenAdminPanel) {
-            return dispatchOpenAdminPanel(senderId, messageMethod);
-        }
-        if (action instanceof MenuAction.OpenFrontPage) {
-            return dispatchOpenFrontPage(senderId, messageMethod);
-        }
-        // PROPOSAL-info-as-book.md section 4.6 — open the /rtp info book at
-        // the supplied scope, or switch back to the chat presentation. Both
-        // arms gate on rtp.info (S-004 reject path on miss) and run on the
-        // dispatch thread (synchronous; InfoCmd does not block).
-        if (action instanceof MenuAction.OpenInfo openInfo) {
-            return dispatchOpenInfo(senderId, openInfo, messageMethod);
-        }
-        if (action instanceof MenuAction.SwitchInfoToText switchToText) {
-            return dispatchSwitchInfoToText(senderId, switchToText, messageMethod);
-        }
-        // Config-menu staging-cart redesign (CHECKLIST-config-staging-cart.md):
-        // four cart-affecting actions minted from the curated /rtp config
-        // <file> page. Each gates on rtp.config.view (same surface as the
-        // curated OpenConfig* arms) inside its dispatcher and re-renders the
-        // file page so the user sees the updated Pending list.
-        if (action instanceof MenuAction.StageConfigValue stage) {
-            return dispatchStageConfigValue(senderId, stage, messageMethod);
-        }
-        if (action instanceof MenuAction.UnstageConfigValue unstage) {
-            return dispatchUnstageConfigValue(senderId, unstage, messageMethod);
-        }
-        if (action instanceof MenuAction.ApplyStagedConfig apply) {
-            return dispatchApplyStagedConfig(senderId, apply, messageMethod);
-        }
-        if (action instanceof MenuAction.DiscardStagedConfig discard) {
-            return dispatchDiscardStagedConfig(senderId, discard, messageMethod);
-        }
-        // CHECKLIST-multiconfig-menu step 7 - three new arms for the generic
-        // MultiConfig submenu (regions, worlds, future kinds). All three
-        // gate on rtp.config.view in the dispatch arm. Path Z scope: the
-        // entry page is browse-only; per-key staging is deferred to a
-        // later slice.
-        if (action instanceof MenuAction.OpenMultiConfigSelector openSel) {
-            return dispatchOpenMultiConfigSelector(senderId, openSel, messageMethod);
-        }
-        if (action instanceof MenuAction.OpenMultiConfigEntry openEntry) {
-            return dispatchOpenMultiConfigEntry(senderId, openEntry, messageMethod);
-        }
-        if (action instanceof MenuAction.MultiConfigMutate mutate) {
-            return dispatchMultiConfigMutate(senderId, mutate, messageMethod);
-        }
-        // ADR-047 / REQ-RTP-MAP-006 declarative chart bridge. OpenMap routes
-        // through ChartSpecTokens (consume on the dispatch thread) and
-        // MapDispatch.paint to deliver a cartography map item to the viewer.
-        // Permission-gated by rtp.admin in the dispatch arm; the inert-binding
-        // gate (NoopMapBinding active) is enforced inside MapDispatch.paint.
-        if (action instanceof MenuAction.OpenMap openMap) {
-            return dispatchOpenMap(senderId, openMap, messageMethod);
-        }
-        // Renderer click effects (SuggestInput / ChangePage / OpenExternalUrl)
-        // must never reach redeem per ADR-035 §3. If one does, the renderer
-        // is buggy — refuse and log.
-        RTP.log(Level.WARNING, "menu redeem received non-dispatchable action "
-                + action.getClass().getSimpleName() + " for " + senderId);
         reject(senderId, MessagesKeys.menuInvalid,
-                "menu redeem rejected: action kind not dispatchable",
-                messageMethod);
+                "menu redeem rejected: open-page disabled", messageMethod);
         return false;
     }
 
@@ -1165,7 +1085,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      *       {@code menuInvalid} (S-004).</li>
      * </ul>
      */
-    private boolean openPage(UUID senderId,
+    // ADR-050 Stage 1b: package-private (used by `/rtp menu page n=<n>` leaf).
+    boolean openPage(UUID senderId,
                              @Nullable CommandsAPICommand nextCommand,
                              int pageIndex,
                              @Nullable Consumer<String> messageMethod) {
@@ -1194,7 +1115,11 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * <p>Unknown / unreachable segments collapse to {@code menuInvalid} +
      * WARN (S-004).
      */
-    private boolean dispatchOpen(UUID senderId,
+    // ADR-050 (Proposed 2026-05-24): package-private so the new concrete
+    // `/rtp menu open ...` leaf (an OpenMenuConcreteCmd nested below) can
+    // route into the same helper the token-redeem path uses. Permission gate
+    // and S-004 reject paths stay inside; no logic moves out.
+    boolean dispatchOpen(UUID senderId,
                                  MenuAction.OpenMenu open,
                                  @Nullable Consumer<String> messageMethod) {
         if (renderer == null || pageBuilder == null) {
@@ -1219,6 +1144,13 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                 continue;
             }
             CommandsAPICommand next = target.getCommandLookup().get(segment.toUpperCase(java.util.Locale.ROOT));
+            if (!(next instanceof TreeCommand)) {
+                // SubConfigCmd children register under `<name>.YML`
+                // (see dispatchPromptAnvilInput note); probe the suffixed
+                // key when the bare key misses.
+                next = target.getCommandLookup()
+                        .get(segment.toUpperCase(java.util.Locale.ROOT) + ".YML");
+            }
             if (!(next instanceof TreeCommand tc)) {
                 RTP.log(Level.WARNING,
                         "menu open-action path segment '" + segment
@@ -1246,7 +1178,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * (S-004): missing builder, unknown path segment, unknown parameter,
      * builder exception, null model, or renderer exception.
      */
-    private boolean dispatchOpenParamPicker(UUID senderId,
+    // ADR-050 Stage 1b: package-private so MenuConcreteCommandLeavesB can call.
+    boolean dispatchOpenParamPicker(UUID senderId,
                                             MenuAction.OpenParamPicker picker,
                                             @Nullable Consumer<String> messageMethod) {
         if (renderer == null || paramPickerBuilder == null) {
@@ -1267,6 +1200,13 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             }
             CommandsAPICommand next = target.getCommandLookup()
                     .get(segment.toUpperCase(java.util.Locale.ROOT));
+            if (!(next instanceof TreeCommand)) {
+                // SubConfigCmd children register under `<name>.YML`
+                // (see dispatchPromptAnvilInput note); probe the suffixed
+                // key when the bare key misses.
+                next = target.getCommandLookup()
+                        .get(segment.toUpperCase(java.util.Locale.ROOT) + ".YML");
+            }
             if (!(next instanceof TreeCommand tc)) {
                 RTP.log(Level.WARNING,
                         "menu param-picker path segment '" + segment
@@ -1317,18 +1257,9 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     messageMethod);
             return false;
         }
-        try {
-            renderer.render(senderId, model);
-            return true;
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu param-picker render failed for " + senderId
-                            + " node=" + target.name() + " param=" + paramName
-                            + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
-                    "menu param-picker rejected: renderer failure", messageMethod);
-            return false;
-        }
+        return MenuDrawer.draw(renderer, senderId, model, messageMethod,
+                this::reject, "param-picker",
+                "node=" + target.name() + " param=" + paramName);
     }
 
     /**
@@ -1345,7 +1276,9 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * opener absent, unknown path segment, unknown parameter, or opener
      * threw / returned {@code false}.
      */
-    private boolean dispatchPromptAnvilInput(UUID senderId,
+    // ADR-050 Stage 2 (2026-05-24): promoted from `private` to package-
+    // private so the concrete `AnvilCmd` leaf in this package can invoke it.
+    boolean dispatchPromptAnvilInput(UUID senderId,
                                              MenuAction.PromptAnvilInput prompt,
                                              @Nullable Consumer<String> messageMethod) {
         if (anvilInputOpener == null) {
@@ -1364,6 +1297,22 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             }
             CommandsAPICommand next = target.getCommandLookup()
                     .get(segment.toUpperCase(java.util.Locale.ROOT));
+            if (!(next instanceof TreeCommand)) {
+                // Fallback for SubConfigCmd children: the per-file
+                // SubConfigCmd registers itself under
+                // `configParser.name.toLowerCase()` which carries the
+                // `.yml` suffix (see SubConfigCmd ctor + ConfigParser.name),
+                // so `commandLookup` exposes e.g. `"DEFAULT.YML"` -- not
+                // `"DEFAULT"`. The menu's slash-aware short-circuit emits
+                // path segments without the `.yml` suffix (e.g.
+                // `["config","regions","default1234"]`), which would
+                // otherwise fail the lookup and reject every per-region
+                // anvil edit click. Probe the `.yml`-suffixed key when the
+                // bare key misses; mirrors the same suffix-fallback in
+                // dispatchOpenConfigKey (lines 1782-1791).
+                String suffixed = segment.toUpperCase(java.util.Locale.ROOT) + ".YML";
+                next = target.getCommandLookup().get(suffixed);
+            }
             if (!(next instanceof TreeCommand tc)) {
                 RTP.log(Level.WARNING,
                         "menu anvil-input path segment '" + segment
@@ -1433,17 +1382,11 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@link #permissionProbeFactory}; a null probe is treated as deny-by-
      * default for the curated config surface (v3.7.1).
      */
+    // ADR-050 split: delegates to {@link #permissionGates}. Kept as a method
+    // so the existing 12 call sites in this file (and the leaf classes in
+    // this package via inherited access) need no churn.
     private boolean hasConfigViewPermission(UUID senderId) {
-        Predicate<String> probe = permissionProbeFactory.apply(senderId);
-        if (probe == null) return false;
-        try {
-            return probe.test(CONFIG_VIEW_PERMISSION);
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu config-view permission probe threw for " + senderId
-                            + ": " + e.getMessage(), e);
-            return false;
-        }
+        return permissionGates.hasConfigView(senderId);
     }
 
     /**
@@ -1452,7 +1395,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@link #configSubtreeBuilder}'s {@code buildSelector}. All failure paths
      * log WARN and reject with {@code menuInvalid} (S-004).
      */
-    private boolean dispatchOpenConfigSelector(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchOpenConfigSelector(UUID senderId,
                                                @Nullable Consumer<String> messageMethod) {
         // Staging-cart contract: returning to the file-selector page silently
         // drops any pending edits the player had staged for a previously-open
@@ -1495,17 +1439,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     messageMethod);
             return false;
         }
-        try {
-            renderer.render(senderId, model);
-            return true;
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu config-selector render failed for " + senderId
-                            + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
-                    "menu config-selector rejected: renderer failure", messageMethod);
-            return false;
-        }
+        return MenuDrawer.draw(renderer, senderId, model, messageMethod,
+                this::reject, "config-selector");
     }
 
     /**
@@ -1514,7 +1449,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@link #configSubtreeBuilder}'s {@code buildFile}. A {@code null}
      * return from the builder (unknown file name) is an S-004 reject path.
      */
-    private boolean dispatchOpenConfigFile(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchOpenConfigFile(UUID senderId,
                                            MenuAction.OpenConfigFile open,
                                            @Nullable Consumer<String> messageMethod) {
         if (renderer == null || configSubtreeBuilder == null) {
@@ -1560,17 +1496,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     messageMethod);
             return false;
         }
-        try {
-            renderer.render(senderId, model);
-            return true;
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu config-file render failed for " + senderId
-                            + " file=" + fileName + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
-                    "menu config-file rejected: renderer failure", messageMethod);
-            return false;
-        }
+        return MenuDrawer.draw(renderer, senderId, model, messageMethod,
+                this::reject, "config-file", "file=" + fileName);
     }
 
     /**
@@ -1690,7 +1617,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         return "";
     }
 
-    private boolean dispatchOpenConfigKey(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchOpenConfigKey(UUID senderId,
                                           MenuAction.OpenConfigKey open,
                                           @Nullable Consumer<String> messageMethod) {
         // [diag-staging-cart] Trace OpenConfigKey dispatch so the operator
@@ -1815,7 +1743,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@code /rtp menu config search}). Reuses the
      * {@link #dispatchPromptAnvilInput} reject paths.
      */
-    private boolean dispatchOpenConfigSearchPrompt(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchOpenConfigSearchPrompt(UUID senderId,
                                                    @Nullable Consumer<String> messageMethod) {
         if (!hasConfigViewPermission(senderId)) {
             RTP.log(Level.WARNING,
@@ -1845,7 +1774,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * return from the builder (e.g. empty / unresolvable query) is an S-004
      * reject path. Shape mirrors {@link #dispatchOpenConfigKey}.
      */
-    private boolean dispatchOpenConfigSearchResults(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchOpenConfigSearchResults(UUID senderId,
                                                     MenuAction.OpenConfigSearchResults search,
                                                     @Nullable Consumer<String> messageMethod) {
         if (renderer == null || configSearchBuilder == null) {
@@ -1887,18 +1817,9 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                             + ", page=" + page + ")", messageMethod);
             return false;
         }
-        try {
-            renderer.render(senderId, model);
-            return true;
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu config-search render failed for " + senderId
-                            + " query=" + query + " page=" + page
-                            + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
-                    "menu config-search rejected: renderer failure", messageMethod);
-            return false;
-        }
+        return MenuDrawer.draw(renderer, senderId, model, messageMethod,
+                this::reject, "config-search",
+                "query=" + query + " page=" + page);
     }
 
     // ------------------------------------------------------------------------
@@ -1914,17 +1835,9 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@link #ADMIN_MENU_PERMISSION}. Treats a null probe as deny-by-default
      * for the admin surface, matching {@link #hasConfigViewPermission}.
      */
+    // ADR-050 split: delegates to {@link #permissionGates}.
     private boolean hasAdminMenuPermission(UUID senderId) {
-        Predicate<String> probe = permissionProbeFactory.apply(senderId);
-        if (probe == null) return false;
-        try {
-            return probe.test(ADMIN_MENU_PERMISSION);
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu admin-panel permission probe threw for " + senderId
-                            + ": " + e.getMessage(), e);
-            return false;
-        }
+        return permissionGates.hasAdminMenu(senderId);
     }
 
     /**
@@ -1934,7 +1847,9 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@code buildAdminPanel}. All failure paths log WARN and reject with
      * {@code menuInvalid} (S-004).
      */
-    private boolean dispatchOpenAdminPanel(UUID senderId,
+    // ADR-050 (Proposed 2026-05-24): package-private for the concrete
+    // `/rtp menu admin` leaf. Permission gate stays inside.
+    boolean dispatchOpenAdminPanel(UUID senderId,
                                            @Nullable Consumer<String> messageMethod) {
         if (renderer == null || curatedPageBuilder == null) {
             RTP.log(Level.WARNING,
@@ -1969,17 +1884,58 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     messageMethod);
             return false;
         }
-        try {
-            renderer.render(senderId, model);
-            return true;
-        } catch (RuntimeException e) {
+        return MenuDrawer.draw(renderer, senderId, model, messageMethod,
+                this::reject, "admin-panel");
+    }
+
+    /**
+     * Dispatch for {@link MenuAction.OpenVisualizations}. Gates on
+     * {@link #ADMIN_MENU_PERMISSION} (same surface as
+     * {@link #dispatchOpenAdminPanel}), then routes through the curated-page
+     * builder's {@code buildVisualizations}. All failure paths log WARN and
+     * reject with {@code menuInvalid} (S-004).
+     */
+    // ADR-050 (Proposed 2026-05-24): package-private for the concrete
+    // `/rtp menu visualizations` and `/rtp visualization` leaves.
+    // Permission gate (rtp.menu.admin) stays inside.
+    boolean dispatchOpenVisualizations(UUID senderId,
+                                               @Nullable Consumer<String> messageMethod) {
+        if (renderer == null || curatedPageBuilder == null) {
             RTP.log(Level.WARNING,
-                    "menu admin-panel render failed for " + senderId
-                            + ": " + e.getMessage(), e);
+                    "menu visualizations received with curated-page builder disabled for "
+                            + senderId);
             reject(senderId, MessagesKeys.menuInvalid,
-                    "menu admin-panel rejected: renderer failure", messageMethod);
+                    "menu visualizations rejected: curated-page builder disabled",
+                    messageMethod);
             return false;
         }
+        if (!hasAdminMenuPermission(senderId)) {
+            RTP.log(Level.WARNING,
+                    "menu visualizations denied: " + senderId
+                            + " lacks " + ADMIN_MENU_PERMISSION);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu visualizations rejected: permission denied", messageMethod);
+            return false;
+        }
+        MenuModel model;
+        try {
+            model = curatedPageBuilder.buildVisualizations(senderId);
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "menu visualizations builder failed for " + senderId
+                            + ": " + e.getMessage(), e);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu visualizations rejected: builder failure", messageMethod);
+            return false;
+        }
+        if (model == null) {
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu visualizations rejected: builder returned null model",
+                    messageMethod);
+            return false;
+        }
+        return MenuDrawer.draw(renderer, senderId, model, messageMethod,
+                this::reject, "visualizations");
     }
 
     /**
@@ -1988,7 +1944,9 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * is the default landing for any menu viewer. All failure paths log WARN
      * and reject with {@code menuInvalid} (S-004).
      */
-    private boolean dispatchOpenFrontPage(UUID senderId,
+    // ADR-050 (Proposed 2026-05-24): package-private for the concrete
+    // `/rtp menu front` leaf.
+    boolean dispatchOpenFrontPage(UUID senderId,
                                           @Nullable Consumer<String> messageMethod) {
         if (renderer == null || curatedPageBuilder == null) {
             RTP.log(Level.WARNING,
@@ -2015,17 +1973,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     messageMethod);
             return false;
         }
-        try {
-            renderer.render(senderId, model);
-            return true;
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu front-page render failed for " + senderId
-                            + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
-                    "menu front-page rejected: renderer failure", messageMethod);
-            return false;
-        }
+        return MenuDrawer.draw(renderer, senderId, model, messageMethod,
+                this::reject, "front-page");
     }
 
     /**
@@ -2033,17 +1982,9 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@code false} on a {@link RuntimeException} from the probe (S-007:
      * an exception is treated as a denial).
      */
+    // ADR-050 split: delegates to {@link #permissionGates}.
     private boolean hasInfoPermission(UUID senderId) {
-        Predicate<String> probe = permissionProbeFactory.apply(senderId);
-        if (probe == null) return false;
-        try {
-            return probe.test("rtp.info");
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu info permission probe threw for " + senderId
-                            + ": " + e.getMessage(), e);
-            return false;
-        }
+        return permissionGates.hasInfo(senderId);
     }
 
     /**
@@ -2054,7 +1995,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@link MenuModel} to the renderer. All failure paths log WARN and
      * reject with {@code menuInvalid} (S-004).
      */
-    private boolean dispatchOpenInfo(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchOpenInfo(UUID senderId,
                                      MenuAction.OpenInfo action,
                                      @Nullable Consumer<String> messageMethod) {
         if (renderer == null || infoBookBuilder == null) {
@@ -2089,17 +2031,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     messageMethod);
             return false;
         }
-        try {
-            renderer.render(senderId, model);
-            return true;
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu info-book render failed for " + senderId
-                            + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
-                    "menu info-book rejected: renderer failure", messageMethod);
-            return false;
-        }
+        return MenuDrawer.draw(renderer, senderId, model, messageMethod,
+                this::reject, "info-book");
     }
 
     /**
@@ -2109,7 +2042,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@link MenuAction.RunRtpCommand}. No book is rendered; the player sees
      * the standard chat output. Failures log WARN + reject (S-004).
      */
-    private boolean dispatchSwitchInfoToText(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchSwitchInfoToText(UUID senderId,
                                              MenuAction.SwitchInfoToText action,
                                              @Nullable Consumer<String> messageMethod) {
         if (!hasInfoPermission(senderId)) {
@@ -2153,11 +2087,10 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      *       {@code MetricsSnapshot} integration in Stage 3 of
      *       {@code CHECKLIST-metrics-to-maps.md}). Denial logs WARN +
      *       rejects with {@code menuInvalid} (S-004).</li>
-     *   <li>Consumes the {@link ChartSpec} from the process-local
-     *       {@link ChartSpecTokens#instance() ChartSpecTokens singleton}.
-     *       Unknown / expired / mismatched-player tokens collapse to
-     *       {@code menuInvalid} (S-004), matching the stale-menu-redeem
-     *       behaviour.</li>
+     *   <li>Builds a {@link ChartSpec} inline from the action's
+     *       {@code (kind, regionName)} payload (ADR-050 Stage 3β: the
+     *       prior {@code ChartSpecTokens} round-trip is gone). Invalid
+     *       inputs collapse to {@code menuInvalid} (S-004).</li>
      *   <li>Hands off to {@link MapDispatch#paint(ChartSpec, UUID)}, which
      *       owns the {@link MessagesKeys#mapBindingMissing} /
      *       {@code mapResolverMissing} / {@code mapUnavailable} /
@@ -2179,14 +2112,18 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     messageMethod);
             return false;
         }
-        Optional<ChartSpec> resolved =
-                ChartSpecTokens.instance().consume(senderId, action.chartSpecToken());
-        if (resolved.isEmpty()) {
+        // ADR-050 Stage 3β: build the ChartSpec inline from (kind, regionName);
+        // the prior ChartSpecTokens round-trip is gone.
+        ChartSpec spec;
+        try {
+            spec = ChartSpec.of(action.kind(), action.regionName());
+        } catch (RuntimeException e) {
             RTP.log(Level.WARNING,
-                    "menu open-map rejected: unknown / expired / mismatched ChartSpec token "
-                            + action.chartSpecToken() + " for " + senderId);
+                    "menu open-map rejected: invalid ChartSpec (kind=" + action.kind()
+                            + ", regionName='" + action.regionName() + "') for " + senderId
+                            + ": " + e.getMessage(), e);
             reject(senderId, MessagesKeys.menuInvalid,
-                    "menu open-map rejected: unknown ChartSpec token",
+                    "menu open-map rejected: invalid ChartSpec",
                     messageMethod);
             return false;
         }
@@ -2196,7 +2133,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             // mapUnavailable / mapBusy) and returns false after notifying the
             // viewer through MessagesKeys. We do not reject() on its false
             // return: that would double-message the player.
-            return MapDispatch.paint(resolved.get(), senderId);
+            return MapDispatch.paint(spec, senderId);
         } catch (RuntimeException e) {
             // Defensive S-004: MapDispatch.paint is supposed to catch its
             // own RuntimeExceptions, but if a downstream binding leaks one
@@ -2272,6 +2209,38 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                         messageMethod);
             }
             String fileName = assembledPath.get(1);
+            // Multi-config directory routing (2026-05-23, follow-up to
+            // ADR-043 / multiconfig-menu wiring). When `assembledPath[1]`
+            // names a MultiConfigParser kind (`regions`, `worlds`, future
+            // `effects`) AND a third segment is present, the user is
+            // addressing a per-entry editor (e.g.
+            // `/rtp menu config regions default`). Route those to
+            // `dispatchOpenMultiConfigEntry` so the entry page is built by
+            // `MultiConfigMenuBuilder.buildEntry` (the cart-aware
+            // synthetic-fileName editor) - NOT through the generic
+            // TreeCommand pageBuilder render, which would land on the
+            // per-region `SubConfigCmd`'s flat-config view and produce a
+            // visually distinct (and feature-poor) page.
+            //
+            // Without this, two regressions appeared:
+            //   - issue A: built-in `default` rendered via the generic
+            //     tree walker (CommandTreeMenuBuilder.buildConfigFile),
+            //     while runtime-added `default1234` rendered via
+            //     MultiConfigMenuBuilder.buildEntry - two visibly
+            //     different editor styles for the "same kind" of entry.
+            //   - issues B/C: the STAGE-mode reopen from AnvilInputSession
+            //     emits `/rtp menu config regions default` to land back
+            //     on the entry editor with the cart surfaced; without
+            //     this branch the walker fell through to
+            //     dispatchOpenConfigFile("regions") and rejected with
+            //     "unknown file 'regions'".
+            if (assembledPath.size() >= 3
+                    && resolveMultiConfigParser(fileName) != null) {
+                String entryName = assembledPath.get(2);
+                return dispatchOpenMultiConfigEntry(senderId,
+                        new MenuAction.OpenMultiConfigEntry(fileName, entryName),
+                        messageMethod);
+            }
             String stagedParam = null;
             if (parameterValues != null) {
                 for (java.util.Map.Entry<String, java.util.List<String>> e
@@ -2316,7 +2285,10 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * config selector that {@code OpenConfigFile("regions/default")}
      * would otherwise try to resolve.
      */
-    private boolean reopenAfterCartOp(UUID senderId,
+    // Package-private so the concrete ConfigCmd leaf (in this package) can
+    // call it for slash-bearing `file=<kind>/<entry>` reopens after a STAGE
+    // anvil-confirm. ADR-050.
+    boolean reopenAfterCartOp(UUID senderId,
                                       String fileName,
                                       @Nullable Consumer<String> messageMethod) {
         int slash = fileName == null ? -1 : fileName.indexOf('/');
@@ -2353,17 +2325,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     "menu open rejected: builder returned null model", messageMethod);
             return false;
         }
-        try {
-            renderer.render(senderId, model);
-            return true;
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu render failed for " + senderId
-                            + " node=" + target.name() + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
-                    "menu open rejected: renderer failure", messageMethod);
-            return false;
-        }
+        return MenuDrawer.draw(renderer, senderId, model, messageMethod,
+                this::reject, "open", "node=" + target.name());
     }
 
     /**
@@ -2376,7 +2339,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * the cart (matching the user-confirmed proposal). All failure paths
      * log WARN and reject with {@code menuInvalid} (S-004).
      */
-    private boolean dispatchStageConfigValue(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchStageConfigValue(UUID senderId,
                                              MenuAction.StageConfigValue stage,
                                              @Nullable Consumer<String> messageMethod) {
         if (!hasConfigViewPermission(senderId)) {
@@ -2413,7 +2377,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@link #CONFIG_VIEW_PERMISSION}. No-op when the cart is empty, scoped
      * to a different file, or does not contain {@code paramName}.
      */
-    private boolean dispatchUnstageConfigValue(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchUnstageConfigValue(UUID senderId,
                                                MenuAction.UnstageConfigValue unstage,
                                                @Nullable Consumer<String> messageMethod) {
         if (!hasConfigViewPermission(senderId)) {
@@ -2449,7 +2414,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * shape. The cart is cleared atomically before the underlying command
      * runs, so a failed apply does not leave the cart half-applied.
      */
-    private boolean dispatchApplyStagedConfig(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchApplyStagedConfig(UUID senderId,
                                               MenuAction.ApplyStagedConfig apply,
                                               @Nullable Consumer<String> messageMethod) {
         if (!hasConfigViewPermission(senderId)) {
@@ -2498,7 +2464,18 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                 args[i++] = e.getKey() + "=" + e.getValue();
             }
         }
-        return dispatchRun(senderId, new MenuAction.RunRtpCommand(args), messageMethod);
+        boolean ok = dispatchRun(senderId, new MenuAction.RunRtpCommand(args), messageMethod);
+        // ADR-050 follow-up (2026-05-24): after a successful apply, re-open
+        // the curated file (or multi-config entry) page so the player lands
+        // back on the editor with the cart cleared, instead of being left
+        // with an empty/closed book. Mirrors stage / unstage / discard's
+        // reopen pattern. If the underlying dispatch failed, the user has
+        // already received the failure reject message; don't pile on a
+        // second navigation attempt.
+        if (ok) {
+            reopenAfterCartOp(senderId, apply.fileName(), messageMethod);
+        }
+        return ok;
     }
 
     /**
@@ -2507,7 +2484,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * the curated {@code /rtp config <file>} page. Gates on
      * {@link #CONFIG_VIEW_PERMISSION}.
      */
-    private boolean dispatchDiscardStagedConfig(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchDiscardStagedConfig(UUID senderId,
                                                 MenuAction.DiscardStagedConfig discard,
                                                 @Nullable Consumer<String> messageMethod) {
         if (!hasConfigViewPermission(senderId)) {
@@ -2576,7 +2554,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * flipped before the selector is re-rendered. All failure paths log
      * WARN + reject with {@code menuInvalid} (S-004).
      */
-    private boolean dispatchOpenMultiConfigSelector(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchOpenMultiConfigSelector(UUID senderId,
                                                     MenuAction.OpenMultiConfigSelector open,
                                                     @Nullable Consumer<String> messageMethod) {
         if (renderer == null || multiConfigBuilder == null) {
@@ -2646,17 +2625,9 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     messageMethod);
             return false;
         }
-        try {
-            renderer.render(senderId, model);
-            return true;
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu multiconfig-selector render failed for " + senderId
-                            + " kind=" + effectiveKind + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
-                    "menu multiconfig-selector rejected: renderer failure", messageMethod);
-            return false;
-        }
+        return MenuDrawer.draw(renderer, senderId, model, messageMethod,
+                this::reject, "multiconfig-selector",
+                "kind=" + effectiveKind);
     }
 
     /**
@@ -2676,7 +2647,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * routes through {@link io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigMenuBuilder#buildEntry}.
      * An unknown kind or unknown entry name is an S-004 reject path.
      */
-    private boolean dispatchOpenMultiConfigEntry(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchOpenMultiConfigEntry(UUID senderId,
                                                  MenuAction.OpenMultiConfigEntry open,
                                                  @Nullable Consumer<String> messageMethod) {
         if (renderer == null || multiConfigBuilder == null) {
@@ -2736,17 +2708,9 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     messageMethod);
             return false;
         }
-        try {
-            renderer.render(senderId, model);
-            return true;
-        } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
-                    "menu multiconfig-entry render failed for " + senderId
-                            + " kind=" + kind + " entry=" + entry + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
-                    "menu multiconfig-entry rejected: renderer failure", messageMethod);
-            return false;
-        }
+        return MenuDrawer.draw(renderer, senderId, model, messageMethod,
+                this::reject, "multiconfig-entry",
+                "kind=" + kind + " entry=" + entry);
     }
 
     /**
@@ -2771,7 +2735,8 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * successful REMOVE (so the next click is a normal navigation by
      * default).
      */
-    private boolean dispatchMultiConfigMutate(UUID senderId,
+    // ADR-050 Stage 1b: package-private.
+    boolean dispatchMultiConfigMutate(UUID senderId,
                                               MenuAction.MultiConfigMutate mutate,
                                               @Nullable Consumer<String> messageMethod) {
         if (renderer == null || multiConfigBuilder == null) {
@@ -2825,6 +2790,17 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                         "menu multiconfig-mutate rejected: remove failure", messageMethod);
                 return false;
             }
+            // Mirror SubConfigCmd's TreeCommand maintenance: drop the
+            // per-entry child SubConfigCmd from the parent's commandLookup
+            // so subsequent /rtp config <kind> <entry> ... no longer
+            // resolves (and the menu's TreeCommand path-walk for
+            // `<kind>/<entry>` reports unknown segment, the truthful
+            // post-remove state). Without this the stale child remained
+            // navigable after a menu-driven REMOVE.
+            unregisterParentChild(kind, entry);
+            // Symmetric eager mirror unregister - see the ADD branch
+            // comment for rationale.
+            unregisterMirrorChild(kind, entry);
             // Clear remove-mode for this kind so the next click is normal nav.
             removeModeKinds.computeIfPresent(senderId, (id, s) -> {
                 s.remove(kind.toLowerCase(java.util.Locale.ROOT));
@@ -2851,6 +2827,28 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             if (lowerKind.equals("regions")) {
                 tryAmendNetherEndSeed(parser, entry);
             }
+            // Mirror SubConfigCmd lines 234-237 (the `/rtp config <kind>
+            // add=<entry>` path): after parser.addParser() succeeds, also
+            // register a child SubConfigCmd on the parent
+            // `/rtp config <kind>` TreeCommand. Without this the new entry
+            // exists on disk + in the parser map but the command tree
+            // doesn't know about it, so the menu's path walker
+            // (dispatchOpenConfigKey) reports
+            //   "menu anvil-input path segment '<entry>' did not resolve
+            //    to a TreeCommand under <kind>"
+            // and rejects the click as `unknown path segment`. This is
+            // the same regression a /rtp config regions add=foo call
+            // would suffer if SubConfigCmd skipped its addSubCommand
+            // step.
+            registerParentChild(kind, parser, entry);
+            // Also eagerly mirror the new child onto the `/rtp menu config
+            // <kind>` mirror subtree so navigation through the menu sees
+            // it without relying on a lazy lookup-time merge - the lazy
+            // path was a second source of truth and introduced subtle
+            // ordering bugs when callers of `addSubCommand` raced with
+            // the merge-on-read fallback. Now both the real tree and the
+            // mirror tree are mutated eagerly and symmetrically on ADD
+            // (and REMOVE below).
         }
         // Re-render the selector so the user sees the new entry list.
         return dispatchOpenMultiConfigSelector(senderId,
@@ -2891,6 +2889,226 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu multiconfig-mutate ADD post-amend failed for entry="
                             + entry + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Locate the parent {@code SubConfigCmd} for {@code /rtp config <kind>}
+     * by walking {@code RTP.baseCommand -> "config" -> "<kind>"}. Returns
+     * {@code null} when any link in the chain is missing (e.g. the base
+     * command isn't wired in tests, or the platform hasn't finished
+     * registering {@code ConfigCmd.addCommands()} yet). The lookup is
+     * case-insensitive on the {@code kind} input: {@code TreeCommand}
+     * stores keys uppercased (see {@code ConfigCmd.java:67}), so we
+     * upper-case before the second {@code get}.
+     */
+    private static @Nullable io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand
+            resolveParentConfigCmd(String kind) {
+        if (kind == null || kind.isEmpty()) return null;
+        if (RTP.baseCommand == null) return null;
+        try {
+            CommandsAPICommand configCmd =
+                    RTP.baseCommand.getCommandLookup().get("CONFIG");
+            if (!(configCmd instanceof io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand configTree)) {
+                return null;
+            }
+            CommandsAPICommand kindCmd = configTree.getCommandLookup()
+                    .get(kind.toUpperCase(java.util.Locale.ROOT));
+            if (kindCmd instanceof io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand kindTree) {
+                return kindTree;
+            }
+            return null;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * After a menu-driven ADD on the {@code <kind>} multi-config parser
+     * succeeds, mirror the post-{@code parser.addParser(target)} steps
+     * from {@code SubConfigCmd} lines 234-237: resolve the freshly added
+     * {@code ConfigParser}, construct a child {@code SubConfigCmd} bound
+     * to the {@code /rtp config <kind>} parent, prime its parameters,
+     * and register it via {@code addSubCommand}. Failures are logged
+     * WARN and swallowed; the parser-side ADD already succeeded, the
+     * row will still appear in the selector, and a {@code /rtp reload}
+     * would rebuild the tree from scratch.
+     */
+    private void registerParentChild(
+            String kind,
+            io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser,
+            String entry) {
+        if (kind == null || entry == null || parser == null) return;
+        io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand parent =
+                resolveParentConfigCmd(kind);
+        if (parent == null) return;
+        try {
+            io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> child = parser.getParser(entry);
+            if (child == null) return;
+            io.github.dailystruggle.rtp.common.commands.config.SubConfigCmd childCmd =
+                    new io.github.dailystruggle.rtp.common.commands.config.SubConfigCmd(
+                            parent, child.name, child);
+            childCmd.addParameters();
+            parent.addSubCommand(childCmd);
+            // Parity with SubConfigCmd.addParameters() / ADD branch:
+            // register a bare (suffix-stripped) {@link
+            // SubConfigCmd.Alias} so `/rtp config <kind> <entry> ...`
+            // resolves without the .yml suffix. Route through
+            // `addSubCommand` (the supported registration API) rather
+            // than touching the parent's `commandLookup` directly -
+            // a previous version of this helper poked the map straight
+            // from outside the owning class, which both bypassed the
+            // framework's bookkeeping and made the registration
+            // invisible to anything that walks `getCommandLookup`'s
+            // structured shape (e.g. mirror snapshotters).
+            String bare = child.name.replace(".yml", "").replace(".YML", "");
+            if (!bare.equalsIgnoreCase(child.name)) {
+                parent.addSubCommand(
+                        new io.github.dailystruggle.rtp.common.commands.config.SubConfigCmd.Alias(
+                                parent, bare, childCmd));
+            }
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-mutate ADD tree-sync failed for kind="
+                            + kind + " entry=" + entry + ": " + e.getMessage(), e);
+        }
+        // Eagerly mirror the freshly registered child(ren) onto the
+        // `/rtp menu config <kind>` shadow subtree so menu navigation
+        // resolves the new entry without any lazy merge-on-read in
+        // `MenuMirrorSubcommand.getCommandLookup()`. Failures here are
+        // logged WARN and swallowed for the same reason as the real-tree
+        // branch above: a `/rtp reload` would rebuild both trees.
+        registerMirrorChild(kind, entry);
+    }
+
+    /**
+     * Walk {@code RTP.baseCommand -> "menu" -> "config" -> "<kind>"} and
+     * return the {@link MenuMirrorSubcommand} parent for the multi-config
+     * subtree, or {@code null} when any link is missing. The mirror tree
+     * is seeded asynchronously by {@link #seedMirrorTree()} after a 10-
+     * tick delay, so this returns {@code null} when called before the
+     * seed pulse has run (e.g. in a unit test that doesn't tick the
+     * scheduler) - the caller treats that as a soft failure and only
+     * logs WARN, matching the real-tree counterpart.
+     */
+    private @Nullable MenuMirrorSubcommand resolveMenuMirrorParent(String kind) {
+        if (kind == null || kind.isEmpty()) return null;
+        try {
+            CommandsAPICommand configMirror =
+                    getCommandLookup().get("CONFIG");
+            if (!(configMirror instanceof MenuMirrorSubcommand configMirrorTree)) {
+                return null;
+            }
+            CommandsAPICommand kindMirror = configMirrorTree.getCommandLookup()
+                    .get(kind.toUpperCase(java.util.Locale.ROOT));
+            if (kindMirror instanceof MenuMirrorSubcommand kindMirrorTree) {
+                return kindMirrorTree;
+            }
+            return null;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * Mint and {@link TreeCommand#addSubCommand} a fresh
+     * {@link MenuMirrorSubcommand} under the {@code /rtp menu config
+     * <kind>} mirror parent that targets the newly registered child
+     * {@link io.github.dailystruggle.rtp.common.commands.config.SubConfigCmd}
+     * on the real {@code /rtp config <kind>} tree (and its bare-name
+     * {@code Alias}, if distinct). Required so that the player command
+     * {@code /rtp menu config <kind> <entry> ...} walks through the mirror
+     * into a leaf that triggers {@link #renderForPath} with the matching
+     * path - without it the mirror would only learn about the new entry
+     * via a lazy lookup-time merge, which we deliberately removed as
+     * part of dropping the second source of truth.
+     */
+    private void registerMirrorChild(String kind, String entry) {
+        if (kind == null || entry == null) return;
+        MenuMirrorSubcommand mirrorParent = resolveMenuMirrorParent(kind);
+        if (mirrorParent == null) return;
+        io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand realParent =
+                resolveParentConfigCmd(kind);
+        if (realParent == null) return;
+        try {
+            Map<String, CommandsAPICommand> realChildren = realParent.getCommandLookup();
+            if (realChildren == null) return;
+            Map<String, CommandsAPICommand> mirrorChildren = mirrorParent.getCommandLookup();
+            String bare = entry.replace(".yml", "").replace(".YML", "");
+            String[] candidateKeys = bare.equalsIgnoreCase(entry)
+                    ? new String[]{entry, entry + ".yml"}
+                    : new String[]{bare, bare + ".yml"};
+            for (String candidate : candidateKeys) {
+                String key = candidate.toUpperCase(java.util.Locale.ROOT);
+                if (mirrorChildren.containsKey(key)) continue;
+                CommandsAPICommand realChild = realChildren.get(key);
+                if (!(realChild instanceof io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand realChildTree)) {
+                    continue;
+                }
+                List<String> childPath = List.of("config", kind, candidate);
+                mirrorParent.addSubCommand(
+                        new MenuMirrorSubcommand(this, mirrorParent, realChildTree, childPath));
+            }
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-mutate ADD mirror-sync failed for kind="
+                            + kind + " entry=" + entry + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Symmetric counterpart to {@link #registerMirrorChild}: drop the
+     * mirror children for {@code <entry>} (both bare and {@code .yml}-
+     * suffixed forms, uppercased) from the {@code /rtp menu config
+     * <kind>} mirror parent so post-REMOVE menu walks miss truthfully.
+     */
+    private void unregisterMirrorChild(String kind, String entry) {
+        if (kind == null || entry == null) return;
+        MenuMirrorSubcommand mirrorParent = resolveMenuMirrorParent(kind);
+        if (mirrorParent == null) return;
+        try {
+            Map<String, CommandsAPICommand> lookup = mirrorParent.getCommandLookup();
+            String bare = entry.replace(".yml", "").replace(".YML", "");
+            lookup.remove(bare);
+            lookup.remove(bare.toUpperCase(java.util.Locale.ROOT));
+            lookup.remove(bare + ".yml");
+            lookup.remove((bare + ".yml").toUpperCase(java.util.Locale.ROOT));
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-mutate REMOVE mirror-sync failed for kind="
+                            + kind + " entry=" + entry + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Symmetric counterpart to {@link #registerParentChild}: after a
+     * menu-driven REMOVE on the {@code <kind>} multi-config parser
+     * succeeds, drop the per-entry child from the parent's
+     * {@code commandLookup} so subsequent path-walk lookups for
+     * {@code /rtp config <kind> <entry> ...} miss (matching the
+     * post-remove disk state). Mirrors {@code SubConfigCmd} line 226
+     * ({@code commandLookup.remove(target)}). {@code TreeCommand}
+     * stores keys uppercased, so probe both the raw entry name and
+     * its {@code .yml}-suffixed form (uppercased) - {@code SubConfigCmd}
+     * registers under {@code configParser.name} which carries the
+     * {@code .yml} suffix.
+     */
+    private void unregisterParentChild(String kind, String entry) {
+        if (kind == null || entry == null) return;
+        io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand parent =
+                resolveParentConfigCmd(kind);
+        if (parent == null) return;
+        try {
+            Map<String, CommandsAPICommand> lookup = parent.getCommandLookup();
+            String bare = entry.replace(".yml", "").replace(".YML", "");
+            lookup.remove(bare);
+            lookup.remove(bare.toUpperCase(java.util.Locale.ROOT));
+            lookup.remove(bare + ".yml");
+            lookup.remove((bare + ".yml").toUpperCase(java.util.Locale.ROOT));
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-mutate REMOVE tree-sync failed for kind="
+                            + kind + " entry=" + entry + ": " + e.getMessage(), e);
         }
     }
 
@@ -2941,18 +3159,19 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         }
     }
 
-    private static @Nullable String extractToken(Map<String, List<String>> parameterValues) {
-        if (parameterValues == null) return null;
-        List<String> vs = parameterValues.get(PARAM_TOKEN);
-        if (vs != null && !vs.isEmpty() && vs.get(0) != null && !vs.get(0).isEmpty()) {
-            return vs.get(0);
-        }
-        // Fallback: commands-api may key the bare arg under the literal name.
-        vs = parameterValues.get("menu");
-        if (vs != null && !vs.isEmpty() && vs.get(0) != null && !vs.get(0).isEmpty()) {
-            return vs.get(0);
-        }
-        return null;
+
+    /**
+     * ADR-050 Stage 1b: package-private wrapper around the private
+     * {@link #reject} so concrete-command leaves
+     * (see {@link MenuConcreteCommandLeavesB}) can reject malformed inputs
+     * (missing required parameters) before constructing a {@code MenuAction}
+     * record whose canonical constructor would throw
+     * {@code IllegalArgumentException} on empty strings.
+     */
+    void rejectMenuInvalid(@Nullable UUID senderId,
+                           String logMessage,
+                           @Nullable Consumer<String> messageMethod) {
+        reject(senderId, MessagesKeys.menuInvalid, logMessage, messageMethod);
     }
 
     private void reject(@Nullable UUID senderId,
@@ -2973,8 +3192,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
 
     private static String defaultFor(MessagesKeys key) {
         return switch (key) {
-            case menuInvalid -> "Invalid menu token.";
-            case menuExpired -> "That menu has expired — please re-open it.";
+            case menuInvalid -> "Invalid menu command.";
             case menuUnknownPlayer -> "Menus may only be used by online players.";
             default -> key.name();
         };

@@ -67,10 +67,9 @@ final class FrontPageBuilderTest {
     @Test
     @DisplayName("Player view: Teleport + Help are always present; no admin rows")
     void playerView_alwaysHasTeleportAndHelp() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
 
-        MenuModel model = new FrontPageBuilder(registry)
+        MenuModel model = new FrontPageBuilder()
                 .build(root, UUID.randomUUID(), perm -> false);
 
         // Teleport row: RunRtpCommand([]) — bare /rtp execute, args are
@@ -92,11 +91,10 @@ final class FrontPageBuilderTest {
     @Test
     @DisplayName("Player view: region row hidden when region parameter is absent")
     void playerView_regionRowHidden_whenParamMissing() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         // No parameters on the root.
 
-        MenuModel model = new FrontPageBuilder(registry)
+        MenuModel model = new FrontPageBuilder()
                 .build(root, UUID.randomUUID(), perm -> false);
 
         assertNull(findOpenParamPicker(model, "region"),
@@ -108,11 +106,10 @@ final class FrontPageBuilderTest {
     @Test
     @DisplayName("Player view: region row hidden when parameter has zero suggestions")
     void playerView_regionRowHidden_whenNoSuggestions() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         root.getParameterLookup().put("region", new FixedParam("", Set.of()));
 
-        MenuModel model = new FrontPageBuilder(registry)
+        MenuModel model = new FrontPageBuilder()
                 .build(root, UUID.randomUUID(), perm -> false);
 
         assertNull(findOpenParamPicker(model, "region"),
@@ -122,14 +119,13 @@ final class FrontPageBuilderTest {
     @Test
     @DisplayName("Player view: region / biome rows appear when parameter has suggestions")
     void playerView_regionAndBiomeRows_appear() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         root.getParameterLookup().put("region",
                 new FixedParam("", Set.of("default")));
         root.getParameterLookup().put("biome",
                 new FixedParam("", Set.of("plains", "forest")));
 
-        MenuModel model = new FrontPageBuilder(registry)
+        MenuModel model = new FrontPageBuilder()
                 .build(root, UUID.randomUUID(), perm -> false);
 
         MenuAction regionAction = findOpenParamPicker(model, "region");
@@ -147,7 +143,6 @@ final class FrontPageBuilderTest {
     @Test
     @DisplayName("Admin view: replaces player picker block with a single OpenAdminPanel entry row")
     void adminView_emitsSingleAdminEntryRow() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         // Subcommand registration is irrelevant for the front-page collapse:
         // the panel-entry row is unconditional in admin view.
@@ -157,7 +152,7 @@ final class FrontPageBuilderTest {
         // render the picker rows — admin viewers descend into the panel.
         root.getParameterLookup().put("region", new FixedParam("", Set.of("default")));
 
-        MenuModel model = new FrontPageBuilder(registry)
+        MenuModel model = new FrontPageBuilder()
                 .build(root, UUID.randomUUID(),
                         perm -> "rtp.menu.admin".equals(perm));
 
@@ -188,10 +183,9 @@ final class FrontPageBuilderTest {
     @Test
     @DisplayName("A throwing permission probe degrades to player view (no admin entry row)")
     void throwingPermissionProbe_yieldsPlayerView() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
 
-        MenuModel model = new FrontPageBuilder(registry).build(
+        MenuModel model = new FrontPageBuilder().build(
                 root, UUID.randomUUID(),
                 perm -> { throw new RuntimeException("boom"); });
 
@@ -206,11 +200,10 @@ final class FrontPageBuilderTest {
     @Test
     @DisplayName("Token registry receives one mint per clickable fragment")
     void tokensMinted_perClickableFragment() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         UUID viewer = UUID.randomUUID();
 
-        MenuModel model = new FrontPageBuilder(registry)
+        MenuModel model = new FrontPageBuilder()
                 .build(root, viewer, perm -> false);
 
         // Count clickable fragments (action != null) on the (single) page.

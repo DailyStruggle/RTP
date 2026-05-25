@@ -44,10 +44,9 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
                 new PrefabIdParameter(PrefabCommand.PERMISSION,
                         "bundled prefab id",
                         (uuid, s) -> true));
-        addParameter("token",
-                new PrefabTokenParameter(PrefabCommand.PERMISSION,
-                        "confirmation token from /rtp admin prefab apply",
-                        (uuid, s) -> true));
+        // Token-removal (2026-05-24, mirrors ADR-050): the opaque `token=`
+        // parameter is gone. The pending diff is resolved from
+        // (callerId, prefabId) via PrefabNonceStore.consumeByCaller.
     }
 
     @Override
@@ -75,48 +74,23 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
             return false;
         }
         List<String> idValues = parameterValues == null ? null : parameterValues.get("id");
-        List<String> tokenValues = parameterValues == null ? null : parameterValues.get("token");
         String prefabId = (idValues == null || idValues.isEmpty()) ? null : idValues.get(0);
-        String token = (tokenValues == null || tokenValues.isEmpty()) ? null : tokenValues.get(0);
         if (prefabId == null || prefabId.isEmpty()) {
-            send(callerId, "&cUsage: &f/rtp admin prefab confirm id=<id> [token=<token>]");
+            send(callerId, "&cUsage: &f/rtp admin prefab confirm id=<id>");
             return false;
         }
-        // Token is optional: when omitted (menu Confirm row dispatch), the
-        // store resolves the newest caller-bound entry. The opaque nonce
-        // was a chat-path replay defense only; clicks in the curated book
-        // menu are already caller-bound by Bukkit's command sender, so
-        // forcing the user to copy a long token into the menu flow is
-        // redundant and was reported as a UX defect (2026-05-22).
-        PrefabNonceStore.ConsumeResult cr = (token == null || token.isEmpty())
-                ? nonceStore.consumeByCaller(callerId, prefabId)
-                : nonceStore.consume(token, callerId, prefabId);
+        // Token-removal (2026-05-24, mirrors ADR-050): the pending diff is
+        // keyed solely on (callerId, prefabId). No opaque nonce, no TTL,
+        // no replay surface — the command sender is the trust boundary.
+        PrefabNonceStore.ConsumeResult cr = nonceStore.consumeByCaller(callerId, prefabId);
         switch (cr.kind()) {
             case NOT_FOUND:
                 RTP.log(Level.WARNING,
                         "[prefab] confirm rejected NOT_FOUND: caller=" + callerId
-                                + " prefab=" + prefabId + " token=" + token);
-                send(callerId, "&cNo such pending confirmation. Tokens are single-use and "
-                        + "expire after ~" + (PrefabNonceStore.DEFAULT_TTL_MILLIS / 1000) + "s.");
-                return false;
-            case EXPIRED:
-                RTP.log(Level.WARNING,
-                        "[prefab] confirm rejected EXPIRED: caller=" + callerId
                                 + " prefab=" + prefabId);
-                send(callerId, "&cConfirmation token expired. Re-run "
-                        + "&f/rtp admin prefab apply " + prefabId + "&c.");
-                return false;
-            case WRONG_CALLER:
-                RTP.log(Level.WARNING,
-                        "[prefab] confirm rejected WRONG_CALLER: caller=" + callerId
-                                + " prefab=" + prefabId);
-                send(callerId, "&cThat confirmation token belongs to a different admin.");
-                return false;
-            case WRONG_PREFAB:
-                RTP.log(Level.WARNING,
-                        "[prefab] confirm rejected WRONG_PREFAB: caller=" + callerId
-                                + " prefab=" + prefabId);
-                send(callerId, "&cThat confirmation token is for a different prefab.");
+                send(callerId, "&cNo pending confirmation for prefab &f" + prefabId
+                        + "&c. Run &f/rtp admin prefab apply id=" + prefabId
+                        + "&c first.");
                 return false;
             case OK:
                 break;

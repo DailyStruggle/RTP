@@ -1,6 +1,6 @@
 # Velocity proxy-a config. Modern forwarding; shared secret in
 # /server/forwarding.secret (mounted from devstack/shared/forwarding.secret).
-config-version = "2.7"
+config-version = "2.8"
 bind = "0.0.0.0:25577"
 motd = "<bold><red>RTP devstack proxy-a"
 show-max-players = 20
@@ -55,3 +55,16 @@ forced-hosts = {}
 	port = 25577
 	map = "Velocity"
 	show-plugins = false
+
+[packet-limiter]
+	#Size of the moving time window in seconds used to calculate average rates.
+	#A larger window tolerates short bursts while still enforcing the configured limits over time.
+	interval = 7
+	#Maximum average number of packets per second a client may send. -1 disables this check.
+	packets-per-second = -1
+	#Maximum average number of compressed (on-wire) bytes per second a client may send. -1 disables this check.
+	bytes-per-second = -1
+	#Maximum average number of decompressed bytes per second a client may send.
+	#Protects against compression bomb attacks where small packets expand to excessive sizes after decompression.
+	#-1 disables this check.
+	decompressed-bytes-per-second = 5242880

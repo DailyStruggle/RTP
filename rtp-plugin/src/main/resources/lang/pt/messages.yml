@@ -116,7 +116,7 @@ estadoEscaneamento: "&a[P0] concluídos [scan_chunks] / [scan_totalChunks] chunk
 # ###############################################################################
 # Seção 7: Comando Info
 # ###############################################################################
-tituloInfo: "&a======Informações do RTP======"
+tituloInfo: "&a&l/rtp info"
 infoTickets: "&7Tickets de chunk ativos globais: #7E9CC8[tickets]"
 # infoTeletransportes: deduplicado com infoPendingTeleports no bloco Health (esvaziado por compatibilidade com sobrescritas de locale).
 infoTeletransportes: ""
@@ -204,8 +204,6 @@ teste_descricao: "testar funcionalidades do RTP"
 # Estas chaves não são traduzidas em lang/pt/messages.lang.yml, portanto usam-se
 # os nomes canônicos em inglês (fallback ao baseline).
 menuInvalid: "&c[P0] esse link de menu não é válido."
-# Sent when a menu token has expired or was already consumed.
-menuExpired: "&c[P0] esse link de menu expirou. Reabra o menu."
 # Enviado quando um resgate de menu não consegue resolver o UUID do jogador chamador.
 menuUnknownPlayer: "&c[P0] os links de menu só podem ser usados por jogadores no jogo."
 # Modelo de tooltip quando não há comentário YAML disponível para um parâmetro. Marcador: [type] - o tipo declarado do parâmetro.
@@ -264,6 +262,8 @@ menuAdminPanelRowRegions: "#5FB3B3▶ regions"
 menuAdminPanelHoverRegions: "&7add, remove, or edit per-region configs"
 menuAdminPanelRowWorlds: "#5FB3B3▶ worlds"
 menuAdminPanelHoverWorlds: "&7add, remove, or edit per-world configs"
+menuAdminPanelRowEffects: "#5FB3B3▶ effects"
+menuAdminPanelHoverEffects: "&7add, remove, or edit per-group teleport effects"
 menuAdminPanelRowInfo: "&b▶ server info"
 menuAdminPanelHoverInfo: "&7show plugin version, region counts, and queue state"
 menuAdminPanelRowDiagnostics: "&c▶ full diagnostics"
@@ -277,6 +277,25 @@ menuAdminPanelHoverReload: "&7reloads all config files; in-flight teleports may 
 menuAdminPanelRowBrowse: "&b▶ browse all commands"
 menuAdminPanelHoverBrowse: "&7open the reflected /rtp command tree"
 menuAdminPanelRowBack: "&7« back"
+# --- Visualizations submenu (admin map of bad locations per region) ---
+# Admin-panel row: open the Visualizations submenu. No placeholders.
+menuAdminPanelRowVisualizations: "#5FB3B3▶ visualizations"
+# Hover text for the admin-panel Visualizations row. No placeholders.
+menuAdminPanelHoverVisualizations: "&7open maps and other operator-facing visualizations"
+# Section divider above the Visualizations block on the admin panel.
+menuAdminPanelSectionVisualizations: "&8» &7visualizations"
+# Non-clickable title row at the top of the Visualizations submenu.
+menuVisualizationsTitle: "#9D7CD8&l⌖ visualizations"
+# Non-clickable hint row below the title.
+menuVisualizationsHint: "&7pick a region to view its bad-locations map"
+# Visualizations row template; [region] - region name.
+menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- region shape map"
+# Hover text for a Visualizations region row; [region] - region name.
+menuVisualizationsHoverRegion: "&7open a map showing bad locations in &b[region]"
+# Non-clickable hint row shown when no regions are configured.
+menuVisualizationsEmpty: "&7(no regions configured)"
+# Visualizations submenu back row (returns to the admin panel).
+menuVisualizationsRowBack: "&7« back"
 # --- Admin panel Setup section: curated prefabs (PROPOSAL-admin-panel-prefabs.md v3.1) ---
 # Section divider above the Setup (quick start) block on the admin panel.
 menuAdminPanelSectionSetup: "&8» &7setup (quick start)"

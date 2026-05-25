@@ -13,7 +13,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -127,7 +126,7 @@ class PrefabCommandTest {
     }
 
     @Test
-    void apply_knownId_mintsNonceWithCorrectBinding() {
+    void apply_knownId_stashesPendingDiffWithCorrectBinding() {
         PrefabNonceStore store = new PrefabNonceStore();
         PrefabApplyCmd apply = new PrefabApplyCmd(null, store);
         UUID caller = UUID.randomUUID();
@@ -140,7 +139,7 @@ class PrefabCommandTest {
     }
 
     @Test
-    void apply_identityOverlay_stillMintsNonce_withEmptyDiff() {
+    void apply_identityOverlay_stillStashesPending_withEmptyDiff() {
         PrefabNonceStore store = new PrefabNonceStore();
         PrefabApplyCmd apply = new PrefabApplyCmd(null, store);
         UUID caller = UUID.randomUUID();
@@ -149,28 +148,32 @@ class PrefabCommandTest {
         params.put("id", List.of("survival-default"));
         boolean result = apply.onCommand(caller, params, null);
         assertTrue(result);
-        // identity overlay produces an empty per-file diff, but the nonce is
-        // still minted so the confirmation flow remains uniform.
+        // identity overlay produces an empty per-file diff, but the pending
+        // entry is still stashed so the confirmation flow remains uniform.
         assertEquals(1, store.size());
     }
 
     // --- PrefabConfirmCmd: nonce semantics -----------------------------------
 
+    // Post-token-removal (2026-05-24, mirrors ADR-050): the pending diff is
+    // keyed solely on (callerId, prefabId). No opaque token, no TTL, no
+    // wrong-caller / wrong-prefab / expired arms — those concerns are
+    // collapsed into the trust boundary of the command sender.
+
     @Test
-    void confirm_validToken_isAcceptedAndConsumed() {
+    void confirm_pendingForCaller_isAcceptedAndConsumed() {
         PrefabNonceStore store = new PrefabNonceStore();
         UUID caller = UUID.randomUUID();
         accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
-        PrefabNonceStore.Entry e = store.mint(caller, "low-performance",
+        store.mint(caller, "low-performance",
                 java.util.Collections.singletonMap("performance",
                         List.of(new PrefabApplier.Change("queue.maxSize", null, 50))));
         PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
         Map<String, List<String>> params = new HashMap<>();
         params.put("id", List.of("low-performance"));
-        params.put("token", List.of(e.token()));
         boolean result = confirm.onCommand(caller, params, null);
-        assertTrue(result, "valid confirm must succeed (4a stub returns true on accepted)");
-        assertEquals(0, store.size(), "nonce must be consumed after successful confirm");
+        assertTrue(result, "valid confirm must succeed (caller-bound resolution)");
+        assertEquals(0, store.size(), "pending entry must be consumed after successful confirm");
     }
 
     @Test
@@ -178,72 +181,51 @@ class PrefabCommandTest {
         PrefabNonceStore store = new PrefabNonceStore();
         UUID caller = UUID.randomUUID();
         accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
-        PrefabNonceStore.Entry e = store.mint(caller, "low-performance", Map.of());
+        store.mint(caller, "low-performance", Map.of());
         PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
         Map<String, List<String>> params = new HashMap<>();
         params.put("id", List.of("low-performance"));
-        params.put("token", List.of(e.token()));
         assertTrue(confirm.onCommand(caller, params, null));
-        // Replay with same token must fail.
+        // A second confirm with no fresh apply must fail (single-use).
         assertFalse(confirm.onCommand(caller, params, null),
-                "single-use nonce must not be replayable");
+                "caller-bound entry is single-use; replay must not succeed");
     }
 
     @Test
-    void confirm_wrongCaller_rejected_andTokenIsBurned() {
-        PrefabNonceStore store = new PrefabNonceStore();
-        UUID minter = UUID.randomUUID();
-        UUID interloper = UUID.randomUUID();
-        accessor.addPlayer(new MockRTPPlayer(minter, "alice", null));
-        accessor.addPlayer(new MockRTPPlayer(interloper, "mallory", null));
-        PrefabNonceStore.Entry e = store.mint(minter, "low-performance", Map.of());
-        PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
-        Map<String, List<String>> params = new HashMap<>();
-        params.put("id", List.of("low-performance"));
-        params.put("token", List.of(e.token()));
-        assertFalse(confirm.onCommand(interloper, params, null),
-                "wrong caller must be rejected");
-        // The wrong-caller path burns the token (defence-in-depth).
-        assertEquals(0, store.size(),
-                "nonce must be consumed even on wrong-caller rejection to prevent grinding");
-    }
-
-    @Test
-    void confirm_wrongPrefab_rejected() {
+    void confirm_noPendingForCaller_rejected() {
         PrefabNonceStore store = new PrefabNonceStore();
         UUID caller = UUID.randomUUID();
         accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
-        PrefabNonceStore.Entry e = store.mint(caller, "low-performance", Map.of());
-        PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
-        Map<String, List<String>> params = new HashMap<>();
-        params.put("id", List.of("high-performance"));
-        params.put("token", List.of(e.token()));
-        assertFalse(confirm.onCommand(caller, params, null),
-                "mismatched prefab id must be rejected");
-        assertEquals(0, store.size(), "nonce must be burned on prefab-mismatch");
-    }
-
-    @Test
-    void confirm_expiredToken_isRejected() {
-        AtomicLong clock = new AtomicLong(1_000_000L);
-        PrefabNonceStore store = new PrefabNonceStore(clock::get, 100L);
-        UUID caller = UUID.randomUUID();
-        accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
-        PrefabNonceStore.Entry e = store.mint(caller, "low-performance", Map.of());
-        // Advance the clock past the TTL. The sweep inside consume() will
-        // evict the entry before the kind check, so we expect NOT_FOUND.
-        clock.set(clock.get() + 200L);
+        // No mint — caller has no pending diff.
         PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
         Map<String, List<String>> params = new HashMap<>();
         params.put("id", List.of("low-performance"));
-        params.put("token", List.of(e.token()));
         assertFalse(confirm.onCommand(caller, params, null),
-                "expired token must be rejected (NOT_FOUND after sweep)");
+                "confirm without a pending apply for the caller must be rejected");
         assertEquals(0, store.size());
     }
 
     @Test
-    void confirm_missingArgs_rejected_storeUntouched() {
+    void confirm_isolatedPerCaller() {
+        // Different callers do not share pending diffs.
+        PrefabNonceStore store = new PrefabNonceStore();
+        UUID alice = UUID.randomUUID();
+        UUID mallory = UUID.randomUUID();
+        accessor.addPlayer(new MockRTPPlayer(alice, "alice", null));
+        accessor.addPlayer(new MockRTPPlayer(mallory, "mallory", null));
+        store.mint(alice, "low-performance", Map.of());
+        PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
+        Map<String, List<String>> params = new HashMap<>();
+        params.put("id", List.of("low-performance"));
+        // Mallory cannot consume Alice's pending diff.
+        assertFalse(confirm.onCommand(mallory, params, null),
+                "another caller must not be able to consume Alice's pending diff");
+        // Alice's entry survives.
+        assertEquals(1, store.size());
+    }
+
+    @Test
+    void confirm_missingId_rejected_storeUntouched() {
         PrefabNonceStore store = new PrefabNonceStore();
         UUID caller = UUID.randomUUID();
         accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
@@ -251,7 +233,7 @@ class PrefabCommandTest {
         PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
         boolean result = confirm.onCommand(caller, new HashMap<>(), null);
         assertFalse(result);
-        assertEquals(1, store.size(), "missing-args confirm must not consume the outstanding nonce");
+        assertEquals(1, store.size(), "missing-id confirm must not consume the outstanding entry");
     }
 
     // --- PrefabRollbackCmd ---------------------------------------------------
@@ -298,11 +280,21 @@ class PrefabCommandTest {
     }
 
     @Test
-    void nonceStore_consume_unknownToken_isNotFound() {
+    void nonceStore_consumeByCaller_noPending_isNotFound() {
         PrefabNonceStore store = new PrefabNonceStore();
         UUID caller = UUID.randomUUID();
-        PrefabNonceStore.ConsumeResult r = store.consume("no-such-token", caller, "low-performance");
+        PrefabNonceStore.ConsumeResult r = store.consumeByCaller(caller, "low-performance");
         assertEquals(PrefabNonceStore.ConsumeResult.Kind.NOT_FOUND, r.kind());
         assertFalse(r.ok());
+    }
+
+    @Test
+    void nonceStore_repeatMint_overwritesPriorPending() {
+        PrefabNonceStore store = new PrefabNonceStore();
+        UUID caller = UUID.randomUUID();
+        store.mint(caller, "low-performance", Map.of());
+        store.mint(caller, "low-performance", Map.of()); // overwrite, not duplicate
+        assertEquals(1, store.size(),
+                "repeat mint for the same (caller, prefabId) must overwrite, not accumulate");
     }
 }

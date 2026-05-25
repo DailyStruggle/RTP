@@ -37,10 +37,10 @@ class MenuModelSurfaceTest {
     // ---- MenuAction ----
 
     @Test
-    @DisplayName("MenuAction is sealed to exactly the twenty-five declared variants")
+    @DisplayName("MenuAction is sealed to exactly the twenty-six declared variants")
     void menuActionSealedShape() {
         Class<?>[] permitted = MenuAction.class.getPermittedSubclasses();
-        assertEquals(25, permitted.length);
+        assertEquals(26, permitted.length);
         List<String> names = Arrays.stream(permitted).map(Class::getSimpleName).sorted().toList();
         assertEquals(List.of(
                 "ApplyStagedConfig",
@@ -62,6 +62,7 @@ class MenuModelSurfaceTest {
                 "OpenMultiConfigEntry",
                 "OpenMultiConfigSelector",
                 "OpenParamPicker",
+                "OpenVisualizations",
                 "PromptAnvilInput",
                 "RunRtpCommand",
                 "StageConfigValue",
@@ -188,6 +189,7 @@ class MenuModelSurfaceTest {
             case MenuAction.OpenConfigSearchPrompt sp -> "cfgsearchprompt";
             case MenuAction.OpenConfigSearchResults sr -> "cfgsearch:" + sr.query() + ":" + sr.page();
             case MenuAction.OpenAdminPanel ap -> "admin";
+            case MenuAction.OpenVisualizations ov -> "viz";
             case MenuAction.OpenFrontPage fp -> "front";
             case MenuAction.OpenInfo oi -> "info:" + oi.scope().kind() + ":" + oi.scope().name();
             case MenuAction.SwitchInfoToText sit -> "info-text:" + sit.scope().kind() + ":" + sit.scope().name();
@@ -195,7 +197,7 @@ class MenuModelSurfaceTest {
             case MenuAction.UnstageConfigValue uv -> "unstage:" + uv.fileName() + ":" + uv.paramName();
             case MenuAction.ApplyStagedConfig ac -> "apply:" + ac.fileName();
             case MenuAction.DiscardStagedConfig dc -> "discard:" + dc.fileName();
-            case MenuAction.OpenMap om -> "map:" + om.chartSpecToken();
+            case MenuAction.OpenMap om -> "map:" + om.kind() + ":" + om.regionName();
             case MenuAction.OpenMultiConfigSelector mcs -> "mcsel:" + mcs.parserKind();
             case MenuAction.OpenMultiConfigEntry mce -> "mcentry:" + mce.parserKind() + ":" + mce.entryName();
             case MenuAction.MultiConfigMutate mcm -> "mcmut:" + mcm.parserKind() + ":" + mcm.entryName() + ":" + mcm.op();

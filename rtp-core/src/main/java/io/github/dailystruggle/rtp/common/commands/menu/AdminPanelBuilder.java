@@ -8,11 +8,9 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -85,19 +83,12 @@ public final class AdminPanelBuilder {
     public static final String CONFIG_VIEW_PERMISSION =
             FrontPageBuilder.CONFIG_VIEW_PERMISSION;
 
-    /** Token TTL aligned with the rest of the curated menu surface. */
-    public static final Duration DEFAULT_TOKEN_TTL = FrontPageBuilder.DEFAULT_TOKEN_TTL;
-
-    private final MenuTokenRegistry tokenRegistry;
-    private final Duration tokenTtl;
-
-    public AdminPanelBuilder(MenuTokenRegistry tokenRegistry) {
-        this(tokenRegistry, DEFAULT_TOKEN_TTL);
-    }
-
-    public AdminPanelBuilder(MenuTokenRegistry tokenRegistry, Duration tokenTtl) {
-        this.tokenRegistry = Objects.requireNonNull(tokenRegistry, "tokenRegistry");
-        this.tokenTtl = Objects.requireNonNull(tokenTtl, "tokenTtl");
+    /**
+     * ADR-050 Stage 3β.D.2b (2026-05-24): no-arg constructor. The renderer
+     * emits concrete {@code /rtp menu ...} commands, so no token registry or
+     * TTL is consulted any more.
+     */
+    public AdminPanelBuilder() {
     }
 
     /**
@@ -230,6 +221,19 @@ public final class AdminPanelBuilder {
                             "Open the scan submenu (start / pause / cancel)."),
                     new MenuAction.OpenMenu(new String[]{"scan"}));
         }
+        // Visualizations row - opens the per-region bad-locations map submenu.
+        // Server-side dispatch arm gates on rtp.menu.admin (same admin surface
+        // as the panel itself), so we surface the row unconditionally; the
+        // dispatch path rejects with menuInvalid on a non-admin click.
+        addRow(
+                diagRows,
+                lookupMsg(
+                        MessagesKeys.menuAdminPanelRowVisualizations,
+                        "&b\u2316 Visualizations"),
+                lookupMsg(
+                        MessagesKeys.menuAdminPanelHoverVisualizations,
+                        "Open maps and other operator-facing visualizations."),
+                new MenuAction.OpenVisualizations());
         appendSection(
                 lines,
                 MessagesKeys.menuAdminPanelSectionDiagnostics,
@@ -290,19 +294,8 @@ public final class AdminPanelBuilder {
         // Page cap matches the InfoBookBuilder convention (13 lines/page).
         List<MenuPage> pages = paginate(lines, backRow);
 
-        // Mint a token per clickable fragment so the renderer can emit
-        // menu:<token> click payloads (ADR-035 §3). Mirrors FrontPageBuilder.
-        for (MenuPage p : pages) {
-            for (MenuLine line : p.lines()) {
-                for (MenuFragment fragment : line.fragments()) {
-                    MenuAction action = fragment.action();
-                    if (action != null) {
-                        tokenRegistry.mint(viewer, action, tokenTtl);
-                    }
-                }
-            }
-        }
-
+        // ADR-050 Stage 3α: pre-mint loop removed. Renderer emits concrete
+        // /rtp menu ... commands per fragment action.
         return new MenuModel(title == null ? "" : title, pages);
     }
 

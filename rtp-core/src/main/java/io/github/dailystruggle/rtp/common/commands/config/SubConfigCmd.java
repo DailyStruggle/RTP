@@ -30,6 +30,67 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 public class SubConfigCmd extends BaseRTPCmdImpl {
 
+  /**
+   * Thin {@link BaseRTPCmdImpl} alias that exposes the same parameter /
+   * sub-command graph as a target {@link SubConfigCmd} under a different
+   * {@link #name()}. Used by the multi-config child registration to make
+   * a per-entry editor reachable under both its parser-key form
+   * ({@code default.yml}) and its bare form ({@code default}) without
+   * mutating {@code commandLookup} directly from outside the owning
+   * class - the only supported way to register a sub-command is
+   * {@link io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand#addSubCommand},
+   * which keys on {@code command.name().toUpperCase()}, so an alias
+   * requires a distinct {@code CommandsAPICommand} instance.
+   *
+   * <p>The alias delegates {@link #onCommand},
+   * {@link #getParameterLookup} and {@link #getCommandLookup} to the
+   * target so the two forms share parameter/child state, and reports
+   * the target's permission and description.
+   */
+  public static final class Alias extends BaseRTPCmdImpl {
+    private final String aliasName;
+    private final SubConfigCmd target;
+
+    public Alias(@Nullable CommandsAPICommand parent, String aliasName, SubConfigCmd target) {
+      super(parent);
+      this.aliasName = aliasName.toLowerCase(java.util.Locale.ROOT);
+      this.target = target;
+    }
+
+    @Override
+    public String name() {
+      return aliasName;
+    }
+
+    @Override
+    public String permission() {
+      return target.permission();
+    }
+
+    @Override
+    public String description() {
+      return target.description();
+    }
+
+    @Override
+    public Map<String, CommandParameter> getParameterLookup() {
+      return target.getParameterLookup();
+    }
+
+    @Override
+    public Map<String, CommandsAPICommand> getCommandLookup() {
+      return target.getCommandLookup();
+    }
+
+    @Override
+    public boolean onCommand(
+        UUID callerId,
+        Map<String, List<String>> parameterValues,
+        CommandsAPICommand nextCommand) {
+      return target.onCommand(callerId, parameterValues, nextCommand);
+    }
+  }
+
   private final String name;
   private final FactoryValue<?> factoryValue;
 
@@ -223,7 +284,16 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         ConfigParser<?> configParser = (ConfigParser<?>) parser.configParserFactory.get(configName);
         if (configParser == null) continue;
         parser.configParserFactory.map.remove(configName.toUpperCase());
-        commandLookup.remove(target);
+        // Drop both the parser-key form (`<entry>.yml`) and the bare
+        // {@link Alias} form (`<entry>`) from the sub-command graph so the
+        // entry is fully unreachable post-remove. `TreeCommand` exposes
+        // no `removeSubCommand` API, so direct map removal is the only
+        // option here - kept symmetric with the matching ADD-side calls
+        // which go through `addSubCommand` (the supported registration
+        // route). Keys are stored upper-cased per `TreeCommand` line 30.
+        String bareRem = configName.replace(".yml", "").replace(".YML", "");
+        commandLookup.remove(configName.toUpperCase(java.util.Locale.ROOT));
+        commandLookup.remove(bareRem.toUpperCase(java.util.Locale.ROOT));
         RtpYamlConfig RtpYamlConfig = configParser.fileDatabase.cachedLookup.get().get(configName);
         if (RtpYamlConfig != null) RtpYamlConfig.getConfigurationFile().deleteOnExit();
       }
@@ -235,6 +305,16 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         SubConfigCmd subUpdateCmd = new SubConfigCmd(this, configParser.name, configParser);
         subUpdateCmd.addParameters();
         addSubCommand(subUpdateCmd);
+        // Parity with flat ConfigCmd.addCommands (lines 56-67) and the
+        // addParameters() initial registration below: also register a
+        // bare (suffix-stripped) {@link Alias} so `/rtp config <kind>
+        // <entry>` resolves without the .yml suffix. Use `addSubCommand`
+        // (the supported registration route) rather than touching
+        // `commandLookup` directly.
+        String bareAdd = configParser.name.replace(".yml", "").replace(".YML", "");
+        if (!bareAdd.equalsIgnoreCase(configParser.name)) {
+          addSubCommand(new Alias(this, bareAdd, subUpdateCmd));
+        }
       }
 
       CommandsAPICommand reload =
@@ -362,9 +442,27 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         } else if (o instanceof RtpYamlSection) {
           if (s.equalsIgnoreCase("shape")) {
             addParameter(s, new ShapeParameter("rtp.update", desc, (uuid, s1) -> true));
+            // Also register each scalar leaf as a dotted parameter
+            // (`shape.radius`, `shape.centerX`, ...) so the menu's
+            // flattened-row click path (CommandTreeMenuBuilder
+            // .buildConfigFile line ~894-910) can stage individual
+            // sub-knobs without rewriting the whole shape value. This
+            // is reached only when the stored value is still a raw
+            // RtpYamlSection - i.e. the freshly-added multi-config
+            // entry case where the shape/vert FactoryValue merge pass
+            // has not yet run. For built-in `default` the value is
+            // already a `Shape` FactoryValue and this branch is not
+            // entered. The dispatcher's dotted-key write branch
+            // (onCommand line ~254-258) routes the typed value through
+            // `RtpYamlConfig.set("shape.radius", value)`.
+            addSectionParameters(s, (RtpYamlSection) o);
           } else if (s.equalsIgnoreCase("vert")) {
             VertParameter vertParameter = new VertParameter("rtp.update", desc, (uuid, s1) -> true);
             addParameter(s, vertParameter);
+            // Same dotted-leaf registration as the shape branch above
+            // (vert is the symmetric factory-backed RtpYamlSection
+            // top-level key).
+            addSectionParameters(s, (RtpYamlSection) o);
           } else {
             addSectionParameters(s, (RtpYamlSection) o);
           }
@@ -390,9 +488,33 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
     } else if (factoryValue instanceof MultiConfigParser<?> parser) {
       for (Map.Entry<?, ?> e : parser.configParserFactory.map.entrySet()) {
         Object entryValue = e.getValue();
-        if (entryValue instanceof FactoryValue)
-          addSubCommand(
-              new SubConfigCmd(this, e.getKey().toString(), (FactoryValue<?>) entryValue));
+        if (entryValue instanceof FactoryValue) {
+          String entryName = e.getKey().toString();
+          SubConfigCmd childCmd =
+              new SubConfigCmd(this, entryName, (FactoryValue<?>) entryValue);
+          addSubCommand(childCmd);
+          // Parity with flat ConfigCmd.addCommands (lines 56-67): also
+          // register the child under its bare (suffix-stripped) name so
+          // `/rtp config <kind> <entry> ...` resolves regardless of
+          // whether the caller writes the .yml suffix. Without this
+          // alias, the STAGE-mode anvil reopen `/rtp menu config regions
+          // default` resolved through the menu's TreeCommand walker but
+          // a direct `/rtp config regions default ...` (or the menu's
+          // Apply pathway) failed with "invalid command - default".
+          // Use a dedicated {@link Alias} sub-command + `addSubCommand`
+          // (the supported registration route) rather than touching
+          // `commandLookup` directly - the latter bypasses the framework
+          // and, critically, would not be picked up by
+          // `MenuMirrorSubcommand` (which snapshots `getCommandLookup`
+          // and re-wraps each `TreeCommand` child as a mirror; a raw
+          // map entry is just as visible, but going through the
+          // documented API keeps registration uniform with everything
+          // else in `addParameters`).
+          String bare = entryName.replace(".yml", "").replace(".YML", "");
+          if (!bare.equalsIgnoreCase(entryName)) {
+            addSubCommand(new Alias(this, bare, childCmd));
+          }
+        }
       }
       addParameter(
           "add",

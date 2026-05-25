@@ -8,11 +8,9 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -66,19 +64,12 @@ public final class FrontPageBuilder {
      */
     public static final String CONFIG_VIEW_PERMISSION = "rtp.config.view";
 
-    /** Token TTL aligned with {@link CommandTreeMenuBuilder#DEFAULT_TOKEN_TTL}. */
-    public static final Duration DEFAULT_TOKEN_TTL = CommandTreeMenuBuilder.DEFAULT_TOKEN_TTL;
-
-    private final MenuTokenRegistry tokenRegistry;
-    private final Duration tokenTtl;
-
-    public FrontPageBuilder(MenuTokenRegistry tokenRegistry) {
-        this(tokenRegistry, DEFAULT_TOKEN_TTL);
-    }
-
-    public FrontPageBuilder(MenuTokenRegistry tokenRegistry, Duration tokenTtl) {
-        this.tokenRegistry = Objects.requireNonNull(tokenRegistry, "tokenRegistry");
-        this.tokenTtl = Objects.requireNonNull(tokenTtl, "tokenTtl");
+    /**
+     * ADR-050 Stage 3β.D.2b (2026-05-24): no-arg constructor. The renderer
+     * emits concrete {@code /rtp menu ...} commands, so no token registry or
+     * TTL is consulted any more.
+     */
+    public FrontPageBuilder() {
     }
 
     /**
@@ -142,17 +133,10 @@ public final class FrontPageBuilder {
         MenuPage page = new MenuPage(lines);
         List<MenuPage> pages = List.of(page);
 
-        // Mint a token per clickable fragment so the renderer can emit
-        // menu:<token> click payloads (ADR-035 §3).
-        for (MenuLine line : page.lines()) {
-            for (MenuFragment fragment : line.fragments()) {
-                MenuAction action = fragment.action();
-                if (action != null) {
-                    tokenRegistry.mint(viewer, action, tokenTtl);
-                }
-            }
-        }
-
+        // ADR-050 Stage 3α (2026-05-24): pre-mint loop removed. The renderer
+        // emits concrete /rtp menu ... commands per fragment action; tokens
+        // are no longer consulted. `tokenRegistry` / `tokenTtl` ctor params
+        // remain for source/binary compat; Stage 3β drops them outright.
         return new MenuModel(title == null ? "" : title, pages);
     }
 

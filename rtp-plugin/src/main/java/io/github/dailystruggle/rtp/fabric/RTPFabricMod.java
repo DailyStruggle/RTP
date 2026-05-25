@@ -188,6 +188,27 @@ public final class RTPFabricMod implements ModInitializer {
                                     "[RTP] Fabric database setup failed: "
                                             + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
                         }
+                        // ------------------------------------------------
+                        // Step E3 — start the periodic async drain of
+                        // databaseAccessor.processQueries. Required for
+                        // SQL-transport network mode: writes produced on
+                        // this backend (cooldown rows, reservation
+                        // tokens, player-state rows) only become visible
+                        // to peer backends after this timer drains them.
+                        // Mirrors RTPBukkitPlugin's DatabaseProcessing
+                        // .start(this) call. The Bukkit and Fabric paths
+                        // share the same platform-agnostic class in
+                        // rtp-core (the Bukkit-package class is a
+                        // deprecated shim around it).
+                        // ------------------------------------------------
+                        try {
+                            io.github.dailystruggle.rtp.common.server
+                                    .DatabaseProcessing.start();
+                        } catch (Throwable t) {
+                            RTP.log(Level.WARNING,
+                                    "[RTP] DatabaseProcessing.start failed: "
+                                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+                        }
                         try {
                             // Give the per-version adapter first crack at effects
                             // wiring — on deobfuscated 26.1.x the default obf path
@@ -227,6 +248,28 @@ public final class RTPFabricMod implements ModInitializer {
             net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
                     .SERVER_STOPPED.register(server ->
                             io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime.unbindServer());
+
+            // ----------------------------------------------------------------
+            // Stop the periodic databaseAccessor.processQueries drain BEFORE
+            // the server tears down its tick loop, mirroring
+            // RTPBukkitPlugin.onDisable's DatabaseProcessing.kill() call. We
+            // hook SERVER_STOPPING (not SERVER_STOPPED) so the kill lands
+            // while the scheduler is still alive and can cancel the task
+            // cleanly. The final drain of pending mutations is handled by
+            // RTP-core's shutdown path (databaseAccessor.shutdown via the
+            // RTPRunnable drain) — this hook only stops the periodic timer.
+            // ----------------------------------------------------------------
+            net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
+                    .SERVER_STOPPING.register(server -> {
+                        try {
+                            io.github.dailystruggle.rtp.common.server
+                                    .DatabaseProcessing.kill();
+                        } catch (Throwable t) {
+                            RTP.log(Level.WARNING,
+                                    "[RTP] DatabaseProcessing.kill failed: "
+                                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+                        }
+                    });
 
             // ----------------------------------------------------------------
             // Post-teleport title / subtitle / actionbar — `messages.yml`
@@ -606,6 +649,27 @@ public final class RTPFabricMod implements ModInitializer {
                 while (rtp.startupTasks.size() > 0) {
                     rtp.startupTasks.execute(Long.MAX_VALUE);
                 }
+            }
+
+            // ----------------------------------------------------------------
+            // Step E3-4 — seed <configDir>/rtp/docs/ from the bundled docs/
+            // tree inside the running mod jar. Mirrors RTPBukkitPlugin's
+            // `JarUtils.extractDocs(getDataFolder(), version)` call so the
+            // admin-facing reference material (architecture diagrams,
+            // requirements, ADRs) ships alongside the config tree on Fabric.
+            // Idempotent + fail-soft — see FabricJarUtils Javadoc.
+            // ----------------------------------------------------------------
+            try {
+                String modVersion = FabricLoader.getInstance()
+                        .getModContainer("rtp")
+                        .map(c -> c.getMetadata().getVersion().getFriendlyString())
+                        .orElse("unknown");
+                io.github.dailystruggle.rtp.fabric.utils.FabricJarUtils
+                        .extractDocs(accessor.getPluginDirectory(), modVersion);
+            } catch (Throwable t) {
+                RTP.log(Level.WARNING,
+                        "[RTP] FabricJarUtils.extractDocs dispatch failed: "
+                                + t.getClass().getSimpleName() + ": " + t.getMessage());
             }
 
             RTP.log(Level.INFO,
