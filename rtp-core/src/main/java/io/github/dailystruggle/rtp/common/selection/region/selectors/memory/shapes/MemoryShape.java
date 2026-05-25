@@ -679,9 +679,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   public void addBiomeLocation(Long location, long width, String biome) {
+    // Canonicalise the biome key so that `FOREST` and `MINECRAFT:FOREST`
+    // alias to the same per-biome bucket; the lookup side (PregenTask
+    // biome-recall, getBiomeKeys / getBiomePrefixSums) does the same.
+    String key = io.github.dailystruggle.rtp.common.selection.region.BiomeNames.canonical(biome);
     pendingBiomeLocations
         .get()
-        .computeIfAbsent(biome, b -> new ConcurrentHashMap<>())
+        .computeIfAbsent(key, b -> new ConcurrentHashMap<>())
         .put(location, width);
     biomeLocationsDirty = true;
   }
@@ -699,11 +703,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   public long[] getBiomeKeys(String biome) {
-    return biomeKeysCache.get(biome);
+    return biomeKeysCache.get(
+        io.github.dailystruggle.rtp.common.selection.region.BiomeNames.canonical(biome));
   }
 
   public long[] getBiomePrefixSums(String biome) {
-    return biomePrefixSumsCache.get(biome);
+    return biomePrefixSumsCache.get(
+        io.github.dailystruggle.rtp.common.selection.region.BiomeNames.canonical(biome));
   }
 
   /**
@@ -732,9 +738,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param biome the biome name
    */
   public void removeBiomeLocation(Long location, String biome) {
+    String key = io.github.dailystruggle.rtp.common.selection.region.BiomeNames.canonical(biome);
     pendingBiomeRemovals
         .get()
-        .computeIfAbsent(biome, b -> new ConcurrentHashMap<>())
+        .computeIfAbsent(key, b -> new ConcurrentHashMap<>())
         .put(location, true);
     biomeLocationsDirty = true;
   }

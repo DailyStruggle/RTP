@@ -149,11 +149,24 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
             "select a biome to teleport to",
             (uuid, s) -> {
               RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
-              // Biome keys are upper-cased with the root locale to avoid locale-dependent
-              // case folding (e.g. Turkish 'i' -> 'İ'), which would otherwise miss biomes
-              // such as ICE_SPIKES on operators running a tr_TR JVM.
-              return (sender.hasPermission("rtp.biome.*") || sender.hasPermission("rtp.biome." + s))
-                      && RTP.serverAccessor.getBiomes().contains(s.toUpperCase(java.util.Locale.ROOT));
+              // Accept namespaced biome ids (e.g. `minecraft:badlands`) as well as bare
+              // enum names (`BADLANDS`). `ServerAccessor#getBiomes()` now emits both
+              // forms, so a single membership probe covers both grammars; the user-typed
+              // string is checked verbatim and (for the bare-name grammar) up-cased
+              // with the root locale to avoid Turkish-i case folding.
+              if (s == null) return false;
+              int colon = s.indexOf(':');
+              String bareKey = (colon >= 0) ? s.substring(colon + 1) : s;
+              String upper = bareKey.toUpperCase(java.util.Locale.ROOT);
+              java.util.Set<String> biomes = RTP.serverAccessor.getBiomes();
+              boolean known = biomes.contains(s)
+                      || biomes.contains(upper)
+                      || biomes.contains(bareKey.toLowerCase(java.util.Locale.ROOT))
+                      || biomes.contains("minecraft:" + bareKey.toLowerCase(java.util.Locale.ROOT));
+              return known
+                      && (sender.hasPermission("rtp.biome.*")
+                              || sender.hasPermission("rtp.biome." + bareKey)
+                              || sender.hasPermission("rtp.biome." + s));
             }));
 
     // target player parameter

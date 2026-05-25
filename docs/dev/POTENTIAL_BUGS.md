@@ -37,6 +37,16 @@ Append to the *Open* section below using the template. Keep entries short — on
 
 ## Open
 
+### 2026-05-24 - `BukkitRTPWorld.getBiomes(world)` / `FoliaRTPWorld.getBiomes(world)` return empty set when the platform setter is null-returning instead of falling back to the world enumeration
+
+- **Discovered during:** /rtp biome=minecraft:BADLANDS namespace-parity fix (this session). User flagged the empty-set fallback explicitly.
+- **Location:** `rtp-bukkit/rtp-bukkit-common/.../bukkitplatform/world/BukkitRTPWorld.java` `getBiomes(RTPWorld<?>)` (line ~117), and the mirrored `rtp-folia/rtp-folia-common/.../folia/world/FoliaRTPWorld.java` `getBiomes(RTPWorld<?>)` (line ~99). Both do `Set<String> pre = getBiomes.apply(world); return (pre == null) ? new HashSet<>() : new HashSet<>(pre);`.
+- **Symptom / hypothesis:** If a custom platform adapter (or an addon that called `setBiomesGetter`) installs a getter that returns `null` for some worlds, the public static `getBiomes(world)` silently returns an empty set rather than falling back to the platform's full biome enumeration (`Biome.values()` / `Registry.BIOME`). Tab-completion, the menu's biome picker, and any caller using this surface to validate user input would then treat every biome as unknown for that world.
+- **Impact:** Latent: today's default lambda never returns null, so the empty-set branch is unreachable in shipped configurations. The hazard surfaces only when a third-party setter (test fixture, addon, or future platform-specific override) returns null. The visible failure mode would be /rtp biome=<x> rejected for every x in the affected world, with no log line.
+- **Suggested next step:** Replace the `new HashSet<>()` fallback with a call to the default platform enumeration (e.g. inline the `Biome.values()` / `Registry.BIOME` walk from the default lambda, or expose a `defaultBiomes(world)` helper next to `setBiomesGetter` and route the null branch through it). Add a regression test that installs a `setBiomesGetter(w -> null)` lambda and asserts `getBiomes(w)` is non-empty and contains a known vanilla biome.
+
+
+
 ### 2026-05-24 - cross-server /rtp completes for a disconnected player (CANCELLED -> RESERVED -> COMPLETED resurrection)
 
 - **Discovered during:** verification of a `lobby-a` /rtp log trace (this session). The trace showed `terminal: ... newState=CANCELLED` fire on disconnect, then ~2s later `supplier: ... CANCELLED(pos=0) -> RESERVED(pos=0)`, then ~2s after that `terminal: ... newState=COMPLETED`. The user chose to defer the fix to bundle it with Phase 2 A2 (atomic-claim Lua); recording here so it is not lost.

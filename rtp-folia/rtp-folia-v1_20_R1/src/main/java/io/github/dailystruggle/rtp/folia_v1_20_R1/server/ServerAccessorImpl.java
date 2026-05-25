@@ -8,7 +8,15 @@ import org.jetbrains.annotations.NotNull;
 public class ServerAccessorImpl extends AbstractFoliaServerAccessor {
   @Override
   public @NotNull java.util.Set<String> getBiomes() {
-    return java.util.Arrays.stream(org.bukkit.block.Biome.values()).map(Enum::name).collect(java.util.stream.Collectors.toSet());
+    // Emit both bare enum names (`BADLANDS`) and namespaced
+    // (`minecraft:badlands`) forms so Brigadier-suggested namespaced ids
+    // pass /rtp's biome param validator.
+    java.util.Set<String> out = new java.util.HashSet<>();
+    for (org.bukkit.block.Biome b : org.bukkit.block.Biome.values()) {
+      out.add(b.name());
+      out.add("minecraft:" + b.name().toLowerCase(java.util.Locale.ROOT));
+    }
+    return out;
   }
 
 }

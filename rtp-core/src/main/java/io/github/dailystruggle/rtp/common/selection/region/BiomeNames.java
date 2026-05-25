@@ -53,4 +53,25 @@ public final class BiomeNames {
     }
     return filter.contains(VANILLA_PREFIX + probed);
   }
+
+  /**
+   * Returns the canonical (vanilla-namespace-stripped, uppercased) form of a biome
+   * id, used as a key for any map keyed by biome name (e.g.
+   * {@link io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape}'s
+   * biome-location maps). Modded namespaces (e.g. {@code IRIS:...},
+   * {@code TERRALITH:...}) are preserved verbatim — only the vanilla
+   * {@code MINECRAFT:} prefix is collapsed so that {@code MINECRAFT:FOREST}
+   * and {@code FOREST} canonicalise to the same key.
+   *
+   * @param name biome id; null/blank yields the input unchanged
+   * @return canonicalised biome key
+   */
+  public static String canonical(String name) {
+    if (name == null) return null;
+    String up = name.toUpperCase(java.util.Locale.ROOT);
+    if (up.startsWith(VANILLA_PREFIX)) {
+      return up.substring(VANILLA_PREFIX.length());
+    }
+    return up;
+  }
 }
