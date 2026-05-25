@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.api.menu;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.UUID;
 
 /**
  * Sealed action attached to a {@link MenuFragment}'s click.
@@ -55,6 +54,7 @@ public sealed interface MenuAction
                 MenuAction.OpenConfigSearchResults,
                 MenuAction.OpenConfigSubParamPage,
                 MenuAction.OpenAdminPanel,
+                MenuAction.OpenVisualizations,
                 MenuAction.OpenFrontPage,
                 MenuAction.OpenInfo,
                 MenuAction.SwitchInfoToText,
@@ -446,6 +446,18 @@ public sealed interface MenuAction
     }
 
     /**
+     * Open the curated admin Visualizations submenu (one row per configured
+     * region, each opening a server-rendered region-shape map via
+     * {@link OpenMap}). Server-resolved by
+     * {@code MenuRedeemSubcommand.dispatchOpenVisualizations};
+     * permission-gated by {@code rtp.menu.admin}, mirroring
+     * {@link OpenAdminPanel}. The Visualizations row is itself surfaced
+     * from the admin panel (see {@code AdminPanelBuilder}).
+     */
+    record OpenVisualizations() implements MenuAction {
+    }
+
+    /**
      * Open the curated front page built by {@code FrontPageBuilder}. Used by
      * the admin panel's back row and wherever a curated-front-page return is
      * needed. Distinct from {@link OpenMenu} with an empty path, which targets
@@ -622,25 +634,26 @@ public sealed interface MenuAction
 
     /**
      * Open a server-side rendered cartography map for the chart described by
-     * the {@code chartSpecToken} (ADR-047, REQ-RTP-MAP-006). The token is a
-     * single-use, TTL-bound handle into the {@code rtp-core}
-     * {@code ChartSpecTokens} registry, minted at fragment-build time and
-     * consumed exactly once by
-     * {@code MenuRedeemSubcommand.dispatchOpenMap}.
+     * {@code kind} + {@code regionName} (ADR-047, REQ-RTP-MAP-006).
      *
-     * <p>The renderer never sees the {@code ChartSpec} itself; the token is
-     * the only authority over which chart the click paints. This mirrors the
-     * ADR-035 {@code MenuTokenRegistry} security boundary: a malicious or
-     * buggy renderer cannot smuggle a different chart through the click.
+     * <p>ADR-050 (2026-05-24): the prior {@code OpenMap(UUID chartSpecToken)}
+     * shape required a process-local {@code ChartSpecTokens} registry to
+     * round-trip the full {@link io.github.dailystruggle.rtp.api.maps.ChartSpec}.
+     * The registry was deleted along with {@code MenuTokenRegistry}; the
+     * dispatcher now constructs {@code ChartSpec.of(kind, regionName)} inline
+     * and hands it to {@code MapDispatch.paint}. The click event is the
+     * self-documenting {@code /rtp visualization x=<kind>:<regionName>}.
      *
      * <p>Server-resolved by {@code MenuRedeemSubcommand.dispatchOpenMap};
      * permission-gated by {@code rtp.admin} (matching the {@code /rtp info}
      * admin gate) and additionally gated on the installed {@code MapBinding}
      * not being the {@code NoopMapBinding} placeholder.
      */
-    record OpenMap(UUID chartSpecToken) implements MenuAction {
+    record OpenMap(io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind kind,
+                   String regionName) implements MenuAction {
         public OpenMap {
-            Objects.requireNonNull(chartSpecToken, "chartSpecToken");
+            Objects.requireNonNull(kind, "kind");
+            Objects.requireNonNull(regionName, "regionName");
         }
     }
 

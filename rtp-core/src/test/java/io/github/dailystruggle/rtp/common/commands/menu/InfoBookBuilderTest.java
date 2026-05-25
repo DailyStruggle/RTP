@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.common.commands.menu;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -117,20 +116,8 @@ class InfoBookBuilderTest {
         assertEquals("second", pages.get(0).lines().get(1).fragments().get(0).text());
     }
 
-    @Test
-    @DisplayName("InfoBookBuilder constructor rejects nulls")
-    void constructorRejectsNulls() {
-        org.junit.jupiter.api.Assertions.assertThrows(
-                NullPointerException.class, () -> new InfoBookBuilder(null));
-        org.junit.jupiter.api.Assertions.assertThrows(
-                NullPointerException.class,
-                () -> new InfoBookBuilder(null, java.time.Duration.ofMinutes(5)));
-    }
-
-    @Test
-    @DisplayName("DEFAULT_TOKEN_TTL matches the curated-menu TTL")
-    void defaultTokenTtlAlignment() {
-        assertEquals(AdminPanelBuilder.DEFAULT_TOKEN_TTL, InfoBookBuilder.DEFAULT_TOKEN_TTL);
-        assertNotNull(InfoBookBuilder.DEFAULT_TOKEN_TTL);
-    }
+    // ADR-050 Stage 3β.D.2b (2026-05-24): deleted `constructorRejectsNulls`
+    // and `defaultTokenTtlAlignment` - the `MenuTokenRegistry` ctor param
+    // and `DEFAULT_TOKEN_TTL` constant are gone (renderer emits concrete
+    // `/rtp menu ...` commands; no TTL applies).
 }

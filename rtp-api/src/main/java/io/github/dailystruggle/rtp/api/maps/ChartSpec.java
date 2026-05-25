@@ -77,6 +77,15 @@ public record ChartSpec(
     public enum Kind {
         /** Per-region "bad points" heatmap sourced from {@code MemoryShape.badKeysCache}. */
         BAD_POINTS_HEATMAP,
+        /**
+         * Per-region two-tone shape map: green inside the region disk, red
+         * for each bad-flagged location, black for outside the disk. Sourced
+         * from {@code MemoryShape.badKeysSnapshot()}. Drives the admin
+         * "Visualizations -> Region shape" entry; see
+         * {@code maps-api} {@code RegionBadLocations} +
+         * {@code RegionBadLocationsRenderer}.
+         */
+        REGION_BAD_LOCATIONS_SHAPE,
         /** Reserved (Stage 3): spiral coverage view of a region. */
         REGION_COVERAGE,
         /** Reserved (Stage 3): per-region pipeline failure-rate heatmap. */

@@ -60,10 +60,9 @@ final class PrefabConfirmationMenuBuilderTest {
     @Test
     @DisplayName("Title substitutes the [prefab] placeholder with the prefab display name")
     void title_carriesPrefabDisplayName() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         Prefab prefab = LowPerformance.INSTANCE;
-        MenuModel model = new PrefabConfirmationMenuBuilder(registry)
-                .build(prefab, "tok123", PrefabApplier.apply(Map.of(), prefab).perFileDiff(),
+        MenuModel model = new PrefabConfirmationMenuBuilder()
+                .build(prefab, PrefabApplier.apply(Map.of(), prefab).perFileDiff(),
                         UUID.randomUUID());
 
         String firstLineText = textOf(model.pages().get(0).lines().get(0));
@@ -73,29 +72,27 @@ final class PrefabConfirmationMenuBuilderTest {
     }
 
     @Test
-    @DisplayName("Confirm row dispatches RunRtpCommand({admin,prefab,confirm,<id>,<token>})")
-    void confirmRow_dispatchesConfirmVerbWithToken() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
+    @DisplayName("Confirm row dispatches RunRtpCommand({admin,prefab,confirm,id=<id>}) (no token, ADR-050-style)")
+    void confirmRow_dispatchesConfirmVerbWithId() {
         Prefab prefab = LowPerformance.INSTANCE;
-        String token = "tok-xyz-987";
 
-        MenuModel model = new PrefabConfirmationMenuBuilder(registry)
-                .build(prefab, token, PrefabApplier.apply(Map.of(), prefab).perFileDiff(),
+        MenuModel model = new PrefabConfirmationMenuBuilder()
+                .build(prefab, PrefabApplier.apply(Map.of(), prefab).perFileDiff(),
                         UUID.randomUUID());
 
         MenuAction confirm = findRunWithArgs(model,
-                "admin", "prefab", "confirm", prefab.id(), token);
-        assertNotNull(confirm, "Confirm row must dispatch the confirm verb carrying the nonce");
+                "admin", "prefab", "confirm", "id=" + prefab.id());
+        assertNotNull(confirm,
+                "Confirm row must dispatch the confirm verb keyed solely on id=<prefabId>");
     }
 
     @Test
     @DisplayName("Cancel row dispatches OpenAdminPanel")
     void cancelRow_dispatchesOpenAdminPanel() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         Prefab prefab = LowPerformance.INSTANCE;
 
-        MenuModel model = new PrefabConfirmationMenuBuilder(registry)
-                .build(prefab, "tok", PrefabApplier.apply(Map.of(), prefab).perFileDiff(),
+        MenuModel model = new PrefabConfirmationMenuBuilder()
+                .build(prefab, PrefabApplier.apply(Map.of(), prefab).perFileDiff(),
                         UUID.randomUUID());
 
         MenuAction cancel = findFirst(model, MenuAction.OpenAdminPanel.class);
@@ -105,13 +102,12 @@ final class PrefabConfirmationMenuBuilderTest {
     @Test
     @DisplayName("Diff body iteration order matches PrefabApplier.perFileDiff order")
     void diff_iterationOrderMatchesApplier() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         Prefab prefab = LowPerformance.INSTANCE;
         Map<String, List<PrefabApplier.Change>> diff =
                 PrefabApplier.apply(Map.of(), prefab).perFileDiff();
 
-        MenuModel model = new PrefabConfirmationMenuBuilder(registry)
-                .build(prefab, "tok", diff, UUID.randomUUID());
+        MenuModel model = new PrefabConfirmationMenuBuilder()
+                .build(prefab, diff, UUID.randomUUID());
 
         // Each file id appears as a fragment header preceding its keyPath rows.
         List<String> seenFiles = new ArrayList<>();
@@ -133,18 +129,17 @@ final class PrefabConfirmationMenuBuilderTest {
     @Test
     @DisplayName("Identity overlay (empty diff): no-changes notice + Confirm/Cancel still emitted")
     void identityOverlay_rendersNoticeAndFooter() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         Prefab prefab = SurvivalDefault.INSTANCE;
 
         Map<String, List<PrefabApplier.Change>> diff =
                 PrefabApplier.apply(Map.of(), prefab).perFileDiff();
         assertTrue(diff.isEmpty(), "SurvivalDefault.INSTANCE must produce an empty diff");
 
-        MenuModel model = new PrefabConfirmationMenuBuilder(registry)
-                .build(prefab, "tok", diff, UUID.randomUUID());
+        MenuModel model = new PrefabConfirmationMenuBuilder()
+                .build(prefab, diff, UUID.randomUUID());
 
         assertNotNull(findRunWithArgs(model,
-                "admin", "prefab", "confirm", prefab.id(), "tok"),
+                "admin", "prefab", "confirm", "id=" + prefab.id()),
                 "Confirm row must still be present on an identity-overlay diff");
         assertNotNull(findFirst(model, MenuAction.OpenAdminPanel.class),
                 "Cancel row must still be present on an identity-overlay diff");
@@ -153,8 +148,6 @@ final class PrefabConfirmationMenuBuilderTest {
     @Test
     @DisplayName("Overflow: per-file diff longer than MAX_LINES_PER_FILE collapses to '... (+N more)'")
     void overflow_collapsesTail() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-
         // Build a synthetic large-diff prefab: 12 keys on performance, all
         // new (currentTrees absent -> all oldValue=null -> all are Changes).
         Map<String, Object> overlay = new LinkedHashMap<>();
@@ -167,8 +160,8 @@ final class PrefabConfirmationMenuBuilderTest {
         Map<String, List<PrefabApplier.Change>> diff =
                 PrefabApplier.apply(Map.of(), big).perFileDiff();
 
-        MenuModel model = new PrefabConfirmationMenuBuilder(registry)
-                .build(big, "tok", diff, UUID.randomUUID());
+        MenuModel model = new PrefabConfirmationMenuBuilder()
+                .build(big, diff, UUID.randomUUID());
 
         int expectedOverflow = 12 - PrefabConfirmationMenuBuilder.MAX_LINES_PER_FILE;
         boolean foundTail = false;
@@ -184,35 +177,29 @@ final class PrefabConfirmationMenuBuilderTest {
     }
 
     @Test
-    @DisplayName("Null and empty argument rejection")
+    @DisplayName("Null argument rejection (tokenless build signature)")
     void nullAndEmpty_rejected() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        PrefabConfirmationMenuBuilder b = new PrefabConfirmationMenuBuilder(registry);
+        PrefabConfirmationMenuBuilder b = new PrefabConfirmationMenuBuilder();
         Prefab prefab = LowPerformance.INSTANCE;
         Map<String, List<PrefabApplier.Change>> diff = Map.of();
         UUID viewer = UUID.randomUUID();
 
         assertThrows(NullPointerException.class,
-                () -> b.build(null, "tok", diff, viewer));
+                () -> b.build(null, diff, viewer));
         assertThrows(NullPointerException.class,
-                () -> b.build(prefab, null, diff, viewer));
+                () -> b.build(prefab, null, viewer));
         assertThrows(NullPointerException.class,
-                () -> b.build(prefab, "tok", null, viewer));
-        assertThrows(NullPointerException.class,
-                () -> b.build(prefab, "tok", diff, null));
-        assertThrows(IllegalArgumentException.class,
-                () -> b.build(prefab, "", diff, viewer));
+                () -> b.build(prefab, diff, null));
     }
 
     @Test
     @DisplayName("Every bundled prefab renders without throwing (PrefabRegistry coverage)")
     void everyBundledPrefab_renders() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         for (Prefab p : PrefabRegistry.list()) {
             Map<String, List<PrefabApplier.Change>> diff =
                     PrefabApplier.apply(Map.of(), p).perFileDiff();
-            MenuModel model = new PrefabConfirmationMenuBuilder(registry)
-                    .build(p, "tok-" + p.id(), diff, UUID.randomUUID());
+            MenuModel model = new PrefabConfirmationMenuBuilder()
+                    .build(p, diff, UUID.randomUUID());
             assertNotNull(model, "Confirmation menu must build for " + p.id());
             assertEquals(1, model.pages().size(),
                     "Confirmation menu for " + p.id() + " must fit on a single book page");

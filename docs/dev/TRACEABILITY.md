@@ -26,7 +26,7 @@ This document connects each requirement to the design decision that motivated it
 | REQ-RTP-F-010 | External API hooks | ARCHITECTURE.md | `SelectionAPI` | — |
 | REQ-RTP-F-011 | Claim integrations | ADR-019 | `GlobalRegionVerifiers` | — |
 | REQ-RTP-F-012 | Admin scan lifecycle | DESIGN.md §1 | `ScanCmd`, `ScanTask` | `ScanCmdTest` |
-| REQ-RTP-F-013 | Configurable messages | ARCHITECTURE.md | `ConfigParser`, `MessagesKeys`, `LanguageCmd` | `ConfigParserLanguageTest`, `LanguageCmdTest` |
+| REQ-RTP-F-013 | Configurable messages | ARCHITECTURE.md | `ConfigParser`, `MessagesKeys`, `LanguageCmd`; menu reject paths preserved across the concrete-command surface ([ADR-050](../adr/ADR-050-concrete-menu-commands-supersede-tokens.md) Stage 1a) by routing `MenuConcreteCommandLeaves` into the existing `MenuRedeemSubcommand.dispatch*` helpers | `ConfigParserLanguageTest`, `LanguageCmdTest`, `ReqRtpMenuConcreteCommandsTest` (ADR-050 Stage 1a: 24 cases - registration / routing / permission gating across `/rtp menu open` `/ admin` `/ front` `/ visualizations` and the root `/rtp visualization` sibling) |
 | REQ-RTP-NF-001 | Persistent state | DESIGN.md §4 | `DatabaseAccessor` | `CachedLocationRoundTripTest` |
 | REQ-RTP-NF-002 | Thread safety | DESIGN.md §2 | `RTPTaskPipe` | `RTPArchitectureTest` |
 | REQ-RTP-NF-003 | Logic isolation | ADR-003 | `RTPBukkitPlugin` | `RTPArchitectureTest` |

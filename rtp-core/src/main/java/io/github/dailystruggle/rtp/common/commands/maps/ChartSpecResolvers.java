@@ -33,6 +33,11 @@ public final class ChartSpecResolvers {
     // register(BAD_POINTS_HEATMAP, ...) but the default is sufficient for
     // the /rtp info -> "bad points in the region" menu entry.
     RESOLVERS.put(ChartSpec.Kind.BAD_POINTS_HEATMAP, new BadPointsHeatmapResolver());
+    // Stage 2 (PR2a): region-shape two-tone map sourced from the same
+    // MemoryShape.badKeysSnapshot() data. Drives the admin
+    // "Visualizations -> Region shape" entry; menu wiring lands in PR2b.
+    RESOLVERS.put(
+        ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE, new RegionBadLocationsShapeResolver());
   }
 
   private ChartSpecResolvers() {}
@@ -60,9 +65,11 @@ public final class ChartSpecResolvers {
     return RESOLVERS.get(kind);
   }
 
-  /** Test-only: removes every registration. Resets the Stage-1 default afterwards. */
+  /** Test-only: removes every registration. Resets the Stage-1 defaults afterwards. */
   static void resetForTest() {
     RESOLVERS.clear();
     RESOLVERS.put(ChartSpec.Kind.BAD_POINTS_HEATMAP, new BadPointsHeatmapResolver());
+    RESOLVERS.put(
+        ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE, new RegionBadLocationsShapeResolver());
   }
 }

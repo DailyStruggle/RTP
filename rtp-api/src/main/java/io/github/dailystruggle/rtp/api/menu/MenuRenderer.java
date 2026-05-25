@@ -15,10 +15,10 @@ import java.util.UUID;
  * loaded must throw {@link IllegalStateException} per REQ-RTP-S-006 — never
  * silently no-op.
  *
- * <p><b>Click round-trip.</b> Each clickable {@link MenuFragment} resolves to
- * a single-use {@code /rtp menu:<token>} command through the
- * {@link MenuTokenRegistry}; renderers must not emit clicks that run anything
- * else as a player command (ADR-035 §Security boundary).
+ * <p><b>Click round-trip (ADR-050).</b> Each clickable {@link MenuFragment}
+ * resolves to a concrete, self-documenting {@code /rtp menu ...} command.
+ * Permission gating remains the security boundary, enforced server-side by
+ * the dispatch helpers on {@code MenuRedeemSubcommand}.
  */
 public interface MenuRenderer {
 

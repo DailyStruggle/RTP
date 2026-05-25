@@ -164,7 +164,7 @@ public final class LobbyDispatchRetryQueue {
                     "[NETWORK][lobbyRetry] duplicate enqueue ignored: playerId=" + playerId);
             return;
         }
-        RTP.log(Level.INFO,
+        RTP.log(Level.FINE,
                 "[NETWORK][state] lobbyRetry parked: playerId=" + playerId
                         + " firstReason=" + firstReason
                         + " maxAttempts=" + maxAttempts
@@ -195,7 +195,7 @@ public final class LobbyDispatchRetryQueue {
         long now = System.currentTimeMillis();
         boolean firstRecord = enrolled.put(playerId, new Entry(playerId, args, now, messageMethod)) == null;
         if (firstRecord) {
-            RTP.log(Level.INFO,
+            RTP.log(Level.FINE,
                     "[NETWORK][state] lobbyRetry recorded enrolment: playerId=" + playerId);
         }
     }
@@ -227,7 +227,7 @@ public final class LobbyDispatchRetryQueue {
         long now = System.currentTimeMillis();
         Entry entry = new Entry(playerId, prev.args, now, prev.messageMethod);
         parked.put(playerId, entry);
-        RTP.log(Level.INFO,
+        RTP.log(Level.FINE,
                 "[NETWORK][state] lobbyRetry re-parked after enrolment timeout: playerId="
                         + playerId);
         return true;
@@ -363,7 +363,7 @@ public final class LobbyDispatchRetryQueue {
                     cs.serverHint(),
                     now));
             parked.remove(entry.playerId);
-            RTP.log(Level.INFO,
+            RTP.log(Level.FINE,
                     "[NETWORK][state] lobbyRetry enrolled after " + entry.attempts
                             + " attempts: playerId=" + entry.playerId
                             + " correlationId=" + correlationId
@@ -408,7 +408,7 @@ public final class LobbyDispatchRetryQueue {
         parked.remove(entry.playerId);
         sendLocalized(entry, key, reasonDetail);
         releaseLock(entry.playerId);
-        RTP.log(Level.INFO,
+        RTP.log(Level.FINE,
                 "[NETWORK][state] lobbyRetry terminated: playerId=" + entry.playerId
                         + " reason=" + reasonDetail
                         + " attempts=" + entry.attempts);

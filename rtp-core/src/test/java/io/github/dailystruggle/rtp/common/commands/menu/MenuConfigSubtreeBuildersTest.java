@@ -53,17 +53,16 @@ class MenuConfigSubtreeBuildersTest {
     @Test
     @DisplayName("buildConfigSelector: Back + Search + header + one OpenConfigFile row per file")
     void buildConfigSelector_layout() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
 
         List<String> files = List.of("performance.yml", "safety.yml", "config.yml");
         MenuModel model = builder.buildConfigSelector(UUID.randomUUID(), files);
 
         assertEquals(1, model.pages().size(), "selector is single-page");
         List<MenuLine> lines = model.pages().get(0).lines();
-        // 1 Back + 1 Search + 1 header + 2 multiconfig rows (regions, worlds) + 3 file rows = 8
-        assertEquals(8, lines.size(),
-                "selector layout: back + search + header + regions + worlds + N file rows");
+        // 1 Back + 1 Search + 1 header + 3 multiconfig rows (regions, worlds, effects) + 3 file rows = 9
+        assertEquals(9, lines.size(),
+                "selector layout: back + search + header + regions + worlds + effects + N file rows");
 
         // Row 0 → Back via OpenMenu(empty path) (root /rtp menu page).
         MenuFragment back = lines.get(0).fragments().get(0);
@@ -95,10 +94,15 @@ class MenuConfigSubtreeBuildersTest {
                 "row 4 must be the Worlds multiconfig submenu entry");
         assertEquals("worlds",
                 ((MenuAction.OpenMultiConfigSelector) worldsAction).parserKind());
+        MenuAction effectsAction = lines.get(5).fragments().get(0).action();
+        assertInstanceOf(MenuAction.OpenMultiConfigSelector.class, effectsAction,
+                "row 5 must be the Effects multiconfig submenu entry");
+        assertEquals("effects",
+                ((MenuAction.OpenMultiConfigSelector) effectsAction).parserKind());
 
-        // Rows 5..7 → one OpenConfigFile per file, in encounter order.
+        // Rows 6..8 → one OpenConfigFile per file, in encounter order.
         for (int i = 0; i < files.size(); i++) {
-            MenuFragment row = lines.get(5 + i).fragments().get(0);
+            MenuFragment row = lines.get(6 + i).fragments().get(0);
             assertInstanceOf(MenuAction.OpenConfigFile.class, row.action(),
                     "file row " + i + " must be OpenConfigFile");
             assertEquals(files.get(i),
@@ -110,15 +114,14 @@ class MenuConfigSubtreeBuildersTest {
     @Test
     @DisplayName("buildConfigSelector: empty file list still yields a usable page (back + header only)")
     void buildConfigSelector_emptyFileList() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
 
         MenuModel model = builder.buildConfigSelector(UUID.randomUUID(), List.of());
 
         List<MenuLine> lines = model.pages().get(0).lines();
-        // back + search + header + regions + worlds = 5
-        assertEquals(5, lines.size(),
-                "empty file list still produces back + search + header + regions/worlds rows");
+        // back + search + header + regions + worlds + effects = 6
+        assertEquals(6, lines.size(),
+                "empty file list still produces back + search + header + regions/worlds/effects rows");
         assertInstanceOf(MenuAction.OpenMenu.class,
                 lines.get(0).fragments().get(0).action());
         assertInstanceOf(MenuAction.OpenConfigSearchPrompt.class,
@@ -128,8 +131,7 @@ class MenuConfigSubtreeBuildersTest {
     @Test
     @DisplayName("buildConfigSelector: null/empty file-name entries are skipped (defensive)")
     void buildConfigSelector_skipsBlankEntries() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
 
         // The list contains a null and an empty string; both must be filtered
         // out by the builder so we never try to construct
@@ -142,19 +144,18 @@ class MenuConfigSubtreeBuildersTest {
 
         MenuModel model = builder.buildConfigSelector(UUID.randomUUID(), mixed);
         List<MenuLine> lines = model.pages().get(0).lines();
-        // back + search + header + regions + worlds + 2 valid file rows = 7
-        assertEquals(7, lines.size());
+        // back + search + header + regions + worlds + effects + 2 valid file rows = 8
+        assertEquals(8, lines.size());
         assertEquals("real.yml",
-                ((MenuAction.OpenConfigFile) lines.get(5).fragments().get(0).action()).fileName());
-        assertEquals("other.yml",
                 ((MenuAction.OpenConfigFile) lines.get(6).fragments().get(0).action()).fileName());
+        assertEquals("other.yml",
+                ((MenuAction.OpenConfigFile) lines.get(7).fragments().get(0).action()).fileName());
     }
 
     @Test
     @DisplayName("buildConfigSelector: null inputs rejected")
     void buildConfigSelector_nullsRejected() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
         assertThrows(NullPointerException.class,
                 () -> builder.buildConfigSelector(null, List.of()));
         assertThrows(NullPointerException.class,
@@ -168,8 +169,7 @@ class MenuConfigSubtreeBuildersTest {
     @Test
     @DisplayName("buildConfigFile: Back→OpenConfigSelector + header + one OpenConfigKey row per loaded key")
     void buildConfigFile_layout() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
 
         @SuppressWarnings("unchecked")
         ConfigParser<PerformanceKeys> parser =
@@ -239,8 +239,7 @@ class MenuConfigSubtreeBuildersTest {
     @Test
     @DisplayName("buildConfigFile: empty-enum parser degrades to a hint row (v3.7.4)")
     void buildConfigFile_emptyEnumHint() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
 
         // Stand up a ConfigParser over an empty enum on the fly. Re-using the
         // tempDir wired by RTPTestSetup keeps file IO contained.
@@ -272,8 +271,7 @@ class MenuConfigSubtreeBuildersTest {
     @Test
     @DisplayName("buildConfigFile: null/empty inputs rejected")
     void buildConfigFile_nullsRejected() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
 
         @SuppressWarnings("unchecked")
         ConfigParser<PerformanceKeys> parser =
@@ -299,8 +297,7 @@ class MenuConfigSubtreeBuildersTest {
     @Test
     @DisplayName("buildConfigFile: keys absent from the YAML are not surfaced in the menu (lite parity)")
     void buildConfigFile_omitsKeysAbsentFromLoadedYaml() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
 
         @SuppressWarnings("unchecked")
         ConfigParser<PerformanceKeys> parser =

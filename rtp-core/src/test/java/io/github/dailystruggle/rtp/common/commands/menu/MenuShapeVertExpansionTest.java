@@ -55,8 +55,7 @@ class MenuShapeVertExpansionTest {
     @Test
     @DisplayName("type picker: Back row + header + one OpenMenu(name:<T>) row per type")
     void typePicker_layout() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
 
         List<String> types = List.of("SQUARE", "CIRCLE");
         List<String> writePath = List.of("config", "regions", "set", "default");
@@ -105,8 +104,7 @@ class MenuShapeVertExpansionTest {
     @Test
     @DisplayName("type picker: current type is marked in the row label (case-insensitive)")
     void typePicker_currentTypeMarker() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
 
         MenuModel model = builder.buildShapeVertTypePicker(
                 UUID.randomUUID(),
@@ -131,8 +129,7 @@ class MenuShapeVertExpansionTest {
     @Test
     @DisplayName("type picker: null currentTypeName is allowed; null/empty entries skipped")
     void typePicker_nullCurrentAndBlankEntries() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
 
         List<String> types = new java.util.ArrayList<>();
         types.add("SQUARE");
@@ -157,8 +154,7 @@ class MenuShapeVertExpansionTest {
     @Test
     @DisplayName("type picker: required args rejected when null or empty")
     void typePicker_argRejection() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
         UUID id = UUID.randomUUID();
 
         assertThrows(NullPointerException.class, () -> builder.buildShapeVertTypePicker(
@@ -184,8 +180,7 @@ class MenuShapeVertExpansionTest {
     @Test
     @DisplayName("sub-param page: Back row + header + one OpenParamPicker per sub-param")
     void subParamPage_layout() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
 
         // Use LinkedHashMap for deterministic iteration order.
         Map<String, Object> subParams = new LinkedHashMap<>();
@@ -239,8 +234,7 @@ class MenuShapeVertExpansionTest {
     @Test
     @DisplayName("sub-param page: empty subParamValues degrades to Back + header + hint")
     void subParamPage_emptyMap() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
 
         MenuModel model = builder.buildShapeVertSubParamPage(
                 UUID.randomUUID(),
@@ -260,8 +254,7 @@ class MenuShapeVertExpansionTest {
     @Test
     @DisplayName("sub-param page: null entry keys are skipped (defensive)")
     void subParamPage_skipsBlankKeys() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
 
         Map<String, Object> subParams = new LinkedHashMap<>();
         subParams.put("radius", 1000);
@@ -284,8 +277,7 @@ class MenuShapeVertExpansionTest {
     @Test
     @DisplayName("sub-param page: required args rejected when null or empty")
     void subParamPage_argRejection() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder(registry);
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
         UUID id = UUID.randomUUID();
 
         assertThrows(NullPointerException.class, () -> builder.buildShapeVertSubParamPage(

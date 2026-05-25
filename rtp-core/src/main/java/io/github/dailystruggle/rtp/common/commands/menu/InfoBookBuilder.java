@@ -8,16 +8,13 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry;
 import io.github.dailystruggle.mapsapi.noop.NoopMapBinding;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
-import io.github.dailystruggle.rtp.common.commands.maps.ChartSpecTokens;
 import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -63,19 +60,12 @@ public final class InfoBookBuilder {
      */
     public static final int LINES_PER_PAGE = 13;
 
-    /** Token TTL aligned with the rest of the curated menu surface. */
-    public static final Duration DEFAULT_TOKEN_TTL = AdminPanelBuilder.DEFAULT_TOKEN_TTL;
-
-    private final MenuTokenRegistry tokenRegistry;
-    private final Duration tokenTtl;
-
-    public InfoBookBuilder(MenuTokenRegistry tokenRegistry) {
-        this(tokenRegistry, DEFAULT_TOKEN_TTL);
-    }
-
-    public InfoBookBuilder(MenuTokenRegistry tokenRegistry, Duration tokenTtl) {
-        this.tokenRegistry = Objects.requireNonNull(tokenRegistry, "tokenRegistry");
-        this.tokenTtl = Objects.requireNonNull(tokenTtl, "tokenTtl");
+    /**
+     * ADR-050 Stage 3β.D.2b (2026-05-24): no-arg constructor. The renderer
+     * emits concrete {@code /rtp menu info ...} commands, so no token
+     * registry or TTL is consulted any more.
+     */
+    public InfoBookBuilder() {
     }
 
     /**
@@ -225,8 +215,8 @@ public final class InfoBookBuilder {
         String refreshHover = lookupMsg(
                 MessagesKeys.infoBookRefreshHover,
                 "Re-render this page against a fresh metrics snapshot.");
+        // ADR-050 Stage 3α: tokenRegistry.mint removed (dead side-effect; renderer emits concrete /rtp menu info commands).
         MenuAction refreshAction = new MenuAction.OpenInfo(scope);
-        tokenRegistry.mint(viewer, refreshAction, tokenTtl);
         lines.add(MenuLine.of(new MenuFragment(refreshLabel, refreshHover, refreshAction)));
 
         // Switch-to-chat row.
@@ -236,7 +226,6 @@ public final class InfoBookBuilder {
                 MessagesKeys.infoBookSwitchToTextHover,
                 "Re-run /rtp info in chat instead of the book.");
         MenuAction switchAction = new MenuAction.SwitchInfoToText(scope);
-        tokenRegistry.mint(viewer, switchAction, tokenTtl);
         lines.add(MenuLine.of(new MenuFragment(switchLabel, switchHover, switchAction)));
 
         // ADR-047 / REQ-RTP-MAP-006 declarative chart bridge: bad-points
@@ -256,11 +245,9 @@ public final class InfoBookBuilder {
                     MessagesKeys.menuInfoBadPointsLabel,
                     "&b\u2316 View bad-points map");
             if (mapLabel != null && !mapLabel.isEmpty()) {
-                UUID chartToken = ChartSpecTokens.instance().mint(
-                        viewer,
-                        ChartSpec.of(ChartSpec.Kind.BAD_POINTS_HEATMAP, scope.name()));
-                MenuAction mapAction = new MenuAction.OpenMap(chartToken);
-                tokenRegistry.mint(viewer, mapAction, tokenTtl);
+                // ADR-050 Stage 3β: OpenMap is now (Kind, regionName); no token round-trip.
+                MenuAction mapAction = new MenuAction.OpenMap(
+                        ChartSpec.Kind.BAD_POINTS_HEATMAP, scope.name());
                 lines.add(MenuLine.of(new MenuFragment(mapLabel, null, mapAction)));
             }
         }

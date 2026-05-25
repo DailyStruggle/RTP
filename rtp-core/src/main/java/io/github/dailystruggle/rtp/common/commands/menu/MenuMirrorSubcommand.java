@@ -74,7 +74,16 @@ public final class MenuMirrorSubcommand extends BaseRTPCmdImpl implements TreeCo
         // Eagerly mirror the target's child TreeCommands as MenuMirrorSubcommands.
         // Non-TreeCommand children have no further navigation surface and are
         // skipped (they would not be walkable by the commands-api parser as a
-        // shadow node anyway).
+        // shadow node anyway). Runtime-added children on the target after the
+        // initial seed are wired in eagerly too: callers that mutate the real
+        // tree at runtime (currently only {@link MenuRedeemSubcommand}'s
+        // multi-config ADD/REMOVE branches via {@code registerMirrorChild} /
+        // {@code unregisterMirrorChild}) are responsible for the symmetric
+        // mutation on this mirror. There is intentionally no lazy merge-on-
+        // read fallback: a second source of truth produced subtle ordering
+        // bugs (the lazy override returning a fresh map silently discarded
+        // {@code addSubCommand} writes; even the merge-and-write variant
+        // raced with concurrent mutators).
         Map<String, CommandsAPICommand> targetChildren = target.getCommandLookup();
         if (targetChildren != null) {
             for (CommandsAPICommand child : targetChildren.values()) {
@@ -87,6 +96,35 @@ public final class MenuMirrorSubcommand extends BaseRTPCmdImpl implements TreeCo
                 addSubCommand(new MenuMirrorSubcommand(redeem, this, tc, childPath));
             }
         }
+    }
+
+    /**
+     * Package-visible accessor used by {@link MenuRedeemSubcommand} to walk
+     * the mirror tree to a specific sub-node for runtime add/remove of
+     * multi-config children. Equivalent to a {@code getTarget()} but kept
+     * narrowly scoped to package-private to discourage external coupling.
+     */
+    TreeCommand target() {
+        return target;
+    }
+
+    /**
+     * Package-visible accessor for the redeem instance, used by
+     * {@link MenuRedeemSubcommand}'s runtime mirror-mutation helpers
+     * when constructing fresh child mirrors so they share the same
+     * {@code redeem} root.
+     */
+    MenuRedeemSubcommand redeem() {
+        return redeem;
+    }
+
+    /**
+     * Path from {@code /rtp} root down to (and including) this mirror's
+     * target. Package-visible for the same reason as {@link #redeem()}:
+     * fresh child mirrors need {@code parentPath + childName}.
+     */
+    List<String> path() {
+        return path;
     }
 
     @Override

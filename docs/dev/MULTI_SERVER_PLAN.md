@@ -58,6 +58,7 @@ These constraints are part of the acceptance criteria for ADR-036; any deviation
 - No proxy-side chunk logic, world data, or entity manipulation. The proxy never owns world state.
 - No replacement of the existing single-server pipeline. With `network.enabled: false`, behaviour is byte-identical to today.
 - No Forge / NeoForge proxy support. (Out of scope until Fabric platform stabilises â€” see `MULTI_PLATFORM_PLAN.md` Phase 4.)
+- No first-class Fabric backend networking support. Decision recorded 2026-05-24: networked Fabric setups (Velocity / BungeeCord in front of a Fabric backend) are **supported only at the SPI level** (the `rtp-proxy-common` dispatcher is platform-agnostic, and the devstack's `backend-c` Fabric instance exercises that) but are **not a prioritized feature** and ship with no documented forwarding-mode recipe until a modpack operator files a concrete request. Operators wanting to try it today use Velocity legacy forwarding + the third-party FabricProxy-Lite mod at their own risk; RTP itself adds nothing Fabric-specific to the proxy path. Revisit if demand materializes.
 - No cross-version protocol breakage without a `schemaVersion` bump.
 - **No post-arrival coordinate resolution.** Coordinates are resolved on the destination *before* the player transfers; see *Coordinate Resolution Timing* below.
 

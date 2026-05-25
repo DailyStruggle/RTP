@@ -5,11 +5,9 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry;
 import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabApplier;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -42,9 +40,6 @@ import java.util.UUID;
  */
 public final class PrefabConfirmationMenuBuilder {
 
-    /** Token TTL aligned with the rest of the curated menu surface. */
-    public static final Duration DEFAULT_TOKEN_TTL = FrontPageBuilder.DEFAULT_TOKEN_TTL;
-
     /**
      * Hard cap on the number of diff lines surfaced per file in the
      * confirmation menu body. A noisy multi-world prefab with hundreds of
@@ -54,43 +49,34 @@ public final class PrefabConfirmationMenuBuilder {
      */
     public static final int MAX_LINES_PER_FILE = 8;
 
-    private final MenuTokenRegistry tokenRegistry;
-    private final Duration tokenTtl;
-
-    public PrefabConfirmationMenuBuilder(MenuTokenRegistry tokenRegistry) {
-        this(tokenRegistry, DEFAULT_TOKEN_TTL);
-    }
-
-    public PrefabConfirmationMenuBuilder(MenuTokenRegistry tokenRegistry, Duration tokenTtl) {
-        this.tokenRegistry = Objects.requireNonNull(tokenRegistry, "tokenRegistry");
-        this.tokenTtl = Objects.requireNonNull(tokenTtl, "tokenTtl");
+    /**
+     * ADR-050 Stage 3β.D.2b (2026-05-24): no-arg constructor. The renderer
+     * emits concrete {@code /rtp menu ...} commands, so no token registry or
+     * TTL is consulted any more.
+     */
+    public PrefabConfirmationMenuBuilder() {
     }
 
     /**
-     * Build the confirmation page for {@code prefab} carrying the {@code
-     * apply}-side {@code nonce}. The {@code Confirm} row dispatches
-     * {@code /rtp admin prefab confirm <prefabId> <nonce>}; the {@code
-     * Cancel} row dispatches {@link MenuAction.OpenAdminPanel}.
+     * Build the confirmation page for {@code prefab}. The {@code Confirm}
+     * row dispatches {@code /rtp admin prefab confirm id=<prefabId>}; the
+     * {@code Cancel} row dispatches {@link MenuAction.OpenAdminPanel}. The
+     * apply-side pending diff is keyed by {@code (callerId, prefabId)} in
+     * {@link io.github.dailystruggle.rtp.common.commands.prefab.PrefabNonceStore};
+     * no opaque token is surfaced to the click.
      *
      * @param prefab the prefab whose diff is being confirmed.
-     * @param nonce  the single-use token minted by {@code PrefabApplyCmd};
-     *               passed back to the confirm verb.
      * @param diff   the per-file diff produced by {@link PrefabApplier#apply}.
      *               Keys are file ids ({@code "performance"},
      *               {@code "regions/<id>"}); values are ordered changes.
-     * @param viewer the calling player UUID. Token-mint scope.
+     * @param viewer the calling player UUID.
      */
     public MenuModel build(Prefab prefab,
-                           String nonce,
                            Map<String, List<PrefabApplier.Change>> diff,
                            UUID viewer) {
         Objects.requireNonNull(prefab, "prefab");
-        Objects.requireNonNull(nonce, "nonce");
         Objects.requireNonNull(diff, "diff");
         Objects.requireNonNull(viewer, "viewer");
-        if (nonce.isEmpty()) {
-            throw new IllegalArgumentException("nonce must not be empty");
-        }
 
         List<MenuLine> lines = new ArrayList<>();
 
@@ -149,7 +135,7 @@ public final class PrefabConfirmationMenuBuilder {
                 "&a&l[confirm]",
                 null,
                 new MenuAction.RunRtpCommand(
-                        new String[]{"admin", "prefab", "confirm", prefab.id(), nonce}));
+                        new String[]{"admin", "prefab", "confirm", "id=" + prefab.id()}));
         addRow(
                 lines,
                 "&c&l[cancel]",
@@ -158,18 +144,9 @@ public final class PrefabConfirmationMenuBuilder {
 
         MenuPage page = new MenuPage(lines);
         List<MenuPage> pages = List.of(page);
-
-        // Mint a token per clickable fragment so the book renderer can emit
-        // menu:<token> click payloads. Mirrors AdminPanelBuilder.
-        for (MenuLine line : page.lines()) {
-            for (MenuFragment fragment : line.fragments()) {
-                MenuAction action = fragment.action();
-                if (action != null) {
-                    tokenRegistry.mint(viewer, action, tokenTtl);
-                }
-            }
-        }
-
+        // ADR-050 Stage 3β.D.2b (2026-05-24): the per-fragment mint loop is
+        // gone (the renderer emits concrete `/rtp menu ...` commands; no
+        // token is consulted).
         return new MenuModel(title, pages);
     }
 

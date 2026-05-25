@@ -131,9 +131,11 @@ public final class NetworkStatusCache {
             return new QueueStatus(playerId, QueueStatus.State.QUEUED, 0,
                     Optional.empty(), Optional.empty(), now);
         });
-        // State-transition log: one line on first seed, FINE on re-seed
-        // (re-seed happens on every retry pulse and would spam at INFO).
-        RTP.log(firstSeed ? Level.INFO : Level.FINE,
+        // State-transition log: emitted at FINE (operator log volume).
+        // The non-state-transition INFO surface for network mode is the
+        // bootstrap banner in NetworkModeBootstrap; per-player traces
+        // live here at FINE.
+        RTP.log(Level.FINE,
                 "[NETWORK][state] " + (firstSeed ? "seeded" : "re-seeded")
                         + " local QUEUED row: playerId=" + playerId
                         + " ttlMs=" + seededTimeoutMs);
@@ -254,7 +256,7 @@ public final class NetworkStatusCache {
                 QueueStatus.State prevState = (prev == null) ? null : prev.state();
                 int prevPos = (prev == null) ? -1 : prev.positionInQueue();
                 if (prevState != s.state() || prevPos != s.positionInQueue()) {
-                    RTP.log(Level.INFO,
+                    RTP.log(Level.FINE,
                             "[NETWORK][state] supplier: playerId=" + s.playerId()
                                     + " " + (prevState == null ? "NEW" : prevState.name())
                                     + "(pos=" + prevPos + ") -> "
@@ -315,7 +317,7 @@ public final class NetworkStatusCache {
         // State-transition log: non-terminal -> terminal (or supplier
         // eviction when newState==null, sticky-TTL FAILED, etc.). One
         // line per UUID per transition; bounded by exactly-once firing.
-        RTP.log(Level.INFO,
+        RTP.log(Level.FINE,
                 "[NETWORK][state] terminal: playerId=" + playerId
                         + " newState=" + (newState == null ? "EVICTED" : newState.name()));
         try {

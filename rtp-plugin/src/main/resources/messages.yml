@@ -132,7 +132,7 @@ scanStatus: "&a[P0] completed [scan_chunks] / [scan_totalChunks] chunks for regi
 # Section 7: Info Command
 # ###############################################################################
 # messages related to the info command
-infoTitle: "&a======RTP Info======"
+infoTitle: "&a&l/rtp info"
 infoTickets: "&7Global Active Chunk Tickets: #7E9CC8[tickets]"
 infoTeleports: "&7Active Teleport State Machines: #7E9CC8[teleports]"
 infoMSPT: "&7Current Plugin MSPT: #7E9CC8[mspt]"
@@ -216,12 +216,12 @@ test_description: "test RTP functions"
 # ###############################################################################
 # Section 8b: Generalized Menu Framework
 # ###############################################################################
-# Sent when a menu token is unknown, malformed, or belongs to another player.
-menuInvalid: "&c[P0] that menu link is invalid."
-# Sent when a menu token has expired or was already consumed.
-menuExpired: "&c[P0] that menu link has expired. Please reopen the menu."
-# Sent when a menu redeem cannot resolve the calling player UUID.
-menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
+# Sent when a concrete /rtp menu ... command is malformed, points at an
+# unknown path/parameter, or fails its server-side permission gate.
+# ADR-050: menu clicks are concrete commands, so there is no token to expire.
+menuInvalid: "&c[P0] that menu command is invalid."
+# Sent when a menu command cannot resolve the calling player UUID.
+menuUnknownPlayer: "&c[P0] menu commands can only be used by in-game players."
 # Hover-fallback template used by the menu reflector when no YAML block-comment
 # is available for a parameter. Placeholder: [type] - the declared parameter type.
 menuHoverFallbackType: "type: [type]"
@@ -285,6 +285,8 @@ menuAdminPanelRowRegions: "#5FB3B3▶ regions"
 menuAdminPanelHoverRegions: "&7add, remove, or edit per-region configs"
 menuAdminPanelRowWorlds: "#5FB3B3▶ worlds"
 menuAdminPanelHoverWorlds: "&7add, remove, or edit per-world configs"
+menuAdminPanelRowEffects: "#5FB3B3▶ effects"
+menuAdminPanelHoverEffects: "&7add, remove, or edit per-group teleport effects"
 menuAdminPanelRowInfo: "#5FB3B3▶ server info"
 menuAdminPanelHoverInfo: "&7show plugin version, region counts, and queue state"
 menuAdminPanelRowDiagnostics: "&c▶ full diagnostics"
@@ -298,6 +300,25 @@ menuAdminPanelHoverReload: "&7reloads all config files; in-flight teleports may 
 menuAdminPanelRowBrowse: "#5FB3B3▶ browse all commands"
 menuAdminPanelHoverBrowse: "&7open the reflected /rtp command tree"
 menuAdminPanelRowBack: "&7« back"
+# --- Visualizations submenu (admin map of bad locations per region) ---
+# Admin-panel row: open the Visualizations submenu. No placeholders.
+menuAdminPanelRowVisualizations: "#5FB3B3▶ visualizations"
+# Hover text for the admin-panel Visualizations row. No placeholders.
+menuAdminPanelHoverVisualizations: "&7open maps and other operator-facing visualizations"
+# Section divider above the Visualizations block on the admin panel.
+menuAdminPanelSectionVisualizations: "&8» &7visualizations"
+# Non-clickable title row at the top of the Visualizations submenu.
+menuVisualizationsTitle: "#9D7CD8&l⌖ visualizations"
+# Non-clickable hint row below the title.
+menuVisualizationsHint: "&7pick a region to view its bad-locations map"
+# Visualizations row template; [region] - region name.
+menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- region shape map"
+# Hover text for a Visualizations region row; [region] - region name.
+menuVisualizationsHoverRegion: "&7open a map showing bad locations in &b[region]"
+# Non-clickable hint row shown when no regions are configured.
+menuVisualizationsEmpty: "&7(no regions configured)"
+# Visualizations submenu back row (returns to the admin panel).
+menuVisualizationsRowBack: "&7« back"
 # --- Admin panel Setup section: curated prefabs (PROPOSAL-admin-panel-prefabs.md v3.1) ---
 # Section divider above the Setup (quick start) block on the admin panel.
 menuAdminPanelSectionSetup: "&8» &7setup (quick start)"

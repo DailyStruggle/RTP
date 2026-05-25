@@ -17,7 +17,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor;
 import io.github.dailystruggle.rtp.bukkitplatform.server.AsyncTeleportProcessing;
-import io.github.dailystruggle.rtp.bukkitplatform.server.DatabaseProcessing;
+import io.github.dailystruggle.rtp.common.server.DatabaseProcessing;
 import io.github.dailystruggle.rtp.bukkitplatform.server.ScanTaskProcessing;
 import io.github.dailystruggle.rtp.bukkitplatform.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
@@ -258,7 +258,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable Folia detected -- skipping ChunkUnloadProcessor");
     }
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable DatabaseProcessing.start");
-    DatabaseProcessing.start(this);
+    DatabaseProcessing.start();
 
     SendMessage.sendMessage(Bukkit.getConsoleSender(), "");
 
@@ -523,7 +523,11 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     Bukkit.getPluginManager().registerEvents(new OnPlayerMove(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerQuit(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerRespawn(), this);
-    Bukkit.getPluginManager().registerEvents(new OnPlayerTeleport(), this);
+    // Deprecated external-teleport interceptor; kept wired for one release cycle, slated for
+    // removal. See OnPlayerTeleport class Javadoc and MULTI_PLATFORM_PLAN.md Step E-tail.
+    @SuppressWarnings("deprecation")
+    OnPlayerTeleport legacyTeleportListener = new OnPlayerTeleport();
+    Bukkit.getPluginManager().registerEvents(legacyTeleportListener, this);
     Bukkit.getPluginManager().registerEvents(new OnWorldLoadUnload(), this);
 
     // L2 of CHECKLIST-cross-server-rtp.md: hand the network-mode bootstrap a

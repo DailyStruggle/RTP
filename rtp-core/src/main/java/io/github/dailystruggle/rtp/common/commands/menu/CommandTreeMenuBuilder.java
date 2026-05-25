@@ -58,9 +58,6 @@ import java.util.function.Predicate;
  */
 public final class CommandTreeMenuBuilder {
 
-    /** Default TTL for tokens minted by the reflector when the config knob is unset. */
-    public static final java.time.Duration DEFAULT_TOKEN_TTL = java.time.Duration.ofHours(6);
-
     /**
      * Stage A.6 — number of suggestion value rows packed onto a single
      * parameter-value picker page before overflow rows are sliced onto
@@ -72,17 +69,12 @@ public final class CommandTreeMenuBuilder {
      */
     public static final int PICKER_VALUES_PER_PAGE = 10;
 
-    private final io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry tokenRegistry;
-    private final java.time.Duration tokenTtl;
-
-    public CommandTreeMenuBuilder(io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry tokenRegistry) {
-        this(tokenRegistry, DEFAULT_TOKEN_TTL);
-    }
-
-    public CommandTreeMenuBuilder(io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry tokenRegistry,
-                                  java.time.Duration tokenTtl) {
-        this.tokenRegistry = Objects.requireNonNull(tokenRegistry, "tokenRegistry");
-        this.tokenTtl = Objects.requireNonNull(tokenTtl, "tokenTtl");
+    /**
+     * ADR-050 Stage 3β.D.2b (2026-05-24): no-arg constructor. The renderer
+     * emits concrete {@code /rtp menu ...} commands, so no token registry or
+     * TTL is consulted any more.
+     */
+    public CommandTreeMenuBuilder() {
     }
 
     /**
@@ -271,18 +263,8 @@ public final class CommandTreeMenuBuilder {
             }
         }
 
-        // Mint a token per clickable fragment so the renderer's click payload can be
-        // the opaque /rtp menu token:<token> form (ADR-035 §3). Token-binding is wholly
-        // server-side; the builder retains no reference to the minted tokens
-        // because the renderer owns the click-event materialisation.
-        for (MenuLine line : lines) {
-            for (MenuFragment fragment : line.fragments()) {
-                MenuAction action = fragment.action();
-                if (action != null) {
-                    tokenRegistry.mint(callerId, action, tokenTtl);
-                }
-            }
-        }
+        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop collapsed.
+        // Renderer emits concrete /rtp menu ... commands; no token is consulted.
 
         String title = root.name() == null ? "" : root.name();
         return new MenuModel(title, List.of(new MenuPage(lines)));
@@ -581,16 +563,7 @@ public final class CommandTreeMenuBuilder {
         // fresh token — ChangePage clicks are renderer-resolved and don't
         // need a server token, but the renderer still mints one uniformly
         // (matches build() and the existing ChangePage handling in tests).
-        for (MenuPage page : pages) {
-            for (MenuLine line : page.lines()) {
-                for (MenuFragment fragment : line.fragments()) {
-                    MenuAction action = fragment.action();
-                    if (action != null) {
-                        tokenRegistry.mint(callerId, action, tokenTtl);
-                    }
-                }
-            }
-        }
+        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop collapsed.
 
         String title = (parent.name() == null ? "" : parent.name()) + ":" + paramName;
         return new MenuModel(title, pages);
@@ -658,6 +631,18 @@ public final class CommandTreeMenuBuilder {
                 "Add, remove, or edit per-world configs.");
         lines.add(MenuLine.of(new MenuFragment(worldsLabel, worldsHover,
                 new MenuAction.OpenMultiConfigSelector("worlds"))));
+        // Effects multi-config selector entry point. Mirrors the Regions /
+        // Worlds rows above: opens the per-group effects multi-config
+        // editor (effects/<group>.yml, parsed via EffectsGroupKeys; see
+        // effects-api-ADR-005 and Configs.reloadConfigs() lines 278-281
+        // where the parser is registered under name="effects").
+        String effectsLabel = lookupMsg(
+                MessagesKeys.menuAdminPanelRowEffects, "&b\u2699 Effects");
+        String effectsHover = lookupMsg(
+                MessagesKeys.menuAdminPanelHoverEffects,
+                "Add, remove, or edit per-group teleport effects.");
+        lines.add(MenuLine.of(new MenuFragment(effectsLabel, effectsHover,
+                new MenuAction.OpenMultiConfigSelector("effects"))));
 
         // One row per known config file. Hover surfaces an "edit <file>"
         // affordance hint so clicking the row reads as an edit entry-point
@@ -673,14 +658,7 @@ public final class CommandTreeMenuBuilder {
 
         // Mint a token per clickable action (mirrors buildParamPicker).
         MenuPage page = new MenuPage(lines);
-        for (MenuLine line : page.lines()) {
-            for (MenuFragment fragment : line.fragments()) {
-                MenuAction action = fragment.action();
-                if (action != null) {
-                    tokenRegistry.mint(callerId, action, tokenTtl);
-                }
-            }
-        }
+        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop collapsed.
 
         return new MenuModel("config", List.of(page));
     }
@@ -796,10 +774,19 @@ public final class CommandTreeMenuBuilder {
                     "&7(no editable keys in this file)", null, null)));
             pages.add(new MenuPage(lines));
         } else {
-            // Paginate to avoid Paper's 32767-char-per-page limit. A book page
-            // realistically fits ~12 rich-text rows before scrolling; use that
-            // as the page budget. Back + header consume 2 rows per page.
-            final int rowsPerPage = 12;
+            // Paginate to avoid Paper's 32767-char-per-page limit and, more
+            // pressingly in practice, to keep every row visible without
+            // running past a Minecraft book page's vertical line budget once
+            // long colorized labels (`&2shape.radius&7: &0<value>`) wrap to
+            // a second visual line. A simple "rows per page" cap mis-counts
+            // wrapped rows (one logical MenuLine can render as 2+ visual
+            // lines), so we instead track a *visual line* budget per page
+            // and charge each row its predicted wrap-line count from
+            // {@link #predictVisualLines}.
+            final int visualLinesPerPage = 14;
+            // Back + header consume ~1 visual line each (short labels).
+            int visualLinesUsed = predictVisualLines(backLabel)
+                    + predictVisualLines(fileName);
             List<MenuLine> lines = new ArrayList<>();
             lines.add(backRow);
             lines.add(headerRow);
@@ -847,44 +834,60 @@ public final class CommandTreeMenuBuilder {
                     // label stays compact (single-line) and clean.
                     lines.add(MenuLine.of(new MenuFragment(label, pendingRowHover,
                             new MenuAction.UnstageConfigValue(fileName, e.getKey()))));
-                    if (lines.size() - 2 >= rowsPerPage) {
+                    visualLinesUsed += predictVisualLines(label);
+                    if (visualLinesUsed >= visualLinesPerPage) {
                         pages.add(new MenuPage(lines));
                         lines = new ArrayList<>();
                         lines.add(backRow);
                         lines.add(headerRow);
+                        visualLinesUsed = predictVisualLines(backLabel)
+                                + predictVisualLines(fileName);
                     }
                 }
                 lines.add(MenuLine.of(new MenuFragment(
                         applyLabel, null, new MenuAction.ApplyStagedConfig(fileName))));
-                if (lines.size() - 2 >= rowsPerPage) {
+                visualLinesUsed += predictVisualLines(applyLabel);
+                if (visualLinesUsed >= visualLinesPerPage) {
                     pages.add(new MenuPage(lines));
                     lines = new ArrayList<>();
                     lines.add(backRow);
                     lines.add(headerRow);
+                    visualLinesUsed = predictVisualLines(backLabel)
+                            + predictVisualLines(fileName);
                 }
             }
             for (E key : visibleKeys) {
                 Object current = loaded.get(key);
                 // Nested config values (e.g. database/network/menu under
                 // config.yml whose stored value is an RtpYamlSection or
-                // Map) render via String.valueOf as garbage like
+                // Map; or `shape`/`vert` on a freshly added multi-config
+                // entry that has not yet had its FactoryValue merge pass
+                // run) render via String.valueOf as garbage like
                 // "RtpYamlSection@1a2b3c". Flatten them into one row per
                 // scalar leaf with a dotted path label (database.dbType,
-                // database.connectionPool.maxPoolSize, ...). Nested rows
-                // are non-clickable because the staging cart only accepts
-                // flat enum-keyed params; in-menu editing of nested
-                // leaves is out of scope for this fix.
+                // database.connectionPool.maxPoolSize, ...). Each row
+                // mints a clickable `OpenConfigKey(fileName,
+                // "<parent>.<sub>")`; the SubConfigCmd parser registers
+                // those dotted names as parameters via
+                // `addSectionParameters`, and the dispatcher's dotted-
+                // key write branch (SubConfigCmd.onCommand line 254-258)
+                // routes the typed value through `RtpYamlConfig.set`.
                 java.util.List<String[]> flattened = flattenNestedConfigValue(current);
                 if (flattened != null) {
                     for (String[] kv : flattened) {
-                        String nestedLabel = "&2" + key.name() + "." + kv[0]
+                        String dottedKey = key.name() + "." + kv[0];
+                        String nestedLabel = "&2" + dottedKey
                                 + "&7: &0" + kv[1];
-                        lines.add(MenuLine.of(new MenuFragment(nestedLabel, null, null)));
-                        if (lines.size() - 2 >= rowsPerPage) {
+                        lines.add(MenuLine.of(new MenuFragment(nestedLabel, null,
+                                new MenuAction.OpenConfigKey(fileName, dottedKey))));
+                        visualLinesUsed += predictVisualLines(nestedLabel);
+                        if (visualLinesUsed >= visualLinesPerPage) {
                             pages.add(new MenuPage(lines));
                             lines = new ArrayList<>();
                             lines.add(backRow);
                             lines.add(headerRow);
+                            visualLinesUsed = predictVisualLines(backLabel)
+                                    + predictVisualLines(fileName);
                         }
                     }
                     continue;
@@ -895,11 +898,14 @@ public final class CommandTreeMenuBuilder {
                 String label = "&2" + key.name() + "&7: &0" + currentStr;
                 lines.add(MenuLine.of(new MenuFragment(label, null,
                         new MenuAction.OpenConfigKey(fileName, key.name()))));
-                if (lines.size() - 2 >= rowsPerPage) {
+                visualLinesUsed += predictVisualLines(label);
+                if (visualLinesUsed >= visualLinesPerPage) {
                     pages.add(new MenuPage(lines));
                     lines = new ArrayList<>();
                     lines.add(backRow);
                     lines.add(headerRow);
+                    visualLinesUsed = predictVisualLines(backLabel)
+                            + predictVisualLines(fileName);
                 }
             }
             if (lines.size() > 2) {
@@ -908,16 +914,7 @@ public final class CommandTreeMenuBuilder {
         }
 
         // Mint tokens for clickable rows across all pages.
-        for (MenuPage page : pages) {
-            for (MenuLine line : page.lines()) {
-                for (MenuFragment fragment : line.fragments()) {
-                    MenuAction action = fragment.action();
-                    if (action != null) {
-                        tokenRegistry.mint(callerId, action, tokenTtl);
-                    }
-                }
-            }
-        }
+        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop collapsed.
 
         return new MenuModel("config:" + fileName, pages);
     }
@@ -1003,14 +1000,7 @@ public final class CommandTreeMenuBuilder {
 
         // Mint a token per clickable action.
         MenuPage page = new MenuPage(lines);
-        for (MenuLine line : page.lines()) {
-            for (MenuFragment fragment : line.fragments()) {
-                MenuAction action = fragment.action();
-                if (action != null) {
-                    tokenRegistry.mint(callerId, action, tokenTtl);
-                }
-            }
-        }
+        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop collapsed.
 
         return new MenuModel("config:" + fileName + ":" + paramName + ":type", List.of(page));
     }
@@ -1096,14 +1086,7 @@ public final class CommandTreeMenuBuilder {
 
         // Mint tokens for clickable rows.
         MenuPage page = new MenuPage(lines);
-        for (MenuLine line : page.lines()) {
-            for (MenuFragment fragment : line.fragments()) {
-                MenuAction action = fragment.action();
-                if (action != null) {
-                    tokenRegistry.mint(callerId, action, tokenTtl);
-                }
-            }
-        }
+        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop collapsed.
 
         return new MenuModel(
                 "config:" + fileName + ":" + paramName + ":" + typeName,
@@ -1111,23 +1094,75 @@ public final class CommandTreeMenuBuilder {
     }
 
     /**
-     * Flatten a nested config value (an {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection}
-     * or a generic {@link Map}) into an ordered list of
+     * Predict the number of *visual* lines a row's label will occupy on a
+     * Minecraft book page. Book pages are ~114 pixels wide; the default
+     * font averages about 6 pixels per character, giving ~19 displayable
+     * characters per visual line. Legacy color codes ({@code &x} / section
+     * markers) are stripped because they do not render as glyphs. Bold
+     * runs are slightly wider but we deliberately round generously (i.e.
+     * over-predict wrapping rather than under-predict) so the page budget
+     * never runs past the visible book area.
+     *
+     * <p>Returns at least {@code 1} for any non-null/non-empty label.
+     */
+    static int predictVisualLines(String raw) {
+        if (raw == null || raw.isEmpty()) return 1;
+        // Strip legacy ampersand and section-sign color codes: `&x` or `§x`
+        // (one trailing alnum). Hex sequences `&#RRGGBB` are not used in
+        // any of the menu labels right now, so the simple pair-strip is
+        // sufficient.
+        int visibleChars = 0;
+        int i = 0;
+        int n = raw.length();
+        while (i < n) {
+            char c = raw.charAt(i);
+            if ((c == '&' || c == '\u00a7') && i + 1 < n) {
+                i += 2;
+                continue;
+            }
+            visibleChars++;
+            i++;
+        }
+        if (visibleChars == 0) return 1;
+        // ~19 chars per visual line on the parchment background. Round up.
+        final int charsPerLine = 19;
+        return (visibleChars + charsPerLine - 1) / charsPerLine;
+    }
+
+    /**
+     * Flatten a nested config value (an {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection},
+     * a generic {@link Map}, or a {@link io.github.dailystruggle.rtp.common.factory.FactoryValue}
+     * such as {@code Shape}/{@code vert}) into an ordered list of
      * {@code [dottedSubPath, scalarValue]} pairs whose dotted path is suitable
      * for rendering as nested {@code parent.a}, {@code parent.a.b.c} rows on a
      * config book page. Returns {@code null} for scalar inputs (caller renders
      * them as a single editable row); returns an empty list when the value is
      * a nested container but has no leaves.
+     *
+     * <p>{@code FactoryValue} support (2026-05-24): {@code shape}/{@code vert}
+     * region keys hold a typed {@code FactoryValue<E>} whose {@code getData()}
+     * returns an {@code EnumMap<E, Object>} of tunables (e.g. {@code radius},
+     * {@code centerX}). This method exposes those as flat dotted rows
+     * (e.g. {@code shape.radius}) so the curated config page renders shape/vert
+     * the same way it renders {@code database}/{@code network} (which are
+     * {@code RtpYamlSection}-backed). The downstream {@code SubConfigCmd}
+     * dotted-key write branch then stages {@code <subKey>:<value>} into the
+     * cart with the dotted name visible, instead of showing the opaque
+     * top-level {@code shape} key whose value would be the {@code FactoryValue}
+     * instance's {@code toString} ("SQUARE", "CIRCLE", ...).
      */
     private static java.util.List<String[]> flattenNestedConfigValue(Object value) {
         if (value == null) return null;
         boolean isSection = value instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
         boolean isMap = value instanceof Map;
-        if (!isSection && !isMap) return null;
+        boolean isFactory = value instanceof io.github.dailystruggle.rtp.common.factory.FactoryValue;
+        if (!isSection && !isMap && !isFactory) return null;
         java.util.List<String[]> out = new ArrayList<>();
         Map<String, Object> level = isSection
                 ? ((io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) value).getValues(false)
-                : coerceMapKeysToString((Map<?, ?>) value);
+                : isFactory
+                        ? factoryValueToMap((io.github.dailystruggle.rtp.common.factory.FactoryValue<?>) value)
+                        : coerceMapKeysToString((Map<?, ?>) value);
         if (level == null || level.isEmpty()) return out;
         Deque<Object[]> stack = new ArrayDeque<>();
         java.util.List<Map.Entry<String, Object>> entries = new ArrayList<>(level.entrySet());
@@ -1158,6 +1193,17 @@ public final class CommandTreeMenuBuilder {
                 for (int i = kids.size() - 1; i >= 0; i--) {
                     stack.push(new Object[]{path + "." + kids.get(i).getKey(), kids.get(i).getValue()});
                 }
+            } else if (node instanceof io.github.dailystruggle.rtp.common.factory.FactoryValue) {
+                Map<String, Object> children = factoryValueToMap(
+                        (io.github.dailystruggle.rtp.common.factory.FactoryValue<?>) node);
+                if (children.isEmpty()) {
+                    out.add(new String[]{path, "&8(empty)"});
+                    continue;
+                }
+                java.util.List<Map.Entry<String, Object>> kids = new ArrayList<>(children.entrySet());
+                for (int i = kids.size() - 1; i >= 0; i--) {
+                    stack.push(new Object[]{path + "." + kids.get(i).getKey(), kids.get(i).getValue()});
+                }
             } else {
                 out.add(new String[]{path, node == null ? "&8(unset)" : String.valueOf(node)});
             }
@@ -1169,6 +1215,33 @@ public final class CommandTreeMenuBuilder {
         java.util.LinkedHashMap<String, Object> out = new java.util.LinkedHashMap<>();
         for (Map.Entry<?, ?> e : in.entrySet()) {
             out.put(String.valueOf(e.getKey()), e.getValue());
+        }
+        return out;
+    }
+
+    /**
+     * Convert a {@link io.github.dailystruggle.rtp.common.factory.FactoryValue}
+     * (e.g. a {@code Shape} or vert config) into an ordered
+     * {@code Map<String, Object>} keyed by the underlying enum names, so
+     * {@link #flattenNestedConfigValue} can emit dotted rows like
+     * {@code shape.radius}, {@code shape.centerX}. The {@code name} field
+     * (the factory discriminator: {@code SQUARE}, {@code CIRCLE},
+     * {@code DEFAULT_VERT}, ...) is included as a leading {@code name}
+     * entry so the operator can change the type from the same flat view.
+     */
+    private static Map<String, Object> factoryValueToMap(
+            io.github.dailystruggle.rtp.common.factory.FactoryValue<?> fv) {
+        java.util.LinkedHashMap<String, Object> out = new java.util.LinkedHashMap<>();
+        // Discriminator first so the type row sits at the top of the flattened
+        // view (mirrors PROPOSAL-config-view-as-book.md page 3a / Q4-2).
+        out.put("name", fv.name);
+        java.util.EnumMap<?, Object> data = fv.getData();
+        if (data != null) {
+            for (Map.Entry<?, Object> e : data.entrySet()) {
+                Object k = e.getKey();
+                if (k == null) continue;
+                out.put(String.valueOf(k), e.getValue());
+            }
         }
         return out;
     }

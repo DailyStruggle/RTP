@@ -5,13 +5,10 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry;
 import io.github.dailystruggle.rtp.common.commands.menu.CommandTreeMenuBuilder;
-import io.github.dailystruggle.rtp.common.commands.menu.FrontPageBuilder;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -32,9 +29,8 @@ import java.util.UUID;
  * and {@link io.github.dailystruggle.rtp.common.commands.menu.AdminPanelBuilder}:
  *
  * <ul>
- *   <li>Each clickable {@link MenuFragment} gets a token minted on the
- *       supplied {@link MenuTokenRegistry} (ADR-035 §3) so the book
- *       renderer can emit {@code menu:&lt;token&gt;} click payloads.</li>
+ *   <li>ADR-050 Stage 3β.D.2b: click events are now concrete
+ *       {@code /rtp menu ...} commands; no token registry is consulted.</li>
  *   <li>Book parchment contrast: yellow ({@code &amp;e}/{@code &amp;6}) and
  *       white ({@code &amp;f}) are avoided; locked rows render in dark
  *       gray ({@code &amp;8}) per the user's session 6 directive.</li>
@@ -60,11 +56,6 @@ import java.util.UUID;
  */
 public final class MultiConfigMenuBuilder {
 
-    /** Token TTL aligned with the rest of the curated menu surface. */
-    public static final Duration DEFAULT_TOKEN_TTL = FrontPageBuilder.DEFAULT_TOKEN_TTL;
-
-    private final MenuTokenRegistry tokenRegistry;
-    private final Duration tokenTtl;
     /**
      * Optional reference to the project-wide {@link CommandTreeMenuBuilder}.
      * When wired by the platform adapter (see
@@ -77,13 +68,12 @@ public final class MultiConfigMenuBuilder {
      */
     private volatile @org.jetbrains.annotations.Nullable CommandTreeMenuBuilder commandTreeMenuBuilder;
 
-    public MultiConfigMenuBuilder(MenuTokenRegistry tokenRegistry) {
-        this(tokenRegistry, DEFAULT_TOKEN_TTL);
-    }
-
-    public MultiConfigMenuBuilder(MenuTokenRegistry tokenRegistry, Duration tokenTtl) {
-        this.tokenRegistry = Objects.requireNonNull(tokenRegistry, "tokenRegistry");
-        this.tokenTtl = Objects.requireNonNull(tokenTtl, "tokenTtl");
+    /**
+     * ADR-050 Stage 3β.D.2b (2026-05-24): no-arg constructor. The renderer
+     * emits concrete {@code /rtp menu ...} commands, so no token registry or
+     * TTL is consulted any more.
+     */
+    public MultiConfigMenuBuilder() {
     }
 
     /**
@@ -169,18 +159,21 @@ public final class MultiConfigMenuBuilder {
         // Add row - opens an anvil-input prompt prefilled with a synthesized
         // unique name so the admin can type a custom region/world name before
         // the entry is created. On confirm the anvil session submits
-        //   /rtp menu multiaddKind=<parserKind> multiadd=<typedName>
+        //   /rtp menu multiaddkind=<parserKind> multiadd=<typedName>
         // which the MenuRedeemSubcommand dispatch arm routes through
         // dispatchMultiConfigMutate(ADD). The parentPath carries the parser
         // kind as a name=value segment so dispatchPromptAnvilInput's walker
         // skips it (it does not resolve as a TreeCommand child) while the
         // platform-side AnvilInputSession#buildCommand still appends it
-        // verbatim to the synthesized /rtp menu ... command.
+        // verbatim to the synthesized /rtp menu ... command. Both
+        // parameter names are lowercase because commands-api's TreeCommand
+        // parser lowercases tokens before paramLookup (TreeCommand.java:277);
+        // a camelCase token is unreachable and fires msgBadParameter.
         String seedName = nextDefaultName(parser.listParsers());
         addRow(lines, "&2&l[+ add new]",
                 "type a name (default: \"" + seedName + "\")",
                 new MenuAction.PromptAnvilInput(
-                        new String[]{"multiaddKind=" + parserKind},
+                        new String[]{"multiaddkind=" + parserKind},
                         "multiadd", seedName));
 
         lines.add(new MenuLine(List.of()));
@@ -217,17 +210,8 @@ public final class MultiConfigMenuBuilder {
 
         MenuPage page = new MenuPage(lines);
         List<MenuPage> pages = List.of(page);
-
-        // Mint one token per clickable fragment (ADR-035 §3).
-        for (MenuLine line : page.lines()) {
-            for (MenuFragment fragment : line.fragments()) {
-                MenuAction action = fragment.action();
-                if (action != null) {
-                    tokenRegistry.mint(viewer, action, tokenTtl);
-                }
-            }
-        }
-
+        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop
+        // collapsed (renderer emits concrete `/rtp menu ...` commands).
         return new MenuModel(title, pages);
     }
 
@@ -604,19 +588,12 @@ public final class MultiConfigMenuBuilder {
     }
 
     /**
-     * Mint one token per clickable fragment in {@code pages} (ADR-035 §3).
-     * Centralised so all three page builders use the same mint loop.
+     * ADR-050 Stage 3β.D.2b (2026-05-24): no-op. The renderer emits concrete
+     * {@code /rtp menu ...} commands; no token is consulted. Method retained
+     * to keep call sites mechanical; remove in a follow-up cleanup once all
+     * three call sites are also pruned.
      */
+    @SuppressWarnings("unused")
     private void mintTokens(List<MenuPage> pages, UUID viewer) {
-        for (MenuPage page : pages) {
-            for (MenuLine line : page.lines()) {
-                for (MenuFragment fragment : line.fragments()) {
-                    MenuAction action = fragment.action();
-                    if (action != null) {
-                        tokenRegistry.mint(viewer, action, tokenTtl);
-                    }
-                }
-            }
-        }
     }
 }

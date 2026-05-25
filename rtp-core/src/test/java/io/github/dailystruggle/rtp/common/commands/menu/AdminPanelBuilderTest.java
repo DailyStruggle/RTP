@@ -69,13 +69,12 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Full admin: emits all curated rows with the back row last")
     void fullAdmin_emitsAllRows() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
         // Wire a /rtp test memory subcommand to exercise the optional row.
         TestableTree testNode = (TestableTree) root.getCommandLookup().get("test");
         testNode.getCommandLookup().put("memory", new LeafSub("memory"));
 
-        MenuModel model = new AdminPanelBuilder(registry)
+        MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(), perm -> true);
 
         // Configuration
@@ -121,11 +120,10 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Lifecycle divider is suppressed when admin lacks rtp.reload")
     void lifecycleDivider_suppressed_whenReloadHidden() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
         // Admin holds everything *except* rtp.reload.
-        MenuModel model = new AdminPanelBuilder(registry)
+        MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(), perm -> !AdminPanelBuilder.RELOAD_PERMISSION.equals(perm));
 
         assertNull(findRunWithArgs(model, "reload"),
@@ -138,13 +136,12 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Configuration divider is suppressed when /rtp config is unregistered")
     void configurationDivider_suppressed_whenConfigUnregistered() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         // No /rtp config. Add unrelated nodes so the panel still has body.
         root.getCommandLookup().put("info", new LeafSub("info"));
         root.getCommandLookup().put("reload", new LeafSub("reload"));
 
-        MenuModel model = new AdminPanelBuilder(registry)
+        MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(), perm -> true);
 
         assertNull(findOpenConfigSelector(model),
@@ -163,10 +160,9 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Admin panel never surfaces Regions / Worlds rows (config selector owns them)")
     void regionsWorldsRows_neverOnAdminPanel() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
-        MenuModel model = new AdminPanelBuilder(registry)
+        MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(), perm -> true);
 
         assertNull(findOpenMultiConfigSelector(model, "regions"),
@@ -178,10 +174,9 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Browse section always renders (its row is unconditional)")
     void browseSection_alwaysRenders() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         // No admin subcommands wired; only the panel chrome + Browse row + Back.
-        MenuModel model = new AdminPanelBuilder(registry)
+        MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(), perm -> true);
 
         assertNotNull(findOpenMenuEmpty(model),
@@ -199,10 +194,9 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Config row is hidden when admin lacks rtp.config.view")
     void configRow_hidden_whenNoConfigView() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
-        MenuModel model = new AdminPanelBuilder(registry).build(
+        MenuModel model = new AdminPanelBuilder().build(
                 root, UUID.randomUUID(),
                 perm -> !AdminPanelBuilder.CONFIG_VIEW_PERMISSION.equals(perm));
 
@@ -213,10 +207,9 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Scan row is hidden when admin lacks rtp.scan")
     void scanRow_hidden_whenNoScan() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
-        MenuModel model = new AdminPanelBuilder(registry).build(
+        MenuModel model = new AdminPanelBuilder().build(
                 root, UUID.randomUUID(),
                 perm -> !AdminPanelBuilder.SCAN_PERMISSION.equals(perm));
 
@@ -231,14 +224,13 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Diagnostics rows drop silently when /rtp test is unregistered")
     void diagnosticsRows_drop_whenTestUnregistered() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = new TestableRoot();
         // Only info + scan + reload registered; test is missing.
         root.getCommandLookup().put("info", new LeafSub("info"));
         root.getCommandLookup().put("scan", new LeafSub("scan"));
         root.getCommandLookup().put("reload", new LeafSub("reload"));
 
-        MenuModel model = new AdminPanelBuilder(registry)
+        MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(), perm -> true);
 
         assertNotNull(findOpenInfoGlobal(model),
@@ -252,11 +244,10 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Memory row drops silently when /rtp test memory is unregistered")
     void memoryRow_drops_whenChildUnregistered() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
         // /rtp test exists but has no `memory` child.
 
-        MenuModel model = new AdminPanelBuilder(registry)
+        MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(), perm -> true);
 
         assertNotNull(findRunWithArgs(model, "test", "full"),
@@ -272,10 +263,9 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Reload row carries a non-null warning hover")
     void reloadRow_hasWarningHover() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
-        MenuModel model = new AdminPanelBuilder(registry)
+        MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(), perm -> true);
 
         MenuFragment reload = findFragmentWithRunArgs(model, "reload");
@@ -289,10 +279,9 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Full diagnostics row carries a non-null warning hover")
     void diagnosticsRow_hasWarningHover() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
-        MenuModel model = new AdminPanelBuilder(registry)
+        MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(), perm -> true);
 
         MenuFragment diag = findFragmentWithRunArgs(model, "test", "full");
@@ -308,10 +297,9 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("A throwing permission probe hides perm-gated rows but keeps Browse + Back")
     void throwingPermissionProbe_hidesGatedRows() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
-        MenuModel model = new AdminPanelBuilder(registry).build(
+        MenuModel model = new AdminPanelBuilder().build(
                 root, UUID.randomUUID(),
                 perm -> { throw new RuntimeException("boom"); });
 
@@ -333,10 +321,9 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Pagination: every page respects LINES_PER_PAGE and the Back row is the last clickable")
     void panelPagination_respectsPageCapAndPlacesBackLast() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
-        MenuModel model = new AdminPanelBuilder(registry)
+        MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(), perm -> true);
 
         // After the Setup-section collapse (one row that opens the
@@ -364,10 +351,9 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Setup section: single OpenParamPicker row opening the prefab id picker")
     void setupSection_emitsSinglePrefabPickerRow() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
-        MenuModel model = new AdminPanelBuilder(registry)
+        MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(), perm -> true);
 
         // The Setup section is a single entry-point row that opens the
@@ -393,10 +379,9 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Setup section: suppressed wholesale when viewer lacks rtp.admin.prefab")
     void setupSection_suppressed_whenLackingPermission() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
-        MenuModel model = new AdminPanelBuilder(registry)
+        MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(),
                         perm -> !AdminPanelBuilder.PREFAB_PERMISSION.equals(perm));
 
@@ -411,10 +396,9 @@ final class AdminPanelBuilderTest {
     @Test
     @DisplayName("Setup section: throwing permission probe hides the entire section")
     void setupSection_hidden_whenProbeThrows() {
-        LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
         TestableRoot root = withAllAdminSubcommands();
 
-        MenuModel model = new AdminPanelBuilder(registry)
+        MenuModel model = new AdminPanelBuilder()
                 .build(root, UUID.randomUUID(),
                         perm -> { throw new RuntimeException("boom"); });
 

@@ -249,14 +249,19 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
 
     @Override
     public void successEvent(RTPCommandSender sender, RTPPlayer player) {
-        // No-op on Fabric for G1: Bukkit fires Bukkit-specific events here
-        // (TeleportCommandSuccessEvent) for plugin observability. Fabric has
-        // no equivalent event bus yet — left as a Step G2 hook (custom
-        // CommandsAPI event channel or a Fabric-side EventBus pattern).
+        // Intentional no-op on Fabric (by design, not deferred). The Bukkit
+        // overrides fire TeleportCommandSuccessEvent / TeleportCommandFailEvent
+        // on the Bukkit plugin event bus for third-party plugin observability;
+        // those events are org.bukkit.event.Event subclasses and cannot be
+        // reused on Fabric. Fabric has no equivalent plugin-event-bus consumer
+        // surface in scope, and RTP's in-house runnable-collection hooks
+        // (RTPRunnable / TeleportData) already cover internal observability,
+        // so firing nothing here is the correct Fabric behaviour. See
+        // MULTI_PLATFORM_PLAN.md Step G2 (resolved 2026-05-24).
     }
 
     @Override
     public void failEvent(RTPCommandSender sender, String msg) {
-        // No-op on Fabric for G1 — see successEvent().
+        // Intentional no-op on Fabric (by design) — see successEvent().
     }
 }

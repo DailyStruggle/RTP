@@ -131,7 +131,7 @@ sniff_status: "&a[P0] sniffed [scan_chunks] / [scan_totalChunks] kibble for terr
 # Section 7: Info (Meow) Command
 # ###############################################################################
 # info command output
-meow_title: "&a======RTP Meow Info======"
+meow_title: "&a&l/rtp info"
 paw_tickets: "&7Global active kibble tickets: #7E9CC8[tickets]"
 pounces: "&7Active pounce state machines: #7E9CC8[teleports]"
 meows_per_tick: "&7Current plugin meows-per-tick: #7E9CC8[mspt]"
@@ -217,8 +217,6 @@ practice_pounce_description: "practice-test RTP functions"
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 scratching_slip_silly: "&c[P0] that scratching slip is all chewed up."
-# Sent when a menu token has expired or was already consumed.
-scratching_slip_stale: "&c[P0] that scratching slip went stale. paw the menu open again."
 # Sent when a menu redeem cannot resolve the calling player UUID.
 scratching_slip_kitties_only: "&c[P0] scratching slips only work for kitties in the world, not tall humans at the console."
 # Hover-fallback template used by the menu reflector when no YAML block-comment
@@ -284,6 +282,8 @@ menuAdminPanelRowRegions: "#5FB3B3▶ territories"
 menuAdminPanelHoverRegions: "&7add, remove, or groom per-territory setups"
 menuAdminPanelRowWorlds: "#5FB3B3▶ boxes"
 menuAdminPanelHoverWorlds: "&7add, remove, or groom per-box setups"
+menuAdminPanelRowEffects: "#5FB3B3▶ effects"
+menuAdminPanelHoverEffects: "&7add, remove, or edit per-group teleport effects"
 menuAdminPanelRowInfo: "&b▶ box info"
 menuAdminPanelHoverInfo: "&7show plugin version, territory counts, and line state"
 menuAdminPanelRowDiagnostics: "&c▶ full hairball checks"
@@ -297,6 +297,25 @@ menuAdminPanelHoverReload: "&7grooms all setup files; mid-pounce kitties may be 
 menuAdminPanelRowBrowse: "&b▶ browse all meows"
 menuAdminPanelHoverBrowse: "&7open the reflected /rtp meow tree"
 menuAdminPanelRowBack: "&7« scamper back"
+# --- Visualizations submenu (admin map of bad locations per region) ---
+# Admin-panel row: open the Visualizations submenu. No placeholders.
+menuAdminPanelRowVisualizations: "#5FB3B3▶ visualizations"
+# Hover text for the admin-panel Visualizations row. No placeholders.
+menuAdminPanelHoverVisualizations: "&7open maps and other operator-facing visualizations"
+# Section divider above the Visualizations block on the admin panel.
+menuAdminPanelSectionVisualizations: "&8» &7visualizations"
+# Non-clickable title row at the top of the Visualizations submenu.
+menuVisualizationsTitle: "#9D7CD8&l⌖ visualizations"
+# Non-clickable hint row below the title.
+menuVisualizationsHint: "&7pick a region to view its bad-locations map"
+# Visualizations row template; [region] - region name.
+menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- region shape map"
+# Hover text for a Visualizations region row; [region] - region name.
+menuVisualizationsHoverRegion: "&7open a map showing bad locations in &b[region]"
+# Non-clickable hint row shown when no regions are configured.
+menuVisualizationsEmpty: "&7(no regions configured)"
+# Visualizations submenu back row (returns to the admin panel).
+menuVisualizationsRowBack: "&7« back"
 # --- Admin panel Setup section: curated prefabs (PROPOSAL-admin-panel-prefabs.md v3.1) ---
 # Section divider above the Setup (quick start) block on the admin panel.
 menuAdminPanelSectionSetup: "&8» &7setup (quick paw start)"
@@ -326,7 +345,7 @@ menuPrefabCancelRow: "&c&l[paw to cancel]"
 # Clickable row label for the Refresh affordance at the bottom of the /rtp info
 # book. Re-renders the current scope against a fresh metrics snapshot.
 # (PROPOSAL-info-as-book.md section 4.6)
-infoBookRefreshRow: "&a[re-sniff]"
+infoBookRefreshRow: "&a[Refresh]"
 # Hover text for the info-book refresh row.
 infoBookRefreshHover: "&7Re-sniff this page against a fresh hairball snapshot."
 # Clickable row label for the Switch-to-chat affordance at the bottom of the

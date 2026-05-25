@@ -5,7 +5,6 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.menu.LocalMenuTokenRegistry;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
@@ -107,8 +106,7 @@ final class MultiConfigMenuBuilderTest {
             // Add a couple of extra entries so we can assert sort order.
             seed("zeta");
             seed("alpha");
-            LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder(registry);
+            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder();
 
             MenuModel model = builder.buildSelector(
                     "regions", regions, /*removeMode*/ false, UUID.randomUUID());
@@ -133,7 +131,9 @@ final class MultiConfigMenuBuilderTest {
             // Add row mints PromptAnvilInput so the admin can type a custom
             // name (the synthesized default<N> is just the prefill). On
             // confirm the anvil session submits
-            //   /rtp menu multiaddKind=regions multiadd=<typedName>
+            //   /rtp menu multiaddkind=regions multiadd=<typedName>
+            // (lowercase per commands-api's TreeCommand parser, which
+            //  lowercases param-name tokens before paramLookup)
             // which the dispatcher routes to MultiConfigMutate(ADD).
             MenuAction.PromptAnvilInput add = findFirstByType(
                     model, MenuAction.PromptAnvilInput.class);
@@ -144,7 +144,7 @@ final class MultiConfigMenuBuilderTest {
                     "Add row prefill must start with 'default': " + add.prefill());
             assertEquals(1, add.parentPath().length,
                     "Add row parentPath must carry exactly the parserKind segment");
-            assertEquals("multiaddKind=regions", add.parentPath()[0],
+            assertEquals("multiaddkind=regions", add.parentPath()[0],
                     "Add row parentPath segment must encode the parserKind as name=value");
             // No MultiConfigMutate(ADD) row anymore: ADD only happens after
             // the anvil confirm. Guard against accidental regression.
@@ -172,8 +172,7 @@ final class MultiConfigMenuBuilderTest {
                     return "default region cannot be removed";
                 }
             });
-            LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder(registry);
+            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder();
 
             MenuModel model = builder.buildSelector(
                     "regions", regions, /*removeMode*/ true, UUID.randomUUID());
@@ -197,8 +196,7 @@ final class MultiConfigMenuBuilderTest {
         void removeMode_clickableEntriesDispatchRemove() {
             // No guard registered: every entry is removable.
             seed("temp1");
-            LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder(registry);
+            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder();
 
             MenuModel model = builder.buildSelector(
                     "regions", regions, /*removeMode*/ true, UUID.randomUUID());
@@ -216,8 +214,7 @@ final class MultiConfigMenuBuilderTest {
         @Test
         @DisplayName("off-mode entry rows dispatch OpenMultiConfigEntry")
         void offMode_clickableEntriesDispatchOpenEntry() {
-            LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder(registry);
+            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder();
 
             MenuModel model = builder.buildSelector(
                     "regions", regions, /*removeMode*/ false, UUID.randomUUID());
@@ -240,8 +237,7 @@ final class MultiConfigMenuBuilderTest {
         @Test
         @DisplayName("renders Back + header + key rows + Remove row")
         void layout() {
-            LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder(registry);
+            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder();
 
             MenuModel model = builder.buildEntry(
                     "regions", "default", regions, UUID.randomUUID());
@@ -270,8 +266,7 @@ final class MultiConfigMenuBuilderTest {
                     return "default region cannot be removed";
                 }
             });
-            LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder(registry);
+            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder();
 
             MenuModel model = builder.buildEntry(
                     "regions", "default", regions, UUID.randomUUID());
@@ -292,8 +287,7 @@ final class MultiConfigMenuBuilderTest {
         @Test
         @DisplayName("unknown entry: empty-state hint + no key rows")
         void unknownEntry_rendersHint() {
-            LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder(registry);
+            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder();
 
             MenuModel model = builder.buildEntry(
                     "regions", "no-such-entry-xyz", regions, UUID.randomUUID());
@@ -305,8 +299,7 @@ final class MultiConfigMenuBuilderTest {
         @Test
         @DisplayName("null and empty args rejected")
         void nullAndEmpty_rejected() {
-            LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder(registry);
+            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder();
             UUID viewer = UUID.randomUUID();
 
             assertThrows(NullPointerException.class,
@@ -333,8 +326,7 @@ final class MultiConfigMenuBuilderTest {
         @Test
         @DisplayName("renders Confirm + Cancel rows; Confirm mints REMOVE, Cancel returns to selector")
         void layout() {
-            LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder(registry);
+            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder();
 
             MenuModel model = builder.buildConfirmRemove(
                     "regions", "alpha", UUID.randomUUID());
@@ -353,8 +345,7 @@ final class MultiConfigMenuBuilderTest {
         @Test
         @DisplayName("null and empty args rejected")
         void nullAndEmpty_rejected() {
-            LocalMenuTokenRegistry registry = new LocalMenuTokenRegistry();
-            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder(registry);
+            MultiConfigMenuBuilder builder = new MultiConfigMenuBuilder();
             UUID viewer = UUID.randomUUID();
 
             assertThrows(NullPointerException.class,

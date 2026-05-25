@@ -11,7 +11,7 @@ import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnWorldLoadUnload;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor;
 import io.github.dailystruggle.rtp.bukkitplatform.server.AsyncTeleportProcessing;
-import io.github.dailystruggle.rtp.bukkitplatform.server.DatabaseProcessing;
+import io.github.dailystruggle.rtp.common.server.DatabaseProcessing;
 import io.github.dailystruggle.rtp.bukkitplatform.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import org.bstats.bukkit.Metrics;
@@ -162,7 +162,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     // Step 7: database processor. With yaml-only persistence this is effectively a
     // no-op flush loop; kept for symmetry with the full bootstrap so /rtp reload
     // behaves identically.
-    DatabaseProcessing.start(this);
+    DatabaseProcessing.start();
 
     SendMessage.sendMessage(Bukkit.getConsoleSender(), "");
 

@@ -151,7 +151,7 @@ public final class JoinTriggerSource implements Listener {
             // Phase B trace (2026-05-23): explicit no-reservation path. The
             // overwhelming majority of joins land here; logged at INFO
             // because it is the diagnostic anchor for "why did /rtp not run".
-            RTP.log(Level.INFO,
+            RTP.log(Level.FINE,
                     "[NETWORK][trace] JoinTriggerSource.handleLookup: no reservation found for " + id
                             + " (standard join; no cross-server /rtp will be dispatched)");
             return;
@@ -161,13 +161,13 @@ public final class JoinTriggerSource implements Listener {
             // The reservation is for another backend (e.g. the proxy
             // routed by player count and the player landed here via a
             // hub override). Silent: no S-004 attribution warranted.
-            RTP.log(Level.INFO,
+            RTP.log(Level.FINE,
                     "[NETWORK][trace] JoinTriggerSource.handleLookup: reservation token.serverId="
                             + token.serverId() + " does not match this backend serverId=" + serverId
                             + " for " + id + " (token=" + token.tokenId() + "); not redeeming on this backend");
             return;
         }
-        RTP.log(Level.INFO,
+        RTP.log(Level.FINE,
                 "[NETWORK][trace] JoinTriggerSource.handleLookup: matched reservation for " + id
                         + " token=" + token.tokenId() + " serverId=" + serverId
                         + "; calling transport.redeem(...)");
@@ -183,7 +183,7 @@ public final class JoinTriggerSource implements Listener {
             return;
         }
         if (outcome == null) return;
-        RTP.log(Level.INFO,
+        RTP.log(Level.FINE,
                 "[NETWORK][trace] JoinTriggerSource.handleRedeem: outcome=" + outcome
                         + " for " + id + " token=" + token.tokenId());
         switch (outcome) {
@@ -233,16 +233,16 @@ public final class JoinTriggerSource implements Listener {
         Runnable hop = () -> {
             Player player = Bukkit.getPlayer(id);
             if (player == null || !player.isOnline()) {
-                RTP.log(Level.INFO,
+                RTP.log(Level.FINE,
                         "[NETWORK][trace] JoinTriggerSource.dispatchRtp: player offline at hop time for " + id
                                 + "; /rtp NOT dispatched");
                 return; // disconnected between join and hop
             }
-            RTP.log(Level.INFO,
+            RTP.log(Level.FINE,
                     "[NETWORK][trace] JoinTriggerSource.dispatchRtp: invoking Bukkit.dispatchCommand(player, \"rtp\") for " + id);
             try {
                 boolean dispatched = Bukkit.dispatchCommand(player, "rtp");
-                RTP.log(Level.INFO,
+                RTP.log(Level.FINE,
                         "[NETWORK][trace] JoinTriggerSource.dispatchRtp: Bukkit.dispatchCommand returned " + dispatched
                                 + " for " + id);
             } catch (Throwable t) {
@@ -310,13 +310,13 @@ public final class JoinTriggerSource implements Listener {
         // next supplier poll will reconcile the row authoritatively;
         // evictLocal is a local-state correction only (does not fire the
         // terminal listener). Null-tolerant for older test fixtures.
-        RTP.log(Level.INFO,
+        RTP.log(Level.FINE,
                 "[NETWORK][trace] JoinTriggerSource.onRedeemed: entered for " + id
                         + " token=" + token.tokenId() + " statusCache=" + (statusCache != null));
         if (statusCache != null) {
             try {
                 statusCache.evictLocal(id);
-                RTP.log(Level.INFO,
+                RTP.log(Level.FINE,
                         "[NETWORK][trace] JoinTriggerSource.onRedeemed: statusCache.evictLocal succeeded for " + id);
             } catch (Throwable t) {
                 RTP.log(Level.WARNING,
@@ -329,7 +329,7 @@ public final class JoinTriggerSource implements Listener {
         if (networkTokenId != null) {
             redeemed = redeemAcrossRegions(networkTokenId);
         }
-        RTP.log(Level.INFO,
+        RTP.log(Level.FINE,
                 "[NETWORK][trace] JoinTriggerSource.onRedeemed: networkTokenId=" + networkTokenId
                         + " redeemedCoord=" + (redeemed != null ? "present" : "null")
                         + " for " + id);
@@ -348,7 +348,7 @@ public final class JoinTriggerSource implements Listener {
                                     + id + " token=" + token.tokenId() + ": " + t.getMessage(), t);
                 }
             }
-            RTP.log(Level.INFO,
+            RTP.log(Level.FINE,
                     "[NETWORK][trace] JoinTriggerSource.onRedeemed: acceptRedeemedReservation accepted="
                             + accepted + " for " + id + " token=" + token.tokenId());
             if (!accepted) {
@@ -368,7 +368,7 @@ public final class JoinTriggerSource implements Listener {
         }
         // Whether or not the coord was pinned, the local /rtp dispatch is
         // the L2 baseline behaviour and must always run on a REDEEMED outcome.
-        RTP.log(Level.INFO,
+        RTP.log(Level.FINE,
                 "[NETWORK][trace] JoinTriggerSource.onRedeemed: dispatching /rtp for " + id);
         dispatchRtp(id);
     }

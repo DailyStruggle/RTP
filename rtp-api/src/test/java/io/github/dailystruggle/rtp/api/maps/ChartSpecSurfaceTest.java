@@ -93,13 +93,15 @@ class ChartSpecSurfaceTest {
     void kindEnumExposesExactlyTheDocumentedValueSet() {
         Set<ChartSpec.Kind> expected = EnumSet.of(
                 ChartSpec.Kind.BAD_POINTS_HEATMAP,
+                ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE,
                 ChartSpec.Kind.REGION_COVERAGE,
                 ChartSpec.Kind.FAIL_RATE_HEATMAP,
                 ChartSpec.Kind.CACHE_OCCUPANCY,
                 ChartSpec.Kind.METRIC_SPARKLINE);
         Set<ChartSpec.Kind> actual = EnumSet.allOf(ChartSpec.Kind.class);
         assertEquals(expected, actual,
-                "ChartSpec.Kind must list exactly the five values locked by CHECKLIST-metrics-to-maps.md row 1.2; "
+                "ChartSpec.Kind must list exactly the six values locked by CHECKLIST-metrics-to-maps.md row 1.2 "
+                        + "(five Stage-3 reserved + REGION_BAD_LOCATIONS_SHAPE active via maps-api); "
                         + "adding or removing a value is a Stage-3 change that requires updating the resolver registry.");
     }
 }

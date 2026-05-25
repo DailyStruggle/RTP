@@ -1,8 +1,10 @@
 # ADR-035 — Interactive Menus via Written Book (Book-First, Chat Fallback)
 
-**Status:** Accepted
+**Status:** Accepted (token-registry sections superseded by [ADR-050](ADR-050-concrete-menu-commands-supersede-tokens.md), Accepted 2026-05-24)
 **Date:** 2026-05-13 (Proposed) / 2026-05-15 (Accepted, amended)
 **Target release:** `3.0.0-beta.3`
+
+> **Supersession 2026-05-24.** [ADR-050](ADR-050-concrete-menu-commands-supersede-tokens.md) (Accepted) supersedes §3 "Click handling and token registry" and §"Security boundary" of this ADR by replacing the opaque `MenuTokenRegistry` indirection with concrete, non-expiring `/rtp menu ...` and `/rtp visualization ...` subcommands. Permission gating on each `dispatch*` helper is the sole security boundary. `MenuTokenRegistry`, `LocalMenuTokenRegistry`, and `ChartSpecTokens` have been deleted; the `menuExpired` message key has been retired. This ADR's other decisions (book-first, `MenuModel` in `rtp-api`, `commands-api` reflector via ADR-044, renderer placement) are unchanged.
 
 > **Amendment 2026-05-15.** Cross-server menu scope (the `SharedMenuTokenRegistry`, SQL/Redis token-store drivers, and the `menu.tokenStore` config block) is **removed from this ADR**. The single source of truth for cross-server menu content is the live `commands-api` command tree, which RTP updates at runtime from database / network-state changes; menus re-reflect that tree on every open. Cross-server *dispatch* of the resulting command is the proxy layer's responsibility ([MULTI_SERVER_PLAN.md](../dev/MULTI_SERVER_PLAN.md)), not the menu's. Tokens therefore remain **local-only** (`LocalMenuTokenRegistry`); they protect the click round-trip against replay, nothing more. The first concrete consumer is **`/rtp config`** (per [`CONFIG_COMMAND_SPEC.md §2.4`](../dev/CONFIG_COMMAND_SPEC.md)), not the no-args region picker; the region picker is deferred to a follow-up consumer. Renderer scope in this release is Paper + Folia only; Spigot per-version book branches and the Fabric chat fallback are deferred. The command-tree → `MenuModel` reflection layer is specified in [ADR-044](ADR-044-command-tree-menu-reflector.md).
 
