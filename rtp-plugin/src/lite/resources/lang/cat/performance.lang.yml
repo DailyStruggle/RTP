@@ -1,0 +1,18 @@
+# --- Language Mapping: performance.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# performance.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+maxAttempts: "max_pounces"
+viewDistanceSelect: "stalking_distance"
+viewDistanceTeleport: "pounce_distance"
+period: "tail_swish_period"
+syncAllottedTime: "sync_nap_time"
+asyncAllottedTime: "async_nap_time"
+minTPS: "minimum_purrs_per_second"
+postTeleportQueueing: "line_up_after_pounce"
+syncLoading: "synced_kibble"
+effectParsing: "sparkle_parsing"
+biomeRecall: "smell_memory"
+biomeRecallForced: "forced_smell_memory"
+checkOnChunkLoads: "check_when_kibble_arrives"
+version: "meowsion"

@@ -1,0 +1,4 @@
+minY: "minY"
+maxY: "maxY"
+direction: "direcao"
+requireSkyLight: "exigirLuzCeu"

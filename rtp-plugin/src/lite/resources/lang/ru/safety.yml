@@ -1,0 +1,278 @@
+# --- Конфигурация безопасности RTP ---
+# Настраивает, как плагин определяет, является ли локация телепорта "безопасной".
+# Грамматика токенов:
+# MATERIAL -- простой материал, например LAVA
+# MATERIAL[prop=val,prop2=val2] -- материал, только если ВСЕ свойства
+# состояния блока совпадают
+# #namespace:tag -- разворачивается во все материалы тега
+# #namespace:tag[prop=val] -- члены тега, только если свойства совпадают
+# *[prop=val] -- ЛЮБОЙ материал при совпадении свойств (джокер)
+# Значения свойств сравниваются без учёта регистра со строковой формой
+# BlockData из Bukkit. Неизвестные теги разворачиваются в пустое множество
+# (no-op, fail-open); некорректные токены логируются один раз на уровне
+# WARN при перезагрузке .
+# Порядок внутри списка не важен.
+# Неуязвимость (секунды)
+# Длительность неуязвимости, предоставляемой игроку после телепорта.
+# Предотвращает урон от огня, утопления или падения при прибытии.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 5
+времяНеуязвимости: 5
+
+# Радиус проверки безопасности (блоки)
+# Радиус вокруг целевого блока для проверки опасных условий.
+# Большие значения дают больше безопасности, но усложняют поиск места.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 0
+радиусБезопасности: 0
+
+# Лимит повторов на устаревший чанк (число)
+# Ограниченный бюджет повторов для стража устаревших чанков
+# . После разрешения асинхронной загрузки чанка
+# следующая задача оценки блока ставится в очередь конвейера задач
+# Count-Bound (планировщик Region Thread Folia). Если конвейер перегружен,
+# нативный GC чанков может выгрузить чанк до выполнения задачи, что иначе
+# вызвало бы синхронную загрузку в Region Thread и сработал бы Folia
+# Watchdog. Когда страж обнаруживает эту гонку, он переставляет асинхронную
+# загрузку в очередь до этого числа раз на кандидата. При исчерпании
+# кандидат отклоняется обычным маршрутом "unsafe" (логируется WARN; ничего
+# не отбрасывается молча).
+# По умолчанию: 2. Увеличивайте только в форках с очень агрессивным GC чанков.
+# @type: integer
+# @range: [0, null]
+# @default: 2
+staleChunkRetryLimit: 2
+
+# Anvil-префильтр только для чтения (только Spigot vanilla)
+# Внепотоковая проба безопасности, которая анализирует сохранённый файл
+# региона `r.X.Z.mca` и отклоняет явно небезопасных кандидатов (лава/магма/
+# огонь на поверхности heightmap) до запроса авторитетной загрузки чанка
+# вживую. Снижает нагрузку на тик-поток в Spigot vanilla, где API живой
+# загрузки чанков не является по-настоящему асинхронным.
+# Не действует на Paper и Folia (они заменяют маршрут загрузки чанков
+# нативными асинхронными API и никогда не входят в префильтр).
+# Живая перепроверка chunk.isSafe(...) остаётся авторитетным источником при
+# ACCEPT; REJECT - единственный короткий путь. См.
+# По умолчанию: true. Установите false, чтобы отключить пробу (полезно в
+# модифицированных форках с экзотическими форматами региона).
+# @type: boolean
+# @default: true
+anvilPrefilterEnabled: true
+
+# Платформы приземления
+# Создаёт платформу приземления в месте назначения телепорта.
+# Центральный блок выбирается по типу блока в локации.
+# Установите platformRadius в -1, чтобы отключить платформы.
+# По умолчанию: -1 (отключено) - современные проверки безопасности
+# (chunk.isSafe + вертикальный регулятор) надёжно дают твёрдые приземления,
+# поэтому аварийная платформа (стеклянный блок) отключена по умолчанию.
+# Увеличьте до 0 или больше, только если по-прежнему наблюдаете
+# небезопасные приземления и хотите вернуть старую опцию fallback.
+# @type: integer
+# @range: [-1, null]
+# @unit: blocks
+# @default: -1
+радиусПлатформы: -1
+
+# Depth (vertical thickness) of the emergency platform.
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
+глубинаПлатформы: 1
+
+# Высота воздуха, которую нужно гарантировать над платформой.
+# Может вызвать проблемы с освещением, если слишком высока.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+высотаВоздухаПлатформы: 2
+
+# Тип блока по умолчанию для платформы, если нет твёрдого блока.
+# @type: material
+# @source: material
+# @default: GLASS
+материалПлатформы: "GLASS"
+
+# Блоки воздуха
+# Типы материалов, считающиеся проходимым/неблокирующим пространством над приземлением.
+# По возможности используйте теги блоков vanilla для совместимости с будущими
+# добавлениями Mojang.
+# @type: list<material>
+# @source: material
+блокиВоздуха:
+  # Настоящие варианты воздуха (ни один тег не покрывает все сразу)
+  - "AIR"
+  - "CAVE_AIR"
+  - "VOID_AIR"
+  - "LEGACY_AIR"
+  - "STRUCTURE_VOID"
+  - "LIGHT"
+  # Цветы
+  - "#minecraft:flowers"
+  - "#minecraft:small_flowers"
+  # Примечание: #minecraft:tall_flowers в ванилле является тегом только для предметов; его члены
+  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) уже охвачены тегом
+  # #minecraft:flowers выше.
+  - "#minecraft:tall_flowers"
+  # Растения вроде травы и кусты, не покрытые тегами цветов
+  - "SHORT_GRASS"
+  - "TALL_GRASS"
+  - "SHORT_DRY_GRASS"
+  - "TALL_DRY_GRASS"
+  - "FERN"
+  - "LARGE_FERN"
+  - "DEAD_BUSH"
+  - "BUSH"
+  - "WILDFLOWERS"
+  - "FIREFLY_BUSH"
+  - "LEGACY_LONG_GRASS"
+  - "LEGACY_DEAD_BUSH"
+  # Саженцы, побеги и грибы
+  - "#minecraft:saplings"
+  - "BROWN_MUSHROOM"
+  - "RED_MUSHROOM"
+  - "CRIMSON_FUNGUS"
+  - "WARPED_FUNGUS"
+  # Посевы и поверхностная флора без удобного тега
+  - "#minecraft:crops"
+  - "MELON_STEM"
+  - "PUMPKIN_STEM"
+  - "SUGAR_CANE"
+  - "BAMBOO_SAPLING"
+  # Лианы и настенная флора
+  - "VINE"
+  - "GLOW_LICHEN"
+  - "WEEPING_VINES"
+  - "TWISTING_VINES"
+  - "HANGING_ROOTS"
+  - "PALE_HANGING_MOSS"
+  - "RESIN_CLUMP"
+  # Рельсы
+  - "#minecraft:rails"
+  # Редстоун и механизмы (нет общего тега)
+  - "REDSTONE_WIRE"
+  - "COMPARATOR"
+  - "REPEATER"
+  - "LEVER"
+  - "STRING"
+  - "TRIPWIRE"
+  # Факелы и освещение (нет тега группы)
+  - "TORCH"
+  - "WALL_TORCH"
+  - "SOUL_TORCH"
+  - "SOUL_WALL_TORCH"
+  - "REDSTONE_TORCH"
+  - "REDSTONE_WALL_TORCH"
+  - "END_ROD"
+  # Кнопки (каменные и деревянные варианты)
+  - "#minecraft:buttons"
+  # Нажимные плиты
+  - "#minecraft:pressure_plates"
+  # Таблички -- все варианты стоящих/настенных/висящих в четырёх тегах
+  - "#minecraft:standing_signs"
+  - "#minecraft:wall_signs"
+  - "#minecraft:ceiling_hanging_signs"
+  - "#minecraft:wall_hanging_signs"
+  - "LEGACY_SIGN"
+  - "LEGACY_WALL_SIGN"
+  # Покрытие пола
+  - "SNOW"
+  - "MOSS_CARPET"
+  - "PALE_MOSS_CARPET"
+  - "LEAF_LITTER"
+
+# Небезопасные блоки
+# Материалы или состояния блоков, которые плагин отклонит как пункт назначения,
+# или любой блок в пределах `safetyRadius` от цели. Поддерживает предикаты
+# состояний и джокеры (см. грамматику в начале файла).
+# @type: list<material>
+# @source: material
+небезопасныеБлоки:
+  # Жидкости
+  - "WATER"
+  - "LAVA"
+  - "BUBBLE_COLUMN"
+  # Любой waterlogged-блок (плиты/лестницы/заборы/стены/таблички/цепи/...) --
+  # заменяет старый псевдотокен 'WATERLOGGED'. Используется джокер из
+  - "*[waterlogged=true]"
+  # Огонь и тепловые опасности
+  - "#minecraft:fire"
+  - "POWDER_SNOW"
+  - "MAGMA_BLOCK"
+  # Костры (как горящие, так и потушенные небезопасны -- игроки проваливаются в них)
+  - "#minecraft:campfires"
+  # Контактный урон / ловушки
+  - "CACTUS"
+  - "SWEET_BERRY_BUSH"
+  - "WITHER_ROSE"
+  - "CHORUS_PLANT"
+  - "CHORUS_FLOWER"
+  - "POINTED_DRIPSTONE"
+  - "COBWEB"
+  - "CREAKING_HEART"
+  # Void / портал / непереносимое
+  - "BEDROCK"
+  - "NETHER_PORTAL"
+  - "END_PORTAL"
+  - "END_GATEWAY"
+  # Взрывоопасное
+  - "TNT"
+  - "END_CRYSTAL"
+  - "RESPAWN_ANCHOR"
+  # Водная флора (риск утопления)
+  - "SEAGRASS"
+  - "TALL_SEAGRASS"
+  - "KELP"
+  - "KELP_PLANT"
+  - "#minecraft:logs"
+
+# Фильтр биомов
+# biomeWhitelist: false -> список `biomes` это чёрный список (пропускает эти биомы)
+#                  true  -> список `biomes` это белый список (разрешает только эти биомы)
+# Чёрный список по умолчанию исключает океаны, реки, void и другие биомы, где
+# твёрдое и безопасное приземление маловероятно или невозможно.
+# @type: boolean
+# @default: false
+белыйСписокБиомов: false
+
+# Biomes treated as whitelist or blacklist members per biomeWhitelist.
+# @type: list<biome>
+# @source: biome
+биомы:
+  # БИОМЫ ОКЕАНОВ
+  - "OCEAN"
+  - "DEEP_OCEAN"
+  - "WARM_OCEAN"
+  - "LUKEWARM_OCEAN"
+  - "DEEP_LUKEWARM_OCEAN"
+  - "COLD_OCEAN"
+  - "DEEP_COLD_OCEAN"
+  - "FROZEN_OCEAN"
+  - "DEEP_FROZEN_OCEAN"
+  # БИОМЫ РЕК
+  - "RIVER"
+  - "FROZEN_RIVER"
+  # СОПУТСТВУЮЩИЕ И ПРИБРЕЖНЫЕ БИОМЫ
+  - "BEACH"
+  - "SNOWY_BEACH"
+  - "STONY_SHORE"
+  - "SWAMP"
+  - "MANGROVE_SWAMP"
+  # БИОМЫ ENDа (без твёрдого приземления / рядом с void)
+  - "SMALL_END_ISLANDS"
+  # БИОМЫ NETHERа (опасный/неровный рельеф)
+  - "BASALT_DELTAS"
+  # ТЕХНИЧЕСКИЕ БИОМЫ
+  - "THE_VOID"
+  - "LUSH_CAVES"
+  - "DEEP_DARK"
+  - "THE_VOID"
+
+# НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ
+version: 1.0

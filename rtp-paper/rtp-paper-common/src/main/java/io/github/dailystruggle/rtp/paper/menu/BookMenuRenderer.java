@@ -212,170 +212,25 @@ public final class BookMenuRenderer implements MenuRenderer {
     @SuppressWarnings("unused")
     private @Nullable ClickEvent toClickEvent(UUID playerId, @Nullable MenuAction action) {
         if (action == null) return null;
-        return switch (action) {
-            case MenuAction.RunRtpCommand run ->
-                    ClickEvent.runCommand(buildRunCommand(run));
-            case MenuAction.OpenMenu open ->
-                    // Empty path = root; omit `path=` entirely because
-                    // commands-api TreeCommand rejects any arg ending in
-                    // `=` (empty value) before the leaf's onCommand runs.
-                    ClickEvent.runCommand("/rtp menu open" + pathArg(open.path()));
-            case MenuAction.OpenParamPicker picker ->
-                    ClickEvent.runCommand("/rtp menu picker"
-                            + pathArg(picker.parentPath())
-                            + " param=" + picker.paramName());
-            case MenuAction.PromptAnvilInput prompt ->
-                    ClickEvent.runCommand(buildAnvilCommand(prompt));
-            case MenuAction.ChangePage change ->
-                    // Adventure pages are 1-based; MenuPage indices are 0-based.
-                    ClickEvent.changePage(change.pageIndex() + 1);
-            case MenuAction.SuggestInput suggest ->
-                    ClickEvent.suggestCommand(suggest.prefix());
-            case MenuAction.OpenExternalUrl url ->
-                    ClickEvent.openUrl(safeUrlString(url.uri()));
-            case MenuAction.OpenConfigSelector ignored ->
-                    ClickEvent.runCommand("/rtp menu config");
-            case MenuAction.OpenConfigFile f ->
-                    ClickEvent.runCommand("/rtp menu config file=" + f.fileName());
-            case MenuAction.OpenConfigKey k ->
-                    ClickEvent.runCommand("/rtp menu config"
-                            + " file=" + k.fileName()
-                            + " key=" + k.paramName());
-            case MenuAction.OpenConfigSubParamPage sp ->
-                    // No dedicated leaf in core today; ConfigCmd's parameter
-                    // grammar discards an unknown `type=` token and falls
-                    // through to the key page, which is the existing
-                    // dispatch behaviour pre-ADR-050.
-                    ClickEvent.runCommand("/rtp menu config"
-                            + " file=" + sp.fileName()
-                            + " key=" + sp.paramName()
-                            + " type=" + sp.typeName());
-            case MenuAction.OpenConfigSearchPrompt ignored ->
-                    ClickEvent.runCommand("/rtp menu config search");
-            case MenuAction.OpenConfigSearchResults sr ->
-                    // ConfigSearchCmd accepts 1-indexed `page=`; record stores
-                    // 0-indexed page, so +1 on emit.
-                    ClickEvent.runCommand("/rtp menu config search"
-                            + " query=" + sr.query()
-                            + " page=" + (sr.page() + 1));
-            case MenuAction.OpenAdminPanel ignored ->
-                    ClickEvent.runCommand("/rtp menu admin");
-            case MenuAction.OpenVisualizations ignored ->
-                    ClickEvent.runCommand("/rtp menu visualizations");
-            case MenuAction.OpenFrontPage ignored ->
-                    ClickEvent.runCommand("/rtp menu front");
-            case MenuAction.OpenInfo info ->
-                    ClickEvent.runCommand("/rtp menu info scope=" + scopeWire(info.scope()));
-            case MenuAction.SwitchInfoToText sw ->
-                    ClickEvent.runCommand("/rtp menu info"
-                            + " scope=" + scopeWire(sw.scope())
-                            + " text=true");
-            case MenuAction.StageConfigValue st ->
-                    ClickEvent.runCommand("/rtp menu stage"
-                            + " file=" + st.fileName()
-                            + " key=" + st.paramName()
-                            + " value=" + st.value());
-            case MenuAction.UnstageConfigValue u ->
-                    ClickEvent.runCommand("/rtp menu unstage"
-                            + " file=" + u.fileName()
-                            + " key=" + u.paramName());
-            case MenuAction.ApplyStagedConfig ap ->
-                    ClickEvent.runCommand("/rtp menu apply file=" + ap.fileName());
-            case MenuAction.DiscardStagedConfig d ->
-                    ClickEvent.runCommand("/rtp menu discard file=" + d.fileName());
-            case MenuAction.OpenMultiConfigSelector ms ->
-                    ClickEvent.runCommand("/rtp menu multi kind=" + ms.parserKind());
-            case MenuAction.OpenMultiConfigEntry me ->
-                    ClickEvent.runCommand("/rtp menu multi"
-                            + " kind=" + me.parserKind()
-                            + " entry=" + me.entryName());
-            case MenuAction.MultiConfigMutate mm ->
-                    ClickEvent.runCommand("/rtp menu multi"
-                            + " kind=" + mm.parserKind()
-                            + " entry=" + mm.entryName()
-                            + " op=" + mm.op().name().toLowerCase(java.util.Locale.ROOT));
-            case MenuAction.OpenMap openMap ->
-                    // ADR-050 Stage 3β: OpenMap carries (kind, regionName).
-                    // Emit `/rtp visualization x=<kind>:<regionName>`; the
-                    // dispatcher parses on the first `:` and builds the
-                    // ChartSpec inline.
-                    ClickEvent.runCommand("/rtp visualization x="
-                            + openMap.kind().name() + ":" + openMap.regionName());
-        };
-    }
-
-    /**
-     * Encodes a {@link MenuAction.RunRtpCommand} as a literal {@code /rtp}
-     * invocation. The args are joined with single spaces; empty args degrade
-     * to bare {@code /rtp}.
-     */
-    private static String buildRunCommand(MenuAction.RunRtpCommand run) {
-        String[] args = run.args();
-        if (args.length == 0) return "/rtp";
-        StringBuilder sb = new StringBuilder("/rtp");
-        for (String arg : args) {
-            sb.append(' ').append(arg);
+        // Renderer-native variants: handled here because the book renderer can
+        // use Adventure's first-class click types (changePage, suggestCommand,
+        // openUrl) that have no /rtp ... command analogue.
+        if (action instanceof MenuAction.ChangePage change) {
+            // Adventure pages are 1-based; MenuPage indices are 0-based.
+            return ClickEvent.changePage(change.pageIndex() + 1);
         }
-        return sb.toString();
-    }
-
-    /**
-     * Encodes a {@link MenuAction.PromptAnvilInput} as the concrete
-     * {@code /rtp menu anvil ...} command consumed by
-     * {@code MenuConcreteCommandLeavesB.AnvilCmd}.
-     */
-    private static String buildAnvilCommand(MenuAction.PromptAnvilInput prompt) {
-        StringBuilder sb = new StringBuilder("/rtp menu anvil")
-                .append(pathArg(prompt.parentPath()))
-                .append(" param=").append(prompt.paramName());
-        String prefill = prompt.prefill();
-        if (prefill != null && !prefill.isEmpty()) {
-            sb.append(" prefill=").append(prefill);
+        if (action instanceof MenuAction.SuggestInput suggest) {
+            return ClickEvent.suggestCommand(suggest.prefix());
         }
-        sb.append(" mode=")
-                .append(prompt.mode().name().toLowerCase(java.util.Locale.ROOT));
-        return sb.toString();
-    }
-
-    /**
-     * Joins a path array as a dot-separated string for the {@code path=}
-     * parameter of the open / picker / anvil leaves. Empty arrays return
-     * the empty string (the leaves treat an empty path as root).
-     */
-    private static String dotted(String[] path) {
-        if (path == null || path.length == 0) return "";
-        StringBuilder sb = new StringBuilder(path[0]);
-        for (int i = 1; i < path.length; i++) {
-            sb.append('.').append(path[i]);
+        if (action instanceof MenuAction.OpenExternalUrl url) {
+            return ClickEvent.openUrl(safeUrlString(url.uri()));
         }
-        return sb.toString();
-    }
-
-    /**
-     * Returns {@code " path=<dotted>"} when the path is non-empty, or the
-     * empty string when it is null/empty. The commands-api parameter parser
-     * rejects any argument that ends in {@code =} (empty value) before the
-     * leaf's onCommand runs (TreeCommand.java:224), so an empty path must
-     * NOT be emitted as {@code path=}; instead the leaf treats a missing
-     * {@code path=} as root.
-     */
-    private static String pathArg(String[] path) {
-        String d = dotted(path);
-        return d.isEmpty() ? "" : " path=" + d;
-    }
-
-    /**
-     * Encodes an {@link MenuAction.InfoScopeToken} for the {@code scope=}
-     * parameter of {@code /rtp menu info}. Format matches
-     * {@code InfoCmd.parseScope}: {@code global}, {@code world:<name>},
-     * {@code region:<name>}.
-     */
-    private static String scopeWire(MenuAction.InfoScopeToken scope) {
-        return switch (scope.kind()) {
-            case GLOBAL -> "global";
-            case WORLD -> "world:" + scope.name();
-            case REGION -> "region:" + scope.name();
-        };
+        // Everything else: delegate to the shared rtp-core helper so the
+        // MenuAction -> /rtp menu ... command mapping has a single source of
+        // truth shared with the chat renderer (ADR-050 Stage 3β.D.2b).
+        String cmd = io.github.dailystruggle.rtp.common.commands.menu.MenuActionToCommand
+                .toRunCommand(action);
+        return (cmd == null) ? null : ClickEvent.runCommand(cmd);
     }
 
     private static String safeUrlString(URI uri) {

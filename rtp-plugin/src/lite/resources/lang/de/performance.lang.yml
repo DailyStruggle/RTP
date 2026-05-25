@@ -1,0 +1,18 @@
+# --- Language Mapping: performance.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# performance.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+maxAttempts: "maxAttempts"
+viewDistanceSelect: "viewDistanceSelect"
+viewDistanceTeleport: "viewDistanceTeleport"
+period: "period"
+syncAllottedTime: "syncAllottedTime"
+asyncAllottedTime: "asyncAllottedTime"
+minTPS: "minTPS"
+postTeleportQueueing: "postTeleportQueueing"
+syncLoading: "syncLoading"
+effectParsing: "effectParsing"
+biomeRecall: "biomeRecall"
+biomeRecallForced: "biomeRecallForced"
+checkOnChunkLoads: "checkOnChunkLoads"
+version: "version"

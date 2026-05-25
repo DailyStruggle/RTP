@@ -1,0 +1,8 @@
+mode: "modo"
+radius: "radio"
+centerRadius: "radioCentro"
+centerX: "centroX"
+centerZ: "centroZ"
+weight: "peso"
+uniquePlacements: "colocacionesUnicas"
+expand: "expandir"

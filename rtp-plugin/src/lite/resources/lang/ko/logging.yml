@@ -1,0 +1,45 @@
+# --- 플러그인 로그 토글 ---
+# 플러그인의 다양한 활동에 대한 로그를 활성화/비활성화합니다.
+# 상세 시스템 로그
+# detailed_reload: 리로드된 모든 파일/섹션을 로그
+# detailed_region_init: 각 리전의 초기화를 로그
+상세_리로드: false
+# Log region initialization details
+상세_리전초기화: false
+
+# 기본 활동 로그
+# command: 플레이어가 실행한 RTP 명령어를 로그
+# teleport: 실제 텔레포트 이벤트를 로그
+명령어: false
+# Log successful teleport events
+텔레포트: true
+
+# 플레이어가 월드를 변경할 때
+이벤트_월드변경: true
+# 플레이어가 서버에 접속할 때
+이벤트_접속: true
+# 플레이어가 리스폰할 때
+이벤트_리스폰: true
+# 플레이어가 이동할 때(이동 기반 RTP 활성화 시)
+이벤트_이동: true
+# 플레이어가 텔레포트할 때(텔레포트 기반 RTP 활성화 시)
+이벤트_텔레포트: true
+
+# 선택 실패 디버그
+# 안전한 위치를 찾지 못했을 때의 세부 정보를 로그에 남깁니다. 실패율과 검색 매개변수를 포함합니다.
+선택실패: true
+
+# 시스템 로그
+# 백그라운드 작업과 데이터베이스 작업에 관련됩니다.
+시스템_메모리추적기: false
+# Debug logs for database activity
+시스템_데이터베이스: false
+
+# 플러그인 레벨의 최소 로그 레벨. 실제 필터는 이 값과 Bukkit logger 중
+# 더 엄격한 쪽이 적용됩니다.
+# 값: SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF.
+# 기본값은 ALL 이며 Bukkit logger 와 동일하게 동작합니다.
+최소레벨: "INFO"
+
+# 버전 번호는 변경하지 마세요
+version: 1.0

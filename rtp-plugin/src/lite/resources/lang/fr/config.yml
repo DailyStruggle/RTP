@@ -1,0 +1,60 @@
+# Temps d'attente (secondes) avant la téléportation
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
+delaiTeleportation: 2
+
+# Distance de mouvement maximale pendant le délai avant annulation
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+distanceAnnulation: 2
+
+# Temps d'attente (secondes) entre les utilisations réussies
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
+refroidissementTeleportation: 300
+
+# Commandes exécutées après la téléportation
+# @type: list<string>
+commandesConsole:
+  - "say [player] vient de se téléporter aléatoirement !"
+
+# Commandes exécutées en tant que joueur téléporté lors d'une téléportation réussie.
+# Utilisez [player] pour le nom du joueur. Les entrées vides sont ignorées.
+# @type: list<string>
+commandesJoueur:
+  # Commandes exécutées en tant que joueur téléporté lors d'une téléportation réussie.
+  # Utilisez [player] pour le nom du joueur. Les entrées vides sont ignorées.
+  # @type: list<string>
+  - ""
+
+# Cadre de menu généralisé.
+# `renderer` est une liste ordonnée de préférences d'identifiants de
+# renderer. En cas d'exception ou d'adaptateur manquant, le framework
+# parcourt la liste et bascule sur l'entrée suivante. Si la liste est
+# épuisée, la voie d'ouverture sans jeton retombe sur le message
+# configurable `menuInvalid`. Identifiants disponibles : book. (Le
+# renderer chat arrivera dans une livraison ultérieure et sera ajouté à la
+# liste par défaut à ce moment-là.)
+menu:
+  # Ordered preference list of renderer ids.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    # Cadre de menu généralisé.
+    # `renderer` est une liste ordonnée de préférences d'identifiants de
+    # renderer. En cas d'exception ou d'adaptateur manquant, le framework
+    # parcourt la liste et bascule sur l'entrée suivante. Si la liste est
+    # épuisée, la voie d'ouverture sans jeton retombe sur le message
+    # configurable `menuInvalid`. Identifiants disponibles : book. (Le
+    # renderer chat arrivera dans une livraison ultérieure et sera ajouté à la
+    # liste par défaut à ce moment-là.)
+    - "book"
+
+# NE PAS MODIFIER LE NUMÉRO DE VERSION
+version: 3.0

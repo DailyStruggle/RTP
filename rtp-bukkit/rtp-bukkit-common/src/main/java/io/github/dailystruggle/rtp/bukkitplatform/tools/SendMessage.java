@@ -136,6 +136,18 @@ public class SendMessage {
 
   public static void sendMessage(
       RTPCommandSender sender, String message, String hover, String click) {
+    sendMessage(sender, message, hover, click, ClickEvent.Action.SUGGEST_COMMAND);
+  }
+
+  /**
+   * Overload that lets callers pick the {@link ClickEvent.Action}. Used by
+   * the menu chat renderer (ADR-050) to dispatch
+   * {@link ClickEvent.Action#RUN_COMMAND} clicks so every fragment auto-fires
+   * its literal {@code /rtp menu ...} command instead of suggesting it.
+   */
+  public static void sendMessage(
+      RTPCommandSender sender, String message, String hover, String click,
+      ClickEvent.Action clickAction) {
     if (message.isEmpty()) return;
     intercept(message);
 
@@ -157,7 +169,7 @@ public class SendMessage {
       }
 
       if (!click.isEmpty()) {
-        ClickEvent clickEvent = new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, click);
+        ClickEvent clickEvent = new ClickEvent(clickAction, click);
         for (BaseComponent component : textComponents) {
           component.setClickEvent(clickEvent);
         }

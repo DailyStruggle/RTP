@@ -357,6 +357,56 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
     return "";
   }
 
+  /**
+   * ADR-050 follow-up (2026-05-24): register typed dotted leaf parameters
+   * (e.g. {@code shape.radius}, {@code shape.centerX}, {@code shape.name})
+   * derived from a {@link FactoryValue}'s {@link FactoryValue#getData()}
+   * map. Used by the {@code Shape}/{@code VerticalAdjustor} arms of
+   * {@link #addParameters()} so the curated menu's flattened-row click
+   * path can stage individual sub-knobs without rewriting the whole
+   * shape/vert value. The {@code name} discriminator is registered as a
+   * generic string parameter so the operator can switch factory types
+   * from the same flat view. Numeric/boolean leaves get typed parameters
+   * so tab-complete and validation match {@link #addSectionParameters}.
+   */
+  private void addFactoryValueDottedParameters(String prefix, FactoryValue<?> fv) {
+    // Discriminator (`shape.name`, `vert.name`) so the factory type can
+    // be switched from the flat view.
+    addParameter(
+        prefix + ".name",
+        new CommandParameter("rtp.update", "", (uuid, s1) -> true) {
+          @Override
+          public Set<String> values() {
+            return new HashSet<>();
+          }
+        });
+    EnumMap<?, Object> data = fv.getData();
+    if (data == null) return;
+    for (Map.Entry<?, Object> e : data.entrySet()) {
+      Object keyObj = e.getKey();
+      if (keyObj == null) continue;
+      String leaf = String.valueOf(keyObj);
+      String fullKey = prefix + "." + leaf;
+      Object value = e.getValue();
+      if (value instanceof Boolean) {
+        addParameter(fullKey, new BooleanParameter("rtp.update", "", (uuid, s1) -> true));
+      } else if (value instanceof Integer || value instanceof Long) {
+        addParameter(fullKey, new IntegerParameter("rtp.update", "", (uuid, s1) -> true));
+      } else if (value instanceof Double || value instanceof Float) {
+        addParameter(fullKey, new FloatParameter("rtp.update", "", (uuid, s1) -> true));
+      } else {
+        addParameter(
+            fullKey,
+            new CommandParameter("rtp.update", "", (uuid, s1) -> true) {
+              @Override
+              public Set<String> values() {
+                return new HashSet<>();
+              }
+            });
+      }
+    }
+  }
+
   private void addSectionParameters(String prefix, RtpYamlSection section) {
     for (String key : section.getKeys(false)) {
       String fullKey = prefix + "." + key;
@@ -435,8 +485,25 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
           addParameter(s, new FloatParameter("rtp.update", desc, (uuid, s1) -> true));
         } else if (o instanceof Shape) {
           addParameter(s, new ShapeParameter("rtp.update", desc, (uuid, s1) -> true));
+          // ADR-050 follow-up (2026-05-24): also register the dotted
+          // scalar leaves derived from this FactoryValue's data
+          // (`shape.radius`, `shape.centerX`, `shape.name`, ...) so
+          // the menu's flattened-row click path can stage individual
+          // sub-knobs via `/rtp config <file> shape.radius=320`. Without
+          // this, the commands-api parser rejects "shape.radius=320"
+          // with "invalid command argument shape.radius=320" because
+          // only the bare `shape` parameter is registered for built-in
+          // regions whose stored value is already a FactoryValue (not
+          // a raw RtpYamlSection). The dispatcher's dotted-key write
+          // branch (onCommand line ~254-258) routes the typed value
+          // through `RtpYamlConfig.set("shape.radius", value)`.
+          addFactoryValueDottedParameters(s, (FactoryValue<?>) o);
         } else if (o instanceof VerticalAdjustor) {
           addParameter(s, new VertParameter("rtp.update", desc, (uuid, s1) -> true));
+          // Same dotted-leaf registration as the shape branch above
+          // (vert is the symmetric FactoryValue-backed top-level key
+          // alongside shape).
+          addFactoryValueDottedParameters(s, (FactoryValue<?>) o);
         } else if (o instanceof Region) {
           addParameter(s, new RegionParameter("rtp.update", desc, (uuid, s1) -> true));
         } else if (o instanceof RtpYamlSection) {

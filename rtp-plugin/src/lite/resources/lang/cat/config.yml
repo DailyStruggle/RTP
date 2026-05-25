@@ -1,0 +1,65 @@
+# Stalk delay (tail flicks)
+# How long the kitty crouches before the actual pounce.
+# Gives the server time to pre-load destination kibble.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
+stalk_delay: 2
+
+# Too-far-to-chase (blocks)
+# If the kitty wanders this far during the crouch, the pounce is cancelled.
+# Set -1 to disable.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+too_far_to_chase: 2
+
+# Nap time (tail flicks)
+# How long a kitty must nap before pouncing again.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
+nap_time: 300
+
+# Post-pounce tricks
+# Commands the tall human runs after a successful pounce.
+# Placeholder [player] is the kitty's name.
+# @type: list<string>
+tall_human_tricks:
+  - "say [player] has just randomly pounced! Mrrow!"
+
+# Tricks the kitty performs after a successful pounce.
+# Use [player] for the kitty's name. Empty entries are ignored.
+# @type: list<string>
+human_tricks:
+  # Tricks the kitty performs after a successful pounce.
+  # Use [player] for the kitty's name. Empty entries are ignored.
+  # @type: list<string>
+  - ""
+
+# Generalized menu framework.
+# `renderer` is an ordered preference list of renderer ids. On exception or
+# missing adapter the framework walks the list and falls back to the next
+# entry. If the list is exhausted the no-token open-page path falls back to
+# the configurable `menuInvalid` message. Available ids: book. (The chat
+# renderer ships in a follow-up and will be added to the default list at
+# that point.)
+menu:
+  # Ordered preference list of renderer ids.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    # Generalized menu framework.
+    # `renderer` is an ordered preference list of renderer ids. On exception or
+    # missing adapter the framework walks the list and falls back to the next
+    # entry. If the list is exhausted the no-token open-page path falls back to
+    # the configurable `menuInvalid` message. Available ids: book. (The chat
+    # renderer ships in a follow-up and will be added to the default list at
+    # that point.)
+    - "book"
+
+# Do not bite the version number, sacred catnip
+meowsion: 3.0

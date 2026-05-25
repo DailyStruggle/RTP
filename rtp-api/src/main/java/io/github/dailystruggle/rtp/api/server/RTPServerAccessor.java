@@ -285,6 +285,39 @@ public interface RTPServerAccessor {
   }
 
   /**
+   * Sends a rich-text message to a command sender whose click action
+   * <strong>auto-dispatches</strong> the supplied command (Adventure
+   * {@code ClickEvent.RUN_COMMAND} on Bukkit-family platforms, the
+   * intermediary / mojmap {@code runCommand} click action on Fabric).
+   *
+   * <p>Distinct from {@link #sendMessage(RTPCommandSender, String, String,
+   * String, String)}, which uses {@code SUGGEST_COMMAND} (pre-fills the
+   * chat input box). Use this overload for menu fragment clicks (per
+   * ADR-050: every menu click carries a literal {@code /rtp menu ...}
+   * command and must auto-dispatch on click).
+   *
+   * <p>Default implementation falls back to {@link #sendMessage(RTPCommandSender,
+   * String, String, String, String)} so out-of-tree {@link RTPServerAccessor}
+   * subclasses keep compiling; production platforms (Bukkit, Folia, Fabric)
+   * override this method to emit a {@code RUN_COMMAND} click.
+   *
+   * @param target     the recipient; must not be {@code null}
+   * @param message    the display text; must not be {@code null}
+   * @param hover      text shown on hover; {@code null} disables hover
+   * @param runCommand command auto-dispatched on click; {@code null} disables click
+   * @param tag        optional context tag; {@code null} means no tag
+   */
+  default void sendMessageWithRunCommand(
+      RTPCommandSender target, String message, String hover, String runCommand, String tag) {
+    sendMessage(target, message, hover, runCommand, tag);
+  }
+
+  default void sendMessageWithRunCommand(
+      RTPCommandSender target, String message, String hover, String runCommand) {
+    sendMessageWithRunCommand(target, message, hover, runCommand, null);
+  }
+
+  /**
    * Applies colour codes and registered placeholder replacements to {@code text}
    * in the context of the given player.
    *

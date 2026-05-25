@@ -1,0 +1,18 @@
+# --- Language Mapping: performance.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# performance.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+maxAttempts: "最大尝试次数"
+viewDistanceSelect: "视距_选择"
+viewDistanceTeleport: "视距_传送"
+period: "周期"
+syncAllottedTime: "分配时间_同步"
+asyncAllottedTime: "分配时间_异步"
+minTPS: "最低TPS"
+postTeleportQueueing: "传送后排队"
+syncLoading: "同步加载"
+effectParsing: "效果解析"
+biomeRecall: "生物群系记忆"
+biomeRecallForced: "生物群系记忆_强制"
+checkOnChunkLoads: "区块加载时检查"
+version: "version"

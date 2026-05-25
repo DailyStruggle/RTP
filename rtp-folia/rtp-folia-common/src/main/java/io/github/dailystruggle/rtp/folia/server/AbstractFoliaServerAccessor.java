@@ -265,6 +265,19 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  public void sendMessageWithRunCommand(
+      RTPCommandSender target, String message, String hover, String runCommand, String tag) {
+    // ADR-050: menu fragment clicks dispatch the literal /rtp menu ... command;
+    // use RUN_COMMAND instead of the SUGGEST_COMMAND used by sendMessage(...).
+    io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(
+        target,
+        tagMessage(message, tag),
+        hover,
+        runCommand,
+        net.md_5.bungee.api.chat.ClickEvent.Action.RUN_COMMAND);
+  }
+
+  @Override
   public String format(@Nullable UUID player, String text) { // @AnyThread — pure text formatting
     org.bukkit.OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player) : null;
     return io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.format(bukkitPlayer, text);

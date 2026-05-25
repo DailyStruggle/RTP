@@ -706,27 +706,53 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   @Override
   public void sendMessage(RTPCommandSender target, String message, String hover, String click,
                           String tag) {
-    // Mirror rtp-spigot SendMessage: when the recipient is an online player on
-    // this Fabric server, build a styled Component carrying HoverEvent.SHOW_TEXT
-    // and ClickEvent.SUGGEST_COMMAND so /rtp info, /rtp help, and any other
-    // command using the rich-text sink render hover tooltips and click-to-suggest
-    // identically to Bukkit/Paper. Console and detached senders fall back to the
-    // plain-string path — hover/click cannot render there.
+    sendInteractiveMessage(target, message, hover, click, FabricLegacyText.ClickKind.SUGGEST);
+  }
+
+  /**
+   * ADR-050 (2026-05-24): the chat-renderer-facing sibling that dispatches
+   * the click as {@code RUN_COMMAND} instead of {@code SUGGEST_COMMAND}.
+   * Every menu fragment carries a literal {@code /rtp menu ...} command
+   * that must auto-fire on click; suggesting it would force the operator
+   * to press Enter.
+   */
+  @Override
+  public void sendMessageWithRunCommand(RTPCommandSender target, String message,
+                                        String hover, String runCommand, String tag) {
+    sendInteractiveMessage(target, message, hover, runCommand, FabricLegacyText.ClickKind.RUN);
+  }
+
+  /**
+   * Shared rich-text dispatch used by both {@link #sendMessage(RTPCommandSender,
+   * String, String, String, String)} and {@link #sendMessageWithRunCommand}.
+   *
+   * <p>Mirrors rtp-spigot {@code SendMessage}: when the recipient is an online
+   * player on this Fabric server, build a styled {@code Component} carrying
+   * {@code HoverEvent.SHOW_TEXT} and a {@code ClickEvent} flavoured by
+   * {@code clickKind}, so {@code /rtp info}, {@code /rtp help}, and the menu
+   * chat renderer all render hover tooltips and clickable lines identically to
+   * Bukkit/Paper. Console and detached senders fall back to the plain-string
+   * path - hover/click cannot render there.
+   */
+  private void sendInteractiveMessage(RTPCommandSender target, String message,
+                                      String hover, String click,
+                                      FabricLegacyText.ClickKind clickKind) {
     if (target == null || message == null) return;
     String formattedMsg   = format(target.uuid(), message);
     String formattedHover = (hover == null) ? null : format(target.uuid(), hover);
     // click is a raw command string; do not run placeholder substitution on it
     // (the click contract is a literal command target, not user-facing text).
-    String suggestion     = click;
+    String payload        = click;
     // Defensive: see sendMessageAndSuggest. Mapping drift on 1.21.5+
     // HoverEvent/ClickEvent constructors must not abort the per-line
     // forEach loop in InfoCmd or the commands-api built-in
-    // TreeCommand#help() dispatch.
+    // TreeCommand#help() dispatch, nor the per-fragment forEach in the
+    // chat menu renderer.
     try {
       RTPPlayer player = getPlayer(target.uuid());
       if (player instanceof FabricRTPPlayer fp && fp.isOnline()) {
         net.minecraft.network.chat.Component component =
-            FabricLegacyText.parseInteractive(formattedMsg, formattedHover, suggestion);
+            FabricLegacyText.parseInteractive(formattedMsg, formattedHover, payload, clickKind);
         fp.sendComponent(component);
         return;
       }
@@ -742,7 +768,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     } catch (Throwable t) {
       RTP.log(Level.WARNING,
           "[RTP] sendMessage(hover/click) interactive path failed ("
-              + t.getClass().getSimpleName() + "): falling back to plain message — "
+              + t.getClass().getSimpleName() + "): falling back to plain message - "
               + t.getMessage());
     }
     target.sendMessage(formattedMsg);

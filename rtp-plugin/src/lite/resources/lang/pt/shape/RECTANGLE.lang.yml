@@ -1,0 +1,7 @@
+mode: "modo"
+width: "largura"
+height: "altura"
+centerX: "centroX"
+centerZ: "centroZ"
+rotation: "rotacao"
+uniquePlacements: "posicoesUnicas"

@@ -1,0 +1,81 @@
+# --- RTP Performance Settings (cat dialect) ---
+# How fast a kitty can stalk and pounce without knocking over the lamp.
+# Max pounce attempts before giving up
+# @type: integer
+# @range: [1, null]
+# @default: 32
+max_pounces: 32
+
+# Kibble (chunk) radius to load while stalking
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+stalking_distance: 0
+
+# Kibble (chunk) radius to load just before pouncing
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+pounce_distance: 0
+
+# Tail flicks (ticks) between background sniff cycles
+# @type: integer
+# @range: [1, null]
+# @unit: ticks
+# @default: 20
+tail_swish_period: 20
+
+# Max whisker-twitches per tick for sync errands
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+sync_nap_time: 50
+
+# Max whisker-twitches per tick for async errands
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+async_nap_time: 50
+
+# Minimum purrs/sec (TPS) to keep sniffing in the background
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+minimum_purrs_per_second: 19.0
+
+# Refill the warm-spot pile right after a pounce
+# @type: boolean
+# @default: false
+line_up_after_pounce: false
+
+# Use sync chunk loading (NOT RECOMMENDED, may pull tail)
+# @type: boolean
+# @default: false
+synced_kibble: false
+
+# Parse sparkle (effect) permissions at startup
+# @type: boolean
+# @default: true
+sparkle_parsing: true
+
+# Reuse already-known biome warm-spots
+# @type: boolean
+# @default: true
+smell_memory: true
+
+# Only use biomes already remembered (no new sniffing)
+# @type: boolean
+# @default: false
+forced_smell_memory: false
+
+# Check for warm-spots in every loaded kibble (chunk)
+# @type: boolean
+# @default: false
+check_when_kibble_arrives: false
+
+# Do not bite the version number, sacred catnip
+meowsion: 1.0

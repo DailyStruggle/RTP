@@ -1,0 +1,65 @@
+# Retraso del teletransporte (segundos)
+# Tiempo que el jugador debe esperar antes de que se realice el teletransporte.
+# A veces le da tiempo al servidor para precargar los chunks de destino.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
+retrasoTeletransporte: 2
+
+# Cancelación por movimiento (bloques)
+# Si el jugador se mueve más de esta distancia durante el retraso, el
+# teletransporte se cancela. Establece -1 para desactivarlo.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+distanciaCancelar: 2
+
+# Tiempo de espera entre teletransportes (segundos)
+# Tiempo que el jugador debe esperar entre usos exitosos de RTP.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
+enfriamientoTeletransporte: 300
+
+# Comandos posteriores al teletransporte
+# Lista de comandos a ejecutar tras un teletransporte exitoso.
+# El marcador [player] representa el nombre del jugador.
+# @type: list<string>
+comandosConsola:
+  - "say ¡[player] acaba de teletransportarse aleatoriamente!"
+
+# Comandos ejecutados como el jugador teletransportado tras un teletransporte exitoso.
+# Use [player] para el nombre del jugador. Las entradas vacías se ignoran.
+# @type: list<string>
+comandosJugador:
+  # Comandos ejecutados como el jugador teletransportado tras un teletransporte exitoso.
+  # Use [player] para el nombre del jugador. Las entradas vacías se ignoran.
+  # @type: list<string>
+  - ""
+
+# Marco de menús generalizado.
+# `renderer` es una lista ordenada de preferencia de ids de renderer. En
+# caso de excepción o de adaptador faltante, el framework recorre la lista
+# y recurre a la siguiente entrada. Si la lista se agota, la ruta de
+# apertura sin token cae al mensaje configurable `menuInvalid`. Ids
+# disponibles: book. (El renderer de chat llegará en una entrega posterior
+# y se añadirá entonces a la lista por defecto.)
+menu:
+  # Ordered preference list of renderer ids.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    # Marco de menús generalizado.
+    # `renderer` es una lista ordenada de preferencia de ids de renderer. En
+    # caso de excepción o de adaptador faltante, el framework recorre la lista
+    # y recurre a la siguiente entrada. Si la lista se agota, la ruta de
+    # apertura sin token cae al mensaje configurable `menuInvalid`. Ids
+    # disponibles: book. (El renderer de chat llegará en una entrega posterior
+    # y se añadirá entonces a la lista por defecto.)
+    - "book"
+
+# NO MODIFIQUES EL NÚMERO DE VERSIÓN
+version: 3.0
