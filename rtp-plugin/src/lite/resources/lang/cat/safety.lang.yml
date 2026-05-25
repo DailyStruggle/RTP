@@ -1,0 +1,17 @@
+# --- Language Mapping: safety.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# safety.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+invulnerabilityTime: "nine_lives_buffer"
+safetyRadius: "soft_landing_radius"
+staleChunkRetryLimit: "staleChunkRetryLimit"
+anvilPrefilterEnabled: "anvilPrefilterEnabled"
+platformRadius: "paw_platform_radius"
+platformDepth: "paw_platform_depth"
+platformAirHeight: "paw_platform_headroom"
+platformMaterial: "paw_platform_material"
+airBlocks: "empty_air_for_zoomies"
+unsafeBlocks: "scary_blocks"
+biomeWhitelist: "friendly_smells"
+biomes: "smells"
+version: "meowsion"

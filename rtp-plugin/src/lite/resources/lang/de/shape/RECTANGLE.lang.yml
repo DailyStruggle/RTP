@@ -1,0 +1,7 @@
+mode: "modo"
+width: "anchura"
+height: "altura"
+centerX: "centroX"
+centerZ: "centroZ"
+rotation: "rotacion"
+uniquePlacements: "colocacionesUnicas"

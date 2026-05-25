@@ -1,0 +1,217 @@
+package io.github.dailystruggle.rtp.common.commands.menu;
+
+import io.github.dailystruggle.rtp.api.menu.MenuAction;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Locale;
+
+/**
+ * Translates a {@link MenuAction} into its concrete-command wire form
+ * (ADR-050 Stage 3β.D.2b, 2026-05-24).
+ *
+ * <p>Single source of truth for the {@code MenuAction -> /rtp menu ...}
+ * mapping shared by {@code BookMenuRenderer} (Paper / Folia book pages) and
+ * {@code ChatMenuRenderer} (Fabric chat lines, future Bukkit chat fallback).
+ * Without a shared helper the two renderers drift on every new
+ * {@code MenuAction} variant; with it, only the call sites differ
+ * (Adventure {@code ClickEvent.runCommand(...)} vs. Fabric / mojmap
+ * {@code ClickEvent.Action.RUN_COMMAND}).
+ *
+ * <p>Renderer-only variants - {@link MenuAction.ChangePage},
+ * {@link MenuAction.SuggestInput}, {@link MenuAction.OpenExternalUrl} - are
+ * included for completeness but produce no concrete command:
+ * <ul>
+ *   <li>{@code ChangePage} emits {@code /rtp menu page n=<n+1>} where
+ *       {@code n} is the 1-based wire page index (the
+ *       {@link MenuAction.ChangePage#pageIndex()} record stores the
+ *       0-based array index).</li>
+ *   <li>{@code SuggestInput} returns {@code null} - the renderer should
+ *       fall back to a non-running click (e.g. Adventure
+ *       {@code ClickEvent.suggestCommand}) or degrade to plain text.</li>
+ *   <li>{@code OpenExternalUrl} returns {@code null} - same fallback
+ *       contract; the chat renderer degrades to plain text since no
+ *       chat-channel URL-click is offered today.</li>
+ * </ul>
+ */
+public final class MenuActionToCommand {
+
+    private MenuActionToCommand() {}
+
+    /**
+     * Returns the literal {@code /rtp ...} command to dispatch on click for
+     * the given {@link MenuAction}, or {@code null} for renderer-only
+     * variants that do not map to a server-side command (see class Javadoc).
+     */
+    public static @Nullable String toRunCommand(@Nullable MenuAction action) {
+        if (action == null) return null;
+        return switch (action) {
+            case MenuAction.RunRtpCommand run -> buildRunCommand(run);
+            // Empty path = root; omit `path=` entirely because the
+            // commands-api TreeCommand parameter parser rejects any
+            // argument that ends in `=` (empty value) before the leaf's
+            // onCommand runs (TreeCommand.java:224).
+            case MenuAction.OpenMenu open ->
+                    "/rtp menu open" + pathArg(open.path());
+            case MenuAction.OpenParamPicker picker ->
+                    "/rtp menu picker"
+                            + pathArg(picker.parentPath())
+                            + " param=" + picker.paramName();
+            case MenuAction.PromptAnvilInput prompt -> buildAnvilCommand(prompt);
+            // Renderer-only variants: no concrete command. ChangePage is
+            // handled by the book renderer's Adventure changePage(int) click
+            // type; the chat renderer translates it to /rtp menu page n=...
+            // via a separate call to changePageCommand(int) below.
+            case MenuAction.ChangePage ignored -> null;
+            case MenuAction.SuggestInput ignored -> null;
+            case MenuAction.OpenExternalUrl ignored -> null;
+            case MenuAction.OpenConfigSelector ignored -> "/rtp menu config";
+            case MenuAction.OpenConfigFile f ->
+                    "/rtp menu config file=" + f.fileName();
+            case MenuAction.OpenConfigKey k ->
+                    "/rtp menu config"
+                            + " file=" + k.fileName()
+                            + " key=" + k.paramName();
+            // No dedicated leaf in core today; ConfigCmd's parameter grammar
+            // discards an unknown `type=` token and falls through to the key
+            // page, which is the existing dispatch behaviour pre-ADR-050.
+            case MenuAction.OpenConfigSubParamPage sp ->
+                    "/rtp menu config"
+                            + " file=" + sp.fileName()
+                            + " key=" + sp.paramName()
+                            + " type=" + sp.typeName();
+            case MenuAction.OpenConfigSearchPrompt ignored ->
+                    "/rtp menu config search";
+            // ConfigSearchCmd accepts 1-indexed `page=`; record stores
+            // 0-indexed page, so +1 on emit.
+            case MenuAction.OpenConfigSearchResults sr ->
+                    "/rtp menu config search"
+                            + " query=" + sr.query()
+                            + " page=" + (sr.page() + 1);
+            case MenuAction.OpenAdminPanel ignored -> "/rtp menu admin";
+            case MenuAction.OpenVisualizations ignored -> "/rtp menu visualizations";
+            case MenuAction.OpenFrontPage ignored -> "/rtp menu front";
+            case MenuAction.OpenInfo info ->
+                    "/rtp menu info scope=" + scopeWire(info.scope());
+            case MenuAction.SwitchInfoToText sw ->
+                    "/rtp menu info"
+                            + " scope=" + scopeWire(sw.scope())
+                            + " text=true";
+            case MenuAction.StageConfigValue st ->
+                    "/rtp menu stage"
+                            + " file=" + st.fileName()
+                            + " key=" + st.paramName()
+                            + " value=" + st.value();
+            case MenuAction.UnstageConfigValue u ->
+                    "/rtp menu unstage"
+                            + " file=" + u.fileName()
+                            + " key=" + u.paramName();
+            case MenuAction.ApplyStagedConfig ap ->
+                    "/rtp menu apply file=" + ap.fileName();
+            case MenuAction.DiscardStagedConfig d ->
+                    "/rtp menu discard file=" + d.fileName();
+            case MenuAction.OpenMultiConfigSelector ms ->
+                    "/rtp menu multi kind=" + ms.parserKind();
+            case MenuAction.OpenMultiConfigEntry me ->
+                    "/rtp menu multi"
+                            + " kind=" + me.parserKind()
+                            + " entry=" + me.entryName();
+            case MenuAction.MultiConfigMutate mm ->
+                    "/rtp menu multi"
+                            + " kind=" + mm.parserKind()
+                            + " entry=" + mm.entryName()
+                            + " op=" + mm.op().name().toLowerCase(Locale.ROOT);
+            // ADR-050 Stage 3β: OpenMap carries (kind, regionName). Emit
+            // `/rtp visualization x=<kind>:<regionName>`; the dispatcher
+            // parses on the first `:` and builds the ChartSpec inline.
+            case MenuAction.OpenMap openMap ->
+                    "/rtp visualization x="
+                            + openMap.kind().name() + ":" + openMap.regionName();
+        };
+    }
+
+    /**
+     * Chat-renderer helper: a {@link MenuAction.ChangePage} maps to a
+     * concrete {@code /rtp menu page n=<n>} command (1-indexed wire form;
+     * the record stores 0-indexed array positions). The book renderer
+     * prefers Adventure's native {@code ClickEvent.changePage(int)} and
+     * does not need this.
+     */
+    public static String changePageCommand(MenuAction.ChangePage change) {
+        // 0-based -> 1-based wire form.
+        return "/rtp menu page n=" + (change.pageIndex() + 1);
+    }
+
+    /**
+     * Encodes a {@link MenuAction.RunRtpCommand} as a literal {@code /rtp}
+     * invocation. The args are joined with single spaces; empty args degrade
+     * to bare {@code /rtp}.
+     */
+    public static String buildRunCommand(MenuAction.RunRtpCommand run) {
+        String[] args = run.args();
+        if (args == null || args.length == 0) return "/rtp";
+        StringBuilder sb = new StringBuilder("/rtp");
+        for (String arg : args) {
+            sb.append(' ').append(arg);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Encodes a {@link MenuAction.PromptAnvilInput} as the concrete
+     * {@code /rtp menu anvil ...} command consumed by
+     * {@code MenuConcreteCommandLeavesB.AnvilCmd}.
+     */
+    public static String buildAnvilCommand(MenuAction.PromptAnvilInput prompt) {
+        StringBuilder sb = new StringBuilder("/rtp menu anvil")
+                .append(pathArg(prompt.parentPath()))
+                .append(" param=").append(prompt.paramName());
+        String prefill = prompt.prefill();
+        if (prefill != null && !prefill.isEmpty()) {
+            sb.append(" prefill=").append(prefill);
+        }
+        sb.append(" mode=")
+                .append(prompt.mode().name().toLowerCase(Locale.ROOT));
+        return sb.toString();
+    }
+
+    /**
+     * Joins a path array as a dot-separated string for the {@code path=}
+     * parameter of the open / picker / anvil leaves. Empty arrays return
+     * the empty string (the leaves treat an empty path as root).
+     */
+    public static String dotted(String[] path) {
+        if (path == null || path.length == 0) return "";
+        StringBuilder sb = new StringBuilder(path[0]);
+        for (int i = 1; i < path.length; i++) {
+            sb.append('.').append(path[i]);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Returns {@code " path=<dotted>"} when the path is non-empty, or the
+     * empty string when it is null/empty. The commands-api parameter parser
+     * rejects any argument that ends in {@code =} (empty value) before the
+     * leaf's onCommand runs (TreeCommand.java:224), so an empty path must
+     * NOT be emitted as {@code path=}; instead the leaf treats a missing
+     * {@code path=} as root.
+     */
+    public static String pathArg(String[] path) {
+        String d = dotted(path);
+        return d.isEmpty() ? "" : " path=" + d;
+    }
+
+    /**
+     * Encodes an {@link MenuAction.InfoScopeToken} for the {@code scope=}
+     * parameter of {@code /rtp menu info}. Format matches
+     * {@code InfoCmd.parseScope}: {@code global}, {@code world:<name>},
+     * {@code region:<name>}.
+     */
+    public static String scopeWire(MenuAction.InfoScopeToken scope) {
+        return switch (scope.kind()) {
+            case GLOBAL -> "global";
+            case WORLD -> "world:" + scope.name();
+            case REGION -> "region:" + scope.name();
+        };
+    }
+}

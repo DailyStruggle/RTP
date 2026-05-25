@@ -1,0 +1,81 @@
+# --- RTP Performance Settings ---
+# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/PERFORMANCE.md
+# Max search attempts before giving up
+# @type: integer
+# @range: [1, null]
+# @default: 32
+maxAttempts: 32
+
+# Chunk radius to load during selection
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+viewDistanceSelect: 0
+
+# Chunk radius to load before teleport
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+viewDistanceTeleport: 0
+
+# Ticks between background cache cycles
+# @type: integer
+# @range: [1, null]
+# @unit: ticks
+# @default: 20
+period: 20
+
+# Max ms per tick for sync tasks
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+syncAllottedTime: 50
+
+# Max ms per tick for async tasks
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+asyncAllottedTime: 50
+
+# Min TPS to continue background queueing
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+minTPS: 19.0
+
+# Refill cache immediately after teleport
+# @type: boolean
+# @default: false
+postTeleportQueueing: false
+
+# Use sync chunk loading (NOT RECOMMENDED)
+# @type: boolean
+# @default: false
+syncLoading: false
+
+# Parse effect permissions on startup
+# @type: boolean
+# @default: true
+effectParsing: true
+
+# Reuse found biome locations
+# @type: boolean
+# @default: true
+biomeRecall: true
+
+# Only use biomes already in cache
+# @type: boolean
+# @default: false
+biomeRecallForced: false
+
+# Check for safe spots in all loaded chunks
+# @type: boolean
+# @default: false
+checkOnChunkLoads: false
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

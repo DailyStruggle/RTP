@@ -1,0 +1,113 @@
+# --- RTP 性能设置 ---
+# 针对服务器性能精细调节插件行为。
+# 最大查找尝试次数
+# 在放弃前为单次请求查找安全位置的最大尝试次数。
+# 影响: 高 — 数值过大会显著增加每次请求的 CPU 占用。
+# @type: integer
+# @range: [1, null]
+# @default: 32
+最大尝试次数: 10
+
+# 目标位置预加载（区块）
+# 在目标周围预加载的区块半径。
+# 加载的区块数 = ( 1 + 2 * 半径 )^2。
+# 影响: 高 — 数值过大可能在传送时导致 TPS 下降。
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+视距_选择: 0
+
+# Chunk radius loaded around the final location immediately before
+# teleport. 0 loads only the destination chunk.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+视距_传送: 0
+
+# 选择频率（游戏刻）
+# 后台为各区域缓存补充新位置的间隔时间。
+# ( 20 ticks = 1 秒 )。
+# 影响: 中 — 数值越小补充越快，但 CPU 占用越多。
+# @type: integer
+# @range: [1, null]
+# @unit: ticks
+# @default: 20
+周期: 20
+
+# 单次任务分配时间（毫秒）
+# 每个 tick 用于 RTP 任务的最大时间（毫秒）。
+# 范围: 0 - 50。
+# 影响: 中 — 数值越大处理越快，但可能挤压 tick 时间。
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+分配时间_同步: 50
+
+# Maximum milliseconds per tick spent in asynchronous tasks.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+分配时间_异步: 50
+
+# 最低 TPS 要求
+# 在向缓存中追加新位置之前要求的最低服务器 TPS。
+# 范围: 0.0 - 20.0。
+# 影响: 低 — 防止插件在服务器卡顿时进一步加重负担。
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+最低TPS: 19.0
+
+# 传送后排队
+# 若为 true，则插件会在一次 RTP 之后立即尝试补充位置缓存。
+# 影响: 中
+# @type: boolean
+# @default: false
+传送后排队: false
+
+# 同步加载
+# 在选择位置时使用同步区块加载。
+# 影响: 高 — 不推荐！可能造成严重的服务器卡顿。
+# @type: boolean
+# @default: false
+同步加载: false
+
+# 权限解析（启动时）
+# onEventParsing: 与通配符权限 *.* 不兼容。
+# 影响: 中 (onEvent) / 低 (effect)
+# @type: boolean
+# @default: false
+事件时解析: false
+
+# Parse effect permission nodes at startup.
+# @type: boolean
+# @default: true
+效果解析: true
+
+# 生物群系选择缓存
+# biomeRecall: 复用按生物群系曾经找到过的位置。
+# biomeRecallForced: 仅使用缓存中已发现的生物群系。
+# 影响: 低 至 中
+# @type: boolean
+# @default: true
+生物群系记忆: true
+
+# When set, only serve biome-filtered requests from cache (never
+# generate new biome searches). Requires biomeRecall.
+# @type: boolean
+# @default: false
+生物群系记忆_强制: false
+
+# 区块加载时被动检查
+# 在区域范围内的所有已加载区块中查找安全位置。
+# 影响: 高 — 可能在区块加载事件中显著增加服务器负担。
+# @type: boolean
+# @default: false
+区块加载时检查: false
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

@@ -42,6 +42,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Hazards and failure modes | [`../admin/HAZARDS.md`](../admin/HAZARDS.md) |
 | Failure detection and responses | [`../admin/HAZARDS.md#failure-modes`](../admin/HAZARDS.md#failure-modes) |
 | External hooks (claim verifiers, economy, placeholders, world border, anvil prefilter) | [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) (ADR-026) |
+| How and why AI tooling is used in this repository | [`AI_USAGE.md`](AI_USAGE.md) |
 
 ## Normative (read before writing code)
 

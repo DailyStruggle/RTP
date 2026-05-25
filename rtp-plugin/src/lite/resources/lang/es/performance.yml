@@ -1,0 +1,106 @@
+# --- Configuración de rendimiento de RTP ---
+# Ajusta con precisión el plugin para el rendimiento del servidor.
+# Intentos máximos de búsqueda
+# Cuántas veces buscará el plugin una ubicación segura antes de detenerse.
+# Impacto: ALTO — valores elevados pueden aumentar mucho el uso de CPU por petición.
+# @type: integer
+# @range: [1, null]
+# @default: 32
+intentosMaximos: 10
+
+# Precarga de destino (chunks)
+# Radio de chunks a precargar alrededor del destino.
+# Número de chunks cargados = ( 1 + 2 * radio )^2.
+# Impacto: ALTO — un valor demasiado alto puede causar caídas de TPS al teletransportar.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+distanciaVistaSeleccion: 0
+
+# Chunk radius loaded around the final location immediately before
+# teleport. 0 loads only the destination chunk.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+distanciaVistaTeletransporte: 0
+
+# Frecuencia de selección (ticks de juego)
+# Tiempo entre búsquedas de nuevas ubicaciones para rellenar las cachés de región.
+# ( 20 ticks = 1 segundo ).
+# Impacto: MEDIO — valores menores rellenan la caché más rápido pero usan más CPU.
+# @type: integer
+# @range: [1, null]
+# @unit: ticks
+# @default: 20
+periodo: 20
+
+# Tiempo asignado por tarea (milisegundos)
+# Tiempo máximo (ms) que se dedica a tareas RTP por tick.
+# Rango: 0 - 50.
+# Impacto: MEDIO — valores altos permiten procesar más rápido a riesgo del tiempo de tick.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+tiempoAsignadoSincrono: 50
+
+# Maximum milliseconds per tick spent in asynchronous tasks.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+tiempoAsignadoAsincrono: 50
+
+# Requisito mínimo de TPS
+# TPS mínimo del servidor antes de encolar una nueva ubicación para la caché.
+# Rango: 0.0 - 20.0.
+# Impacto: BAJO — evita que el plugin añada lag cuando el servidor va mal.
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+tpsMinimo: 19.0
+
+# Encolado posterior al teletransporte
+# Si es true, el plugin intentará rellenar la caché de ubicaciones inmediatamente después de un RTP.
+# Impacto: MEDIO
+# @type: boolean
+# @default: false
+encolarPostTeletransporte: false
+
+# Carga síncrona
+# Usar carga síncrona de chunks para la selección de ubicaciones.
+# Impacto: ALTO — ¡NO RECOMENDADO! Puede provocar bloqueos importantes del servidor.
+# @type: boolean
+# @default: false
+cargaSincrona: false
+
+# Parse effect permission nodes at startup.
+# @type: boolean
+# @default: true
+analisisEfectos: true
+
+# Caché de selección de biomas
+# biomeRecall: Reutilizar ubicaciones previamente encontradas por bioma.
+# biomeRecallForced: Usar únicamente biomas ya descubiertos y almacenados en caché.
+# Impacto: BAJO a MEDIO
+# @type: boolean
+# @default: true
+recuerdoBioma: true
+
+# When set, only serve biome-filtered requests from cache (never
+# generate new biome searches). Requires biomeRecall.
+# @type: boolean
+# @default: false
+recuerdoBiomaForzado: false
+
+# Comprobación pasiva de chunks
+# Busca ubicaciones seguras dentro de todos los chunks cargados dentro del rango de una región.
+# Impacto: ALTO — puede aumentar significativamente la carga del servidor en los eventos de carga de chunks.
+# @type: boolean
+# @default: false
+verificarEnCargaChunk: false
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

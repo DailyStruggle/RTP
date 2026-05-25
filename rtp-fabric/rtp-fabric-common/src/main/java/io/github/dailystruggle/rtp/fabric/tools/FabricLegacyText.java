@@ -39,27 +39,61 @@ public final class FabricLegacyText {
     private FabricLegacyText() {}
 
     /**
+     * Which click action a generated {@link ClickEvent} should carry.
+     *
+     * <ul>
+     *   <li>{@link #SUGGEST} - the classic rtp-spigot behaviour: typing the
+     *       command is pre-filled in the player's chat input. Used by
+     *       {@code /rtp info}, {@code /rtp help}, and other rich-text sinks
+     *       that invite the player to optionally run the command.</li>
+     *   <li>{@link #RUN} - auto-dispatch on click (ADR-050). Used by the
+     *       chat menu renderer so every menu fragment fires its literal
+     *       {@code /rtp menu ...} command exactly as a typed invocation
+     *       would.</li>
+     * </ul>
+     */
+    public enum ClickKind {
+        SUGGEST,
+        RUN
+    }
+
+    /**
+     * Backwards-compatible overload: uses {@link ClickKind#SUGGEST} (the
+     * historical rtp-spigot behaviour). New callers should pick the click
+     * kind explicitly via
+     * {@link #parseInteractive(String, String, String, ClickKind)}.
+     */
+    public static Component parseInteractive(String raw,
+                                             @Nullable String hover,
+                                             @Nullable String click) {
+        return parseInteractive(raw, hover, click, ClickKind.SUGGEST);
+    }
+
+    /**
      * Parse {@code raw} as legacy text and return a styled {@link Component} with
-     * an optional hover ({@code HoverEvent.Action.SHOW_TEXT}) and click-to-suggest
-     * ({@code ClickEvent.Action.SUGGEST_COMMAND}) annotation applied to the root component.
+     * an optional hover ({@code HoverEvent.Action.SHOW_TEXT}) and click
+     * annotation applied to the root component. The click flavour is selected
+     * by {@code clickKind} - either {@code SUGGEST_COMMAND} or {@code RUN_COMMAND}.
      *
      * <p>Mirrors the rtp-spigot {@code SendMessage.sendMessage(target, msg, hover, click)}
      * path, which decorates a Bungee {@code BaseComponent} with the same two events.
      * Hover/click are rendered as a single annotation across the whole line
      * (matching Bukkit's {@code BaseComponent.setHoverEvent}/{@code setClickEvent}
-     * semantics — not per-segment).
+     * semantics - not per-segment).
      *
      * <p>If both {@code hover} and {@code click} are {@code null} or empty, this
      * returns the result of {@link #parse(String)} unchanged.
      *
-     * @param raw   primary message; legacy {@code &}/{@code §} codes accepted
-     * @param hover hover-tooltip text; legacy codes accepted; {@code null}/empty disables hover
-     * @param click suggest-command target; colour codes are stripped before insertion
-     *              into the chat input; {@code null}/empty disables click
+     * @param raw       primary message; legacy {@code &}/{@code §} codes accepted
+     * @param hover     hover-tooltip text; legacy codes accepted; {@code null}/empty disables hover
+     * @param click     click target (command for SUGGEST/RUN); colour codes are stripped before
+     *                  insertion; {@code null}/empty disables click
+     * @param clickKind which {@link ClickEvent.Action} the click should carry
      */
     public static Component parseInteractive(String raw,
                                              @Nullable String hover,
-                                             @Nullable String click) {
+                                             @Nullable String click,
+                                             ClickKind clickKind) {
         Component base = parse(raw);
         boolean hasHover = hover != null && !hover.isEmpty();
         boolean hasClick = click != null && !click.isEmpty();
@@ -69,16 +103,17 @@ public final class FabricLegacyText {
         // entire line regardless of inner colour/format runs (Bukkit parity).
         //
         // NOTE (drift guard): the HoverEvent / ClickEvent constructor shapes
-        // changed in 1.21.5+ — they were converted to sealed records with
-        // per-action types (e.g. ClickEvent.SuggestCommand, HoverEvent.ShowText).
-        // The legacy `new HoverEvent(Action, Component)` / `new ClickEvent(Action, String)`
-        // calls trigger NoSuchMethodError / ClassFormatError at runtime on
-        // those versions, which (because callers like InfoCmd dispatch each
-        // line via forEach) truncates the output mid-loop. We therefore wrap
-        // the styling in a best-effort try/catch and degrade gracefully to
-        // the un-decorated component rather than aborting the whole command.
-        // The drift itself should be repaired in the per-version adapter
-        // (rtp-fabric-v1_21_R5 / R11) — tracked under Step F follow-ups.
+        // changed in 1.21.5+ - they were converted to sealed records with
+        // per-action types (e.g. ClickEvent.SuggestCommand / ClickEvent.RunCommand,
+        // HoverEvent.ShowText). The legacy `new HoverEvent(Action, Component)` /
+        // `new ClickEvent(Action, String)` calls trigger NoSuchMethodError /
+        // ClassFormatError at runtime on those versions, which (because callers
+        // like InfoCmd dispatch each line via forEach) truncates the output
+        // mid-loop. We therefore wrap the styling in a best-effort try/catch
+        // and degrade gracefully to the un-decorated component rather than
+        // aborting the whole command. The drift itself should be repaired in
+        // the per-version adapter (rtp-fabric-v1_21_R5 / R11) - tracked under
+        // Step F follow-ups.
         try {
             MutableComponent mut = base.copy();
             Style style = mut.getStyle();
@@ -88,11 +123,12 @@ public final class FabricLegacyText {
                 if (hoverEv != null) style = style.withHoverEvent(hoverEv);
             }
             if (hasClick) {
-                // Strip colour from the suggest-command target so § codes never leak
-                // into the player's chat input — mirrors the Spigot path which feeds
-                // the raw command string straight into ClickEvent.SUGGEST_COMMAND.
-                String suggestion = stripColor(click);
-                ClickEvent clickEv = buildSuggestCommandClick(suggestion);
+                // Strip colour from the click target so § codes never leak
+                // into the dispatched/suggested command string - mirrors the
+                // Spigot path which feeds the raw command string straight
+                // into ClickEvent.{SUGGEST,RUN}_COMMAND.
+                String payload = stripColor(click);
+                ClickEvent clickEv = buildClick(clickKind, payload);
                 if (clickEv != null) style = style.withClickEvent(clickEv);
             }
             return mut.setStyle(style);
@@ -369,6 +405,7 @@ public final class FabricLegacyText {
 
     private static volatile java.lang.reflect.Constructor<?> CLICK_CTOR_LEGACY;
     private static volatile java.lang.reflect.Constructor<?> CLICK_CTOR_SUGGEST;
+    private static volatile java.lang.reflect.Constructor<?> CLICK_CTOR_RUN;
     private static volatile boolean CLICK_PROBED;
 
     private static HoverEvent buildShowTextHover(Component hoverComp) {
@@ -386,17 +423,23 @@ public final class FabricLegacyText {
         return null;
     }
 
-    private static ClickEvent buildSuggestCommandClick(String suggestion) {
+    private static ClickEvent buildClick(ClickKind kind, String payload) {
         if (!CLICK_PROBED) probeClickCtors();
         try {
+            ClickEvent.Action action = (kind == ClickKind.RUN)
+                    ? ClickEvent.Action.RUN_COMMAND
+                    : ClickEvent.Action.SUGGEST_COMMAND;
             if (CLICK_CTOR_LEGACY != null) {
-                return (ClickEvent) CLICK_CTOR_LEGACY.newInstance(ClickEvent.Action.SUGGEST_COMMAND, suggestion);
+                return (ClickEvent) CLICK_CTOR_LEGACY.newInstance(action, payload);
             }
-            if (CLICK_CTOR_SUGGEST != null) {
-                return (ClickEvent) CLICK_CTOR_SUGGEST.newInstance(suggestion);
+            // 1.21.5+ / 26.x record carriers: per-action constructor.
+            java.lang.reflect.Constructor<?> recordCtor =
+                    (kind == ClickKind.RUN) ? CLICK_CTOR_RUN : CLICK_CTOR_SUGGEST;
+            if (recordCtor != null) {
+                return (ClickEvent) recordCtor.newInstance(payload);
             }
         } catch (Throwable t) {
-            // fall through — caller skips the click decoration.
+            // fall through - caller skips the click decoration.
         }
         return null;
     }
@@ -437,6 +480,10 @@ public final class FabricLegacyText {
             try {
                 Class<?> suggest = Class.forName("net.minecraft.network.chat.ClickEvent$SuggestCommand");
                 CLICK_CTOR_SUGGEST = suggest.getConstructor(String.class);
+            } catch (Throwable ignored) { /* nothing matched */ }
+            try {
+                Class<?> run = Class.forName("net.minecraft.network.chat.ClickEvent$RunCommand");
+                CLICK_CTOR_RUN = run.getConstructor(String.class);
             } catch (Throwable ignored) { /* nothing matched */ }
         }
         CLICK_PROBED = true;

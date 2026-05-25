@@ -1,0 +1,18 @@
+# --- Language Mapping: performance.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# performance.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+maxAttempts: "최대시도횟수"
+viewDistanceSelect: "시야거리_선택"
+viewDistanceTeleport: "시야거리_텔레포트"
+period: "주기"
+syncAllottedTime: "할당시간_동기"
+asyncAllottedTime: "할당시간_비동기"
+minTPS: "최소TPS"
+postTeleportQueueing: "텔레포트후큐잉"
+syncLoading: "동기로딩"
+effectParsing: "이펙트파싱"
+biomeRecall: "바이옴기억"
+biomeRecallForced: "바이옴기억_강제"
+checkOnChunkLoads: "청크로드시검사"
+version: "version"

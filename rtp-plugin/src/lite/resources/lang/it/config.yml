@@ -1,0 +1,56 @@
+# --- Configurazione principale di RTP ---
+# Documentazione: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CORE_CONFIG.md
+# La selezione della lingua ora risiede in language.yml (caricato prima di config.yml).
+# Tempo di attesa prima che un teletrasporto in coda venga eseguito.
+# 0 teletrasporta immediatamente (salta la finestra di annullamento per movimento).
+# Interagisce con cancelDistance qui sotto.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
+ritardoTeletrasporto: 2
+
+# Distanza massima che un giocatore può percorrere durante teleportDelay prima
+# che il teletrasporto in coda venga annullato.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+distanzaAnnullamento: 2
+
+# Tempo di attesa tra usi riusciti di /rtp dallo stesso giocatore.
+# Aggirato da rtp.nocooldown.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
+raffreddamentoTeletrasporto: 300
+
+# Comandi della console eseguiti su teletrasporto riuscito. Usa [player] per
+# il nome del giocatore di destinazione. Le voci di stringa vuote sono ignorate.
+# @type: list<string>
+comandiConsole:
+  - "say [player] si è appena teletrasportato casualmente!"
+
+# Comandi eseguiti come il giocatore che si teletrasporta su teletrasporto riuscito.
+# Usa [player] per il nome del giocatore di destinazione. Le voci di stringa vuote sono ignorate.
+# @type: list<string>
+comandiGiocatore:
+  - ""
+
+# Framework di menù generalizzato.
+# `renderer` è una lista ordinata di preferenze di id di renderer. In caso di
+# eccezione o di adattatore mancante il framework percorre la lista e ripiega
+# sulla voce successiva. Se la lista è esaurita, il percorso di apertura di pagina
+# senza token ripiega sul messaggio configurabile `menuInvalid`. Id disponibili:
+# book. (Il renderer chat arriva in un follow-up e sarà aggiunto alla lista
+# predefinita a quel punto.)
+menu:
+  # Lista ordinata di preferenze di id di renderer.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    - "book"
+
+# NON MODIFICARE IL NUMERO DI VERSIONE
+versione: 3.0

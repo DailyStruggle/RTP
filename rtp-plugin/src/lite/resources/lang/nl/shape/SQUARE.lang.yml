@@ -1,0 +1,8 @@
+mode: "modus"
+radius: "straal"
+centerRadius: "middenStraal"
+centerX: "middenX"
+centerZ: "middenZ"
+weight: "gewicht"
+uniquePlacements: "uniekePlaatsingen"
+expand: "uitbreiden"

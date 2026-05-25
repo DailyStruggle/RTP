@@ -1,0 +1,28 @@
+# Log player-executed RTP commands
+human_trick: false
+# Log successful pounce events
+pounce: true
+
+# Log RTP triggered by world changes
+hopped_to_new_box: true
+# Log RTP triggered on join
+new_kitty_arrived: true
+# Log RTP triggered on respawn
+nine_lives_used: true
+# Log move event processing
+prowl: true
+# Log teleport event processing
+pounce_event: true
+
+# Log info when a warm-spot search fails
+missed_the_pounce: true
+
+# Debug logs for snack (memory) activity
+snack_inventory: false
+# Minimum meow volume. Effective filter is the finer of this and the
+# tall-human logger's own level. Accepts: SEVERE, WARNING, INFO, CONFIG,
+# FINE, FINER, FINEST, ALL, OFF. Default ALL behaves like the tall-human logger.
+minimum_meow_volume: "INFO"
+
+# Do not bite the version number, sacred catnip
+meowsion: 1.0

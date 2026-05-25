@@ -214,6 +214,39 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
         addSubCommand(new ConfigCmd(this));
         addSubCommand(new ScanCmd(this));
         addSubCommand(new InfoCmd(this));
+
+        // /rtp menu - mirror of RTPCmdBukkit:215-230. ADR-050 Stage 3β.D.2b
+        // (2026-05-24) deleted the token registry; clicks carry concrete
+        // /rtp menu ... commands resolved by MenuWiringSupport.attachTo.
+        // Fabric platform pieces:
+        //   * permissionProbe - routes through RTP.serverAccessor's ADR-048
+        //     Phase B menuPermissionProbe override (FabricServerAccessor
+        //     -> FabricEffectivePermissionsResolver per rtp-fabric-ADR-011).
+        //   * renderer        - ChatMenuRenderer (rtp-fabric-ADR-012 §1):
+        //     single rtp-core class, no per-version carrier split needed
+        //     because the only platform coupling is the run-command sink
+        //     installed on FabricServerAccessor.sendMessageWithRunCommand.
+        //   * anvilOpener     - FabricChatPromptCallback (rtp-fabric-ADR-012
+        //     §3): TTL-bounded chat-prompt substitute for the Paper anvil
+        //     GUI; degrades to menuInvalid when ServerMessageEvents is not
+        //     on the runtime classpath.
+        final java.util.function.Function<UUID, java.util.function.Predicate<String>>
+            menuPermissionProbe = viewer -> perm -> {
+                if (perm == null || perm.isEmpty()) return true;
+                if (viewer.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+                    return true;
+                }
+                return RTP.serverAccessor.menuPermissionProbe(viewer).test(perm);
+            };
+        final io.github.dailystruggle.rtp.api.menu.MenuRenderer menuRenderer =
+            new io.github.dailystruggle.rtp.common.commands.menu.ChatMenuRenderer();
+        final io.github.dailystruggle.rtp.common.commands.menu.MenuRedeemSubcommand.AnvilInputOpener
+            anvilOpener =
+                new io.github.dailystruggle.rtp.fabric.menu.FabricChatPromptCallback();
+        io.github.dailystruggle.rtp.common.commands.menu.MenuWiringSupport.attachTo(
+            this,
+            new io.github.dailystruggle.rtp.common.commands.menu.MenuPlatformBindings(
+                menuPermissionProbe, menuRenderer, anvilOpener));
     }
 
     @Override

@@ -1,0 +1,15 @@
+# --- Language Mapping: logging.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# logging.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+command: "comando"
+teleport: "teletrasporto"
+event_changeworld: "evento_cambioMondo"
+event_join: "evento_accesso"
+event_respawn: "evento_respawn"
+event_move: "evento_movimento"
+event_teleport: "evento_teletrasporto"
+selection_failure: "fallimento_selezione"
+system_memory_tracker: "sistema_tracciamentoMemoria"
+min_level: "livello_minimo"
+version: "versione"

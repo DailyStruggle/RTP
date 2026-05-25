@@ -1,0 +1,58 @@
+# Wartezeit (Sekunden) vor der Teleportation
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
+teleportVerzoegerung: 2
+
+# Maximale Bewegungsdistanz während der Verzögerung vor Abbruch
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+distanzAbbruch: 2
+
+# Wartezeit (Sekunden) zwischen erfolgreichen Nutzungen
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
+teleportAbkuehlung: 300
+
+# Befehle, die nach der Teleportation ausgeführt werden
+# @type: list<string>
+konsolenBefehle:
+  - "say [player] hat sich gerade zufällig teleportiert!"
+
+# Befehle, die als der teleportierte Spieler bei erfolgreichem Teleport ausgeführt werden.
+# Verwenden Sie [player] für den Spielernamen. Leere Einträge werden ignoriert.
+# @type: list<string>
+spielerBefehle:
+  # Befehle, die als der teleportierte Spieler bei erfolgreichem Teleport ausgeführt werden.
+  # Verwenden Sie [player] für den Spielernamen. Leere Einträge werden ignoriert.
+  # @type: list<string>
+  - ""
+
+# Allgemeines Menü-Framework.
+# `renderer` ist eine geordnete Präferenzliste von Renderer-IDs. Bei einer
+# Ausnahme oder einem fehlenden Adapter geht das Framework die Liste durch
+# und greift auf den nächsten Eintrag zurück. Ist die Liste erschöpft,
+# greift der Pfad ohne Token auf die konfigurierbare `menuInvalid`-Meldung
+# zurück. Verfügbare IDs: book. (Der Chat-Renderer kommt im Folge-Release
+# und wird dann der Standardliste hinzugefügt.)
+menu:
+  # Ordered preference list of renderer ids.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    # Allgemeines Menü-Framework.
+    # `renderer` ist eine geordnete Präferenzliste von Renderer-IDs. Bei einer
+    # Ausnahme oder einem fehlenden Adapter geht das Framework die Liste durch
+    # und greift auf den nächsten Eintrag zurück. Ist die Liste erschöpft,
+    # greift der Pfad ohne Token auf die konfigurierbare `menuInvalid`-Meldung
+    # zurück. Verfügbare IDs: book. (Der Chat-Renderer kommt im Folge-Release
+    # und wird dann der Standardliste hinzugefügt.)
+    - "book"
+
+# ÄNDERE NICHT DIE VERSIONSNUMMER
+version: 3.0

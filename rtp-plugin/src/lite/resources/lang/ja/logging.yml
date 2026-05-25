@@ -1,0 +1,45 @@
+# --- プラグインログ切り替え ---
+# プラグインの各種アクティビティのログを有効/無効にします。
+# 詳細システムログ
+# detailed_reload: リロードされたすべてのファイル/セクションをログ
+# detailed_region_init: 各リージョンの初期化をログ
+詳細_リロード: false
+# Log region initialization details
+詳細_リージョン初期化: false
+
+# 基本アクティビティログ
+# command: プレイヤーが実行した RTP コマンドをログ
+# teleport: 実際のテレポートイベントをログ
+コマンド: false
+# Log successful teleport events
+テレポート: true
+
+# プレイヤーがワールドを切り替えたとき
+イベント_ワールド変更: true
+# プレイヤーがサーバーに参加したとき
+イベント_参加: true
+# プレイヤーがリスポーンしたとき
+イベント_リスポーン: true
+# プレイヤーが移動したとき (移動駆動 RTP が有効な場合)
+イベント_移動: true
+# プレイヤーがテレポートしたとき (テレポート駆動 RTP が有効な場合)
+イベント_テレポート: true
+
+# 選択失敗デバッグ
+# 安全な位置を見つけられなかったときの詳細をログに残します。失敗率や検索パラメータを含みます。
+選択失敗: true
+
+# システムログ
+# バックグラウンドタスクとデータベース操作に関連します。
+システム_メモリトラッカ: false
+# Debug logs for database activity
+システム_データベース: false
+
+# プラグインレベルの最小ログレベル。実際のフィルタはこの値と Bukkit logger のうち
+# より厳しい方が適用されます。
+# 値: SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF。
+# デフォルトは ALL で、Bukkit logger と同じ動作になります。
+最低レベル: "INFO"
+
+# バージョン番号は変更しないでください
+version: 1.0

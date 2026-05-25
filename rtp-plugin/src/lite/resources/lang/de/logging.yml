@@ -1,0 +1,28 @@
+# Von Spielern ausgeführte RTP-Befehle protokollieren
+befehl: false
+# Erfolgreiche Teleport-Ereignisse protokollieren
+teleport: true
+
+# RTP ausgelöst durch Weltenwechsel protokollieren
+ereignisWeltwechsel: true
+# RTP ausgelöst beim Beitritt protokollieren
+ereignisBeitritt: true
+# RTP ausgelöst beim Respawn protokollieren
+ereignisRespawn: true
+# Verarbeitung von Bewegungsereignissen protokollieren
+ereignisBewegung: true
+# Verarbeitung von Teleport-Ereignissen protokollieren
+ereignisTeleport: true
+
+# Informationen protokollieren, wenn die Standortauswahl fehlschlägt
+auswahlFehlschlag: true
+
+# Debug-Protokolle für Speicheraktivität
+systemSpeicherTracker: false
+# Plugin-spezifisches Mindest-Log-Level. Wirksam ist der feinere der beiden
+# Filter (dieser und der Bukkit-Logger). Erlaubt: SEVERE, WARNING, INFO, CONFIG,
+# FINE, FINER, FINEST, ALL, OFF. Standard ALL ist identisch zum Bukkit-Logger.
+minLevel: "INFO"
+
+# ÄNDERE NICHT DIE VERSIONSNUMMER
+version: 1.0

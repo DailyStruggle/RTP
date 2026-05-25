@@ -1,0 +1,111 @@
+# テレポート遅延（秒）
+# 実際にテレポートが発動するまでにプレイヤーが待つ時間。
+# サーバーが目的地のチャンクを事前にロードする時間を確保できます。
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
+テレポート遅延: 2
+
+# 移動キャンセル（ブロック）
+# 遅延中にプレイヤーがこの距離以上動いたらテレポートをキャンセルします。
+# -1 で無効化。
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+キャンセル距離: 2
+
+# テレポート間隔（秒）
+# プレイヤーが連続して RTP を使うまでに待つ時間。
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
+テレポートクールダウン: 300
+
+# テレポート後コマンド
+# テレポート成功後に実行するコマンドのリスト。
+# プレースホルダ [player] はプレイヤー名を表します。
+# @type: list<string>
+コンソールコマンド:
+  - "say [player] がランダムテレポートしました！"
+
+# テレポート成功時に対象プレイヤーとして実行されるコマンド。
+# [player] でプレイヤー名を指定します。空のエントリは無視されます。
+# @type: list<string>
+プレイヤーコマンド:
+  # テレポート成功時に対象プレイヤーとして実行されるコマンド。
+  # [player] でプレイヤー名を指定します。空のエントリは無視されます。
+  # @type: list<string>
+  - ""
+
+# --- データベース設定 ---
+# キャッシュされた位置やプレイヤーデータの保存先。
+データベース:
+  # 利用可能な type: yaml, sqlite, mysql, postgresql
+  # - yaml/sqlite: ローカルファイル（追加設定不要）
+  # - mysql/postgresql: リモートデータベース（下記の認証情報が必要）
+  # @type: enum
+  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
+  # @default: "sqlite"
+  type: "sqlite"
+  # ネットワークデータベースの認証情報（ローカルでは無視されます）
+  # @type: string
+  host: "127.0.0.1"
+  # データベースのポート。mysql/postgresql のみで使用されます。
+  # @type: integer
+  # @range: [1, 65535]
+  port: 3306
+  # データベース / スキーマ名。mysql/postgresql のみで使用されます。
+  # @type: string
+  name: "rtp"
+  # データベースのユーザー名。mysql/postgresql のみで使用されます。
+  # @type: string
+  username: "root"
+  # データベースのパスワード。mysql/postgresql のみで使用されます。
+  # @type: string
+  password: "password"
+
+# --- ネットワーク同期 ---
+# Redis は複数サーバー間でキャッシュされた位置を同期するために使われます。
+ネットワーク:
+  redis:
+    # Enable Redis-backed network state binding.
+    # @type: boolean
+    # @default: false
+    enabled: false
+    # Redis host.
+    # @type: string
+    host: "127.0.0.1"
+    # Redis port.
+    # @type: integer
+    # @range: [1, 65535]
+    port: 6379
+    # Redis password. Empty string disables auth.
+    # @type: string
+    password: ""
+
+# 汎用メニューフレームワーク。
+# `renderer` はレンダラ ID の優先順位付きリストです。例外発生時または
+# 該当アダプタが無い場合、フレームワークは順にリストを辿り次のエントリへ
+# フォールバックします。リストを使い切った場合、トークン無しのページ表示
+# パスは設定可能な `menuInvalid` メッセージにフォールバックします。
+# 利用可能な ID: book。(チャットレンダラは後続リリースで追加され、その時点で
+# デフォルトリストに加わります。)
+menu:
+  # Ordered preference list of renderer ids.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    # 汎用メニューフレームワーク。
+    # `renderer` はレンダラ ID の優先順位付きリストです。例外発生時または
+    # 該当アダプタが無い場合、フレームワークは順にリストを辿り次のエントリへ
+    # フォールバックします。リストを使い切った場合、トークン無しのページ表示
+    # パスは設定可能な `menuInvalid` メッセージにフォールバックします。
+    # 利用可能な ID: book。(チャットレンダラは後続リリースで追加され、その時点で
+    # デフォルトリストに加わります。)
+    - "book"
+
+# バージョン番号は変更しないでください
+version: 3.0

@@ -1,0 +1,17 @@
+# --- Language Mapping: safety.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# safety.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+invulnerabilityTime: "tiempoInvulnerabilidad"
+safetyRadius: "radioSeguridad"
+staleChunkRetryLimit: "staleChunkRetryLimit"
+anvilPrefilterEnabled: "anvilPrefilterEnabled"
+platformRadius: "radioPlataforma"
+platformDepth: "profundidadPlataforma"
+platformAirHeight: "alturaAirePlataforma"
+platformMaterial: "materialPlataforma"
+airBlocks: "bloquesAire"
+unsafeBlocks: "bloquesInseguros"
+biomeWhitelist: "listaPermitidaBiomas"
+biomes: "biomas"
+version: "version"
