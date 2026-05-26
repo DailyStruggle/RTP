@@ -94,6 +94,28 @@ public class SubcommandBypassesTeleportGuardsTest {
     }
 
     @Test
+    void rtpHelp_doesNotEmitAlreadyTeleporting_whenPlayerIsProcessing() {
+        MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "test", null);
+        accessor.addPlayer(sender);
+
+        // Simulate an in-flight teleport: sender is in processingPlayers.
+        RTP.getInstance().processingPlayers.add(sender.uuid());
+
+        TestRTPCmd rtpCmd = new TestRTPCmd();
+        rtpCmd.addSubCommand(new InfoCmd(rtpCmd));
+
+        sender.sentMessages.clear();
+
+        // Simulation: `/rtp help` (built-in TreeCommand verb, not a registered subcommand).
+        rtpCmd.onCommand(sender, rtpCmd, "rtp", new String[]{"help"});
+
+        boolean alreadyTeleportingFired = sender.sentMessages.stream()
+                .anyMatch(m -> m.contains("already teleporting"));
+        assertFalse(alreadyTeleportingFired,
+                "`rtp help` must not emit alreadyTeleporting. Sent: " + sender.sentMessages);
+    }
+
+    @Test
     void rtpRoot_stillEmitsAlreadyTeleporting_whenPlayerIsProcessing() {
         MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "test", null);
         accessor.addPlayer(sender);

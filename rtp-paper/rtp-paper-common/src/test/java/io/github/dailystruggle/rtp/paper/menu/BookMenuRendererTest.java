@@ -440,9 +440,10 @@ final class BookMenuRendererTest {
 
         ClickEvent click = firstClickEvent(book.pages().get(0));
         assertNotNull(click);
-        // ADR-050 Stage 3β: OpenMap carries (kind, regionName); click event
-        // emits the self-documenting `/rtp visualization x=<kind>:<region>`.
-        assertEquals("/rtp visualization x=BAD_POINTS_HEATMAP:myregion", click.value());
+        // Bad-locations leaf wiring (2026-05-26): OpenMap dispatches to the
+        // per-Kind typed sub-command, `/rtp visualization <literal> region=<name>`.
+        // The legacy root-level `x=<kind>:<region>` form is gone.
+        assertEquals("/rtp visualization bad-points-heatmap region=myregion", click.value());
     }
 
     @Test

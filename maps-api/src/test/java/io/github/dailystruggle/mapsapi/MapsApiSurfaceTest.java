@@ -95,39 +95,47 @@ class MapsApiSurfaceTest {
     }
 
     @Test
-    @DisplayName("RegionBadLocations defensively copies its badKeys array on construction and on accessor read")
+    @DisplayName("RegionBadLocations defensively copies its palette buffer on construction and on accessor read")
     void regionBadLocationsDefensiveCopy() {
-        long[] external = {1L, 2L, 3L};
-        RegionBadLocations rbl = new RegionBadLocations("region-a", 0, 0, 100, external);
+        byte[] external = new byte[4]; // 2x2 palette buffer
+        external[0] = PaletteIndex.GREEN;
+        external[1] = PaletteIndex.RED;
+        external[2] = PaletteIndex.BLACK;
+        external[3] = PaletteIndex.GREEN;
+        RegionBadLocations rbl = new RegionBadLocations("region-a", 2, 2, external);
 
         // Mutating source must not affect snapshot.
-        external[0] = 999L;
-        assertEquals(1L, rbl.badKeys()[0]);
+        external[0] = PaletteIndex.RED;
+        assertEquals(PaletteIndex.GREEN, rbl.palette()[0]);
 
         // Accessor returns a fresh array each call.
-        long[] a = rbl.badKeys();
-        long[] b = rbl.badKeys();
-        assertNotSame(a, b, "badKeys() shall return a defensive copy each call");
-        a[0] = 42L;
-        assertEquals(1L, rbl.badKeys()[0]);
-
-        assertEquals(3, rbl.badCount());
+        byte[] a = rbl.palette();
+        byte[] b = rbl.palette();
+        assertNotSame(a, b, "palette() shall return a defensive copy each call");
+        a[0] = PaletteIndex.RED;
+        assertEquals(PaletteIndex.GREEN, rbl.palette()[0]);
     }
 
     @Test
-    @DisplayName("RegionBadLocations constructor rejects null name, null array, and non-positive radius")
+    @DisplayName("RegionBadLocations constructor rejects null name, null buffer, non-positive dimensions, and length mismatch")
     void regionBadLocationsRejectsBadArgs() {
         assertThrows(NullPointerException.class,
-                () -> new RegionBadLocations(null, 0, 0, 100, new long[0]));
+                () -> new RegionBadLocations(null, 2, 2, new byte[4]));
         assertThrows(NullPointerException.class,
-                () -> new RegionBadLocations("r", 0, 0, 100, null));
+                () -> new RegionBadLocations("r", 2, 2, null));
         assertThrows(IllegalArgumentException.class,
-                () -> new RegionBadLocations("r", 0, 0, 0, new long[0]));
+                () -> new RegionBadLocations("r", 0, 2, new byte[0]));
         assertThrows(IllegalArgumentException.class,
-                () -> new RegionBadLocations("r", 0, 0, -1, new long[0]));
-        // Empty bad set is legal.
-        RegionBadLocations ok = new RegionBadLocations("r", 0, 0, 100, new long[0]);
-        assertEquals(0, ok.badCount());
+                () -> new RegionBadLocations("r", -1, 2, new byte[0]));
+        assertThrows(IllegalArgumentException.class,
+                () -> new RegionBadLocations("r", 2, 0, new byte[0]));
+        assertThrows(IllegalArgumentException.class,
+                () -> new RegionBadLocations("r", 2, 2, new byte[3]));
+        // Empty palette (zero-byte buffer) is not legal; dims must match.
+        // Minimum legal size: 1x1.
+        RegionBadLocations ok = new RegionBadLocations("r", 1, 1, new byte[1]);
+        assertEquals(1, ok.width());
+        assertEquals(1, ok.height());
     }
 
     @Test

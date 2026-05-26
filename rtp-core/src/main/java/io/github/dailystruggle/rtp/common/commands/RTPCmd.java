@@ -83,9 +83,15 @@ public interface RTPCmd extends BaseRTPCmd {
     // the root teleport invocation, not to administrative / query subcommands.
     boolean hasSubCommand = false;
     if (args != null && args.length > 0) {
-      Map<String, CommandsAPICommand> lookup = getCommandLookup();
-      if (lookup != null && !lookup.isEmpty()) {
-        hasSubCommand = lookup.containsKey(args[0].toUpperCase(java.util.Locale.ROOT));
+      // Built-in `help` verb (handled by TreeCommand when no "HELP" subcommand is registered)
+      // is an informational query, not a teleport: bypass the teleport-related guards.
+      if (args[0].equalsIgnoreCase("help")) {
+        hasSubCommand = true;
+      } else {
+        Map<String, CommandsAPICommand> lookup = getCommandLookup();
+        if (lookup != null && !lookup.isEmpty()) {
+          hasSubCommand = lookup.containsKey(args[0].toUpperCase(java.util.Locale.ROOT));
+        }
       }
     }
 

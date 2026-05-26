@@ -9,25 +9,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Drives {@link RegionBadLocationsRenderer} against {@link InMemoryMapBinding}
- * and asserts on the resulting pixel buffer:
- * <ul>
- *   <li>corners outside the inscribed disk are {@link PaletteIndex#BLACK};</li>
- *   <li>the canvas centre is {@link PaletteIndex#GREEN} when no bad keys
- *       cover it;</li>
- *   <li>a bad key on the centre paints {@link PaletteIndex#RED} (red
- *       overrides the green disk);</li>
- *   <li>bad keys outside the region's bounding square are silently
- *       clipped (no exception, no out-of-canvas writes);</li>
- *   <li>{@link io.github.dailystruggle.mapsapi.MapCanvas#commit()} is
- *       invoked exactly once per ephemeral render.</li>
- * </ul>
+ * Drives {@link RegionBadLocationsRenderer} against {@link InMemoryMapBinding}.
+ * The renderer is now a pure blit (with nearest-neighbour scaling when the
+ * canvas size differs from the model buffer size); classification lives in
+ * the {@code RegionBadLocationsShapeResolver}, so these tests fabricate
+ * the palette buffer directly and assert that it lands on the canvas
+ * pixel-for-pixel.
  */
-@DisplayName("RegionBadLocationsRenderer - palette + disk geometry + clip semantics")
+@DisplayName("RegionBadLocationsRenderer - blit + nearest-neighbour scaling")
 class RegionBadLocationsRendererTest {
 
     private final InMemoryMapBinding binding = new InMemoryMapBinding();
@@ -38,101 +30,65 @@ class RegionBadLocationsRendererTest {
                 id, null, MapAllocationRequest.Locking.LOCKED));
     }
 
-    /** Pack a block coordinate the same way {@link RegionBadLocations#badKeys()} expects. */
-    private static long key(int bx, int bz) {
-        return ((long) bx << 32) | (bz & 0xFFFFFFFFL);
-    }
-
     @Test
-    @DisplayName("empty bad set: corners are BLACK, centre is GREEN")
-    void emptyBadSet() {
-        MapHandle h = allocate("empty");
-        RegionBadLocations m = new RegionBadLocations("r", 0, 0, 100, new long[0]);
+    @DisplayName("identical-resolution buffer is blitted pixel-for-pixel")
+    void identityBlit() {
+        MapHandle h = allocate("identity");
+        // 128x128 all-green model.
+        byte[] palette = new byte[128 * 128];
+        java.util.Arrays.fill(palette, PaletteIndex.GREEN);
+        // Stamp the four corners and the centre with distinguishable colours.
+        palette[0]                     = PaletteIndex.BLACK;            // (0,0)
+        palette[127]                   = PaletteIndex.RED;              // (127,0)
+        palette[127 * 128]             = PaletteIndex.RED;              // (0,127)
+        palette[127 * 128 + 127]       = PaletteIndex.BLACK;            // (127,127)
+        palette[64 * 128 + 64]         = PaletteIndex.RED;              // centre
+
+        RegionBadLocations m = new RegionBadLocations("r", 128, 128, palette);
         binding.renderEphemeral(h, renderer, m);
 
         byte[][] pixels = binding.snapshot(h);
-        // Corners are outside the inscribed circle -> BLACK.
         assertEquals(PaletteIndex.BLACK, pixels[0][0]);
-        assertEquals(PaletteIndex.BLACK, pixels[0][127]);
-        assertEquals(PaletteIndex.BLACK, pixels[127][0]);
+        assertEquals(PaletteIndex.RED,   pixels[0][127]);
+        assertEquals(PaletteIndex.RED,   pixels[127][0]);
         assertEquals(PaletteIndex.BLACK, pixels[127][127]);
-        // Centre lies inside the inscribed circle -> GREEN.
-        assertEquals(PaletteIndex.GREEN, pixels[64][64]);
+        assertEquals(PaletteIndex.RED,   pixels[64][64]);
+        assertEquals(PaletteIndex.GREEN, pixels[10][10]);
         assertEquals(1, binding.commitCount(h));
     }
 
     @Test
-    @DisplayName("bad key at region centre paints RED at canvas centre")
-    void badKeyAtCentre() {
-        MapHandle h = allocate("centre-bad");
-        long[] keys = { key(0, 0) }; // centerX=centerZ=0 -> exact centre
-        RegionBadLocations m = new RegionBadLocations("r", 0, 0, 100, keys);
+    @DisplayName("smaller-resolution buffer is upscaled with nearest-neighbour")
+    void nearestNeighbourUpscale() {
+        MapHandle h = allocate("upscale");
+        // 2x2 chequerboard: GREEN, RED, RED, GREEN.
+        byte[] palette = {
+                PaletteIndex.GREEN, PaletteIndex.RED,
+                PaletteIndex.RED,   PaletteIndex.GREEN,
+        };
+        RegionBadLocations m = new RegionBadLocations("r", 2, 2, palette);
         binding.renderEphemeral(h, renderer, m);
 
         byte[][] pixels = binding.snapshot(h);
-        // The bad key lands at the centre pixel; with radius=100 and
-        // 128-pixel canvas, the centre block maps to pixel (63 or 64).
-        // Accept either: assert RED appears somewhere in a small box.
-        boolean foundRed = false;
-        for (int y = 60; y <= 68 && !foundRed; y++) {
-            for (int x = 60; x <= 68 && !foundRed; x++) {
-                if (pixels[y][x] == PaletteIndex.RED) foundRed = true;
-            }
-        }
-        assertEquals(true, foundRed, "expected at least one RED pixel near canvas centre");
-        // Far corner still BLACK.
-        assertEquals(PaletteIndex.BLACK, pixels[0][0]);
-    }
-
-    @Test
-    @DisplayName("bad key outside region bounding square is silently clipped")
-    void badKeyOutsideClipped() {
-        MapHandle h = allocate("outside");
-        long[] keys = { key(10_000, 10_000) }; // way outside radius=100 region
-        RegionBadLocations m = new RegionBadLocations("r", 0, 0, 100, keys);
-        // Must not throw, must still commit exactly once.
-        binding.renderEphemeral(h, renderer, m);
-
-        byte[][] pixels = binding.snapshot(h);
-        // No RED anywhere on the canvas.
-        for (byte[] row : pixels) {
-            for (byte b : row) {
-                assertNotEquals(PaletteIndex.RED, b,
-                        "out-of-range bad key shall not produce any RED pixel");
-            }
-        }
+        // Top-left quadrant of the 128x128 canvas should be GREEN.
+        assertEquals(PaletteIndex.GREEN, pixels[0][0]);
+        assertEquals(PaletteIndex.GREEN, pixels[10][10]);
+        // Top-right quadrant should be RED.
+        assertEquals(PaletteIndex.RED, pixels[10][120]);
+        // Bottom-left quadrant should be RED.
+        assertEquals(PaletteIndex.RED, pixels[120][10]);
+        // Bottom-right quadrant should be GREEN.
+        assertEquals(PaletteIndex.GREEN, pixels[120][120]);
         assertEquals(1, binding.commitCount(h));
-    }
-
-    @Test
-    @DisplayName("red overrides green: bad pixel sits on top of the green disk")
-    void redOverGreen() {
-        MapHandle h = allocate("override");
-        // A bad key offset slightly from centre, definitely inside the disk.
-        long[] keys = { key(5, 5) };
-        RegionBadLocations m = new RegionBadLocations("r", 0, 0, 1000, keys);
-        binding.renderEphemeral(h, renderer, m);
-
-        byte[][] pixels = binding.snapshot(h);
-        boolean foundRed = false;
-        int greenCount = 0;
-        for (byte[] row : pixels) {
-            for (byte b : row) {
-                if (b == PaletteIndex.RED) foundRed = true;
-                if (b == PaletteIndex.GREEN) greenCount++;
-            }
-        }
-        assertEquals(true, foundRed, "expected RED for the bad-flagged location");
-        // Green disk should still dominate the canvas (radius >> 1 pixel red dot).
-        assertEquals(true, greenCount > 1000,
-                "expected the inscribed green disk to remain mostly green; got " + greenCount);
     }
 
     @Test
     @DisplayName("canvas dimensions remain vanilla 128x128")
     void canvasIs128x128() {
         MapHandle h = allocate("dim");
-        RegionBadLocations m = new RegionBadLocations("r", 0, 0, 100, new long[0]);
+        byte[] palette = new byte[128 * 128];
+        java.util.Arrays.fill(palette, PaletteIndex.GREEN);
+        RegionBadLocations m = new RegionBadLocations("r", 128, 128, palette);
         binding.renderEphemeral(h, renderer, m);
 
         byte[][] pixels = binding.snapshot(h);
@@ -143,9 +99,10 @@ class RegionBadLocationsRendererTest {
     }
 
     @Test
-    @DisplayName("renderer null-arg rejection (direct render(canvas, model) call)")
+    @DisplayName("renderer null-arg rejection")
     void nullArgs() {
-        RegionBadLocations m = new RegionBadLocations("r", 0, 0, 100, new long[0]);
+        byte[] palette = new byte[1];
+        RegionBadLocations m = new RegionBadLocations("r", 1, 1, palette);
         TinyCanvas canvas = new TinyCanvas();
         assertThrows(IllegalArgumentException.class,
                 () -> renderer.render(null, m));

@@ -756,18 +756,50 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * ADR-016 §13.3 upgrade-drift gate — non-blocking delegation to
-   * {@link org.bukkit.World#isChunkGenerated(int, int)}. A {@code true} answer
-   * means the chunk is already on disk, so the seed-synthesised biome fallback
-   * must NOT be used even on vanilla worlds (the persisted palette wins). Any
-   * {@link Throwable} collapses to {@code true} — "assume generated, skip the
-   * pre-check" is the conservative default that preserves correctness.
+   * ADR-016 §13.3 upgrade-drift gate — region-file backed probe.
+   *
+   * <p>Resolution order:</p>
+   * <ol>
+   *   <li>{@link World#isChunkLoaded(int, int)} — a loaded chunk is by
+   *       definition generated; cheapest answer, safe to call off-tick
+   *       (concurrent map lookup).</li>
+   *   <li>{@link io.github.dailystruggle.rtp.anvil.AnvilRegionOccupancyCache#isOccupied}
+   *       against the {@code r.X.Z.mca} file resolved via
+   *       {@link io.github.dailystruggle.rtp.anvil.AnvilPrefilter#regionFileFor}.
+   *       The cache amortises the 32x32 region-tile occupancy bitmap across
+   *       all ~1024 sibling-chunk queries — crucial for {@code ScanTask}
+   *       PRESCAN which sweeps adjacent chunks in spiral order.</li>
+   *   <li>Any {@link Throwable} collapses to {@code true} — "assume
+   *       generated, skip the perf fast path" preserves the ADR-016 §13.3
+   *       palette-drift correctness (false-positives only forfeit a fast
+   *       path; false-negatives would risk the bug).</li>
+   * </ol>
+   *
+   * <p>Replaces the previous direct {@code world.isChunkGenerated} delegation,
+   * which on Paper/Spigot is a synchronous chunk-system / region-file index
+   * walk and collapsed {@code ScanTask}'s {@code peakInFlight} from {@code cap=50}
+   * to ~2-3 when called per-candidate. Mirrors the Fabric implementation
+   * (FabricRTPWorld#isChunkGenerated) so the Fabric-only precheck gate in
+   * ScanTask can be removed.</p>
    */
   @Override
   public boolean isChunkGenerated(int cx, int cz) {
     if (world == null) return true;
     try {
-      return world.isChunkGenerated(cx, cz);
+      if (world.isChunkLoaded(cx, cz)) return true;
+    } catch (Throwable ignored) {
+      // Fall through to the on-disk probe.
+    }
+    try {
+      java.nio.file.Path worldFolder = world.getWorldFolder().toPath();
+      String dim = dimensionRegionSubpath(world);
+      java.nio.file.Path regionFile =
+          io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(worldFolder, dim, cx, cz);
+      if (regionFile == null || !java.nio.file.Files.exists(regionFile)) {
+        return false;
+      }
+      return io.github.dailystruggle.rtp.anvil.AnvilRegionOccupancyCache
+          .isOccupied(regionFile, cx, cz);
     } catch (Throwable ignored) {
       return true;
     }

@@ -71,7 +71,13 @@ public class ScanTask extends RTPRunnable {
   public static final int PHASE_PRESCAN = 0;
   public static final int PHASE_FULLSCAN = 1;
   public static final int PHASE_GENSCAN = 2;
-  private final AtomicInteger scanPhase = new AtomicInteger(PHASE_GENSCAN);
+  // GENSCAN disabled (2026-05-25): the dedicated chunk-generation pre-pass was
+  // observed to run very slowly in practice (sustained cps in the low tens on
+  // backend-b devstack). Start directly in PRESCAN; if PRESCAN encounters an
+  // ungenerated chunk it flips the whole scan to FULLSCAN (which loads/
+  // generates and authoritatively validates in a single I/O). GENSCAN code
+  // paths are retained but unreachable from the initial phase.
+  private final AtomicInteger scanPhase = new AtomicInteger(PHASE_PRESCAN);
 
   /** Whether the task is currently paused */
   public AtomicBoolean pause = new AtomicBoolean(false);
@@ -1243,6 +1249,36 @@ public class ScanTask extends RTPRunnable {
         // re-evaluates it via the anvil probe.
         res.complete(false);
         return res;
+      }
+
+      // GENSCAN replacement (2026-05-25): with GENSCAN disabled as the initial
+      // phase, PRESCAN carries the ungenerated-chunk detection. The inline
+      // `isChunkGenerated` precheck is now universal across Bukkit/Paper/Folia/Fabric:
+      // every platform's RTPWorld.isChunkGenerated routes through the
+      // AnvilRegionOccupancyCache (an mtime-validated, 1024-bit per-region-file
+      // occupancy bitmap built once and reused across all ~1024 sibling-chunk
+      // queries in that 32x32 tile). PRESCAN sweeps adjacent chunks in spiral
+      // order, so first-touch cost is amortised over the whole region file —
+      // the previous Paper/Folia regression (synchronous Bukkit chunk-system
+      // call collapsing peakInFlight from cap=50 to ~2-3) no longer applies.
+      // Conservative on error: treat as generated and let the probe path take it.
+      if (scanPhase.get() == PHASE_PRESCAN) {
+        boolean generated = true;
+        try {
+          generated = world.isChunkGenerated(cx, cz);
+        } catch (Throwable t) {
+          RTP.log(Level.FINE, "[ScanTask] isChunkGenerated threw for world=" + world.name()
+                  + " chunk=(" + cx + "," + cz + "): " + t);
+        }
+        if (!generated) {
+          if (scanPhase.compareAndSet(PHASE_PRESCAN, PHASE_FULLSCAN)) {
+            RTP.log(Level.INFO, "[RTP] prescan encountered ungenerated chunk for region="
+                    + region.name + " at (" + cx + "," + cz + ") -> switching to full-load scan");
+          }
+          runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ, midY,
+                  finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res);
+          return res;
+        }
       }
 
       // BIOME_LOOKUP_PERF_PLAN.md PR-5: probe-first with cache-aware gating.

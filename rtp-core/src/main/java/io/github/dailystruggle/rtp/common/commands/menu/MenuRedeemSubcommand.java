@@ -111,6 +111,18 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
 
     private final TreeCommand rtpRoot;
     private final java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory;
+
+    /**
+     * Package-private accessor for the permission probe factory installed at
+     * construction. Exposed so collaborator classes in the same package (e.g.
+     * {@link VisualizationDispatch}) can build their own permission gates
+     * without holding a back-reference to this subcommand. Intentionally
+     * narrow: callers should prefer constructing a {@link MenuPermissionGates}
+     * from the returned function rather than calling the probe directly.
+     */
+    java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory() {
+        return permissionProbeFactory;
+    }
     /**
      * ADR-050 menu-package split: shared permission-gate helper. Bound to
      * {@link #permissionProbeFactory} at construction. The three legacy

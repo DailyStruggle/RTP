@@ -9,8 +9,11 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import io.github.dailystruggle.rtp.common.RTP;
 
 /**
  * Fabric counterpart to rtp-spigot's {@code SendMessage.Hex2Color} +
@@ -136,13 +139,10 @@ public final class FabricLegacyText {
             // Mapping drift on 1.21.5+ (HoverEvent/ClickEvent became records).
             // Fall back to the un-decorated component so /rtp info, /rtp help,
             // and any other consumer of the rich-text sink still emit their
-            // full output. Best-effort log so the regression is visible.
-            try {
-                java.util.logging.Logger.getLogger("RTP").log(java.util.logging.Level.FINE,
-                        "[RTP] FabricLegacyText.parseInteractive: hover/click decoration "
-                                + "unavailable on this MC version (" + t.getClass().getSimpleName()
-                                + "), delivering plain component.");
-            } catch (Throwable ignored) { /* best-effort */ }
+            // full output. One-shot WARNING + stacktrace so the regression is
+            // visible without spamming on every menu render; future-demotable
+            // to FINER once 1.21.11+ carrier coverage stabilises.
+            logDecorationFailureOnce(t, hasHover, hasClick, clickKind);
             return base;
         }
     }
@@ -419,6 +419,7 @@ public final class FabricLegacyText {
             }
         } catch (Throwable t) {
             // fall through to null — caller will skip the hover decoration.
+            logHoverBuildFailureOnce(t);
         }
         return null;
     }
@@ -440,6 +441,7 @@ public final class FabricLegacyText {
             }
         } catch (Throwable t) {
             // fall through - caller skips the click decoration.
+            logClickBuildFailureOnce(t, kind);
         }
         return null;
     }
@@ -457,18 +459,26 @@ public final class FabricLegacyText {
             } catch (Throwable ignored) { /* not on this runtime */ }
         }
         if (HOVER_CTOR_LEGACY == null) {
+            // 1.21.5+: per-action records nested under HoverEvent. The mojmap name
+            // is "ShowText", but on intermediary-mapped runtimes (Fabric production)
+            // the nested class is "class_2568$class_NNNN". String.forName with the
+            // mojmap literal won't resolve there — enumerate nested classes of the
+            // (already-remapped) HoverEvent.class symbol instead and pick the
+            // unique subclass whose single-arg ctor takes a Component.
             try {
-                Class<?> showText = Class.forName("net.minecraft.network.chat.HoverEvent$ShowText");
-                HOVER_CTOR_SHOWTEXT = showText.getConstructor(Component.class);
-            } catch (Throwable ignored) {
-                try {
-                    // Some intermediate snapshots used a `Text` nested class instead of `ShowText`.
-                    Class<?> showText = Class.forName("net.minecraft.network.chat.HoverEvent$Text");
-                    HOVER_CTOR_SHOWTEXT = showText.getConstructor(Component.class);
-                } catch (Throwable ignored2) { /* nothing matched */ }
-            }
+                for (Class<?> nested : HoverEvent.class.getDeclaredClasses()) {
+                    if (!HoverEvent.class.isAssignableFrom(nested)) continue;
+                    try {
+                        java.lang.reflect.Constructor<?> ctor = nested.getDeclaredConstructor(Component.class);
+                        ctor.setAccessible(true);
+                        HOVER_CTOR_SHOWTEXT = ctor;
+                        break;
+                    } catch (NoSuchMethodException ignored) { /* try next */ }
+                }
+            } catch (Throwable ignored) { /* nothing matched */ }
         }
         HOVER_PROBED = true;
+        logProbeResults();
     }
 
     private static synchronized void probeClickCtors() {
@@ -477,16 +487,114 @@ public final class FabricLegacyText {
             CLICK_CTOR_LEGACY = ClickEvent.class.getConstructor(ClickEvent.Action.class, String.class);
         } catch (Throwable ignored) { /* not on this runtime */ }
         if (CLICK_CTOR_LEGACY == null) {
+            // 1.21.5+: per-action records nested under ClickEvent. Mojmap names
+            // are "SuggestCommand" / "RunCommand", but on intermediary-mapped
+            // runtimes those are "class_2558$class_NNNN". Enumerate nested
+            // (String)-ctor subclasses, instantiate each, and dispatch by the
+            // result of its action() accessor — robust across mappings.
             try {
-                Class<?> suggest = Class.forName("net.minecraft.network.chat.ClickEvent$SuggestCommand");
-                CLICK_CTOR_SUGGEST = suggest.getConstructor(String.class);
-            } catch (Throwable ignored) { /* nothing matched */ }
-            try {
-                Class<?> run = Class.forName("net.minecraft.network.chat.ClickEvent$RunCommand");
-                CLICK_CTOR_RUN = run.getConstructor(String.class);
+                for (Class<?> nested : ClickEvent.class.getDeclaredClasses()) {
+                    if (!ClickEvent.class.isAssignableFrom(nested)) continue;
+                    java.lang.reflect.Constructor<?> ctor;
+                    try {
+                        ctor = nested.getDeclaredConstructor(String.class);
+                    } catch (NoSuchMethodException ignored) {
+                        continue;
+                    }
+                    ctor.setAccessible(true);
+                    try {
+                        Object instance = ctor.newInstance("");
+                        ClickEvent.Action action = ((ClickEvent) instance).getAction();
+                        if (action == ClickEvent.Action.SUGGEST_COMMAND && CLICK_CTOR_SUGGEST == null) {
+                            CLICK_CTOR_SUGGEST = ctor;
+                        } else if (action == ClickEvent.Action.RUN_COMMAND && CLICK_CTOR_RUN == null) {
+                            CLICK_CTOR_RUN = ctor;
+                        }
+                    } catch (Throwable ignored) { /* not this one */ }
+                    if (CLICK_CTOR_SUGGEST != null && CLICK_CTOR_RUN != null) break;
+                }
             } catch (Throwable ignored) { /* nothing matched */ }
         }
         CLICK_PROBED = true;
+        logProbeResults();
+    }
+
+    // ------------------------------------------------------------------
+    // Diagnostic logging (2026-05-25): hover + click both silently fail on
+    // Fabric 1.21.11 (user-reported regression). One-shot INFO summary of
+    // the reflective probes plus a one-shot WARNING + stack on the first
+    // styling failure pinpoints whether the mapping drift is (a) a missed
+    // probe (Class.forName / getConstructor returned null) or (b) a
+    // Style.withHoverEvent / withClickEvent signature change on this MC
+    // version. Demote to FINER once 1.21.11+ carrier coverage stabilises.
+    // ------------------------------------------------------------------
+
+    private static volatile boolean PROBE_LOGGED;
+    private static volatile boolean DECORATION_FAILURE_LOGGED;
+    private static volatile boolean HOVER_BUILD_FAILURE_LOGGED;
+    private static volatile boolean CLICK_BUILD_FAILURE_LOGGED;
+
+    private static synchronized void logProbeResults() {
+        if (PROBE_LOGGED) return;
+        PROBE_LOGGED = true;
+        try {
+            // Probes run lazily: hover probe runs from buildShowTextHover, click probe
+            // from buildClick. logProbeResults is called from both, so only emit once
+            // both have actually been run.
+            if (!HOVER_PROBED || !CLICK_PROBED) {
+                PROBE_LOGGED = false; // retry on the next probe
+                return;
+            }
+            RTP.log(Level.INFO,
+                    "[RTP] FabricLegacyText probe results: "
+                            + "HOVER_CTOR_LEGACY=" + (HOVER_CTOR_LEGACY != null)
+                            + ", HOVER_CTOR_SHOWTEXT=" + (HOVER_CTOR_SHOWTEXT != null)
+                            + ", CLICK_CTOR_LEGACY=" + (CLICK_CTOR_LEGACY != null)
+                            + ", CLICK_CTOR_SUGGEST=" + (CLICK_CTOR_SUGGEST != null)
+                            + ", CLICK_CTOR_RUN=" + (CLICK_CTOR_RUN != null)
+                            + " (HoverEvent class=" + HoverEvent.class.getName()
+                            + ", ClickEvent class=" + ClickEvent.class.getName() + ")");
+        } catch (Throwable ignored) { /* best-effort */ }
+    }
+
+    private static void logDecorationFailureOnce(Throwable t, boolean hasHover,
+                                                 boolean hasClick, ClickKind clickKind) {
+        if (DECORATION_FAILURE_LOGGED) return;
+        DECORATION_FAILURE_LOGGED = true;
+        try {
+            RTP.log(Level.WARNING,
+                    "[RTP] FabricLegacyText.parseInteractive: hover/click decoration "
+                            + "failed on this MC version (hasHover=" + hasHover
+                            + ", hasClick=" + hasClick + ", clickKind=" + clickKind
+                            + "); delivering plain component. Cause: "
+                            + t.getClass().getName() + ": " + t.getMessage(), t);
+        } catch (Throwable ignored) { /* best-effort */ }
+    }
+
+    private static void logHoverBuildFailureOnce(Throwable t) {
+        if (HOVER_BUILD_FAILURE_LOGGED) return;
+        HOVER_BUILD_FAILURE_LOGGED = true;
+        try {
+            RTP.log(Level.WARNING,
+                    "[RTP] FabricLegacyText.buildShowTextHover: reflective ctor invoke "
+                            + "failed (HOVER_CTOR_LEGACY=" + (HOVER_CTOR_LEGACY != null)
+                            + ", HOVER_CTOR_SHOWTEXT=" + (HOVER_CTOR_SHOWTEXT != null)
+                            + "). Cause: " + t.getClass().getName() + ": " + t.getMessage(), t);
+        } catch (Throwable ignored) { /* best-effort */ }
+    }
+
+    private static void logClickBuildFailureOnce(Throwable t, ClickKind kind) {
+        if (CLICK_BUILD_FAILURE_LOGGED) return;
+        CLICK_BUILD_FAILURE_LOGGED = true;
+        try {
+            RTP.log(Level.WARNING,
+                    "[RTP] FabricLegacyText.buildClick: reflective ctor invoke failed "
+                            + "(kind=" + kind
+                            + ", CLICK_CTOR_LEGACY=" + (CLICK_CTOR_LEGACY != null)
+                            + ", CLICK_CTOR_SUGGEST=" + (CLICK_CTOR_SUGGEST != null)
+                            + ", CLICK_CTOR_RUN=" + (CLICK_CTOR_RUN != null)
+                            + "). Cause: " + t.getClass().getName() + ": " + t.getMessage(), t);
+        } catch (Throwable ignored) { /* best-effort */ }
     }
 
     private static Style applyFormatting(Style style, ChatFormatting fmt) {
