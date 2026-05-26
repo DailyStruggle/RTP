@@ -121,7 +121,7 @@ stateDiagram-v2
     [*] --> PENDING : reserveFromNetworkKept(tokenId)<br/>(backend B carves from networkKeptLocations)
     PENDING --> CLAIMED : UPDATE ... WHERE state='PENDING'<br/>(row-count = 1, winning proxy)
     PENDING --> CLAIMED_LOSS : row-count = 0<br/>(racing proxy loses)
-    CLAIMED_LOSS --> [*] : surface messages.yml failure;<br/>capped-retry chain picks next candidate
+    CLAIMED_LOSS --> [*] : surface messages.yml failure,<br/>capped-retry chain picks next candidate
 
     CLAIMED --> ROUTING : StatusSink ROUTING<br/>transferPlayer fired
     ROUTING --> COMPLETED : JoinTriggerSource.redeemReserved<br/>player consumes coord
@@ -132,7 +132,7 @@ stateDiagram-v2
 
     CLAIMED --> EXPIRED : TTL elapses without redeem<br/>ReservationTokenReaper sweep
     ROUTING --> EXPIRED : same
-    EXPIRED --> PENDING : claimReanimateMs window<br/>(proxy died; surviving proxy re-opens)
+    EXPIRED --> PENDING : claimReanimateMs window<br/>(proxy died, surviving proxy re-opens)
     EXPIRED --> [*] : beyond reanimation (coord falls back to unkeptLocations)
 ```
 
