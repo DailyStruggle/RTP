@@ -8,8 +8,10 @@ A high-performance random teleportation plugin for Bukkit-derived Minecraft serv
 [![Release](https://img.shields.io/github/v/release/DailyStruggle/RTP)](https://github.com/DailyStruggle/RTP/releases)
 [![Java](https://img.shields.io/badge/Java-21-blue)](https://adoptium.net/)
 [![SpigotMC](https://img.shields.io/badge/SpigotMC-RTP-orange)](https://www.spigotmc.org/resources/rtp.94812/)
+[![BuiltByBit](https://img.shields.io/badge/BuiltByBit-RTP%20Pro-blue)](https://builtbybit.com/resources/rtp-pro.105418/)
 
 🔗 [SpigotMC Resource Page](https://www.spigotmc.org/resources/rtp.94812/)
+🔗 [BuiltByBit Resource Page](https://builtbybit.com/resources/rtp-pro.105418/)
 
 ---
 
