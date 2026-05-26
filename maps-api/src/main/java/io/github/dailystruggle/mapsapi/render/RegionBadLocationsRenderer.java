@@ -5,33 +5,21 @@ import io.github.dailystruggle.mapsapi.PaletteIndex;
 import io.github.dailystruggle.mapsapi.model.RegionBadLocations;
 
 /**
- * Categorical {@link ChartRenderer} for the admin {@code Visualizations}
- * submenu's {@code Region shape} entry. Paints the region's bad-location
- * snapshot onto the canvas using three named palette slots:
+ * Stateless {@link ChartRenderer} for {@link RegionBadLocations}. Blits the
+ * model's pre-classified {@code byte[] palette} buffer onto the canvas
+ * using nearest-neighbour scaling when the canvas size differs from the
+ * model's buffer size.
+ *
+ * <p>Classification is entirely the resolver's responsibility - this
+ * renderer makes no assumptions about region geometry (no center,
+ * no radius, no disk). The three palette colours that appear in
+ * {@code model.palette()} are by convention:
  *
  * <ul>
- *   <li>{@link PaletteIndex#BLACK} — outside the inscribed disk of radius
- *       {@code model.radius()}; the unexplored backdrop.</li>
- *   <li>{@link PaletteIndex#GREEN} — inside the disk and not flagged bad;
- *       the "good inside the region" backdrop. Note this is "not flagged
- *       bad", not "verified safe" — regions don't persist a verified-safe
- *       set (see {@link RegionBadLocations} class Javadoc).</li>
- *   <li>{@link PaletteIndex#RED} — a recorded bad location. Drawn last so
- *       a bad pixel inside the disk overrides the green backdrop.</li>
+ *   <li>{@link PaletteIndex#BLACK} - outside the region's spatial domain;</li>
+ *   <li>{@link PaletteIndex#GREEN} - inside the region, not flagged bad;</li>
+ *   <li>{@link PaletteIndex#RED}   - flagged bad in the region's memory shape.</li>
  * </ul>
- *
- * <p>Pixel mapping. The canvas is square ({@code canvas.width() ==
- * canvas.height() == 128} for vanilla cartography), centred on
- * {@code (model.centerX(), model.centerZ())} with a half-edge equal to
- * {@code model.radius()}. A block coordinate {@code (bx, bz)} maps to
- * pixel:
- * <pre>
- *   px = (bx - centerX + radius) * width  / (2 * radius)
- *   py = (bz - centerZ + radius) * height / (2 * radius)
- * </pre>
- * Block coordinates outside the {@code [centerX - radius, centerX + radius]}
- * by {@code [centerZ - radius, centerZ + radius]} square clip to nothing
- * via {@link MapCanvas#setPixel(int, int, byte)}'s out-of-bounds rule.
  *
  * <p>This renderer is stateless (REQ-RTP-MAP-002); the
  * {@link #INSTANCE singleton} is safe to share across resolvers, dispatchers,
@@ -52,52 +40,33 @@ public final class RegionBadLocationsRenderer implements ChartRenderer<RegionBad
         }
         final int cw = canvas.width();
         final int ch = canvas.height();
-        // 1) Black backdrop: outside-disk + reset prior frame state.
-        canvas.fillRect(0, 0, cw - 1, ch - 1, PaletteIndex.BLACK);
+        final int mw = model.width();
+        final int mh = model.height();
+        // Read once via the defensive accessor; we'll index it directly.
+        final byte[] palette = model.palette();
 
-        final int radius = model.radius();
-        final int centerX = model.centerX();
-        final int centerZ = model.centerZ();
-        final long diameter = 2L * radius;
-
-        // 2) Green disk: paint every pixel whose canvas-centre corresponds to
-        // a block coordinate within the inscribed disk of radius `radius`.
-        // We iterate by pixel rather than by block to honour the canvas's
-        // resolution exactly and avoid aliasing when `radius > canvas.width()`.
-        final double cxPixel = (cw - 1) / 2.0;
-        final double cyPixel = (ch - 1) / 2.0;
-        // Squared half-extent in pixel space (the inscribed circle inside
-        // the canvas-aligned bounding square).
-        final double rPixel = Math.min(cxPixel, cyPixel);
-        final double rPixelSq = rPixel * rPixel;
-        for (int py = 0; py < ch; py++) {
-            double dy = py - cyPixel;
-            double dy2 = dy * dy;
-            for (int px = 0; px < cw; px++) {
-                double dx = px - cxPixel;
-                if (dx * dx + dy2 <= rPixelSq) {
-                    canvas.setPixel(px, py, PaletteIndex.GREEN);
+        if (cw == mw && ch == mh) {
+            // Fast path: identical resolutions, blit row by row.
+            for (int py = 0; py < ch; py++) {
+                int row = py * mw;
+                for (int px = 0; px < cw; px++) {
+                    canvas.setPixel(px, py, palette[row + px]);
                 }
             }
+            return;
         }
-
-        // 3) Red bad cells: stamp every bad-key over the green disk. Coords
-        // outside the bounding square map to out-of-canvas pixels and are
-        // clipped by MapCanvas.setPixel's out-of-bounds rule.
-        final long[] keys = model.badKeys();
-        for (long key : keys) {
-            int bx = (int) (key >> 32);
-            int bz = (int) key;
-            // Block -> pixel: bx in [centerX - radius, centerX + radius] -> px in [0, cw - 1]
-            long dx = (long) bx - centerX + radius;
-            long dz = (long) bz - centerZ + radius;
-            if (dx < 0 || dx > diameter || dz < 0 || dz > diameter) {
-                // Outside the bounding square; clipped.
-                continue;
+        // Nearest-neighbour scale from (mw x mh) to (cw x ch). Source index
+        // = px * mw / cw (truncating), which collapses to identity when
+        // cw == mw. Clamp defensively in case of rounding edge cases.
+        for (int py = 0; py < ch; py++) {
+            int sy = (int) ((long) py * mh / ch);
+            if (sy >= mh) sy = mh - 1;
+            int row = sy * mw;
+            for (int px = 0; px < cw; px++) {
+                int sx = (int) ((long) px * mw / cw);
+                if (sx >= mw) sx = mw - 1;
+                canvas.setPixel(px, py, palette[row + sx]);
             }
-            int px = (int) (dx * (cw - 1) / diameter);
-            int py = (int) (dz * (ch - 1) / diameter);
-            canvas.setPixel(px, py, PaletteIndex.RED);
         }
         // Note: the binding owns commit() dispatch (one-shot or live frame).
         // Mirrors HeatmapRenderer which also does not call commit() itself.

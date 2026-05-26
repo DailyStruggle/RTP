@@ -135,6 +135,47 @@ Canonical positional order matches `FireworkEffect.KEY_ORDER` in `effects-api`. 
 
 Missing trailing arguments keep the effect's built-in defaults (see each `*Effect` class constructor).
 
+### Where to find valid values
+
+The positional tables above tell you which *kind* of token each slot accepts (`Particle` constant, `Sound` constant, `PotionEffectType` name, ...). The exhaustive list of constants is **server-version-specific** and lives in the platform's own reference, not here. Use these as your catalogue:
+
+**Bukkit / Paper / Spigot / Folia backends** (the `rtp.effect.*` permission grammar resolves directly against these enums):
+
+| Token type | 1.21 (LTS line) | 26.1 (current) |
+|------------|-----------------|----------------|
+| `Particle` (PARTICLE.TYPE) | [`org.bukkit.Particle` - 1.21](https://jd.papermc.io/paper/1.21.4/org/bukkit/Particle.html) | [`org.bukkit.Particle` - 26.1](https://jd.papermc.io/paper/26.1.2/org/bukkit/Particle.html) |
+| `Sound` (SOUND.TYPE) | [`org.bukkit.Sound` - 1.21](https://jd.papermc.io/paper/1.21.4/org/bukkit/Sound.html) | [`org.bukkit.Sound` - 26.1](https://jd.papermc.io/paper/26.1.2/org/bukkit/Sound.html) |
+| `PotionEffectType` (POTION.TYPE) | [`PotionEffectType` - 1.21](https://jd.papermc.io/paper/1.21.4/org/bukkit/potion/PotionEffectType.html) | [`PotionEffectType` - 26.1](https://jd.papermc.io/paper/26.1.2/org/bukkit/potion/PotionEffectType.html) |
+| `FireworkEffect.Type` (FIREWORK.TYPE) | [`FireworkEffect.Type` - 1.21](https://jd.papermc.io/paper/1.21.4/org/bukkit/FireworkEffect.Type.html) | [`FireworkEffect.Type` - 26.1](https://jd.papermc.io/paper/26.1.2/org/bukkit/FireworkEffect.Type.html) |
+| `Color` (FIREWORK.COLOR / FADE) | [`org.bukkit.Color` - 1.21](https://jd.papermc.io/paper/1.21.4/org/bukkit/Color.html) | [`org.bukkit.Color` - 26.1](https://jd.papermc.io/paper/26.1.2/org/bukkit/Color.html) |
+| `Note.Tone` reference (NOTE.TONE) | [`org.bukkit.Note` - 1.21](https://jd.papermc.io/paper/1.21.4/org/bukkit/Note.html) | [`org.bukkit.Note` - 26.1](https://jd.papermc.io/paper/26.1.2/org/bukkit/Note.html) |
+
+Use the **enum constant name** verbatim in the permission node (e.g. `FLAME`, `ENTITY_ENDERMAN_TELEPORT`, `NIGHT_VISION`, `BALL`, `BLUE`). Names are case-sensitive in the underlying `valueOf` call, but the parser uppercases the token before lookup so casing in the permission node is forgiving.
+
+**Fabric / plain Minecraft backends** (and any time you want the version-agnostic, vanilla-side catalogue):
+
+| Token type | Reference |
+|------------|-----------|
+| Particles | [Minecraft Wiki - Java Edition particle list](https://minecraft.wiki/w/Java_Edition_protocol/Particles) |
+| Sounds (sound event IDs) | [Minecraft Wiki - Sounds.json / sound events](https://minecraft.wiki/w/Sounds.json) |
+| Status effects (potion types) | [Minecraft Wiki - Effect](https://minecraft.wiki/w/Effect) |
+| Firework shapes / colors | [Minecraft Wiki - Firework Star](https://minecraft.wiki/w/Firework_Star) |
+
+The wiki tables use lowercase namespaced IDs (e.g. `minecraft:flame`, `minecraft:entity.enderman.teleport`). Strip the `minecraft:` prefix and translate to the Bukkit enum form by uppercasing and replacing `.` with `_` (`entity.enderman.teleport` -> `ENTITY_ENDERMAN_TELEPORT`). For Fabric, the same vanilla IDs are what the underlying `ParticleType` / `SoundEvent` registries use.
+
+> **Version drift is real.** `Particle` and `Sound` constants are renamed, added, or removed between Minecraft versions (notable churn between 1.20.x and 1.21.x, and again into the 26.x line). If a permission node stops working after a server update, check the Javadoc for your running version before assuming a bug. The `/particle` and `/playsound` vanilla commands have tab completion against the running registry and are the fastest sanity check.
+
+### Tab completion via your permissions plugin
+
+`EffectFactory.addPermissions(prefix)` (called by `rtp-plugin` when `effectParsing` is enabled) auto-registers a Bukkit `Permission` node for **every** `TYPE` enum constant of every built-in effect, under each pipeline-stage prefix. If your permissions plugin (LuckPerms, PEX, GroupManager, ...) reads from the server's `PluginManager` permission registry, those nodes show up in tab completion:
+
+```
+/lp user <name> permission set rtp.effect.postteleport.PARTICLE.<TAB>
+   -> FLAME, PORTAL, END_ROD, HEART, ... (every Particle constant on this server)
+```
+
+This is the **fastest way to discover valid type names without leaving the game**: turn on `effectParsing`, reload, and tab-complete from your perms plugin. Positional args after the TYPE (NUMBER, DURATION, color, offsets, etc.) are not auto-registered as nodes - those still come from the Javadoc / wiki tables above.
+
 ### Worked examples
 
 Each node is one complete effect. Grant multiple to stack them on the same stage.

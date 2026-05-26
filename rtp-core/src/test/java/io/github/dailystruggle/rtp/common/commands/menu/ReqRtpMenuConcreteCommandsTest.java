@@ -375,6 +375,93 @@ class ReqRtpMenuConcreteCommandsTest {
     }
 
     // ------------------------------------------------------------------------
+    // Visualization sub-commands - typed per-kind drill-down under
+    // `/rtp visualization`. Starting with `bad-locations`
+    // (REGION_BAD_LOCATIONS_SHAPE); future kinds (`coverage`, `fail-rate`,
+    // `cache`, `heatmap`) follow the same shape.
+    // ------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("VisualizationBadLocations (/rtp visualization bad-locations region=<name>)")
+    class VisualizationBadLocations {
+
+        @Test
+        @DisplayName("`bad-locations` registers as a child of `/rtp visualization`")
+        void badLocationsRegistered() {
+            Fixture f = Fixture.withAllPermissions();
+
+            CommandsAPICommand visualization =
+                    f.root.getCommandLookup().get("VISUALIZATION");
+            assertNotNull(visualization, "/rtp visualization must be registered");
+            Map<String, CommandsAPICommand> children =
+                    ((TreeCommand) visualization).getCommandLookup();
+            assertNotNull(children, "visualization children lookup");
+            assertTrue(children.containsKey("BAD-LOCATIONS"),
+                    "/rtp visualization bad-locations must be registered");
+
+            CommandsAPICommand leaf = children.get("BAD-LOCATIONS");
+            assertEquals("bad-locations", leaf.name());
+            assertEquals(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+                    leaf.permission(),
+                    "bad-locations gates on rtp.menu.admin");
+        }
+
+        @Test
+        @DisplayName("`bad-locations` declares a typed `region` parameter")
+        void badLocationsDeclaresRegionParameter() {
+            Fixture f = Fixture.withAllPermissions();
+
+            TreeCommand leaf = (TreeCommand)
+                    ((TreeCommand) f.root.getCommandLookup().get("VISUALIZATION"))
+                            .getCommandLookup().get("BAD-LOCATIONS");
+            assertNotNull(leaf.getParameterLookup(), "parameter lookup");
+            // addParameter lowercases parameter names in commands-api.
+            assertTrue(leaf.getParameterLookup().containsKey(
+                            MenuConcreteCommandLeaves.PARAM_REGION.toLowerCase()),
+                    "bad-locations exposes the `region` parameter "
+                            + "(commands-api wire form: region=<name>)");
+        }
+
+        @Test
+        @DisplayName("`bad-locations` without region= falls through to the selector")
+        void badLocationsWithoutRegionOpensSelector() {
+            Fixture f = Fixture.withAllPermissions();
+
+            CommandsAPICommand leaf =
+                    ((TreeCommand) f.root.getCommandLookup().get("VISUALIZATION"))
+                            .getCommandLookup().get("BAD-LOCATIONS");
+            UUID viewer = UUID.randomUUID();
+            boolean ok = leaf.onCommand(viewer, new HashMap<>(), null,
+                    (Consumer<String>) f.messages::add);
+
+            assertTrue(ok, "missing region= must open the selector, not reject");
+            assertNotNull(f.rendered.get(), "selector must be rendered");
+            assertEquals("visualizations", f.rendered.get().title(),
+                    "bare bad-locations shares the visualizations selector model");
+        }
+
+        @Test
+        @DisplayName("`bad-locations region=<name>` rejects without rtp.menu.admin (S-004)")
+        void badLocationsRejectsWithoutAdminPermission() {
+            Fixture f = Fixture.withAdminPermission(false);
+
+            CommandsAPICommand leaf =
+                    ((TreeCommand) f.root.getCommandLookup().get("VISUALIZATION"))
+                            .getCommandLookup().get("BAD-LOCATIONS");
+            UUID viewer = UUID.randomUUID();
+            Map<String, List<String>> params = new HashMap<>();
+            params.put(MenuConcreteCommandLeaves.PARAM_REGION, List.of("default"));
+            boolean ok = leaf.onCommand(viewer, params, null,
+                    (Consumer<String>) f.messages::add);
+
+            assertFalse(ok,
+                    "missing rtp.menu.admin must reject region-targeted drill-down");
+            assertFalse(f.messages.isEmpty(),
+                    "configurable rejection message must surface (REQ-RTP-F-013)");
+        }
+    }
+
+    // ------------------------------------------------------------------------
     // Fixture
     // ------------------------------------------------------------------------
 

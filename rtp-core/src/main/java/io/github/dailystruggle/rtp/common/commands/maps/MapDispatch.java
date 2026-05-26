@@ -194,6 +194,11 @@ public final class MapDispatch {
     Objects.requireNonNull(viewer, "viewer");
 
     MapBinding binding = BINDING.get();
+    RTP.log(Level.INFO,
+        "[viz/bad-locations] MapDispatch.paint entry: kind=" + spec.kind()
+            + " region=" + spec.regionName()
+            + " viewer=" + viewer
+            + " binding=" + (binding == null ? "null" : binding.getClass().getName()));
     if (binding instanceof NoopMapBinding) {
       RTP.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
@@ -213,7 +218,17 @@ public final class MapDispatch {
 
     ChartSpecResolver.Resolution resolution;
     try {
+      RTP.log(Level.INFO,
+          "[viz/bad-locations] resolver.resolve invoking: resolver="
+              + resolver.getClass().getName());
       resolution = resolver.resolve(spec);
+      RTP.log(Level.INFO,
+          "[viz/bad-locations] resolver.resolve OK: renderer="
+              + (resolution == null ? "null"
+                  : resolution.renderer().getClass().getName())
+              + " model=" + (resolution == null || resolution.model() == null
+                  ? "null"
+                  : resolution.model().getClass().getName()));
     } catch (ChartSpecResolver.UnresolvableChartSpecException e) {
       RTP.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
@@ -240,7 +255,13 @@ public final class MapDispatch {
         MapAllocationRequest.Locking.LOCKED);
     MapHandle handle;
     try {
+      RTP.log(Level.INFO,
+          "[viz/bad-locations] binding.allocate invoking on "
+              + binding.getClass().getName());
       handle = binding.allocate(request);
+      RTP.log(Level.INFO,
+          "[viz/bad-locations] binding.allocate OK: handle="
+              + (handle == null ? "null" : handle.toString()));
     } catch (RuntimeException e) {
       RTP.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
@@ -256,7 +277,12 @@ public final class MapDispatch {
     // the MapView reference forever. Untracked on every exit path below.
     UUID trackingId = MemoryTracker.track(handle, MEMORY_TRACKER_LABEL, MEMORY_TRACKER_TTL_MS);
     try {
+      RTP.log(Level.INFO,
+          "[viz/bad-locations] binding.renderEphemeral invoking for viewer="
+              + viewer);
       binding.renderEphemeral(handle, resolution.renderer(), resolution.model());
+      RTP.log(Level.INFO,
+          "[viz/bad-locations] binding.renderEphemeral OK for viewer=" + viewer);
     } catch (RuntimeException e) {
       RTP.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer

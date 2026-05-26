@@ -2,9 +2,12 @@ package io.github.dailystruggle.rtp.common.commands.menu;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
+import io.github.dailystruggle.rtp.common.RTP;
 
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,15 +50,13 @@ final class MenuConcreteCommandLeaves {
     static final String PARAM_PATH = "path";
 
     /**
-     * Parameter name on {@code /rtp visualization x=<regionName>} when the
-     * regional drill-down lands in Stage 1b. In Stage 1a the parameter is
-     * accepted (for forward compatibility with the renderer changes in
-     * Stage 2) but a present value is currently ignored: the bare command
-     * always opens the visualizations selector through
-     * {@code dispatchOpenVisualizations}. The per-region drill-down arrives
-     * with the {@code OpenMap(String)} record change in Stage 3.
+     * Parameter name on {@code /rtp visualization bad-locations region=<regionName>}
+     * (and any future visualization sub-command that drills down per region).
+     * Always named {@code region}: the previous Stage 1a {@code x} alias on
+     * {@code /rtp visualization} was removed when the typed sub-command
+     * grammar landed.
      */
-    static final String PARAM_X = "x";
+    static final String PARAM_REGION = "region";
 
     /**
      * {@code /rtp menu open [path=<dotted.path>]} - open a menu page at the
@@ -255,14 +256,11 @@ final class MenuConcreteCommandLeaves {
     }
 
     /**
-     * {@code /rtp visualization [x=<regionName>]} - root-level sibling of
-     * {@code /rtp menu} that opens the visualizations selector. In Stage 1a
-     * the {@code x} parameter is registered for forward compatibility but a
-     * present value is ignored: the bare command always opens the selector
+     * {@code /rtp visualization} - root-level sibling of {@code /rtp menu}
+     * that opens the visualizations selector. Typed per-kind sub-commands
+     * (e.g. {@link VisualizationBadLocationsCmd}) hang off this node; the
+     * bare {@code /rtp visualization} call always opens the selector
      * through {@link MenuRedeemSubcommand#dispatchOpenVisualizations}.
-     * Per-region drill-down (replacing the {@code OpenMap(UUID chartSpecToken)}
-     * record with {@code OpenMap(String regionName)} per ADR-050 §Decision 2)
-     * arrives in Stage 3 with the {@code ChartSpecTokens} deletion.
      *
      * <p>This leaf is registered as a child of the {@code /rtp} root
      * (not as a child of {@code menu}) so the command is reachable as
@@ -276,14 +274,18 @@ final class MenuConcreteCommandLeaves {
         VisualizationRootCmd(CommandsAPICommand rtpRoot, MenuRedeemSubcommand owner) {
             super(rtpRoot);
             this.owner = owner;
-            addParameter(PARAM_X, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
-                    "region name (Stage 1b: opens per-region map; Stage 1a: ignored)",
-                    (uuid, value) -> value != null && !value.isEmpty()) {
-                @Override
-                public Set<String> values() {
-                    return Collections.emptySet();
-                }
-            });
+            // Typed per-kind sub-commands hang off the visualization root.
+            // Each kind owns its own dispatcher class (e.g.
+            // VisualizationDispatch for `bad-locations`) and does NOT call
+            // back into MenuRedeemSubcommand for the dispatch itself -
+            // visualization wiring is intentionally kept out of the legacy
+            // menu/cart god-class. The selector fallback (no-arg, no-region)
+            // is the one menu-side path that legitimately stays on `owner`.
+            VisualizationDispatch dispatch =
+                    new VisualizationDispatch(owner.permissionProbeFactory());
+            addSubCommand(new VisualizationBadLocationsCmd(
+                    dispatch,
+                    owner::dispatchOpenVisualizations));
         }
 
         @Override
@@ -300,6 +302,15 @@ final class MenuConcreteCommandLeaves {
         public boolean onCommand(UUID callerId,
                                  Map<String, List<String>> parameterValues,
                                  @Nullable CommandsAPICommand nextCommand) {
+            // When a typed sub-command was matched (e.g. `bad-locations`),
+            // commands-api's TreeCommand walker invokes the sub-command's
+            // onCommand itself after this node completes (see
+            // TreeCommand.java:267-272). We just need to step aside and
+            // NOT also open the selector - opening it here would
+            // double-execute alongside the sub-command. Only the bare
+            // `/rtp visualization` (no sub-command) opens the selector.
+            // Matches the pattern in ScanCmd / PrefabApplyCmd / TestCancelCmd.
+            if (nextCommand != null) return true;
             return owner.dispatchOpenVisualizations(callerId, null);
         }
 
@@ -308,7 +319,126 @@ final class MenuConcreteCommandLeaves {
                                  Map<String, List<String>> parameterValues,
                                  @Nullable CommandsAPICommand nextCommand,
                                  Consumer<String> messageMethod) {
+            if (nextCommand != null) return true;
             return owner.dispatchOpenVisualizations(callerId, messageMethod);
+        }
+    }
+
+    /**
+     * {@code /rtp visualization bad-locations [region=<regionName>]} - draw
+     * the per-region {@link ChartSpec.Kind#REGION_BAD_LOCATIONS_SHAPE} chart.
+     * When {@code region=} is absent the command falls through to the
+     * visualizations selector (same behavior as bare
+     * {@code /rtp visualization}); when {@code region=<name>} is present it
+     * dispatches through {@link VisualizationDispatch#paintBadLocations},
+     * which owns the permission gate, {@link ChartSpec} validation, and
+     * {@code MapDispatch.paint} failure surfaces.
+     *
+     * <p>Crucially, this leaf does <strong>not</strong> hold a reference to
+     * {@link MenuRedeemSubcommand}: visualization dispatch lives in its own
+     * class so the legacy redeem/cart subcommand does not keep growing.
+     * Only the no-region selector fallback (a menu-side concern) is passed
+     * in as a {@link java.util.function.BiFunction} callback wired up by
+     * {@link VisualizationRootCmd}.
+     *
+     * <p>Permission gate is {@code rtp.menu.admin}. The {@code region}
+     * parameter's suggestion set is read live from
+     * {@code RTP.selectionAPI.regionNames()} so tab-completion stays in
+     * sync with the running configuration; an empty / missing
+     * {@code selectionAPI} collapses to an empty suggestion set.
+     */
+    static final class VisualizationBadLocationsCmd
+            extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+
+        private final VisualizationDispatch dispatch;
+        private final java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener;
+
+        VisualizationBadLocationsCmd(
+                VisualizationDispatch dispatch,
+                java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener) {
+            // Parent is rewritten by addSubCommand on registration under
+            // the `visualization` root - passing null here matches the
+            // pattern used by other concrete leaves attached via
+            // addSubCommand in this package.
+            super(null);
+            this.dispatch = java.util.Objects.requireNonNull(dispatch, "dispatch");
+            this.selectorOpener = java.util.Objects.requireNonNull(selectorOpener, "selectorOpener");
+            addParameter(PARAM_REGION, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+                    "region name (omit to open the visualizations selector)",
+                    (uuid, value) -> value != null && !value.isEmpty()) {
+                @Override
+                public Set<String> values() {
+                    return liveRegionNames();
+                }
+            });
+        }
+
+        @Override
+        public String name() {
+            return "bad-locations";
+        }
+
+        @Override
+        public String permission() {
+            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand) {
+            return dispatch(callerId, parameterValues, null);
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand,
+                                 Consumer<String> messageMethod) {
+            return dispatch(callerId, parameterValues, messageMethod);
+        }
+
+        private boolean dispatch(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable Consumer<String> messageMethod) {
+            String regionName = firstValue(parameterValues, PARAM_REGION);
+            RTP.log(java.util.logging.Level.INFO,
+                    "[viz/bad-locations] leaf reached: caller=" + callerId
+                            + " region=" + regionName
+                            + " hasMsg=" + (messageMethod != null));
+            if (regionName == null || regionName.isEmpty()) {
+                // No region specified - fall through to the visualizations
+                // selector. This is a menu-side concern, hence the callback
+                // back into MenuRedeemSubcommand#dispatchOpenVisualizations.
+                RTP.log(java.util.logging.Level.INFO,
+                        "[viz/bad-locations] no region= -> opening selector");
+                Boolean ok = selectorOpener.apply(callerId, messageMethod);
+                return Boolean.TRUE.equals(ok);
+            }
+            boolean result = dispatch.paintBadLocations(callerId, regionName, messageMethod);
+            RTP.log(java.util.logging.Level.INFO,
+                    "[viz/bad-locations] leaf returning result=" + result);
+            return result;
+        }
+
+        private static @Nullable String firstValue(@Nullable Map<String, List<String>> values,
+                                                   String key) {
+            if (values == null) return null;
+            List<String> raw = values.get(key);
+            if (raw == null || raw.isEmpty()) return null;
+            String first = raw.get(0);
+            return (first == null || first.isEmpty()) ? null : first;
+        }
+
+        private static Set<String> liveRegionNames() {
+            try {
+                if (RTP.selectionAPI == null) return Collections.emptySet();
+                Set<String> names = RTP.selectionAPI.regionNames();
+                if (names == null || names.isEmpty()) return Collections.emptySet();
+                return new LinkedHashSet<>(names);
+            } catch (RuntimeException e) {
+                return Collections.emptySet();
+            }
         }
     }
 }

@@ -67,10 +67,29 @@ public final class FabricPlayerLifecycleHook extends DispatchingPlayerLifecycleH
 
     private static UUID extractUuid(Object player) {
         if (player == null) return null;
+        // Prefer the typed FabricVersionAdapter.getPlayerUUID SPI so Loom
+        // remaps the descriptor per-runtime (mojmap getUUID on 26.x; intermediary
+        // method_5667 on 1.20/1.21.x). Reflective getMethod("getUUID") fails on
+        // intermediary because the mojmap method name is obfuscated there.
+        try {
+            io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+                    io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+            if (adapter != null) {
+                UUID uuid = adapter.getPlayerUUID(player);
+                if (uuid != null) return uuid;
+            }
+        } catch (Throwable t) {
+            // fall through to reflective attempt
+        }
         try {
             Method m = player.getClass().getMethod("getUUID");
             Object out = m.invoke(player);
             return (out instanceof UUID u) ? u : null;
+        } catch (NoSuchMethodException nsme) {
+            // Intermediary runtime where mojmap name is absent and adapter
+            // wasn't available; best-effort no-op (caller logs at WARNING-free
+            // level since this is a non-fatal lifecycle path).
+            return null;
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP] FabricPlayerLifecycleHook: getUUID() failed on "

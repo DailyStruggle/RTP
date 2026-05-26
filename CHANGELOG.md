@@ -6,7 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ---
 
-## [3.0.0-beta.4] - Unreleased
+## [3.0.0] - Unreleased
+
+### Changed
+
+- **`RTPWorld.isChunkGenerated` on Bukkit / Paper / Folia now routes through the same `AnvilRegionOccupancyCache` bitmap path Fabric uses, and `ScanTask`'s PRESCAN precheck runs unconditionally on every platform.** `BukkitRTPWorld.isChunkGenerated` and `FoliaRTPWorld.isChunkGenerated` previously delegated to `org.bukkit.World#isChunkGenerated`, a synchronous chunk-system / region-file index walk on the calling thread. When `ScanTask` invoked it per-candidate inside the in-flight gate, it collapsed `peakInFlight` from `cap=50` to ~2-3 and held PRESCAN cps at ~19 on a 193k-chunk world (the `[TRACE] ScanTask diag` regression). The previously-shipped Fabric-only `isFabricPlatform()` gate that fenced off the precheck on Bukkit-family platforms is removed; both `BukkitRTPWorld.isChunkGenerated` and `FoliaRTPWorld.isChunkGenerated` now try `World#isChunkLoaded` first (cheap, off-region safe), then `AnvilPrefilter.regionFileFor` + `AnvilRegionOccupancyCache.isOccupied` against the `r.X.Z.mca` file, with the `true`-on-error conservative default preserved for the ADR-016 §13.3 palette-drift contract. The 1024-bit per-region-file occupancy bitmap built on first touch amortises across all ~1024 sibling-chunk queries in that 32x32 tile, so PRESCAN's spiral sweep first-touches each region file once and then runs in O(1) per chunk for the next ~1023 candidates. `ScanTask.IS_FABRIC_CACHE` + `isFabricPlatform()` deleted.
+
+---
+
+## [3.0.0-beta.4] - 2026-05-25
 
 ### Changed
 
@@ -290,7 +298,8 @@ Earlier versions introduced the multi-module split (`rtp-api` / `rtp-core` / pla
 
 ---
 
-[3.0.0-beta.4]: https://github.com/DailyStruggle/RTP/compare/v3.0.0-beta.3...HEAD
+[3.0.0]: https://github.com/DailyStruggle/RTP/compare/v3.0.0-beta.4...HEAD
+[3.0.0-beta.4]: https://github.com/DailyStruggle/RTP/compare/v3.0.0-beta.3...v3.0.0-beta.4
 [3.0.0-beta.3]: https://github.com/DailyStruggle/RTP/compare/v3.0.0-beta.2...v3.0.0-beta.3
 [3.0.0-beta.2]: https://github.com/DailyStruggle/RTP/compare/v3.0.0-beta.1...v3.0.0-beta.2
 [3.0.0-beta.1]: https://github.com/DailyStruggle/RTP/compare/v2.0.18...v3.0.0-beta.1

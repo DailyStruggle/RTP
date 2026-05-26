@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.maps;
 
+import io.github.dailystruggle.mapsapi.PaletteIndex;
 import io.github.dailystruggle.mapsapi.model.ChartModel;
 import io.github.dailystruggle.mapsapi.model.RegionBadLocations;
 import io.github.dailystruggle.mapsapi.render.RegionBadLocationsRenderer;
@@ -31,17 +32,22 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-MAP-006 / ADR-047 - Stage 2 (PR2a) resolver coverage for the
- * region-shape two-tone map used by the admin "Visualizations -> Region
- * shape" entry. Mirrors the structure of {@code BadPointsHeatmapResolverTest}:
+ * REQ-RTP-MAP-006 - {@link RegionBadLocationsShapeResolver} contract under
+ * the 2026-05-26 rewrite: the resolver now emits a pre-classified palette
+ * buffer (canvas-sized) by leap-sampling
+ * {@link MemoryShape#locationToXZ(long)} for bounds and pixel-driving
+ * {@link MemoryShape#contains(int, int)} / {@link MemoryShape#isKnownBad(int, int)}
+ * for the in/out + bad/good classification. Empty bad-set is no longer a
+ * failure: it produces an all-green disk over a black backdrop.
  *
  * <ul>
- *   <li>Happy path: known region + non-empty badKeysCache -> a
- *       {@link RegionBadLocations} carrying the same bad keys re-encoded
- *       to MemoryShape's packed long form, paired with
+ *   <li>Happy path: non-empty cache -> palette buffer containing at least
+ *       one {@link PaletteIndex#RED} pixel, paired with
  *       {@link RegionBadLocationsRenderer#INSTANCE}.</li>
+ *   <li>Empty cache: still resolves, palette buffer contains no RED but
+ *       does contain {@link PaletteIndex#GREEN} (the region's in-shape
+ *       fill).</li>
  *   <li>Failure: unknown region -> {@code UnresolvableChartSpecException}.</li>
- *   <li>Failure: empty badKeysCache -> {@code UnresolvableChartSpecException}.</li>
  *   <li>Failure: wrong {@code ChartSpec.Kind} -> {@code UnresolvableChartSpecException}.</li>
  *   <li>Failure: null spec -> {@code UnresolvableChartSpecException}, not NPE.</li>
  * </ul>
@@ -85,7 +91,8 @@ class RegionBadLocationsShapeResolverTest {
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
   }
 
-  /** Same seeding helper as {@code BadPointsHeatmapResolverTest}. */
+  /** Reflectively seeds the MemoryShape's bad-keys cache + prefix sums so
+   *  {@link MemoryShape#isKnownBad(long)} returns true for the seeded keys. */
   private static void seedBadKeys(MemoryShape<?> shape, long[] keys) throws Exception {
     Field keysField = MemoryShape.class.getDeclaredField("badKeysCache");
     keysField.setAccessible(true);
@@ -97,13 +104,28 @@ class RegionBadLocationsShapeResolverTest {
     sumsField.set(shape, sums);
   }
 
+  private static int countPalette(byte[] palette, byte color) {
+    int n = 0;
+    for (byte b : palette) if (b == color) n++;
+    return n;
+  }
+
   @Test
-  @DisplayName("Happy path: non-empty cache -> RegionBadLocations + RegionBadLocationsRenderer")
-  void happyPath_returnsRegionBadLocations() throws Exception {
-    long k0 = shape.xzToLocation(10L, 20L);
-    long k1 = shape.xzToLocation(-30L, 40L);
-    long k2 = shape.xzToLocation(50L, -60L);
-    long[] keys = new long[] {k0, k1, k2};
+  @DisplayName("Happy path: non-empty cache -> palette buffer with at least one RED pixel")
+  void happyPath_returnsPopulatedPaletteBuffer() throws Exception {
+    // The resolver classifies one block per canvas pixel (128x128), so an
+    // isolated bad key has a sub-pixel chance of being struck by the
+    // pixel grid against a Square with default range (~260k locations).
+    // Seed a contiguous 64-block-wide block-patch so the RED region is
+    // guaranteed to land on multiple canvas pixels regardless of stride.
+    java.util.List<Long> raw = new java.util.ArrayList<>();
+    for (int dx = -32; dx <= 32; dx++) {
+      for (int dz = -32; dz <= 32; dz++) {
+        long k = shape.xzToLocation((long) dx + 80L, (long) dz + 80L);
+        raw.add(k);
+      }
+    }
+    long[] keys = raw.stream().distinct().mapToLong(Long::longValue).toArray();
     java.util.Arrays.sort(keys);
     seedBadKeys(shape, keys);
 
@@ -116,29 +138,33 @@ class RegionBadLocationsShapeResolverTest {
     ChartModel model = res.model();
     RegionBadLocations rbl = assertInstanceOf(RegionBadLocations.class, model);
     assertEquals("default", rbl.regionName());
-    assertEquals(3, rbl.badCount(),
-        "every decoded bad key shall round-trip into the snapshot");
-    assertTrue(rbl.radius() > 0,
-        "radius shall be strictly positive (RegionBadLocations canonical constructor invariant)");
-    // Centre derived from bbox midpoint of decoded XZ. Square.xzToLocation
-    // may round-trip through its internal index encoding, so we assert the
-    // centre is *inside* the observed XZ extent rather than hardcoding the
-    // pre-encoding midpoint.
-    long[] decodedKeys = rbl.badKeys();
-    int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
-    int minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
-    for (long k : decodedKeys) {
-      int bx = (int) (k >> 32);
-      int bz = (int) k;
-      if (bx < minX) minX = bx;
-      if (bx > maxX) maxX = bx;
-      if (bz < minZ) minZ = bz;
-      if (bz > maxZ) maxZ = bz;
-    }
-    assertTrue(rbl.centerX() >= minX && rbl.centerX() <= maxX,
-        "centerX shall lie inside the decoded XZ bbox [" + minX + "," + maxX + "], got " + rbl.centerX());
-    assertTrue(rbl.centerZ() >= minZ && rbl.centerZ() <= maxZ,
-        "centerZ shall lie inside the decoded XZ bbox [" + minZ + "," + maxZ + "], got " + rbl.centerZ());
+    assertEquals(128, rbl.width(), "resolver emits canvas-aligned 128-wide buffer");
+    assertEquals(128, rbl.height(), "resolver emits canvas-aligned 128-tall buffer");
+    byte[] palette = rbl.palette();
+    assertTrue(countPalette(palette, PaletteIndex.GREEN) > 0,
+        "in-region pixels shall be GREEN");
+    assertTrue(countPalette(palette, PaletteIndex.RED) > 0,
+        "seeded bad locations shall produce at least one RED pixel; "
+            + "got palette histogram BLACK=" + countPalette(palette, PaletteIndex.BLACK)
+            + " GREEN=" + countPalette(palette, PaletteIndex.GREEN)
+            + " RED=" + countPalette(palette, PaletteIndex.RED));
+  }
+
+  @Test
+  @DisplayName("Empty cache: still resolves to a populated GREEN+BLACK buffer (no failure)")
+  void emptyCache_resolvesToGreenDisk() throws Exception {
+    seedBadKeys(shape, new long[0]);
+    ChartSpec spec = ChartSpec.of(ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE, "default");
+
+    ChartSpecResolver.Resolution res = resolver.resolve(spec);
+
+    assertNotNull(res, "empty bad-set is no longer a failure path");
+    RegionBadLocations rbl = assertInstanceOf(RegionBadLocations.class, res.model());
+    byte[] palette = rbl.palette();
+    assertEquals(0, countPalette(palette, PaletteIndex.RED),
+        "no bad keys -> no RED pixels");
+    assertTrue(countPalette(palette, PaletteIndex.GREEN) > 0,
+        "in-region pixels shall still be GREEN even when bad set is empty");
   }
 
   @Test
@@ -148,18 +174,6 @@ class RegionBadLocationsShapeResolverTest {
     ChartSpec spec = ChartSpec.of(ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE, "no_such_region");
     assertThrows(ChartSpecResolver.UnresolvableChartSpecException.class,
         () -> resolver.resolve(spec));
-  }
-
-  @Test
-  @DisplayName("Failure: empty bad-keys cache -> UnresolvableChartSpecException")
-  void emptyCache_throws() throws Exception {
-    seedBadKeys(shape, new long[0]);
-    ChartSpec spec = ChartSpec.of(ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE, "default");
-    ChartSpecResolver.UnresolvableChartSpecException ex = assertThrows(
-        ChartSpecResolver.UnresolvableChartSpecException.class,
-        () -> resolver.resolve(spec));
-    assertTrue(ex.getMessage().contains("no bad-location data"),
-        "exception message shall name the empty-cache condition: " + ex.getMessage());
   }
 
   @Test

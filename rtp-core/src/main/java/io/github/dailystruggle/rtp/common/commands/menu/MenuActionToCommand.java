@@ -120,12 +120,18 @@ public final class MenuActionToCommand {
                             + " kind=" + mm.parserKind()
                             + " entry=" + mm.entryName()
                             + " op=" + mm.op().name().toLowerCase(Locale.ROOT);
-            // ADR-050 Stage 3β: OpenMap carries (kind, regionName). Emit
-            // `/rtp visualization x=<kind>:<regionName>`; the dispatcher
-            // parses on the first `:` and builds the ChartSpec inline.
+            // ADR-050 Stage 3β + bad-locations leaf (2026-05-26): OpenMap
+            // dispatches to the per-Kind typed sub-command under
+            // `/rtp visualization`. The legacy `x=<kind>:<region>` wire
+            // form (root-level `x=` parameter on VisualizationRootCmd) was
+            // removed when the typed sub-commands landed; the framework
+            // refuses it as "invalid command argument". One literal per
+            // ChartSpec.Kind; reserved (no-leaf-yet) kinds still emit a
+            // best-guess literal so they're ready when the corresponding
+            // leaf lands. See MenuConcreteCommandLeaves.VisualizationRootCmd.
             case MenuAction.OpenMap openMap ->
-                    "/rtp visualization x="
-                            + openMap.kind().name() + ":" + openMap.regionName();
+                    "/rtp visualization " + visualizationKindLiteral(openMap.kind())
+                            + " region=" + openMap.regionName();
         };
     }
 
@@ -212,6 +218,26 @@ public final class MenuActionToCommand {
             case GLOBAL -> "global";
             case WORLD -> "world:" + scope.name();
             case REGION -> "region:" + scope.name();
+        };
+    }
+
+    /**
+     * Maps a {@link io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind} to
+     * its {@code /rtp visualization <literal>} sub-command word. Only
+     * {@code REGION_BAD_LOCATIONS_SHAPE} currently has a registered leaf
+     * ({@code bad-locations}); the other Kinds emit best-guess literals
+     * matching their reserved sub-command names so click events stay
+     * stable when those leaves land in Stage 3.
+     */
+    static String visualizationKindLiteral(
+            io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind kind) {
+        return switch (kind) {
+            case REGION_BAD_LOCATIONS_SHAPE -> "bad-locations";
+            case BAD_POINTS_HEATMAP        -> "bad-points-heatmap";
+            case REGION_COVERAGE           -> "coverage";
+            case FAIL_RATE_HEATMAP         -> "fail-rate";
+            case CACHE_OCCUPANCY           -> "cache";
+            case METRIC_SPARKLINE          -> "metric";
         };
     }
 }
