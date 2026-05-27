@@ -86,13 +86,17 @@ class BukkitMapBindingTest {
     }
 
     @Test
-    @DisplayName("bindLive is explicitly deferred and throws UnsupportedOperationException")
-    void bindLiveIsDeferred() {
+    @DisplayName("bindLive installs a live renderer and returns a working Cancellation")
+    void bindLiveInstallsAndCancels() {
         MapHandle handle = binding.allocate(new MapAllocationRequest(
                 "bad-points/world/live-stub", null, MapAllocationRequest.Locking.LOCKED));
         Heatmap2D model = new Heatmap2D(2, 2, new double[4], 0.0, 1.0);
-        assertThrows(UnsupportedOperationException.class,
-                () -> binding.bindLive(handle, HeatmapRenderer.INSTANCE, () -> model));
+        io.github.dailystruggle.mapsapi.Cancellation c =
+                binding.bindLive(handle, HeatmapRenderer.INSTANCE, () -> model);
+        org.junit.jupiter.api.Assertions.assertNotNull(c);
+        org.junit.jupiter.api.Assertions.assertFalse(c.cancelled());
+        c.cancel();
+        org.junit.jupiter.api.Assertions.assertTrue(c.cancelled());
     }
 
     @Test

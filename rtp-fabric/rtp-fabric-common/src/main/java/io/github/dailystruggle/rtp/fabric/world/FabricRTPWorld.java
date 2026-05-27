@@ -861,6 +861,78 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * <p>Fabric mirror of {@code BukkitRTPWorld#readBiomesInRegionFile}: reads
+     * {@code r.<rcx>.<rcz>.mca} once via {@link
+     * io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache} on the
+     * {@link io.github.dailystruggle.rtp.anvil.AnvilIoPool}, decodes every chunk
+     * in the file, and samples the biome at chunk-local {@code (8, y, 8)}.
+     * Canonicalises to the same uppercase, {@code minecraft:}-stripped form
+     * {@code MemoryShape.addBiomeLocation} stores under. S-005: no tick-thread
+     * chunk I/O.
+     */
+    @Override
+    public java.util.Map<Long, String> readBiomesInRegionFile(
+            int rcx, int rcz, int y) {
+        ServerLevel level = world;
+        if (level == null) return java.util.Collections.emptyMap();
+        MinecraftServer server = level.getServer();
+        if (server == null) return java.util.Collections.emptyMap();
+        final java.nio.file.Path worldFolder;
+        try {
+            worldFolder = server.getWorldPath(LevelResource.ROOT);
+        } catch (Throwable t) {
+            return java.util.Collections.emptyMap();
+        }
+        final String dim = dimensionRegionSubpath(level);
+        try {
+            java.nio.file.Path regionFile =
+                io.github.dailystruggle.rtp.anvil.AnvilPrefilter
+                    .regionFileFor(worldFolder, dim, rcx << 5, rcz << 5);
+            if (regionFile == null) return java.util.Collections.emptyMap();
+            byte[] regionBytes =
+                io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
+            if (regionBytes == null) return java.util.Collections.emptyMap();
+            java.util.HashMap<Long, String> out = new java.util.HashMap<>(1024);
+            for (int rx = 0; rx < 32; rx++) {
+                for (int rz = 0; rz < 32; rz++) {
+                    try {
+                        io.github.dailystruggle.rtp.anvil.AnvilChunkView view =
+                            io.github.dailystruggle.rtp.anvil.AnvilReader.readChunkView(
+                                regionBytes, rx, rz);
+                        if (view == null) continue;
+                        String raw = view.getBiomeAt(8, y, 8);
+                        if (raw == null) continue;
+                        String canonical = canonicaliseBiome(raw);
+                        if (canonical == null || canonical.isEmpty()) continue;
+                        int cx = (rcx << 5) | rx;
+                        int cz = (rcz << 5) | rz;
+                        long key = ((long) cx << 32) | (cz & 0xFFFF_FFFFL);
+                        out.put(key, canonical);
+                    } catch (Throwable ignored) {
+                        // chunk not present / unreadable; skip silently.
+                    }
+                }
+            }
+            return out;
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.FINE,
+                "[RTP] FabricRTPWorld.readBiomesInRegionFile failed for world=" + name
+                    + " region=(" + rcx + "," + rcz + "): "
+                    + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return java.util.Collections.emptyMap();
+        }
+    }
+
+    private static String canonicaliseBiome(String name) {
+        if (name == null) return null;
+        String up = name.toUpperCase(java.util.Locale.ROOT);
+        if (up.startsWith("MINECRAFT:")) return up.substring("MINECRAFT:".length());
+        return up;
+    }
+
+    /**
      * Applicability gate for the column probe — parity with
      * {@code BukkitRTPWorld#shouldPrefilter}. Returns {@code true} only when
      * the chunk is not currently loaded and the

@@ -1,8 +1,10 @@
 # RTP — Random Teleport
 
-**Current Version:** `3.0.0-beta.1` — ⚠️ **beta**. Supported on Spigot / Paper / Folia. Fabric ships in-tree but is **not yet functional** — see [Beta Scope, Known Issues & Roadmap in CHANGELOG.md](CHANGELOG.md#beta-scope).
+The Folia-native, region-aware random teleport plugin for production Minecraft servers. Pre-generated, pre-validated locations resolve in 0-2 ticks with no main-thread chunk I/O and no region thrashing under load.
 
-A high-performance random teleportation plugin for Bukkit-derived Minecraft servers (Spigot, Paper, Folia).
+**Supported:** Spigot, Paper, Folia 1.20+ (stable). Fabric 1.21+ (in development).
+
+🔗 **[Get RTP Pro on BuiltByBit](https://builtbybit.com/resources/rtp-pro.105418/)** — supports continued development and unlocks the Pro feature set.
 
 [![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
 [![Release](https://img.shields.io/github/v/release/DailyStruggle/RTP)](https://github.com/DailyStruggle/RTP/releases)
@@ -17,14 +19,17 @@ A high-performance random teleportation plugin for Bukkit-derived Minecraft serv
 
 ## Why RTP?
 
-Most random teleport plugins work by repeatedly rolling random coordinates until they find a valid spot, a naive approach that can stall the server under load. RTP takes a different approach, rooted in a [mathematical proof](https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/) that maps the 2D teleport region onto a 1D curve, which eliminates rerolling entirely and guarantees uniform spatial distribution:
+Legacy random-teleport plugins reroll random coordinates until one lands somewhere safe. Under load on Folia, each candidate triggers cross-region API calls (chunk lookups, block checks, biome queries), thrashing region threads and stretching teleports to seconds. RTP is designed the opposite way: every served location is pre-computed, pre-validated, and ready to hand out in 0-2 ticks.
 
-- **Bounded algorithms, not rerolling.** Location selection runs in deterministic time (O(log n)) by preemptively subtracting known-invalid sectors from the candidate space. See the [original mathematical writeup](https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/) and [ADR-001](docs/adr/ADR-001-archimedean-spiral-1d-mapping.md) for the full rationale.
-- **Pre-generation queue.** Safe locations are validated asynchronously *before* a player asks for one, so teleports resolve in 0–2 game ticks (≤ 100 ms) on average.
-- **Spatial Memory.** The plugin maps the entire teleport region and remembers invalid areas, such as oceans, solid blocks, and claims. Use `/rtp scan` to proactively map out a region, ensuring deterministic performance and instant skips of unsafe territory.
-- **Multi-region support.** A single world can have any number of independent teleport regions, each with its own shape, distribution, permissions, and queue.
-- **Platform-aware concurrency.** Separate adapters for Spigot, Paper, and Folia ensure correct thread-safety on each server type, including Folia's region-based multithreading.
-- **Extensible API.** Addon developers can register custom shapes, vertical adjustors, and claim-check hooks without modifying the plugin.
+- **Built for Folia, not retrofitted.** Region-aware scheduling end-to-end. No synchronous chunk I/O on the main thread, no foreign-region API calls in the hot path, no `ThreadAccessException` fallbacks dragging down teleport latency. Spigot and Paper adapters share the same bounded pipeline with platform-correct concurrency.
+- **Pre-generation queue.** Safe locations are validated asynchronously *before* a player asks for one. Teleports resolve in 0-2 game ticks (≤ 100 ms) on average regardless of region size, biome complexity, or player count.
+- **Bounded algorithms, not rerolling.** Location selection runs in deterministic time via a 2D-to-1D Archimedean-spiral mapping that preemptively subtracts known-invalid sectors from the candidate space. See the [mathematical writeup](https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/) and [ADR-001](docs/adr/ADR-001-archimedean-spiral-1d-mapping.md).
+- **Spatial memory.** The plugin maps every region it serves and remembers what's invalid (oceans, solid blocks, claims, biome exclusions). `/rtp scan` proactively maps a region for deterministic performance and instant skips of unsafe territory. Memory survives server restarts.
+- **Custom polygons.** Define teleport regions with any closed concave or convex polygon, not just circles and squares. Polygon shapes use the same spatial-memory and pre-validation pipeline as the built-in shapes.
+- **Void-world and SkyBlock support.** The `vert:fixed` adjustor places players at a configured Y for void worlds, SkyBlock servers, and any region where the platform creates the foothold rather than the terrain.
+- **Multi-region per world.** A single world can host any number of independent teleport regions, each with its own shape, distribution, permissions, queue, and economy cost.
+- **Production diagnostics.** `MemoryTracker` accounts for chunk tickets and pipeline allocations on every exit path; spark-compatible profiling surface; per-region MSPT and queue telemetry for tuning under live load.
+- **Extensible API.** Addon developers register custom shapes, vertical adjustors, and claim-check hooks without modifying the plugin.
 
 ---
 
@@ -42,29 +47,24 @@ Most random teleport plugins work by repeatedly rolling random coordinates until
 
 ---
 
-## ⚠️ Pregenerate Your World First — and Pick a Capable Server
+## Pregenerate First
 
-RTP loads chunks asynchronously on demand (S-005 — never sync chunk I/O on the main thread). On a freshly-explored world, the first teleports and the first `/rtp scan` are bound by **the host server's chunk-generation throughput**, not by RTP. On suboptimal server software — most notably stock **Fabric / vanilla** chunk systems on 1.20.1 — generation runs largely on the tick thread and can take several seconds per chunk, which will stall the queue (and even mass-pregeneration tools such as [Chunky](https://modrinth.com/plugin/chunky) can stall the server on the same hardware).
-
-**Strongly recommended:**
-
-1. **Use a server software with a parallel chunk system for production traffic.** **Paper** and **Folia** scale well; vanilla **Fabric** is supported but is single-tick-thread bound for FULL-status generation and will struggle on cold worlds regardless of how RTP is tuned.
-2. **Pregenerate every world you'll add to RTP** (e.g. with Chunky or WorldBorder) sized to match each region's configured radius **before** putting RTP into production traffic. On Fabric specifically, expect pregeneration itself to be slow and to require a maintenance window — not something to do on a live server. See [QUICK_START Step 0](docs/admin/QUICK_START.md#step-0--prerequisites--pregenerate-the-world) for sizing guidance.
-
-If you're on Fabric and the world is not pregenerated, RTP will keep working, but `/rtp` attempt rates and queue fill rates will be capped by the server's generation throughput, not by RTP's pipeline.
+For best results, pregenerate each RTP world (Chunky / WorldBorder) sized to your region radius before going live. RTP's pipeline is bounded by your server's chunk-generation throughput on first touch; pregeneration removes that bottleneck. See [QUICK_START Step 0](docs/admin/QUICK_START.md#step-0--prerequisites--pregenerate-the-world).
 
 ---
 
 ## Features
 
-- **Shapes:** Circle, square, rectangle, each supporting flat, normal, and exponential distributions.
+- **Shapes:** Circle, square, rectangle, and admin-authored **custom polygons** (convex or concave), each supporting flat, normal, and exponential distributions.
 - **Distributions:** Tune where players land, such as uniform spread, center-weighted, or ring-shaped.
 - **Biome filters:** Exclude specific biomes (e.g., ocean, nether_wastes) per region.
+- **Void-world / SkyBlock support:** `vert:fixed` adjustor places players at a configured Y for void worlds, SkyBlock servers, and any region where the platform creates the foothold instead of the terrain.
 - **Claim integration:** Works with GriefPrevention, WorldGuard, Towny, and any addon implementing the validation hook.
 - **Economy support:** Optional Vault integration to charge players per teleport.
 - **Per-region permissions:** Fine-grained permission nodes per region and per world.
 - **Runtime config reload:** Adjust region settings by command without restarting the server.
 - **Persistent state:** Spatial memory and region shape data survive server restarts, avoiding cold-start rebuild penalties.
+- **Built-in diagnostics:** `MemoryTracker` accounts for chunk tickets and pipeline allocations on every exit path; spark-compatible profiling surface for production tuning.
 
 ---
 
@@ -120,12 +120,6 @@ Custom shapes can be registered at runtime via the `rtp-api`. See the `addons/` 
 ### Full Reference Index
 
 See [docs/MAP.md](docs/MAP.md) for a one-line catalog of every document, or [docs/dev/INDEX.md](docs/dev/INDEX.md) for a task-to-file router. Root-level: [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), [SECURITY.md](SECURITY.md).
-
----
-
-## A Note On AI Assistance
-
-I am a solo engineer, and I use AI coding assistants (LLM-based pair-programming tools) for scaffolding, refactoring, test generation, and documentation drafting. Every line that ships is reviewed, tested, and signed off by me — architecture, safety invariants (thread model, chunk-ticket lifecycle, claim checks), and release decisions are mine alone. No AI output is published without human verification against the requirements in [docs/dev/REQUIREMENTS.md](docs/dev/REQUIREMENTS.md) and the test suite. If you prefer plugins written without AI tooling in the loop at all, RTP is not that plugin, and I would rather you know up front.
 
 ---
 

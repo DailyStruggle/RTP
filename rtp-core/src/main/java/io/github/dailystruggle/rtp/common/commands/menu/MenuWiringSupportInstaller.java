@@ -263,7 +263,19 @@ final class MenuWiringSupportInstaller {
             public MenuModel buildVisualizations(UUID viewer) {
                 // PR2b: curated admin Visualizations submenu. rtp.menu.admin is
                 // enforced by MenuRedeemSubcommand.dispatchOpenVisualizations.
+                // Top-level page is the chart-kind picker; per-kind region
+                // pickers land here via buildVisualizationRegions below.
                 return new VisualizationsSubmenuBuilder().build(viewer);
+            }
+
+            @Override
+            public MenuModel buildVisualizationRegions(
+                    UUID viewer,
+                    io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind kind) {
+                // Kind-scoped region picker reached from the chart-kind
+                // picker's row clicks via dispatchOpenVisualizationRegions.
+                // rtp.menu.admin is enforced upstream.
+                return new VisualizationsSubmenuBuilder().buildRegionList(viewer, kind);
             }
         };
     }

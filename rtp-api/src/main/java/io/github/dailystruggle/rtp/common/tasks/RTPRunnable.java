@@ -44,17 +44,73 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
    *
    * <p>Prefer this method over calling {@link #run()} directly when submitting to the
    * scheduler so that performance accounting and lifecycle cleanup run automatically.
+   *
+   * <p><b>Spark profiler tagging.</b> When {@link #sparkFrameName()} returns a non-{@code null}
+   * tag from the allow-list, execution is routed through a fixed bridge method whose Java name
+   * matches the tag (e.g. {@code rtp_pipeline_attempt}). Spark's async sampler then attributes
+   * samples taken inside this task to that frame, making profiler reports self-describing
+   * without any soft-dependency on Spark itself. Adds one (cheap) stack frame per task run.
+   * Default ({@code null}) skips the bridge entirely.
    */
   public void runWithTracking() {
     long start = System.nanoTime();
     try {
-      this.run();
+      String tag = sparkFrameName();
+      if (tag == null) {
+        this.run();
+      } else {
+        runTagged(tag);
+      }
     } finally {
       io.github.dailystruggle.rtp.common.tools.PerformanceTracker.totalNanosecondsConsumed.add(
               System.nanoTime() - start);
       if (trackingId != null) updateHook.accept(trackingId);
     }
   }
+
+  /**
+   * Returns a Spark-profiler frame tag for this task, or {@code null} to opt out.
+   *
+   * <p>The returned string must be one of the fixed allow-list entries dispatched in
+   * {@link #runTagged(String)}. Unknown tags fall through to a generic
+   * {@code rtp_unknown_task} bridge. Subclasses override this with a one-line constant.
+   *
+   * @return Spark frame tag (e.g. {@code "rtp_pipeline_attempt"}), or {@code null} for no tag
+   */
+  protected String sparkFrameName() {
+    return null;
+  }
+
+  /**
+   * Dispatches {@link #run()} through a fixed, pre-named bridge method whose Java name
+   * matches the {@code tag} so it appears verbatim in Spark async-sampler stack frames.
+   *
+   * <p>Spark cannot see dynamic strings, only method names on the stack; this is why the
+   * allow-list of bridges is hard-coded rather than synthesized.
+   *
+   * @param tag one of the documented allow-list tags (see {@link #sparkFrameName()})
+   */
+  private void runTagged(String tag) {
+    switch (tag) {
+      case "rtp_pipeline_attempt":   rtp_pipeline_attempt();   break;
+      case "rtp_cache_generator":    rtp_cache_generator();    break;
+      case "rtp_scan_crawler":       rtp_scan_crawler();       break;
+      case "rtp_async_task_drain":   rtp_async_task_drain();   break;
+      case "rtp_scan_drain":         rtp_scan_drain();         break;
+      case "rtp_force_queue":        rtp_force_queue();        break;
+      default:                       rtp_unknown_task();       break;
+    }
+  }
+
+  // --- Spark-tagged bridge methods. Names are the contract; do not rename without
+  // --- updating LESSONS_LEARNED.md and any saved Spark report URLs that reference them.
+  private void rtp_pipeline_attempt()   { this.run(); }
+  private void rtp_cache_generator()    { this.run(); }
+  private void rtp_scan_crawler()       { this.run(); }
+  private void rtp_async_task_drain()   { this.run(); }
+  private void rtp_scan_drain()         { this.run(); }
+  private void rtp_force_queue()        { this.run(); }
+  private void rtp_unknown_task()       { this.run(); }
 
   protected AtomicBoolean cancelled = new AtomicBoolean(false);
   protected AtomicBoolean isRunning = new AtomicBoolean(false);

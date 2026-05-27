@@ -284,6 +284,21 @@ public class RTP {
       1200L,
       1200L));
 
+    // 1 Hz MSPT + heap ring sampler. Feeds the METRIC_SPARKLINE chart kind
+    // (/rtp visualization sparkline) with ~2 minutes of rolling history at
+    // 128 slots. Uses metrics.snapshot() which is platform-aware and
+    // already wired with the active MetricsBinding by the platform adapter.
+    trackedTasks.add(scheduler.runTaskTimerAsynchronously(
+            () -> {
+                try {
+                    metrics.snapshotRing().recordFromSnapshot(metrics.snapshot());
+                } catch (Throwable ignored) {
+                    // Sampler shall never poison the scheduler thread.
+                }
+            },
+            20L,
+            20L));
+
     io.github.dailystruggle.rtp.common.tools.PerformanceTracker.start(scheduler);
     trackedTasks.add(scheduler.runTaskTimerAsynchronously(
         () -> {

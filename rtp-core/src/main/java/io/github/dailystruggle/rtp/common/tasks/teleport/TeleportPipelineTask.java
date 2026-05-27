@@ -116,6 +116,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
     this.currentPhase = Phase.LOAD;
   }
 
+  /** Spark-profiler frame tag (diagram 01 / 08). See {@link RTPRunnable#sparkFrameName()}. */
+  @Override
+  protected String sparkFrameName() { return "rtp_pipeline_attempt"; }
+
   public Phase getPhase() {
     return this.currentPhase;
   }

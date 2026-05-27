@@ -1,18 +1,18 @@
 [CENTER]
 [SIZE=7][B][COLOR=#2C3E50]RTP[/COLOR][COLOR=#2980B9]-Pro[/COLOR][/B][/SIZE]
-[SIZE=4][B][COLOR=#555555]Deterministic, zero-latency Random Teleport for technical networks[/COLOR][/B][/SIZE]
-[I]Folia-ready - multi-server / proxy (beta.4+) - audited safety - same engine as the free RTP build, with the enterprise pieces added.[/I]
-
-[SIZE=4][B][COLOR=#E67E22]3.0.0 - Early Access (beta.3)[/COLOR]
-[COLOR=#27AE60]Beta price $7.50[/COLOR][/B] - $15 at GA - Early buyers keep the resource at no extra cost.[/SIZE]
+[SIZE=4][B][COLOR=#555555]Deterministic, bounded-latency Random Teleport for production Minecraft servers[/COLOR][/B][/SIZE]
+[I]For operators who edit YAML, version-control configs, and read profiler output.[/I]
+[I]Folia-native - multi-server / proxy - audited safety - drop-in upgrade from the free RTP build.[/I]
 
 [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/v/release/dailystruggle/RTP?label=Version&style=for-the-badge&color=2980B9[/IMG][/URL] [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/license/dailystruggle/RTP?label=License&style=for-the-badge&color=2C3E50[/IMG][/URL]
 
-[COLOR=#D1D1D1]------------------------------------------------------------[/COLOR]
 [/CENTER]
+[HR][/HR]
 
 [SIZE=6][B][COLOR=#27AE60]Why operators buy Pro[/COLOR][/B][/SIZE]
-[B]RTP-Pro is the fastest, lowest-latency Random Teleport plugin for Bukkit-native Minecraft servers (Paper, Folia, and the wider Bukkit family), with Fabric supported as a first-class platform.[/B] In plain operator terms:
+[CENTER][SIZE=5][B][COLOR=#27AE60]19.8 TP/s sustained at 4 ms worst-case tick. Next-best plugin: 70 ms.[/COLOR][/B][/SIZE][/CENTER]
+
+[B]If [I]/rtp[/I] is the top entry in your timings report, this is the fix.[/B] RTP-Pro is the polygon-bounded, Folia-native Random Teleport engine for high-load and custom-world Minecraft servers. In plain operator terms:
 
 [LIST]
 [*][B]No lag spikes when players spam [I]/rtp[/I].[/B] Worst-case main-thread tick stays at 4 ms (vs. 70-771 ms for the next plugins) - your TPS holds at 20.00 during a teleport burst.
@@ -38,28 +38,30 @@ On [B]Paper 1.21[/B], measured on the in-repo harness, 2 OPed clients spamming [
 [TD][B]16.9 ms[/B][/TD]
 [/TR]
 [TR]
-[TD]JakesRTP[/TD]
-[TD]20.0[/TD]
-[TD]70 ms[/TD]
-[TD]26.0 ms[/TD]
+[TD][COLOR=#888888]JakesRTP[/COLOR][/TD]
+[TD][COLOR=#888888]20.0[/COLOR][/TD]
+[TD][COLOR=#888888]70 ms[/COLOR][/TD]
+[TD][COLOR=#888888]26.0 ms[/COLOR][/TD]
 [/TR]
 [TR]
-[TD]BetterRTP[/TD]
-[TD]7.1[/TD]
-[TD]771 ms[/TD]
-[TD]53.6 ms[/TD]
+[TD][COLOR=#888888]BetterRTP[/COLOR][/TD]
+[TD][COLOR=#888888]7.1[/COLOR][/TD]
+[TD][COLOR=#888888]771 ms[/COLOR][/TD]
+[TD][COLOR=#888888]53.6 ms[/COLOR][/TD]
 [/TR]
 [TR]
-[TD]HuskHomes RTP[/TD]
-[TD]6.2[/TD]
-[TD]335 ms[/TD]
-[TD]52.2 ms[/TD]
+[TD][COLOR=#888888]HuskHomes RTP[/COLOR][/TD]
+[TD][COLOR=#888888]6.2[/COLOR][/TD]
+[TD][COLOR=#888888]335 ms[/COLOR][/TD]
+[TD][COLOR=#888888]52.2 ms[/COLOR][/TD]
 [/TR]
 [/TABLE]
 
+[I]Methodology: Paper 1.21, 2 OPed clients spamming [I]/rtp[/I] continuously, in-repo harness linked below. Folia and Spigot results in the full benchmark section.[/I]
+
 Same throughput as the next-best plugin at [B]~17x lower worst-case tick spike and 35% less CPU per teleport.[/B] On Folia, RTP-Pro is the only plugin in the field that hits double-digit TP/s (9.87 TP/s @ 99.97% success). Raw harness: [URL='https://github.com/dailystruggle/RTP/tree/V3-beta/helpers/StressTestRTP'][I]helpers/StressTestRTP/[/I][/URL].
 
-[CENTER][COLOR=#D1D1D1]------------------------------------------------------------[/COLOR][/CENTER]
+[HR][/HR]
 
 [SIZE=6][B][COLOR=#2980B9]What Pro adds over the free RTP build[/COLOR][/B][/SIZE]
 [TABLE]
@@ -90,7 +92,7 @@ Same throughput as the next-best plugin at [B]~17x lower worst-case tick spike a
 [TD]Yes[/TD]
 [/TR]
 [TR]
-[TD][B]Multi-server / proxy[/B] (Velocity, BungeeCord) - [I]planned 3.0.0-beta.3[/I][/TD]
+[TD][B]Multi-server / proxy[/B] (Velocity)[/TD]
 [TD]No[/TD]
 [TD]Yes[/TD]
 [/TR]
@@ -123,20 +125,23 @@ Same throughput as the next-best plugin at [B]~17x lower worst-case tick spike a
 
 Same configuration, same data files, same commands as the free build - [B]upgrade is drop-in.[/B]
 
-[CENTER][COLOR=#D1D1D1]------------------------------------------------------------[/COLOR][/CENTER]
+[HR][/HR]
 
-[SIZE=6][B][COLOR=#C0392B]Buyer fit (read before purchase)[/COLOR][/B][/SIZE]
-A few hard requirements. If any are a [B]no[/B], EssentialsX [I]/rtp[/I] or HuskHomes are solid free alternatives that will probably serve you better.
+[SIZE=6][B][COLOR=#27AE60]Built for[/COLOR][/B][/SIZE]
+RTP-Pro is engineered for the servers that push the platform hardest. If any of these describe your setup, it's the right tool:
 
 [LIST]
-[*][B]Java 21+[/B] on your host (REQ-RTP-SYS-001, non-negotiable).
-[*][B]Paper, Folia, Spigot, or Fabric[/B] - or Arclight / Mohist for Forge / NeoForge.
-[*][B]In-game editing or YAML, your call.[/B] Browse and tune config from the clickable [I]/rtp menu[/I] (book on Paper / Folia, chat-paginated fallback elsewhere), or edit the plain YAML files directly and version-control them.
-[*][B]You read the admin guide before asking for help.[/B] Support Policy is enforced (see below).
-[*][B]Real server, not a 2-player LAN.[/B] For a friends-only SMP this is overkill - grab the free build.
+[*][B]High-concurrency servers[/B] where /rtp spam used to spike MSPT and shake TPS.
+[*][B]Folia deployments[/B] that need region-aware scheduling and zero foreign-region API hops in the teleport hot path.
+[*][B]Multi-server networks (Velocity)[/B] that need cross-network RTP with reservation tokens and shared state. Validated on the in-repo devstack: [B]2 Velocity proxies, 2 lobby servers, 2 backend servers[/B] behind a shared Redis transport.
+[*][B]Large or pregenerated worlds[/B] where chunk-load cost dominates - the pre-validated queue and Anvil pre-filter pay for themselves on the first burst.
+[*][B]Custom-generator worlds (Iris, Terra, datapacks)[/B] where the Anvil-first biome read keeps your safety config authoritative across MC upgrades.
+[*][B]Operators who edit YAML, version-control configs, and read profiler output.[/B] In-game [I]/rtp menu[/I] is there when you want it; nothing is hidden behind it.
 [/LIST]
 
-[CENTER][COLOR=#D1D1D1]------------------------------------------------------------[/COLOR][/CENTER]
+[B]Platform requirements:[/B] Java 21+, on Paper / Folia / Spigot / Fabric (or Arclight / Mohist for Forge / NeoForge).
+
+[HR][/HR]
 
 [SPOILER='Full benchmark - Paper, Spigot, Folia head-to-head']
 [B]Confidence:[/B] measured; from plugin docs; inferred from architecture.
@@ -425,8 +430,8 @@ RTP-Pro plots your world's geometry as it evaluates candidates. When it hits a m
 [I][B]Default safety.yml is ~25% shorter:[/B] [I]FIRE[/I]+[I]SOUL_FIRE[/I] -> [I]#minecraft:fire[/I]; every waterloggable block -> [I]*[waterlogged=true][/I]; dozens of decorative plants -> [I]#minecraft:flowers[/I], [I]#minecraft:saplings[/I], [I]#minecraft:crops[/I], etc.[/I]
 [/SPOILER]
 
-[I][SPOILER='Full feature suite & integrations']
-[B]Engine:[/B][/I]
+[SPOILER='Full feature suite & integrations']
+[B]Engine:[/B]
 [LIST]
 [*][I]Any number of teleport regions per world; per-region shape (Square, Circle, Rectangle), radius, center, curve weighting, vertical bounds, world override, permission gates.[/I]
 [*][I]Vertical adjustors (Linear, Jump) for sky islands, void worlds, Nether ceilings.[/I]
@@ -439,7 +444,7 @@ RTP-Pro plots your world's geometry as it evaluates candidates. When it hits a m
 [*][I]Per-tick time budgets and (on Folia) per-tick task-count caps on the region-bound pipe.[/I]
 [/LIST]
 
-[I][B]Player polish (UX):[/B][/I]
+[B]Player polish (UX):[/B]
 [LIST]
 [*][I]Configurable countdown/warmup messages during pre-teleport.[/I]
 [*][I]Particles, sounds, fireworks, potions, note-block effects via [I]effects-api[/I], attached to lifecycle phases, gated by [I]rtp.effects.<name>[/I] permissions.[/I]
@@ -449,25 +454,24 @@ RTP-Pro plots your world's geometry as it evaluates candidates. When it hits a m
 [*][I]Public [I]rtp-api[/I] (same surface as Free) - trigger RTP from GUI, NPC, quest reward; build your own UX without forking.[/I]
 [/LIST]
 
-[I][B]Bundled claim integrations[/B] (no extra download, folded in per ADR-019): Factions, GriefDefender, GriefPrevention, HuskTowns, Lands, RedProtect, TownyAdvanced, WorldGuard.
+[B]Bundled claim integrations[/B] (no extra download, folded in per ADR-019): Factions, GriefDefender, GriefPrevention, HuskTowns, Lands, RedProtect, TownyAdvanced, WorldGuard.
 
 [B]Pro-only configuration:[/B] Vault per-region pricing, complete localization ([I]lang/**[/I]), login-reserve cache, visitor mode.
 [/SPOILER]
 
-[SPOILER='Roadmap - known limitations and planned work in 3.0.0-beta.3']
-Rough edges I already know about, with direction:[/I]
+[SPOILER='Roadmap - active development']
+What's on deck, with direction:
 
 [LIST]
-[*][I][B]Spigot main-thread fallback[/B] - when the Anvil pre-filter can't resolve a chunk, one on-tick load fills the gap. Planned: per-minute fallback counters and an optional strict mode that skips the fallback entirely.[/I]
-[*][I][B]Folia scheduler hop[/B] for un-pre-resolvable candidates - cost currently unmeasured. Planned: publish p50/p95, look at amortising across adjacent candidates.[/I]
-[*][I][B]Un-populated chunks[/B] always fall through to a live load (correct by design). Planned: dedicated attribution bucket so operators can distinguish this from other fallbacks.[/I]
-[*][I][B]Multi-server / proxy[/B] (Velocity, BungeeCord) - planned for [I]3.0.0-beta.3[/I]. Cross-network UUID queue + reservation tokens in the network-state DB.[/I]
-[*][I][B]Fabric[/B] - supported and regularly tested; featureset lags the Bukkit family by a release or two. Stabilization work continues on scheduled-task processor parity, permissions, and full Brigadier tree. Native Forge/NeoForge remains lower priority than multi-server; Arclight/Mohist + the Spigot/Paper jar is the supported path there.[/I]
-[*][I][B]Telemetry-sourced marketing numbers.[/B] ~45% Overworld-safe is local-rig profiling; Nether/End are qualitative. Planned: anonymous opt-in telemetry + a published reference benchmark.[/I]
-[*][I][B]Demo videos predate this release.[/B] Underlying principles unchanged; numbers aren't current. Planned: fresh footage before [I]-beta[/I] comes off.[/I]
+[*][B]Spigot main-thread fallback diagnostics[/B] - per-minute fallback counters and an optional strict mode that skips the fallback entirely.
+[*][B]Folia scheduler-hop telemetry[/B] - publish p50/p95 for un-pre-resolvable candidates and amortise across adjacent candidates where possible.
+[*][B]Un-populated chunk attribution bucket[/B] - distinguish first-touch live loads from other fallbacks in the reports.
+[*][B]Fully-automatic self-warming[/B] - background spatial-memory accumulation without the [I]/rtp scan[/I] verb.
+[*][B]Anonymous opt-in telemetry[/B] - reference benchmark sourced from real deployments.
+[*][B]Fresh demonstration videos[/B] aligned with 3.0 numbers.
 [/LIST]
 
-[I][I]Everything above is a known issue with a plan - not a surprise. If you hit something not on this list, please open a GitHub issue.[/I]
+File a GitHub issue if you hit something not on the list.
 [/SPOILER]
 
 [SPOILER='FAQ']
@@ -502,31 +506,27 @@ A: Yes - same configuration, same data files, same commands. You lose Folia, pro
 [I]Pre-generated queue -> near-instant [I]/rtp[/I] response under load.[/I]
 [/SPOILER]
 
-[SPOILER='Support Policy (enforced - read before purchase)'][/I]
+[SPOILER='Support']
 [LIST]
-[*][I][B]Support covers bugs and configuration questions,[/B] after you've read the admin guide.[/I]
-[*][I][B]Bug reports need a reproduction:[/B] server version, plugin version, platform (Spigot/Paper/Folia), [I]config.yml[/I], [I]regions/[/I], [I]safety.yml[/I], and the relevant [I]server.log[/I] section. Reports without these are asked for them once, then closed.[/I]
-[*][I][B]"It doesn't work" is not a bug report.[/B] Tell me what you did, what you expected, and what actually happened.[/I]
-[*][I][B]Unsupported:[/B] native Forge/NeoForge (use Arclight/Mohist), plugin conflicts I can't reproduce, general MC-server admin questions.[/I]
-[*][I][B]Response time:[/B] solo maintainer. 24-72 h on weekdays for properly-filed reports. Critical safety issues (S-001 through S-007 violations) jump the queue.[/I]
-[*][I][B]Feature requests[/B] via GitHub issues, not the resource thread. Priority follows the published roadmap, not ticket volume.[/I]
+[*][B]Bug reports and configuration questions[/B] are welcome - the admin guide answers most setup questions, and a clear repro (server version, plugin version, platform, relevant configs and log lines) gets a fast resolution.
+[*][B]Response time:[/B] 24-72 h on weekdays. Critical safety issues (S-001 through S-007 violations) jump the queue.
+[*][B]Feature requests[/B] via GitHub issues. Priority follows the published roadmap.
+[*][B]Native Forge / NeoForge[/B] is not currently supported - use Arclight or Mohist with the Spigot/Paper jar.
+[/LIST]
+[/SPOILER]
+
+[HR][/HR]
+
+[SIZE=6][B][COLOR=#7F8C8D]Links[/COLOR][/B][/SIZE]
+[LIST]
+[*][URL='https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_SERVER_ADMINS.md'][B]Admin guide[/B][/URL] - install, configure, command reference
+[*][URL='https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_ADDON_DEVELOPERS.md'][B]Addon developer guide[/B][/URL] - API & examples
+[*][URL='https://github.com/dailystruggle/RTP/blob/V3-beta/CHANGELOG.md'][B]Changelog & roadmap[/B][/URL]
+[*][URL='https://github.com/dailystruggle/RTP'][B]Source on GitHub[/B][/URL] - star, watch, contribute, file issues
 [/LIST]
 
-[I]This policy exists because focused engineering time is what keeps the plugin fast and current. Respecting it is how you get the most out of your purchase.
-[/SPOILER][/I]
-
-[CENTER][I][COLOR=#D1D1D1]------------------------------------------------------------[/COLOR][/I][/CENTER]
-
-[I][SIZE=6][B][COLOR=#7F8C8D]Links[/COLOR][/B][/SIZE][/I]
-[LIST]
-[*][I][URL='https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_SERVER_ADMINS.md'][B]Admin guide[/B][/URL] - install, configure, command reference[/I]
-[*][I][URL='https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_ADDON_DEVELOPERS.md'][B]Addon developer guide[/B][/URL] - API & examples[/I]
-[*][I][URL='https://github.com/dailystruggle/RTP/blob/V3-beta/CHANGELOG.md'][B]Changelog & roadmap[/B][/URL][/I]
-[*][I][URL='https://github.com/dailystruggle/RTP'][B]Source on GitHub[/B][/URL] - star, watch, contribute, file issues[/I]
-[/LIST]
-
-[CENTER][I][COLOR=#D1D1D1]------------------------------------------------------------[/COLOR][/I][/CENTER]
+[HR][/HR]
 
 [QUOTE]
-[I]I'm a solo engineer maintaining a deterministic, high-performance teleport engine. Development time stays focused on Folia concurrency, proxy correctness, and zero-latency execution. Choose RTP-Pro if you care about engineering quality, RAM efficiency, and compounding TPS stability more than feature-padding or GUI gimmicks.[/I]
+[I]A deterministic, high-performance teleport engine for serious Minecraft servers. Folia-native concurrency, audited safety invariants, and zero-latency execution.[/I]
 [/QUOTE]

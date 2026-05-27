@@ -68,6 +68,41 @@ public interface MapCanvas {
     void clear();
 
     /**
+     * Writes a single pixel at {@code (x, y)} using a 24-bit RGB colour
+     * (0xRRGGBB; the high byte is ignored). Bindings that can quantise
+     * arbitrary RGB to their host palette (Bukkit-family via
+     * {@code MapPalette.matchColor}) shall override this; the default
+     * implementation falls back to the nearest logical-palette colour by
+     * crude luminance bucketing so that non-Bukkit bindings render
+     * something visible rather than silently dropping the pixel.
+     *
+     * <p>Renderers that need richer-than-32-slot colour (e.g. biome maps
+     * using the server-provided per-biome map colour) shall prefer this
+     * entry point; the binding handles the platform-specific colour-match
+     * detail.
+     *
+     * <p>Coordinates outside {@code [0, width()) x [0, height())} shall
+     * be silently clipped.
+     *
+     * @param x   pixel column
+     * @param y   pixel row
+     * @param rgb 24-bit colour as {@code (r << 16) | (g << 8) | b}
+     */
+    default void setPixelRgb(int x, int y, int rgb) {
+        // Default fallback: pick a logical-palette ramp slot by luminance.
+        // Bukkit-family bindings override this with MapPalette.matchColor
+        // for true ~144-colour rendering; this fallback keeps NoopMapBinding
+        // and any other binding without an RGB matcher honest.
+        int r = (rgb >> 16) & 0xFF;
+        int g = (rgb >> 8)  & 0xFF;
+        int b = rgb         & 0xFF;
+        int luma = (r * 299 + g * 587 + b * 114) / 1000; // 0..255
+        // Map onto PaletteIndex.RAMP_MIN(1) .. RAMP_MAX(27).
+        int slot = 1 + (luma * (27 - 1) / 255);
+        setPixel(x, y, (byte) slot);
+    }
+
+    /**
      * Publishes the current pixel state to the host runtime. After {@code commit()}
      * the canvas may be reused for the next frame. Implementations shall not block
      * the calling thread on chunk I/O (REQ-RTP-S-005, REQ-RTP-MAP-002).

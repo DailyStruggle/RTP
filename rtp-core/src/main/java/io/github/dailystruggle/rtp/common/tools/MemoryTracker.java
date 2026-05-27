@@ -125,6 +125,17 @@ public class MemoryTracker {
   }
 
   public static void runDiagnostics() {
+    // Spark-profiler tagged entry: dispatch through a method whose name matches the
+    // documented allow-list tag so the async sampler attributes diagram-04 work
+    // (the active-GC sweep) to a self-describing frame. See LESSONS_LEARNED.md
+    // "Spark-tagged regions in the live pipeline" and RTPRunnable#sparkFrameName().
+    rtp_active_gc_sweep();
+  }
+
+  // --- Spark-tagged bridge for diagram 04 (active-GC sweep). Renaming this method
+  // --- breaks the documented Spark frame contract; update LESSONS_LEARNED.md if you
+  // --- must rename it.
+  private static void rtp_active_gc_sweep() {
     // Diagram 04: TimerTrigger -> FetchMap. Per-pulse heartbeat at FINE so operators
     // can confirm the active GC sweep is actually firing without enabling INFO spam.
     log(Level.FINE,

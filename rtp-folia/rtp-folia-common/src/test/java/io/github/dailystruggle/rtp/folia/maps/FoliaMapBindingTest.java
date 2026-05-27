@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -47,15 +46,15 @@ class FoliaMapBindingTest {
     }
 
     @Test
-    @DisplayName("bindLive throws a Folia-specific UnsupportedOperationException")
-    void bindLiveIsFoliaSpecific() {
+    @DisplayName("bindLive is inherited from BukkitMapBinding (NPE on null handle, contract delegated)")
+    void bindLiveIsInherited() {
         FoliaMapBinding binding = new FoliaMapBinding();
-        UnsupportedOperationException ex = assertThrows(
-                UnsupportedOperationException.class,
+        // The inherited path rejects null args via Objects.requireNonNull; the
+        // important contract here is that FoliaMapBinding no longer overrides
+        // bindLive to throw UnsupportedOperationException -- live charts now
+        // work on Folia via the supplier-driven LiveChartRenderer.
+        assertThrows(NullPointerException.class,
                 () -> binding.bindLive(null, null, null));
-        assertNotNull(ex.getMessage());
-        assertTrue(ex.getMessage().contains("FoliaMapBinding.bindLive"),
-                "message should name the Folia path so log readers can identify it; got: " + ex.getMessage());
     }
 
     @Test
