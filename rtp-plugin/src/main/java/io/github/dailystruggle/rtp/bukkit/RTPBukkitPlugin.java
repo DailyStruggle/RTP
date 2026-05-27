@@ -233,6 +233,24 @@ public final class RTPBukkitPlugin extends JavaPlugin {
           "[LIFECYCLE] onEnable MapBinding install failed; MapDispatch will fall back to NoopMapBinding",
           t);
     }
+    // Install the Bukkit-family BiomeColorSource so the biomes visualisation
+    // can ask the server for each biome's native cartography colour (rather
+    // than mapping biome-name hashes onto the 27-step heat ramp, which made
+    // nether/end render homogeneously and overworld collide on every other
+    // biome). Reflective so this compiles against older Bukkit APIs that
+    // predate Biome#getMapColor; on those runtimes the resolver falls back
+    // to the categorical palette in BiomeColorSource#fallback.
+    try {
+      io.github.dailystruggle.mapsapi.BiomeColorSource.install(
+          new io.github.dailystruggle.rtp.bukkit.maps.BukkitBiomeColorSource());
+      RTP.log(java.util.logging.Level.FINE,
+          "[LIFECYCLE] onEnable installed BukkitBiomeColorSource");
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[LIFECYCLE] onEnable BiomeColorSource install failed;"
+              + " biomes viz will use the built-in categorical palette",
+          t);
+    }
     // Catch worlds that were already loaded by the time the listener registered
     // (either before RTP enabled, or between region config load and listener
     // registration), so dormant regions for those worlds are activated without

@@ -194,7 +194,7 @@ public final class MapDispatch {
     Objects.requireNonNull(viewer, "viewer");
 
     MapBinding binding = BINDING.get();
-    RTP.log(Level.INFO,
+    RTP.log(Level.FINE,
         "[viz/bad-locations] MapDispatch.paint entry: kind=" + spec.kind()
             + " region=" + spec.regionName()
             + " viewer=" + viewer
@@ -218,11 +218,11 @@ public final class MapDispatch {
 
     ChartSpecResolver.Resolution resolution;
     try {
-      RTP.log(Level.INFO,
+      RTP.log(Level.FINE,
           "[viz/bad-locations] resolver.resolve invoking: resolver="
               + resolver.getClass().getName());
       resolution = resolver.resolve(spec);
-      RTP.log(Level.INFO,
+      RTP.log(Level.FINE,
           "[viz/bad-locations] resolver.resolve OK: renderer="
               + (resolution == null ? "null"
                   : resolution.renderer().getClass().getName())
@@ -255,11 +255,11 @@ public final class MapDispatch {
         MapAllocationRequest.Locking.LOCKED);
     MapHandle handle;
     try {
-      RTP.log(Level.INFO,
+      RTP.log(Level.FINE,
           "[viz/bad-locations] binding.allocate invoking on "
               + binding.getClass().getName());
       handle = binding.allocate(request);
-      RTP.log(Level.INFO,
+      RTP.log(Level.FINE,
           "[viz/bad-locations] binding.allocate OK: handle="
               + (handle == null ? "null" : handle.toString()));
     } catch (RuntimeException e) {
@@ -277,20 +277,66 @@ public final class MapDispatch {
     // the MapView reference forever. Untracked on every exit path below.
     UUID trackingId = MemoryTracker.track(handle, MEMORY_TRACKER_LABEL, MEMORY_TRACKER_TTL_MS);
     try {
-      RTP.log(Level.INFO,
-          "[viz/bad-locations] binding.renderEphemeral invoking for viewer="
-              + viewer);
-      binding.renderEphemeral(handle, resolution.renderer(), resolution.model());
-      RTP.log(Level.INFO,
-          "[viz/bad-locations] binding.renderEphemeral OK for viewer=" + viewer);
+      if (spec.kind() == ChartSpec.Kind.METRIC_SPARKLINE) {
+        // Live-refresh path: the sparkline pulls a fresh model from the
+        // resolver on every CraftMapView tick (~1 Hz while held), so the
+        // viewer sees MSPT + heap evolve in real time. The Supplier
+        // re-invokes resolver.resolve(spec); any UnresolvableChartSpec /
+        // runtime fault inside the supplier is caught by
+        // LiveChartRenderer and logged to stderr without crashing the
+        // tick. Initial Resolution is discarded (its model is a stale
+        // snapshot by the next tick anyway); the supplier is the source
+        // of truth from here on.
+        final ChartSpecResolver resolverRef = resolver;
+        RTP.log(Level.FINE,
+            "[viz/sparkline] binding.bindLive invoking for viewer=" + viewer);
+        binding.bindLive(handle,
+            resolution.renderer(),
+            () -> {
+              try {
+                return resolverRef.resolve(spec).model();
+              } catch (ChartSpecResolver.UnresolvableChartSpecException ex) {
+                return null; // skip this tick
+              }
+            });
+        RTP.log(Level.FINE,
+            "[viz/sparkline] binding.bindLive OK for viewer=" + viewer);
+      } else {
+        RTP.log(Level.FINE,
+            "[viz/bad-locations] binding.renderEphemeral invoking for viewer="
+                + viewer);
+        binding.renderEphemeral(handle, resolution.renderer(), resolution.model());
+        RTP.log(Level.FINE,
+            "[viz/bad-locations] binding.renderEphemeral OK for viewer=" + viewer);
+      }
     } catch (RuntimeException e) {
       RTP.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
-              + " renderEphemeral failed: " + e.getMessage(), e);
+              + " render failed: " + e.getMessage(), e);
       sendMessage(viewer, MessagesKeys.mapUnavailable);
       return false;
     } finally {
       MemoryTracker.untrack(trackingId);
+    }
+
+    // Delivery: a freshly-rendered MapView is invisible to the client unless
+    // a FILLED_MAP item referencing its id reaches the viewer. The binding
+    // owns the platform-specific delivery (Bukkit-family: drop a
+    // FILLED_MAP item entity at the viewer's feet; Folia: same, hopped via
+    // the viewer's EntityScheduler). S-004: delivery faults exit through
+    // the same WARNING + mapUnavailable message path as renderEphemeral.
+    try {
+      RTP.log(Level.FINE,
+          "[viz/bad-locations] binding.deliverTo invoking for viewer=" + viewer);
+      binding.deliverTo(handle, viewer);
+      RTP.log(Level.FINE,
+          "[viz/bad-locations] binding.deliverTo OK for viewer=" + viewer);
+    } catch (RuntimeException e) {
+      RTP.log(Level.WARNING,
+          "ChartSpec " + spec.kind() + " for viewer " + viewer
+              + " deliverTo failed: " + e.getMessage(), e);
+      sendMessage(viewer, MessagesKeys.mapUnavailable);
+      return false;
     }
     return true;
   }

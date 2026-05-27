@@ -350,6 +350,47 @@ public abstract class RTPWorld<T> {
   }
 
   /**
+   * Bulk biome read over a single anvil region file ({@code r.<rcx>.<rcz>.mca}),
+   * used by {@code RegionBiomesResolver} to paint a biome chart without doing
+   * per-pixel chunk loads.
+   *
+   * <p>Returns a map keyed by chunk-pos-packed
+   * ({@code ((long)cx << 32) | (cz & 0xFFFF_FFFFL)}) -> uppercase biome name as
+   * stored by {@code MemoryShape.addBiomeLocation} (vanilla {@code MINECRAFT:}
+   * prefix stripped). Missing / ungenerated chunks within the region file are
+   * simply absent from the map.
+   *
+   * <p>Read at world-Y {@code y}; biomes vary by 3D position in modern MC, so
+   * the caller picks a sampling y (typically a surface anchor such as 64).
+   *
+   * <p><b>Blocking, off-tick-thread only.</b> Implementations perform
+   * synchronous {@code .mca} I/O on the calling thread; callers shall invoke
+   * from an async / background context such as {@code RTP.scheduler}'s async
+   * executor or the {@code MapDispatch.paint} dispatch path. Calling from a
+   * Folia region thread or the Bukkit main tick thread is a defect (S-005).
+   * The caller's resolver is forbidden from blocking on
+   * {@code CompletableFuture#get / #join} by REQ-RTP-MAP-006, but a
+   * direct synchronous read off the tick thread does not violate that rule.
+   *
+   * <p>Default returns an empty map. Adapters with {@code .mca}-backed stores
+   * ({@code BukkitRTPWorld}, {@code FoliaRTPWorld}, {@code FabricRTPWorld})
+   * SHOULD override using {@code AnvilPrefilter.regionFileFor} +
+   * {@code AnvilRegionByteCache.get} + {@code AnvilReader.readChunkView} +
+   * {@code AnvilChunkView.getBiomeAt}.
+   *
+   * <p>S-005: implementations shall NOT perform live chunk I/O; the contract
+   * is on-disk anvil-only.
+   *
+   * @param rcx region-file X coord ({@code cx >> 5})
+   * @param rcz region-file Z coord ({@code cz >> 5})
+   * @param y   world-Y at which to sample the biome
+   * @return chunk-pos-packed -> biome-name map (never null; may be empty)
+   */
+  public Map<Long, String> readBiomesInRegionFile(int rcx, int rcz, int y) {
+    return java.util.Collections.emptyMap();
+  }
+
+  /**
    * Creates a platform at the specified location if necessary to ensure it is safe.
    *
    * @param location the location to create a platform at

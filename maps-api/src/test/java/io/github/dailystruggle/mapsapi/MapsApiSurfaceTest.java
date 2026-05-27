@@ -5,6 +5,7 @@ import io.github.dailystruggle.mapsapi.model.ChartModel;
 import io.github.dailystruggle.mapsapi.model.Heatmap2D;
 import io.github.dailystruggle.mapsapi.model.MermaidChart;
 import io.github.dailystruggle.mapsapi.model.RegionBadLocations;
+import io.github.dailystruggle.mapsapi.model.RegionBiomesRgb;
 import io.github.dailystruggle.mapsapi.model.RegionCoverage;
 import io.github.dailystruggle.mapsapi.model.TimeSeries;
 import org.junit.jupiter.api.DisplayName;
@@ -46,7 +47,9 @@ class MapsApiSurfaceTest {
                 TimeSeries.class.getName(),
                 RegionCoverage.class.getName(),
                 RegionBadLocations.class.getName(),
-                MermaidChart.class.getName());
+                RegionBiomesRgb.class.getName(),
+                MermaidChart.class.getName(),
+                io.github.dailystruggle.mapsapi.model.DualSparkline.class.getName());
         assertEquals(expected, permitted,
                 "ChartModel permits clause shall list exactly the documented record shapes");
     }

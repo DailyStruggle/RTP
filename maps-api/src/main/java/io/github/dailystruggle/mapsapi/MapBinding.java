@@ -3,6 +3,7 @@ package io.github.dailystruggle.mapsapi;
 import io.github.dailystruggle.mapsapi.model.ChartModel;
 import io.github.dailystruggle.mapsapi.render.ChartRenderer;
 
+import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
@@ -68,4 +69,29 @@ public interface MapBinding {
     <M extends ChartModel> Cancellation bindLive(MapHandle handle,
                                                  ChartRenderer<M> renderer,
                                                  Supplier<M> modelSupplier);
+
+    /**
+     * Delivers the rendered map referenced by {@code handle} to {@code viewer}
+     * so the client actually displays it. Minecraft only renders a
+     * {@code MapView}'s pixels to a client that is holding a {@code FILLED_MAP}
+     * item referencing the view's id (or sees one in an item frame); a freshly
+     * allocated and painted {@code MapView} with no item pointing at it is
+     * invisible by design. Implementations shall arrange for that item to
+     * reach the viewer (Bukkit-family: place a {@code FILLED_MAP} into the
+     * player's inventory).
+     *
+     * <p>Default implementation is a no-op so the {@code NoopMapBinding} and
+     * test doubles need no override.
+     *
+     * <p>Threading: implementations are responsible for hopping to the
+     * platform-appropriate thread (Folia: viewer's {@code EntityScheduler};
+     * Paper: main thread) before mutating player inventory.
+     *
+     * <p>S-004: implementations shall not silently swallow delivery failures
+     * (offline viewer, full inventory, etc.); throw {@link RuntimeException}
+     * so {@code MapDispatch.paint} surfaces a user-facing message.
+     */
+    default void deliverTo(MapHandle handle, UUID viewer) {
+        // no-op: NoopMapBinding and test doubles inherit this.
+    }
 }

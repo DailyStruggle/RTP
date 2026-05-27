@@ -59,7 +59,7 @@ final class VisualizationDispatch {
     boolean paintBadLocations(UUID viewer,
                               String regionName,
                               @Nullable Consumer<String> messageMethod) {
-        RTP.log(Level.INFO,
+        RTP.log(Level.FINE,
                 "[viz/bad-locations] dispatch entry: viewer=" + viewer
                         + " region=" + regionName);
         if (viewer == null) {
@@ -94,11 +94,11 @@ final class VisualizationDispatch {
         try {
             // MapDispatch.paint owns the configurable viewer-facing failure
             // surfaces; do not double-message on its false return.
-            RTP.log(Level.INFO,
+            RTP.log(Level.FINE,
                     "[viz/bad-locations] handing off to MapDispatch.paint for "
                             + viewer + " region=" + regionName);
             boolean ok = MapDispatch.paint(spec, viewer);
-            RTP.log(Level.INFO,
+            RTP.log(Level.FINE,
                     "[viz/bad-locations] MapDispatch.paint returned " + ok
                             + " for viewer=" + viewer);
             return ok;
@@ -107,6 +107,119 @@ final class VisualizationDispatch {
                     "visualization bad-locations MapDispatch.paint threw for " + viewer
                             + ": " + e.getMessage(), e);
             reject(viewer, "visualization bad-locations rejected: dispatch failure",
+                    messageMethod);
+            return false;
+        }
+    }
+
+    /**
+     * Dispatch for {@code /rtp visualization biomes region=&lt;name&gt;}:
+     * paints the per-region {@link ChartSpec.Kind#REGION_BIOMES} chart
+     * through {@link MapDispatch}. Mirrors {@link #paintBadLocations} in
+     * every respect except the chart kind; the gate, validation, and
+     * failure-message surfaces are identical.
+     */
+    boolean paintBiomes(UUID viewer,
+                        String regionName,
+                        @Nullable Consumer<String> messageMethod) {
+        RTP.log(Level.FINE,
+                "[viz/biomes] dispatch entry: viewer=" + viewer
+                        + " region=" + regionName);
+        if (viewer == null) {
+            RTP.log(Level.WARNING,
+                    "visualization biomes rejected: null viewer");
+            return false;
+        }
+        if (regionName == null || regionName.isEmpty()) {
+            reject(viewer, "visualization biomes rejected: empty regionName",
+                    messageMethod);
+            return false;
+        }
+        if (!permissionGates.hasAdminMenu(viewer)) {
+            RTP.log(Level.WARNING,
+                    "visualization biomes denied: " + viewer
+                            + " lacks " + MenuPermissionGates.ADMIN_MENU_PERMISSION);
+            reject(viewer, "visualization biomes rejected: permission denied",
+                    messageMethod);
+            return false;
+        }
+        ChartSpec spec;
+        try {
+            spec = ChartSpec.of(ChartSpec.Kind.REGION_BIOMES, regionName);
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "visualization biomes rejected: invalid ChartSpec (region='"
+                            + regionName + "') for " + viewer + ": " + e.getMessage(), e);
+            reject(viewer, "visualization biomes rejected: invalid ChartSpec",
+                    messageMethod);
+            return false;
+        }
+        try {
+            RTP.log(Level.FINE,
+                    "[viz/biomes] handing off to MapDispatch.paint for "
+                            + viewer + " region=" + regionName);
+            boolean ok = MapDispatch.paint(spec, viewer);
+            RTP.log(Level.FINE,
+                    "[viz/biomes] MapDispatch.paint returned " + ok
+                            + " for viewer=" + viewer);
+            return ok;
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "visualization biomes MapDispatch.paint threw for " + viewer
+                            + ": " + e.getMessage(), e);
+            reject(viewer, "visualization biomes rejected: dispatch failure",
+                    messageMethod);
+            return false;
+        }
+    }
+
+    /**
+     * Dispatch for {@code /rtp visualization sparkline}: paints the
+     * global {@link ChartSpec.Kind#METRIC_SPARKLINE} chart (MSPT + heap)
+     * through {@link MapDispatch}. No region; the resolver ignores
+     * {@code ChartSpec#regionName}.
+     */
+    boolean paintSparkline(UUID viewer, @Nullable Consumer<String> messageMethod) {
+        RTP.log(Level.FINE,
+                "[viz/sparkline] dispatch entry: viewer=" + viewer);
+        if (viewer == null) {
+            RTP.log(Level.WARNING, "visualization sparkline rejected: null viewer");
+            return false;
+        }
+        if (!permissionGates.hasAdminMenu(viewer)) {
+            RTP.log(Level.WARNING,
+                    "visualization sparkline denied: " + viewer
+                            + " lacks " + MenuPermissionGates.ADMIN_MENU_PERMISSION);
+            reject(viewer, "visualization sparkline rejected: permission denied",
+                    messageMethod);
+            return false;
+        }
+        ChartSpec spec;
+        try {
+            // regionName is required non-null by ChartSpec; pass empty
+            // string since the resolver ignores it.
+            spec = ChartSpec.of(ChartSpec.Kind.METRIC_SPARKLINE, "");
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "visualization sparkline rejected: invalid ChartSpec for "
+                            + viewer + ": " + e.getMessage(), e);
+            reject(viewer, "visualization sparkline rejected: invalid ChartSpec",
+                    messageMethod);
+            return false;
+        }
+        try {
+            RTP.log(Level.FINE,
+                    "[viz/sparkline] handing off to MapDispatch.paint for " + viewer);
+            boolean ok = MapDispatch.paint(spec, viewer);
+            RTP.log(Level.FINE,
+                    "[viz/sparkline] MapDispatch.paint returned " + ok
+                            + " for viewer=" + viewer);
+            return ok;
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "visualization sparkline MapDispatch.paint threw for " + viewer
+                            + ": " + e.getMessage(), e);
+            reject(viewer, "visualization sparkline rejected: dispatch failure",
                     messageMethod);
             return false;
         }

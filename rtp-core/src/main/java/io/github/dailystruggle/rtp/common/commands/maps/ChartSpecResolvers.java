@@ -38,6 +38,13 @@ public final class ChartSpecResolvers {
     // "Visualizations -> Region shape" entry; menu wiring lands in PR2b.
     RESOLVERS.put(
         ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE, new RegionBadLocationsShapeResolver());
+    // Per-region biome map sourced from the same MemoryShape memory caches;
+    // mirrors the bad-locations resolver but stamps biome-run palette slots
+    // into a location-indexed lookup and reads them back per pixel.
+    RESOLVERS.put(ChartSpec.Kind.REGION_BIOMES, new RegionBiomesResolver());
+    // Global MSPT + heap sparkline backed by the 1 Hz MetricsSnapshotRing
+    // populated by the sampler installed in RTP.start.
+    RESOLVERS.put(ChartSpec.Kind.METRIC_SPARKLINE, new MetricSparklineResolver());
   }
 
   private ChartSpecResolvers() {}
@@ -71,5 +78,7 @@ public final class ChartSpecResolvers {
     RESOLVERS.put(ChartSpec.Kind.BAD_POINTS_HEATMAP, new BadPointsHeatmapResolver());
     RESOLVERS.put(
         ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE, new RegionBadLocationsShapeResolver());
+    RESOLVERS.put(ChartSpec.Kind.REGION_BIOMES, new RegionBiomesResolver());
+    RESOLVERS.put(ChartSpec.Kind.METRIC_SPARKLINE, new MetricSparklineResolver());
   }
 }

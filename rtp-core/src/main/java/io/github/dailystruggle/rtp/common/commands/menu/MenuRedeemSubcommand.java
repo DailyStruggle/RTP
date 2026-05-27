@@ -576,6 +576,19 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         default @Nullable MenuModel buildVisualizations(UUID viewer) {
             return null;
         }
+
+        /**
+         * Build the kind-scoped region picker reached from the top-level
+         * Visualizations chart-kind picker (a row click on e.g. "Bad
+         * Locations" lands here with {@code kind == REGION_BAD_LOCATIONS_SHAPE}).
+         * Default returns {@code null} so existing wire-ups that do not yet
+         * route this action keep compiling; the dispatch arm treats
+         * {@code null} as an S-004 reject path with {@code menuInvalid}.
+         */
+        default @Nullable MenuModel buildVisualizationRegions(
+                UUID viewer, ChartSpec.Kind kind) {
+            return null;
+        }
     }
 
     /**
@@ -1948,6 +1961,63 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         }
         return MenuDrawer.draw(renderer, senderId, model, messageMethod,
                 this::reject, "visualizations");
+    }
+
+    /**
+     * Kind-scoped variant of {@link #dispatchOpenVisualizations}: opens the
+     * per-kind region picker (one row per configured region, each row
+     * dispatching {@link MapDispatch} for the given {@code kind}). Used by
+     * the top-level chart-kind picker's row clicks, which land here via
+     * each visualization leaf's no-region selector fallback. Gated on
+     * {@link #ADMIN_MENU_PERMISSION}; all failure paths log WARN and
+     * reject with {@code menuInvalid} (S-004).
+     */
+    boolean dispatchOpenVisualizationRegions(UUID senderId,
+                                             ChartSpec.Kind kind,
+                                             @Nullable Consumer<String> messageMethod) {
+        if (kind == null) {
+            RTP.log(Level.WARNING,
+                    "menu visualization-regions rejected: null kind for " + senderId);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu visualization-regions rejected: null kind", messageMethod);
+            return false;
+        }
+        if (renderer == null || curatedPageBuilder == null) {
+            RTP.log(Level.WARNING,
+                    "menu visualization-regions received with curated-page builder disabled for "
+                            + senderId);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu visualization-regions rejected: curated-page builder disabled",
+                    messageMethod);
+            return false;
+        }
+        if (!hasAdminMenuPermission(senderId)) {
+            RTP.log(Level.WARNING,
+                    "menu visualization-regions denied: " + senderId
+                            + " lacks " + ADMIN_MENU_PERMISSION);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu visualization-regions rejected: permission denied", messageMethod);
+            return false;
+        }
+        MenuModel model;
+        try {
+            model = curatedPageBuilder.buildVisualizationRegions(senderId, kind);
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "menu visualization-regions builder failed for " + senderId
+                            + " kind=" + kind + ": " + e.getMessage(), e);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu visualization-regions rejected: builder failure", messageMethod);
+            return false;
+        }
+        if (model == null) {
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu visualization-regions rejected: builder returned null model",
+                    messageMethod);
+            return false;
+        }
+        return MenuDrawer.draw(renderer, senderId, model, messageMethod,
+                this::reject, "visualization-regions[" + kind + "]");
     }
 
     /**

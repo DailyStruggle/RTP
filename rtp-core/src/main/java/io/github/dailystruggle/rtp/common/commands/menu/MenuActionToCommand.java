@@ -233,11 +233,12 @@ public final class MenuActionToCommand {
             io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind kind) {
         return switch (kind) {
             case REGION_BAD_LOCATIONS_SHAPE -> "bad-locations";
+            case REGION_BIOMES             -> "biomes";
             case BAD_POINTS_HEATMAP        -> "bad-points-heatmap";
             case REGION_COVERAGE           -> "coverage";
             case FAIL_RATE_HEATMAP         -> "fail-rate";
             case CACHE_OCCUPANCY           -> "cache";
-            case METRIC_SPARKLINE          -> "metric";
+            case METRIC_SPARKLINE          -> "sparkline";
         };
     }
 }

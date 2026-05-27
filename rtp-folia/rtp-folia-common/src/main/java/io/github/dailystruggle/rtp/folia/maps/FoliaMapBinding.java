@@ -1,17 +1,13 @@
 package io.github.dailystruggle.rtp.folia.maps;
 
-import io.github.dailystruggle.mapsapi.Cancellation;
 import io.github.dailystruggle.mapsapi.MapHandle;
 import io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding;
-import io.github.dailystruggle.mapsapi.model.ChartModel;
-import io.github.dailystruggle.mapsapi.render.ChartRenderer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.util.Objects;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 /**
  * Folia-specific {@code MapBinding} override. Thin subclass of
@@ -29,10 +25,11 @@ import java.util.function.Supplier;
  *       itself, so the one-shot {@code MapRenderer} installed by the
  *       superclass is sufficient and S-005 compliant (no chunk I/O on any
  *       region thread).</li>
- *   <li>{@code bindLive} -- still {@code UnsupportedOperationException};
- *       live charts arrive in Stage 3 of {@code CHECKLIST-metrics-to-maps.md}
- *       and that is the natural place to introduce the per-viewer
- *       {@code EntityScheduler} pixel-commit pulse.</li>
+ *   <li>{@code bindLive} -- inherited from the superclass. The
+ *       supplier-driven live renderer reads only {@code RTP.metrics}
+ *       (no chunk I/O, no region-affine state), so the per-tick
+ *       {@code CraftMapView.render} dispatch on Folia is sufficient
+ *       and no {@code EntityScheduler} hop is required.</li>
  * </ul>
  *
  * <p>Why this class exists at all if it currently delegates: the
@@ -84,15 +81,31 @@ public class FoliaMapBinding extends BukkitMapBinding {
         }
     }
 
+    /**
+     * Folia override: hop to the viewer's {@code EntityScheduler} before
+     * dropping the {@code FILLED_MAP} item entity, because mutating world
+     * state at a player's location from a foreign region thread throws
+     * {@code ThreadAccessException} on Folia. Delegates to the superclass
+     * implementation once on the correct thread. If the viewer cannot be
+     * reached (offline, no Folia scheduler present), falls back to the
+     * superclass path (which itself throws an {@code IllegalStateException}
+     * the dispatcher then surfaces to the player via {@code mapUnavailable}).
+     */
     @Override
-    public <M extends ChartModel> Cancellation bindLive(MapHandle handle,
-                                                       ChartRenderer<M> renderer,
-                                                       Supplier<M> modelSupplier) {
-        // Override the superclass deferral with a Folia-specific message,
-        // so test failure / log readers see which platform path is unwired.
-        throw new UnsupportedOperationException(
-                "FoliaMapBinding.bindLive: deferred to Stage 3 of CHECKLIST-metrics-to-maps."
-                        + " The Folia-specific per-viewer EntityScheduler pulse will be"
-                        + " introduced together with the live-chart renderer.");
+    public void deliverTo(MapHandle handle, UUID viewer) {
+        Objects.requireNonNull(handle, "handle");
+        Objects.requireNonNull(viewer, "viewer");
+        boolean hopped = dispatchToViewerRegion(viewer, () -> super.deliverTo(handle, viewer));
+        if (!hopped) {
+            // Viewer offline / Folia scheduler unavailable; superclass will
+            // throw IllegalStateException, which is the S-004 contract.
+            super.deliverTo(handle, viewer);
+        }
     }
+
+    // bindLive is inherited from BukkitMapBinding: CraftMapView.render is
+    // dispatched per-viewer by the platform's own scheduling, on Folia just
+    // as on Paper. The LiveChartRenderer body is supplier-driven and reads
+    // only RTP.metrics (no chunk I/O, no region-affine state), so no
+    // EntityScheduler hop is needed inside the per-tick render path.
 }

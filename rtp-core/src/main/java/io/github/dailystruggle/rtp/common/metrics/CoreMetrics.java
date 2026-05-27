@@ -24,6 +24,7 @@ import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Metrics {
 
     private final PipelineHistogram pipelineHistogram = new PipelineHistogram();
+    private final MetricsSnapshotRing snapshotRing = new MetricsSnapshotRing();
     private volatile io.github.dailystruggle.metrics.api.MetricsBinding binding =
             io.github.dailystruggle.metrics.api.MetricsBinding.NOOP;
 
@@ -45,6 +46,15 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
 
     public PipelineHistogram pipelineHistogram() {
         return pipelineHistogram;
+    }
+
+    /**
+     * Returns the rolling MSPT+heap ring populated by the 1 Hz sampler
+     * installed in {@code RTP.start}. Drives the {@code METRIC_SPARKLINE}
+     * chart kind.
+     */
+    public MetricsSnapshotRing snapshotRing() {
+        return snapshotRing;
     }
 
     @Override

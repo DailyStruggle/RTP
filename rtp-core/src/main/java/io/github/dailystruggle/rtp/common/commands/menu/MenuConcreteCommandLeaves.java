@@ -283,9 +283,25 @@ final class MenuConcreteCommandLeaves {
             // is the one menu-side path that legitimately stays on `owner`.
             VisualizationDispatch dispatch =
                     new VisualizationDispatch(owner.permissionProbeFactory());
+            // Each kind's leaf opens its own kind-scoped region picker when
+            // invoked without region= (so the menu flow is "pick kind ->
+            // pick region", not a loop back to the chart-kind picker).
             addSubCommand(new VisualizationBadLocationsCmd(
                     dispatch,
-                    owner::dispatchOpenVisualizations));
+                    (uuid, msg) -> owner.dispatchOpenVisualizationRegions(
+                            uuid,
+                            io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE,
+                            msg)));
+            addSubCommand(new VisualizationBiomesCmd(
+                    dispatch,
+                    (uuid, msg) -> owner.dispatchOpenVisualizationRegions(
+                            uuid,
+                            io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_BIOMES,
+                            msg)));
+            // Sparkline is a global chart (no region), so it has no
+            // kind-scoped region picker fallback - the leaf paints
+            // directly when invoked with no parameters.
+            addSubCommand(new VisualizationSparklineCmd(dispatch));
         }
 
         @Override
@@ -402,7 +418,7 @@ final class MenuConcreteCommandLeaves {
                                  Map<String, List<String>> parameterValues,
                                  @Nullable Consumer<String> messageMethod) {
             String regionName = firstValue(parameterValues, PARAM_REGION);
-            RTP.log(java.util.logging.Level.INFO,
+            RTP.log(java.util.logging.Level.FINE,
                     "[viz/bad-locations] leaf reached: caller=" + callerId
                             + " region=" + regionName
                             + " hasMsg=" + (messageMethod != null));
@@ -410,13 +426,13 @@ final class MenuConcreteCommandLeaves {
                 // No region specified - fall through to the visualizations
                 // selector. This is a menu-side concern, hence the callback
                 // back into MenuRedeemSubcommand#dispatchOpenVisualizations.
-                RTP.log(java.util.logging.Level.INFO,
+                RTP.log(java.util.logging.Level.FINE,
                         "[viz/bad-locations] no region= -> opening selector");
                 Boolean ok = selectorOpener.apply(callerId, messageMethod);
                 return Boolean.TRUE.equals(ok);
             }
             boolean result = dispatch.paintBadLocations(callerId, regionName, messageMethod);
-            RTP.log(java.util.logging.Level.INFO,
+            RTP.log(java.util.logging.Level.FINE,
                     "[viz/bad-locations] leaf returning result=" + result);
             return result;
         }
@@ -439,6 +455,156 @@ final class MenuConcreteCommandLeaves {
             } catch (RuntimeException e) {
                 return Collections.emptySet();
             }
+        }
+    }
+
+    /**
+     * {@code /rtp visualization biomes [region=<regionName>]} - draw the
+     * per-region {@link ChartSpec.Kind#REGION_BIOMES} chart. Structural
+     * twin of {@link VisualizationBadLocationsCmd} (same parameter set,
+     * same permission gate, same selector fallback); only the dispatch
+     * method and command name differ. Biome data is read exclusively from
+     * the region's {@code MemoryShape.biomeKeysCache} - no
+     * {@code World#getBiome}, no anvil prefilter, no chunk I/O.
+     */
+    static final class VisualizationBiomesCmd
+            extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+
+        private final VisualizationDispatch dispatch;
+        private final java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener;
+
+        VisualizationBiomesCmd(
+                VisualizationDispatch dispatch,
+                java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener) {
+            super(null);
+            this.dispatch = java.util.Objects.requireNonNull(dispatch, "dispatch");
+            this.selectorOpener = java.util.Objects.requireNonNull(selectorOpener, "selectorOpener");
+            addParameter(PARAM_REGION, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+                    "region name (omit to open the visualizations selector)",
+                    (uuid, value) -> value != null && !value.isEmpty()) {
+                @Override
+                public Set<String> values() {
+                    return liveRegionNames();
+                }
+            });
+        }
+
+        @Override
+        public String name() {
+            return "biomes";
+        }
+
+        @Override
+        public String permission() {
+            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand) {
+            return dispatch(callerId, parameterValues, null);
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand,
+                                 Consumer<String> messageMethod) {
+            return dispatch(callerId, parameterValues, messageMethod);
+        }
+
+        private boolean dispatch(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable Consumer<String> messageMethod) {
+            String regionName = firstValue(parameterValues, PARAM_REGION);
+            RTP.log(java.util.logging.Level.FINE,
+                    "[viz/biomes] leaf reached: caller=" + callerId
+                            + " region=" + regionName
+                            + " hasMsg=" + (messageMethod != null));
+            if (regionName == null || regionName.isEmpty()) {
+                RTP.log(java.util.logging.Level.FINE,
+                        "[viz/biomes] no region= -> opening selector");
+                Boolean ok = selectorOpener.apply(callerId, messageMethod);
+                return Boolean.TRUE.equals(ok);
+            }
+            boolean result = dispatch.paintBiomes(callerId, regionName, messageMethod);
+            RTP.log(java.util.logging.Level.FINE,
+                    "[viz/biomes] leaf returning result=" + result);
+            return result;
+        }
+
+        private static @Nullable String firstValue(@Nullable Map<String, List<String>> values,
+                                                   String key) {
+            if (values == null) return null;
+            List<String> raw = values.get(key);
+            if (raw == null || raw.isEmpty()) return null;
+            String first = raw.get(0);
+            return (first == null || first.isEmpty()) ? null : first;
+        }
+
+        private static Set<String> liveRegionNames() {
+            try {
+                if (RTP.selectionAPI == null) return Collections.emptySet();
+                Set<String> names = RTP.selectionAPI.regionNames();
+                if (names == null || names.isEmpty()) return Collections.emptySet();
+                return new LinkedHashSet<>(names);
+            } catch (RuntimeException e) {
+                return Collections.emptySet();
+            }
+        }
+    }
+
+    /**
+     * {@code /rtp visualization sparkline} - draw the global MSPT + heap
+     * sparkline chart ({@link ChartSpec.Kind#METRIC_SPARKLINE}). No
+     * parameters; the chart is server-global, with Folia regions
+     * aggregated as max-MSPT upstream by {@code MetricsSnapshotRing}.
+     * Permission gate is {@code rtp.menu.admin}.
+     */
+    static final class VisualizationSparklineCmd
+            extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+
+        private final VisualizationDispatch dispatch;
+
+        VisualizationSparklineCmd(VisualizationDispatch dispatch) {
+            super(null);
+            this.dispatch = java.util.Objects.requireNonNull(dispatch, "dispatch");
+        }
+
+        @Override
+        public String name() {
+            return "sparkline";
+        }
+
+        @Override
+        public String permission() {
+            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand) {
+            return dispatch(callerId, null);
+        }
+
+        @Override
+        public boolean onCommand(UUID callerId,
+                                 Map<String, List<String>> parameterValues,
+                                 @Nullable CommandsAPICommand nextCommand,
+                                 Consumer<String> messageMethod) {
+            return dispatch(callerId, messageMethod);
+        }
+
+        private boolean dispatch(UUID callerId, @Nullable Consumer<String> messageMethod) {
+            RTP.log(java.util.logging.Level.FINE,
+                    "[viz/sparkline] leaf reached: caller=" + callerId
+                            + " hasMsg=" + (messageMethod != null));
+            boolean result = dispatch.paintSparkline(callerId, messageMethod);
+            RTP.log(java.util.logging.Level.FINE,
+                    "[viz/sparkline] leaf returning result=" + result);
+            return result;
         }
     }
 }

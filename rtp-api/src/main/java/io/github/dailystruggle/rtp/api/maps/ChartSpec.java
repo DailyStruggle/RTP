@@ -86,6 +86,18 @@ public record ChartSpec(
          * {@code RegionBadLocationsRenderer}.
          */
         REGION_BAD_LOCATIONS_SHAPE,
+        /**
+         * Per-region biome map sourced from {@code MemoryShape.biomeKeysCache}.
+         * Pixels inside the region disk are coloured by the biome whose
+         * observed-locations run contains the pixel's location index
+         * (hashed onto a stable palette slot); pixels inside the disk with
+         * no observed biome render as a neutral "unknown" colour; pixels
+         * outside the disk render as black. Drives the admin
+         * {@code /rtp visualization biomes region=<name>} command; see
+         * {@code maps-api} {@code RegionBadLocations} +
+         * {@code RegionBadLocationsRenderer} (reused for biomes).
+         */
+        REGION_BIOMES,
         /** Reserved (Stage 3): spiral coverage view of a region. */
         REGION_COVERAGE,
         /** Reserved (Stage 3): per-region pipeline failure-rate heatmap. */

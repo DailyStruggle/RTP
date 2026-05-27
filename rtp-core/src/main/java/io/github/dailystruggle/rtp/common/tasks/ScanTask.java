@@ -33,6 +33,10 @@ import java.util.stream.Collectors;
 
 /** Task for pre-scanning a region with valid teleport locations */
 public class ScanTask extends RTPRunnable {
+  /** Spark-profiler frame tag (diagram 05). See {@link RTPRunnable#sparkFrameName()}. */
+  @Override
+  protected String sparkFrameName() { return "rtp_scan_crawler"; }
+
   /** Number of locations to process in each step */
   public final AtomicLong scanIncrement = new AtomicLong(0L);
   private final AtomicLong cps = new AtomicLong(128);

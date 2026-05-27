@@ -436,8 +436,11 @@ class ReqRtpMenuConcreteCommandsTest {
 
             assertTrue(ok, "missing region= must open the selector, not reject");
             assertNotNull(f.rendered.get(), "selector must be rendered");
-            assertEquals("visualizations", f.rendered.get().title(),
-                    "bare bad-locations shares the visualizations selector model");
+            assertEquals("visualization-regions[REGION_BAD_LOCATIONS_SHAPE]",
+                    f.rendered.get().title(),
+                    "bare bad-locations opens its own kind-scoped region picker "
+                            + "(not the top-level chart-kind picker), so the menu flow "
+                            + "is `pick kind -> pick region` without a back-loop.");
         }
 
         @Test
@@ -494,6 +497,12 @@ class ReqRtpMenuConcreteCommandsTest {
                         @Override
                         public MenuModel buildFrontPage(UUID viewer) {
                             return stubModel("front-page");
+                        }
+                        @Override
+                        public MenuModel buildVisualizationRegions(
+                                UUID viewer,
+                                io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind kind) {
+                            return stubModel("visualization-regions[" + kind + "]");
                         }
                         @Override
                         public MenuModel buildVisualizations(UUID viewer) {

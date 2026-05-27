@@ -9,8 +9,11 @@ import io.github.dailystruggle.mapsapi.MapHandle;
 import io.github.dailystruggle.mapsapi.model.ChartModel;
 import io.github.dailystruggle.mapsapi.render.ChartRenderer;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.MapMeta;
 import org.bukkit.map.MapPalette;
 import org.bukkit.map.MapRenderer;
 import org.bukkit.map.MapView;
@@ -149,16 +152,97 @@ public class BukkitMapBinding implements MapBinding, MapBindingLifecycle {
         view.addRenderer(new OneShotChartRenderer<>(renderer, model));
     }
 
+    /**
+     * Drops a {@code FILLED_MAP} item entity at the viewer's feet whose
+     * {@code MapMeta} points at the {@code MapView} backing {@code handle}.
+     * Minecraft only renders a {@code MapView}'s pixels to clients that see
+     * a {@code FILLED_MAP} item referencing the view's id (held or in an
+     * entity / item frame), so without this step the painted chart is
+     * invisible to the player.
+     *
+     * <p>Threading: this call mutates world state and must run on the
+     * viewer's region thread. The Bukkit-family implementation assumes the
+     * caller already hopped to the main thread; the {@code FoliaMapBinding}
+     * override re-hops via the viewer's {@code EntityScheduler}.
+     *
+     * <p>S-004: failures (viewer offline, world unavailable, item entity
+     * spawn refused by the server) throw {@link IllegalStateException}
+     * rather than silently swallowing, so the dispatcher can surface a
+     * user-facing message.
+     */
+    @Override
+    public void deliverTo(MapHandle handle, UUID viewer) {
+        Objects.requireNonNull(handle, "handle");
+        Objects.requireNonNull(viewer, "viewer");
+        Player player = Bukkit.getPlayer(viewer);
+        if (player == null) {
+            throw new IllegalStateException(
+                    "BukkitMapBinding.deliverTo: viewer " + viewer
+                            + " is not online; cannot drop FILLED_MAP for chartId="
+                            + handle.chartId());
+        }
+        MapView view = Bukkit.getMap(handle.mapId());
+        if (view == null) {
+            throw new IllegalStateException(
+                    "BukkitMapBinding.deliverTo: no MapView for handle.mapId="
+                            + handle.mapId() + " chartId=" + handle.chartId());
+        }
+        ItemStack item = new ItemStack(Material.FILLED_MAP, 1);
+        MapMeta meta = (MapMeta) item.getItemMeta();
+        if (meta == null) {
+            throw new IllegalStateException(
+                    "BukkitMapBinding.deliverTo: FILLED_MAP has no MapMeta (server="
+                            + Bukkit.getServer().getVersion() + ")");
+        }
+        meta.setMapView(view);
+        item.setItemMeta(meta);
+        player.getWorld().dropItem(player.getLocation(), item);
+    }
+
+    /**
+     * Live-chart binding: installs a {@link MapRenderer} that, on every
+     * {@code CraftMapView.render} invocation (Bukkit ticks one per
+     * holding/framing client per server tick), pulls a fresh model from
+     * {@code modelSupplier} and re-paints the canvas. Unlike the one-shot
+     * renderer this does NOT short-circuit after the first paint, so the
+     * chart updates over time as long as the viewer is holding (or has
+     * framed) the {@code FILLED_MAP} item.
+     *
+     * <p>The {@link Cancellation} returned flips a {@code cancelled} flag
+     * the renderer checks every tick; we deliberately do not call
+     * {@code view.removeRenderer(this)} from cancel() because
+     * {@code CraftMapView.render} iterates its renderer list under the
+     * tick and mutating mid-iteration throws CME (see
+     * {@code OneShotChartRenderer}'s prior crash on Folia 1.21.11). The
+     * stale renderer is evicted lazily by the next
+     * {@code allocate} / {@code renderEphemeral} / {@code bindLive} on
+     * the same view (all three paths strip existing renderers first).
+     */
     @Override
     public <M extends ChartModel> Cancellation bindLive(MapHandle handle,
                                                         ChartRenderer<M> renderer,
                                                         Supplier<M> modelSupplier) {
-        // CHECKLIST-metrics-to-maps Stage 3 owns live charts. Today nothing
-        // upstream calls this path, so we fail loudly rather than silently
-        // accepting and never refreshing.
-        throw new UnsupportedOperationException(
-                "BukkitMapBinding.bindLive: live charts arrive in Stage 3 of "
-                        + "CHECKLIST-metrics-to-maps; use renderEphemeral for one-shot paints.");
+        Objects.requireNonNull(handle, "handle");
+        Objects.requireNonNull(renderer, "renderer");
+        Objects.requireNonNull(modelSupplier, "modelSupplier");
+        MapView view = Bukkit.getMap(handle.mapId());
+        if (view == null) {
+            throw new IllegalStateException(
+                    "BukkitMapBinding.bindLive: no MapView for handle.mapId="
+                            + handle.mapId() + " chartId=" + handle.chartId());
+        }
+        // Drop any previously-installed renderer for this handle so a
+        // prior one-shot / live binding does not double-paint.
+        for (MapRenderer existing : view.getRenderers()) {
+            view.removeRenderer(existing);
+        }
+        LiveChartRenderer<M> live = new LiveChartRenderer<>(renderer, modelSupplier);
+        view.addRenderer(live);
+        return new Cancellation() {
+            private volatile boolean cancelled = false;
+            @Override public void cancel() { cancelled = true; live.cancel(); }
+            @Override public boolean cancelled() { return cancelled; }
+        };
     }
 
     /** @return the {@code MapView} backing {@code handle}, or {@code null} if none. */
@@ -295,8 +379,61 @@ public class BukkitMapBinding implements MapBinding, MapBindingLifecycle {
             if (rendered) return;
             chartRenderer.render(new BukkitMapCanvas(bukkitCanvas), model);
             rendered = true;
-            // Detach: subsequent ticks shall not re-run the chart renderer.
-            map.removeRenderer(this);
+            // Do NOT call map.removeRenderer(this) here: CraftMapView.render
+            // is iterating its renderer list when it invokes us, and mutating
+            // that list mid-iteration throws ConcurrentModificationException
+            // on the next tick's player update (observed on Folia 1.21.11,
+            // crashed the ServerPlayer tick and disconnected the viewer).
+            // Subsequent ticks short-circuit on the `rendered` flag above;
+            // stale renderers are evicted lazily on the next allocate /
+            // renderEphemeral for the same chartId (both paths strip
+            // existing renderers before installing new ones).
+        }
+    }
+
+    /**
+     * Live-refresh {@link MapRenderer}: every {@code CraftMapView.render}
+     * invocation pulls a fresh model from {@code modelSupplier} and runs
+     * the chart renderer against the per-tick canvas. A volatile
+     * {@code cancelled} flag short-circuits the path after
+     * {@link Cancellation#cancel()} fires; the renderer is not removed
+     * from the {@link MapView} mid-iteration (CME hazard, see class-doc).
+     * Exceptions thrown by the supplier or renderer are caught and logged
+     * via {@code System.err} (the {@code maps-api} module cannot reach
+     * {@code RTP.log}); the renderer continues to be installed and may
+     * succeed on a later tick (S-004: no silent swallow - the WARNING is
+     * audible, and {@code MemoryTracker} reaping still applies upstream).
+     */
+    private static final class LiveChartRenderer<M extends ChartModel> extends MapRenderer {
+        private final ChartRenderer<M> chartRenderer;
+        private final Supplier<M> modelSupplier;
+        private volatile boolean cancelled = false;
+
+        LiveChartRenderer(ChartRenderer<M> chartRenderer, Supplier<M> modelSupplier) {
+            super(false);
+            this.chartRenderer = chartRenderer;
+            this.modelSupplier = modelSupplier;
+        }
+
+        void cancel() { cancelled = true; }
+
+        @Override
+        public void render(MapView map, org.bukkit.map.MapCanvas bukkitCanvas, Player player) {
+            if (cancelled) return;
+            try {
+                M model = modelSupplier.get();
+                if (model == null) return;
+                chartRenderer.render(new BukkitMapCanvas(bukkitCanvas), model);
+            } catch (RuntimeException e) {
+                // Cannot reach RTP.log from maps-api; surface to stderr so
+                // the host plugin's log still captures it. Do not rethrow:
+                // an exception here would propagate into CraftMapView.render
+                // and crash the player tick (Folia 1.21.11 ServerPlayer
+                // disconnect pattern we already hit once).
+                System.err.println(
+                        "[maps-api] LiveChartRenderer render failed for chartId="
+                                + map.getId() + ": " + e.getMessage());
+            }
         }
     }
 
@@ -367,6 +504,20 @@ public class BukkitMapBinding implements MapBinding, MapBindingLifecycle {
                     delegate.setPixel(xx, yy, vb);
                 }
             }
+        }
+
+        @Override
+        public void setPixelRgb(int x, int y, int rgb) {
+            if (x < 0 || x >= VANILLA_WIDTH || y < 0 || y >= VANILLA_HEIGHT) return;
+            int r = (rgb >> 16) & 0xFF;
+            int g = (rgb >> 8)  & 0xFF;
+            int b = rgb         & 0xFF;
+            // MapPalette.matchColor walks the full vanilla map palette
+            // (~144 distinct colours) and returns the nearest match. This
+            // bypasses the 32-slot logical palette entirely - renderers
+            // that drive setPixelRgb get the full vanilla colour space
+            // without changing the logical contract.
+            delegate.setPixel(x, y, MapPalette.matchColor(r, g, b));
         }
 
         @Override

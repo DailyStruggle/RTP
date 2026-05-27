@@ -610,3 +610,19 @@ tp-plugin/.../fabric/ found zero references to the symbol. That was a false posi
 tp-core's RTP constructor: line 243 schedules a new AsyncTaskProcessing(25ms) on RTP.scheduler.runTaskTimerAsynchronously(...) every tick, and AsyncTaskProcessing.run calls RTP.getInstance().miscAsyncTasks.execute(...). On Fabric, FabricScheduler.runTaskTimerAsynchronously(task, delay, period) queues () -> ASYNC_EXECUTOR.execute(task) into the per-tick scheduled map, which FabricEventBridge drives from ServerTickEvents.END_SERVER_TICK. Net effect: once setServer(MinecraftServer) fires, every server tick dispatches an AsyncTaskProcessing instance onto the Fabric scheduler's ASYNC_EXECUTOR, which drains miscAsyncTasks exactly as it does on Bukkit/Paper/Folia. The takeaway: when auditing parity for a 
 tp-core field, search 
 tp-core first (specifically the RTP constructor and 	asks.tick package) before concluding the platform adapter is missing wiring.
+
+## 2026-05-26 - Spark-tagged regions in the live pipeline (no Spark soft-dep needed)
+
+Spark's async sampler attributes samples by stack-frame method name plus thread name; it has no public source-tag API. To make Spark reports for the five "demanding code paths" (architecture diagrams 01-05) self-describing without depending on Spark itself, `RTPRunnable.runWithTracking()` now dispatches `run()` through one of a fixed allow-list of pre-named bridge methods when the subclass overrides `sparkFrameName()` to return a tag. The bridge method's Java name (e.g. `rtp_pipeline_attempt`) is what shows up in the Spark stack frame, which is why the dispatch table is hard-coded rather than synthesized - Spark can read method names, not dynamic strings.
+
+Active tags (do not rename without updating this entry; saved Spark report URLs reference them):
+
+- `rtp_pipeline_attempt` - `TeleportPipelineTask` (diagrams 01 + 08)
+- `rtp_cache_generator` - `RegionCacheTask` (diagram 02)
+- `rtp_scan_crawler` - `ScanTask` (diagram 05)
+- `rtp_async_task_drain` - `AsyncTaskProcessing` (diagrams 01/02 async worker drain)
+- `rtp_scan_drain` - `ScanTaskProcessing` (diagram 05)
+- `rtp_force_queue` - `ForceQueue` (diagram 02 force-queue trigger)
+- `rtp_active_gc_sweep` - `MemoryTracker.runDiagnostics` (diagram 04; static method, wraps body directly rather than going through `RTPRunnable` since `MemoryTracker` is not a task)
+
+The convention is `rtp_<stage>` snake_case. Adding a new tag requires three coordinated edits: a new bridge method on `RTPRunnable`, a new `case` in `RTPRunnable.runTagged`, and a row in this list. Diagram 03 (chunk-ticket lifecycle) intentionally has no dedicated tag - its work happens inside `TeleportPipelineTask` and `RegionCacheTask`, both already tagged. Cost: one extra (cheap) bridge stack frame per tagged task run. The takeaway: when you need profiler observability for a hot path, you do not need to add Spark as a dependency - a named method on the call stack is the entire contract.

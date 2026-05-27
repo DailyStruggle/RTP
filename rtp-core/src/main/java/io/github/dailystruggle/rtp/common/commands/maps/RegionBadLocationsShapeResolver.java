@@ -61,7 +61,7 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
 
     @Override
     public Resolution resolve(ChartSpec spec) throws UnresolvableChartSpecException {
-        RTP.log(java.util.logging.Level.INFO,
+        RTP.log(java.util.logging.Level.FINE,
                 "[viz/bad-locations] resolver entry: spec="
                         + (spec == null ? "null"
                                 : (spec.kind() + " region=" + spec.regionName())));
@@ -147,7 +147,7 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
         if (boundW <= 0L) boundW = 1L;
         if (boundH <= 0L) boundH = 1L;
 
-        RTP.log(java.util.logging.Level.INFO,
+        RTP.log(java.util.logging.Level.FINE,
                 "[viz/bad-locations] resolver bbox: region=" + region.name
                         + " range=" + range + " step=" + step
                         + " samples=" + samples

@@ -50,6 +50,10 @@ public final class ForceQueue extends RTPRunnable {
     this.regions = regions;
   }
 
+  /** Spark-profiler frame tag (diagram 02 force-queue trigger). See {@link RTPRunnable#sparkFrameName()}. */
+  @Override
+  protected String sparkFrameName() { return "rtp_force_queue"; }
+
   @Override
   public void run() {
     preActions.forEach(consumer -> consumer.accept(this));

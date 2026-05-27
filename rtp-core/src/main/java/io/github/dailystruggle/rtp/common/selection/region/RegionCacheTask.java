@@ -115,6 +115,10 @@ public class RegionCacheTask extends RTPRunnable {
         return new RegionCacheTask(region, maxNanos, true);
     }
 
+    /** Spark-profiler frame tag (diagram 02). See {@link RTPRunnable#sparkFrameName()}. */
+    @Override
+    protected String sparkFrameName() { return "rtp_cache_generator"; }
+
     /**
      * Executes the location generation and caching logic.
      */

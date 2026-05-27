@@ -47,16 +47,16 @@ On Folia, a confirmed candidate that the Anvil probe could not resolve pays one 
 - [ ] **Regression test: live-load safety net cannot re-admit a prior reject.** Assert that a chunk the Anvil probe rejected on populated data is never subsequently accepted by the live-load path. Must hold under Folia region-stealing and concurrent player teleports.
 - [ ] **Failure attribution bucket.** Extend the `FailTypes` taxonomy (or the equivalent telemetry surface) with `unpopulatedFallthrough` so `/rtp test full` can report its frequency distinctly from other fallbacks. Currently invisible.
 
-### 1.D — Fabric: not supported
+### 1.D — Fabric: supported (stable as of 2026-05-26)
 
-The front page honestly says "Not Supported". The requirements explicitly scope Fabric out. Both are correct today; the roadmap is to eventually lift the restriction.
+Fabric (`rtp-fabric`) is a first-class, in-scope, stable platform. The three standing blockers documented in prior revisions of this section are resolved; the front page and `REQUIREMENTS.md §0` should be updated to reflect that Fabric is supported, not out of scope.
 
-- [ ] **Resolve the three standing blockers in `MULTI_PLATFORM_PLAN.md`:**
-  - [ ] **S-005 violation in `FabricWorld.getChunkAt`.** Route through `ServerWorld#getChunkManager().getWorldChunk(..., load=false)` with a `CompletableFuture` wrapper, or share the `rtp-anvil` pre-filter path already used by Bukkit adapters.
-  - [ ] **Null stub in `FabricServerAccessor.getLocationGenerator`.** Replace with a functioning implementation; pre-core-load must throw `IllegalStateException` per `REQ-RTP-S-006`.
-  - [ ] **Unresolved Loom dependency.** Pin a Loom version in `settings.gradle`; document the Fabric build prerequisites in `CONTRIBUTING.md`.
-- [ ] **Decide the shipping model.** Either: (a) Fabric ships in `3.1.0`; (b) Fabric ships as a separate `rtp-fabric-preview` artifact on its own release line. Pick one, then update `REQUIREMENTS.md §0 Out of Scope` so the document does not contradict the shipping artifact.
-- [ ] **Re-run the `rtp-api` interface-sufficiency analysis** once the three blockers are resolved. Record the result as an ADR regardless of outcome — interface gaps that turn out to exist are more valuable to document than interface adequacy that turns out to hold.
+- [x] ~~**Resolve the three standing blockers in `MULTI_PLATFORM_PLAN.md`:**~~
+  - [x] ~~**S-005 violation in `FabricRTPWorld.getChunkAt`.**~~ — `getChunkAt` returns `CompletableFuture<Long>` and routes through an async chunk-load path; S-005 compliant.
+  - [x] ~~**Null stub in `FabricServerAccessor.getLocationGenerator`.**~~ — fully wired; throws `IllegalStateException` per `REQ-RTP-S-006` when called pre-init.
+  - [x] ~~**Unresolved Loom dependency.**~~ — resolved via the obf/unobf carrier split ([rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)).
+- [ ] **Update front-page / requirements wording.** `docs/FRONT_PAGE.bbcode` and `REQUIREMENTS.md §0 Out of Scope` still describe Fabric as unsupported; reframe to first-class supported platform.
+- [ ] **Re-run the `rtp-api` interface-sufficiency analysis** and record the result as an ADR (April 2026 gap analysis concluded interfaces are sufficient; promote the finding from `MULTI_PLATFORM_PLAN.md` to an Accepted ADR).
 
 ### 1.E — Unsourced statistics on the front page
 

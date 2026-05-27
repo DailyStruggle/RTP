@@ -275,6 +275,82 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   /**
+   * {@inheritDoc}
+   *
+   * <p>Reads {@code r.<rcx>.<rcz>.mca} once via {@link
+   * io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache}, decodes each of the
+   * up-to-1024 chunks via {@link io.github.dailystruggle.rtp.anvil.AnvilReader#readChunkView},
+   * and samples the biome at chunk-local {@code (8, y, 8)} via
+   * {@link io.github.dailystruggle.rtp.anvil.AnvilChunkView#getBiomeAt}.
+   *
+   * <p>Biome names are canonicalised to the same uppercase, {@code minecraft:}
+   * -stripped form used by {@code MemoryShape.addBiomeLocation} so that
+   * {@link io.github.dailystruggle.mapsapi.BiomeColorSource}'s dimension overrides
+   * (keyed e.g. {@code "NETHER_WASTES"}) match.
+   *
+   * <p>S-005: dispatched onto {@link io.github.dailystruggle.rtp.anvil.AnvilIoPool};
+   * no tick-thread chunk I/O.
+   */
+  @Override
+  public java.util.Map<Long, String> readBiomesInRegionFile(
+      int rcx, int rcz, int y) {
+    if (world == null) return java.util.Collections.emptyMap();
+    final java.nio.file.Path worldFolder = world.getWorldFolder().toPath();
+    final String dim = dimensionRegionSubpath(world);
+    try {
+      // regionFileFor takes a chunk coord; rcx<<5, rcz<<5 is the NW corner.
+      java.nio.file.Path regionFile =
+          io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
+              worldFolder, dim, rcx << 5, rcz << 5);
+      if (regionFile == null) return java.util.Collections.emptyMap();
+      byte[] regionBytes =
+          io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
+      if (regionBytes == null) return java.util.Collections.emptyMap();
+      java.util.HashMap<Long, String> out = new java.util.HashMap<>(1024);
+      for (int rx = 0; rx < 32; rx++) {
+        for (int rz = 0; rz < 32; rz++) {
+          try {
+            io.github.dailystruggle.rtp.anvil.AnvilChunkView view =
+                io.github.dailystruggle.rtp.anvil.AnvilReader.readChunkView(
+                    regionBytes, rx, rz);
+            if (view == null) continue;
+            String raw = view.getBiomeAt(8, y, 8);
+            if (raw == null) continue;
+            String canonical = canonicaliseBiome(raw);
+            if (canonical == null || canonical.isEmpty()) continue;
+            int cx = (rcx << 5) | rx;
+            int cz = (rcz << 5) | rz;
+            long key = ((long) cx << 32) | (cz & 0xFFFF_FFFFL);
+            out.put(key, canonical);
+          } catch (Throwable ignored) {
+            // chunk not present in region file or unreadable; skip silently.
+          }
+        }
+      }
+      return out;
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.FINE,
+          "[RTP] readBiomesInRegionFile failed for world=" + name
+              + " region=(" + rcx + "," + rcz + "): "
+              + t.getClass().getSimpleName() + ": " + t.getMessage());
+      return java.util.Collections.emptyMap();
+    }
+  }
+
+  /**
+   * Canonicalises an on-disk biome id ({@code "minecraft:plains"},
+   * {@code "iris:volcanic_ash_plains"}) to the form stored by
+   * {@code MemoryShape.addBiomeLocation}: uppercase, vanilla {@code MINECRAFT:}
+   * prefix stripped, modded namespaces preserved verbatim.
+   */
+  private static String canonicaliseBiome(String name) {
+    if (name == null) return null;
+    String up = name.toUpperCase(java.util.Locale.ROOT);
+    if (up.startsWith("MINECRAFT:")) return up.substring("MINECRAFT:".length());
+    return up;
+  }
+
+  /**
    * Returns {@code true} when the applicability gates for the ADR-016 Anvil pre-filter
    * are all satisfied for the chunk at absolute coords {@code (cx, cz)}:
    * <ul>

@@ -11,30 +11,67 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.TreeSet;
 import java.util.UUID;
 
 /**
- * Curated submenu reached from the admin panel "Visualizations" row. Lists
- * every configured region one-per-row; clicking a row dispatches an
- * {@link MenuAction.OpenMap} carrying
- * {@link ChartSpec.Kind#REGION_BAD_LOCATIONS_SHAPE} + the region name
- * (ADR-050 Stage 3β: no ChartSpec token round-trip), which the
- * {@code dispatchOpenMap} arm in {@code MenuRedeemSubcommand} resolves
- * through {@code RegionBadLocationsShapeResolver} into a cartography
- * map item painted by {@code RegionBadLocationsRenderer}.
+ * Curated submenu reached from the admin panel "Visualizations" row.
+ *
+ * <p>Two pages are produced by this builder:
+ * <ul>
+ *   <li>{@link #build(UUID)} - the top-level <b>chart-kind picker</b>: one
+ *       row per supported visualization kind (bad-locations, biomes, ...).
+ *       Clicking a row runs {@code /rtp visualization &lt;verb&gt;} with no
+ *       {@code region=} argument; the visualization leaf's no-region
+ *       selector-fallback then lands on {@link #buildRegionList(UUID,
+ *       ChartSpec.Kind)} via
+ *       {@code MenuRedeemSubcommand.dispatchOpenVisualizationRegions}.</li>
+ *   <li>{@link #buildRegionList(UUID, ChartSpec.Kind)} - the kind-scoped
+ *       <b>region picker</b>: one row per configured region, each emitting
+ *       {@link MenuAction.OpenMap} carrying the kind + region name. Same
+ *       per-row shape as the legacy flat submenu, only kind-parameterised.</li>
+ * </ul>
  *
  * <p>The admin-permission gate ({@code rtp.menu.admin}) is enforced
  * upstream by the dispatch arm; this builder trusts that contract and
- * does not re-probe it. The back row returns to the admin panel via
- * {@link MenuAction.OpenAdminPanel}.
+ * does not re-probe it. The back row of the chart-kind picker returns to
+ * the admin panel via {@link MenuAction.OpenAdminPanel}; the back row of
+ * a kind-scoped region picker returns to the chart-kind picker via
+ * {@link MenuAction.OpenVisualizations}.
  */
 public final class VisualizationsSubmenuBuilder {
 
     /** Maximum book lines per page (matches {@link AdminPanelBuilder#LINES_PER_PAGE}). */
     static final int LINES_PER_PAGE = AdminPanelBuilder.LINES_PER_PAGE;
+
+    /**
+     * Ordered display table for the chart-kind picker. The {@code verb} is
+     * the {@code /rtp visualization &lt;verb&gt;} sub-command name, and the
+     * {@code label} / {@code hover} are the human-readable strings shown on
+     * the row (book-menu colour contrast: avoid yellow/white per project
+     * guidelines).
+     */
+    private static final Map<ChartSpec.Kind, KindRow> KIND_ROWS;
+    static {
+        Map<ChartSpec.Kind, KindRow> m = new LinkedHashMap<>();
+        m.put(ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE,
+                new KindRow("bad-locations",
+                        "&1\u25b6 Bad locations &7- per-region shape map",
+                        "&7open a map of bad-locations samples per region"));
+        m.put(ChartSpec.Kind.REGION_BIOMES,
+                new KindRow("biomes",
+                        "&2\u25b6 Biomes &7- per-region biome map",
+                        "&7open a map of observed biomes per region"));
+        m.put(ChartSpec.Kind.METRIC_SPARKLINE,
+                new KindRow("sparkline",
+                        "&4\u25b6 Pipeline health &7- MSPT + heap sparkline",
+                        "&7open a server-global MSPT and heap sparkline"));
+        KIND_ROWS = java.util.Collections.unmodifiableMap(m);
+    }
 
     /**
      * ADR-050 Stage 3β.D.2b (2026-05-24): no-arg constructor. The renderer
@@ -45,10 +82,11 @@ public final class VisualizationsSubmenuBuilder {
     }
 
     /**
-     * Build the curated Visualizations submenu {@link MenuModel} for
-     * {@code viewer}. Reads the live region list from
-     * {@code RTP.selectionAPI.regionNames()} on every call (post-write
-     * rebuild contract).
+     * Build the top-level Visualizations <b>chart-kind picker</b> for
+     * {@code viewer}: one row per supported chart kind, each running the
+     * corresponding {@code /rtp visualization &lt;verb&gt;} command which
+     * lands on the per-kind region picker via the leaf's selector fallback.
+     * The back row returns to the admin panel.
      */
     public MenuModel build(UUID viewer) {
         Objects.requireNonNull(viewer, "viewer");
@@ -59,18 +97,71 @@ public final class VisualizationsSubmenuBuilder {
         if (title != null && !title.isEmpty()) {
             lines.add(MenuLine.of(new MenuFragment(title, null, null)));
         }
-        String hint = lookupMsg(
-                MessagesKeys.menuVisualizationsHint,
-                "&7pick a region to view its bad-locations map");
-        if (hint != null && !hint.isEmpty()) {
-            lines.add(MenuLine.of(new MenuFragment(hint, null, null)));
-        }
+        // Hint text deliberately kept generic ("pick a visualization") rather
+        // than reading the locale's bad-locations-flavoured menuVisualizationsHint,
+        // which still ships the legacy "pick a region to view its bad-locations
+        // map" copy; routing that key away from the chart-kind picker would
+        // force a locale-TSV pass on every shipped locale (see project
+        // guidelines, Locale Config TSV Pipeline section). Hardcoded English
+        // fallback is acceptable for an admin diagnostic surface.
+        String hint = "&7pick a visualization";
+        lines.add(MenuLine.of(new MenuFragment(hint, null, null)));
         // blank spacer
         lines.add(new MenuLine(List.of()));
 
-        // Per-region rows. Sort the live set so book pagination is stable
-        // across calls (matches the operator's expectation that regions
-        // listed alphabetically reappear in the same order on refresh).
+        for (Map.Entry<ChartSpec.Kind, KindRow> e : KIND_ROWS.entrySet()) {
+            KindRow row = e.getValue();
+            MenuAction action = new MenuAction.RunRtpCommand(
+                    new String[] {"visualization", row.verb});
+            lines.add(MenuLine.of(new MenuFragment(row.label, row.hover, action)));
+        }
+
+        String backLabel = lookupMsg(MessagesKeys.menuVisualizationsRowBack, "&7\u21a9 Back");
+        MenuLine backRow = null;
+        if (backLabel != null && !backLabel.isEmpty()) {
+            backRow = MenuLine.of(new MenuFragment(
+                    backLabel, null, new MenuAction.OpenAdminPanel()));
+        }
+
+        List<MenuPage> pages = paginate(lines, backRow);
+        return new MenuModel(title == null ? "" : title, pages);
+    }
+
+    /**
+     * Build the kind-scoped Visualizations <b>region picker</b> for
+     * {@code viewer}: one row per configured region, each emitting
+     * {@link MenuAction.OpenMap} carrying {@code (kind, regionName)}. Reads
+     * the live region list from {@code RTP.selectionAPI.regionNames()} on
+     * every call (post-write rebuild contract). The back row returns to the
+     * top-level chart-kind picker via {@link MenuAction.OpenVisualizations}.
+     *
+     * @param viewer the clicking player's UUID.
+     * @param kind   the chart-kind scope; the only valid values today are
+     *               {@link ChartSpec.Kind#REGION_BAD_LOCATIONS_SHAPE} and
+     *               {@link ChartSpec.Kind#REGION_BIOMES}. Other kinds throw
+     *               {@link IllegalArgumentException} (caught by the dispatch
+     *               arm as a builder failure -> S-004 reject).
+     */
+    public MenuModel buildRegionList(UUID viewer, ChartSpec.Kind kind) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(kind, "kind");
+        KindRow kindRow = KIND_ROWS.get(kind);
+        if (kindRow == null) {
+            throw new IllegalArgumentException(
+                    "VisualizationsSubmenuBuilder.buildRegionList: unsupported kind " + kind);
+        }
+
+        List<MenuLine> lines = new ArrayList<>();
+
+        String title = lookupMsg(MessagesKeys.menuVisualizationsTitle, "&5&l\u2316 Visualizations");
+        if (title != null && !title.isEmpty()) {
+            lines.add(MenuLine.of(new MenuFragment(title, null, null)));
+        }
+        // Kind-scoped subhead (hardcoded copy; see hint comment in build()).
+        String subhead = "&7" + kindRow.shortName() + " &8- pick a region";
+        lines.add(MenuLine.of(new MenuFragment(subhead, null, null)));
+        lines.add(new MenuLine(List.of()));
+
         List<String> regionNames = collectRegionNames();
         if (regionNames.isEmpty()) {
             String empty = lookupMsg(
@@ -86,9 +177,7 @@ public final class VisualizationsSubmenuBuilder {
                     MessagesKeys.menuVisualizationsHoverRegion,
                     "&7open a map showing bad locations in &b[region]");
             for (String regionName : regionNames) {
-                // ADR-050 Stage 3β: OpenMap is now (Kind, regionName); no token round-trip.
-                MenuAction action = new MenuAction.OpenMap(
-                        ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE, regionName);
+                MenuAction action = new MenuAction.OpenMap(kind, regionName);
                 String label = rowTemplate.replace("[region]", regionName);
                 String hover = hoverTemplate == null || hoverTemplate.isEmpty()
                         ? null
@@ -97,17 +186,15 @@ public final class VisualizationsSubmenuBuilder {
             }
         }
 
-        // Back row -> admin panel.
+        // Back row -> top-level chart-kind picker (one level up).
         String backLabel = lookupMsg(MessagesKeys.menuVisualizationsRowBack, "&7\u21a9 Back");
         MenuLine backRow = null;
         if (backLabel != null && !backLabel.isEmpty()) {
             backRow = MenuLine.of(new MenuFragment(
-                    backLabel, null, new MenuAction.OpenAdminPanel()));
+                    backLabel, null, new MenuAction.OpenVisualizations()));
         }
 
         List<MenuPage> pages = paginate(lines, backRow);
-        // ADR-050 Stage 3β.D.2b (2026-05-24): the per-fragment mint loop is
-        // gone (the renderer emits concrete `/rtp menu ...` commands).
         return new MenuModel(title == null ? "" : title, pages);
     }
 
@@ -180,8 +267,32 @@ public final class VisualizationsSubmenuBuilder {
         if (lang == null) return fallback;
         Object v = lang.getConfigValue(key, fallback);
         String s = v == null ? fallback : v.toString();
-        // Mirror lookupMsg conventions elsewhere: trim and accept the
-        // fallback when the live value is blank.
         return s;
+    }
+
+    /**
+     * Per-kind chart-kind picker row metadata. {@code verb} is the
+     * {@code /rtp visualization &lt;verb&gt;} sub-command name; the label
+     * and hover use book-safe (non-yellow, non-white) colours per project
+     * guidelines.
+     */
+    private record KindRow(String verb, String label, String hover) {
+        /**
+         * Short human-readable name used for the kind-scoped subhead on the
+         * region picker. Derived from {@link #label} by stripping the
+         * leading colour code and arrow, and truncating at the dash.
+         */
+        String shortName() {
+            String s = label;
+            // strip leading "&X" or "&l" / "&l" pairs and the bullet
+            while (s.length() >= 2 && s.charAt(0) == '&') {
+                s = s.substring(2);
+            }
+            int dash = s.indexOf(" &");
+            if (dash > 0) s = s.substring(0, dash);
+            int arrow = s.indexOf('\u25b6');
+            if (arrow >= 0) s = s.substring(arrow + 1);
+            return s.trim();
+        }
     }
 }

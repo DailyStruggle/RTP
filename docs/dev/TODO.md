@@ -13,7 +13,7 @@
 Active frontier per [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md). Tracked in detail under [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md); items below are the must-finish set to call Fabric "stable". Loom resolution, the S-005 fix in `FabricWorld.getChunkAt`, `FabricServerAccessor.getLocationGenerator`, Brigadier bridge wiring, and effects-API parity have landed — see CHANGELOG `[3.0.0-beta.2]` and the linked rtp-fabric / effects-api ADRs.
 
 - [ ] **Platform smoke test.** Add a Fabric entry to whatever `rtp test full` analogue exists (or create one) so a CI / manual run produces the same pass/fail matrix as Paper and Folia. Covers the still-owed Fabric `ReqRtpS005*` coverage and tab-completion parity test. **Implementation plan:** [`scratch/CHECKLIST-fabric-rtp-test-full.md`](scratch/CHECKLIST-fabric-rtp-test-full.md) (five phases — core SPI lift → leaf migration → Fabric registration → offline tab-completion parity test → docs).
-- [ ] **Promote out of "unstable" in `MULTI_PLATFORM_PLAN.md` and `AGENTS.md` *Current Development Focus*** once the smoke-test item is green.
+- [x] **Promote out of "unstable" in `AGENTS.md` *Current Development Focus*** — done 2026-05-26 (AGENTS.md §Current Development Focus item 2). `MULTI_PLATFORM_PLAN.md` Fabric framing still owed alongside the smoke-test item above.
 
 Out of scope here (deliberately): Forge / NeoForge — gated until Fabric stabilises (Phase 4).
 

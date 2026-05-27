@@ -30,6 +30,10 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     this.availableTime = availableTime;
   }
 
+  /** Spark-profiler frame tag (diagrams 01/02 async worker drain). See {@link RTPRunnable#sparkFrameName()}. */
+  @Override
+  protected String sparkFrameName() { return "rtp_async_task_drain"; }
+
   @Override
   public void run() {
 //    System.out.println("[RTP-DEBUG] AsyncTaskProcessing: Tick started.");
