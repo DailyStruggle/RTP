@@ -86,10 +86,11 @@ public class ParsePermissions {
     }
 
     Set<String> perms = sender.getEffectivePermissions();
+    int res = -1;
     for (String perm : perms) {
       if (perm.startsWith(permissionPrefix)) {
         String[] val = perm.replace(permissionPrefix, "").split("\\.");
-        if (val.length < 1 || val[0] == null || val[0].equals("")) continue;
+        if (val.length < 1 || val[0] == null || val[0].isEmpty()) continue;
         int number;
         try {
           number = Integer.parseInt(val[0]);
@@ -98,9 +99,9 @@ public class ParsePermissions {
           continue;
         }
         entryMap.put(permissionPrefix, new AbstractMap.SimpleEntry<>(current, number));
-        return number;
+        if( number < res || res < 0 ) res = number;
       }
     }
-    return -1;
+    return res;
   }
 }
