@@ -169,6 +169,44 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     // Step 8: drain late startup tasks. Shared helper (ADR-024).
     BootstrapSupport.drainStartupTasks();
 
+    // Maps subsystem (ADR-047 / CHECKLIST-metrics-to-maps Stage 2.6). The
+    // maps-api, BukkitMapBinding, BukkitBiomeColorSource, and the
+    // visualization resolvers are all shipped in the lite jar (ADR-024 does
+    // not exclude mapsapi/**). Without this install MapDispatch stays on
+    // NoopMapBinding and every `/rtp visualization ...` click bottoms out
+    // in the configurable `mapBindingMissing` message ("map rendering is
+    // not available on this server"). Lite is Paper-only per ADR-024
+    // (line 190), so unconditionally install the plain BukkitMapBinding;
+    // no Folia branch is needed here. Failure is logged and swallowed so a
+    // hypothetical platform that can't allocate maps degrades gracefully
+    // to the same `mapBindingMissing` UX rather than crashing onEnable.
+    try {
+      io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding binding =
+          new io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding();
+      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(binding);
+      RTP.log(Level.FINE,
+          "[LIFECYCLE-LITE] onEnable installed " + binding.getClass().getSimpleName()
+              + " (MapDispatch active binding)");
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[LIFECYCLE-LITE] onEnable MapBinding install failed; MapDispatch will fall back to NoopMapBinding",
+          t);
+    }
+    // Install the Bukkit-family BiomeColorSource so the biomes visualisation
+    // asks the server for each biome's native cartography colour (rather
+    // than falling back to the built-in 16-entry categorical palette).
+    try {
+      io.github.dailystruggle.mapsapi.BiomeColorSource.install(
+          new io.github.dailystruggle.rtp.bukkit.maps.BukkitBiomeColorSource());
+      RTP.log(Level.FINE,
+          "[LIFECYCLE-LITE] onEnable installed BukkitBiomeColorSource");
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[LIFECYCLE-LITE] onEnable BiomeColorSource install failed;"
+              + " biomes viz will use the built-in categorical palette",
+          t);
+    }
+
     // Step 9: per-permission effects parse, deferred to tick+1 to mirror the
     // full bootstrap. Lite ships effects-api shaded so per-permission effects
     // (e.g. rtp.effects.<name>) must fire identically to the full edition.
@@ -274,6 +312,16 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     try {
       io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.uninstall();
     } catch (Throwable ignored) {
+    }
+    // Fan out the host-plugin disable to every registered MapBindingLifecycle
+    // so the active BukkitMapBinding (installed in onEnable above) releases
+    // its cached MapHandles. Idempotent; safe if MapDispatch was never used.
+    try {
+      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.fireDisable();
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[LIFECYCLE-LITE] onDisable MapDispatch.fireDisable failed (continuing): "
+              + t.getMessage(), t);
     }
     // Lite has no shutdown-flush phase (no SQL/Redis backend to drain).
     // Async/sync teleport processors are stopped via the same hooks the full bootstrap
