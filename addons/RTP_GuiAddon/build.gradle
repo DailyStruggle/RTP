@@ -1,0 +1,28 @@
+plugins {
+    id 'java'
+}
+group = 'io.github.dailystruggle'
+version = '1.0-SNAPSHOT'
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+repositories {
+    mavenCentral()
+    maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+}
+dependencies {
+    compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    // This addon depends ONLY on the stable, semver-guaranteed rtp-api surface.
+    // It deliberately does NOT link rtp-core: a third-party GUI author should be
+    // able to build a full destination picker + status decoration + teleport
+    // intent without reaching into any rtp-core internal. (See
+    // docs/dev/scratch/PROPOSAL-gui-author-spi.md, security boundary section.)
+    compileOnly project(':rtp-api')
+    // metrics-api is exposed transitively by rtp-api, but declare it explicitly
+    // so the MetricsSnapshot import is self-documenting.
+    compileOnly project(':metrics-api')
+}
+test {
+    useJUnitPlatform()
+}

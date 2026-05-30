@@ -67,7 +67,7 @@ database:
   # @type: string
   password: "password"
 
-# Cross-server / proxy transport settings. See docs/dev/MULTI_SERVER_PLAN.md.
+# Cross-server / proxy transport settings.
 network:
   redis:
     # Włącza wiązanie stanu sieci oparte na Redis.

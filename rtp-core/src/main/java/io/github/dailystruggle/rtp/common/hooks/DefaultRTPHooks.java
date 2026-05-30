@@ -4,8 +4,10 @@ import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry;
 import io.github.dailystruggle.rtp.api.hooks.EconomyProviderRegistry;
 import io.github.dailystruggle.rtp.api.hooks.PlaceholderProviderRegistry;
+import io.github.dailystruggle.rtp.api.hooks.PvPCombatStateRegistry;
 import io.github.dailystruggle.rtp.api.hooks.RTPHooks;
 import io.github.dailystruggle.rtp.api.hooks.RegionVerifierRegistry;
+import io.github.dailystruggle.rtp.api.hooks.RootActionRegistry;
 import io.github.dailystruggle.rtp.api.hooks.WorldBorderProviderRegistry;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -95,6 +97,18 @@ public final class DefaultRTPHooks implements RTPHooks {
     @Override public void clear() { borderProvider = null; }
   };
 
+  private volatile PvPCombatStateRegistry.Provider pvpProvider;
+  private final PvPCombatStateRegistry pvpRegistry = new PvPCombatStateRegistry() {
+    @Override public void bind(Provider provider) {
+      if (provider == null) {
+        throw new IllegalArgumentException("[RTP API] PvP combat-state provider must not be null");
+      }
+      pvpProvider = provider;
+    }
+    @Override public Provider current() { return pvpProvider; }
+    @Override public void clear() { pvpProvider = null; }
+  };
+
   private volatile AnvilPrefilterRegistry.Provider anvilProvider;
   private final AnvilPrefilterRegistry anvilRegistry = new AnvilPrefilterRegistry() {
     @Override public void bind(Provider provider) {
@@ -107,9 +121,23 @@ public final class DefaultRTPHooks implements RTPHooks {
     @Override public void clear() { anvilProvider = null; }
   };
 
+  private volatile RootActionRegistry.Action rootAction;
+  private final RootActionRegistry rootActionRegistry = new RootActionRegistry() {
+    @Override public void bind(Action action) {
+      if (action == null) {
+        throw new IllegalArgumentException("[RTP API] root action must not be null");
+      }
+      rootAction = action;
+    }
+    @Override public Action current() { return rootAction; }
+    @Override public void clear() { rootAction = null; }
+  };
+
   @Override public RegionVerifierRegistry verifiers() { return verifierRegistry; }
   @Override public EconomyProviderRegistry economy() { return economyRegistry; }
   @Override public PlaceholderProviderRegistry placeholders() { return placeholderRegistry; }
   @Override public WorldBorderProviderRegistry worldBorder() { return borderRegistry; }
   @Override public AnvilPrefilterRegistry anvilPrefilter() { return anvilRegistry; }
+  @Override public PvPCombatStateRegistry pvpCombatState() { return pvpRegistry; }
+  @Override public RootActionRegistry rootAction() { return rootActionRegistry; }
 }

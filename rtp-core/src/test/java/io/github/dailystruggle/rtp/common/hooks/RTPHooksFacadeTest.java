@@ -88,6 +88,7 @@ class RTPHooksFacadeTest {
     assertNotNull(h.placeholders());
     assertNotNull(h.worldBorder());
     assertNotNull(h.anvilPrefilter());
+    assertNotNull(h.pvpCombatState());
   }
 
   @Test
@@ -165,5 +166,23 @@ class RTPHooksFacadeTest {
     assertNotNull(hooks.anvilPrefilter().current());
     hooks.anvilPrefilter().clear();
     assertNull(hooks.anvilPrefilter().current());
+  }
+
+  @Test
+  @DisplayName("PvP combat-state registry binds, replaces native, and clears (null-guarded)")
+  void pvpCombatStateRegistry_roundTrip() {
+    Class<?> ignored = RTP.class;
+    assertNotNull(ignored);
+    RTPHooks hooks = RTPAPI.hooks();
+
+    assertNull(hooks.pvpCombatState().current(), "no provider bound -> native fallback");
+    UUID tagged = UUID.randomUUID();
+    hooks.pvpCombatState().bind(uuid -> uuid.equals(tagged));
+    assertNotNull(hooks.pvpCombatState().current());
+    assertTrue(hooks.pvpCombatState().current().isInCombat(tagged));
+    assertEquals(false, hooks.pvpCombatState().current().isInCombat(UUID.randomUUID()));
+    hooks.pvpCombatState().clear();
+    assertNull(hooks.pvpCombatState().current());
+    assertThrows(IllegalArgumentException.class, () -> hooks.pvpCombatState().bind(null));
   }
 }

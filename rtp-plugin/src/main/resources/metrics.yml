@@ -1,7 +1,6 @@
 # --- RTP Metrics Settings ---
-# Reporting-only knobs for the Phase M2 metrics SPI. Throttle / tuning
+# Reporting-only knobs for the metrics SPI. Throttle / tuning
 # knobs continue to live in performance.yml.
-# Documentation: docs/dev/METRICS_PLAN.md > Folia Aggregation
 # Populate MetricsSnapshot.foliaRegions() with per-region detail on Folia.
 # Has no effect on Paper / Bukkit / Fabric (single-region runtimes always
 # return an empty list, which is the correct answer for those platforms).

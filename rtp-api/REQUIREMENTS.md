@@ -9,6 +9,7 @@ For design and implementation details that satisfy these requirements, see [`doc
 - **REQ-API-F-001 — Custom Shapes:** The system shall allow external plugins to register custom spatial geometries (`Shape`). Registration of a custom shape requires deriving from the concrete shape base classes and shall be served at the implementation-extension tier (`rtp-core`) rather than through the thin `rtp-api` contract surface, consistent with REQ-API-NF-002.
 - **REQ-API-F-002 — Vertical Adjustors:** The system shall allow external plugins to register custom Y-axis adjustment logic (e.g., surface, cave, or custom logic). Registration shall be served at the implementation-extension tier (`rtp-core`) for the same reason as REQ-API-F-001.
 - **REQ-API-F-003 — Validation Hooks:** The API shall provide hooks for external claim and protection plugins (e.g., GriefPrevention, WorldGuard) to validate location safety asynchronously.
+- **REQ-API-F-006 — Bare-Command Root Action:** The API shall provide a single-binding hook through which an external addon may override the behaviour of a bare random-teleport command (no arguments) without affecting any subcommand. When no override is bound the system shall perform the classic random teleport, and an override that fails shall not suppress the classic behaviour.
 
 ### 1.2 Data Structures and Models
 - **REQ-API-F-004 — Agnostic Representation:** Shared models (e.g., `RTPLocation`, `RTPWorld`, `RTPPlayer`) shall be platform-agnostic to ensure compatibility across Bukkit, Paper, Folia, and potential future server implementations.

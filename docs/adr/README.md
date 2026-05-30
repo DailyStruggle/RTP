@@ -50,6 +50,7 @@ An ADR captures a significant architectural decision: the context that forced it
 | [ADR-049](ADR-049-network-mode-platform-neutral-lift.md) | Lift network-mode plumbing (`NetworkModeBootstrap` + 12 helpers) from `rtp-plugin/bukkit/network/` to `rtp-core`; new `PlayerLifecycleHook` SPI on `RTPServerAccessor`; supersedes rtp-fabric-ADR-013 | Accepted |
 | [ADR-053](ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit.md) | Pipeline Latency Percentiles and Slow-Teleport Audit (extends ADR-032; `/rtp info` readout) | Accepted |
 | [ADR-054](ADR-054-rtprunnable-self-scheduling-thread-routing.md) | RTPRunnable Self-Scheduling Thread Routing (`target`/`location` + `schedule()` entity/region/async dispatch) | Accepted |
+| [ADR-057](ADR-057-platform-agnostic-addon-spi.md) | Platform-agnostic addon SPI (`RTPAddon` + `AddonRegistry` ServiceLoader discovery; replaces Bukkit `JavaPlugin` addon loading) | Accepted |
 
 ## Subproject ADRs
 

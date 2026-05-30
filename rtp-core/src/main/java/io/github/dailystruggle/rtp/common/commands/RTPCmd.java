@@ -95,6 +95,37 @@ public interface RTPCmd extends BaseRTPCmd {
       }
     }
 
+    // --------------------------------------------------------------------------------------------------------------
+    // Pluggable bare-/rtp root action (ADR-056). A third-party addon may bind an
+    // action (e.g. open a GUI) that replaces the classic teleport for a bare
+    // `/rtp`. Subcommands (`hasSubCommand`) are never affected. When no action is
+    // bound, current() is null and we fall through to the classic teleport path.
+    // A bound action that returns true has handled the command and bypasses the
+    // teleport-specific guards (cooldown / processingPlayers), exactly as a
+    // subcommand does. An action that throws is logged (REQ-RTP-S-004) and treated
+    // as not-handled, so the classic teleport still runs.
+    if (!hasSubCommand) {
+      io.github.dailystruggle.rtp.api.hooks.RootActionRegistry.Action rootAction = null;
+      try {
+        io.github.dailystruggle.rtp.api.hooks.RootActionRegistry rootActionRegistry =
+                io.github.dailystruggle.rtp.api.RTPAPI.hooks().rootAction();
+        if (rootActionRegistry != null) rootAction = rootActionRegistry.current();
+      } catch (IllegalStateException coreNotLoaded) {
+        // hooks facade not published yet (REQ-RTP-S-006); fall through to classic teleport.
+        rootAction = null;
+      }
+      if (rootAction != null) {
+        boolean handled = false;
+        try {
+          handled = rootAction.run(senderId, messageMethod);
+        } catch (Throwable t) {
+          RTP.log(Level.WARNING,
+                  "[RTP] bound /rtp root action threw; falling back to classic teleport", t);
+        }
+        if (handled) return true;
+      }
+    }
+
     long dt = -1;
 
     // --------------------------------------------------------------------------------------------------------------

@@ -99,7 +99,13 @@ function Convert-YamlFileToRows {
     $rows = New-Object System.Collections.Generic.List[object]
     $pendingComments = New-Object System.Collections.Generic.List[string]
     $pendingBlank = $false
-    $currentParent = ''
+    # Indentation-aware parent stack. Each frame is @{ indent = <int>; key = <string> }.
+    # The effective parent_path is the dot-join of the frames' keys. Frames are
+    # popped whenever a non-list line dedents to (or above) their indent, so
+    # sibling maps that follow a deeper nested map (e.g. the multi-level
+    # `loadBalancer.terms` block) are attributed to the correct parent instead
+    # of being appended onto the previous branch.
+    $stack = New-Object System.Collections.Generic.List[object]
     $listIndex = -1
 
     for ($i = 0; $i -lt $lines.Length; $i++) {
@@ -120,12 +126,19 @@ function Convert-YamlFileToRows {
         $indent = $indentMatch.Groups[1].Value.Length
         $stripped = $line.Substring($indent)
 
-        if ($indent -eq 0 -and -not $stripped.StartsWith('- ')) {
-            $currentParent = ''
-            $listIndex = -1
-        }
+        $isListItem = ($stripped.StartsWith('- ') -or $stripped -eq '-')
 
-        if ($stripped.StartsWith('- ') -or $stripped -eq '-') {
+        # Dedent handling: pop any frames at or below the current indent. List
+        # items are exempt so a list whose items share their parent key's
+        # indent (block sequence) stays attributed to that key.
+        if (-not $isListItem) {
+            while ($stack.Count -gt 0 -and $stack[$stack.Count - 1].indent -ge $indent) {
+                $stack.RemoveAt($stack.Count - 1)
+            }
+        }
+        $currentParent = (($stack | ForEach-Object { $_.key }) -join '.')
+
+        if ($isListItem) {
             $listIndex++
             $value = $stripped.Substring(1).TrimStart()
             $rows.Add([pscustomobject]@{
@@ -142,6 +155,9 @@ function Convert-YamlFileToRows {
             $pendingBlank = $false
             continue
         }
+
+        # Any non-list line terminates an in-progress block sequence.
+        $listIndex = -1
 
         $kv = [regex]::Match($stripped, '^([^:#\s][^:]*?)\s*:(?:\s*(.*))?$')
         if (-not $kv.Success) {
@@ -165,18 +181,13 @@ function Convert-YamlFileToRows {
             }) | Out-Null
             $pendingComments.Clear()
             $pendingBlank = $false
-            if ($currentParent -eq '') {
-                $currentParent = $key
-            } else {
-                $currentParent = "$currentParent.$key"
-            }
-            $listIndex = -1
+            $stack.Add([pscustomobject]@{ indent = $indent; key = $key }) | Out-Null
             continue
         }
 
         $rows.Add([pscustomobject]@{
             relpath           = $RelPath
-            parent_path       = if ($indent -gt 0) { $currentParent } else { '' }
+            parent_path       = $currentParent
             key               = $key
             index             = ''
             value             = Strip-Quotes $value
@@ -186,11 +197,6 @@ function Convert-YamlFileToRows {
         }) | Out-Null
         $pendingComments.Clear()
         $pendingBlank = $false
-
-        if ($indent -eq 0) {
-            $currentParent = ''
-            $listIndex = -1
-        }
     }
 
     return $rows

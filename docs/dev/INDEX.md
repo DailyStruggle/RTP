@@ -38,6 +38,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Coverage targets | [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) |
 | Server-admin docs | [`../FOR_SERVER_ADMINS.md`](../FOR_SERVER_ADMINS.md) → [`../admin/`](../admin/) ([CONFIGURATION.md](../admin/CONFIGURATION.md), [REGIONS.md](../admin/REGIONS.md), [CORE_CONFIG.md](../admin/CORE_CONFIG.md), [PERFORMANCE.md](../admin/PERFORMANCE.md), [ECONOMY.md](../admin/ECONOMY.md), [SAFETY.md](../admin/SAFETY.md)) |
 | Addon author docs | [`../FOR_ADDON_DEVELOPERS.md`](../FOR_ADDON_DEVELOPERS.md) |
+| How to load / deploy an addon (ServiceLoader, classpath, lifecycle) | [`ADDON_LOADING.md`](ADDON_LOADING.md) (ADR-057) |
 | Flat map of every doc | [`../MAP.md`](../MAP.md) |
 | Hazards and failure modes | [`../admin/HAZARDS.md`](../admin/HAZARDS.md) |
 | Failure detection and responses | [`../admin/HAZARDS.md#failure-modes`](../admin/HAZARDS.md#failure-modes) |

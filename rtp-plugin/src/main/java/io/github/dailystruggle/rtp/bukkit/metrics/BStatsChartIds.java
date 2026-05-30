@@ -34,6 +34,14 @@ public final class BStatsChartIds {
   public static final String ADDONS_LOADED = "addons_loaded";
   public static final String LITE_FEATURES_DROPPED = "lite_features_dropped";
 
+  // --- Active locale / language selection (SimplePie) ---
+  // Reports which shipped locale the server has selected in language.yml
+  // (en / de / es / fr / ...). Cardinality is bounded by the fixed shipped-
+  // locale whitelist in RTPCostMetricsCharts#KNOWN_LOCALES; any other value
+  // collapses to "other" and an unresolved value to "unknown", so an admin
+  // can't turn this into a fingerprint vector with a custom locale name.
+  public static final String LANGUAGE_SELECTION = "language_selection";
+
   // --- Runtime cost / health (numeric + bucketised) ---
   public static final String REGION_COUNT = "region_count";
   public static final String CACHE_POOL_HEALTH = "cache_pool_health";
@@ -56,4 +64,35 @@ public final class BStatsChartIds {
   public static final String TICK_BUDGET_UTILISATION = "tick_budget_utilisation";
   public static final String FOLIA_REGION_COUNT = "folia_region_count";
   public static final String PENDING_TELEPORTS_PRESSURE = "pending_teleports_pressure";
+
+  // --- Aggregate outcome metrics (process-global RtpOutcomeStats.GLOBAL) ---
+  // Driven by the always-on location-generation outcome accumulator
+  // (RtpOutcomeStats), independent of per-invocation verbose flags. Both charts
+  // are categorical / bucketised and therefore fingerprint-safe: the success
+  // rate is bucketised (never a raw cumulative count) and the dominant failure
+  // cause is drawn from the fixed LocationGenerator.FailTypes catalogue.
+  public static final String AGGREGATE_SUCCESS_RATE = "aggregate_success_rate";
+  public static final String AGGREGATE_TOP_FAILURE_CAUSE = "aggregate_top_failure_cause";
+
+  // --- RTP-correlated MSPT p99 cost, correlated to platform ---
+  // DrilldownPie: outer slice = server platform (folia / paper / spigot / ...),
+  // inner slice = bucketised p99 of the host server MSPT (milliseconds per
+  // tick), computed from the preexisting 1 Hz MetricsSnapshotRing populated by
+  // the CoreMetrics sampler. This surfaces the real per-tick cost (not just the
+  // location-generation pipeline latency) and lets the fleet dashboard
+  // correlate that tail cost with the host platform. Both levels are
+  // categorical / bucketised, so no raw MSPT scalar is ever emitted.
+  public static final String MSPT_P99_BY_PLATFORM = "mspt_p99_by_platform";
+
+  // --- RTP-correlated MSPT p99 cost, correlated to game / plugin version ---
+  // Two DrilldownPie companions to MSPT_P99_BY_PLATFORM: the outer slice is
+  // the host Minecraft version (major.minor) / the RTP plugin version, the inner
+  // slice is the same bucketised MSPT p99. This lets the fleet dashboard
+  // correlate the tail cost with the game version and the plugin version, in
+  // addition to the platform. Both levels are categorical / bucketised, so no
+  // raw MSPT scalar is ever emitted. The outer version labels are not
+  // fingerprinting vectors: bStats already collects the core Minecraft-version
+  // and plugin-version charts for every server.
+  public static final String MSPT_P99_BY_GAME_VERSION = "mspt_p99_by_game_version";
+  public static final String MSPT_P99_BY_PLUGIN_VERSION = "mspt_p99_by_plugin_version";
 }
