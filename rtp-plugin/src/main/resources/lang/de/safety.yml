@@ -197,5 +197,51 @@ biomes:
   - "DEEP_DARK"
   - "THE_VOID"
 
+# --- Optionale PvP-/Combat-Tag-Vorabprüfung ---
+# Hauptschalter. Wenn true, fragt /rtp die aktive Kampfzustands-Autorität ab,
+# bevor ein Spieler angemeldet wird, und erneut, bevor das Ziel angewendet wird, und
+# wendet pvpOnCombat unten an. Standardmäßig aus.
+# @type: boolean
+# @default: false
+pvpCheckEnabled: false
+
+# Wie lange nach dem Austeilen oder Erleiden von PvP-Schaden ein Spieler vom nativen
+# RTP-Tracker als "im Kampf" gilt. Wird ignoriert, wenn ein externes Combat-Tag-Plugin gebunden ist.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 15
+pvpCombatTagSeconds: 15
+
+# Was zu tun ist, wenn ein im Kampf markierter Spieler /rtp anfordert (oder mittendrin ist).
+# ALLOW  - erlauben, aber eine Prüfzeile protokollieren
+# DENY   - den Befehl mit der Beschäftigt-Meldung ablehnen
+# DELAY  - aufschieben, bis die Kampfmarkierung abläuft, dann fortfahren
+# CANCEL - einen laufenden / eingereihten Teleport abbrechen
+# Unbekannte Werte fallen sicher auf DENY zurück.
+# @type: enum
+# @options: [ALLOW, DENY, DELAY, CANCEL]
+# @default: DENY
+pvpOnCombat: "DENY"
+
+# Bevorzugte Quelle des Kampfzustands.
+# AUTO     - externes Combat-Tag-Plugin, falls eines gebunden ist, sonst nativer Tracker
+# NATIVE   - immer den nativen Schadens-Tracker von RTP verwenden
+# EXTERNAL - nur ein gebundenes Combat-Tag-Plugin (kein nativer Rückfall)
+# @type: enum
+# @options: [AUTO, NATIVE, EXTERNAL]
+# @default: AUTO
+pvpSource: "AUTO"
+
+# Nativer Tracker: einen Spieler markieren, der PvP-Schaden ERLEIDET.
+# @type: boolean
+# @default: true
+pvpTagVictim: true
+
+# Nativer Tracker: einen Spieler markieren, der PvP-Schaden AUSTEILT.
+# @type: boolean
+# @default: true
+pvpTagAggressor: true
+
 # ÄNDERE NICHT DIE VERSIONSNUMMER
 version: 1.0

@@ -1,7 +1,6 @@
 # --- RTP-Metrik-Einstellungen ---
-# Reine Reporting-Schalter für die Phase-M2-Metrik-SPI. Drossel-/Tuning-
+# Reine Reporting-Schalter für die Metrik-SPI. Drossel-/Tuning-
 # Schalter bleiben in performance.yml.
-# Dokumentation: docs/dev/METRICS_PLAN.md > Folia Aggregation
 # Füllt MetricsSnapshot.foliaRegions() auf Folia mit Details pro Region.
 # Keine Wirkung auf Paper / Bukkit / Fabric (Single-Region-Runtimes geben
 # stets eine leere Liste zurück, was für diese Plattformen korrekt ist).

@@ -621,7 +621,7 @@ public class RegionQueueManager {
      * @param uuid player uuid
      * @return true if fast locations contains the player
      */
-    boolean hasFastLocation(UUID uuid) {
+    public boolean hasFastLocation(UUID uuid) {
         return fastLocations.containsKey(uuid);
     }
 

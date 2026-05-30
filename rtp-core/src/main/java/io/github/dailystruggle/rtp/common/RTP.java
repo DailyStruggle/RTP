@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
@@ -77,6 +78,15 @@ public class RTP {
 
   /** only one of each of these objects */
   public static Configs configs;
+
+  /**
+   * Platform-agnostic registry of {@link io.github.dailystruggle.rtp.api.addon.RTPAddon}s.
+   * Discovered via {@link java.util.ServiceLoader} and loaded once core initialisation
+   * completes; unloaded on {@link #stop()}. Replaces the Bukkit-only addon loading path
+   * so example/third-party addons run on every platform.
+   */
+  public static final io.github.dailystruggle.rtp.common.addon.AddonRegistry addons =
+      new io.github.dailystruggle.rtp.common.addon.AddonRegistry();
 
   public static final UUID serverId = RTPAPI.serverId;
 
@@ -289,6 +299,127 @@ public class RTP {
       TeleportData d = getInstance().latestTeleportData.get(uuid);
       return (d != null && !d.completed) || getInstance().processingPlayers.contains(uuid);
     };
+
+    // GUI-author SPI reads (PROPOSAL-gui-author-spi.md). Permission-gated target
+    // list + per-target status for populating third-party menu items. Read-only:
+    // these never trigger a teleport or charge a player - RTPAPI.teleport(...)
+    // re-enforces every safety/permission/economy check regardless.
+    io.github.dailystruggle.rtp.api.RTPAPI.allowedTargetsDelegate = uuid -> {
+      java.util.List<io.github.dailystruggle.rtp.api.RtpTarget> out = new ArrayList<>();
+      // A bare /rtp is always offered.
+      out.add(io.github.dailystruggle.rtp.api.RtpTarget.defaultRegion());
+      try {
+        RTPPlayer player = serverAccessor.getPlayer(uuid);
+        for (String name : selectionAPI.regionNames()) {
+          if (name == null || name.trim().isEmpty()) continue;
+          Region region = selectionAPI.getRegion(name);
+          if (region == null) continue;
+          boolean requirePerm = region.getSettings().requirePermission();
+          if (requirePerm
+              && (player == null || !player.hasPermission("rtp.regions." + name))) {
+            continue;
+          }
+          out.add(io.github.dailystruggle.rtp.api.RtpTarget.region(name));
+        }
+      } catch (RuntimeException ex) {
+        log(Level.WARNING, "[RTP API] getAllowedTargets failed: " + ex.getMessage(), ex);
+      }
+      return Collections.unmodifiableList(out);
+    };
+
+    io.github.dailystruggle.rtp.api.RTPAPI.targetStatusDelegate = (uuid, target) -> {
+      try {
+        RTPPlayer player = serverAccessor.getPlayer(uuid);
+        if (player == null) {
+          return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
+              io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.UNKNOWN, 0L, 0.0);
+        }
+
+        Region region;
+        try {
+          region = resolveApiRegion(target, player);
+        } catch (RuntimeException ex) {
+          return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
+              io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.DISABLED, 0L, 0.0);
+        }
+        if (region == null || region.getWorld() == null) {
+          return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
+              io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.DISABLED, 0L, 0.0);
+        }
+
+        // Permission for the named target (mirrors SelectionAPI gating).
+        boolean noPerm = false;
+        switch (target.kind()) {
+          case REGION:
+            if (region.getSettings().requirePermission()
+                && !player.hasPermission("rtp.regions." + target.name())) {
+              noPerm = true;
+            }
+            break;
+          case WORLD: {
+            ConfigParser<WorldKeys> worldParser = configs.getWorldParser(target.name());
+            boolean requirePerm = worldParser != null
+                && Boolean.parseBoolean(
+                    worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
+            if (requirePerm && !player.hasPermission("rtp.worlds." + target.name())) {
+              noPerm = true;
+            }
+            break;
+          }
+          case DEFAULT:
+          default:
+            break;
+        }
+
+        // Cost: region price plus the configured economy base price, unless the
+        // player teleports for free. Funds check mirrors RTPCmd's balanceFloor.
+        double cost = region.getSettings().price();
+        boolean noFunds = false;
+        RTPEconomy economy = RTP.economy;
+        if (economy != null && !player.hasPermission("rtp.free")) {
+          double floor = 0.0;
+          ConfigParser<EconomyKeys> eco =
+              (ConfigParser<EconomyKeys>) configs.getParser(EconomyKeys.class);
+          if (eco != null) {
+            cost += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
+            floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0).doubleValue();
+          }
+          if ((economy.bal(uuid) - cost) < floor) {
+            noFunds = true;
+          }
+        }
+
+        // Remaining cooldown.
+        long remaining = 0L;
+        TeleportData d = getInstance().latestTeleportData.get(uuid);
+        if (d != null) {
+          long dt = System.currentTimeMillis() - d.time;
+          if (dt < 0) dt = 0L;
+          remaining = Math.max(0L, player.cooldown() - dt);
+        }
+
+        io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability availability;
+        if (noPerm) {
+          availability = io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION;
+        } else if (remaining > 0L) {
+          availability = io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.ON_COOLDOWN;
+        } else if (noFunds) {
+          availability = io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_FUNDS;
+        } else {
+          availability = io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.READY;
+        }
+        return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
+            availability, remaining, Math.max(0.0, cost));
+      } catch (RuntimeException ex) {
+        log(Level.WARNING, "[RTP API] getTargetStatus failed: " + ex.getMessage(), ex);
+        return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
+            io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.UNKNOWN, 0L, 0.0);
+      }
+    };
+
+    // Runtime-health snapshot for dashboard tiles. Sampled by the active metrics
+    // binding, not computed on the caller's thread (no main-thread cost / chunk I/O).
+    io.github.dailystruggle.rtp.api.RTPAPI.metricsSnapshotDelegate = () -> metrics.snapshot();
   }
 
   /**
@@ -451,6 +582,15 @@ public class RTP {
 
     long asyncTime = TimeUnit.MILLISECONDS.toNanos(25); // Bumped to 5ms since async has more headroom
     trackedTasks.add(scheduler.runTaskTimerAsynchronously(new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(asyncTime), 1, 1));
+
+    // Discover and load platform-agnostic addons once core init has settled. Deferred via a
+    // startup task so RTPAPI delegates installed by the platform adapter after construction are
+    // visible to RTPAddon#onLoad (the load is idempotent; late programmatic registrations are
+    // loaded eagerly by AddonRegistry#register).
+    startupTasks.add(new RTPRunnable(() -> {
+      addons.discover();
+      addons.loadAll();
+    }, 20));
 
   }
 
@@ -849,6 +989,9 @@ public class RTP {
       log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop networkManager.shutdown");
       instance.networkManager.shutdown();
     }
+
+    log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop addons.unloadAll");
+    addons.unloadAll();
 
     log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop serverAccessor.stop");
     serverAccessor.stop();

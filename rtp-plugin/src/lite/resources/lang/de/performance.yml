@@ -4,7 +4,7 @@
 # @type: integer
 # @range: [1, null]
 # @default: 32
-maxAttempts: 32
+maxVersuche: 32
 
 # Chunk-Radius, der während der Auswahl rund um einen Kandidatenort geladen wird.
 # 0 lädt nur den Kandidaten-Chunk.
@@ -12,7 +12,7 @@ maxAttempts: 32
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
-viewDistanceSelect: 0
+sichtweiteAuswahl: 0
 
 # Chunk-Radius, der unmittelbar vor dem Teleport rund um den endgültigen Ort
 # geladen wird. 0 lädt nur den Ziel-Chunk.
@@ -20,28 +20,28 @@ viewDistanceSelect: 0
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
-viewDistanceTeleport: 0
+sichtweiteTeleport: 0
 
 # Ticks zwischen Hintergrund-Cache-Zyklen (Regions-Vorbefüllung, Warteschlangen-Auffüllung).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
-period: 20
+intervall: 20
 
 # Maximale Millisekunden pro Tick für synchrone Aufgaben.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
-syncAllottedTime: 50
+syncZugeteilteZeit: 50
 
 # Maximale Millisekunden pro Tick für asynchrone Aufgaben.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
-asyncAllottedTime: 50
+asyncZugeteilteZeit: 50
 
 # Mindest-Server-TPS, die zum Fortführen der Hintergrund-Warteschlange nötig ist.
 # Hintergrundarbeit pausiert, wenn die TPS unter diesen Schwellenwert fallen.
@@ -53,35 +53,35 @@ minTPS: 19.0
 # Den Regions-Cache unmittelbar nach einem erfolgreichen Teleport auffüllen.
 # @type: boolean
 # @default: false
-postTeleportQueueing: false
+nachTeleportEinreihung: false
 
 # Synchrones Chunk-Laden verwenden. NICHT EMPFOHLEN. Verletzt den Geist von S-005
 # auf Folia und blockiert den Haupt-Thread auf Paper/Spigot.
 # @type: boolean
 # @default: false
-syncLoading: false
+syncLaden: false
 
 # Effekt-Berechtigungsknoten beim Start auswerten.
 # @type: boolean
 # @default: true
-effectParsing: true
+effektAuswertung: true
 
 # Zuvor gefundene biom-passende Orte aus dem Cache wiederverwenden.
 # @type: boolean
 # @default: true
-biomeRecall: true
+biomWiederverwendung: true
 
 # Wenn gesetzt, biom-gefilterte Anfragen nur aus dem Cache bedienen (niemals
 # neue Biom-Suchen erzeugen). Erfordert biomeRecall.
 # @type: boolean
 # @default: false
-biomeRecallForced: false
+biomWiederverwendungErzwungen: false
 
 # In allen geladenen Chunks nach sicheren Landeplätzen suchen (opportunistische
 # Vorbefüllung).
 # @type: boolean
 # @default: false
-checkOnChunkLoads: false
+beiChunkLadenPruefen: false
 
 # ÄNDERE NICHT DIE VERSIONSNUMMER
 version: 1.0

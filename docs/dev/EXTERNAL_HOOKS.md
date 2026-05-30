@@ -105,6 +105,40 @@ RTPAPI.hooks().worldBorder().bind((world, x, z) -> myBorder.contains(world, x, z
 RTPAPI.hooks().anvilPrefilter().bind((world, cx, cz) -> myDecision(world, cx, cz));
 ```
 
+### 6. PvP combat state - `RTPHooks#pvpCombatState()`
+
+| | |
+|---|---|
+| **API symbol** | `io.github.dailystruggle.rtp.api.hooks.PvPCombatStateRegistry` |
+| **Provider** | `Provider#isInCombat(UUID) -> boolean`. |
+| **Behavior modified** | Replaces RTP's native PvP damage tracker as the authority for the optional `/rtp` combat gate (refuse / delay / cancel a teleport for a combat-tagged player). See [ADR-055](../adr/ADR-055-pvp-combat-gate.md) and ROADMAP Tier 2. |
+| **When invoked** | `PvPGate` at the `/rtp` pre-dispatch surface (before queue enrolment) and again before the destination is applied (execution prefilter). Gate is off by default (`safety.yml#pvpCheckEnabled`). |
+| **Threading** | Called from the command thread and the teleport pipeline; implementations shall be thread-safe and non-blocking. |
+| **Failure mode** | A throwing provider is logged once at WARNING and treated as "not in combat" (REQ-RTP-S-004); a buggy integration never blocks teleports. |
+| **Producers (planned)** | Soft-depend adapters for PvPManager / SimpleCombatLog / CombatLogX (follow-up increment), gated on `isPluginEnabled(...)` like the claim `*Checker`s. When none is bound (or `pvpSource: NATIVE`), RTP's `NativePvPCombatTracker` answers instead. |
+| **REQ / S-rule** | REQ-RTP-S-004, REQ-RTP-F-013. |
+
+```java
+RTPAPI.hooks().pvpCombatState().bind(uuid -> myCombatPlugin.isTagged(uuid));
+```
+
+### 7. Bare-`/rtp` root action - `RTPHooks#rootAction()`
+
+| | |
+|---|---|
+| **API symbol** | `io.github.dailystruggle.rtp.api.hooks.RootActionRegistry` |
+| **Action** | `Action#run(UUID, Consumer<String>) -> boolean handled`. |
+| **Behavior modified** | Replaces what a bare `/rtp` (no arguments) does, e.g. open an addon GUI instead of teleporting. Subcommands (`/rtp admin`, ...) are never affected. See [ADR-056](../adr/ADR-056-bare-rtp-root-action.md). |
+| **When invoked** | `RTPCmd.onCommand` on the bare-root (`!hasSubCommand`) branch, before the teleport guards. `return true` handles the command (classic teleport suppressed, cooldown / processing bypassed); `return false` defers to the classic teleport. |
+| **Threading** | Runs on the command thread; implementations shall be non-blocking and must not perform synchronous chunk I/O (REQ-RTP-S-005). |
+| **Failure mode** | A throwing action is logged once at WARNING and treated as not-handled, so a bare `/rtp` falls back to the classic teleport (REQ-RTP-S-004). |
+| **Producers (today)** | None in core (single-binding, addon-supplied). A GUI/menu addon binds an action that opens its picker; to reuse the classic teleport it returns `false` or calls `RTPAPI.teleport(uuid, target)` itself. |
+| **REQ / S-rule** | REQ-API-F-006, REQ-RTP-S-004. |
+
+```java
+RTPAPI.hooks().rootAction().bind((uuid, feedback) -> { openMyMenu(uuid); return true; });
+```
+
 ---
 
 ## Hooks not (yet) routed through `RTPHooks`

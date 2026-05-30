@@ -35,12 +35,12 @@ spielerBefehle:
 
 # Datenbankkonfiguration
 datenbank:
-  # Backend type.
+  # Backend-Typ.
   # @type: enum
   # @options: ["yaml", "sqlite", "mysql", "postgresql"]
   # @default: "sqlite"
   type: "sqlite"
-  # Database host. Used by mysql/postgresql only.
+  # Datenbank-Host. Wird nur von mysql/postgresql verwendet.
   # @type: string
   host: "127.0.0.1"
   # Datenbank-Port. Wird nur von mysql/postgresql verwendet.
@@ -60,18 +60,18 @@ datenbank:
 # Netzwerk- und Synchronisationskonfiguration
 netzwerk:
   redis:
-    # Enable Redis-backed network state binding.
+    # Redis-gestützte Netzwerkstatus-Bindung aktivieren.
     # @type: boolean
     # @default: false
     enabled: false
-    # Redis host.
+    # Redis-Host.
     # @type: string
     host: "127.0.0.1"
-    # Redis port.
+    # Redis-Port.
     # @type: integer
     # @range: [1, 65535]
     port: 6379
-    # Redis password. Empty string disables auth.
+    # Redis-Passwort. Eine leere Zeichenkette deaktiviert die Authentifizierung.
     # @type: string
     password: ""
 

@@ -1,7 +1,6 @@
 # --- RTP メトリクス設定 ---
-# Phase M2 メトリクス SPI のレポート専用つまみ。スロットル / チューニング
+# メトリクス SPI のレポート専用つまみ。スロットル / チューニング
 # つまみは引き続き performance.yml に置かれます。
-# ドキュメント: docs/dev/METRICS_PLAN.md > Folia Aggregation
 # Folia で MetricsSnapshot.foliaRegions() にリージョン別詳細を格納します。
 # Paper / Bukkit / Fabric では効果なし (単一リージョン環境では常に空の
 # リストを返し、それがこれらのプラットフォームでは正しい挙動です)。

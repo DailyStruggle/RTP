@@ -139,7 +139,7 @@ infoMSPT: "&7Bieżący MSPT pluginu: #7E9CC8[mspt]"
 infoLadowaniaRazem: "&7Łącznie wczytanych chunków: #7E9CC8[loads]"
 infoLadowaniaWgZrodla: "&7Wczytania wg źródła: #7E9CC8[loadsByOrigin]"
 infoWspolczynnikWycieku: "&7Bieżący wskaźnik wycieku chunków: #7E9CC8[leakRate]"
-# --- Metrics SPI health block (METRICS_PLAN.md > /rtp info Surface) ---
+# --- Metrics SPI health block ---
 infoGlebokoscKolejki: "&7Gracze oczekujący w kolejkach regionów: #7E9CC8[queueDepth]"
 infoOczekujaceTeleporty: "&7Oczekujące potoki teleportacji: #7E9CC8[pendingTeleports]"
 infoSredniaPipelineMs: "&7Śr. opóźnienie potoku: #7E9CC8[avgPipelineMs] ms"
@@ -280,13 +280,13 @@ menuStronaGlownaWierszTeleport: "&a▶ /rtp &7- teleport to a random location"
 menuStronaGlownaWierszRegion: "&a▶ /rtp region:&7... &7- pick a region"
 menuStronaGlownaWierszBiom: "&a▶ /rtp biome:&7... &7- pick a biome"
 menuStronaGlownaWierszPomoc: "&a▶ /rtp help &7- list commands"
-# Front-page admin entry row (PROPOSAL-admin-panel.md v2): the only inline
+# Front-page admin entry row: the only inline
 # admin-visible row on the front page; click descends into the curated admin
 # panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
 menuStronaGlownaWierszAdmin: "#9D7CD8▶ admin panel &7- operator tools"
 # Tekst podpowiedzi dla wiersza wejscia do panelu admina. Brak zmiennych.
 menuStronaGlownaHoverAdmin: "&7narzędzia operatora: konfiguracja, skany, diagnostyka, przeładowanie"
-# --- Strona ksiazki panelu admina (PROPOSAL-admin-panel.md v2) ---
+# --- Strona ksiazki panelu admina ---
 # Nieklikalny wiersz tytulu na gorze panelu admina. Brak zmiennych.
 menuPanelAdminaTytul: "#5FB3B3&l⚙ admin panel"
 # Nieklikalny wiersz podpowiedzi pod menuAdminPanelTitle. Brak zmiennych.
@@ -337,7 +337,7 @@ menuWizualizacjeHoverRegion: "&7otwórz mapę pokazującą złe lokalizacje w &b
 menuWizualizacjePuste: "&7(brak skonfigurowanych regionów)"
 # Visualizations submenu back row (returns to the admin panel).
 menuWizualizacjeWierszWstecz: "&7« back"
-# --- Sekcja Konfiguracja panelu admina: wyselekcjonowane prefaby (PROPOSAL-admin-panel-prefabs.md v3.1) ---
+# --- Sekcja Konfiguracja panelu admina: wyselekcjonowane prefaby ---
 # Separator sekcji nad blokiem Konfiguracja (szybki start) w panelu admina.
 menuPanelAdminaSekcjaKonfiguracja: "&8» &7setup (quick start)"
 # Wiersz Konfiguracja + podpowiedz: nakladka tozsamosciowa survival-default (przywroc dostarczone domyslne).
@@ -365,7 +365,6 @@ menuPrefabPotwierdzWiersz: "&a&l[confirm]"
 menuPrefabAnulujWiersz: "&c&l[cancel]"
 # Etykieta klikalnego wiersza opcji Odswiez na dole ksiazki /rtp info.
 # Renderuje ponownie biezacy zakres na podstawie swiezego zrzutu metryk.
-# (PROPOSAL-info-as-book.md sekcja 4.6)
 infoKsiazkaOdswiezWiersz: "&a[Refresh]"
 # Tekst podpowiedzi dla wiersza odswiezania ksiazki info.
 infoKsiazkaOdswiezHover: "&7Ponownie wyrenderuj tę stronę na podstawie świeżej migawki metryk."
@@ -452,7 +451,7 @@ mapaZajeta: "&e[P1] usługa map jest zajęta; spróbuj ponownie za chwilę."
 # powiazaniem jest NoopMapBinding (REQ-RTP-MAP-006 / ADR-047).
 menuInfoZlePunktyEtykieta: "#9D7CD8&l# mapa złych punktów"
 
-# --- Komunikaty trybu sieciowego miedzy serwerami (L6 / rtp-proxy-ADR-014) ---
+# --- Komunikaty trybu sieciowego miedzy serwerami ---
 # Wysylane tylko gdy `network.enabled: true`, a `/rtp` gracza jest kierowane
 # przez miedzyserwerowa kolejke oczekiwania (zob. network.yml `routing.mode`).
 # Wszystkie klucze sa opcjonalne z perspektywy gracza - bazowy cykl L2
@@ -494,11 +493,11 @@ siecNieudane: "&c[P0] teleportacja międzyserwerowa nie powiodła się: [reason]
 # [region] - zadana nazwa regionu.
 siecRegionNiedostepny: "&c[P0] żaden backend nie obsługuje obecnie regionu '[region]'."
 # Wysylane, gdy zadana nazwa regionu odpowiada dwom lub wiecej backendom, a
-# polityka skonfigurowana przez operatora nie potrafi wybrac jednego (D6 w przyszlosci: uruchamia sie
-# tylko przy silniejszych politykach niz `warn` z L6). Zmienna: [region].
+# polityka skonfigurowana przez operatora nie potrafi wybrac jednego (uruchamia sie
+# tylko przy silniejszych politykach niz `warn`). Zmienna: [region].
 siecRegionNiejednoznaczny: "&c[P0] region '[region]' jest niejednoznaczny między backendami; przypnij serwer."
 
-# --- Podmenu MultiConfig (CHECKLIST-multiconfig-menu / PROPOSAL-multiconfig-menu.md) ---
+# --- Podmenu MultiConfig ---
 # Zastepczy wiersz naglowka uzywany, gdy nie zarejestrowano klucza naglowka per-rodzaj.
 # Zmienna: [parserKind] - surowa nazwa rodzaju multi-config.
 multikonfigNaglowekDomyslny: "#5FB3B3&l[parserKind]"

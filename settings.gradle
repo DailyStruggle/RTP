@@ -166,6 +166,13 @@ include 'rtp-proxy:rtp-proxy-common'
 include 'rtp-proxy:rtp-proxy-velocity'
 
 include 'addons:RTP_ExampleAddon'
+// RTP_GuiAddon — reference inventory (chest) destination picker built ONLY on the
+// stable rtp-api GUI-author surface (getAllowedTargets / getTargetStatus /
+// teleport / getMetricsSnapshot). Demonstrates the security boundary from
+// docs/dev/scratch/PROPOSAL-gui-author-spi.md: RTP owns validation, the addon
+// owns presentation + click handling. Bukkit-family only (Fabric has no Bukkit
+// inventory API).
+include 'addons:RTP_GuiAddon'
 
 // Standalone helper plugins (no rtp-api / rtp-core dependency).
 // See helpers/PeriodicWorldSaver/README.md for the directory rationale.

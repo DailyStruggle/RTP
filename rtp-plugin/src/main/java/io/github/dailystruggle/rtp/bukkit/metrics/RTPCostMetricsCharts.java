@@ -6,9 +6,13 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.metrics.api.MetricsBinding;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension;
+import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
+import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.AdvancedPie;
+import org.bstats.charts.DrilldownPie;
 import org.bstats.charts.MultiLineChart;
 import org.bstats.charts.SimplePie;
 import org.bstats.charts.SingleLineChart;
@@ -91,6 +95,12 @@ public final class RTPCostMetricsCharts {
     // ASSEMBLY_VARIANT inverted for dashboard convenience.
     metrics.addCustomChart(new SimplePie(BStatsChartIds.LITE_FEATURES_DROPPED,
             () -> "lite".equalsIgnoreCase(variant) ? "lite" : "none"));
+
+    // Active language / locale: SimplePie of the locale selected in language.yml
+    // (en / de / es / fr / ...). Bounded by the shipped-locale whitelist so a
+    // custom locale name can't fingerprint the server (collapses to "other").
+    metrics.addCustomChart(new SimplePie(BStatsChartIds.LANGUAGE_SELECTION,
+            RTPCostMetricsCharts::detectLanguage));
 
     // --- Region count (single-line, configuration cost dimension) ---
     metrics.addCustomChart(new SingleLineChart(BStatsChartIds.REGION_COUNT,
@@ -209,11 +219,206 @@ public final class RTPCostMetricsCharts {
       b.put(pendingTeleportsBucket(n), 1);
       return b;
     }));
+
+    // --- Aggregate outcome metrics (process-global RtpOutcomeStats.GLOBAL) ---
+    // The always-on location-generation outcome accumulator records every
+    // terminal PregenTask outcome (success, or a failure bucketed by
+    // FailTypes) independent of the per-invocation verbose flag. Both charts
+    // are categorical / bucketised so no raw cumulative count (which would grow
+    // unbounded and fingerprint long-lived servers) is ever emitted.
+    //
+    // Success rate: bucketised fraction of successful generations. "unknown"
+    // until the first outcome is recorded.
+    metrics.addCustomChart(new AdvancedPie(BStatsChartIds.AGGREGATE_SUCCESS_RATE, () -> {
+      Map<String, Integer> b = new HashMap<>();
+      b.put(aggregateSuccessRateBucket(), 1);
+      return b;
+    }));
+
+    // Top failure cause: the single FailTypes with the highest cumulative
+    // reject count, or "none" when no failures (or no outcomes) recorded.
+    // Cardinality is bounded by the fixed FailTypes catalogue.
+    metrics.addCustomChart(new SimplePie(BStatsChartIds.AGGREGATE_TOP_FAILURE_CAUSE,
+            RTPCostMetricsCharts::detectTopFailureCause));
+
+    // --- RTP-correlated MSPT p99 cost, correlated to platform ---
+    // DrilldownPie: the outer slice is the host platform, the inner slice is the
+    // bucketised p99 of the host server MSPT (milliseconds per tick), computed
+    // from the preexisting 1 Hz MetricsSnapshotRing (the rolling MSPT/heap ring
+    // the CoreMetrics sampler already populates) rather than the
+    // location-generation pipeline latency. This answers "what is the per-tick
+    // tail cost, and on which platform?" directly on the fleet dashboard. Both
+    // levels are categorical / bucketised so no raw MSPT scalar is ever emitted.
+    metrics.addCustomChart(new DrilldownPie(BStatsChartIds.MSPT_P99_BY_PLATFORM, () -> {
+      Map<String, Map<String, Integer>> map = new HashMap<>();
+      Map<String, Integer> inner = new HashMap<>();
+      inner.put(msptP99Bucket(msptP99Ms()), 1);
+      map.put(detectPlatform(), inner);
+      return map;
+    }));
+
+    // The same MSPT-p99 tail cost, correlated to the host Minecraft version
+    // (outer = major.minor game version) and the RTP plugin version (outer =
+    // plugin version). These answer "does a particular game / plugin version
+    // regress the tail cost?" on the fleet dashboard. Inner slice is the
+    // identical bucketised MSPT p99; both levels are categorical so no raw MSPT
+    // scalar is emitted, and the version labels are already collected by
+    // bStats' core charts (not a new fingerprint vector).
+    metrics.addCustomChart(new DrilldownPie(BStatsChartIds.MSPT_P99_BY_GAME_VERSION, () -> {
+      Map<String, Map<String, Integer>> map = new HashMap<>();
+      Map<String, Integer> inner = new HashMap<>();
+      inner.put(msptP99Bucket(msptP99Ms()), 1);
+      map.put(detectGameVersion(), inner);
+      return map;
+    }));
+
+    metrics.addCustomChart(new DrilldownPie(BStatsChartIds.MSPT_P99_BY_PLUGIN_VERSION, () -> {
+      Map<String, Map<String, Integer>> map = new HashMap<>();
+      Map<String, Integer> inner = new HashMap<>();
+      inner.put(msptP99Bucket(msptP99Ms()), 1);
+      map.put(detectPluginVersion(), inner);
+      return map;
+    }));
+  }
+
+  /**
+   * Host Minecraft version reduced to {@code major.minor} (e.g. {@code "1.21"}),
+   * read from {@link Bukkit#getBukkitVersion()} (e.g. {@code "1.21.4-R0.1-SNAPSHOT"}).
+   * Returns {@code "unknown"} when the version can't be parsed (or on any error).
+   * Reducing to major.minor keeps cardinality bounded.
+   */
+  static String detectGameVersion() {
+    try {
+      String raw = Bukkit.getBukkitVersion();
+      if (raw == null || raw.isBlank()) return "unknown";
+      // Strip the "-R0.1-SNAPSHOT" qualifier, then keep major.minor only.
+      String core = raw.split("-", 2)[0];
+      String[] parts = core.split("\\.");
+      if (parts.length >= 2) return parts[0] + "." + parts[1];
+      return core.isBlank() ? "unknown" : core;
+    } catch (Throwable t) {
+      return "unknown";
+    }
+  }
+
+  /**
+   * The RTP plugin version, read from the {@code "RTP"} plugin's description.
+   * Returns {@code "unknown"} when the plugin handle isn't available (or on any
+   * error). The plugin version is already reported by bStats' core chart, so it
+   * is not a new fingerprinting vector.
+   */
+  static String detectPluginVersion() {
+    try {
+      org.bukkit.plugin.Plugin rtp = Bukkit.getPluginManager().getPlugin("RTP");
+      if (rtp == null) return "unknown";
+      String version = rtp.getDescription().getVersion();
+      return (version == null || version.isBlank()) ? "unknown" : version;
+    } catch (Throwable t) {
+      return "unknown";
+    }
+  }
+
+  /**
+   * Point-in-time p99 of the host server MSPT (milliseconds per tick), computed
+   * from the preexisting {@link io.github.dailystruggle.rtp.common.metrics.MetricsSnapshotRing}
+   * owned by {@link CoreMetrics} (the rolling 1 Hz MSPT/heap ring). Returns
+   * {@link Double#NaN} when the core metrics implementation is not live, no
+   * samples have been recorded yet, or on any error.
+   */
+  static double msptP99Ms() {
+    try {
+      if (RTP.metrics instanceof CoreMetrics) {
+        double[] samples = ((CoreMetrics) RTP.metrics).snapshotRing().msptSnapshot();
+        return percentile(samples, 0.99);
+      }
+    } catch (Throwable ignored) {
+      // fall through to the NaN sentinel
+    }
+    return Double.NaN;
+  }
+
+  /**
+   * Nearest-rank percentile over a snapshot array, skipping {@code NaN}
+   * sentinels (unsampled slots). Returns {@link Double#NaN} when there are no
+   * finite samples. {@code q} is a fraction in {@code [0, 1]}.
+   */
+  private static double percentile(double[] samples, double q) {
+    if (samples == null || samples.length == 0) return Double.NaN;
+    double[] finite = new double[samples.length];
+    int n = 0;
+    for (double v : samples) {
+      if (!Double.isNaN(v)) finite[n++] = v;
+    }
+    if (n == 0) return Double.NaN;
+    double[] sorted = java.util.Arrays.copyOf(finite, n);
+    java.util.Arrays.sort(sorted);
+    int rank = (int) Math.ceil(q * n) - 1;
+    if (rank < 0) rank = 0;
+    if (rank >= n) rank = n - 1;
+    return sorted[rank];
+  }
+
+  /**
+   * Fingerprint-safe bucket for the MSPT p99 in ms. {@code "unknown"} until the
+   * first sample lands (NaN). Never emits a raw MSPT value.
+   */
+  static String msptP99Bucket(double ms) {
+    if (Double.isNaN(ms) || ms < 0.0) return "unknown";
+    if (ms < 25.0) return "<25";
+    if (ms < 50.0) return "25-50";
+    if (ms < 100.0) return "50-100";
+    if (ms < 250.0) return "100-250";
+    if (ms < 1000.0) return "250-1000";
+    return "1000+";
+  }
+
+  /**
+   * Bucketised success rate from {@link RtpOutcomeStats#GLOBAL}. Returns
+   * {@code "unknown"} when no outcomes have been recorded yet (or on any
+   * error). Never emits a raw count, so long-lived servers cannot be
+   * fingerprinted by their cumulative totals.
+   */
+  static String aggregateSuccessRateBucket() {
+    try {
+      double rate = RtpOutcomeStats.GLOBAL.successRate();
+      if (Double.isNaN(rate) || rate < 0.0) return "unknown";
+      if (rate < 0.50) return "<50";
+      if (rate < 0.75) return "50-75";
+      if (rate < 0.90) return "75-90";
+      if (rate < 0.99) return "90-99";
+      return "99+";
+    } catch (Throwable t) {
+      return "unknown";
+    }
+  }
+
+  /**
+   * Name of the {@link LocationGenerator.FailTypes} with the highest cumulative
+   * reject count in {@link RtpOutcomeStats#GLOBAL}, or {@code "none"} when no
+   * failures have been recorded. Cardinality is bounded by the fixed FailTypes
+   * enum, so this never leaks a fingerprintable value.
+   */
+  static String detectTopFailureCause() {
+    try {
+      LocationGenerator.FailTypes top = null;
+      long best = 0L;
+      for (Map.Entry<LocationGenerator.FailTypes, Long> e :
+              RtpOutcomeStats.GLOBAL.failureBreakdown().entrySet()) {
+        long count = (e.getValue() == null) ? 0L : e.getValue();
+        if (count > best) {
+          best = count;
+          top = e.getKey();
+        }
+      }
+      return (top == null) ? "none" : top.name();
+    } catch (Throwable t) {
+      return "unknown";
+    }
   }
 
   // --- Detection helpers (no-throw; log-and-fallback so a chart fail never breaks startup) ---
 
-  private static String detectPlatform() {
+  static String detectPlatform() {
     try {
       String name = Bukkit.getServer().getName();
       String version = Bukkit.getServer().getVersion();
@@ -249,6 +454,36 @@ public final class RTPCostMetricsCharts {
       if (lc.contains("postgres")) return "postgresql";
       if (lc.contains("mysql") || lc.contains("mariadb")) return "mysql";
       return "other";
+    } catch (Throwable t) {
+      return "unknown";
+    }
+  }
+
+  /**
+   * Fixed set of locales shipped with RTP (the {@code lang/<locale>/} resource
+   * directories plus the {@code en} baseline). Reporting only members of this
+   * set bounds the chart's cardinality; any other configured locale collapses
+   * to {@code "other"} so a custom locale name can't fingerprint the server.
+   */
+  static final List<String> KNOWN_LOCALES =
+          Collections.unmodifiableList(Arrays.asList(
+                  "en", "cat", "de", "es", "fr", "it",
+                  "ja", "ko", "nl", "pl", "pt", "ru", "zh"));
+
+  /**
+   * Active locale selected in {@code language.yml}, normalised to a member of
+   * {@link #KNOWN_LOCALES} (or {@code "other"} for any shipped-but-unlisted /
+   * custom locale, {@code "unknown"} when it can't be resolved). Never echoes a
+   * raw, potentially-custom locale string.
+   */
+  static String detectLanguage() {
+    try {
+      if (RTP.serverAccessor == null) return "unknown";
+      String locale = io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap
+              .resolve(RTP.serverAccessor.getPluginDirectory());
+      if (locale == null || locale.isBlank()) return "unknown";
+      String lc = locale.toLowerCase();
+      return KNOWN_LOCALES.contains(lc) ? lc : "other";
     } catch (Throwable t) {
       return "unknown";
     }

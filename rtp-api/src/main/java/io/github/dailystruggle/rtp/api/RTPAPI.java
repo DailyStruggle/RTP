@@ -1,14 +1,19 @@
 package io.github.dailystruggle.rtp.api;
 
+import io.github.dailystruggle.metrics.api.FoliaRegionSample;
+import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.rtp.api.hooks.RTPHooks;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
 
 /**
@@ -96,6 +101,29 @@ public class RTPAPI {
    * directly.
    */
   public static volatile Predicate<UUID> warmupDelegate = null;
+
+  /**
+   * Delegate that lists the {@link RtpTarget}s a player is permitted to use,
+   * with permission gates already applied. Populated by {@code rtp-core} during
+   * {@code onEnable}; {@code null} until then. Use
+   * {@link #getAllowedTargets(UUID)} rather than calling this field directly.
+   */
+  public static volatile Function<UUID, List<RtpTarget>> allowedTargetsDelegate = null;
+  /**
+   * Delegate that reports the per-player {@link RtpTargetStatus} for a target
+   * (cooldown, cost, availability). Populated by {@code rtp-core} during
+   * {@code onEnable}; {@code null} until then. Use
+   * {@link #getTargetStatus(UUID, RtpTarget)} rather than calling this field
+   * directly.
+   */
+  public static volatile BiFunction<UUID, RtpTarget, RtpTargetStatus> targetStatusDelegate = null;
+  /**
+   * Delegate that supplies the latest sampled runtime-health
+   * {@link MetricsSnapshot}. Populated by {@code rtp-core} during
+   * {@code onEnable}; {@code null} until then. Use {@link #getMetricsSnapshot()}
+   * rather than calling this field directly.
+   */
+  public static volatile Supplier<MetricsSnapshot> metricsSnapshotDelegate = null;
 
 
   /**
@@ -254,5 +282,112 @@ public class RTPAPI {
           "[RTP API] Cannot read warmup state: Core implementation is not loaded.");
     }
     return d.test(player);
+  }
+
+  /**
+   * Returns the {@link RtpTarget}s {@code player} is permitted to teleport to,
+   * with the same permission gates the {@code /rtp} command applies already
+   * resolved.
+   *
+   * <p>Intended for populating a destination picker in a third-party GUI: every
+   * returned target is one the player may actually use, so a GUI can render the
+   * list verbatim. The result always contains {@link RtpTarget#defaultRegion()}
+   * as its first element (a bare {@code /rtp} is always offered), followed by any
+   * named regions the player passes the permission check for.
+   *
+   * <p>This is a read-only query; it never triggers a teleport. Submitting one of
+   * the returned targets to {@link #teleport(UUID, RtpTarget)} re-enforces every
+   * safety and permission check regardless of this list.
+   *
+   * @param player the player UUID; must not be {@code null}
+   * @return an immutable, non-null list of permitted targets
+   * @throws IllegalStateException    if {@code rtp-core} has not loaded yet
+   *     (REQ-RTP-S-006)
+   * @throws IllegalArgumentException if {@code player} is {@code null}
+   */
+  public static List<RtpTarget> getAllowedTargets(UUID player) {
+    if (player == null) throw new IllegalArgumentException("[RTP API] player must not be null");
+    Function<UUID, List<RtpTarget>> d = allowedTargetsDelegate;
+    if (d == null) {
+      throw new IllegalStateException(
+          "[RTP API] Cannot read allowed targets: Core implementation is not loaded.");
+    }
+    List<RtpTarget> result = d.apply(player);
+    return (result == null) ? Collections.emptyList() : result;
+  }
+
+  /**
+   * Returns the per-player {@link RtpTargetStatus} for {@code target}: remaining
+   * cooldown, monetary cost, and an availability verdict.
+   *
+   * <p>Intended for decorating a destination button in a third-party GUI (greyed
+   * out on cooldown, a price tag, a lock when the player lacks permission). The
+   * values are a point-in-time read and are never refreshed after the call.
+   *
+   * <p>This is a read-only query; it never triggers a teleport or charges the
+   * player. The authoritative checks still run inside
+   * {@link #teleport(UUID, RtpTarget)}.
+   *
+   * @param player the player UUID; must not be {@code null}
+   * @param target the target to describe; must not be {@code null}
+   * @return a non-null status snapshot
+   * @throws IllegalStateException    if {@code rtp-core} has not loaded yet
+   *     (REQ-RTP-S-006)
+   * @throws IllegalArgumentException if {@code player} or {@code target} is {@code null}
+   */
+  public static RtpTargetStatus getTargetStatus(UUID player, RtpTarget target) {
+    if (player == null) throw new IllegalArgumentException("[RTP API] player must not be null");
+    if (target == null) throw new IllegalArgumentException("[RTP API] target must not be null");
+    BiFunction<UUID, RtpTarget, RtpTargetStatus> d = targetStatusDelegate;
+    if (d == null) {
+      throw new IllegalStateException(
+          "[RTP API] Cannot read target status: Core implementation is not loaded.");
+    }
+    RtpTargetStatus status = d.apply(player, target);
+    return (status == null)
+        ? new RtpTargetStatus(RtpTargetStatus.Availability.UNKNOWN, 0L, 0.0)
+        : status;
+  }
+
+  /**
+   * Returns the latest sampled runtime-health {@link MetricsSnapshot} (TPS, MSPT,
+   * tick-budget utilisation, player count, heap, and per-region detail).
+   *
+   * <p>Intended for dashboard tiles in a third-party GUI. The snapshot is
+   * produced by the active metrics binding's sampler, not computed on the
+   * caller's thread, so reading it introduces no main-thread cost and no chunk
+   * I/O. Unsampled fields are reported as {@link MetricsSnapshot#UNSAMPLED}.
+   *
+   * @return a non-null snapshot
+   * @throws IllegalStateException if {@code rtp-core} has not loaded yet
+   *     (REQ-RTP-S-006)
+   */
+  public static MetricsSnapshot getMetricsSnapshot() {
+    Supplier<MetricsSnapshot> d = metricsSnapshotDelegate;
+    if (d == null) {
+      throw new IllegalStateException(
+          "[RTP API] Cannot read metrics: Core implementation is not loaded.");
+    }
+    return d.get();
+  }
+
+  /**
+   * Returns the per-region runtime samples from the latest
+   * {@link #getMetricsSnapshot()}.
+   *
+   * <p>On Folia (and any future multi-region runtime) this is one
+   * {@link FoliaRegionSample} per region; on single-region runtimes it is empty.
+   * Convenience equivalent of {@code getMetricsSnapshot().foliaRegions}.
+   *
+   * @return an immutable, non-null list of per-region samples (possibly empty)
+   * @throws IllegalStateException if {@code rtp-core} has not loaded yet
+   *     (REQ-RTP-S-006)
+   */
+  public static List<FoliaRegionSample> getRegionSamples() {
+    MetricsSnapshot snapshot = getMetricsSnapshot();
+    if (snapshot == null || snapshot.foliaRegions == null) {
+      return Collections.emptyList();
+    }
+    return snapshot.foliaRegions;
   }
 }

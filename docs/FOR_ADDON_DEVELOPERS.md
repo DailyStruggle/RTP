@@ -31,6 +31,15 @@ Particularly relevant: ADR-001 (spiral mapping), ADR-006 (async queue), ADR-011 
 
 ---
 
+## How to Load an Addon
+
+Once your addon is written, see [dev/ADDON_LOADING.md](dev/ADDON_LOADING.md) for how RTP
+discovers, loads, and unloads it on every platform (the `RTPAddon` SPI + `ServiceLoader`
+descriptor, classpath placement, and lifecycle). The decision behind it is
+[ADR-057](adr/ADR-057-platform-agnostic-addon-spi.md).
+
+---
+
 ## Reference Material
 
 - [REQUIREMENTS.md](dev/REQUIREMENTS.md) — the `REQ-API-*` requirements define the stability contract your addon can rely on.

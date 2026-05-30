@@ -16,6 +16,13 @@ dependencies {
     // platform adapters see these types transitively.
     api project(':commands-api')
     api project(':yaml-api')
+    // metrics-api: the GUI-author SPI exposes runtime-health reads
+    // (RTPAPI.getMetricsSnapshot / getRegionSamples) returning MetricsSnapshot
+    // and FoliaRegionSample. metrics-api is a pure-Java, dependency-free SPI
+    // module (metrics-api-ADR-001), so this edge keeps the DAG acyclic:
+    // metrics-api <- rtp-api <- rtp-core. 'api' so addon authors see the
+    // snapshot types transitively.
+    api project(':metrics-api')
 
     compileOnly 'org.jetbrains:annotations:24.1.0'
     // Checker Framework processor — runs during compileJava only, not shipped in the JAR.

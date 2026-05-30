@@ -1,7 +1,6 @@
 # --- RTP 指标设置 ---
-# Phase M2 指标 SPI 的仅报告类开关。节流 / 调优开关仍位于
+# 指标 SPI 的仅报告类开关。节流 / 调优开关仍位于
 # performance.yml 中。
-# 文档: docs/dev/METRICS_PLAN.md > Folia Aggregation
 # 在 Folia 上以每区域明细填充 MetricsSnapshot.foliaRegions()。
 # 对 Paper / Bukkit / Fabric 无效 (单区域运行时始终返回空列表，
 # 这是这些平台的正确答案)。

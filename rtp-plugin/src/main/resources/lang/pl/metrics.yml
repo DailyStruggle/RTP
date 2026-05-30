@@ -1,7 +1,6 @@
 # --- Ustawienia metryk RTP ---
 # Pokrętła wyłącznie raportowe dla SPI metryk z Fazy M2. Pokrętła
 # ograniczania / strojenia pozostają w performance.yml.
-# Dokumentacja: docs/dev/METRICS_PLAN.md > Folia Aggregation
 # Wypełnia MetricsSnapshot.foliaRegions() szczegółami per-region w Folii.
 # Brak efektu na Paper / Bukkit / Fabric (środowiska jednoregionowe zawsze
 # zwracają pustą listę, co jest poprawną odpowiedzią dla tych platform).

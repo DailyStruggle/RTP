@@ -1,0 +1,12 @@
+name: RTP_GuiAddon
+version: '${version}'
+main: io.github.dailystruggle.rtp.guiexample.RTPGuiAddon
+api-version: 1.17
+prefix: RTP-GUI
+authors: [ leaf26 ]
+description: 'example addon - a chest-inventory destination picker built only on the stable rtp-api GUI-author surface'
+depend: [ RTP ]
+commands:
+  rtpgui:
+    description: open the RTP destination picker GUI
+    usage: /rtpgui

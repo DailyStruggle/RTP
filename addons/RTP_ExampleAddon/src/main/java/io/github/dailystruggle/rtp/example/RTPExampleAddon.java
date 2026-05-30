@@ -1,29 +1,40 @@
 package io.github.dailystruggle.rtp.example;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
-import org.bukkit.Bukkit;
-import org.bukkit.plugin.java.JavaPlugin;
+import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
+import java.util.logging.Level;
 
 /**
  * Reference example addon for RTP.
+ *
+ * <p>Platform-agnostic: implements {@link RTPAddon} and is discovered by
+ * {@code rtp-core} through {@link java.util.ServiceLoader} (see
+ * {@code META-INF/services/io.github.dailystruggle.rtp.api.addon.RTPAddon}), so it runs
+ * on Bukkit/Paper/Folia and Fabric alike with no Bukkit plugin loader or
+ * {@code org.bukkit.*} imports.
  *
  * <p>Demonstrates common RTP API touch-points:
  * <ul>
  *   <li><b>Config</b>: Registers {@link ConfigParser} with {@link ExampleKeys} for {@code /rtp reload}.</li>
  *   <li><b>Safety</b>: Registers an async verifier predicate via {@link RTPAPI#hooks()}. (See ADR-026).</li>
- *   <li><b>Events</b>: Implements {@link org.bukkit.event.Listener} for RTP lifecycle events.</li>
+ *   <li><b>Events</b>: Registers a post-teleport callback on
+ *       {@link TeleportPipelineTask#teleportPostActions} - the platform-agnostic
+ *       replacement for the Bukkit {@code PostTeleportEvent}.</li>
  *   <li><b>Reload</b>: Uses {@link Configs#onReload(Runnable)} for live config updates.</li>
  * </ul>
  *
  * <p>See {@code README.md} for a walkthrough.
  */
-public final class RTPExampleAddon extends JavaPlugin {
+public final class RTPExampleAddon implements RTPAddon {
+
+  private final ExampleCountdownHooks countdownHooks = new ExampleCountdownHooks();
 
   @Override
-  public void onEnable() {
+  public void onLoad() {
     // 1. Register the addon's config file (example.yml) with RTP's Configs registry.
     RTP.configs.putParser(registerParser());
 
@@ -51,8 +62,28 @@ public final class RTPExampleAddon extends JavaPlugin {
           return true;
         });
 
-    // 3. Register a Bukkit listener for RTP's lifecycle events.
-    Bukkit.getPluginManager().registerEvents(new ExampleTeleportListener(), this);
+    // 3. Observe RTP's lifecycle via the platform-agnostic post-teleport runnable list.
+    //    This fires at the end of the TELEPORT phase on every platform, replacing the
+    //    Bukkit-only PostTeleportEvent listener.
+    TeleportPipelineTask.teleportPostActions.add(this::onPostTeleport);
+
+    // 5. Register the two example countdowns (delay + queue), also platform-agnostic.
+    countdownHooks.register();
+  }
+
+  /** Logs a line whenever the {@code announceTeleport} flag is enabled in {@code example.yml}. */
+  @SuppressWarnings("unchecked")
+  private void onPostTeleport(TeleportPipelineTask task) {
+    ConfigParser<ExampleKeys> parser =
+        (ConfigParser<ExampleKeys>) RTP.configs.getParser(ExampleKeys.class);
+    if (parser == null) return;
+
+    Object flag = parser.getConfigValue(ExampleKeys.announceTeleport, false);
+    boolean enabled =
+        (flag instanceof Boolean) ? (Boolean) flag : Boolean.parseBoolean(String.valueOf(flag));
+    if (!enabled) return;
+
+    RTP.log(Level.INFO, "[RTP_ExampleAddon] post-teleport observed");
   }
 
   /**
@@ -71,8 +102,9 @@ public final class RTPExampleAddon extends JavaPlugin {
   }
 
   @Override
-  public void onDisable() {
+  public void onUnload() {
     // Addons should be able to come and go without leaving RTP in a half-state. If you allocated
     // tickets, scheduled tasks, or wrote to the DB, release/cancel/flush them here.
+    countdownHooks.unregister();
   }
 }

@@ -4,7 +4,7 @@
 # @type: integer
 # @range: [1, null]
 # @default: 32
-maxAttempts: 32
+maxVersuche: 32
 
 # Chunk-Radius, der während der Auswahl rund um einen Kandidatenort geladen wird.
 # 0 lädt nur den Kandidaten-Chunk.
@@ -12,7 +12,7 @@ maxAttempts: 32
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
-viewDistanceSelect: 0
+sichtweiteAuswahl: 0
 
 # Chunk-Radius, der unmittelbar vor dem Teleport rund um den endgültigen Ort
 # geladen wird. 0 lädt nur den Ziel-Chunk.
@@ -20,28 +20,28 @@ viewDistanceSelect: 0
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
-viewDistanceTeleport: 0
+sichtweiteTeleport: 0
 
 # Ticks zwischen Hintergrund-Cache-Zyklen (Regions-Vorbefüllung, Warteschlangen-Auffüllung).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
-period: 20
+intervall: 20
 
 # Maximale Millisekunden pro Tick für synchrone Aufgaben.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
-syncAllottedTime: 50
+syncZugeteilteZeit: 50
 
 # Maximale Millisekunden pro Tick für asynchrone Aufgaben.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
-asyncAllottedTime: 50
+asyncZugeteilteZeit: 50
 
 # Mindest-Server-TPS, die zum Fortführen der Hintergrund-Warteschlange nötig ist.
 # Hintergrundarbeit pausiert, wenn die TPS unter diesen Schwellenwert fallen.
@@ -53,56 +53,56 @@ minTPS: 19.0
 # Den Regions-Cache unmittelbar nach einem erfolgreichen Teleport auffüllen.
 # @type: boolean
 # @default: false
-postTeleportQueueing: false
+nachTeleportEinreihung: false
 
 # Synchrones Chunk-Laden verwenden. NICHT EMPFOHLEN. Verletzt den Geist von S-005
 # auf Folia und blockiert den Haupt-Thread auf Paper/Spigot.
 # @type: boolean
 # @default: false
-syncLoading: false
+syncLaden: false
 
 # Berechtigungsknoten bei jedem Ereignis neu auswerten, statt sie zu cachen.
 # @type: boolean
 # @default: false
-onEventParsing: false
+ereignisAuswertung: false
 
 # Effekt-Berechtigungsknoten beim Start auswerten.
 # @type: boolean
 # @default: true
-effectParsing: true
+effektAuswertung: true
 
 # Zuvor gefundene biom-passende Orte aus dem Cache wiederverwenden.
 # @type: boolean
 # @default: true
-biomeRecall: true
+biomWiederverwendung: true
 
 # Wenn gesetzt, biom-gefilterte Anfragen nur aus dem Cache bedienen (niemals
 # neue Biom-Suchen erzeugen). Erfordert biomeRecall.
 # @type: boolean
 # @default: false
-biomeRecallForced: false
+biomWiederverwendungErzwungen: false
 
 # In allen geladenen Chunks nach sicheren Landeplätzen suchen (opportunistische
 # Vorbefüllung).
 # @type: boolean
 # @default: false
-checkOnChunkLoads: false
+beiChunkLadenPruefen: false
 
 # Hintergrund-Datenerfassung für Besucher-Analysen aktivieren.
 # @type: boolean
 # @default: false
-visitorEnabled: true
+besucherAktiviert: true
 
 # Reservierten Cache für Beitritts-Teleports vorhalten (rtp.onevent.firstjoin / rtp.onevent.join). Größe richtet sich nach verbleibenden freien Spieler-Slots. Siehe
 # @type: boolean
 # @default: false
-loginCacheEnabled: false
+loginCacheAktiviert: false
 
 # Harte Obergrenze für den Beitritts-Cache. 0 = automatisch (max-players des Servers beim Start).
 # @type: integer
 # @range: [0, null]
 # @default: 0
-loginCacheCap: 0
+loginCacheObergrenze: 0
 
 # Wahrscheinlichkeit, einen nicht generierten Chunk pro Auswahlversuch abzulehnen.
 # 0.0 = keine Bevorzugung (Standard), 1.0 = nicht generiertes Land strikt meiden.
@@ -110,7 +110,7 @@ loginCacheCap: 0
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.0
-pregeneratedPreference: 0.0
+vorgeneriertBevorzugung: 0.0
 
 # Anteil der L3-Backlog-Kapazität, bei dem das Auffüllen wieder einsetzt (Hysterese).
 # 0.5 = erst auffüllen, wenn L3 auf 50% geleert ist (Standard). 1.0 = kontinuierlich
@@ -119,35 +119,35 @@ pregeneratedPreference: 0.0
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
-backlogRefillThreshold: 0.5
+rueckstauAuffuellSchwelle: 0.5
 
-# Latency threshold (ms) above which an immediately-served (unqueued) teleport
-# is audited: a WARN is logged and the cumulative slowPipelineCount counter
-# (surfaced by /rtp info) is incremented. Only immediate/unqueued teleports are
-# audited; queued at-rate teleports are excluded because their measured time
-# includes queue-wait. 0 or below disables the audit. See ADR-053.
+# Latenzschwelle (ms), oberhalb der ein sofort bedienter (nicht eingereihter) Teleport
+# geprüft wird: eine WARN wird protokolliert und der kumulative slowPipelineCount-Zähler
+# (angezeigt von /rtp info) wird erhöht. Nur sofortige/nicht eingereihte Teleports werden
+# geprüft; eingereihte at-rate-Teleports werden ausgeschlossen, da ihre gemessene Zeit
+# die Warteschlangen-Wartezeit enthält. 0 oder darunter deaktiviert die Prüfung. Siehe ADR-053.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
-slowPipelineThresholdMs: 5000
+langsamePipelineSchwelleMs: 5000
 
-# Public teleport-queue depth (players waiting) at or above which queue
-# backpressure is audited: an edge-triggered WARN is logged and the cumulative
-# queueGrowthWarnCount counter (surfaced by /rtp info) is incremented once per
-# crossing. 0 or below disables the audit (opt-in). See ADR-053.
+# Tiefe der öffentlichen Teleport-Warteschlange (wartende Spieler), ab der die
+# Warteschlangen-Rückstauprüfung erfolgt: eine flankengesteuerte WARN wird protokolliert und der
+# kumulative queueGrowthWarnCount-Zähler (angezeigt von /rtp info) wird einmal pro
+# überschreitung erhöht. 0 oder darunter deaktiviert die Prüfung (Opt-in). Siehe ADR-053.
 # @type: integer
 # @range: [0, null]
 # @unit: players
 # @default: 0
-queueGrowthWarnThreshold: 0
+warteschlangenWachstumWarnSchwelle: 0
 # Einstellungen für /rtp admin prefab. Der `apply` -> `confirm`-Ablauf schreibt
 # jede berührte Konfigurationsdatei mit einem gleichnamigen Backup
 # <file>.yml.bak.<epochMillis>; `bakRetention` begrenzt, wie viele solcher
 # Backups je Datei behalten werden, älteste zuerst entfernt. Auf 1 setzen, um nur
 # das neueste Backup zu behalten; Werte unter 1 werden auf 1 angehoben. /rtp admin
 # prefab rollback geht Backups über mehrere Aufrufe vom neuesten zum ältesten durch.
-prefab:
+vorlage:
   # @type: integer
   # @range: [1, null]
   # @default: 3
