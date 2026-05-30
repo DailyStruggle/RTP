@@ -3,11 +3,8 @@
 [SIZE=4][B][COLOR=#555555]Deterministic, bounded-latency Random Teleport for production Minecraft servers[/COLOR][/B][/SIZE]
 [I]For operators who edit YAML, version-control configs, and read profiler output.[/I]
 [I]Folia-native - multi-server / proxy - audited safety - drop-in upgrade from the free RTP build.[/I]
-
-[URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/v/release/dailystruggle/RTP?label=Version&style=for-the-badge&color=2980B9[/IMG][/URL] [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/license/dailystruggle/RTP?label=License&style=for-the-badge&color=2C3E50[/IMG][/URL]
-
 [/CENTER]
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#27AE60]Why operators buy Pro[/COLOR][/B][/SIZE]
 [CENTER][SIZE=5][B][COLOR=#27AE60]19.8 TP/s sustained at 4 ms worst-case tick. Next-best plugin: 70 ms.[/COLOR][/B][/SIZE][/CENTER]
@@ -18,7 +15,7 @@
 [*][B]No lag spikes when players spam [I]/rtp[/I].[/B] Worst-case main-thread tick stays at 4 ms (vs. 70-771 ms for the next plugins) - your TPS holds at 20.00 during a teleport burst.
 [*][B]Instant teleports, no "Finding a safe location..." wait.[/B] Pre-verified location queue serves [I]/rtp[/I] in one tick instead of loading chunks on demand.
 [*][B]The only RTP plugin that runs natively on Folia at double-digit TP/s[/B] (9.87 TP/s @ 99.97 % success) - every competitor stalls regions or fails to load.
-[*][B]Drop-in upgrade from the free RTP build.[/B] Same [I]config.yml[/I], same commands, same claim-plugin integrations (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect) - flip the jar, keep the data.
+[*][B]Automatic performance the moment the jar drops in.[/B] Pre-warmed location queue, persistent spatial memory, off-tick Anvil pre-filter and async chunk loading kick in on first start - no profiling, no tuning, no per-world hand-holding. Same [I]config.yml[/I], commands, and claim-plugin integrations (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect) as the free build, so the upgrade itself is risk-free.
 [*][B]Audited safety[/B]: no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures (REQ-RTP-S-001..S-007).
 [/LIST]
 
@@ -61,7 +58,7 @@ On [B]Paper 1.21[/B], measured on the in-repo harness, 2 OPed clients spamming [
 
 Same throughput as the next-best plugin at [B]~17x lower worst-case tick spike and 35% less CPU per teleport.[/B] On Folia, RTP-Pro is the only plugin in the field that hits double-digit TP/s (9.87 TP/s @ 99.97% success). Raw harness: [URL='https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP'][I]helpers/StressTestRTP/[/I][/URL].
 
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#2980B9]What Pro adds over the free RTP build[/COLOR][/B][/SIZE]
 [TABLE]
@@ -72,60 +69,60 @@ Same throughput as the next-best plugin at [B]~17x lower worst-case tick spike a
 [TH][B]RTP-Pro[/B][/TH]
 [/TR]
 [TR]
-[TD]Spigot + Paper engine, queues, spiral, Anvil pre-filter[/TD]
-[TD]Yes[/TD]
-[TD]Yes[/TD]
-[/TR]
-[TR]
-[TD]8 claim plugins bundled (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect)[/TD]
-[TD]Yes[/TD]
-[TD]Yes[/TD]
-[/TR]
-[TR]
-[TD][I]effects-api[/I], [I]rtp-api[/I], PlaceholderAPI, ProtocolLib[/TD]
-[TD]Yes[/TD]
-[TD]Yes[/TD]
-[/TR]
-[TR]
 [TD][B]Folia[/B] (Region Scheduler + off-tick pre-filter, no 1-tick stalls)[/TD]
 [TD]No[/TD]
-[TD]Yes[/TD]
+[TD][B]Yes[/B][/TD]
 [/TR]
 [TR]
 [TD][B]Multi-server / proxy[/B] (Velocity)[/TD]
 [TD]No[/TD]
-[TD]Yes[/TD]
+[TD][B]Yes[/B][/TD]
 [/TR]
 [TR]
 [TD][B]SQL / Redis[/B] shared-state backends (H2, SQLite, MySQL, PostgreSQL, Jedis)[/TD]
 [TD]No[/TD]
-[TD]Yes[/TD]
+[TD][B]Yes[/B][/TD]
 [/TR]
 [TR]
 [TD][B]Vault[/B] economy (charge for [I]/rtp[/I])[/TD]
 [TD]No[/TD]
-[TD]Yes[/TD]
+[TD][B]Yes[/B][/TD]
 [/TR]
 [TR]
 [TD]Multilingual [I]lang/**[/I], login-reserve cache, visitor mode[/TD]
 [TD]No[/TD]
-[TD]Yes[/TD]
+[TD][B]Yes[/B][/TD]
 [/TR]
 [TR]
 [TD][B][I]safety.yml[/I] token grammar[/B] - vanilla block tags, state predicates, wildcards[/TD]
 [TD]No[/TD]
-[TD]Yes[/TD]
+[TD][B]Yes[/B][/TD]
 [/TR]
 [TR]
 [TD]Earliest release on each MC version + priority support[/TD]
 [TD]No[/TD]
-[TD]Yes[/TD]
+[TD][B]Yes[/B][/TD]
+[/TR]
+[TR]
+[TD][COLOR=#888888]Spigot + Paper engine, queues, spiral, Anvil pre-filter[/COLOR][/TD]
+[TD][COLOR=#888888]Yes[/COLOR][/TD]
+[TD][COLOR=#888888]Yes[/COLOR][/TD]
+[/TR]
+[TR]
+[TD][COLOR=#888888]8 claim plugins bundled (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect)[/COLOR][/TD]
+[TD][COLOR=#888888]Yes[/COLOR][/TD]
+[TD][COLOR=#888888]Yes[/COLOR][/TD]
+[/TR]
+[TR]
+[TD][COLOR=#888888][I]effects-api[/I], [I]rtp-api[/I], PlaceholderAPI, ProtocolLib[/COLOR][/TD]
+[TD][COLOR=#888888]Yes[/COLOR][/TD]
+[TD][COLOR=#888888]Yes[/COLOR][/TD]
 [/TR]
 [/TABLE]
 
 Same configuration, same data files, same commands as the free build - [B]upgrade is drop-in.[/B]
 
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#27AE60]Built for[/COLOR][/B][/SIZE]
 RTP-Pro is engineered for the servers that push the platform hardest. If any of these describe your setup, it's the right tool:
@@ -141,7 +138,7 @@ RTP-Pro is engineered for the servers that push the platform hardest. If any of 
 
 [B]Platform requirements:[/B] Java 21+, on Paper / Folia / Spigot / Fabric (or Arclight / Mohist for Forge / NeoForge).
 
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SPOILER='Full benchmark - Paper, Spigot, Folia head-to-head']
 [B]Confidence:[/B] measured; from plugin docs; inferred from architecture.
@@ -468,7 +465,6 @@ What's on deck, with direction:
 [*][B]Un-populated chunk attribution bucket[/B] - distinguish first-touch live loads from other fallbacks in the reports.
 [*][B]Fully-automatic self-warming[/B] - background spatial-memory accumulation without the [I]/rtp scan[/I] verb.
 [*][B]Anonymous opt-in telemetry[/B] - reference benchmark sourced from real deployments.
-[*][B]Fresh demonstration videos[/B] aligned with 3.0 numbers.
 [/LIST]
 
 File a GitHub issue if you hit something not on the list.
@@ -494,17 +490,6 @@ A: Paper, with memory to spare for the location cache. RTP works particularly we
 A: Yes - same configuration, same data files, same commands. You lose Folia, proxy, SQL/Redis, Vault, multilingual, and the tag/state-predicate grammar.
 [/SPOILER]
 
-[SPOILER='Demonstration videos (RTP 2.x - same principles, older numbers)']
-[I]Recorded on earlier versions. Spatial learning and queue-paced throughput are unchanged in 3.0; on-screen numbers aren't current-release benchmarks.[/I]
-
-[B]Learning & deterministic-time test[/B]
-[media=youtube]PY6W7DikhAI[/media]
-[I]The plugin "learns" bad sectors; selection time converges to a predictable lower bound.[/I]
-
-[B]Command-response & throughput test[/B]
-[media=youtube]l6KSvKxsKAQ[/media]
-[I]Pre-generated queue -> near-instant [I]/rtp[/I] response under load.[/I]
-[/SPOILER]
 
 [SPOILER='Support']
 [LIST]
@@ -515,7 +500,7 @@ A: Yes - same configuration, same data files, same commands. You lose Folia, pro
 [/LIST]
 [/SPOILER]
 
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#7F8C8D]Links[/COLOR][/B][/SIZE]
 [LIST]
@@ -525,7 +510,7 @@ A: Yes - same configuration, same data files, same commands. You lose Folia, pro
 [*][URL='https://github.com/dailystruggle/RTP'][B]Source on GitHub[/B][/URL] - star, watch, contribute, file issues
 [/LIST]
 
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [QUOTE]
 [I]A deterministic, high-performance teleport engine for serious Minecraft servers. Folia-native concurrency, audited safety invariants, and zero-latency execution.[/I]

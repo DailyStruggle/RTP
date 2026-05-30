@@ -9,6 +9,10 @@ plugins {
 
 dependencies {
     api project(':rtp-api')
+    // yaml-api -- in-house zero-dependency YAML substrate (ADR-025), extracted
+    // from this module so rtp-api can host the configurable selection model.
+    // 'api' so downstream consumers keep seeing the YAML types transitively.
+    api project(':yaml-api')
 
     // Core logic dependencies (platform agnostic)
     // snakeyaml is provided at runtime by Spigot/Paper/Folia, but NOT by

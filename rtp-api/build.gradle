@@ -7,6 +7,16 @@ configurations {
 }
 
 dependencies {
+    // commands-api + yaml-api: rtp-api hosts the extensible selection model
+    // (FactoryValue + the Shape / VerticalAdjustor hierarchy). Shapes expose
+    // CommandParameter-typed config (commands-api) and FactoryValue loads its
+    // lang map via the in-house YAML substrate (yaml-api). Both modules are
+    // pure-Java and depend on nothing in this graph, so the DAG stays acyclic:
+    // commands-api, yaml-api <- rtp-api <- rtp-core. 'api' so addon authors and
+    // platform adapters see these types transitively.
+    api project(':commands-api')
+    api project(':yaml-api')
+
     compileOnly 'org.jetbrains:annotations:24.1.0'
     // Checker Framework processor — runs during compileJava only, not shipped in the JAR.
     // checker-qual (the annotation classes) is inherited from the root subprojects block.

@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.bukkit.tools.softdepends;
 
-import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -115,7 +114,7 @@ public class ChunkyBorderChecker {
                 Shape<RectangleParams> shape = (Shape<RectangleParams>) value;
                 if (!(shape instanceof ChunkyRTPShape)) {
                   shape = new ChunkyRTPShape("chunky_" + border.name());
-                  RTPAPI.addShape(shape);
+                  RTP.addShape(shape);
                 }
                 long radiusX = (long) ((borderData.getRadiusX() * 0.9d) / 16);
                 long radiusZ = (long) ((borderData.getRadiusZ() * 0.9d) / 16);

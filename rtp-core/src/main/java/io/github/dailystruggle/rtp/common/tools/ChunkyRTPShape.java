@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.tools;
 
-import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Rectangle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import org.popcraft.chunky.ChunkyProvider;
@@ -22,7 +22,7 @@ public class ChunkyRTPShape extends Rectangle {
     super(chunkyShapeName.toUpperCase());
     this.chunkyShapeName = "chunky_" + chunkyShapeName;
 
-    RTPAPI.addShape(this);
+    RTP.addShape(this);
   }
 
   /**

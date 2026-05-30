@@ -1,0 +1,109 @@
+﻿relpath	parent_path	base_key	index	new_key	new_value	new_comment
+messages.yml		placeholders				# --- Komunikaty RTP widoczne dla gracza ---\n# Wszystkie ciagi widoczne dla gracza i konsoli.\n#\n# Formatowanie:\n#   - klasyczne kody kolorow Bukkit (np. &a, &e, &c)\n#   - szesnastkowe kody kolorow (np. #2636ef)\n#   - symbole PlaceholderAPI (gdy PAPI jest zainstalowane)\n#\n# Symbole zastepcze:\n#   - Wspolne symbole "[Pn]" sa zdefiniowane na liscie `placeholders` ponizej.\n#     [P0] to domyslnie prefiks RTP.\n#   - Symbole specyficzne dla komunikatu (np. [attempts], [world]) sa opisane\n#     bezposrednio nad kazdym komunikatem, ktory ich uzywa.\n#\n# ###############################################################################\n# Sekcja 1: Konfiguracja ogolna\n# ###############################################################################\n# lista dodatkowych symboli zastepczych\n# format: Pn - gdzie n to indeks na tej liscie
+messages.yml		alreadyTeleporting				# ###############################################################################\n# Sekcja 2: Teleportacja\n# ###############################################################################\n# podczas teleportacji wyswietl to
+messages.yml		teleportCancel				# jesli teleportacja zostanie anulowana
+messages.yml		days				# ###############################################################################\n# Sekcja 3: Formatowanie czasu\n# ###############################################################################\n# dla symboli czasu: jak nazywac dni, godziny, minuty, sekundy i milisekundy
+messages.yml		oldFile				# ###############################################################################\n# Sekcja 4: System i zarzadzanie\n# ###############################################################################\n# wersja pliku konfiguracyjnego jest nizsza niz najnowsza\n# zmienna: [filename] - nazwa pliku, wraz z rozszerzeniem
+messages.yml		busy				# wtyczka jest zajeta przeladowywaniem
+messages.yml		invalidCommand				# wtyczka nie ma podkomendy lub parametru zadanego przez uzytkownika\n# zmienna: [arg] - sprobowany argument
+messages.yml		locationSaved				# ###############################################################################\n# Sekcja 5: Logi administracyjne\n# ###############################################################################\n# logowane, gdy lokalizacje sa zapisywane/wczytywane z bazy danych\n# zmienna: [amount] - liczba lokalizacji\n# zmienna: [region] - nazwa regionu
+messages.yml		scanStart				# ###############################################################################\n# Sekcja 6: Komenda skanowania\n# ###############################################################################\n# komunikaty zwiazane z komenda skanowania\n# zmienna: [scan_regions] - lista regionow
+messages.yml		scanStatus				# zmienne: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+messages.yml		infoTitle				# ###############################################################################\n# Sekcja 7: Komenda info\n# ###############################################################################\n# komunikaty zwiazane z komenda info
+messages.yml		infoFoliaRegionsHeader				# Wiersz naglowka wprowadzajacy tabele per-region Folia (tylko srodowisko Folia).
+messages.yml		infoFoliaRegion				# Szablon wiersza dla pojedynczego regionu Folia. Zmienne: [regionId] [tps1m]\n# [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
+messages.yml		worldInfo				# pod-listy info\n# zmienne: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
+messages.yml		rtp				# ###############################################################################\n# Sekcja 8: Opisy komend\n# ###############################################################################\n# wyswietlane w komendzie pomocy
+messages.yml		menuInvalid				# ###############################################################################\n# Sekcja 8b: Uogolniony framework menu\n# ###############################################################################\n# Wysylane, gdy konkretna komenda /rtp menu ... jest zniekształcona, wskazuje na\n# nieznana sciezke/parametr lub nie przechodzi bramki uprawnien po stronie serwera.\n# ADR-050: klikniecia w menu to konkretne komendy, wiec nie ma tokenu do wygasniecia.
+messages.yml		menuHoverFallbackType				# Szablon zastepczy podpowiedzi uzywany przez reflektor menu, gdy dla parametru\n# nie ma komentarza blokowego w YAML. Zmienna: [type] - zadeklarowany typ parametru.
+messages.yml		menuHoverFallbackBounds				# Szablon zastepczy podpowiedzi uzywany przez reflektor menu, gdy parametr udostepnia\n# maly, wyselekcjonowany zbior wartosci. Zmienna: [values] - dozwolone wartosci rozdzielone przecinkami.
+messages.yml		menuBack				# Etykieta wiersza nawigacji "cofnij o jeden poziom" dodawanego na poczatku kazdej nie-glownej strony menu.
+messages.yml		menuExecute				# Szablon etykiety wiersza "wykonaj zlozona komende" dodawanego na poczatku kazdej\n# uruchamialnej, nie-glownej strony menu. Zmienna: [command] - zlozone wywolanie /rtp ...
+messages.yml		menuPickValue				# Wiersz naglowka na gorze podstrony wyboru wartosci parametru (Etap A.2).\n# Zmienne: [param] - nazwa parametru; [command] - zlozone wywolanie /rtp ...
+messages.yml		menuTypeValue				# Etykieta zastepczego wiersza "wpisz wlasna wartosc" na stronie wyboru wartosci parametru.\n# Klikniecie wstepnie wypelnia czat zlozona komenda az do '<param>:', dzieki czemu gracz\n# moze wpisac dowolna wartosc, takze spoza listy sugestii.
+messages.yml		menuConstructed				# Nieklikalny wiersz naglowka na gorze kazdej nie-glownej strony menu (Etap A.4).\n# Pokazuje aktualnie budowane wywolanie /rtp wraz z wszelkimi przypisanymi\n# parametrami (name:value). Zmienna: [command] - zlozone argumenty.
+messages.yml		menuRootTitle				# Nieklikalny wiersz tytulu dodawany na poczatku glownej strony menu /rtp (Etap A.5).\n# Zapewnia powitalny naglowek, zanim gracz zejdzie do dowolnej podkomendy.
+messages.yml		menuRootHint				# Nieklikalny wiersz podtytulu/podpowiedzi dodawany na glownej stronie menu /rtp pod\n# menuRootTitle (Etap A.5). Krotki tekst orientacyjny dla nowych uzytkownikow.
+messages.yml		menuPagePrev				# Wiersze nawigacji dodawane do stronicowanych stron menu (Etap A.6) - klikniecie\n# przenosi do poprzedniej/nastepnej strony tego samego modelu. Zmienna:\n# [page] - czytelny dla czlowieka numer strony docelowej liczony od 1.
+messages.yml		menuFrontPageSectionTeleport				# Separator sekcji na stronie glownej nad wierszami teleportacji (widok gracza).
+messages.yml		menuFrontPageHoverAdmin				# Tekst podpowiedzi dla wiersza wejscia do panelu admina. Brak zmiennych.
+messages.yml		menuAdminPanelTitle				# --- Strona ksiazki panelu admina (PROPOSAL-admin-panel.md v2) ---\n# Nieklikalny wiersz tytulu na gorze panelu admina. Brak zmiennych.
+messages.yml		menuAdminPanelHint				# Nieklikalny wiersz podpowiedzi pod menuAdminPanelTitle. Brak zmiennych.
+messages.yml		menuAdminPanelSectionConfig				# Separatory sekcji w panelu admina. Brak zmiennych.
+messages.yml		menuAdminPanelHoverVisualizations				# Tekst podpowiedzi dla wiersza Wizualizacje w panelu admina. Brak zmiennych.
+messages.yml		menuAdminPanelSectionVisualizations				# Separator sekcji nad blokiem Wizualizacje w panelu admina.
+messages.yml		menuVisualizationsTitle				# Nieklikalny wiersz tytulu na gorze podmenu Wizualizacje.
+messages.yml		menuVisualizationsHint				# Nieklikalny wiersz podpowiedzi pod tytulem.
+messages.yml		menuVisualizationsHoverRegion				# Tekst podpowiedzi dla wiersza regionu Wizualizacje; [region] - nazwa regionu.
+messages.yml		menuVisualizationsEmpty				# Nieklikalny wiersz podpowiedzi pokazywany, gdy nie skonfigurowano zadnych regionow.
+messages.yml		menuAdminPanelSectionSetup				# --- Sekcja Konfiguracja panelu admina: wyselekcjonowane prefaby (PROPOSAL-admin-panel-prefabs.md v3.1) ---\n# Separator sekcji nad blokiem Konfiguracja (szybki start) w panelu admina.
+messages.yml		menuPrefabSurvivalDefaultRow				# Wiersz Konfiguracja + podpowiedz: nakladka tozsamosciowa survival-default (przywroc dostarczone domyslne).
+messages.yml		menuPrefabLowPerformanceRow				# Wiersz Konfiguracja + podpowiedz: niska wydajnosc (dluzszy puls, mniejsze cache, login cache wyl.).
+messages.yml		menuPrefabHighPerformanceRow				# Wiersz Konfiguracja + podpowiedz: wysoka wydajnosc (krotki puls, duze cache, login cache wl.).
+messages.yml		menuPrefabFoliaTunedRow				# Wiersz Konfiguracja + podpowiedz: dostrojone pod Folia (strojenie schedulera regionalnego).
+messages.yml		menuPrefabMultiWorldRow				# Wiersz Konfiguracja + podpowiedz: wiele swiatow (jeden region na swiat z biezacego domyslnego).
+messages.yml		menuPrefabConfirmTitle				# Tytul menu potwierdzenia. Zmienna: [prefab] - id prefabu lub nazwa wyswietlana.
+messages.yml		menuPrefabConfirmHint				# Nieklikalny wiersz podpowiedzi menu potwierdzenia pod tytulem. Brak zmiennych.
+messages.yml		menuPrefabConfirmRow				# Wiersz stopki menu potwierdzenia: potwierdz i zapisz prefab na dysk.
+messages.yml		menuPrefabCancelRow				# Wiersz stopki menu potwierdzenia: anuluj i wroc do panelu admina.
+messages.yml		infoBookRefreshRow				# Etykieta klikalnego wiersza opcji Odswiez na dole ksiazki /rtp info.\n# Renderuje ponownie biezacy zakres na podstawie swiezego zrzutu metryk.\n# (PROPOSAL-info-as-book.md sekcja 4.6)
+messages.yml		infoBookRefreshHover				# Tekst podpowiedzi dla wiersza odswiezania ksiazki info.
+messages.yml		infoBookSwitchToTextRow				# Etykieta klikalnego wiersza opcji Przelacz na czat na dole ksiazki\n# /rtp info. Uruchamia ponownie ten sam zakres przez klasyczna sciezke czatu.
+messages.yml		infoBookSwitchToTextHover				# Tekst podpowiedzi dla wiersza przelaczenia ksiazki info na czat.
+messages.yml		infoBookOverflowFooter				# Wiersz stopki renderowany, gdy tresc ksiazki /rtp info przekracza limit\n# strony ksiazki. Klikniecie uruchamia ten sam zakres w trybie czatu, aby nie utracic danych.
+messages.yml		infoBookAutoRefreshDeferredNote				# Nieklikalny wiersz notatki informujacy, ze okresowe automatyczne odswiezanie ksiazki\n# info nie jest obecnie wspierane w tej kompilacji (odlozone do pozniejszego\n# kamienia milowego). Uzytkownicy moga kliknac wiersz Odswiez, aby odswiezyc recznie.
+messages.yml		configSelectorTitle				# Nieklikalny wiersz tytulu na gorze strony wyboru pliku konfiguracji (Etap C.1).\n# Pokazywany, gdy admin klika "/rtp config" ze strony glownej.
+messages.yml		configSelectorBackRow				# Etykieta wiersza nawigacji "powrot do glownego menu /rtp" na stronie wyboru konfiguracji.
+messages.yml		configFileTitle				# Nieklikalny wiersz tytulu na gorze strony pojedynczego pliku konfiguracji (Etap C.2).\n# Zmienna: [file] - nazwa pliku konfiguracji (np. "performance", "safety").
+messages.yml		configFileBackRow				# Etykieta wiersza nawigacji "powrot do wyboru konfiguracji" na stronie pojedynczego pliku konfiguracji.
+messages.yml		configFileEmptyHint				# Nieklikalny wiersz podpowiedzi pokazywany, gdy plik konfiguracji nie ma edytowalnych kluczy.
+messages.yml		configKeyRowFormat				# Etykieta wiersza per-klucz na stronie pliku konfiguracji. Zmienne:\n#   [key]   - nazwa klucza konfiguracji; [value] - aktualnie zapisana wartosc.
+messages.yml		configKeyHoverFormat				# Tekst podpowiedzi dla wiersza per-klucz na stronie pliku konfiguracji. Zmienne:\n#   [key], [value], [type] - nazwa klucza, biezaca wartosc i zadeklarowany typ.
+messages.yml		configTypePickerTitle				# Nieklikalny wiersz tytulu na gorze strony wyboru typu shape/vert (Etap C.3a).\n# Zmienne: [param] - "shape" lub "vert"; [current] - nazwa aktualnie aktywnego typu.
+messages.yml		configSubParamPageTitle				# Nieklikalny wiersz tytulu na gorze strony podparametru shape/vert (Etap C.3b).\n# Zmienne: [param] - "shape" lub "vert"; [type] - nazwa aktywnego typu.
+messages.yml		configValueUnsetPlaceholder				# Tekst zastepczy renderowany w miejsce wartosci konfiguracji, ktora nie zostala ustawiona.
+messages.yml		configPendingHeader				# Nieklikalny wiersz naglowka oddzielajacy liste "Zmienialne" od listy "Oczekujace"\n# (koszyk zmian) na stronie pliku konfiguracji, gdy ogladajacy ma przygotowane jedna lub\n# wiecej niezatwierdzonych zmian. Brak zmiennych. Unikaj zoltego (&e/&6) i bialego\n# (&f): pergamin ksiazki renderuje je wyblakle.
+messages.yml		configPendingRowFormat				# Etykieta wiersza dla przygotowanego (oczekujacego) wpisu klucz=wartosc na stronie konfiguracji.\n# Klikniecie wiersza usuwa go z koszyka. Zmienne: [key], [value].\n# Unikaj zoltego/bialego na pergaminie ksiazki.
+messages.yml		configPendingRowHover				# Tekst podpowiedzi pokazywany, gdy ogladajacy najedzie na oczekujacy (przygotowany) wiersz\n# na stronie konfiguracji. Brak zmiennych.
+messages.yml		configApplyRow				# Klikalna etykieta wiersza "zastosuj przygotowane zmiany" na stronie konfiguracji.\n# Uruchamia zlozona komende /rtp config <file> k1=v1 ... i czysci koszyk.
+messages.yml		configDiscardRow				# Klikalna etykieta wiersza "odrzuc przygotowane zmiany" na stronie konfiguracji.\n# Czysci koszyk bez zastosowania.
+messages.yml		mapBindingMissing				# --- Most deklaratywnej kompozycji wykresow ADR-047 (REQ-RTP-MAP-006) ---\n# Wysylane do ogladajacego, gdy uruchomi sie akcja menu OPEN_MAP, ale nie jest\n# zarejestrowane zadne konkretne MapBinding (NoopMapBinding nadal jest aktywne, np. na\n# kompilacji Lite lub zanim RTPHooks podlaczy powiazanie platformy).
+messages.yml		mapResolverMissing				# Wysylane, gdy MapDispatch otrzyma ChartSpec, ktorego Kind nie ma zarejestrowanego\n# ChartSpecResolver (np. ogladajacy z Etapu 1 klika sparkline z Etapu 3, zanim\n# resolver zostanie dodany).
+messages.yml		mapUnavailable				# Wysylane, gdy resolver dziala, ale bazowe zrodlo danych jest niedostepne\n# dla zadanego celu (nieznany region, brak danych, swiat nie zaladowany).\n# Zmienna: [region] - zadana nazwa regionu (moze byc pusta).
+messages.yml		mapBusy				# Wysylane, gdy aktywne MapBinding nie moze teraz przydzielic uchwytu mapy\n# (przeciwcisnienie zdefiniowane przez powiazanie, np. osiagnieto limit per-ogladajacy).
+messages.yml		menuInfoBadPointsLabel				# Etykieta klikalnego wiersza menu "/rtp info", ktory po kliknieciu tworzy\n# token ChartSpec(BAD_POINTS_HEATMAP, ...) i prosi aktywne MapBinding\n# o wyrenderowanie mapy cieplnej 128x128 znanych indeksow spirali zlych\n# punktow biezacego regionu. Wiersz jest pomijany przy renderowaniu, gdy zainstalowanym\n# powiazaniem jest NoopMapBinding (REQ-RTP-MAP-006 / ADR-047).
+messages.yml		networkQueued				# --- Komunikaty trybu sieciowego miedzy serwerami (L6 / rtp-proxy-ADR-014) ---\n# Wysylane tylko gdy `network.enabled: true`, a `/rtp` gracza jest kierowane\n# przez miedzyserwerowa kolejke oczekiwania (zob. network.yml `routing.mode`).\n# Wszystkie klucze sa opcjonalne z perspektywy gracza - bazowy cykl L2\n# `delayMessage` / `teleportMessage` nadal steruje widocznym przeplywem.\n# Wysylane, gdy zadanie zostalo przyjete do miedzyserwerowej kolejki oczekiwania\n# i czeka na przejecie przez backend. Zmienna: [position] - pozycja liczona\n# od 0 z `pollStatus`; moze byc pusta, jesli transport nie zwroci pozycji.
+messages.yml		alreadyQueued				# Wysylane, gdy gracz uruchamia /rtp*, podczas gdy ma juz nieterminalne\n# miedzyserwerowe zgloszenie (ADR-015 / REQ-RTP-NET-015 blokada komendy). Zmienna:\n# [position] - pozycja FIFO, gdy znana; pusta, gdy proxy jeszcze jej\n# nie przydzielilo.
+messages.yml		networkTimedOut				# Wysylane, gdy wpis miedzyserwerowej listy oczekujacych zostaje usuniety po przekroczeniu\n# skonfigurowanego TTL (ADR-015). Brak zmiennych.
+messages.yml		waitlistFull				# Wysylane, gdy zgloszenie do miedzyserwerowej listy oczekujacych jest odrzucone, poniewaz wspolna\n# lista oczekujacych osiagnela skonfigurowany maksymalny rozmiar (ADR-015 REJECTED_FULL).\n# Brak zmiennych.
+messages.yml		networkRouting				# Wysylane, gdy kolejka przekazala zadanie do routera proxy i\n# trwa wybor backendu.
+messages.yml		networkReserved				# Wysylane, gdy backend zarezerwowal koordynaty dla tego gracza, a\n# proxy zaraz zainicjuje skok miedzy serwerami. Zmienna: [server]\n# - serverId docelowego backendu.
+messages.yml		networkTransferring				# Wysylane, gdy proxy jest w trakcie skoku. Zmienna: [server] - cel.
+messages.yml		networkFallback				# Wysylane, gdy sciezka miedzyserwerowa poddala sie, a zadanie wrocilo do\n# lokalnego backendu. Zmienna: [reason] - jedna z wartosci\n# `RoutingDecision.FallbackReason` (np. NO_LIVE_PEER, QUEUE_FULL).
+messages.yml		networkFailed				# Wysylane, gdy miedzyserwerowe zadanie zakonczylo sie terminalnym niepowodzeniem (brak mozliwego\n# powrotu). Zmienna: [reason] - `DispatchOutcome.Failed.Reason`.
+messages.yml		networkRegionUnavailable				# Wysylane, gdy gracz poprosil o konkretny region (`/rtp <region>`), ale\n# zaden backend w sieci aktualnie go nie obsluguje. Zmienna:\n# [region] - zadana nazwa regionu.
+messages.yml		networkRegionAmbiguous				# Wysylane, gdy zadana nazwa regionu odpowiada dwom lub wiecej backendom, a\n# polityka skonfigurowana przez operatora nie potrafi wybrac jednego (D6 w przyszlosci: uruchamia sie\n# tylko przy silniejszych politykach niz `warn` z L6). Zmienna: [region].
+messages.yml		multiconfigHeaderDefault				# --- Podmenu MultiConfig (CHECKLIST-multiconfig-menu / PROPOSAL-multiconfig-menu.md) ---\n# Zastepczy wiersz naglowka uzywany, gdy nie zarejestrowano klucza naglowka per-rodzaj.\n# Zmienna: [parserKind] - surowa nazwa rodzaju multi-config.
+messages.yml		multiconfigHeaderRegions				# Etykieta wiersza naglowka strony wyboru multi-config dla regionow. Brak zmiennych.
+messages.yml		multiconfigHeaderWorlds				# Etykieta wiersza naglowka strony wyboru multi-config dla swiatow. Brak zmiennych.
+messages.yml		multiconfigToggleRemoveModeOff				# Etykieta wiersza przelacznika, gdy tryb usuwania jest WYLACZONY. Brak zmiennych.
+messages.yml		multiconfigToggleRemoveModeOn				# Etykieta wiersza przelacznika, gdy tryb usuwania jest WLACZONY. Klikniecia w wiersze wpisow usuwaja.
+messages.yml		multiconfigRowAdd				# Etykieta wiersza wyboru dla wpisu "+ Dodaj nowy...". Brak zmiennych.
+messages.yml		multiconfigRowAddHover				# Tekst podpowiedzi dla wiersza Dodaj. Zmienna: [name] - wstepnie wypelniona domyslna nazwa.
+messages.yml		multiconfigRowEditHover				# Tekst podpowiedzi dla wiersza wpisu w trybie normalnym. Zmienna: [name].
+messages.yml		multiconfigRowRemoveHover				# Tekst podpowiedzi dla wiersza wpisu w trybie usuwania. Zmienna: [name].
+messages.yml		multiconfigConfirmTitle				# Wiersz tytulu strony potwierdzenia usuniecia. Zmienna: [name].
+messages.yml		multiconfigConfirmYes				# Etykieta wiersza Tak na stronie potwierdzenia usuniecia. Brak zmiennych.
+messages.yml		multiconfigConfirmNo				# Etykieta wiersza Anuluj na stronie potwierdzenia usuniecia. Brak zmiennych.
+messages.yml		multiconfigLockRegionDefault				# Tekst podpowiedzi na zablokowanym (wyszarzonym) wierszu regionu domyslnego. Brak zmiennych.
+messages.yml		multiconfigLockWorldLoaded				# Tekst podpowiedzi na zablokowanym (wyszarzonym) wierszu swiata. Zmienna: [name].
+messages.yml		multiconfigResultAdded				# Komunikat wyniku po pomyslnym DODANIU. Zmienna: [name].
+messages.yml		multiconfigResultRemoved				# Komunikat wyniku po pomyslnym USUNIECIU. Zmienna: [name].
+messages.yml		multiconfigResultAddFailed				# Komunikat wyniku, gdy DODANIE sie nie powiodlo. Zmienne: [name], [reason].
+messages.yml		multiconfigResultRemoveFailed				# Komunikat wyniku, gdy USUNIECIE sie nie powiodlo. Zmienne: [name], [reason].
+messages.yml		multiconfigResultNameInvalid				# Komunikat wyniku, gdy proponowana nazwa wpisu zostaje odrzucona przez sanityzer.\n# Zmienna: [name].
+messages.yml		multiconfigResultNameTaken				# Komunikat wyniku, gdy DODANIE koliduje z istniejaca nazwa wpisu.\n# Zmienna: [name].
+messages.yml		PLAYER_AVAILABLE				# ###############################################################################\n# Sekcja 9: Wsparcie PlaceholderAPI\n# ###############################################################################\n# symbole statusu dla graczy
+messages.yml		title				# ###############################################################################\n# Sekcja 10: Wizualne\n# ###############################################################################\n# ustawienia tytulu\n# usun lub ustaw title na "", aby wylaczyc\n# zalecane jest PlaceholderAPI dla wspolrzednych
+messages.yml		version				# ###############################################################################\n# Sekcja 11: Metadane\n# ###############################################################################\n# NIE ZMIENIAJ NUMERU WERSJI
+messages.yml		showDevTag				# ###############################################################################\n# Sekcja 12: Opcje deweloperskie\n# ###############################################################################\n# ustaw na true, aby dodawac tag deweloperski (np. &8(RTP:ClassName)) do kazdego komunikatu

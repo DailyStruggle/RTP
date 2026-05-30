@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  *       absent payloads and rejects null type without NPE.</li>
  * </ol>
  *
- * <p>See {@code docs/dev/scratch/PROPOSAL-metrics-api-extraction.md} §1.1.
+ * <p>See {@code metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md}.
  */
 class MetricsExtensionParityTest {
 

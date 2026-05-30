@@ -39,6 +39,15 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private final java.util.concurrent.atomic.AtomicBoolean handledInFlight = new java.util.concurrent.atomic.AtomicBoolean(false);
   /** Wall-clock start (nanos) for {@code avgPipelineMs} histogram, recorded once on cleanup. */
   private final long pipelineStartNanos = System.nanoTime();
+  /**
+   * ADR-053 §2a: whether this teleport was served immediately (unqueued) rather than from the
+   * at-rate public wait queue. {@code true} for the {@code QueueTask.unqueuedFast} / custom /
+   * on-event immediate paths; {@code false} only for the queue-drain serve path (the 4-arg
+   * constructor used exclusively by {@code Region.execute}). The slow-teleport latency audit
+   * is gated to immediate teleports because a queued task's elapsed window would otherwise be
+   * contaminated by at-rate queue-wait time and false-positive on every queued teleport.
+   */
+  private final boolean immediateTeleport;
   private final java.util.concurrent.atomic.AtomicBoolean pipelineHistogramRecorded = new java.util.concurrent.atomic.AtomicBoolean(false);
   public static final List<Consumer<TeleportPipelineTask>> setupPreActions = new ArrayList<>();
   public static final List<BiConsumer<TeleportPipelineTask, Boolean>> setupPostActions =
@@ -94,11 +103,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
   public TeleportPipelineTask(GenerationContext context) {
     this.context = context;
+    this.immediateTeleport = true;
   }
 
   public TeleportPipelineTask(GenerationContext context, Region region) {
     this.context = context;
     this.region = region;
+    this.immediateTeleport = true;
   }
 
   public TeleportPipelineTask(GenerationContext context, Region region, RTPCoords preSelectedCoords) {
@@ -106,6 +117,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
     this.region = region;
     this.coords = preSelectedCoords;
     this.currentPhase = Phase.LOAD;
+    this.immediateTeleport = true;
   }
 
   public TeleportPipelineTask(GenerationContext context, Region region, RTPCoords preSelectedCoords, ChunkReservation reservation) {
@@ -114,6 +126,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
     this.coords = preSelectedCoords;
     this.reservation = reservation;
     this.currentPhase = Phase.LOAD;
+    // Queue-drain serve path (Region.execute): this is the at-rate public-queue path, so the
+    // slow-teleport latency audit (ADR-053 §2a) must NOT apply. Backpressure on this path is
+    // covered separately by the queue-growth audit (§2b).
+    this.immediateTeleport = false;
   }
 
   /** Spark-profiler frame tag (diagram 01 / 08). See {@link RTPRunnable#sparkFrameName()}. */
@@ -629,6 +645,20 @@ public final class TeleportPipelineTask extends RTPRunnable {
       try {
         long elapsedMs = (System.nanoTime() - pipelineStartNanos) / 1_000_000L;
         RTP.metrics.pipelineHistogram().record(elapsedMs);
+        // ADR-053 §2a (REQ-RTP-OBS-005): audit a slow latency only for immediate/unqueued
+        // teleports. Queued (at-rate) teleports are excluded because their elapsed window
+        // includes queue-wait time and would false-positive; their degradation signal is the
+        // queue-growth audit (§2b). The counter/WARN live on CoreMetrics; the audit is opt-out
+        // (slowPipelineThresholdMs <= 0 disables) and never aborts cleanup (S-004 posture).
+        if (immediateTeleport
+                && RTP.metrics instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics) {
+          UUID auditId = (context != null && context.player() != null)
+                  ? context.player().uuid() : null;
+          String auditCtx = "player=" + auditId
+                  + " region=" + (region != null ? region.name : "null");
+          ((io.github.dailystruggle.rtp.common.metrics.CoreMetrics) RTP.metrics)
+                  .auditImmediateTeleport(elapsedMs, auditCtx);
+        }
       } catch (Throwable ignored) {
         // intentionally swallowed: metrics must not interfere with teardown.
       }
@@ -639,6 +669,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
             + " handledInFlight=" + handledInFlight.get()
             + " thread=" + Thread.currentThread().getName());
     cleanupPreActions.forEach(consumer -> consumer.accept(this));
+    // Deliver the public-API completion outcome exactly once. Cleanup is the unique
+    // terminal phase for every code path (success, cancel, exception, GC sweep), so
+    // firing here guarantees an RTPAPI.teleport future never hangs (REQ-RTP-S-004).
+    // No-op for teleports not initiated through the public API.
+    if (this.teleportData != null) {
+      this.teleportData.fireOnComplete();
+    }
     try {
       // Explicitly untrack the data to prevent false positive leak alerts
       if (this.teleportData != null) {

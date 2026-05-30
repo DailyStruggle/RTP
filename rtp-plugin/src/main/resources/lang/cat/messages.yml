@@ -142,6 +142,14 @@ drool_rate: "&7Current drool (chunk leak) rate: #7E9CC8[leakRate]"
 kitties_in_territory_lines: "&7Kitties waiting in territory lines: #7E9CC8[queueDepth]"
 pending_pounces: "&7Pending pounce pipelines: #7E9CC8[pendingTeleports]"
 average_pounce_lag: "&7Average pounce lag: #7E9CC8[avgPipelineMs] ms"
+# Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
+# [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
+infoPipelinePercentiles: "&7Pipeline Latency (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
+# Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
+# [slowPipelineCount] [slowPipelineThresholdMs].
+infoSlowPipeline: "&7Slow Teleports (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
+# Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+infoQueueGrowth: "&7Queue-Growth Warnings (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 tall_human_brain_jar: "&7Tall-human brain-jar: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # Header line for the Health pipeline labelled block in /rtp info.
 pounce_pipeline_health_header: "&7--- Health: pounce pipeline ---"
@@ -226,48 +234,48 @@ paw_hint_type: "paw-flavour: [type]"
 # small curated value set. Placeholder: [values] - comma-joined accepted values.
 menuHoverFallbackBounds: "accepted flavours: [values]"
 # Label for the "go back one level" navigation row prepended to every non-root menu page.
-menuBack: "&7« scamper back"
+menuBack: "&7Â« scamper back"
 # Label template for the "execute the assembled command" row prepended to every
 # runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
-menuExecute: "&a▶ pounce [command]"
+menuExecute: "&aâ–¶ pounce [command]"
 # Header row at the top of a parameter-value picker sub-page (Stage A.2).
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
 pick_a_flavour: "&7pick a flavour for [param] (will pounce: /rtp [command] [param]:<value>)"
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list.
-menuTypeValue: "&7✎ type a custom flavour..."
+menuTypeValue: "&7âœŽ type a custom flavour..."
 # Non-clickable header row at the top of every non-root menu page (Stage A.4).
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
 kneading: "&7kneading: #7E9CC8/rtp [command]"
 # Non-clickable title row prepended to the root /rtp menu page (Stage A.5).
 # Provides a welcoming header before the player descends into any subcommand.
-menuRootTitle: "#5FB3B3&l⚡ RTP meow menu"
+menuRootTitle: "#5FB3B3&lâš¡ RTP meow menu"
 # Non-clickable subtitle/hint row prepended to the root /rtp menu page below
 # menuRootTitle (Stage A.5). Short orientation text for first-time users.
 paw_an_option: "&7paw an option below to begin"
-# Navigation rows appended to paginated menu pages (Stage A.6) — clicking
+# Navigation rows appended to paginated menu pages (Stage A.6) â€” clicking
 # them moves to the previous/next page of the same model. Placeholder:
 # [page] - the 1-based human-readable target page number.
-menuPagePrev: "&7« previous page ([page])"
-menuPageNext: "&7next page ([page]) »"
+menuPagePrev: "&7Â« previous page ([page])"
+menuPageNext: "&7next page ([page]) Â»"
 # Section divider on the front page above teleport rows (player view).
 menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
 # Front-page rows. No placeholders.
-menuFrontPageRowTeleport: "&a▶ /rtp &7- pounce to a random warm spot"
-menuFrontPageRowRegion: "&a▶ /rtp region:&7... &7- sniff a territory"
-menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- sniff a flavour of land"
-menuFrontPageRowHelp: "&a▶ /rtp help &7- list meows"
+menuFrontPageRowTeleport: "&aâ–¶ /rtp &7- pounce to a random warm spot"
+menuFrontPageRowRegion: "&aâ–¶ /rtp region:&7... &7- sniff a territory"
+menuFrontPageRowBiome: "&aâ–¶ /rtp biome:&7... &7- sniff a flavour of land"
+menuFrontPageRowHelp: "&aâ–¶ /rtp help &7- list meows"
 # Front-page admin entry row (PROPOSAL-admin-panel.md v2): the only inline
 # admin-visible row on the front page; click descends into the curated admin
 # panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
-menuFrontPageRowAdmin: "#9D7CD8▶ head-kitty panel &7- staff tools"
+menuFrontPageRowAdmin: "#9D7CD8â–¶ head-kitty panel &7- staff tools"
 # Hover text for the admin-panel entry row. No placeholders.
 menuFrontPageHoverAdmin: "&7staff tools: setup, sniffing, hairball checks, grooming"
 # --- Admin panel book page (PROPOSAL-admin-panel.md v2) ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
-menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+menuAdminPanelTitle: "#5FB3B3&lâš™ admin panel"
 # Non-clickable hint row below menuAdminPanelTitle. No placeholders.
 menuAdminPanelHint: "&7paw an option; chompy actions show a warning hover"
 # Section dividers on the admin panel. No placeholders.
@@ -276,66 +284,66 @@ menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
 menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
 # Admin-panel rows + hovers. No placeholders.
-menuAdminPanelRowConfig: "&b▶ setup editor"
+menuAdminPanelRowConfig: "&bâ–¶ setup editor"
 menuAdminPanelHoverConfig: "&7open the curated setup picker"
-menuAdminPanelRowRegions: "#5FB3B3▶ territories"
+menuAdminPanelRowRegions: "#5FB3B3â–¶ territories"
 menuAdminPanelHoverRegions: "&7add, remove, or groom per-territory setups"
-menuAdminPanelRowWorlds: "#5FB3B3▶ boxes"
+menuAdminPanelRowWorlds: "#5FB3B3â–¶ boxes"
 menuAdminPanelHoverWorlds: "&7add, remove, or groom per-box setups"
-menuAdminPanelRowEffects: "#5FB3B3▶ effects"
+menuAdminPanelRowEffects: "#5FB3B3â–¶ effects"
 menuAdminPanelHoverEffects: "&7add, remove, or edit per-group teleport effects"
-menuAdminPanelRowInfo: "&b▶ box info"
+menuAdminPanelRowInfo: "&bâ–¶ box info"
 menuAdminPanelHoverInfo: "&7show plugin version, territory counts, and line state"
-menuAdminPanelRowDiagnostics: "&c▶ full hairball checks"
+menuAdminPanelRowDiagnostics: "&câ–¶ full hairball checks"
 menuAdminPanelHoverDiagnostics: "&7runs every hairball check; may be expensive"
-menuAdminPanelRowMemory: "&b▶ snack inventory snapshot"
+menuAdminPanelRowMemory: "&bâ–¶ snack inventory snapshot"
 menuAdminPanelHoverMemory: "&7dump active kibble-ticket and pounce-pipeline snacks"
-menuAdminPanelRowScan: "&b▶ sniff control"
+menuAdminPanelRowScan: "&bâ–¶ sniff control"
 menuAdminPanelHoverScan: "&7open the sniff submenu (start / pause / cancel)"
-menuAdminPanelRowReload: "&c▶ groom (reload)"
+menuAdminPanelRowReload: "&câ–¶ groom (reload)"
 menuAdminPanelHoverReload: "&7grooms all setup files; mid-pounce kitties may be jostled"
-menuAdminPanelRowBrowse: "&b▶ browse all meows"
+menuAdminPanelRowBrowse: "&bâ–¶ browse all meows"
 menuAdminPanelHoverBrowse: "&7open the reflected /rtp meow tree"
-menuAdminPanelRowBack: "&7« scamper back"
+menuAdminPanelRowBack: "&7Â« scamper back"
 # --- Visualizations submenu (admin map of bad locations per region) ---
 # Admin-panel row: open the Visualizations submenu. No placeholders.
-menuAdminPanelRowVisualizations: "#5FB3B3▶ visualizations"
+menuAdminPanelRowVisualizations: "#5FB3B3â–¶ visualizations"
 # Hover text for the admin-panel Visualizations row. No placeholders.
 menuAdminPanelHoverVisualizations: "&7open maps and other operator-facing visualizations"
 # Section divider above the Visualizations block on the admin panel.
-menuAdminPanelSectionVisualizations: "&8» &7visualizations"
+menuAdminPanelSectionVisualizations: "&8Â» &7visualizations"
 # Non-clickable title row at the top of the Visualizations submenu.
-menuVisualizationsTitle: "#9D7CD8&l⌖ visualizations"
+menuVisualizationsTitle: "#9D7CD8&lâŒ– visualizations"
 # Non-clickable hint row below the title.
 menuVisualizationsHint: "&7pick a region to view its bad-locations map"
 # Visualizations row template; [region] - region name.
-menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- region shape map"
+menuVisualizationsRowRegion: "#5FB3B3â–¶ [region] &7- region shape map"
 # Hover text for a Visualizations region row; [region] - region name.
 menuVisualizationsHoverRegion: "&7open a map showing bad locations in &b[region]"
 # Non-clickable hint row shown when no regions are configured.
 menuVisualizationsEmpty: "&7(no regions configured)"
 # Visualizations submenu back row (returns to the admin panel).
-menuVisualizationsRowBack: "&7« back"
+menuVisualizationsRowBack: "&7Â« back"
 # --- Admin panel Setup section: curated prefabs (PROPOSAL-admin-panel-prefabs.md v3.1) ---
 # Section divider above the Setup (quick start) block on the admin panel.
-menuAdminPanelSectionSetup: "&8» &7setup (quick paw start)"
+menuAdminPanelSectionSetup: "&8Â» &7setup (quick paw start)"
 # Setup row + hover: survival-default identity overlay (reset to shipped defaults).
-menuPrefabSurvivalDefaultRow: "#5FB3B3▶ survival-default"
+menuPrefabSurvivalDefaultRow: "#5FB3B3â–¶ survival-default"
 menuPrefabSurvivalDefaultHover: "&7reset to the shipped defaults (plain-kibble overlay)"
 # Setup row + hover: low-performance (longer pulse, smaller caches, login cache off).
-menuPrefabLowPerformanceRow: "#5FB3B3▶ low-performance"
+menuPrefabLowPerformanceRow: "#5FB3B3â–¶ low-performance"
 menuPrefabLowPerformanceHover: "&7sleepy boxes / shared-CPU dens: longer pulse, smaller piles, login warm-spots off"
 # Setup row + hover: high-performance (short pulse, large caches, login cache on).
-menuPrefabHighPerformanceRow: "#5FB3B3▶ high-performance"
+menuPrefabHighPerformanceRow: "#5FB3B3â–¶ high-performance"
 menuPrefabHighPerformanceHover: "&7dedicated boxes / many kitties: short pulse, big piles, login warm-spots on"
 # Setup row + hover: folia-tuned (regional scheduler tuning).
-menuPrefabFoliaTunedRow: "#5FB3B3▶ folia-tuned"
+menuPrefabFoliaTunedRow: "#5FB3B3â–¶ folia-tuned"
 menuPrefabFoliaTunedHover: "&7folia regional scheduler: faster per-den pulses, fewer kibble tickets at once"
 # Setup row + hover: multi-world (one region per world from current default).
-menuPrefabMultiWorldRow: "#5FB3B3▶ multi-world"
+menuPrefabMultiWorldRow: "#5FB3B3â–¶ multi-world"
 menuPrefabMultiWorldHover: "&7synthesise one territory per box from the current default"
 # Confirmation menu title. Placeholder: [prefab] - prefab id or display name.
-menuPrefabConfirmTitle: "#9D7CD8&l⚙ confirm flavour: #5FB3B3[prefab]"
+menuPrefabConfirmTitle: "#9D7CD8&lâš™ confirm flavour: #5FB3B3[prefab]"
 # Confirmation menu non-clickable hint row below the title. No placeholders.
 menuPrefabConfirmHint: "&7sniff the changes below, then paw confirm or cancel"
 # Confirmation menu footer row: confirm and write the prefab to disk.
@@ -362,14 +370,14 @@ infoBookOverflowFooter: "&7(too many meows for one page - paw to see the rest in
 infoBookAutoRefreshDeferredNote: "&8(auto-grooming not yet supported; paw re-sniff to update)"
 # Non-clickable title row at the top of the config-file selector page (Stage C.1).
 # Shown when an admin clicks "/rtp config" from the front page.
-configSelectorTitle: "#5FB3B3&l⚙ setup files"
+configSelectorTitle: "#5FB3B3&lâš™ setup files"
 # Label for the "back to /rtp menu root" navigation row on the config selector page.
-configSelectorBackRow: "&7« back to the meow menu"
+configSelectorBackRow: "&7Â« back to the meow menu"
 # Non-clickable title row at the top of a single config-file page (Stage C.2).
 # Placeholder: [file] - the config file name (e.g. "performance", "safety").
-configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
+configFileTitle: "#5FB3B3&lâš™ config: &7[file]"
 # Label for the "back to config selector" navigation row on a single config-file page.
-configFileBackRow: "&7« back to setup files"
+configFileBackRow: "&7Â« back to setup files"
 # Non-clickable hint row shown when a config file has no editable keys.
 configFileEmptyHint: "&7(no groomable keys in this file)"
 # Per-key row label on a config-file page. Placeholders:
@@ -380,10 +388,10 @@ configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
 configKeyHoverFormat: "&7paw to groom &7[key] &7(flavour: [type])"
 # Non-clickable title row at the top of a shape/vert type-picker page (Stage C.3a).
 # Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
-configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+configTypePickerTitle: "#5FB3B3&lâš™ pick [param] type &7(current: &7[current]&7)"
 # Non-clickable title row at the top of a shape/vert sub-parameter page (Stage C.3b).
 # Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
-configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+configSubParamPageTitle: "#5FB3B3&lâš™ [param] &7- &7[type] &7sub-parameters"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
 configViewRawHint: "&7[P0] booklet view unavailable; falling back to raw dump."
@@ -555,5 +563,5 @@ meowsion: 1.0
 # ###############################################################################
 # Section 12: Developer Options
 # ###############################################################################
-# set to true to append a kitten tag (e.g. §8(RTP:ClassName)) to every message
+# set to true to append a kitten tag (e.g. Â§8(RTP:ClassName)) to every message
 show_kitten_tag: false

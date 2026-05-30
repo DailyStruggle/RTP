@@ -30,5 +30,5 @@ foliaAggregationMspt: "max"
 # @default: max
 foliaAggregationTickBudget: "max"
 
-# DO NOT TOUCH VERSION NUMBER
+# ÄNDERE NICHT DIE VERSIONSNUMMER
 version: 1.0

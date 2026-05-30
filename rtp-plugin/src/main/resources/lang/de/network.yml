@@ -1,122 +1,122 @@
-# RTP Network Mode (multi-server / multi-proxy)
+# RTP Netzwerkmodus (Multi-Server / Multi-Proxy)
 #
-# Phase 2e of MULTI_SERVER_PLAN.md. Disabled by default; flipping
-# `network.enabled: true` opts this backend into the cross-server network.
-# See rtp-proxy-ADR-002 for the full schema and rtp-proxy-ADR-011 for the
-# DB-as-bus (`transport.type: sql`) binding documented here.
+# Phase 2e von MULTI_SERVER_PLAN.md. Standardmäßig deaktiviert; das Umstellen von
+# `network.enabled: true` nimmt dieses Backend in das serverübergreifende Netzwerk auf.
+# Siehe rtp-proxy-ADR-002 für das vollständige Schema und rtp-proxy-ADR-011 für die
+# hier dokumentierte DB-als-Bus-Bindung (`transport.type: sql`).
 #
-# REQ-RTP-NET-002 (Behavioural Parity When Disabled): when `enabled: false`
-# this file is read, validated, and otherwise ignored - no threads start,
-# no database tables are created, no transport opens. The backend behaves
-# byte-identically to a pre-Phase-2 build.
+# REQ-RTP-NET-002 (Verhaltensgleichheit bei Deaktivierung): wenn `enabled: false`,
+# wird diese Datei gelesen, validiert und ansonsten ignoriert - es starten keine Threads,
+# es werden keine Datenbanktabellen erstellt, es öffnet kein Transport. Das Backend verhält
+# sich byte-identisch zu einem Build vor Phase 2.
 network:
   enabled: false
   schemaVersion: 1
-  # Stable backend identity. Required when `enabled: true`. No default - the
-  # operator MUST supply one; two backends sharing a serverId will overwrite
-  # each other's heartbeat row.
+  # Stabile Backend-Identität. Erforderlich, wenn `enabled: true`. Kein Standard - der
+  # Betreiber MUSS eine angeben; zwei Backends mit derselben serverId überschreiben
+  # gegenseitig ihre Heartbeat-Zeile.
   serverId: ""
-  # Backends never assume a proxy role. `role: backend` is the only valid
-  # value on this side; the field exists only for symmetry with proxy
-  # adapters (which honour `role: auto | proxy`).
+  # Backends nehmen niemals eine Proxy-Rolle an. `role: backend` ist der einzige gültige
+  # Wert auf dieser Seite; das Feld existiert nur aus Symmetrie zu Proxy-
+  # Adaptern (die `role: auto | proxy` berücksichtigen).
   role: "backend"
-  # Environment variable holding the shared HMAC secret. Required when
-  # `enabled: true` AND `transport.type: redis`; SQL binding currently
-  # treats the env var as optional (DB connection auth + TLS is the
-  # security boundary - rtp-proxy-ADR-011 Q1).
+  # Umgebungsvariable mit dem gemeinsamen HMAC-Secret. Erforderlich, wenn
+  # `enabled: true` UND `transport.type: redis`; die SQL-Bindung behandelt
+  # die Umgebungsvariable derzeit als optional (DB-Verbindungs-Authentifizierung + TLS bilden die
+  # Sicherheitsgrenze - rtp-proxy-ADR-011 Q1).
   secretEnv: "RTP_NET_SECRET"
 
 transport:
-  # Backing store for cross-process state.
-  # - `in-memory`: development only; nothing leaves the JVM (REQ-RTP-NET-002
-  #   parity-by-construction).
-  # - `sql`: DB-as-bus (rtp-proxy-ADR-011). Reuses the existing RTP database
-  #   accessor pool from `database.yml`. Fallback when redis is not available.
-  # - `redis`: Jedis-backed heartbeats + pub/sub fan-out (rtp-proxy-ADR-005).
-  #   Phase 2e-Redis A1: heartbeats and snapshot work; atomic claim (used for
-  #   cross-backend reservation tokens) lands in A2. Project goal is
-  #   redis-first; flip `type: redis` once you have a Redis instance shared
-  #   across every backend and proxy.
+  # Speicher-Backend für prozessübergreifenden Zustand.
+  # - `in-memory`: nur für die Entwicklung; nichts verlässt die JVM (REQ-RTP-NET-002
+  #   Gleichheit per Konstruktion).
+  # - `sql`: DB-als-Bus (rtp-proxy-ADR-011). Verwendet den vorhandenen RTP-Datenbank-
+  #   Accessor-Pool aus `database.yml` wieder. Rückfalloption, wenn Redis nicht verfügbar ist.
+  # - `redis`: Jedis-gestützte Heartbeats + Pub/Sub-Verteilung (rtp-proxy-ADR-005).
+  #   Phase 2e-Redis A1: Heartbeats und Snapshot funktionieren; der atomare Claim (genutzt für
+  #   backend-übergreifende Reservierungs-Tokens) kommt in A2. Projektziel ist
+  #   redis-first; stelle `type: redis` um, sobald du eine von allen Backends und Proxys
+  #   gemeinsam genutzte Redis-Instanz hast.
   type: "sql"
   redis:
-    # Required when `type: redis`. Hostname or IP of the Redis instance
-    # shared by every backend and proxy in the network.
+    # Erforderlich, wenn `type: redis`. Hostname oder IP der Redis-Instanz,
+    # die von jedem Backend und Proxy im Netzwerk gemeinsam genutzt wird.
     host: "localhost"
-    # Default Redis port. Override if your deployment uses a non-standard one.
+    # Standard-Redis-Port. Überschreiben, falls dein Deployment einen abweichenden verwendet.
     port: 6379
-    # Optional. Leave empty / omitted for unauthenticated Redis (dev/test);
-    # set when Redis ACL or `requirepass` is configured.
+    # Optional. Für unauthentifiziertes Redis (Dev/Test) leer lassen / weglassen;
+    # setzen, wenn Redis-ACL oder `requirepass` konfiguriert ist.
     password: ""
 
 heartbeat:
-  # How often this backend publishes its state row. 1000ms is the default
-  # used by both proxy-side and backend-side publishers; the proxy's
-  # poll loop must observe rows within `staleAfterMs` to consider them live.
+  # Wie oft dieses Backend seine Zustandszeile veröffentlicht. 1000ms ist der Standard,
+  # der von Publishern auf Proxy- und Backend-Seite verwendet wird; die Poll-Schleife
+  # des Proxys muss Zeilen innerhalb von `staleAfterMs` sehen, um sie als aktiv zu werten.
   intervalMs: 1000
   staleAfterMs: 5000
-# Backend-side router (L6 / rtp-proxy-ADR-014). When `routing.mode` is
-# `local` (the default), `/rtp` runs the local pipeline only and the rest
-# of this file is informational. Flip to `auto` to opt this backend into
-# the cross-server wait queue (still local-first when the local backend
-# has the requested region available).
+# Router auf Backend-Seite (L6 / rtp-proxy-ADR-014). Wenn `routing.mode`
+# `local` ist (Standard), führt `/rtp` nur die lokale Pipeline aus und der Rest
+# dieser Datei ist nur informativ. Auf `auto` umstellen, um dieses Backend in
+# die serverübergreifende Warteschlange aufzunehmen (weiterhin lokal zuerst, wenn das lokale
+# Backend die angeforderte Region verfügbar hat).
 routing:
-  # `local`  - never enrol into the cross-server wait queue (D2 default;
-  #            zero behaviour change for pre-L6 servers).
-  # `auto`   - prefer local when this backend can serve the region; enrol
-  #            into the wait queue only when local cannot serve.
-  # `always` - always enrol into the wait queue (developer / acceptance
-  #            harness mode; not recommended for production).
+  # `local`  - niemals in die serverübergreifende Warteschlange eintragen (D2-Standard;
+  #            keine Verhaltensänderung für Server vor L6).
+  # `auto`   - lokal bevorzugen, wenn dieses Backend die Region bedienen kann; nur dann
+  #            in die Warteschlange eintragen, wenn lokal nicht bedient werden kann.
+  # `always` - immer in die Warteschlange eintragen (Entwickler- / Abnahme-
+  #            Testmodus; nicht für die Produktion empfohlen).
   mode: "local"
-  # Lobby mode (L6 Slice I). When true, this backend becomes a pure dispatch
-  # node:
-  #  - Heartbeats publish an empty `regions` set and `acceptingRequests:false`
-  #    so peers never select this backend as a cross-server destination.
-  #  - A bare `/rtp` (no `region=` argument) auto-routes to the peer +
-  #    region with the largest `regionKeptCounts` value across the snapshot
-  #    ("most-kept" policy, v1). Explicit `rtp region=<server>:<region>`
-  #    still works as in Slice H2.
-  #  - When no peer advertises any region, bare `/rtp` rejects with the
-  #    localized `networkRegionUnavailable` message instead of silently
-  #    falling through to the (empty) local pipeline.
-  # Default false preserves pre-Slice-I behaviour.
+  # Lobby-Modus (L6 Slice I). Wenn true, wird dieses Backend zu einem reinen Dispatch-
+  # Knoten:
+  #  - Heartbeats veröffentlichen eine leere `regions`-Menge und `acceptingRequests:false`,
+  #    damit Peers dieses Backend nie als serverübergreifendes Ziel auswählen.
+  #  - Ein bloßes `/rtp` (ohne `region=`-Argument) leitet automatisch zum Peer +
+  #    der Region mit dem größten `regionKeptCounts`-Wert im Snapshot weiter
+  #    ("most-kept"-Politik, v1). Explizites `rtp region=<server>:<region>`
+  #    funktioniert weiterhin wie in Slice H2.
+  #  - Wenn kein Peer eine Region anbietet, lehnt bloßes `/rtp` mit der
+  #    lokalisierten `networkRegionUnavailable`-Meldung ab, statt stillschweigend
+  #    in die (leere) lokale Pipeline durchzufallen.
+  # Standard false bewahrt das Verhalten vor Slice I.
   lobbyMode: false
-# Cross-server wait queue (L6 / rtp-proxy-ADR-014). All keys here are
-# ignored when `network.enabled: false` or `routing.mode: local`.
+# Serverübergreifende Warteschlange (L6 / rtp-proxy-ADR-014). Alle Schlüssel hier werden
+# ignoriert, wenn `network.enabled: false` oder `routing.mode: local`.
 queue:
-  # Maximum number of locally-buffered enrolments before backpressure
-  # rejects new `/rtp` calls with `RoutingDecision.FallbackReason.QUEUE_FULL`.
+  # Maximale Anzahl lokal gepufferter Eintragungen, bevor der Gegendruck
+  # neue `/rtp`-Aufrufe mit `RoutingDecision.FallbackReason.QUEUE_FULL` ablehnt.
   maxDepth: 50
-  # Backend dirty-write flush cadence (ms). Lower = lower end-to-end
-  # latency, higher = fewer round trips to the transport. 250ms is the
-  # PROPOSAL §7 default.
+  # Flush-Takt für Dirty-Writes des Backends (ms). Niedriger = geringere Ende-zu-Ende-
+  # Latenz, höher = weniger Roundtrips zum Transport. 250ms ist der
+  # Standard aus PROPOSAL Abschnitt 7.
   flushIntervalMs: 250
-  # Backend status-cache poll cadence (ms). Drives how often the backend
-  # reads `rtp:net:wq:status:<pid>` to refresh per-player progress.
+  # Poll-Takt des Backend-Status-Caches (ms). Bestimmt, wie oft das Backend
+  # `rtp:net:wq:status:<pid>` liest, um den Fortschritt je Spieler zu aktualisieren.
   pollIntervalMs: 1000
-  # Optional passive aging of envelope HASHes. `0` disables (terminal
-  # transitions still DEL the env HASH explicitly per D3); set to a
-  # positive value if you want operator-visible TTL on stuck envelopes.
+  # Optionales passives Altern der Envelope-HASHes. `0` deaktiviert (terminale
+  # Übergänge löschen den Envelope-HASH gemäß D3 weiterhin explizit per DEL); auf einen
+  # positiven Wert setzen, wenn du eine betreiber-sichtbare TTL für hängende Envelopes willst.
   entryTtlMs: 0
-  # Cross-server `/rtp` enrolment rate limit (token bucket). Operator
-  # safety net against runaway clients.
+  # Ratenbegrenzung für serverübergreifende `/rtp`-Eintragungen (Token-Bucket). Betreiber-
+  # Sicherheitsnetz gegen außer Kontrolle geratene Clients.
   crossServerRequestsPerSecond: 5
   crossServerRequestsBurst: 10
-  # Proxy-side BLPOP worker count (rtp-proxy-velocity). Increase only when
-  # the proxy is observed to saturate a single worker; the dispatcher and
-  # transport pool are the real bottlenecks.
+  # Anzahl der BLPOP-Worker auf Proxy-Seite (rtp-proxy-velocity). Nur erhöhen, wenn
+  # beobachtet wird, dass der Proxy einen einzelnen Worker auslastet; der Dispatcher und
+  # der Transport-Pool sind die eigentlichen Engpässe.
   workerThreads: 1
-# Reservation-token lifecycle (L6 / REQ-RTP-NET-011).
+# Lebenszyklus der Reservierungs-Tokens (L6 / REQ-RTP-NET-011).
 reservation:
-  # Proxy-side TTL reaper cadence (ms). The reaper sweeps expired tokens
-  # and fires `ReleaseSink.onRelease(tokenId, TTL_EXPIRED)` so co-located
-  # backends can return the coordinate to `networkKeptLocations`.
+  # Takt des TTL-Reapers auf Proxy-Seite (ms). Der Reaper räumt abgelaufene Tokens auf
+  # und löst `ReleaseSink.onRelease(tokenId, TTL_EXPIRED)` aus, damit am selben Ort liegende
+  # Backends die Koordinate an `networkKeptLocations` zurückgeben können.
   reapIntervalMs: 30000
-  # Per-token TTL (ms). A claimed-but-not-consumed reservation older than
-  # this is treated as abandoned and released.
+  # TTL je Token (ms). Eine beanspruchte, aber nicht verbrauchte Reservierung, die älter
+  # als dieser Wert ist, gilt als verwaist und wird freigegeben.
   ttlMs: 60000
-# Region-collision policy (L6 / rtp-proxy-ADR-014 §Region Collisions).
-# Only `warn` is shipped in L6; `rename-local` and `reject-startup` are
-# documented follow-ups. Unknown values silently degrade to `warn`.
+# Politik bei Regions-Kollisionen (L6 / rtp-proxy-ADR-014 Abschnitt Region Collisions).
+# In L6 wird nur `warn` ausgeliefert; `rename-local` und `reject-startup` sind
+# dokumentierte Folgeaufgaben. Unbekannte Werte fallen stillschweigend auf `warn` zurück.
 regionCollision:
   policy: "warn"
 # Load balancer scoring table (rtp-proxy-ADR-004 *Region-Pair Scoring*).

@@ -5,12 +5,10 @@
 
 [I]Send your players to a safe, random spot - fast, fair, and engineered not to lag your server.[/I]
 
-[SIZE=4][COLOR=#27AE60][B]100% Free.[/B][/COLOR] Same engine as the paid [B]RTP-Pro[/B] build. No paywalled [I]/rtp[/I], no nag screens, no ads - just anonymous [URL='https://bstats.org/']bStats[/URL] usage stats (server-admin opt-out via [I]plugins/bStats/config.yml[/I]).[/SIZE]
-
-[URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/v/release/dailystruggle/RTP?label=Version&style=for-the-badge&color=2C3E50[/IMG][/URL] [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/license/dailystruggle/RTP?label=License&style=for-the-badge&color=2C3E50[/IMG][/URL]
+[SIZE=4][COLOR=#27AE60][B]100% Free.[/B][/COLOR] Same engine as the paid [URL='https://builtbybit.com/resources/rtp-pro.105418'][B]RTP-Pro[/B][/URL] build. No paywalled [I]/rtp[/I], no nag screens, no ads - just anonymous [URL='https://bstats.org/']bStats[/URL] usage stats (server-admin opt-out via [I]plugins/bStats/config.yml[/I]).[/SIZE]
 
 [/CENTER]
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#27AE60]Why operators pick RTP[/COLOR][/B][/SIZE]
 [CENTER][SIZE=5][B][COLOR=#27AE60]19.8 TP/s sustained at 4 ms worst-case tick. Next-best plugin: 70 ms.[/COLOR][/B][/SIZE][/CENTER]
@@ -50,7 +48,7 @@ Every number on this page is anchored in the repo:
 [/LIST]
 [/SPOILER]
 
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#C0392B]Operator fit (30-second check)[/COLOR][/B][/SIZE]
 A few hard requirements. If any are a [B]no[/B], EssentialsX [I]/rtp[/I] or HuskHomes are fine free alternatives.
@@ -62,7 +60,7 @@ A few hard requirements. If any are a [B]no[/B], EssentialsX [I]/rtp[/I] or Husk
 [*]❌ Folia, proxy/cross-server, SQL/Redis, Vault economy -> those live in [B]RTP-Pro[/B].
 [/LIST]
 
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#16A085]Install (30 seconds)[/COLOR][/B][/SIZE]
 [LIST=1]
@@ -74,7 +72,7 @@ A few hard requirements. If any are a [B]no[/B], EssentialsX [I]/rtp[/I] or Husk
 
 That's it. Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/I] later - via [I]/rtp menu[/I] or by editing the YAML directly. Full admin guide is auto-unpacked into [I]plugins/RTP/docs/[/I] on first run, and lives online at the [URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md'][B]admin guide[/B][/URL].
 
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#2980B9]What's in the box[/COLOR][/B][/SIZE]
 [LIST]
@@ -89,7 +87,7 @@ That's it. Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/
 [*]🛠️ [B]Public [I]rtp-api[/I][/B] - same surface as Pro. Trigger RTP from a GUI, NPC, or quest; build your own UX without forking.
 [/LIST]
 
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#16A085]Platform support[/COLOR][/B][/SIZE]
 [TABLE]
@@ -103,7 +101,7 @@ That's it. Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/
 [TR][TD][B]Native Forge / NeoForge[/B][/TD][TD]🔁 Use Arclight / Mohist[/TD][TD]No native adapter planned.[/TD][/TR]
 [/TABLE]
 
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SPOILER='📊 Full benchmark vs. 4 other RTP plugins on Paper, Spigot, and Folia']
 [I]2 OPed real clients spamming [I]/rtp[/I] back-to-back, queues enabled where the plugin offers them, cooldowns/delays zeroed. RTP and RTP-Pro share the same engine on Spigot/Paper; only the Folia adapter differs.[/I]
@@ -163,17 +161,6 @@ That's it. Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/
 Full methodology, raw CSVs, per-run analyses: [URL=https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP][I]helpers/StressTestRTP/[/I][/URL].
 [/SPOILER]
 
-[SPOILER='🎬 Demonstration videos (RTP 2.x — same principles, older numbers)']
-[I]Recorded on the original RTP 2.x resource. Spatial learning and queue-paced throughput are unchanged in 3.0; the on-screen numbers predate the current release.[/I]
-
-[B]Learning & deterministic-time test[/B]
-[media=youtube]PY6W7DikhAI[/media]
-[I]The plugin "learns" bad sectors; selection time converges to a predictable lower bound.[/I]
-
-[B]Command-response & throughput test[/B]
-[media=youtube]l6KSvKxsKAQ[/media]
-[I]Pre-generated queue → near-instant [I]/rtp[/I] response under load.[/I]
-[/SPOILER]
 
 [SPOILER='📚 Commands, placeholders, soft-deps']
 [B]Commands[/B] (full reference: [URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md']admin guide[/URL])
@@ -237,10 +224,10 @@ Support for the free build is [B]community-tier and best-effort[/B] — a solo m
 Live list: [URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md#known-issues']CHANGELOG[/URL].
 [/SPOILER]
 
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#27AE60]Need Folia, a proxy network, or paid support?[/COLOR][/B][/SIZE]
-[B]RTP-Pro[/B] is a drop-in upgrade - same configuration, same data files, same commands. It adds:
+[URL='https://builtbybit.com/resources/rtp-pro.105418'][B]RTP-Pro[/B][/URL] is a drop-in upgrade - same configuration, same data files, same commands. It adds:
 [LIST]
 [*][B]Folia[/B] adapter (Region Scheduler + off-tick pre-filter, no 1-tick stalls)
 [*][B]Multi-server / proxy[/B] support (Velocity), validated on the in-repo devstack (2 proxies, 2 lobbies, 2 backends behind shared Redis)
@@ -250,7 +237,7 @@ Live list: [URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md#known
 [*]Earliest releases on each version + priority support within a documented response window
 [/LIST]
 
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#7F8C8D]Links[/COLOR][/B][/SIZE]
 [LIST]
@@ -260,7 +247,7 @@ Live list: [URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md#known
 [*][URL='https://github.com/dailystruggle/RTP'][B]Source on GitHub[/B][/URL] - star, watch, contribute, file issues
 [/LIST]
 
-[HR][/HR]
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [QUOTE]
 [I]I'm a solo engineer maintaining a deterministic, high-performance teleport engine. The free build is the same core code that ships in RTP-Pro - released openly because single-server Bukkit/Paper operators deserve a fast, audited [I]/rtp[/I] without a paywall. If RTP saves your TPS, a star on GitHub or a properly-filed bug report goes a long way.[/I]

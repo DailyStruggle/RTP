@@ -1,60 +1,63 @@
-# --- RTP Safety Configuration ---
-# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/SAFETY.md
-# Seconds of invulnerability after teleport
+# --- RTP Sicherheitskonfiguration ---
+# Dokumentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/SAFETY.md
+# Sekunden der Unverwundbarkeit nach Abschluss eines Teleports.
+# 0 deaktiviert das Unverwundbarkeitsfenster nach dem Teleport.
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
 # @default: 5
 invulnerabilityTime: 5
 
-# Block radius around landing to check for hazards
+# Blockradius rund um den Landepunkt, der auf Gefahren geprüft wird.
+# 0 prüft nur den Landeblock und die unmittelbare Vertikale.
 # @type: integer
 # @range: [0, null]
 # @unit: blocks
 # @default: 0
 safetyRadius: 0
 
-# Max retries for stale-chunk guard
+# Maximale Wiederholungen des Stale-Chunk-Schutzes, bevor der Versuch fehlschlägt.
 # @type: integer
 # @range: [0, null]
 # @default: 2
 staleChunkRetryLimit: 2
 
-# Off-thread anvil prefilter
+# Den Off-Thread-Anvil-NBT-Vorfilter verwenden, um Kandidaten zu verwerfen,
+# ohne ihre Chunks zu laden.
 # @type: boolean
 # @default: true
 anvilPrefilterEnabled: true
 
-# Radius of emergency platform (-1 to disable)
+# Radius der Notfall-Landeplattform am Zielort.
+# -1 deaktiviert die Plattform vollständig.
 # @type: integer
 # @range: [-1, null]
 # @unit: blocks
 # @default: -1
 platformRadius: -1
 
-# Depth of platform
+# Tiefe (vertikale Dicke) der Notfallplattform.
 # @type: integer
 # @range: [1, null]
 # @unit: blocks
 # @default: 1
 platformDepth: 1
 
-# Air space above platform
+# Über der Notfallplattform freigeräumte Lufthöhe.
 # @type: integer
 # @range: [0, null]
 # @unit: blocks
 # @default: 2
 platformAirHeight: 2
 
-# Material for platform
+# Material der Notfall-Landeplattform.
 # @type: material
 # @source: material
 # @default: GLASS
 platformMaterial: "GLASS"
 
-# Blocks treated as passable air for landing-safety checks.
-# Accepts Bukkit Material names and "#minecraft:<tag>" tag references
-#.
+# Blöcke, die bei Lande-Sicherheitsprüfungen als begehbare Luft behandelt werden.
+# Akzeptiert Bukkit-Material-Namen und "#minecraft:<tag>"-Tag-Referenzen.
 # @type: list<material>
 # @source: material
 airBlocks:
@@ -126,9 +129,9 @@ airBlocks:
   - "PALE_MOSS_CARPET"
   - "LEAF_LITTER"
 
-# Blocks that disqualify a landing spot (lava, hazards, etc.).
-# Accepts Bukkit Material names, "#minecraft:<tag>" tag references, and
-# state predicates such as "*[waterlogged=true]".
+# Blöcke, die einen Landepunkt ungültig machen (Lava, Gefahren usw.).
+# Akzeptiert Bukkit-Material-Namen, "#minecraft:<tag>"-Tag-Referenzen und
+# Zustands-Prädikate wie "*[waterlogged=true]".
 # @type: list<material>
 # @source: material
 unsafeBlocks:
@@ -161,12 +164,13 @@ unsafeBlocks:
   - "KELP_PLANT"
   - "#minecraft:logs"
 
-# If true, 'biomes' is a whitelist; otherwise a blacklist
+# Wenn true, ist die biomes-Liste eine Whitelist (nur diese Biome sind
+# erlaubt). Wenn false, ist sie eine Blacklist (diese Biome werden ausgeschlossen).
 # @type: boolean
 # @default: false
 biomeWhitelist: false
 
-# Biomes treated as whitelist or blacklist members per biomeWhitelist.
+# Biome, die gemäß biomeWhitelist als Whitelist- oder Blacklist-Mitglieder behandelt werden.
 # @type: list<biome>
 # @source: biome
 biomes:
@@ -193,5 +197,5 @@ biomes:
   - "DEEP_DARK"
   - "THE_VOID"
 
-# DO NOT TOUCH VERSION NUMBER
+# ÄNDERE NICHT DIE VERSIONSNUMMER
 version: 1.0

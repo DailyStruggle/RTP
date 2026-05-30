@@ -169,14 +169,17 @@ scratch (at the cost of a fill operation).
 ### H-009 — Addon Calls `rtp-api` Before Core Is Loaded
 **Severity:** Medium
 
-**Description:** An addon plugin calls `RTPAPI.addShape()` or `RTPAPI.addVerticalAdjustor()`
-before `rtp-core` has registered its delegate, resulting in an `IllegalStateException` that
-disables the addon without a clear operator-facing explanation.
+**Description:** An addon plugin calls an `RTP` / `rtp-api` entry point (e.g. `RTP.addShape()`,
+`RTP.addVerticalAdjustor()`, or `RTPAPI.hooks()`) before `rtp-core` has finished loading,
+resulting in an `IllegalStateException` that disables the addon without a clear
+operator-facing explanation.
 
-**Mitigation:** `RTPAPI` throws `IllegalStateException` with an explicit message
-(`[RTP API] Cannot add shape: Core implementation is not loaded.`) rather than a
-`NullPointerException`. Addon developers are directed to call `rtp-api` methods inside their
-own `onEnable` after declaring RTP as a `depend` (not `softdepend`) in `plugin.yml`.
+**Mitigation:** Contract-surface entry points throw `IllegalStateException` with an explicit
+message (e.g. `[RTP API] Cannot access hooks: Core implementation is not loaded.`) rather than
+a `NullPointerException`. Custom shape / vertical-adjustor registration is an implementation-tier
+extension performed against `rtp-core` (two-tier API model, ADR-051). Addon developers are
+directed to call these inside their own `onEnable` after declaring RTP as a `depend` (not
+`softdepend`) in `plugin.yml`.
 
 **Governing:** `REQ-RTP-S-006`, `REQ-RTP-F-010`, ADR-011
 

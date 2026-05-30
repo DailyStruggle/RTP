@@ -184,14 +184,10 @@ public class RTP {
     factoryMap.put(factoryNames.multiConfig, new Factory<MultiConfigParser<?>>());
 
     // --- INJECT IMPLEMENTATIONS INTO THE API ---
-    // This safely routes RTPAPI calls directly to the RTP core methods
-    io.github.dailystruggle.rtp.api.RTPAPI.shapeAdder = shapeObj -> {
-      if (shapeObj instanceof Shape<?>) addShape((Shape<?>) shapeObj);
-    };
-
-    io.github.dailystruggle.rtp.api.RTPAPI.vertAdder = vertObj -> {
-      if (vertObj instanceof VerticalAdjustor<?>) addVerticalAdjustor((VerticalAdjustor<?>) vertObj);
-    };
+    // Two-tier API model: custom Shape / VerticalAdjustor registration is an
+    // implementation-tier extension served by the typed RTP.addShape(Shape) /
+    // RTP.addVerticalAdjustor(VerticalAdjustor) entry points in this module, not
+    // by rtp-api. Addons deriving a new shape compile against rtp-core.
 
     // ADR-026: expose the unified external-hook facade. Third-party plugins call
     // RTPAPI.hooks() to register claim verifiers, economy, placeholders, world
@@ -199,6 +195,130 @@ public class RTP {
     // internals. See docs/dev/EXTERNAL_HOOKS.md.
     io.github.dailystruggle.rtp.api.RTPAPI.hooks =
         new io.github.dailystruggle.rtp.common.hooks.DefaultRTPHooks();
+
+    // First-class teleport entry point for addons: trigger an RTP for an online
+    // player and complete a future with the outcome, without reaching into core
+    // internals. Mirrors the RTPCmd teleport path; completion is delivered via
+    // TeleportData.onComplete, fired exactly once at the pipeline's terminal
+    // cleanup phase (REQ-RTP-S-004). See RTPAPI#teleport.
+    io.github.dailystruggle.rtp.api.RTPAPI.teleportDelegate = (uuid, target) -> {
+      java.util.concurrent.CompletableFuture<io.github.dailystruggle.rtp.api.RTPResult> future =
+          new java.util.concurrent.CompletableFuture<>();
+      try {
+        RTPPlayer player = serverAccessor.getPlayer(uuid);
+        if (player == null) {
+          future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+              io.github.dailystruggle.rtp.api.RTPResult.Reason.PLAYER_OFFLINE,
+              "No online player with UUID " + uuid));
+          return future;
+        }
+
+        Region region;
+        try {
+          region = resolveApiRegion(target, player);
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+          future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+              io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+              String.valueOf(ex.getMessage())));
+          return future;
+        }
+        if (region == null || region.getWorld() == null) {
+          future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+              io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+              "Could not resolve a region/world for " + target));
+          return future;
+        }
+
+        final Region targetRegion = region;
+        TeleportData data = new TeleportData();
+        io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(
+            data, "TeleportData-" + uuid, 120000L);
+        data.sender = player;
+        data.targetRegion = targetRegion;
+        data.onComplete = td -> {
+          if (td.completed && td.selectedCoords != null) {
+            RTPWorld<?> w = serverAccessor.getRTPWorld(td.selectedCoords.worldName());
+            if (w == null) w = targetRegion.getWorld();
+            future.complete(io.github.dailystruggle.rtp.api.RTPResult.success(
+                new io.github.dailystruggle.rtp.api.world.RTPLocation(
+                    w, td.selectedCoords.x(), td.selectedCoords.y(), td.selectedCoords.z())));
+          } else {
+            future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_SAFE_LOCATION,
+                "No safe location was found"));
+          }
+        };
+        getInstance().latestTeleportData.put(uuid, data);
+
+        io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask task =
+            new io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask(
+                new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, null),
+                targetRegion);
+        data.nextTask = task;
+        targetRegion.inFlightCalculations.incrementAndGet();
+        scheduler.runTaskAsynchronously(task);
+      } catch (Throwable t) {
+        future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+            io.github.dailystruggle.rtp.api.RTPResult.Reason.ERROR, String.valueOf(t.getMessage())));
+      }
+      return future;
+    };
+
+    io.github.dailystruggle.rtp.api.RTPAPI.cancelDelegate = uuid -> {
+      TeleportData d = getInstance().latestTeleportData.get(uuid);
+      boolean pending = (d != null && !d.completed)
+          || getInstance().processingPlayers.contains(uuid);
+      new RTPTeleportCancel(uuid).run();
+      return pending;
+    };
+
+    io.github.dailystruggle.rtp.api.RTPAPI.queueDepthDelegate = world -> {
+      if (world == null) return 0;
+      try {
+        Region region = resolveApiRegion(
+            io.github.dailystruggle.rtp.api.RtpTarget.world(world.name()), null);
+        if (region == null) return 0;
+        long depth = region.getPublicQueueLength();
+        return (int) Math.max(0, Math.min(Integer.MAX_VALUE, depth));
+      } catch (RuntimeException ex) {
+        return 0;
+      }
+    };
+
+    io.github.dailystruggle.rtp.api.RTPAPI.warmupDelegate = uuid -> {
+      TeleportData d = getInstance().latestTeleportData.get(uuid);
+      return (d != null && !d.completed) || getInstance().processingPlayers.contains(uuid);
+    };
+  }
+
+  /**
+   * Resolve an {@link io.github.dailystruggle.rtp.api.RtpTarget} to a concrete
+   * {@link Region} for the public teleport API. A {@code null} player is allowed
+   * only for {@link io.github.dailystruggle.rtp.api.RtpTarget.Kind#REGION} and
+   * {@code WORLD} targets (read-only queries); {@code DEFAULT} requires a player.
+   */
+  private static Region resolveApiRegion(
+      io.github.dailystruggle.rtp.api.RtpTarget target, RTPPlayer player) {
+    if (target == null) {
+      throw new IllegalArgumentException("target must not be null");
+    }
+    switch (target.kind()) {
+      case REGION:
+        return selectionAPI.getRegionOrDefault(target.name());
+      case WORLD: {
+        ConfigParser<WorldKeys> worldParser = configs.getWorldParser(target.name());
+        String regionName = (worldParser == null)
+            ? "default"
+            : worldParser.getConfigValue(WorldKeys.region, "default").toString();
+        return selectionAPI.getRegionOrDefault(regionName);
+      }
+      case DEFAULT:
+      default:
+        if (player == null) {
+          throw new IllegalArgumentException("default-region target requires an online player");
+        }
+        return selectionAPI.getRegion(player);
+    }
   }
 
   public final ConcurrentHashMap<UUID, TeleportData> priorTeleportData = new ConcurrentHashMap<>();
@@ -223,6 +343,10 @@ public class RTP {
     if (serverAccessor == null) throw new IllegalStateException("null serverAccessor");
     if (scheduler == null) throw new IllegalStateException("null scheduler");
 
+    // Install the active scheduler into RTPRunnable so tasks can self-dispatch onto the
+    // correct thread via RTPRunnable#schedule() (entity/region/async routing).
+    RTPRunnable.scheduler = scheduler;
+
     miscSyncTasks = (RTPTaskPipe) serverAccessor.createTaskPipe();
     miscAsyncTasks = (RTPTaskPipe) serverAccessor.createTaskPipe();
     startupTasks = (RTPTaskPipe) serverAccessor.createTaskPipe();
@@ -233,16 +357,16 @@ public class RTP {
     RTPAPI.setServerAccessor(serverAccessor);
     instance = this;
 
-    RTPAPI.addShape(new Circle());
-    RTPAPI.addShape(new Ellipse());
-    RTPAPI.addShape(new Square());
-    RTPAPI.addShape(new Rectangle());
-    RTPAPI.addShape(new Circle_Normal());
-    RTPAPI.addShape(new Square_Normal());
-    RTPAPI.addShape(new Polygon());
-    RTPAPI.addVerticalAdjustor(new LinearAdjustor(new ArrayList<>())); // todo: make this work
-    RTPAPI.addVerticalAdjustor(new JumpAdjustor(new ArrayList<>()));
-    RTPAPI.addVerticalAdjustor(new FixedAdjustor(new ArrayList<>()));
+    addShape(new Circle());
+    addShape(new Ellipse());
+    addShape(new Square());
+    addShape(new Rectangle());
+    addShape(new Circle_Normal());
+    addShape(new Square_Normal());
+    addShape(new Polygon());
+    addVerticalAdjustor(new LinearAdjustor(new ArrayList<>())); // todo: make this work
+    addVerticalAdjustor(new JumpAdjustor(new ArrayList<>()));
+    addVerticalAdjustor(new FixedAdjustor(new ArrayList<>()));
 
     configs = new Configs(serverAccessor.getPluginDirectory());
 

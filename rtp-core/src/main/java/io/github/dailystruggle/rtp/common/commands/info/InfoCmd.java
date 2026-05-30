@@ -204,6 +204,9 @@ public class InfoCmd extends BaseRTPCmdImpl {
       String infoQueueDepth = lang.getConfigValue(MessagesKeys.infoQueueDepth, "").toString();
       String infoPendingTeleports = lang.getConfigValue(MessagesKeys.infoPendingTeleports, "").toString();
       String infoAvgPipelineMs = lang.getConfigValue(MessagesKeys.infoAvgPipelineMs, "").toString();
+      String infoPipelinePercentiles = lang.getConfigValue(MessagesKeys.infoPipelinePercentiles, "").toString();
+      String infoSlowPipeline = lang.getConfigValue(MessagesKeys.infoSlowPipeline, "").toString();
+      String infoQueueGrowth = lang.getConfigValue(MessagesKeys.infoQueueGrowth, "").toString();
       String infoHeap = lang.getConfigValue(MessagesKeys.infoHeap, "").toString();
       String infoHealthPipelineHeader = lang.getConfigValue(MessagesKeys.infoHealthPipelineHeader, "").toString();
       String infoTps = lang.getConfigValue(MessagesKeys.infoTps, "").toString();
@@ -229,6 +232,10 @@ public class InfoCmd extends BaseRTPCmdImpl {
       if (!infoQueueDepth.isEmpty()) emit(callerId, infoQueueDepth);
       if (!infoPendingTeleports.isEmpty()) emit(callerId, infoPendingTeleports);
       if (!infoAvgPipelineMs.isEmpty()) emit(callerId, infoAvgPipelineMs);
+      // ADR-053: pipeline-latency percentiles + slow-teleport / queue-growth audit counters.
+      if (!infoPipelinePercentiles.isEmpty()) emit(callerId, infoPipelinePercentiles);
+      if (!infoSlowPipeline.isEmpty()) emit(callerId, infoSlowPipeline);
+      if (!infoQueueGrowth.isEmpty()) emit(callerId, infoQueueGrowth);
       if (!infoHeap.isEmpty()) emit(callerId, infoHeap);
       if (!infoDatabaseLatencyMs.isEmpty()) emit(callerId, infoDatabaseLatencyMs);
 

@@ -74,6 +74,31 @@ public class PlaceholderProvider {
     }
 
     /**
+     * Point-in-time pipeline-latency percentiles (ADR-053 §1). Reads the
+     * {@code CoreMetrics}-owned {@link io.github.dailystruggle.rtp.common.metrics.PipelineHistogram}
+     * when the live {@code Metrics} is the core implementation; otherwise returns an all-{@code NaN}
+     * (zero-sample) snapshot. Never returns {@code null}.
+     */
+    private static io.github.dailystruggle.rtp.common.metrics.PipelineHistogram.Percentiles currentPercentiles() {
+        try {
+            if (RTP.metrics instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics) {
+                return ((io.github.dailystruggle.rtp.common.metrics.CoreMetrics) RTP.metrics)
+                        .pipelineHistogram().percentiles();
+            }
+        } catch (Throwable ignored) {
+            // fall through to the empty readout
+        }
+        return new io.github.dailystruggle.rtp.common.metrics.PipelineHistogram.Percentiles(
+                Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN,
+                Double.NaN, Double.NaN, 0);
+    }
+
+    /** Renders a percentile value in ms (2 dp), or {@code "n/a"} when unsampled. */
+    private static String formatPercentile(double v) {
+        return (Double.isNaN(v) || Double.isInfinite(v)) ? "n/a" : String.format("%.2f", v);
+    }
+
+    /**
      * Run {@code body} with one freshly-captured snapshot installed for the current thread.
      * Snapshot is captured by {@code RTP.metrics.snapshot()} exactly once at entry and
      * is cleared on exit (even on exception).
@@ -336,6 +361,33 @@ public class PlaceholderProvider {
                 uuid -> {
                     double v = currentRtpExt().avgPipelineMs;
                     return Double.isNaN(v) ? "n/a" : String.format("%.2f", v);
+                });
+        // ADR-053 §1 / REQ-RTP-OBS-004: pipeline-latency percentiles, computed on demand by
+        // sorting a point-in-time copy of the bounded histogram ring. Read directly off the
+        // CoreMetrics-owned PipelineHistogram (not the snapshot extension) since percentiles are
+        // a read-path over the same data; render "n/a" until the first sample lands.
+        placeholders.put("pipelineMsP50", uuid -> formatPercentile(currentPercentiles().p50));
+        placeholders.put("pipelineMsP75", uuid -> formatPercentile(currentPercentiles().p75));
+        placeholders.put("pipelineMsP90", uuid -> formatPercentile(currentPercentiles().p90));
+        placeholders.put("pipelineMsP95", uuid -> formatPercentile(currentPercentiles().p95));
+        placeholders.put("pipelineMsP99", uuid -> formatPercentile(currentPercentiles().p99));
+        placeholders.put("pipelineSampleCount",
+                uuid -> String.valueOf(currentPercentiles().sampleCount));
+        // ADR-053 §2a / REQ-RTP-OBS-005: slow-teleport audit (immediate/unqueued only).
+        placeholders.put("slowPipelineCount",
+                uuid -> String.valueOf(currentRtpExt().slowPipelineCount));
+        placeholders.put("slowPipelineThresholdMs",
+                uuid -> {
+                    long t = currentRtpExt().slowPipelineThresholdMs;
+                    return (t <= 0L) ? "disabled" : String.valueOf(t);
+                });
+        // ADR-053 §2b / REQ-RTP-OBS-006: queue-growth audit.
+        placeholders.put("queueGrowthWarnCount",
+                uuid -> String.valueOf(currentRtpExt().queueGrowthWarnCount));
+        placeholders.put("queueGrowthWarnThreshold",
+                uuid -> {
+                    int t = currentRtpExt().queueGrowthWarnThreshold;
+                    return (t <= 0) ? "disabled" : String.valueOf(t);
                 });
         placeholders.put(
                 "heapUsedMb",

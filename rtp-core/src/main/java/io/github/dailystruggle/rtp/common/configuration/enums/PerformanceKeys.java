@@ -20,5 +20,7 @@ public enum PerformanceKeys {
   loginCacheCap,
   pregeneratedPreference,
   backlogRefillThreshold,
+  slowPipelineThresholdMs,
+  queueGrowthWarnThreshold,
   version
 }

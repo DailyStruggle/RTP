@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.tools;
 
-import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
@@ -50,7 +49,7 @@ public class ChunkyChecker {
           Shape<RectangleParams> shape = (Shape<RectangleParams>) factory.get(s);
           if (shape == null) {
             shape = new ChunkyRTPShape(s);
-            RTPAPI.addShape(shape);
+            RTP.addShape(shape);
           }
         }
       }

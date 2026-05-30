@@ -1,0 +1,27 @@
+// yaml-api -- in-house, zero-dependency YAML substrate (ADR-025). Pure-Java
+// module: no Bukkit / Fabric / Loom / core dependency. Extracted from
+// rtp-core's io.github.dailystruggle.rtp.common.configuration.yaml package so
+// that rtp-api can host the configurable selection model (FactoryValue and the
+// Shape / VerticalAdjustor hierarchy) without depending on rtp-core. The
+// package name is preserved verbatim on extraction so no import site across the
+// monorepo changes; only the providing jar moves.
+//
+// Shape mirrors metrics-api / maps-api: java-library, JUnit Jupiter + Mockito
+// inherited from the root subprojects {} block.
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    compileOnly 'org.jetbrains:annotations:24.1.0'
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+javadoc {
+    options.encoding = 'UTF-8'
+    options.addStringOption('Xdoclint:syntax,html', '-quiet')
+}

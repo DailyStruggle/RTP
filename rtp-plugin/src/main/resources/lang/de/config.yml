@@ -83,7 +83,7 @@ netzwerk:
 # zurück. Verfügbare IDs: book. (Der Chat-Renderer kommt im Folge-Release
 # und wird dann der Standardliste hinzugefügt.)
 menu:
-  # Ordered preference list of renderer ids.
+  # Geordnete Präferenzliste von Renderer-IDs.
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:

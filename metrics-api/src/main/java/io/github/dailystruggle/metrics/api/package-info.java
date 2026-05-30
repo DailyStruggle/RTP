@@ -8,19 +8,19 @@
  * detail). The contract is deliberately plugin-agnostic: it carries
  * host-runtime fields only. Plugin-specific counters (e.g. RTP's teleport
  * pipeline queue depth) belong on a typed extension slot, not on the shared
- * surface — see PROPOSAL-metrics-api-extraction.md §1.1 / §2.1.
+ * surface — see {@code metrics-api-ADR-001} (docs/adr/).
  *
  * <p>This package intentionally has no {@code org.bukkit} / {@code net.minecraft} /
  * Folia imports. Consumers depend on this module via
  * {@code api project(':metrics-api')}; sibling plugins consume via
  * {@code compileOnly} so the lite-jar shading rule prevents dual-loading
- * (per PROPOSAL §1.1).
+ * (per {@code metrics-api-ADR-001}).
  *
- * <p>Phase 1 (this session): module skeleton + neutral package root +
- * Gradle wiring. The actual SPI move ({@code Metrics}, {@code MetricsBinding},
- * {@code MetricsSnapshot}, {@code FoliaRegionSample}) and the extension-model
- * reshape land in a follow-up session — see the proposal's revised
- * implementation order and the audit recorded in
- * {@code docs/dev/scratch/CHECKLIST-metrics-api-extraction.md}.
+ * <p>Surface: {@code Metrics} (read-only facade + static registry),
+ * {@code MetricsBinding} (host-runtime contract), {@code MetricsSnapshot}
+ * (immutable snapshot + typed extension slot), {@code MetricsExtension}
+ * (typed plugin-counter slot), {@code FoliaRegionSample} (per-region detail).
+ * Rationale and the rtp-core extraction history are recorded in
+ * {@code metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md}.
  */
 package io.github.dailystruggle.metrics.api;

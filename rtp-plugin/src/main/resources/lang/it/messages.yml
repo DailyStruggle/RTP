@@ -140,6 +140,14 @@ infoTassoFughe: "&7Tasso attuale di fughe di chunk: #7E9CC8[leakRate]"
 infoProfonditaCoda: "&7Giocatori in attesa nelle code di regione: #7E9CC8[queueDepth]"
 infoTeletrasportiInAttesa: "&7Pipeline di teletrasporto in attesa: #7E9CC8[pendingTeleports]"
 infoMediaPipelineMs: "&7Latenza media pipeline: #7E9CC8[avgPipelineMs] ms"
+# Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
+# [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
+infoPipelinePercentiles: "&7Pipeline Latency (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
+# Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
+# [slowPipelineCount] [slowPipelineThresholdMs].
+infoSlowPipeline: "&7Slow Teleports (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
+# Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+infoQueueGrowth: "&7Queue-Growth Warnings (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7Heap JVM: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # Riga di intestazione per il blocco etichettato Salute pipeline in /rtp info.
 infoIntestazioneSalutePipeline: "&7--- Salute: pipeline ---"

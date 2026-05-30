@@ -149,6 +149,27 @@ pregeneratedPreference: 0.0
 # @range: [0.0, 1.0]
 # @default: 0.5
 backlogRefillThreshold: 0.5
+
+# Latency threshold (ms) above which an immediately-served (unqueued) teleport
+# is audited: a WARN is logged and the cumulative slowPipelineCount counter
+# (surfaced by /rtp info) is incremented. Only immediate/unqueued teleports are
+# audited; queued at-rate teleports are excluded because their measured time
+# includes queue-wait. 0 or below disables the audit. See ADR-053.
+# @type: integer
+# @range: [0, null]
+# @unit: ms
+# @default: 5000
+slowPipelineThresholdMs: 5000
+
+# Public teleport-queue depth (players waiting) at or above which queue
+# backpressure is audited: an edge-triggered WARN is logged and the cumulative
+# queueGrowthWarnCount counter (surfaced by /rtp info) is incremented once per
+# crossing. 0 or below disables the audit (opt-in). See ADR-053.
+# @type: integer
+# @range: [0, null]
+# @unit: players
+# @default: 0
+queueGrowthWarnThreshold: 0
 # Settings for /rtp admin prefab. The `apply` -> `confirm` flow writes
 # each touched config file with a sibling backup named
 # <file>.yml.bak.<epochMillis>; `bakRetention` caps how many such
