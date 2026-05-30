@@ -453,6 +453,73 @@ public class PlaceholderProvider {
                     int v = currentRtpExt().databaseLatencyMs;
                     return (v < 0) ? "n/a" : String.valueOf(v);
                 });
+        // Generation-outcome placeholders (ADR-052). Read directly off the process-global
+        // RtpOutcomeStats.GLOBAL accumulator (the same read-directly pattern the ADR-053
+        // percentiles use for the CoreMetrics histogram) rather than threading through the
+        // MetricsSnapshot extension: these counters are wait-free and process-global, so a
+        // direct read needs no snapshot round-trip. They surface the operator-facing
+        // success/failure rate and per-cause rejection breakdown (the analogue of a
+        // competitor's "/rtp unsafe-stats") in /rtp info.
+        placeholders.put(
+                "genSuccessRate",
+                uuid -> {
+                    double r = io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.successRate();
+                    return Double.isNaN(r) ? "n/a" : String.format("%.1f%%", r * 100.0);
+                });
+        placeholders.put(
+                "genFailureRate",
+                uuid -> {
+                    double r = io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.successRate();
+                    return Double.isNaN(r) ? "n/a" : String.format("%.1f%%", (1.0 - r) * 100.0);
+                });
+        placeholders.put(
+                "genOutcomeTotal",
+                uuid -> {
+                    io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats stats =
+                            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL;
+                    return String.valueOf(stats.successCount() + stats.totalFailures());
+                });
+        placeholders.put(
+                "genFailureBreakdown",
+                uuid -> {
+                    Map<io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes, Long>
+                            breakdown =
+                            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.failureBreakdown();
+                    // Comma-separated "cause=N" list, omitting zero buckets, busiest first.
+                    String out = breakdown.entrySet().stream()
+                            .filter(e -> e.getValue() > 0L)
+                            .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                            .map(e -> e.getKey().name() + "=" + e.getValue())
+                            .collect(java.util.stream.Collectors.joining(", "));
+                    return out.isEmpty() ? "none" : out;
+                });
+        placeholders.put(
+                "genTopRejectionCause",
+                uuid -> {
+                    Map<io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes, Long>
+                            breakdown =
+                            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.failureBreakdown();
+                    return breakdown.entrySet().stream()
+                            .filter(e -> e.getValue() > 0L)
+                            .max(java.util.Map.Entry.comparingByValue())
+                            .map(e -> e.getKey().name())
+                            .orElse("none");
+                });
+        placeholders.put(
+                "genTopRejectionShare",
+                uuid -> {
+                    Map<io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes, Long>
+                            breakdown =
+                            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.failureBreakdown();
+                    long total = 0L;
+                    long top = 0L;
+                    for (long v : breakdown.values()) {
+                        total += v;
+                        if (v > top) top = v;
+                    }
+                    if (total == 0L) return "n/a";
+                    return String.format("%.1f%%", ((double) top / total) * 100.0);
+                });
         // B12 (METRICS_PLAN.md > Health colour coding): coloured-wrapper variants of the
         // numeric Health-Pipeline placeholders. Each prepends a legacy &-code chosen by
         // ColourBands (green/yellow/red/grey) and trails &r so adjacent template text keeps

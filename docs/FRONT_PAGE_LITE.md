@@ -96,6 +96,27 @@ That's it. Tune `plugins/RTP/config.yml` and `plugins/RTP/regions/*.yml` later -
 - **PlaceholderAPI, ProtocolLib, custom generators** - Iris, Terra, datapacks work out of the box; modded biome IDs preserved.
 - **Public `rtp-api`** - same surface as Pro. Trigger RTP from a GUI, NPC, or quest; build your own UX without forking.
 
+<details>
+<summary><b>Already built in - the things operators usually bolt on with extra plugins</b></summary>
+
+A lot of what people install companion plugins for is already in the free engine, under RTP's own vocabulary. Check here before adding an add-on:
+
+| Capability | How RTP already covers it |
+|---|---|
+| Secure in-game menu (no chest-GUI exploits) | `/rtp menu` is a *read-only book* UI: clickable destinations and config with the same permission checks as a typed command, and **zero** inventory-dupe / click-exploit surface. The book is the deliberate, safer design - not a missing chest GUI. |
+| Runtime region authoring (no config-file round-trip) | Ephemeral per-invocation overrides via `rtp.params` (`centerx=`/`centerz=`/`radius=`), or persistent edits via `/rtp config regions <name> centerX=...`. A named region is a full target - center + shape + radius + queue + permissions - not just a saved coordinate. |
+| World overrides | Redirect a `/rtp` issued in the Nether or End to a safe world automatically via the `worlds.yml` `override` key - no teleport loops. |
+| Open claim-integration API | Register any claim/region/biome check through `GlobalRegionVerifiers` / `RegionVerifierRegistry` - open, async, platform-neutral. Eight claim plugins are already bundled through it; addons add their own with one lambda. |
+| First-join random teleport | Distribute new players across the map on login, served instantly from the pre-generated queue. |
+| Built-in operator diagnostics in `/rtp info` | Live queue depth and growth, pipeline latency percentiles, chunk-ticket leak rate, TPS/MSPT, plus generation success/failure rate and the top coordinate-rejection cause (biome, unsafe block, claim, ...). No separate metrics add-on. |
+| Command-block & console ready | The unified command framework parses player, console, and command-block callers with equal safety - drive `/rtp` from redstone, datapacks, or scripts. |
+| Self-scheduling API tasks | `RTPRunnable` routes work onto the correct region / async thread automatically via `schedule()` - addon authors get correct scheduling for free. |
+| Live config reload (no restart) | Retune regions/safety/effects without a restart: `/rtp reload` (all) or `/rtp reload <file>` (one file); `/rtp config <file> set k=v` saves and reloads automatically. |
+
+*(Folia, multi-server / proxy, SQL/Redis, Vault economy, and multilingual `lang/**` live in [RTP-Pro](https://builtbybit.com/resources/rtp-pro.105418) - not engine gaps.)*
+
+</details>
+
 ---
 
 ## Platform support

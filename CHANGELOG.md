@@ -8,6 +8,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ## [3.0.1] - Unreleased
 
+### Added
+
+- **`/rtp info` now surfaces generation outcomes: success/failure rate and a per-cause rejection breakdown** (REQ-RTP-OBS-007, [ADR-052](docs/adr/ADR-052-outcome-metrics-and-cause-tagged-bad-locations.md)). The always-on process-global `RtpOutcomeStats` accumulator (already fed by the pipeline) is now read by six new `PlaceholderProvider` placeholders (`[genSuccessRate]`, `[genFailureRate]`, `[genOutcomeTotal]`, `[genFailureBreakdown]`, `[genTopRejectionCause]`, `[genTopRejectionShare]`) and three new `messages.yml` health-block lines (`infoFailureRate`, `infoTopRejectionCause`, `infoFailureBreakdown`). This gives operators the in-game analogue of a competitor's `/rtp unsafe-stats` (e.g. "rejections dominated by `biome` / `safety` / `vert`") without simulating traffic. Placeholders read the accumulator directly (the same read-path pattern the ADR-053 percentiles use), so no `MetricsSnapshot`/`metrics-api` change was needed; empty templates skip silently so locales without the new keys keep working. New keys propagated through every shipped locale via the TSV pipeline. Covered by `RtpOutcomeStatsInfoPlaceholderTest` (2 cases); `LocaleParityTest` 154/154.
+
 ## [3.0.0] - 2026-05-29
 
 ### Changed

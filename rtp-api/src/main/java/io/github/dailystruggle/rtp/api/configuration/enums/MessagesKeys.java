@@ -181,6 +181,27 @@ public enum MessagesKeys {
    * (the {@code [databaseLatencyMs]} placeholder).
    */
   infoDatabaseLatencyMs,
+  /**
+   * Info line showing the generation success / failure rate
+   * (the {@code [genSuccessRate]} / {@code [genFailureRate]} / {@code [genOutcomeTotal]}
+   * placeholders, sourced from the process-global {@code RtpOutcomeStats}). See ADR-052.
+   * Empty template skips silently — locales without this key keep working.
+   */
+  infoFailureRate,
+  /**
+   * Info line showing the per-cause rejection breakdown
+   * (the {@code [genFailureBreakdown]} placeholder, a comma-separated {@code cause=N}
+   * list over {@code LocationGenerator.FailTypes}, sourced from {@code RtpOutcomeStats}).
+   * The operator-facing analogue of a competitor's {@code /rtp unsafe-stats}. See ADR-052.
+   * Empty template skips silently.
+   */
+  infoFailureBreakdown,
+  /**
+   * Info line naming the single most common rejection cause and its share
+   * (the {@code [genTopRejectionCause]} / {@code [genTopRejectionShare]} placeholders,
+   * sourced from {@code RtpOutcomeStats}). See ADR-052. Empty template skips silently.
+   */
+  infoTopRejectionCause,
   // --- /rtp info colour-band thresholds (B12 / METRICS_PLAN.md > Health colour coding) ---
   // Doubles stored as YAML scalars; consumed by ColourBands in rtp-core to wrap
   // coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&e/&c codes.
