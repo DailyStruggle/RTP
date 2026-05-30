@@ -213,6 +213,10 @@ public class InfoCmd extends BaseRTPCmdImpl {
       String infoMSPTLive = lang.getConfigValue(MessagesKeys.infoMSPTLive, "").toString();
       String infoSoftCap = lang.getConfigValue(MessagesKeys.infoSoftCap, "").toString();
       String infoDatabaseLatencyMs = lang.getConfigValue(MessagesKeys.infoDatabaseLatencyMs, "").toString();
+      // ADR-052: generation success/failure rate + per-cause rejection breakdown.
+      String infoFailureRate = lang.getConfigValue(MessagesKeys.infoFailureRate, "").toString();
+      String infoFailureBreakdown = lang.getConfigValue(MessagesKeys.infoFailureBreakdown, "").toString();
+      String infoTopRejectionCause = lang.getConfigValue(MessagesKeys.infoTopRejectionCause, "").toString();
       String infoDisclaimerHeader = lang.getConfigValue(MessagesKeys.infoDisclaimerHeader, "").toString();
       String infoDisclaimer = lang.getConfigValue(MessagesKeys.infoDisclaimer, "").toString();
 
@@ -238,6 +242,11 @@ public class InfoCmd extends BaseRTPCmdImpl {
       if (!infoQueueGrowth.isEmpty()) emit(callerId, infoQueueGrowth);
       if (!infoHeap.isEmpty()) emit(callerId, infoHeap);
       if (!infoDatabaseLatencyMs.isEmpty()) emit(callerId, infoDatabaseLatencyMs);
+      // ADR-052: generation outcome metrics. Empty templates skip silently so locales
+      // without the new keys keep working unchanged.
+      if (!infoFailureRate.isEmpty()) emit(callerId, infoFailureRate);
+      if (!infoTopRejectionCause.isEmpty()) emit(callerId, infoTopRejectionCause);
+      if (!infoFailureBreakdown.isEmpty()) emit(callerId, infoFailureBreakdown);
 
       // Section C / METRICS_PLAN.md > Folia Aggregation — render the per-region
       // table when the active MetricsBinding publishes per-region detail (Folia).

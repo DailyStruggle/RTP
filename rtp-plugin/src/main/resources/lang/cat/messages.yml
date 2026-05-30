@@ -161,6 +161,16 @@ box_purr_rate: "&7Box purr-rate (mspt): #7E9CC8[mspt] ms (&7whisker budget: #7E9
 kitties_in_the_box: "&7Kitties: #7E9CC8[playerCount] / [softCap]"
 # Latest kibble-stash round-trip latency in ms. Placeholder: [databaseLatencyMs].
 scratching_post_lag: "&7Scratching-post lag: #7E9CC8[databaseLatencyMs] ms"
+# Generation outcome metrics (ADR-052), sourced from the process-global RtpOutcomeStats.
+# Success/failure rate over all recorded generation attempts. Placeholders:
+# [genSuccessRate] [genFailureRate] [genOutcomeTotal].
+infoFailureRate: "&7Generation Success: #7E9CC8[genSuccessRate]&7 (fail #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
+# Single most common rejection cause and its share of all failures. Placeholders:
+# [genTopRejectionCause] [genTopRejectionShare].
+infoTopRejectionCause: "&7Top Rejection Cause: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
+# Per-cause rejection breakdown (the analogue of a competitor's /rtp unsafe-stats).
+# Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
+infoFailureBreakdown: "&7Rejections by Cause: #7E9CC8[genFailureBreakdown]"
 # Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
 # to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&7/&c.
 infoThresholdTpsGreen: 19.5
