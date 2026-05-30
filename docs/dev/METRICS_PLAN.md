@@ -36,6 +36,11 @@ This document is the canonical plan for **runtime metrics** in RTP — the platf
 | `queueDepth` | int | `RegionQueueManager.playerQueue.size()` summed across regions. |
 | `pendingTeleports` | int | `MemoryTracker` count of in-flight `TeleportPipelineTask`s. |
 | `avgPipelineMs` | rolling double | `TeleportPipelineTask` completion-time histogram (added in this plan). |
+| `pipelineMsP50` / `pipelineMsP75` / `pipelineMsP90` / `pipelineMsP95` / `pipelineMsP99` | double (ms) | Percentiles of the same `PipelineHistogram` window, computed on demand by sorting a point-in-time copy of the bounded 256-sample ring (no new sampling; no change to the wait-free write path). `NaN` until the first sample lands. See [ADR-053](../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit.md). |
+| `slowPipelineCount` | long | Cumulative count (since process start) of **immediate/unqueued** `TeleportPipelineTask` completions whose latency exceeded `slowPipelineThresholdMs`. Queued (at-rate) teleports are excluded because their elapsed window includes queue-wait time and would false-positive (see ADR-053 §2a). Incremented once per task at the existing single-shot `runCleanup` recorder site, alongside a `WARN` log. `0` when the audit is disabled. See [ADR-053](../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit.md) and REQ-RTP-OBS-005. |
+| `slowPipelineThresholdMs` | long (ms) | The resolved slow-teleport audit threshold from `performance.yml > slowPipelineThresholdMs` (default `5000`; `<= 0` disables the audit). Published in the snapshot so the `/rtp info performance` readout can render `slowPipelineCount` against the threshold that produced it. |
+| `queueGrowthWarnCount` | long | Cumulative count (since process start) of edge-triggered queue-backpressure warnings: incremented once each time the summed `queueDepth` transitions from below `queueGrowthWarnThreshold` to at-or-above it (re-armed only after it falls back below). Paired with a `WARN` log. `0` when the audit is disabled. Distinct from `slowPipelineCount`: this is the queued-path signal where per-teleport latency is dominated by at-rate queue wait. See [ADR-053](../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit.md) §2b and REQ-RTP-OBS-006. |
+| `queueGrowthWarnThreshold` | int (players) | The resolved queue-growth audit threshold from `performance.yml > queueGrowthWarnThreshold` (default `0` = disabled/opt-in; a positive value arms the edge-triggered audit). Published in the snapshot so the `/rtp info performance` readout can render `queueGrowthWarnCount` against the threshold that produced it. |
 | `chunkLoadBacklog` | int | Count of incomplete chunk-load `CompletableFuture`s tracked through the platform's async chunk API. |
 | `memoryTrackerEntries` | int | `MemoryTracker.size()`. |
 | `databaseLatencyMs` | int | Last write/read RTT against the configured `AbstractSQLDatabaseAccessor`. |
@@ -375,21 +380,30 @@ This decision is internal to the metrics plan and does not need ADR-025 ratifica
 
 ## Module Placement
 
+> **Updated 2026-05-17**: the SPI was extracted into the standalone `metrics-api/` module (neutral root `io.github.dailystruggle.metrics.api.*`) per [metrics-api-ADR-001](../../metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md). The diagram below reflects the post-extraction home. RTP-specific counters now live on `RTPMetricsExtension` (in `rtp-core`) rather than on the shared snapshot.
+
 ```
+metrics-api/                 -- platform-neutral SPI (io.github.dailystruggle.metrics.api.*)
+  ├── Metrics              (read-only facade + cross-plugin static registry)
+  ├── MetricsBinding       (host-runtime contract, all methods defaulted)
+  ├── MetricsSnapshot      (immutable host-runtime snapshot + typed extension slot)
+  ├── MetricsExtension     (typed plugin-counter slot)
+  └── FoliaRegionSample    (per-region detail carrier)
 rtp-api/                     -- (no metrics types; keeps API stable)
 rtp-core/
   └── metrics/
-      ├── Metrics              (facade, reads from RTP.serverAccessor + local samplers)
-      ├── MetricsSnapshot      (immutable record)
+      ├── CoreMetrics          (aggregator implementing metrics-api Metrics)
+      ├── RTPMetricsExtension  (RTP-specific counters: queueDepth, pendingTeleports, ...)
       ├── PipelineHistogram    (rolling stats for avgPipelineMs)
+      ├── MetricsSnapshotRing  (1 Hz MSPT+heap ring)
       └── HeapSampler          (java.lang.management wrapper)
-rtp-bukkit/    -- BukkitTpsSampler (local 1-tick averager) + AbstractServerAccessor extension
+rtp-bukkit/    -- BukkitTpsSampler (local 1-tick averager)
 rtp-paper/     -- PaperMetricsBinding (delegates to Bukkit.getTPS / getAverageTickTime)
 rtp-folia/     -- FoliaMetricsBinding (per-region samplers + configurable aggregation)
 rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 ```
 
-`MetricsSnapshot` lives in `rtp-core` so addons and the multi-server plan's `BackendStatePublisher` can both depend on it without dragging platform types.
+`MetricsSnapshot` lives in `metrics-api` so addons, sibling monorepo plugins, and the multi-server plan's `BackendStatePublisher` can all depend on it without dragging `rtp-core` or platform types.
 
 `RTP.serverAccessor` gains a small additive surface (`getMetricsBinding()` returning the platform-specific source). This is the same "additive `serverAccessor` extension" pattern flagged in `MULTI_SERVER_PLAN.md > Module Placement`.
 
@@ -446,6 +460,9 @@ rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 ## Open Items / Follow-Ups
 
 - **`avgPipelineMs` window length and reset semantics** — *resolved (2026-05-15)* by [ADR-032](../adr/ADR-032-teleport-pipeline-latency-histogram.md): 256-sample wait-free ring, never resets, mean-only readout.
+- **Pipeline latency percentiles (p50/p75/p90/p95/p99)** — *resolved (2026-05-29)* by [ADR-053](../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit.md): exposed as an additive on-demand read path that sorts a point-in-time copy of the existing bounded ring (no sketch dependency, no change to the wait-free write path). Amends ADR-032's deferred "mean-only readout" item.
+- **Slow-teleport audit threshold** — *resolved (2026-05-29)* by [ADR-053](../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit.md): `performance.yml > slowPipelineThresholdMs` (default `5000` ms; `<= 0` disables). Drives a once-per-task `WARN` log and the cumulative `slowPipelineCount`, **gated to immediate/unqueued teleports only** (queued at-rate teleports include queue-wait time in their elapsed window and would false-positive — see ADR-053 §2a / REQ-RTP-OBS-005). Confirm the default during the implementation slice from beta-server data; lite-assembly servers on lower-end hardware may want a higher default.
+- **Queue-growth audit threshold** — *resolved (2026-05-29)* by [ADR-053](../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit.md) §2b / REQ-RTP-OBS-006: `performance.yml > queueGrowthWarnThreshold` (int players; default `0` = disabled/opt-in). Edge-triggered `WARN` + cumulative `queueGrowthWarnCount` evaluated on the existing snapshot cadence against the summed `queueDepth`. This is the queued-path backpressure signal that replaces a naive per-queued-teleport latency alarm. Confirm the default arming value (and whether to ship a non-zero default) during the implementation slice from beta-server data — acceptable queue depth is highly rate- and capacity-dependent.
 - **`biomeRerolls` cap / top-N policy** — straw-man: no cap (vanilla biome cardinality is naturally bounded). Revisit if a modpack pushes the map past ~500 keys, at which point introduce `metrics.biomeRerolls.topN` (default 32). Confirm during M1.
 - **`biomeRerolls` reset semantics** — straw-man: cumulative since process start. Operators wanting deltas compute them from successive snapshots, consistent with the *Snapshot, not stream* goal.
 - **`biomeRerolls` window default** — straw-man: 300s. Short enough to attribute the next `/rtp` to dissatisfaction with the prior outcome, long enough to absorb a player looking around before deciding. Confirm during M1 from beta-server data.
@@ -491,6 +508,9 @@ The existing config-oriented output stays; a new **Health** block appends below 
 - `queueDepth`: total `RegionQueueManager.playerQueue` size summed across regions.
 - `pendingTeleports`: count of in-flight `TeleportPipelineTask`s.
 - `avgPipelineMs`: rolling mean over the histogram window.
+- `pipelineMs` percentiles: `p50 / p75 / p90 / p95 / p99` over the same histogram window (per [ADR-053](../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit.md)). Shown alongside the mean so a tail-latency problem (mean fine, p99 high) is visible at a glance; `sampleCount` is printed next to them so an operator can judge whether the distribution is stable yet.
+- `slowPipelineCount`: cumulative count of **immediate/unqueued** completions over `slowPipelineThresholdMs`, rendered as `slow: <count> (> <threshold> ms)`. Paints yellow when non-zero; the per-event detail already went to the `WARN` log at completion time. Omitted (or shown as `slow: disabled`) when the threshold is `<= 0`. Queued at-rate teleports are deliberately excluded here (their elapsed time includes queue wait); their pressure signal is `queueGrowthWarnCount` below.
+- `queueGrowthWarnCount`: cumulative count of edge-triggered queue-backpressure warnings, rendered as `queue-growth: <count> (>= <threshold> players)`. Paints yellow when the current `queueDepth` is at-or-above `queueGrowthWarnThreshold`. Omitted (or shown as `queue-growth: disabled`) when the threshold is `<= 0`. This is the queued-path counterpart to `slowPipelineCount`.
 - `chunkLoadBacklog`: incomplete async chunk-load futures.
 - `effectiveQueueWaitMs`: rolling EMA of player-enqueue → pipeline-start latency. Shown next to `queueDepth` so operators can compare *size* vs *experienced wait*.
 - `pipelineFailureRate`: rolling `failures / completions` over the last sample window, plus the top-3 entries of `pipelineFailureBreakdown` (e.g. `biome:42, unsafe:9, nullChunk:1`). A non-zero `nullChunk` count paints red regardless of overall rate (S-005 spirit; surfaces a regression even when raw throughput looks fine).
@@ -543,10 +563,11 @@ The network block is silently omitted when `network.enabled: false` so single-se
 
 ### Verbosity
 
-`/rtp info` defaults to a compact view. Two flags expand it:
+`/rtp info` defaults to a compact view. Three flags expand or focus it:
 
 - `/rtp info verbose` (or `-v`): expand the per-region cache table and show per-platform extras (Folia per-region TPS table when on Folia; raw sampler readings on Spigot 1.20.1).
-- `/rtp info json` (machine-readable): emits the full `MetricsSnapshot` as JSON for piping into log aggregators or monitoring scripts. Implementation note: serialise the existing immutable record; do not invent a parallel schema.
+- `/rtp info performance` (sub-selector): focus the readout on the recorded server-and-plugin runtime state — the *Health — server*, *Health — pipeline* (including the `pipelineMs` percentiles, the immediate-only `slowPipelineCount`, and the queued-path `queueGrowthWarnCount` lines above), and *Health — demand* groups — without the configuration-oriented region/world output. This is the maintainer-chosen surface for the slow-RTP / percentile readout (per [ADR-053](../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit.md)); it reads the same single cached `Metrics.snapshot()` (plus `pipelineHistogram().percentiles()`) and adds no new sampling. Reuses `rtp.info`. Composable with `verbose` and `json` (`/rtp info performance json`).
+- `/rtp info json` (machine-readable): emits the full `MetricsSnapshot` as JSON for piping into log aggregators or monitoring scripts, including the `pipelineMsP*` percentile fields, `slowPipelineCount` / `slowPipelineThresholdMs`, and `queueGrowthWarnCount` / `queueGrowthWarnThreshold`. Implementation note: serialise the existing immutable record; do not invent a parallel schema.
 
 Permission: both flags reuse `rtp.info` (existing node — no new permissions needed for v1). A more restrictive `rtp.info.network` may be split out later if ops want to hide proxy details from sub-admins; deferred until requested.
 
@@ -566,11 +587,14 @@ The existing `InfoCmdTest` covers structural behaviour (subcommand permission, p
 
 - A unit test asserting `/rtp info` calls `Metrics.snapshot()` exactly once per invocation (no N×region calls).
 - A unit test asserting the network block is *omitted* when `network.enabled: false` (REQ-RTP-NET-005 surface).
-- A snapshot test of the JSON output shape so ops scripts can rely on key stability across releases.
+- A snapshot test of the JSON output shape (including the `pipelineMsP*` percentile fields and `slowPipelineCount` / `slowPipelineThresholdMs`) so ops scripts can rely on key stability across releases.
+- A unit test asserting the `pipelineMs` percentiles render from `PipelineHistogram.percentiles()` and that `/rtp info performance` reads exactly one `Metrics.snapshot()` (REQ-RTP-OBS-004 surface).
+- A unit test asserting `slowPipelineCount` increments once per slow **immediate/unqueued** completion and emits a `WARN` log, that a **queued** (at-rate) completion over the threshold does **not** increment it (no false positive from queue-wait time), and that a `<= 0` threshold disables the audit (REQ-RTP-OBS-005 surface).
+- A unit test asserting `queueGrowthWarnCount` increments once on the below→at-or-above `queueGrowthWarnThreshold` transition (edge-triggered, not once per evaluation), re-arms after the depth drops below, and that a `<= 0` threshold disables the audit (REQ-RTP-OBS-006 surface).
 
 ### Phasing
 
-- **Phase M1**: ship the *server*, *pipeline*, and *demand* health groups (drives off the same M1 work). Includes `effectiveQueueWaitMs`, `pipelineFailureRate` + breakdown top-3, and `gcPauseRecent` lines once their catalogue rows land.
+- **Phase M1**: ship the *server*, *pipeline*, and *demand* health groups (drives off the same M1 work). Includes `effectiveQueueWaitMs`, `pipelineFailureRate` + breakdown top-3, and `gcPauseRecent` lines once their catalogue rows land. The `pipelineMs` percentiles, `slowPipelineCount` / `slowPipelineThresholdMs`, and the `/rtp info performance` sub-selector ride this same M1 slice (per [ADR-053](../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit.md)) — they read data the M0 histogram already records and need no new sampler.
 - **Phase M1 (gated on biome-reroll wiring)**: the *player satisfaction* group's `biomeRerolls` table; `loginReserveExhaustion` rides the same M1 slice as the rest of the LB-input M1 candidates.
 - **Phase M2**: per-region cache table + Folia per-region detail (depends on `FoliaMetricsBinding` from M2). Adds `cacheServeRateLast60s` / `coldServeRatio` / `pregenSaturation` to the *load-balancer inputs* sub-block once their catalogue rows land. `sustainableRatePerMin` joins the *demand* group (verbose) when the reservoir lands.
 - **Phase M3**: network block (depends on `MULTI_SERVER_PLAN.md` Phase 2 reservation-token table being live).

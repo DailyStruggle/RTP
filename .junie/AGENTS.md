@@ -135,6 +135,7 @@ Read only what the task requires. Do not read everything.
 | New feature or platform work | [`docs/dev/MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md) |
 | Multi-server / proxy (Velocity, BungeeCord) work | [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md) (D-005 gated; admin docs stub: [`docs/admin/proxies/INDEX.md`](../docs/admin/proxies/INDEX.md)) |
 | Runtime metrics (TPS / MSPT / heap / queue / pipeline samples) | [`docs/dev/METRICS_PLAN.md`](../docs/dev/METRICS_PLAN.md) (implementation eligible) |
+| Implementing or consuming the metrics SPI (`MetricsBinding`, `MetricsSnapshot`, `MetricsExtension`) | [`metrics-api/README.md`](../metrics-api/README.md) + [metrics-api-ADR-001](../metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md) |
 | Database / command / shutdown work | [`docs/dev/LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md) |
 | Verifying a requirement is already satisfied | [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) (REQ-* → class → test) |
 | Adding/auditing a third-party integration (claim plugin, economy, PAPI, world border, anvil prefilter) or any reflection added to accommodate other plugins | [`docs/dev/EXTERNAL_HOOKS.md`](../docs/dev/EXTERNAL_HOOKS.md) + [ADR-026](../docs/adr/ADR-026-external-hook-api-surface.md) |
@@ -246,7 +247,7 @@ Place new code following this decision order:
 
 1. **`rtp-api`** — public interfaces and shared models for addon developers. No platform imports.
 2. **`rtp-core`** — core logic (regions, queues, spiral math, `MemoryTracker`). No platform imports; changes here affect every platform.
-3. **`commands-api` / `effects-api`** — unified frameworks. Extend these, don't fork per-platform.
+3. **`commands-api` / `effects-api` / `maps-api` / `metrics-api`** — unified, platform-neutral SPI frameworks for addons and sibling plugins. Extend these, don't fork per-platform. `metrics-api` (`io.github.dailystruggle.metrics.api.*`) holds the runtime-health SPI (`Metrics`, `MetricsBinding`, `MetricsSnapshot`, `MetricsExtension`, `FoliaRegionSample`); concrete bindings live in platform adapters and the host aggregator (`CoreMetrics`) in `rtp-core`. See [metrics-api-ADR-001](../metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md).
 4. **Platform adapter** (`rtp-bukkit`, `rtp-paper`, `rtp-folia`, `rtp-fabric`) — platform-specific only. Never push platform logic into core.
 5. **`rtp-plugin`** — Bukkit-family entry point. No business logic.
 6. **`addons/`** — third-party integrations that depend only on `rtp-api`.

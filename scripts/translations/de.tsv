@@ -1,0 +1,137 @@
+relpath	parent_path	base_key	index	new_key	new_value	new_comment
+messages.yml		alreadyTeleporting			&7[P0] du wirst bereits teleportiert!	
+messages.yml		teleportDeniedReloading			&7[P0] Teleports sind vorübergehend deaktiviert, während das Plugin neu lädt. Bitte versuche es gleich erneut.	
+messages.yml		chunkLoading			&7[P0] Lade Chunks! bitte warten...	
+messages.yml		teleportCancel			&7[P0] Teleport abgebrochen!	
+messages.yml		unsafe			&7[P0] konnte innerhalb von [attempts] Versuchen keinen sicheren Ort finden	
+messages.yml		cooldownMessage			&7[P0] Du kannst erst in [remainingCooldown] wieder teleportieren	
+messages.yml		noLocationsQueued			#f5eb73[P0] derzeit keine Orte bereit	
+messages.yml		queueUpdate			#2636ef[P0] dein Platz in der Schlange: [spot]	
+messages.yml		notEnoughMoney			&7[P0] du brauchst dafür mindestens $[money].	
+messages.yml		oldFile			&b[P0] alte [filename] erkannt. Aktualisiere	
+messages.yml		newWorld			&b[P0] neue Welt '[world]' erkannt	
+messages.yml		invalidWorld			&7[P0] konnte Welt '[world]' nicht finden	
+messages.yml		reloading			&b[P0] lade [filename]...	
+messages.yml		reloaded			&b[P0] [filename] erfolgreich geladen.	
+messages.yml		updating			&a[P0] aktualisiere [filename]...	
+messages.yml		updated			&a[P0] [filename] erfolgreich aktualisiert.	
+messages.yml		badArg			&c[P0] ungültiges Befehlsargument [arg]	
+messages.yml		consoleCmdNotAllowed			&c[P0] Du musst ein Spieler im Spiel sein, um diesen Befehl auszuführen.	
+messages.yml		noPerms			&7Es tut mir leid, aber du hast keine Berechtigung, diesen Befehl auszuführen. Bitte wende dich an die Server-Administratoren, falls du glaubst, dass dies ein Fehler ist.	
+messages.yml		locationSaved			&7[P0] [amount] Orte für [region] erfolgreich gespeichert	
+messages.yml		locationLoaded			&7[P0] [amount] Orte für [region] erfolgreich geladen	
+messages.yml		scanStart			&a[P0] Scan-Aufgabe gestartet für Regionen: [scan_regions]	
+messages.yml		scanReset			&7[P0] Scan-Warteschlange zurückgesetzt für Regionen: [scan_regions]	
+messages.yml		scanCancel			&7[P0] Scan-Aufgabe abgebrochen für Regionen: [scan_regions]	
+messages.yml		scanPause			#A020F0[P0] Scan-Aufgabe pausiert für Regionen: [scan_regions]	
+messages.yml		scanResume			#10A5F5[P0] Scan-Aufgabe fortgesetzt für Regionen: [scan_regions]	
+messages.yml		scanRunning			&c[P0] Scan-Aufgabe läuft bereits für Regionen: [scan_regions]	
+messages.yml		scanNotRunning			&c[P0] Scan-Aufgabe läuft nicht für Regionen: [scan_regions]	
+messages.yml		infoTeleports			&7Aktive Teleport-Zustandsmaschinen: #7E9CC8[teleports]	
+messages.yml		infoTotalLoads			&7Insgesamt geladene Chunks: #7E9CC8[loads]	
+messages.yml		infoLoadsByOrigin			&7Ladevorgänge nach Ursprung: #7E9CC8[loadsByOrigin]	
+messages.yml		infoLeakRate			&7Aktuelle Chunk-Leak-Rate: #7E9CC8[leakRate]	
+messages.yml		infoQueueDepth			&7Spieler in Regions-Warteschlangen: #7E9CC8[queueDepth]	
+messages.yml		infoPendingTeleports			&7Ausstehende Teleport-Pipelines: #7E9CC8[pendingTeleports]	
+messages.yml		infoAvgPipelineMs			&7Durchschnittliche Pipeline-Latenz: #7E9CC8[avgPipelineMs] ms	
+messages.yml		infoHeap			&7JVM-Heap: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB	
+messages.yml		infoHealthPipelineHeader			&7--- Zustand: Pipeline ---	
+messages.yml		infoTps			&7TPS (1m/5m/15m): #7E9CC8[tps1m] / [tps5m] / [tps15m]	
+messages.yml		infoMSPTLive			&7Server-MSPT: #7E9CC8[mspt] ms (&7Tick-Budget: #7E9CC8[tickBudgetUtilisation]&7)	
+messages.yml		infoSoftCap			&7Spieler: #7E9CC8[playerCount] / [softCap]	
+messages.yml		infoDatabaseLatencyMs			&7Datenbank-Latenz: #7E9CC8[databaseLatencyMs] ms	
+messages.yml		infoFoliaRegionsHeader			&7--- Folia-Regionen ---	
+messages.yml		infoDisclaimerHeader			&7--- Diagnose-Hinweis ---	
+messages.yml		infoDisclaimer			&7Diagnose-Hinweis: Wenn die Gesamtzahl verwaister Chunks des Servers die gesamten Ladevorgänge dieses Plugins ([loads]) übersteigt, ist dieses Plugin nicht die alleinige Ursache des Speicherlecks.	
+messages.yml		infoWorldHeader			#008080Welten:	
+messages.yml		infoConsoleWorldHeader			&7--- Welten ---	
+messages.yml		infoRegionHeader			#63C5DARegionen:	
+messages.yml		infoConsoleRegionHeader			&7--- Regionen ---	
+messages.yml		rtp_description			zu einem zufälligen Ort teleportieren	
+messages.yml		help			&b/rtp help - dies anzeigen	
+messages.yml		help_description			Befehle beschreiben	
+messages.yml		reload			&b/rtp reload - Konfigurationsdateien neu laden	
+messages.yml		reload_description			Konfigurationsdateien neu laden	
+messages.yml		scan_description			gespeicherte Daten löschen und alle möglichen Regionsplatzierungen testen	
+messages.yml		config_description			Konfigurationsdateien zur Laufzeit aktualisieren	
+messages.yml		info_description			den aktuellen Zustand des Plugins prüfen	
+messages.yml		test_description			RTP-Funktionen testen	
+messages.yml		menuHoverFallbackType			Typ: [type]	
+messages.yml		menuHoverFallbackBounds			akzeptiert: [values]	
+messages.yml		menuPickValue			&7wähle einen Wert für [param] (führt aus: /rtp [command] [param]:<value>)	
+messages.yml		menuConstructed			&7baue zusammen: #7E9CC8/rtp [command]	
+messages.yml		menuRootHint			&7klicke unten auf eine Option, um zu beginnen	
+messages.yml		menuFrontPageHoverAdmin			&7Operator-Werkzeuge: Konfiguration, Scans, Diagnose, Neuladen	
+messages.yml		menuAdminPanelHoverConfig			&7den kuratierten Konfigurations-Selektor öffnen	
+messages.yml		menuAdminPanelHoverRegions			&7regionsbezogene Konfigurationen hinzufügen, entfernen oder bearbeiten	
+messages.yml		menuAdminPanelHoverWorlds			&7weltbezogene Konfigurationen hinzufügen, entfernen oder bearbeiten	
+messages.yml		menuAdminPanelHoverEffects			&7gruppenbezogene Teleport-Effekte hinzufügen, entfernen oder bearbeiten	
+messages.yml		menuAdminPanelHoverInfo			&7Plugin-Version, Regionsanzahl und Warteschlangenstatus anzeigen	
+messages.yml		menuAdminPanelHoverDiagnostics			&7führt die vollständige Diagnose-Suite aus; kann aufwendig sein	
+messages.yml		menuAdminPanelHoverMemory			&7aktive Chunk-Ticket- und Pipeline-Zuweisungen ausgeben	
+messages.yml		menuAdminPanelHoverScan			&7das Scan-Untermenü öffnen (Start / Pause / Abbruch)	
+messages.yml		menuAdminPanelHoverReload			&7lädt alle Konfigurationsdateien neu; laufende Teleports können betroffen sein	
+messages.yml		menuAdminPanelHoverBrowse			&7den gespiegelten /rtp-Befehlsbaum öffnen	
+messages.yml		menuAdminPanelHoverVisualizations			&7Karten und andere operatorseitige Visualisierungen öffnen	
+messages.yml		menuVisualizationsHint			&7wähle eine Region, um ihre Karte schlechter Orte anzuzeigen	
+messages.yml		menuVisualizationsHoverRegion			&7eine Karte öffnen, die schlechte Orte in &b[region] anzeigt	
+messages.yml		menuVisualizationsEmpty			&7(keine Regionen konfiguriert)	
+messages.yml		menuPrefabSurvivalDefaultHover			&7auf die ausgelieferten Standardwerte zurücksetzen (identische Überlagerung)	
+messages.yml		menuPrefabLowPerformanceHover			&7schwache Hosts / Shared-CPU-VPSes: längerer Puls, kleinere Caches, Login-Cache aus	
+messages.yml		menuPrefabHighPerformanceHover			&7dedizierte Hardware / hohe Spielerzahlen: kurzer Puls, große Caches, Login-Cache an	
+messages.yml		menuPrefabFoliaTunedHover			&7Folia-Regionsscheduler: schnellere Pulse pro Region, weniger gleichzeitige Chunk-Tickets	
+messages.yml		menuPrefabMultiWorldHover			&7aus dem aktuellen Standard eine Region pro Welt erzeugen	
+messages.yml		menuPrefabConfirmHint			&7prüfe die Änderungen unten, dann klicke auf Bestätigen oder Abbrechen	
+messages.yml		menuPrefabConfirmRow			&a&l[confirm]	
+messages.yml		menuPrefabCancelRow			&c&l[cancel]	
+messages.yml		infoBookRefreshRow			&a[Refresh]	
+messages.yml		infoBookRefreshHover			&7Diese Seite mit einer frischen Metrik-Momentaufnahme neu rendern.	
+messages.yml		infoBookSwitchToTextRow			&7[Switch to chat]	
+messages.yml		infoBookSwitchToTextHover			&7/rtp info stattdessen im Chat ausführen.	
+messages.yml		infoBookOverflowFooter			&7(Inhalt gekürzt - klicke, um die vollständige Ausgabe im Chat zu sehen)	
+messages.yml		infoBookAutoRefreshDeferredNote			&8(automatisches Aktualisieren noch nicht unterstützt; klicke auf Aktualisieren)	
+messages.yml		configFileEmptyHint			&7(keine bearbeitbaren Schlüssel in dieser Datei)	
+messages.yml		configViewRawHint			&7[P0] Buchansicht nicht verfügbar; greife auf Rohausgabe zurück.	
+messages.yml		configValueUnsetPlaceholder			&8(nicht gesetzt)	
+messages.yml		configPendingRowHover			klicke, um zu verwerfen	
+messages.yml		configApplyRow			&a&l[apply]	
+messages.yml		configDiscardRow			&c&l[discard]	
+messages.yml		mapBindingMissing			&c[P0] Kartendarstellung ist auf diesem Server nicht verfügbar.	
+messages.yml		mapResolverMissing			&c[P0] für diese Anfrage ist kein Karten-Resolver registriert.	
+messages.yml		mapUnavailable			&e[P1] Kartendaten sind derzeit nicht verfügbar.	
+messages.yml		mapBusy			&e[P1] der Kartendienst ist beschäftigt; bitte versuche es gleich erneut.	
+messages.yml		menuInfoBadPointsLabel			#9D7CD8&l# Karte schlechter Orte	
+messages.yml		networkQueued			&7[P0] für ein serverübergreifendes Ziel eingereiht (Position [position])...	
+messages.yml		alreadyQueued			&cDu wartest bereits in der serverübergreifenden Warteschlange (Position [position]). Bitte warte.	
+messages.yml		networkTimedOut			&c[P0] serverübergreifender Teleport hat beim Warten auf ein Backend das Zeitlimit überschritten.	
+messages.yml		waitlistFull			&c[P0] serverübergreifende Warteschlange ist voll; bitte versuche es gleich erneut.	
+messages.yml		networkRouting			&7[P0] leite zu einem Backend weiter...	
+messages.yml		networkReserved			&a[P0] Koordinate auf [server] reserviert. Übertrage...	
+messages.yml		networkTransferring			&a[P0] übertrage zu [server]...	
+messages.yml		networkFallback			&e[P0] serverübergreifend nicht verfügbar ([reason]); greife lokal zurück.	
+messages.yml		networkFailed			&c[P0] serverübergreifender Teleport fehlgeschlagen: [reason].	
+messages.yml		networkRegionUnavailable			&c[P0] derzeit bedient kein Backend die Region '[region]'.	
+messages.yml		networkRegionAmbiguous			&c[P0] Region '[region]' ist über mehrere Backends mehrdeutig; bitte einen Server festlegen.	
+messages.yml		multiconfigToggleRemoveModeOff			&8[ ] Entfernen-Modus	
+messages.yml		multiconfigToggleRemoveModeOn			&c[x] Entfernen-Modus (klicke einen Eintrag zum Löschen)	
+messages.yml		multiconfigRowAdd			&a+ neu hinzufügen...	
+messages.yml		multiconfigRowAddHover			&7gib einen Namen im Amboss-Dialog ein; vorausgefüllt: &f[name]	
+messages.yml		multiconfigRowEditHover			&7&f[name] bearbeiten	
+messages.yml		multiconfigRowRemoveHover			&c&f[name] löschen	
+messages.yml		multiconfigConfirmTitle			&c&l[name] löschen?	
+messages.yml		multiconfigConfirmYes			&c&l[confirm delete]	
+messages.yml		multiconfigConfirmNo			&a&l[cancel]	
+messages.yml		multiconfigLockRegionDefault			&7die Standardregion kann nicht entfernt werden	
+messages.yml		multiconfigLockWorldLoaded			&7Welt '[name]' ist auf dem Server geladen; entlade sie, bevor du ihre Konfiguration entfernst	
+messages.yml		multiconfigResultAdded			&a'[name]' hinzugefügt.	
+messages.yml		multiconfigResultRemoved			&a'[name]' entfernt.	
+messages.yml		multiconfigResultAddFailed			&c'[name]' konnte nicht hinzugefügt werden: [reason]	
+messages.yml		multiconfigResultRemoveFailed			&c'[name]' konnte nicht entfernt werden: [reason]	
+messages.yml		multiconfigResultNameInvalid			&cName '[name]' ist nicht erlaubt; verwende Buchstaben, Ziffern, '_', '-', '.'	
+messages.yml		multiconfigResultNameTaken			&cein Eintrag mit dem Namen '[name]' existiert bereits.	
+messages.yml		PLAYER_AVAILABLE			&aVERFÜGBAR	
+messages.yml		PLAYER_SETUP			&bWÄHLE EINEN ORT	
+messages.yml		PLAYER_LOADING			&bLADE CHUNKS	
+messages.yml		PLAYER_TELEPORTING			&bTELEPORTIERE	
+messages.yml		multiconfigHeaderRegions			#5FB3B3&l Regionen	
+messages.yml		multiconfigHeaderWorlds			#5FB3B3&l Welten	

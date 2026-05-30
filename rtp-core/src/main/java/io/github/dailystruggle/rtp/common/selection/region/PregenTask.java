@@ -92,6 +92,44 @@ final class PregenTask implements Runnable {
         } catch (Throwable ignored) {
             // best-effort breadcrumb; never let diagnostics break the pipeline
         }
+        // Always-on outcome metrics (independent of verbose). The breadcrumb name
+        // begins with the cause token ("biome/...", "safetyExternal/...", etc.) or
+        // "success ..." — parse the leading token and feed the process-global
+        // accumulator so success/failure rates and the per-cause breakdown fill
+        // from real traffic. Best-effort: never let metrics break the pipeline.
+        try {
+            recordOutcomeMetric(name);
+        } catch (Throwable ignored) {
+            // defensive: metrics accounting must never affect generation
+        }
+    }
+
+    /**
+     * Maps an outcome breadcrumb to the process-global
+     * {@link io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats}.
+     * The leading token (up to the first {@code '/'} or space) is either
+     * {@code "success"} or the name of a {@link LocationGenerator.FailTypes}
+     * constant. Unrecognised tokens are bucketed as {@code FailTypes.misc}.
+     */
+    private static void recordOutcomeMetric(String name) {
+        if (name == null || name.isEmpty()) return;
+        int cut = name.length();
+        for (int idx = 0; idx < name.length(); idx++) {
+            char c = name.charAt(idx);
+            if (c == '/' || c == ' ') { cut = idx; break; }
+        }
+        String token = name.substring(0, cut);
+        if (token.equals("success")) {
+            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.recordSuccess();
+            return;
+        }
+        LocationGenerator.FailTypes cause;
+        try {
+            cause = LocationGenerator.FailTypes.valueOf(token);
+        } catch (IllegalArgumentException ex) {
+            cause = LocationGenerator.FailTypes.misc;
+        }
+        io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.recordFailure(cause);
     }
 
     /**
@@ -605,7 +643,7 @@ final class PregenTask implements Runnable {
                 // addBadChunk: chunk-uniform — within a chunk the per-column selection order
                 // is deterministic, so the twin spiral index picks the same column and
                 // vert.adjust returns null identically.
-                ((MemoryShape<?>) state.shape).addBadChunk(finalL);
+                ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.vert);
             }
             if (state.verbose) {
                 state.failMap.get(LocationGenerator.FailTypes.vert)
@@ -628,7 +666,7 @@ final class PregenTask implements Runnable {
             if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
                 // addBadChunk: chunk-uniform — biome is a per-chunk property; the twin spiral
                 // index decodes to the same chunk and is guaranteed to fail the same biome check.
-                ((MemoryShape<?>) state.shape).addBadChunk(finalL);
+                ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.biome);
             }
             if (state.verbose) {
                 String cb = currBiome;
@@ -788,7 +826,7 @@ final class PregenTask implements Runnable {
                 // addBadChunk: chunk-uniform — within a chunk the per-column selection order
                 // is deterministic, so the twin spiral index picks the same column and the
                 // same (2r+1)^3 safety scan rejects it again.
-                ((MemoryShape<?>) state.shape).addBadChunk(finalL);
+                ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.safety);
             }
             closeIfPresent(reservation);
             rescheduleNextAttempt();
@@ -811,7 +849,7 @@ final class PregenTask implements Runnable {
                             // addBadChunk: chunk-uniform — within a chunk the per-column
                             // selection order is deterministic, so the twin spiral index picks
                             // the same column and the verifier rejects it identically.
-                            ((MemoryShape<?>) state.shape).addBadChunk(finalL);
+                            ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.safetyExternal);
                         }
                         closeIfPresent(reservation);
                         continueInline(this::rescheduleNextAttempt);

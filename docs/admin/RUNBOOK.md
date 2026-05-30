@@ -74,7 +74,8 @@ air, or into a claimed region they cannot build in.
    causes are:
    - `ClassNotFoundException` or `NoSuchMethodError`, usually the wrong adapter jar for this server
      version (see FM-008 in `FAILURE_MODES.md`).
-   - `IllegalStateException: [RTP API] Cannot add shape`, which happens when an addon loads before RTP core
+   - `IllegalStateException: [RTP API] Cannot access hooks: Core implementation is not loaded`, which
+     happens when an addon touches an `rtp-api` contract entry point before RTP core finishes loading
      (see FM-009).
    - YAML parse error, meaning a config file (`config.yml`, `performance.yml`, or a region file) has a
      syntax error.
@@ -160,11 +161,12 @@ across restarts, consuming significant disk space.
 
 ## Addon Reports `IllegalStateException` on Load
 
-**Symptom:** An addon jar logs `[RTP API] Cannot add shape: Core implementation is not loaded`
-and fails to enable.
+**Symptom:** An addon jar logs `[RTP API] Cannot access hooks: Core implementation is not loaded`
+(or a similar `Core implementation is not loaded` message) and fails to enable.
 
-**Diagnosis:** The addon is calling `RTPAPI.addShape()` or `RTPAPI.addVerticalAdjustor()`
-before `rtp-core` has finished its `onEnable`. This is a load-order problem (FM-009).
+**Diagnosis:** The addon is calling an `rtp-api` contract entry point (e.g. `RTPAPI.hooks()`) -- or an
+`rtp-core` extension entry point such as `RTP.addShape()` / `RTP.addVerticalAdjustor()` -- before
+`rtp-core` has finished its `onEnable`. This is a load-order problem (FM-009).
 
 **Resolution:**
 1. Open the addon's `plugin.yml`.

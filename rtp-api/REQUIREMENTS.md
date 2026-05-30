@@ -6,8 +6,8 @@ For design and implementation details that satisfy these requirements, see [`doc
 ## 1. Functional Requirements
 
 ### 1.1 Extensibility Interfaces
-- **REQ-API-F-001 — Custom Shapes:** The API shall expose interfaces allowing external plugins to register custom spatial geometries (`Shape`).
-- **REQ-API-F-002 — Vertical Adjustors:** The API shall support custom logic for Y-axis adjustments (e.g., surface, cave, or custom logic).
+- **REQ-API-F-001 — Custom Shapes:** The system shall allow external plugins to register custom spatial geometries (`Shape`). Registration of a custom shape requires deriving from the concrete shape base classes and shall be served at the implementation-extension tier (`rtp-core`) rather than through the thin `rtp-api` contract surface, consistent with REQ-API-NF-002.
+- **REQ-API-F-002 — Vertical Adjustors:** The system shall allow external plugins to register custom Y-axis adjustment logic (e.g., surface, cave, or custom logic). Registration shall be served at the implementation-extension tier (`rtp-core`) for the same reason as REQ-API-F-001.
 - **REQ-API-F-003 — Validation Hooks:** The API shall provide hooks for external claim and protection plugins (e.g., GriefPrevention, WorldGuard) to validate location safety asynchronously.
 
 ### 1.2 Data Structures and Models

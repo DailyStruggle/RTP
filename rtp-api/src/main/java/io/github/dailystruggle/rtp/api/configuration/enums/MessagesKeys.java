@@ -133,6 +133,25 @@ public enum MessagesKeys {
    */
   infoAvgPipelineMs,
   /**
+   * Info line showing pipeline-latency percentiles
+   * (the {@code [pipelineMsP50]} / {@code [pipelineMsP75]} / {@code [pipelineMsP90]} /
+   * {@code [pipelineMsP95]} / {@code [pipelineMsP99]} / {@code [pipelineSampleCount]}
+   * placeholders). See ADR-053 / REQ-RTP-OBS-004.
+   */
+  infoPipelinePercentiles,
+  /**
+   * Info line showing the slow-teleport audit counter and its threshold
+   * (the {@code [slowPipelineCount]} / {@code [slowPipelineThresholdMs]} placeholders).
+   * Counts immediate/unqueued teleports only. See ADR-053 §2a / REQ-RTP-OBS-005.
+   */
+  infoSlowPipeline,
+  /**
+   * Info line showing the queue-growth audit counter and its threshold
+   * (the {@code [queueGrowthWarnCount]} / {@code [queueGrowthWarnThreshold]} placeholders).
+   * See ADR-053 §2b / REQ-RTP-OBS-006.
+   */
+  infoQueueGrowth,
+  /**
    * Info line showing JVM heap usage
    * (the {@code [heapUsedMb]} / {@code [heapMaxMb]} placeholders).
    */

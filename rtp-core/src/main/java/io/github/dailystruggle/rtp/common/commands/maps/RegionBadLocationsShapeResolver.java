@@ -5,6 +5,7 @@ import io.github.dailystruggle.mapsapi.model.RegionBadLocations;
 import io.github.dailystruggle.mapsapi.render.RegionBadLocationsRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 
@@ -166,9 +167,10 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
                 int bx = (int) (minX + px * boundW / (BUFFER_WIDTH - 1));
                 byte color;
                 if (memoryShape.contains(bx, bz)) {
-                    color = memoryShape.isKnownBad(bx, bz)
-                            ? PaletteIndex.RED
-                            : PaletteIndex.GREEN;
+                    int cause = memoryShape.causeAt(bx, bz);
+                    color = (cause < 0)
+                            ? PaletteIndex.GREEN
+                            : causeColor(cause);
                 } else {
                     color = PaletteIndex.BLACK;
                 }
@@ -179,5 +181,58 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
         RegionBadLocations model = new RegionBadLocations(
                 region.name, BUFFER_WIDTH, BUFFER_HEIGHT, palette);
         return Resolution.of(RegionBadLocationsRenderer.INSTANCE, model);
+    }
+
+    /**
+     * Maps a {@link LocationGenerator.FailTypes} ordinal (the per-run
+     * rejection cause recorded by the pregen pipeline and persisted in the
+     * region's {@link MemoryShape}) to a logical {@link PaletteIndex} byte so
+     * each unsafe pixel is colored by <i>why</i> it was rejected rather than
+     * a single hazard red. Only the chunk-attributable causes (vert / biome /
+     * safety / safetyExternal) are persisted today; the remaining ordinals
+     * are mapped defensively so any future persisted cause still renders a
+     * stable, distinguishable color. Unknown / {@code misc} falls back to the
+     * generic {@link PaletteIndex#RED}.
+     *
+     * <p>Colors are drawn from the existing 32-symbol palette contract (the
+     * named slots plus distinct shades on the heat ramp) so no
+     * {@code MapBinding} palette table change is required:
+     * <ul>
+     *   <li><b>vert</b> (no safe vertical position) -> dark red / maroon;</li>
+     *   <li><b>safety</b> / prefilter block (unsafe block) -> a bright-red ramp
+     *       shade (distinct from the named {@link PaletteIndex#RED} so it does
+     *       not collide with the generic {@code misc} fallback);</li>
+     *   <li><b>safetyExternal</b> (claim / external protection) -> orange;</li>
+     *   <li><b>biome</b> / prefilter biome (filtered biome) -> yellow;</li>
+     *   <li><b>worldBorder</b> -> cream;</li>
+     *   <li><b>nullChunk</b> / ungenerated / timeout -> {@link PaletteIndex#WHITE};</li>
+     *   <li><b>misc</b> / anything else -> {@link PaletteIndex#RED}.</li>
+     * </ul>
+     *
+     * @param causeOrdinal a {@link LocationGenerator.FailTypes} ordinal
+     * @return a logical palette byte for the cause
+     */
+    static byte causeColor(int causeOrdinal) {
+        // Distinct shades along the black -> red -> yellow -> white heat ramp
+        // (PaletteIndex.RAMP_MIN..RAMP_MAX). Chosen for visual separation at
+        // the 1-pixel vanilla map scale.
+        final byte MAROON = (byte) (PaletteIndex.RAMP_MIN + 7);  // ~ dark red
+        final byte SCARLET = (byte) (PaletteIndex.RAMP_MIN + 12); // ~ bright red, != named RED
+        final byte ORANGE = (byte) (PaletteIndex.RAMP_MIN + 17); // red -> yellow
+        final byte YELLOW = (byte) (PaletteIndex.RAMP_MIN + 22); // ~ yellow
+        final byte CREAM = (byte) (PaletteIndex.RAMP_MIN + 25);  // yellow -> white
+        LocationGenerator.FailTypes[] values = LocationGenerator.FailTypes.values();
+        if (causeOrdinal < 0 || causeOrdinal >= values.length) {
+            return PaletteIndex.RED;
+        }
+        return switch (values[causeOrdinal]) {
+            case vert, prefilterRange -> MAROON;
+            case safety, prefilterBlock -> SCARLET;
+            case safetyExternal -> ORANGE;
+            case biome, prefilterBiome -> YELLOW;
+            case worldBorder -> CREAM;
+            case nullChunk, ungenerated, timeout -> PaletteIndex.WHITE;
+            case misc -> PaletteIndex.RED;
+        };
     }
 }

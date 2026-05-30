@@ -88,7 +88,7 @@ The `rtp-api` module provides a strict, defined interface for external integrati
 - **Concurrency Abstractions**: All blocking and async operations are dispatched via `SyncTaskProcessing` and `AsyncTaskProcessing` abstractions implementing `RTPRunnable`, keeping `rtp-core` free of direct platform imports.
 
 ### rtp-api Implementation Notes
-- **Registration Guards**: `RTPAPI.addShape()` and `RTPAPI.addVerticalAdjustor()` throw `IllegalStateException` if called before core is loaded, enforcing a write-once contract.
+- **Registration Guards**: Custom `Shape` / vertical-adjustor registration is an implementation-extension capability served at the `rtp-core` tier via the typed `RTP.addShape(Shape)` / `RTP.addVerticalAdjustor(VerticalAdjustor)` entry points (two-tier API model, [ADR-051](../adr/ADR-051-two-tier-api-extension-model.md)). The thin `rtp-api` contract no longer exposes untyped `addShape(Object)` shims. Contract-surface delegates that remain on `RTPAPI` (e.g. `hooks()`) still throw `IllegalStateException` if accessed before core is loaded (REQ-RTP-S-006).
 - **Location Generator Interface**: `ILocationGenerator` is the core abstraction through which `GenerationContext` flows; platform accessors implement this to wire into the teleport pipeline.
 - **Lock-Free Config Caching**: API-level configuration caches use `EnumMap` and `ConcurrentHashMap` to ensure high-throughput reads without synchronization bottlenecks.
 - **Exception Isolation**: Addon-supplied `Shape` or validation `Predicate`/`Function` implementations are called inside `try-finally` blocks so that unhandled addon exceptions do not escape into the core pipeline.

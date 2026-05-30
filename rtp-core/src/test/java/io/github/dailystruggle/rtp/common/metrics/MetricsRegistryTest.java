@@ -16,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Phase C parity test for the cross-plugin static registry on {@link Metrics}.
- * Verifies the user-locked semantics from
- * {@code PROPOSAL-metrics-api-extraction.md} §1.1 / §3 Q6:
+ * Verifies the registry semantics recorded in
+ * {@code metrics-api-ADR-001} §7 (last-writer-wins, extension cardinality):
  * <ol>
  *   <li>{@link Metrics#currentBinding()} defaults to {@link MetricsBinding#NOOP}.</li>
  *   <li>{@link Metrics#registerBinding(MetricsBinding)} is last-writer-wins and

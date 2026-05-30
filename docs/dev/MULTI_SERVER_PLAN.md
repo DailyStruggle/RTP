@@ -889,4 +889,19 @@ Choice is deferred until the proxy-side `commands-api` surface is concrete (an e
 
 ---
 
+## Deferred: extract `proxy-api/` sibling module
+
+Tracked here (moved 2026-05-29 from the now-completed metrics-api extraction proposal, which mirrored this decision; see [metrics-api-ADR-001](../../metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md) *Deferred sibling extraction*). Once `metrics-api` had shipped, `rtp-proxy-common` was slated for the same plugin-agnostic split, as a *simple file transfer* with no reshaping:
+
+- **Extract** into a new `proxy-api/` subproject (neutral root `io.github.dailystruggle.proxy.api.*`, mirroring the `metrics-api` neutral-root decision):
+  - Generic transport SPI: `NetworkTransport`, `ProxySender`, `ProxyHeartbeat`, `BackendHeartbeat`, `Subscription`.
+  - Analytics / observability shapes: `NetworkSnapshot`, `BackendSelector`, `LoadBalancerConfig`, `WeightedAverageBackendSelector`.
+  - In-memory default binding: `InMemoryNetworkStateBinding`.
+  - Generic outcome / reason enums: `DispatchOutcome`, `ReleaseReason`, `TransferOutcome`, `TriggerType`, `MessageKey`.
+- **Keep** in `rtp-proxy-common`: `RtpDispatcher`, `RtpRequest`, `ReservationClient`, `ReservationToken` (RTP-teleport-specific reservation semantics, REQ-RTP-NET-011/012/014).
+- **Timing**: after `metrics-api` lands and ships at least one full build green. Not in the same session.
+- **Scope discipline**: *simple transfer* - no reshaping of types, no extension model, no static registry. The reservation slot stays where it is; if a sibling plugin later needs a non-teleport reservation primitive, that is a separate proposal.
+
+---
+
 *Self-update note*: any durable engineering lesson discovered while executing this plan goes to [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md); incidental potential bugs go to [`POTENTIAL_BUGS.md`](POTENTIAL_BUGS.md); architecturally significant decisions get their own ADR. Do not bloat this file with implementation lore â€” it is a roadmap, not an encyclopaedia.

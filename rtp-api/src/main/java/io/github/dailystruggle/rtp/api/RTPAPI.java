@@ -5,8 +5,11 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
 
 /**
  * Central registry and delegate hub for the RTP public API.
@@ -17,9 +20,18 @@ import java.util.function.Function;
  * addon method calls are made.
  *
  * <p><b>Invariant:</b> Once {@code rtp-core} has finished {@code onEnable},
- * {@code serverAccessor}, {@code shapeAdder}, {@code vertAdder}, and
- * {@code biomeProvider} are all non-null and remain non-null for the lifetime
- * of the server process.
+ * {@code serverAccessor} and {@code biomeProvider} are non-null and remain
+ * non-null for the lifetime of the server process.
+ *
+ * <p><b>Two-tier API model:</b> {@code rtp-api} is the thin, stable, publishable
+ * <em>contract</em> surface (teleport, hooks, by-world queries). Registering a
+ * custom {@code Shape} or vertical adjustor is an <em>implementation-tier</em>
+ * extension that requires the concrete, heavyweight base classes; those live in
+ * {@code rtp-core} (the platform-independent engine) and are registered through
+ * the typed {@code RTP.addShape(Shape)} / {@code RTP.addVerticalAdjustor(VerticalAdjustor)}
+ * entry points. An addon author who derives a new shape therefore compiles
+ * against {@code rtp-core}, not {@code rtp-api} (REQ-API-F-001/F-002,
+ * REQ-API-NF-002).
  *
  * <p><b>Thread safety:</b> All delegate fields are {@code volatile} so that the
  * single write performed by the main thread during {@code onEnable} is
@@ -42,18 +54,6 @@ public class RTPAPI {
 
   // Functional delegates mapped by the Core module. Volatile for cross-thread visibility.
   /**
-   * Delegate that registers a custom {@code Shape} implementation with the core
-   * registry (REQ-API-F-001). Populated by {@code rtp-core} during {@code onEnable};
-   * {@code null} until then.
-   */
-  public static volatile Consumer<Object> shapeAdder = null;
-  /**
-   * Delegate that registers a custom vertical adjustor implementation with the
-   * core registry (REQ-API-F-002). Populated by {@code rtp-core} during
-   * {@code onEnable}; {@code null} until then.
-   */
-  public static volatile Consumer<Object> vertAdder = null;
-  /**
    * Delegate that resolves the set of biome names available in a given world.
    * Populated by {@code rtp-core} during {@code onEnable}; {@code null} until then.
    * Use {@link #getBiomes(RTPWorld)} rather than calling this field directly.
@@ -67,6 +67,35 @@ public class RTPAPI {
    * (REQ-RTP-S-006). See ADR-026 and {@code docs/dev/EXTERNAL_HOOKS.md}.
    */
   public static volatile RTPHooks hooks = null;
+
+  /**
+   * Delegate that triggers a teleport for an online player and completes the
+   * returned future with the outcome. Populated by {@code rtp-core} during
+   * {@code onEnable}; {@code null} until then. Use
+   * {@link #teleport(UUID, RtpTarget)} rather than calling this field directly.
+   */
+  public static volatile BiFunction<UUID, RtpTarget, CompletableFuture<RTPResult>> teleportDelegate =
+      null;
+  /**
+   * Delegate that cancels a pending teleport for a player, returning {@code true}
+   * if a request was actually cancelled. Populated by {@code rtp-core} during
+   * {@code onEnable}; {@code null} until then. Use {@link #cancel(UUID)} rather
+   * than calling this field directly.
+   */
+  public static volatile Predicate<UUID> cancelDelegate = null;
+  /**
+   * Delegate that reports the combined ready-location queue depth for a world.
+   * Populated by {@code rtp-core} during {@code onEnable}; {@code null} until then.
+   * Use {@link #queueDepth(RTPWorld)} rather than calling this field directly.
+   */
+  public static volatile ToIntFunction<RTPWorld<?>> queueDepthDelegate = null;
+  /**
+   * Delegate that reports whether a player currently has an in-flight (warming-up)
+   * teleport. Populated by {@code rtp-core} during {@code onEnable}; {@code null}
+   * until then. Use {@link #isWarmingUp(UUID)} rather than calling this field
+   * directly.
+   */
+  public static volatile Predicate<UUID> warmupDelegate = null;
 
 
   /**
@@ -96,35 +125,6 @@ public class RTPAPI {
               + "If you are an addon developer, do not overwrite RTPAPI.serverAccessor.");
     }
     serverAccessor = accessor;
-  }
-
-  /**
-   * Register a custom {@code Shape} (REQ-API-F-001). Call from the addon's {@code onEnable}
-   * on the main thread, after {@code rtp-core} has loaded; afterwards the shape is
-   * selectable by its registered name in region config.
-   *
-   * @throws IllegalStateException if {@code rtp-core} has not registered its delegate yet
-   */
-  public static void addShape(Object shape) {
-    if (shapeAdder != null) {
-      shapeAdder.accept(shape);
-    } else {
-      throw new IllegalStateException("[RTP API] Cannot add shape: Core implementation is not loaded.");
-    }
-  }
-
-  /**
-   * Register a custom vertical adjustor (REQ-API-F-002). Call from the addon's
-   * {@code onEnable} on the main thread, after {@code rtp-core} has loaded.
-   *
-   * @throws IllegalStateException if {@code rtp-core} has not registered its delegate yet
-   */
-  public static void addVerticalAdjustor(Object verticalAdjustor) {
-    if (vertAdder != null) {
-      vertAdder.accept(verticalAdjustor);
-    } else {
-      throw new IllegalStateException("[RTP API] Cannot add vertical adjustor: Core implementation is not loaded.");
-    }
   }
 
   /**
@@ -161,5 +161,98 @@ public class RTPAPI {
           "[RTP API] Cannot access hooks: Core implementation is not loaded.");
     }
     return h;
+  }
+
+  /**
+   * Triggers a random teleport for an online player and reports the outcome.
+   *
+   * <p>This is the addon-facing equivalent of a player running {@code /rtp}: it
+   * resolves {@code target} to a region, runs the full safety pipeline off the
+   * main thread, and moves the player when a safe destination is found. The
+   * returned future always completes - with a success {@link RTPResult} on a
+   * successful teleport, or a failure {@code RTPResult} otherwise (REQ-RTP-S-004);
+   * it is never left to silently hang on a no-op.
+   *
+   * <p>Safe to call from any thread once {@code rtp-core} has loaded. The future
+   * may complete on an internal RTP thread; use {@code thenAcceptAsync} with your
+   * platform executor if you need main-thread continuation.
+   *
+   * @param player the UUID of the online player to teleport; must not be {@code null}
+   * @param target where to send the player; use {@link RtpTarget#defaultRegion()}
+   *     for the default behaviour. Must not be {@code null}.
+   * @return a future that completes with the teleport outcome
+   * @throws IllegalStateException    if {@code rtp-core} has not loaded yet
+   *     (REQ-RTP-S-006)
+   * @throws IllegalArgumentException if {@code player} or {@code target} is {@code null}
+   */
+  public static CompletableFuture<RTPResult> teleport(UUID player, RtpTarget target) {
+    if (player == null) throw new IllegalArgumentException("[RTP API] player must not be null");
+    if (target == null) throw new IllegalArgumentException("[RTP API] target must not be null");
+    BiFunction<UUID, RtpTarget, CompletableFuture<RTPResult>> d = teleportDelegate;
+    if (d == null) {
+      throw new IllegalStateException(
+          "[RTP API] Cannot teleport: Core implementation is not loaded.");
+    }
+    return d.apply(player, target);
+  }
+
+  /**
+   * Cancels a pending or in-flight teleport for a player, if any.
+   *
+   * @param player the player UUID; must not be {@code null}
+   * @return {@code true} if a teleport request was found and cancelled,
+   *     {@code false} if the player had no pending teleport
+   * @throws IllegalStateException    if {@code rtp-core} has not loaded yet
+   *     (REQ-RTP-S-006)
+   * @throws IllegalArgumentException if {@code player} is {@code null}
+   */
+  public static boolean cancel(UUID player) {
+    if (player == null) throw new IllegalArgumentException("[RTP API] player must not be null");
+    Predicate<UUID> d = cancelDelegate;
+    if (d == null) {
+      throw new IllegalStateException(
+          "[RTP API] Cannot cancel: Core implementation is not loaded.");
+    }
+    return d.test(player);
+  }
+
+  /**
+   * Returns the number of pre-verified, ready-to-serve locations currently queued
+   * for {@code world}'s teleport region.
+   *
+   * @param world the world to query; must not be {@code null}
+   * @return the queue depth ({@code >= 0})
+   * @throws IllegalStateException    if {@code rtp-core} has not loaded yet
+   *     (REQ-RTP-S-006)
+   * @throws IllegalArgumentException if {@code world} is {@code null}
+   */
+  public static int queueDepth(RTPWorld<?> world) {
+    if (world == null) throw new IllegalArgumentException("[RTP API] world must not be null");
+    ToIntFunction<RTPWorld<?>> d = queueDepthDelegate;
+    if (d == null) {
+      throw new IllegalStateException(
+          "[RTP API] Cannot read queue depth: Core implementation is not loaded.");
+    }
+    return d.applyAsInt(world);
+  }
+
+  /**
+   * Returns whether {@code player} currently has an in-flight (warming-up)
+   * teleport that has been requested but not yet completed.
+   *
+   * @param player the player UUID; must not be {@code null}
+   * @return {@code true} if a teleport is in progress for the player
+   * @throws IllegalStateException    if {@code rtp-core} has not loaded yet
+   *     (REQ-RTP-S-006)
+   * @throws IllegalArgumentException if {@code player} is {@code null}
+   */
+  public static boolean isWarmingUp(UUID player) {
+    if (player == null) throw new IllegalArgumentException("[RTP API] player must not be null");
+    Predicate<UUID> d = warmupDelegate;
+    if (d == null) {
+      throw new IllegalStateException(
+          "[RTP API] Cannot read warmup state: Core implementation is not loaded.");
+    }
+    return d.test(player);
   }
 }

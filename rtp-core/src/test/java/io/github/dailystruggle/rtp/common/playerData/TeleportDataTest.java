@@ -252,4 +252,50 @@ class TeleportDataTest {
         data.written = true;
         assertTrue(data.written);
     }
+
+    // -------------------------------------------------------------------------
+    // onComplete / fireOnComplete (public API teleport-future completion, S-004)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void fireOnComplete_invokesCallbackExactlyOnce() {
+        TeleportData data = new TeleportData();
+        int[] calls = {0};
+        data.onComplete = td -> calls[0]++;
+
+        data.fireOnComplete();
+        data.fireOnComplete();
+        data.fireOnComplete();
+
+        assertEquals(1, calls[0], "onComplete must fire exactly once across multiple cleanup paths");
+    }
+
+    @Test
+    void fireOnComplete_isNoOpWhenCallbackNull() {
+        TeleportData data = new TeleportData();
+        assertNull(data.onComplete);
+        assertDoesNotThrow(data::fireOnComplete);
+    }
+
+    @Test
+    void fireOnComplete_swallowsCallbackException() {
+        TeleportData data = new TeleportData();
+        data.onComplete = td -> { throw new RuntimeException("boom"); };
+        assertDoesNotThrow(data::fireOnComplete,
+                "a misbehaving consumer callback must never abort pipeline cleanup");
+    }
+
+    @Test
+    void clone_doesNotCarryOnCompleteCallback() {
+        TeleportData original = new TeleportData();
+        original.sender = new MockRTPCommandSender(UUID.randomUUID(), "Frank");
+        int[] calls = {0};
+        original.onComplete = td -> calls[0]++;
+
+        TeleportData copy = original.clone();
+        copy.fireOnComplete();
+
+        assertNull(copy.onComplete, "history/prior-data clones must not retain the API callback");
+        assertEquals(0, calls[0], "a clone must never fire the original's completion callback");
+    }
 }

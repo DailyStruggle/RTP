@@ -126,6 +126,14 @@
 信息_队列深度: "&7Players Waiting In Region Queues: #7E9CC8[queueDepth]"
 信息_等待传送: "&7Pending Teleport Pipelines: #7E9CC8[pendingTeleports]"
 信息_平均管道毫秒: "&7Avg Pipeline Latency: #7E9CC8[avgPipelineMs] ms"
+# Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
+# [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
+infoPipelinePercentiles: "&7Pipeline Latency (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
+# Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
+# [slowPipelineCount] [slowPipelineThresholdMs].
+infoSlowPipeline: "&7Slow Teleports (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
+# Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+infoQueueGrowth: "&7Queue-Growth Warnings (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 信息_堆内存: "&7JVM Heap: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # /rtp info 中 Health pipeline 标记块的标题行。
 信息_健康管道标题: "&7--- Health: pipeline ---"

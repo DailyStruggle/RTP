@@ -60,7 +60,38 @@ public class TeleportData implements Cloneable {
   /** Flag indicating whether the teleport data has been written to the database. */
   public boolean written = false;
 
+  /**
+   * Optional one-shot completion callback used by the public API entry point
+   * ({@code RTPAPI.teleport}) to complete its returned future. Invoked exactly
+   * once at the pipeline's terminal cleanup phase via {@link #fireOnComplete()},
+   * regardless of whether the teleport succeeded, failed, or was cancelled
+   * (REQ-RTP-S-004). {@code null} for teleports that were not initiated through
+   * the public API (e.g. the {@code /rtp} command path), in which case
+   * {@link #fireOnComplete()} is a no-op. Not persisted and not copied to clones.
+   */
+  public transient java.util.function.Consumer<TeleportData> onComplete = null;
+
+  private transient final java.util.concurrent.atomic.AtomicBoolean completionDelivered =
+      new java.util.concurrent.atomic.AtomicBoolean(false);
+
   public TeleportData() {
+  }
+
+  /**
+   * Fire the {@link #onComplete} callback at most once. Safe to call from any
+   * thread and on any number of pipeline exit paths; only the first call has any
+   * effect. A callback failure is swallowed so it can never abort teleport
+   * teardown.
+   */
+  public void fireOnComplete() {
+    java.util.function.Consumer<TeleportData> cb = onComplete;
+    if (cb != null && completionDelivered.compareAndSet(false, true)) {
+      try {
+        cb.accept(this);
+      } catch (Throwable ignored) {
+        // never let an API consumer's callback break pipeline cleanup
+      }
+    }
   }
 
   @Override
@@ -81,6 +112,8 @@ public class TeleportData implements Cloneable {
       clone.queueLocation = queueLocation;
       clone.processingTime = processingTime;
       clone.written = written;
+      // History/prior-data clones must never fire an API completion callback.
+      clone.onComplete = null;
       return clone;
     } catch (CloneNotSupportedException e) {
       throw new AssertionError();

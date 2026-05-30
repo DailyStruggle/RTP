@@ -1,88 +1,94 @@
-# --- RTP Performance Settings ---
-# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/PERFORMANCE.md
-# Max search attempts before giving up
+# --- RTP Leistungseinstellungen ---
+# Dokumentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/PERFORMANCE.md
+# Maximale Suchversuche pro /rtp-Aufruf, bevor aufgegeben wird.
 # @type: integer
 # @range: [1, null]
 # @default: 32
 maxAttempts: 32
 
-# Chunk radius to load during selection
+# Chunk-Radius, der während der Auswahl rund um einen Kandidatenort geladen wird.
+# 0 lädt nur den Kandidaten-Chunk.
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
 viewDistanceSelect: 0
 
-# Chunk radius to load before teleport
+# Chunk-Radius, der unmittelbar vor dem Teleport rund um den endgültigen Ort
+# geladen wird. 0 lädt nur den Ziel-Chunk.
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
 viewDistanceTeleport: 0
 
-# Ticks between background cache cycles
+# Ticks zwischen Hintergrund-Cache-Zyklen (Regions-Vorbefüllung, Warteschlangen-Auffüllung).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
 period: 20
 
-# Max ms per tick for sync tasks
+# Maximale Millisekunden pro Tick für synchrone Aufgaben.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
 syncAllottedTime: 50
 
-# Max ms per tick for async tasks
+# Maximale Millisekunden pro Tick für asynchrone Aufgaben.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
 asyncAllottedTime: 50
 
-# Min TPS to continue background queueing
+# Mindest-Server-TPS, die zum Fortführen der Hintergrund-Warteschlange nötig ist.
+# Hintergrundarbeit pausiert, wenn die TPS unter diesen Schwellenwert fallen.
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
 minTPS: 19.0
 
-# Refill cache immediately after teleport
+# Den Regions-Cache unmittelbar nach einem erfolgreichen Teleport auffüllen.
 # @type: boolean
 # @default: false
 postTeleportQueueing: false
 
-# Use sync chunk loading (NOT RECOMMENDED)
+# Synchrones Chunk-Laden verwenden. NICHT EMPFOHLEN. Verletzt den Geist von S-005
+# auf Folia und blockiert den Haupt-Thread auf Paper/Spigot.
 # @type: boolean
 # @default: false
 syncLoading: false
 
-# Parse permissions on every event
+# Berechtigungsknoten bei jedem Ereignis neu auswerten, statt sie zu cachen.
 # @type: boolean
 # @default: false
 onEventParsing: false
 
-# Parse effect permissions on startup
+# Effekt-Berechtigungsknoten beim Start auswerten.
 # @type: boolean
 # @default: true
 effectParsing: true
 
-# Reuse found biome locations
+# Zuvor gefundene biom-passende Orte aus dem Cache wiederverwenden.
 # @type: boolean
 # @default: true
 biomeRecall: true
 
-# Only use biomes already in cache
+# Wenn gesetzt, biom-gefilterte Anfragen nur aus dem Cache bedienen (niemals
+# neue Biom-Suchen erzeugen). Erfordert biomeRecall.
 # @type: boolean
 # @default: false
 biomeRecallForced: false
 
-# Check for safe spots in all loaded chunks
+# In allen geladenen Chunks nach sicheren Landeplätzen suchen (opportunistische
+# Vorbefüllung).
 # @type: boolean
 # @default: false
 checkOnChunkLoads: false
 
-# Enable background data gathering
+# Hintergrund-Datenerfassung für Besucher-Analysen aktivieren.
 # @type: boolean
 # @default: false
 visitorEnabled: true
@@ -98,27 +104,53 @@ loginCacheEnabled: false
 # @default: 0
 loginCacheCap: 0
 
-# Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
+# Wahrscheinlichkeit, einen nicht generierten Chunk pro Auswahlversuch abzulehnen.
+# 0.0 = keine Bevorzugung (Standard), 1.0 = nicht generiertes Land strikt meiden.
+# Generierte Chunks bestehen immer.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.0
 pregeneratedPreference: 0.0
 
-# Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
+# Anteil der L3-Backlog-Kapazität, bei dem das Auffüllen wieder einsetzt (Hysterese).
+# 0.5 = erst auffüllen, wenn L3 auf 50% geleert ist (Standard). 1.0 = kontinuierlich
+# auffüllen. Höhere Werte gruppieren .mca-Bin-Prüfungen für bessere
+# CPU-/Speichereffizienz.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
 backlogRefillThreshold: 0.5
-# Settings for /rtp admin prefab. The `apply` -> `confirm` flow writes
-# each touched config file with a sibling backup named
-# <file>.yml.bak.<epochMillis>; `bakRetention` caps how many such
-# backups are kept per file, oldest pruned first. Set to 1 to keep only
-# the most recent backup; values below 1 are clamped to 1. /rtp admin
-# prefab rollback walks backups newest-first across multiple invocations.
+
+# Latency threshold (ms) above which an immediately-served (unqueued) teleport
+# is audited: a WARN is logged and the cumulative slowPipelineCount counter
+# (surfaced by /rtp info) is incremented. Only immediate/unqueued teleports are
+# audited; queued at-rate teleports are excluded because their measured time
+# includes queue-wait. 0 or below disables the audit. See ADR-053.
+# @type: integer
+# @range: [0, null]
+# @unit: ms
+# @default: 5000
+slowPipelineThresholdMs: 5000
+
+# Public teleport-queue depth (players waiting) at or above which queue
+# backpressure is audited: an edge-triggered WARN is logged and the cumulative
+# queueGrowthWarnCount counter (surfaced by /rtp info) is incremented once per
+# crossing. 0 or below disables the audit (opt-in). See ADR-053.
+# @type: integer
+# @range: [0, null]
+# @unit: players
+# @default: 0
+queueGrowthWarnThreshold: 0
+# Einstellungen für /rtp admin prefab. Der `apply` -> `confirm`-Ablauf schreibt
+# jede berührte Konfigurationsdatei mit einem gleichnamigen Backup
+# <file>.yml.bak.<epochMillis>; `bakRetention` begrenzt, wie viele solcher
+# Backups je Datei behalten werden, älteste zuerst entfernt. Auf 1 setzen, um nur
+# das neueste Backup zu behalten; Werte unter 1 werden auf 1 angehoben. /rtp admin
+# prefab rollback geht Backups über mehrere Aufrufe vom neuesten zum ältesten durch.
 prefab:
   # @type: integer
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
-# DO NOT TOUCH VERSION NUMBER
+# ÄNDERE NICHT DIE VERSIONSNUMMER
 version: 1.0

@@ -104,6 +104,15 @@ class RegionBadLocationsShapeResolverTest {
     sumsField.set(shape, sums);
   }
 
+  /** Reflectively seeds the per-run rejection-cause cache, aligned 1:1 with
+   *  the bad-keys cache, so {@link MemoryShape#causeAt(long)} resolves each
+   *  seeded key to its recorded {@link io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes}. */
+  private static void seedBadCauses(MemoryShape<?> shape, byte[] causes) throws Exception {
+    Field causesField = MemoryShape.class.getDeclaredField("badCauseCache");
+    causesField.setAccessible(true);
+    causesField.set(shape, causes);
+  }
+
   private static int countPalette(byte[] palette, byte color) {
     int n = 0;
     for (byte b : palette) if (b == color) n++;
@@ -165,6 +174,47 @@ class RegionBadLocationsShapeResolverTest {
         "no bad keys -> no RED pixels");
     assertTrue(countPalette(palette, PaletteIndex.GREEN) > 0,
         "in-region pixels shall still be GREEN even when bad set is empty");
+  }
+
+  @Test
+  @DisplayName("Cause colorization: per-run cause is rendered as its distinct palette shade, not generic RED")
+  void causeColorization_rendersCauseSpecificShade() throws Exception {
+    // Seed a contiguous block-patch (as in the happy path) so the bad run
+    // is guaranteed to strike multiple canvas pixels, then tag every key in
+    // the run with the same recorded cause (biome). The resolver must color
+    // those pixels with causeColor(biome) rather than the generic RED.
+    java.util.List<Long> raw = new java.util.ArrayList<>();
+    for (int dx = -32; dx <= 32; dx++) {
+      for (int dz = -32; dz <= 32; dz++) {
+        raw.add(shape.xzToLocation((long) dx + 80L, (long) dz + 80L));
+      }
+    }
+    long[] keys = raw.stream().distinct().mapToLong(Long::longValue).toArray();
+    java.util.Arrays.sort(keys);
+    seedBadKeys(shape, keys);
+
+    byte biomeCause =
+        (byte) io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.biome.ordinal();
+    byte[] causes = new byte[keys.length];
+    java.util.Arrays.fill(causes, biomeCause);
+    seedBadCauses(shape, causes);
+
+    ChartSpecResolver.Resolution res = resolver.resolve(
+        ChartSpec.of(ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE, "default"));
+
+    RegionBadLocations rbl = assertInstanceOf(RegionBadLocations.class, res.model());
+    byte[] palette = rbl.palette();
+
+    byte expected = RegionBadLocationsShapeResolver.causeColor(
+        io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.biome.ordinal());
+    assertTrue(expected != PaletteIndex.RED,
+        "biome cause shall map to a non-RED shade so it is distinguishable");
+    assertTrue(countPalette(palette, expected) > 0,
+        "bad locations tagged 'biome' shall render as causeColor(biome)=" + expected
+            + "; got histogram for that shade=" + countPalette(palette, expected)
+            + " RED=" + countPalette(palette, PaletteIndex.RED));
+    assertEquals(0, countPalette(palette, PaletteIndex.RED),
+        "no key was tagged with a RED-mapped cause, so no generic RED pixels expected");
   }
 
   @Test

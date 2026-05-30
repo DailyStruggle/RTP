@@ -4,7 +4,7 @@
 // FabricMetricsBinding) live in their respective platform adapters and
 // depend on this module via `api project(':metrics-api')`.
 //
-// Per PROPOSAL-metrics-api-extraction.md §1.1, this module is designed for
+// Per metrics-api-ADR-001 (docs/adr/), this module is designed for
 // **monorepo reuse**: sibling plugins in the same monorepo can consume the
 // SPI without depending on rtp-core. The package root is therefore neutral
 // (io.github.dailystruggle.metrics.api.*), not RTP-scoped.

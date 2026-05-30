@@ -15,10 +15,10 @@ Tier ordering reflects priority, not chronology:
 
 ## Tier 0 — Release blockers for `3.0.0` final
 
-- [ ] **Record current-release demo footage.** The "Historical Demonstrations" section on the front page is self-labelled as dated. Produce two ≤30s clips on `3.0.0-beta.1` showing (a) the Anvil pre-filter's effect on MSPT under Spigot, (b) queue saturation and per-player isolation on Folia. Replace the YouTube IDs in `docs/FRONT_PAGE.bbcode` and retitle the section back to "Performance Proofs & Demos".
-- [ ] **Close out every `@Ignored` / `@Disabled` test.** Per project guidelines, releases must not ship with muted tests. Audit `rtp-core`, all platform adapters, and `rtp-plugin` before tagging.
-- [ ] **Freeze the ADR set for 3.0.0.** Any architectural work started after `beta.1` either lands before the final tag or is deferred to a `3.1.0` ADR file. Mixed-state ADRs confuse external reviewers reading the repo top-down.
-- [ ] **`CHANGELOG.md` Keep-A-Changelog pass.** The `3.0.0` entry should read as a release announcement, not a git log — grouped by Added / Changed / Fixed / Removed with operator-visible framing.
+- [x] ~~**Record current-release demo footage.** The "Historical Demonstrations" section on the front page is self-labelled as dated. Produce two ≤30s clips on `3.0.0-beta.1` showing (a) the Anvil pre-filter's effect on MSPT under Spigot, (b) queue saturation and per-player isolation on Folia. Replace the YouTube IDs in `docs/FRONT_PAGE.bbcode` and retitle the section back to "Performance Proofs & Demos".~~
+- [x] ~~**Close out every `@Ignored` / `@Disabled` test.** Per project guidelines, releases must not ship with muted tests. Audit `rtp-core`, all platform adapters, and `rtp-plugin` before tagging.~~
+- [x] ~~**Freeze the ADR set for 3.0.0.** Any architectural work started after `beta.1` either lands before the final tag or is deferred to a `3.1.0` ADR file. Mixed-state ADRs confuse external reviewers reading the repo top-down.~~
+- [x] ~~**`CHANGELOG.md` Keep-A-Changelog pass.** The `3.0.0` entry should read as a release announcement, not a git log — grouped by Added / Changed / Fixed / Removed with operator-visible framing.~~
 
 ---
 
@@ -30,22 +30,22 @@ Each subsection below matches a caveat that the front page currently admits. The
 
 The Anvil pre-filter falls through to a live load only when the probe returns `UNKNOWN` (no region file, unsupported data version, decode error, or un-populated chunk). On vanilla Spigot this costs one on-tick chunk load per fallback.
 
-- [ ] **Document un-populated-chunk warming as the operator remedy.** The `REQ-RTP-F-012` world-scan lifecycle (`start` / `pause` / `resume` / `reset` / `cancel`) populates every candidate on disk and collapses the fallback to near-zero for warmed regions. Write this up in `docs/admin/QUICK_START.md` as the recommended cold-start workflow.
-- [ ] **Add a `--until-populated` convenience flag to the admin scan command** (if not already present) so the cold-start workflow is one command, not a cron job.
-- [ ] **Tick-budget telemetry.** Surface a rolling counter — fallbacks/minute and total μs spent on the main thread per fallback — via `/rtp test full` and a dedicated stats subcommand. A `SpigotPrefilterStats` companion to `MemoryTracker` is the likely shape.
-- [ ] **Optional "reject on unknown" mode.** Config flag (default off) that skips candidates when the probe returns `UNKNOWN` instead of paying the on-tick fallback. For operators who prefer a guaranteed zero main-thread cost over maximum throughput.
+- [x] ~~**Document un-populated-chunk warming as the operator remedy.** The `REQ-RTP-F-012` world-scan lifecycle (`start` / `pause` / `resume` / `reset` / `cancel`) populates every candidate on disk and collapses the fallback to near-zero for warmed regions. Write this up in `docs/admin/QUICK_START.md` as the recommended cold-start workflow.~~
+- [x] ~~**Add a `--until-populated` convenience flag to the admin scan command** (if not already present) so the cold-start workflow is one command, not a cron job.~~
+- [x] ~~**Tick-budget telemetry.** Surface a rolling counter — fallbacks/minute and total μs spent on the main thread per fallback — via `/rtp test full` and a dedicated stats subcommand. A `SpigotPrefilterStats` companion to `MemoryTracker` is the likely shape.~~
+- [x] ~~**Optional "reject on unknown" mode.** Config flag (default off) that skips candidates when the probe returns `UNKNOWN` instead of paying the on-tick fallback. For operators who prefer a guaranteed zero main-thread cost over maximum throughput.~~
 
 ### 1.B — Folia fallback: one Region-Scheduler hop
 
 On Folia, a confirmed candidate that the Anvil probe could not resolve pays one Region-Scheduler hop to the authoritative live load.
 
-- [ ] **Measure the hop cost.** Add a traceable timing test (`FoliaRegionHopTimingTest`, traceable to `REQ-RTP-NF-002`) that captures nanoseconds between Anvil-probe-complete and Region-Scheduler-ready on a representative candidate. Publish the p50/p95 numbers in the release notes; until then the caveat is unquantified.
-- [ ] **Investigate hop amortization.** Can consecutive candidates within the same region share a single Region-Scheduler entry? If yes, implement and document with an ADR. If no, write the ADR explaining why — closing the question is as valuable as fixing it.
+- [x] ~~**Measure the hop cost.** Add a traceable timing test (`FoliaRegionHopTimingTest`, traceable to `REQ-RTP-NF-002`) that captures nanoseconds between Anvil-probe-complete and Region-Scheduler-ready on a representative candidate. Publish the p50/p95 numbers in the release notes; until then the caveat is unquantified.~~
+- [x] ~~**Investigate hop amortization.** Can consecutive candidates within the same region share a single Region-Scheduler entry? If yes, implement and document with an ADR. If no, write the ADR explaining why — closing the question is as valuable as fixing it.~~
 
 ### 1.C — Un-populated chunks fall through to live load
 
-- [ ] **Regression test: live-load safety net cannot re-admit a prior reject.** Assert that a chunk the Anvil probe rejected on populated data is never subsequently accepted by the live-load path. Must hold under Folia region-stealing and concurrent player teleports.
-- [ ] **Failure attribution bucket.** Extend the `FailTypes` taxonomy (or the equivalent telemetry surface) with `unpopulatedFallthrough` so `/rtp test full` can report its frequency distinctly from other fallbacks. Currently invisible.
+- [x] ~~**Regression test: live-load safety net cannot re-admit a prior reject.** Assert that a chunk the Anvil probe rejected on populated data is never subsequently accepted by the live-load path. Must hold under Folia region-stealing and concurrent player teleports.~~
+- [x] ~~**Failure attribution bucket.** Extend the `FailTypes` taxonomy (or the equivalent telemetry surface) with `unpopulatedFallthrough` so `/rtp test full` can report its frequency distinctly from other fallbacks. Currently invisible.~~
 
 ### 1.D — Fabric: supported (stable as of 2026-05-26)
 
@@ -55,16 +55,16 @@ Fabric (`rtp-fabric`) is a first-class, in-scope, stable platform. The three sta
   - [x] ~~**S-005 violation in `FabricRTPWorld.getChunkAt`.**~~ — `getChunkAt` returns `CompletableFuture<Long>` and routes through an async chunk-load path; S-005 compliant.
   - [x] ~~**Null stub in `FabricServerAccessor.getLocationGenerator`.**~~ — fully wired; throws `IllegalStateException` per `REQ-RTP-S-006` when called pre-init.
   - [x] ~~**Unresolved Loom dependency.**~~ — resolved via the obf/unobf carrier split ([rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)).
-- [ ] **Update front-page / requirements wording.** `docs/FRONT_PAGE.bbcode` and `REQUIREMENTS.md §0 Out of Scope` still describe Fabric as unsupported; reframe to first-class supported platform.
-- [ ] **Re-run the `rtp-api` interface-sufficiency analysis** and record the result as an ADR (April 2026 gap analysis concluded interfaces are sufficient; promote the finding from `MULTI_PLATFORM_PLAN.md` to an Accepted ADR).
+- [x] ~~**Update front-page / requirements wording.** `docs/FRONT_PAGE.bbcode` and `REQUIREMENTS.md §0 Out of Scope` still describe Fabric as unsupported; reframe to first-class supported platform.~~
+- [x] ~~**Re-run the `rtp-api` interface-sufficiency analysis** and record the result as an ADR (April 2026 gap analysis concluded interfaces are sufficient; promote the finding from `MULTI_PLATFORM_PLAN.md` to an Accepted ADR).~~
 
 ### 1.E — Unsourced statistics on the front page
 
 The Spatial Memory paragraph now cites a concrete ~45% Overworld-safe figure from a local profiling pass on a vanilla 1.21 seed set; Nether and End ratios remain qualitative ("dominated by lava seas", "almost entirely void"). The caveat has narrowed from "no numbers anywhere" to "one number, not yet reproducible by readers".
 
-- [ ] **Publish the reference profiling run** in `docs/admin/BENCHMARKS.md` — seed list, sample size, methodology, and per-dimension safe-fraction columns for Overworld / Nether / End. Until this exists, the ~45% figure is an author claim, not a reproducible one.
-- [ ] **Extend the existing bStats integration with custom charts.** Default metrics are already wired (`RTPBukkitPlugin` → bStats ID `30865`, relocated `org.bstats` → `io.github.dailystruggle.rtp.bstats`); what is missing is `addCustomChart(...)` for RTP-specific aggregates — platform split, region count, queue depth, and observed safe-fraction histograms per dimension.
-- [ ] **Replace the qualitative Nether/End phrasing** on the front page with measured figures once either path above lands.
+- [x] ~~**Publish the reference profiling run** in `docs/admin/BENCHMARKS.md` — seed list, sample size, methodology, and per-dimension safe-fraction columns for Overworld / Nether / End. Until this exists, the ~45% figure is an author claim, not a reproducible one.~~
+- [x] ~~**Extend the existing bStats integration with custom charts.** Default metrics are already wired (`RTPBukkitPlugin` → bStats ID `30865`, relocated `org.bstats` → `io.github.dailystruggle.rtp.bstats`); what is missing is `addCustomChart(...)` for RTP-specific aggregates — platform split, region count, queue depth, and observed safe-fraction histograms per dimension.~~
+- [x] ~~**Replace the qualitative Nether/End phrasing** on the front page with measured figures once either path above lands.~~
 
 ---
 
@@ -79,6 +79,8 @@ The Spatial Memory paragraph now cites a concrete ~45% Overworld-safe figure fro
 - [ ] **Claim-plugin integration audit.** The front page lists seven integrations. Audit each against current upstream releases (Factions forks, GriefDefender 2.x, Lands 7.x, HuskTowns 3.x, TownyAdvanced 0.x, WorldGuard 7.x, GriefPrevention 16.x) and publish `docs/admin/CLAIM_PLUGIN_COMPATIBILITY.md` with per-plugin version matrices. At least one integration is almost certainly lagging.
 - [ ] **CI matrix across platforms.** The Jenkinsfile builds, but `rtp test full` should run against Spigot + Paper + Folia (and eventually Fabric) in parallel matrix form, even with mock servers where necessary. This is the step that converts `TRACEABILITY.md` from "documented" to "continuously enforced".
 - [ ] **Addon-developer quickstart.** `docs/FOR_ADDON_DEVELOPERS.md` is linked from the front page, but a one-page *"register a custom shape in 20 lines"* tutorial is the document that actually drives third-party adoption.
+- [ ] **Region-specific schematic (`.schem`) support.** Per-region arrival structures (small platform, lobby pad, arrival shrine) pasted at the chosen `RTPLocation` from a `.schem` or equivalent NBT structure file. No ADR yet — open one before implementation per Rule D-005. Sketch a `SchematicPaster` SPI in `rtp-api` with a load-async + paste-on-region-thread split per S-005, a per-region config knob pointing at a file under `plugins/RTP/schematics/` (Fabric: `config/rtp/schematics/`), Bukkit/Paper/Folia implementations via WorldEdit/FAWE soft-depend (catalog under [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md), per [ADR-026](../adr/ADR-026-external-hook-api-surface.md)), Fabric via vanilla structure-block NBT load routed through the obf/unobf carrier per [rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md), and claim-aware suppression per S-003 and [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md). Add a `docs/admin/` page and traceability rows for the paste-on-region-thread regression test.
+- [ ] **Optional PvP / combat-tag check.** Optional pre-flight check that refuses (or delays) `/rtp` when the requesting player has recently taken or dealt PvP damage, so players cannot `/rtp` to escape mid-fight. Off by default. No ADR yet — open one before implementation per Rule D-005. New `safety.yml` block (`pvp: { enabled: false, combatTagSeconds: 15, source: native|external }`) plus a configurable refusal message under `messages.yml` per REQ-RTP-F-013 (routed through the locale TSV pipeline); a `PvPCombatState` SPI in `rtp-api` with per-platform listeners recording "last PvP damage ts" (`EntityDamageByEntityEvent` on Bukkit/Paper/Folia, equivalent event hook or mixin on Fabric); a soft-depend adapter for combat-tag plugins (CombatLogX, CombatTagPlus) with a catalog row in [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) per [ADR-026](../adr/ADR-026-external-hook-api-surface.md); gating wired into the `/rtp` pre-dispatch surface (`BukkitBaseRTPCmd` and platform peers) ahead of queue enrolment, emitting an S-004 audit on refusal. Add `ReqRtp*PvP*` tests, traceability rows, and a `docs/admin/` section describing the knob and the native-vs-external trade-off.
 
 ---
 

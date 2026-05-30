@@ -49,6 +49,10 @@ pluginManagement {
 rootProject.name = 'RTP'
 
 include 'rtp-api'
+// yaml-api -- in-house zero-dependency YAML substrate (ADR-025), extracted from
+// rtp-core so rtp-api can host the configurable selection model without a core
+// dependency. Pure Java, no platform/Loom dependency.
+include 'yaml-api'
 include 'commands-api'
 include 'effects-api'
 // maps-api — runtime cartography SPI (ADR-046, maps-api-ADR-001).
@@ -57,10 +61,10 @@ include 'effects-api'
 // inside the platform adapters; this module ships only the platform-neutral
 // SPI + NoopMapBinding + HeatmapRenderer + ChartModel hierarchy.
 include 'maps-api'
-// metrics-api — platform-portable metrics SPI (PROPOSAL-metrics-api-extraction.md,
-// active 2026-05-17). Pure Java SPI: no Bukkit / Fabric / Loom dependency.
+// metrics-api — platform-portable metrics SPI (metrics-api-ADR-001,
+// extracted 2026-05-17). Pure Java SPI: no Bukkit / Fabric / Loom dependency.
 // Designed for monorepo reuse — sibling plugins can consume without rtp-core
-// (per §1.1 of the proposal). Concrete bindings (PaperMetricsBinding,
+// (per metrics-api-ADR-001). Concrete bindings (PaperMetricsBinding,
 // BukkitTpsSampler, FoliaMetricsBinding + FoliaRegionTpsSampler,
 // FabricMetricsBinding) stay in their respective platform adapters.
 include 'metrics-api'

@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -35,6 +36,26 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public long spatialResolution = 1L;
   protected volatile long[] badKeysCache = new long[0];
   protected volatile long[] badPrefixSumsCache = new long[0];
+  /**
+   * Per-run rejection cause, aligned 1:1 with {@link #badKeysCache} (one
+   * {@link LocationGenerator.FailTypes} ordinal, stored as a byte, per coalesced
+   * bad-location run). When adjacent runs coalesce during rebuild the first run's
+   * cause is kept (first-cause-wins; small-scale information loss is acceptable).
+   * Legacy {@code .bin} files and untagged callers default to {@code misc}.
+   */
+  protected volatile byte[] badCauseCache = new byte[0];
+
+  /** {@code FailTypes.misc} ordinal as a byte: the default / unknown cause. */
+  protected static final byte MISC_CAUSE = (byte) LocationGenerator.FailTypes.misc.ordinal();
+
+  /**
+   * First int of a {@code .bin} payload written with the cause-tagged format.
+   * Distinguishable from a legacy file whose first int is the (small, positive)
+   * world-name byte length. Spells "RTP1" big-endian.
+   */
+  private static final int BIN_MAGIC = 0x52545031;
+  /** Current cause-tagged {@code .bin} format version (1 == legacy, no magic). */
+  private static final int BIN_VERSION = 2;
   protected volatile ConcurrentHashMap<String, long[]> biomeKeysCache = new ConcurrentHashMap<>();
   protected volatile ConcurrentHashMap<String, long[]> biomePrefixSumsCache =
       new ConcurrentHashMap<>();
@@ -211,6 +232,65 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
+   * Returns the recorded rejection cause for the bad-location run that
+   * contains {@code (x, z)}, or {@code -1} if the coordinate is not known
+   * bad. The returned byte (when {@code >= 0}) is a
+   * {@link LocationGenerator.FailTypes} ordinal, mirroring the per-run
+   * {@link #badCauseCache}. Used by the region bad-locations chart bridge to
+   * colorize each unsafe pixel by outcome rather than a single hazard color.
+   *
+   * @param x the x coordinate
+   * @param z the z coordinate
+   * @return the {@link LocationGenerator.FailTypes} ordinal, or {@code -1}
+   *     if {@code (x, z)} is not known bad
+   */
+  public int causeAt(int x, int z) {
+    return causeAt((long) xzToLocation(x, z));
+  }
+
+  /**
+   * Returns the recorded rejection cause for the bad-location run that
+   * contains {@code location}, or {@code -1} if it is not known bad. The
+   * returned byte (when {@code >= 0}) is a
+   * {@link LocationGenerator.FailTypes} ordinal. Pending / rebuilding
+   * entries with no resolved run cause read as {@code misc}.
+   *
+   * @param location the location value
+   * @return the {@link LocationGenerator.FailTypes} ordinal, or {@code -1}
+   *     if {@code location} is not known bad
+   */
+  public int causeAt(long location) {
+    if (pendingBadLocations.get().containsKey(location)) return MISC_CAUSE & 0xFF;
+
+    ConcurrentHashMap<Long, Long> rebuilding = rebuildingBadLocations;
+    if (rebuilding != null && rebuilding.containsKey(location)) return MISC_CAUSE & 0xFF;
+
+    long[] sums = badPrefixSumsCache;
+    long[] keys = badKeysCache;
+    byte[] causes = badCauseCache;
+    if (keys.length == 0) return -1;
+
+    int floorIdx = -1;
+    for (int k = 0; k < keys.length; k++) {
+      if (keys[k] <= location) {
+        floorIdx = k;
+      } else {
+        break;
+      }
+    }
+
+    if (floorIdx >= 0 && floorIdx < sums.length) {
+      long key = keys[floorIdx];
+      long sum = sums[floorIdx];
+      long prevSum = (floorIdx > 0) ? sums[floorIdx - 1] : 0L;
+      boolean inRun = (key == location) || (location < (key + (sum - prevSum)));
+      if (!inRun) return -1;
+      return (floorIdx < causes.length) ? (causes[floorIdx] & 0xFF) : (MISC_CAUSE & 0xFF);
+    }
+    return -1;
+  }
+
+  /**
    * Returns an immutable snapshot of the current bad-location key array
    * (sorted, packed long-encoded XZ keys). Used by the ADR-047 declarative
    * chart bridge ({@code BadPointsHeatmapResolver} in rtp-core) to compose a
@@ -225,6 +305,19 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     return Arrays.copyOf(keys, keys.length);
   }
 
+  /**
+   * Returns an immutable snapshot of the per-run rejection-cause array, aligned
+   * 1:1 with {@link #badKeysSnapshot()} (each element is a
+   * {@link LocationGenerator.FailTypes} ordinal stored as a byte). Runs with no
+   * recorded cause read as {@code misc}.
+   *
+   * @return a fresh array copy; never {@code null}, may be zero-length
+   */
+  public byte[] badCausesSnapshot() {
+    byte[] causes = badCauseCache;
+    return Arrays.copyOf(causes, causes.length);
+  }
+
   public void save(String fileName, String worldName) {
     if (!fileName.endsWith(".bin")) fileName = fileName + ".bin";
 
@@ -236,6 +329,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     // Snapshot under write lock to avoid concurrent modifications
     long[] sBadKeys;
     long[] sBadSums;
+    byte[] sBadCauses;
     Map<String, long[]> sBiomeKeys;
     Map<String, long[]> sBiomeSums;
 
@@ -243,6 +337,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     try {
       sBadKeys = Arrays.copyOf(badKeysCache, badKeysCache.length);
       sBadSums = Arrays.copyOf(badPrefixSumsCache, badPrefixSumsCache.length);
+      sBadCauses = Arrays.copyOf(badCauseCache, badCauseCache.length);
       sBiomeKeys = new HashMap<>(biomeKeysCache.size());
       sBiomeSums = new HashMap<>(biomePrefixSumsCache.size());
       for (Map.Entry<String, long[]> e : biomeKeysCache.entrySet()) {
@@ -255,13 +350,16 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       writeLock.unlock();
     }
 
-    // Build a binary payload (big-endian) without any synchronous disk I/O here
+    // Build a binary payload (big-endian) without any synchronous disk I/O here.
+    // Cause-tagged format (BIN_VERSION 2): a magic+version header precedes the
+    // legacy layout, and each bad-run carries a trailing cause byte.
     byte[] worldBytes = worldName.getBytes(StandardCharsets.UTF_8);
     int size = 0;
+    size += 8; // BIN_MAGIC + BIN_VERSION
     size += 4 + worldBytes.length; // world name length + bytes
     size += 8; // scanStride
     size += 4; // bad array length
-    size += sBadKeys.length * 16; // key + delta per entry
+    size += sBadKeys.length * 17; // key + delta + cause byte per entry
     size += 4; // biome map size
     for (Map.Entry<String, long[]> e : sBiomeKeys.entrySet()) {
       byte[] bName = e.getKey().getBytes(StandardCharsets.UTF_8);
@@ -272,6 +370,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     }
 
     ByteBuffer buf = ByteBuffer.allocate(size).order(ByteOrder.BIG_ENDIAN);
+    buf.putInt(BIN_MAGIC);
+    buf.putInt(BIN_VERSION);
     buf.putInt(worldBytes.length).put(worldBytes);
     buf.putLong(scanStride.get());
 
@@ -281,6 +381,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       buf.putLong(sBadKeys[i]);
       long delta = sBadSums[i] - prev;
       buf.putLong(delta);
+      buf.put(i < sBadCauses.length ? sBadCauses[i] : MISC_CAUSE);
       prev = sBadSums[i];
     }
 
@@ -317,6 +418,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     // 1. Snapshot under write lock to avoid concurrent modifications
     long[] sBadKeys;
     long[] sBadSums;
+    byte[] sBadCauses;
     java.util.Map<String, long[]> sBiomeKeys;
     java.util.Map<String, long[]> sBiomeSums;
 
@@ -324,6 +426,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     try {
       sBadKeys = java.util.Arrays.copyOf(badKeysCache, badKeysCache.length);
       sBadSums = java.util.Arrays.copyOf(badPrefixSumsCache, badPrefixSumsCache.length);
+      sBadCauses = java.util.Arrays.copyOf(badCauseCache, badCauseCache.length);
       sBiomeKeys = new java.util.HashMap<>(biomeKeysCache.size());
       sBiomeSums = new java.util.HashMap<>(biomePrefixSumsCache.size());
       for (java.util.Map.Entry<String, long[]> e : biomeKeysCache.entrySet()) {
@@ -336,13 +439,20 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       writeLock.unlock();
     }
 
-    // 2. Convert Bad Location prefix sums back to discrete lengths
-    java.util.List<java.util.Map<String, Long>> badList = new java.util.ArrayList<>();
+    // 2. Convert Bad Location prefix sums back to discrete lengths, tagging each
+    //    run with its rejection cause (one cause per run; `misc` when unknown).
+    LocationGenerator.FailTypes[] failTypes = LocationGenerator.FailTypes.values();
+    java.util.List<java.util.Map<String, Object>> badList = new java.util.ArrayList<>();
     long prev = 0L;
     for (int i = 0; i < sBadKeys.length; i++) {
-      java.util.Map<String, Long> entry = new java.util.LinkedHashMap<>();
+      java.util.Map<String, Object> entry = new java.util.LinkedHashMap<>();
       entry.put("start", sBadKeys[i]);
       entry.put("length", sBadSums[i] - prev);
+      int causeOrd = (i < sBadCauses.length) ? (sBadCauses[i] & 0xFF) : (MISC_CAUSE & 0xFF);
+      String causeName = (causeOrd >= 0 && causeOrd < failTypes.length)
+          ? failTypes[causeOrd].name()
+          : LocationGenerator.FailTypes.misc.name();
+      entry.put("cause", causeName);
       badList.add(entry);
       prev = sBadSums[i];
     }
@@ -424,7 +534,19 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       }
       try {
                 ByteBuffer buf = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN);
-                int wLen = buf.getInt();
+                // Format detection: a cause-tagged payload (BIN_VERSION >= 2)
+                // begins with BIN_MAGIC; a legacy payload begins directly with the
+                // (small, positive) world-name byte length.
+                int first = buf.getInt();
+                int version;
+                int wLen;
+                if (first == BIN_MAGIC) {
+                  version = buf.getInt();
+                  wLen = buf.getInt();
+                } else {
+                  version = 1;
+                  wLen = first;
+                }
                 if (wLen < 0 || wLen > buf.remaining()) return;
                 byte[] w = new byte[wLen];
                 buf.get(w);
@@ -437,17 +559,23 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                   scanStride.set(-1L);
                 }
 
+                // Per-bad-run on-disk width: legacy = key(8) + delta(8); v2 adds a
+                // trailing cause byte. Legacy runs load with cause `misc`.
+                int badEntryWidth = (version >= 2) ? 17 : 16;
                 int badSize = buf.getInt();
-                if (badSize < 0 || badSize > (buf.remaining() / 16)) return;
+                if (badSize < 0 || badSize > (buf.remaining() / badEntryWidth)) return;
                 long[] newBadKeys = new long[badSize];
                 long[] newBadSums = new long[badSize];
+                byte[] newBadCauses = new byte[badSize];
                 long running = 0L;
                 for (int i = 0; i < badSize; i++) {
                   long k = buf.getLong();
                   long d = buf.getLong();
+                  byte cause = (version >= 2) ? buf.get() : MISC_CAUSE;
                   newBadKeys[i] = k;
                   running += d;
                   newBadSums[i] = running;
+                  newBadCauses[i] = cause;
                 }
 
                 int biomeSize = buf.getInt();
@@ -481,6 +609,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 try {
                   badKeysCache = newBadKeys;
                   badPrefixSumsCache = newBadSums;
+                  badCauseCache = newBadCauses;
                   biomeKeysCache = newBiomeKeysCache;
                   biomePrefixSumsCache = newBiomePrefixSumsCache;
                   badLocationsDirty = true;
@@ -496,7 +625,17 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   public void addBadLocation(long location) {
-    pendingBadLocations.get().put(location, 1L);
+    addBadLocation(location, LocationGenerator.FailTypes.misc);
+  }
+
+  /**
+   * Marks a single 1D index bad and records the rejection {@code cause}. The cause
+   * is carried on the pending entry's value (its {@link LocationGenerator.FailTypes}
+   * ordinal) and surfaces as the per-run cause after the next rebuild.
+   */
+  public void addBadLocation(long location, LocationGenerator.FailTypes cause) {
+    long ord = (cause == null) ? MISC_CAUSE : cause.ordinal();
+    pendingBadLocations.get().put(location, ord);
     badLocationsDirty = true;
   }
 
@@ -657,13 +796,27 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    *         every preimage was already marked bad.
    */
   public int addBadChunk(long location) {
+    return addBadChunk(location, LocationGenerator.FailTypes.misc);
+  }
+
+  /**
+   * Cause-tagged variant of {@link #addBadChunk(long)}. Every preimage marked bad
+   * records {@code cause} (carried through to the per-run {@link #badCauseCache}
+   * after the next rebuild). See {@link #addBadChunk(long)} for the preimage
+   * semantics and amplification bound.
+   *
+   * @param location any 1D index that decodes to the target chunk.
+   * @param cause the rejection cause to attribute to the marked indices.
+   * @return number of indices newly marked (0, 1 or 2).
+   */
+  public int addBadChunk(long location, LocationGenerator.FailTypes cause) {
     int[] xz = locationToXZ(location);
     long[] preimage = chunkToLocations(xz[0], xz[1]);
     if (preimage.length == 0) {
       // FP slop at the boundary, or chunk outside shape: fall back to the
       // single-index mark so the original rejection is at least recorded.
       if (!isKnownBad(location)) {
-        addBadLocation(location);
+        addBadLocation(location, cause);
         return 1;
       }
       return 0;
@@ -671,7 +824,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     int marked = 0;
     for (long p : preimage) {
       if (!isKnownBad(p)) {
-        addBadLocation(p);
+        addBadLocation(p, cause);
         marked++;
       }
     }
@@ -694,6 +847,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     scanStride.set(-1L);
     badKeysCache = new long[0];
     badPrefixSumsCache = new long[0];
+    badCauseCache = new byte[0];
     biomeKeysCache = new ConcurrentHashMap<>();
     biomePrefixSumsCache = new ConcurrentHashMap<>();
     biomeMappedKeysCache = new long[0];
@@ -1030,20 +1184,29 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         // 4. Read current volatile arrays
         long[] currentBadKeys = badKeysCache;
         long[] currentBadSums = badPrefixSumsCache;
+        byte[] currentBadCauses = badCauseCache;
 
-        // 5. Merge values from capturedBad into local data with RLE compression
-        java.util.List<Long> tempBadKeys = new java.util.ArrayList<>();
-        for (Long loc : localPendingBad.keySet()) {
-            tempBadKeys.add(loc);
+        // 5. Merge values from capturedBad into local data with RLE compression.
+        //    Each pending entry's map value carries the FailTypes ordinal (cause)
+        //    of the rejection that marked it (default `misc`). One cause is kept
+        //    per coalesced run (first-cause-wins; small-scale info loss accepted).
+        long[] pendingKeys = new long[localPendingBad.size()];
+        long[] pendingCauses = new long[localPendingBad.size()];
+        {
+          int pk = 0;
+          for (java.util.Map.Entry<Long, Long> e : localPendingBad.entrySet()) {
+            pendingKeys[pk] = e.getKey();
+            Long v = e.getValue();
+            pendingCauses[pk] = (v == null) ? MISC_CAUSE : v;
+            pk++;
+          }
         }
-        long[] pendingKeys = new long[tempBadKeys.size()];
-        for (int k = 0; k < tempBadKeys.size(); k++) {
-            pendingKeys[k] = tempBadKeys.get(k);
-        }
-        Arrays.sort(pendingKeys);
+        // Sort keys while keeping the parallel cause column aligned.
+        sortParallelArrays(pendingKeys, pendingCauses, 0, pendingKeys.length - 1);
 
         long[] mergedKeys = new long[currentBadKeys.length + pendingKeys.length];
         long[] mergedLengths = new long[currentBadKeys.length + pendingKeys.length];
+        byte[] mergedCauses = new byte[currentBadKeys.length + pendingKeys.length];
         int mergeIndex = 0;
 
         int i = 0; // currentBadKeys index
@@ -1051,30 +1214,36 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         long currentStart = -1;
         long currentLength = -1;
+        byte currentCause = MISC_CAUSE;
 
         while (i < currentBadKeys.length || j < pendingKeys.length) {
           long nextKey;
           long nextLength;
+          byte nextCause;
 
           if (i < currentBadKeys.length && j < pendingKeys.length) {
             if (currentBadKeys[i] <= pendingKeys[j]) {
               nextKey = currentBadKeys[i];
               long prevSum = (i > 0) ? currentBadSums[i - 1] : 0L;
               nextLength = currentBadSums[i] - prevSum;
+              nextCause = (i < currentBadCauses.length) ? currentBadCauses[i] : MISC_CAUSE;
               i++;
             } else {
               nextKey = pendingKeys[j];
               nextLength = 1L;
+              nextCause = (byte) pendingCauses[j];
               j++;
             }
           } else if (i < currentBadKeys.length) {
             nextKey = currentBadKeys[i];
             long prevSum = (i > 0) ? currentBadSums[i - 1] : 0L;
             nextLength = currentBadSums[i] - prevSum;
+            nextCause = (i < currentBadCauses.length) ? currentBadCauses[i] : MISC_CAUSE;
             i++;
           } else {
             nextKey = pendingKeys[j];
             nextLength = 1L;
+            nextCause = (byte) pendingCauses[j];
             j++;
           }
 
@@ -1083,16 +1252,20 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
           if (currentStart == -1) {
             currentStart = nextKey;
             currentLength = nextLength;
+            currentCause = nextCause;
           } else {
             if (nextKey <= currentStart + currentLength + spatialResolution) {
               currentLength = Math.max(currentLength, nextKey + nextLength - currentStart);
+              // first-cause-wins: keep currentCause when runs coalesce.
             } else {
               mergedKeys[mergeIndex] = currentStart;
               mergedLengths[mergeIndex] = currentLength;
+              mergedCauses[mergeIndex] = currentCause;
               currentBadSum += currentLength;
               mergeIndex++;
               currentStart = nextKey;
               currentLength = nextLength;
+              currentCause = nextCause;
             }
           }
         }
@@ -1100,6 +1273,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         if (currentStart != -1) {
             mergedKeys[mergeIndex] = currentStart;
             mergedLengths[mergeIndex] = currentLength;
+            mergedCauses[mergeIndex] = currentCause;
             currentBadSum += currentLength;
             mergeIndex++;
         }
@@ -1107,16 +1281,19 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         // Build newKeys and newSums local arrays
         long[] newKeys = new long[mergeIndex];
         long[] newSums = new long[mergeIndex];
+        byte[] newCauses = new byte[mergeIndex];
         long runningSum = 0;
         for (int k = 0; k < mergeIndex; k++) {
           newKeys[k] = mergedKeys[k];
           runningSum += mergedLengths[k];
           newSums[k] = runningSum;
+          newCauses[k] = mergedCauses[k];
         }
 
 
         this.badKeysCache = newKeys;
         this.badPrefixSumsCache = newSums;
+        this.badCauseCache = newCauses;
         this.rebuildingBadLocations = null; // Clear the reference only after the arrays update
 
         this.badLocationsDirty = !pendingBadLocations.get().isEmpty();
@@ -1188,6 +1365,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     MemoryShape<E> shape = (MemoryShape<E>) super.clone();
     shape.badKeysCache = new long[0];
     shape.badPrefixSumsCache = new long[0];
+    shape.badCauseCache = new byte[0];
     shape.biomeKeysCache = new ConcurrentHashMap<>();
     shape.biomePrefixSumsCache = new ConcurrentHashMap<>();
     shape.biomeMappedKeysCache = new long[0];

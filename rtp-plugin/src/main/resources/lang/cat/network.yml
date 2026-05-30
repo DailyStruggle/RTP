@@ -88,7 +88,7 @@ queue:
   maxDepth: 50
   # Backend dirty-write flush cadence (ms). Lower = lower end-to-end
   # latency, higher = fewer round trips to the transport. 250ms is the
-  # PROPOSAL §7 default.
+  # PROPOSAL Â§7 default.
   flushIntervalMs: 250
   # Backend status-cache poll cadence (ms). Drives how often the backend
   # reads `rtp:net:wq:status:<pid>` to refresh per-player progress.
@@ -114,7 +114,7 @@ reservation:
   # Per-token TTL (ms). A claimed-but-not-consumed reservation older than
   # this is treated as abandoned and released.
   ttlMs: 60000
-# Region-collision policy (L6 / rtp-proxy-ADR-014 §Region Collisions).
+# Region-collision policy (L6 / rtp-proxy-ADR-014 Â§Region Collisions).
 # Only `warn` is shipped in L6; `rename-local` and `reject-startup` are
 # documented follow-ups. Unknown values silently degrade to `warn`.
 regionCollision:

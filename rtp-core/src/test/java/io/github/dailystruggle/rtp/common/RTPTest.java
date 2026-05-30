@@ -135,17 +135,17 @@ class RTPTest {
     }
 
     @Test
-    void rtpapi_shapeAdder_delegatesToAddShape() {
+    void addShape_registersAdditionalShapeInFactory() {
         Rectangle rect = new Rectangle();
-        RTPAPI.addShape(rect);
+        RTP.addShape(rect);
         var shapeFactory = RTP.factoryMap.get(RTP.factoryNames.shape);
         assertTrue(shapeFactory.contains(rect.name));
     }
 
     @Test
-    void rtpapi_vertAdder_delegatesToAddVerticalAdjustor() {
+    void addVerticalAdjustor_registersAdditionalAdjustorInFactory() {
         LinearAdjustor linear = new LinearAdjustor(new ArrayList<>());
-        RTPAPI.addVerticalAdjustor(linear);
+        RTP.addVerticalAdjustor(linear);
         var vertFactory = RTP.factoryMap.get(RTP.factoryNames.vert);
         assertTrue(vertFactory.contains(linear.name));
     }
