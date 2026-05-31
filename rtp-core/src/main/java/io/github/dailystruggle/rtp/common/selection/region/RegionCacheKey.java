@@ -63,6 +63,13 @@ public final class RegionCacheKey {
    *       which candidate is "safe".</li>
    *   <li>{@link SafetyKeys#staleChunkRetryLimit} — runtime budget, does not change the
    *       predicate.</li>
+   *   <li>{@link SafetyKeys#platformRestoreSeconds} — post-teleport footprint-restore timer,
+   *       does not affect which candidate is "safe".</li>
+   *   <li>{@link SafetyKeys#pvpCheckEnabled}, {@link SafetyKeys#pvpCombatTagSeconds},
+   *       {@link SafetyKeys#pvpOnCombat}, {@link SafetyKeys#pvpSource},
+   *       {@link SafetyKeys#pvpTagVictim}, {@link SafetyKeys#pvpTagAggressor} — pre-flight
+   *       combat-tag gate knobs, applied per-player before/after teleport; they never change
+   *       which destination is "known-bad".</li>
    *   <li>{@link SafetyKeys#version} — file-format marker.</li>
    * </ul>
    */

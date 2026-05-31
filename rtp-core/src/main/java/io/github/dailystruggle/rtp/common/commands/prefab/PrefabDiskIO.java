@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
 import java.io.File;
 import java.io.IOException;
@@ -62,12 +63,19 @@ public final class PrefabDiskIO {
             // full file write rather than masking the failure mode.
             return new LinkedHashMap<>();
         }
-        return deepCopy(cfg.getMapValues(true));
+        // Use the shallow (non-deep) read and recurse manually: getMapValues(true)
+        // FLATTENS nested sections into dot-delimited keys (e.g. "shape.name"),
+        // which defeats PrefabApplier's nested-map merge (it would then see no
+        // "shape" Map in the base and replace the whole node wholesale, dropping
+        // sibling keys and comments). A genuinely nested tree is required so the
+        // sparse overlay merges key-by-key.
+        return deepCopy(cfg.getMapValues(false));
     }
 
     /**
      * Snapshot every file id touched by {@code prefab} (its performance
-     * overlay and each region overlay) into a {@code fileId -> tree} map
+     * overlay, its safety overlay, and each region overlay) into a
+     * {@code fileId -> tree} map
      * suitable as the {@code currentTrees} argument to
      * {@link PrefabApplier#apply}.
      */
@@ -76,6 +84,9 @@ public final class PrefabDiskIO {
         Map<String, Map<String, Object>> snapshot = new LinkedHashMap<>();
         if (!prefab.performanceOverlay().isEmpty()) {
             snapshot.put("performance", readLive(pluginDirectory, "performance"));
+        }
+        if (!prefab.safetyOverlay().isEmpty()) {
+            snapshot.put("safety", readLive(pluginDirectory, "safety"));
         }
         for (String regionId : prefab.regionOverlays().keySet()) {
             String fileId = "regions/" + regionId;
@@ -259,7 +270,12 @@ public final class PrefabDiskIO {
         if (in == null) return out;
         for (Map.Entry<String, Object> e : in.entrySet()) {
             Object v = e.getValue();
-            if (v instanceof Map<?, ?>) {
+            if (v instanceof RtpYamlSection section) {
+                // Nested section (shallow getMapValues(false) coerces nested
+                // mappings to RtpYamlSection): recurse so the resulting tree is
+                // a plain nested Map that PrefabApplier can merge key-by-key.
+                out.put(e.getKey(), deepCopy(section.getMapValues(false)));
+            } else if (v instanceof Map<?, ?>) {
                 out.put(e.getKey(), deepCopy((Map<String, Object>) v));
             } else if (v instanceof List<?>) {
                 out.put(e.getKey(), new ArrayList<>((List<Object>) v));

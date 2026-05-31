@@ -12,6 +12,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -140,6 +141,36 @@ class PrefabApplierTest {
     }
 
     @Test
+    @DisplayName("oneblock safety overlay enables a single grass-block platform in safety.yml")
+    void oneBlockSafetyOverlayEnablesPlatform() {
+        Map<String, Map<String, Object>> base = new LinkedHashMap<>();
+        Map<String, Object> safety = new LinkedHashMap<>();
+        safety.put("platformRadius", -1);          // shipped default: platform disabled
+        safety.put("platformMaterial", "GLASS");
+        safety.put("invulnerabilityTime", 5);      // unrelated key, must be preserved
+        base.put("safety", safety);
+
+        PrefabApplier.Result r = PrefabApplier.apply(base,
+                io.github.dailystruggle.rtp.common.commands.prefab.builtin.OneBlock.INSTANCE);
+
+        Map<String, Object> newSafety = r.newTrees().get("safety");
+        assertEquals(0, newSafety.get("platformRadius"), "platform must be enabled (radius 0)");
+        assertEquals("GRASS_BLOCK", newSafety.get("platformMaterial"));
+        assertEquals(1, newSafety.get("platformDepth"));
+        assertEquals(2, newSafety.get("platformAirHeight"));
+        // unrelated key preserved
+        assertEquals(5, newSafety.get("invulnerabilityTime"));
+
+        List<PrefabApplier.Change> safetyDiff = r.perFileDiff().get("safety");
+        assertNotNull(safetyDiff, "oneblock must produce a safety.yml diff");
+        assertFalse(safetyDiff.isEmpty());
+        PrefabApplier.Change radiusChange = safetyDiff.stream()
+                .filter(c -> c.keyPath().equals("platformRadius")).findFirst().orElseThrow();
+        assertEquals(-1, radiusChange.oldValue());
+        assertEquals(0, radiusChange.newValue());
+    }
+
+    @Test
     @DisplayName("lists are replaced wholesale (no element-wise merge)")
     void listsReplacedWholesale() {
         Map<String, Map<String, Object>> base = new LinkedHashMap<>();
@@ -150,6 +181,7 @@ class PrefabApplierTest {
         Prefab overlayPrefab = new Prefab(
                 "test-list-overlay", "k", "k", "d",
                 Map.of("items", List.of("x", "y")),
+                Map.of(),
                 Map.of(),
                 false
         );
@@ -163,6 +195,7 @@ class PrefabApplierTest {
         Map<String, Map<String, Object>> base = new LinkedHashMap<>();
         Prefab newRegionPrefab = new Prefab(
                 "test-new-region", "k", "k", "d",
+                Map.of(),
                 Map.of(),
                 Map.of("brandNew", Map.of("world", "nether", "cacheCap", 5)),
                 false

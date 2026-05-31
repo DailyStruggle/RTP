@@ -4,11 +4,13 @@ import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry;
 import io.github.dailystruggle.rtp.api.hooks.EconomyProviderRegistry;
 import io.github.dailystruggle.rtp.api.hooks.PlaceholderProviderRegistry;
+import io.github.dailystruggle.rtp.api.hooks.PlatformCreatorRegistry;
 import io.github.dailystruggle.rtp.api.hooks.PvPCombatStateRegistry;
 import io.github.dailystruggle.rtp.api.hooks.RTPHooks;
 import io.github.dailystruggle.rtp.api.hooks.RegionVerifierRegistry;
 import io.github.dailystruggle.rtp.api.hooks.RootActionRegistry;
 import io.github.dailystruggle.rtp.api.hooks.WorldBorderProviderRegistry;
+import io.github.dailystruggle.rtp.api.platform.PlatformCreator;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
@@ -121,6 +123,18 @@ public final class DefaultRTPHooks implements RTPHooks {
     @Override public void clear() { anvilProvider = null; }
   };
 
+  private volatile PlatformCreator platformCreator;
+  private final PlatformCreatorRegistry platformCreatorRegistry = new PlatformCreatorRegistry() {
+    @Override public void bind(PlatformCreator creator) {
+      if (creator == null) {
+        throw new IllegalArgumentException("[RTP API] platform creator must not be null");
+      }
+      platformCreator = creator;
+    }
+    @Override public PlatformCreator current() { return platformCreator; }
+    @Override public void clear() { platformCreator = null; }
+  };
+
   private volatile RootActionRegistry.Action rootAction;
   private final RootActionRegistry rootActionRegistry = new RootActionRegistry() {
     @Override public void bind(Action action) {
@@ -140,4 +154,5 @@ public final class DefaultRTPHooks implements RTPHooks {
   @Override public AnvilPrefilterRegistry anvilPrefilter() { return anvilRegistry; }
   @Override public PvPCombatStateRegistry pvpCombatState() { return pvpRegistry; }
   @Override public RootActionRegistry rootAction() { return rootActionRegistry; }
+  @Override public PlatformCreatorRegistry platformCreator() { return platformCreatorRegistry; }
 }

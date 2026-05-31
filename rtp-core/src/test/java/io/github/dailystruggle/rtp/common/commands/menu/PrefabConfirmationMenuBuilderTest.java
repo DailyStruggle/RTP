@@ -156,7 +156,7 @@ final class PrefabConfirmationMenuBuilderTest {
         }
         Prefab big = new Prefab(
                 "big-test", "noKey", "noKey", "test",
-                overlay, Map.of(), false);
+                overlay, Map.of(), Map.of(), false);
         Map<String, List<PrefabApplier.Change>> diff =
                 PrefabApplier.apply(Map.of(), big).perFileDiff();
 

@@ -25,7 +25,10 @@ description: 'Random teleport, lite edition (no SQL, no Folia) -- see ADR-024'
 # small-server target and claim-protection support is a baseline operator
 # expectation there. Vault/economy, Chunky/ChunkyBorder, and PlaceholderAPI
 # remain Pro-only. See ADR-024 (claim-plugin amendment).
-softdepend: [ GriefDefender, GriefPrevention, Towny, HuskTowns, Factions, Lands, RedProtect, WorldGuard ]
+# CombatLogX / PvPManager / SimpleCombatLog are listed so the PvP gate's bundled
+# combat-tag adapters (ADR-055) can resolve those plugins' API classes at runtime
+# (Paper/Folia gates cross-plugin class access behind a declared dependency).
+softdepend: [ GriefDefender, GriefPrevention, Towny, HuskTowns, Factions, Lands, RedProtect, WorldGuard, CombatLogX, PvPManager, SimpleCombatLog ]
 folia-supported: false
 
 commands:

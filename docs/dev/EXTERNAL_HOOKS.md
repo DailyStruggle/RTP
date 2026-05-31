@@ -115,7 +115,7 @@ RTPAPI.hooks().anvilPrefilter().bind((world, cx, cz) -> myDecision(world, cx, cz
 | **When invoked** | `PvPGate` at the `/rtp` pre-dispatch surface (before queue enrolment) and again before the destination is applied (execution prefilter). Gate is off by default (`safety.yml#pvpCheckEnabled`). |
 | **Threading** | Called from the command thread and the teleport pipeline; implementations shall be thread-safe and non-blocking. |
 | **Failure mode** | A throwing provider is logged once at WARNING and treated as "not in combat" (REQ-RTP-S-004); a buggy integration never blocks teleports. |
-| **Producers (planned)** | Soft-depend adapters for PvPManager / SimpleCombatLog / CombatLogX (follow-up increment), gated on `isPluginEnabled(...)` like the claim `*Checker`s. When none is bound (or `pvpSource: NATIVE`), RTP's `NativePvPCombatTracker` answers instead. |
+| **Producers (today)** | `rtp-plugin/.../softdepends/pvp/{PvPManagerChecker,CombatLogXChecker,SimpleCombatLogChecker}` via `PvPIntegrations.setup(...)`, gated on `isPluginEnabled(...)` like the claim `*Checker`s. The first enabled plugin (priority: PvPManager, then CombatLogX, then Simple Combat Log) is bound through `RTPAPI.hooks().pvpCombatState().bind(...)`. PvPManager and CombatLogX have stable developer APIs and their adapters compile against the published API as `compileOnly` dependencies (provided by the plugin at runtime, declared as Bukkit `softdepend`s in `plugin.yml` so the cross-plugin classes resolve); Simple Combat Log has no published artifact and stays reflective (it probes for a conventional combat-query method and falls back to the native tracker when none is exposed). When none is bound (or `pvpSource: NATIVE`), RTP's `NativePvPCombatTracker` answers instead. Third-party combat plugins and addons do **not** need a bundled `*Checker`: they may bind their own provider directly via `RTPAPI.hooks().pvpCombatState().bind(...)` (see the worked example in [`addons/RTP_ExampleAddon/README.md`](../../addons/RTP_ExampleAddon/README.md)). A bound provider replaces any bundled adapter (single-binding, last-bind-wins). |
 | **REQ / S-rule** | REQ-RTP-S-004, REQ-RTP-F-013. |
 
 ```java
@@ -138,6 +138,50 @@ RTPAPI.hooks().pvpCombatState().bind(uuid -> myCombatPlugin.isTagged(uuid));
 ```java
 RTPAPI.hooks().rootAction().bind((uuid, feedback) -> { openMyMenu(uuid); return true; });
 ```
+
+### 8. Arrival platform creator - `RTPHooks#platformCreator()`
+
+| | |
+|---|---|
+| **API symbol** | `io.github.dailystruggle.rtp.api.hooks.PlatformCreatorRegistry` |
+| **Provider type** | `io.github.dailystruggle.rtp.api.platform.PlatformCreator` (the bundled file-backed specialisation is `io.github.dailystruggle.rtp.api.schematic.SchematicPaster`). |
+| **Action** | Two-phase: `PlatformCreator#prepare(RTPLocation) -> CompletableFuture<?>` (off-thread) then `PlatformCreator#createPlatform(RTPLocation, Object prepared) -> boolean built` (region thread). `createPlatform(RTPLocation)` is a convenience single-phase default for creators with nothing to pre-load. |
+| **Behavior modified** | Replaces RTP's built-in emergency block disc with an addon-supplied arrival platform - a procedural pad, a lobby structure, a pasted schematic, etc. See [ADR-058](../adr/ADR-058-region-specific-schematic-paste.md). |
+| **When invoked** | `prepare(at)` runs in `TeleportPipelineTask#runLoad`, off the region thread, so any blocking load happens there (REQ-RTP-S-005); `createPlatform(at, prepared)` runs in `TeleportPipelineTask#buildArrivalPlatform`, on the region-owning thread, immediately before the player is moved, whenever the landing column warrants a platform (`shouldBuildPlatform`). A bound `SchematicPaster` is driven through this **same** two-phase path - it is no longer special-cased at the dispatch site (its default `prepare`/`createPlatform` decline when no region source applies). |
+| **Threading** | `prepare(...)` runs on a non-region (load) thread and is where blocking file/network I/O belongs; `createPlatform(...)` runs on the thread that owns the destination region (Folia region thread; Bukkit/Paper main thread) and **must not** perform synchronous file/network or chunk I/O (REQ-RTP-S-005). |
+| **Failure mode** | A throwing or declining (`false`) creator - or a `prepare` future that failed or had not completed by paste time - is logged and RTP writes its default emergency platform instead (REQ-RTP-S-004); the creator never aborts the teleport. |
+| **Producers (today)** | None in core (single-binding, addon-supplied). The region-specific schematic (resolved from the world/region `schematics/<region>.schem` file) is an independent path and remains the default when no addon override is bound. |
+| **REQ / S-rule** | REQ-RTP-S-001, REQ-RTP-S-004, REQ-RTP-S-005. |
+
+```java
+// Single-phase: a creator with nothing to pre-load just overrides createPlatform(at).
+// It runs on the region thread; return true once the platform is written, false to let
+// RTP build its default emergency disc instead.
+RTPAPI.hooks().platformCreator().bind(new PlatformCreator() {
+  @Override public String creatorName() { return "MyLobbyPad"; }
+  @Override public boolean createPlatform(RTPLocation at) {
+    return myPadBuilder.build(at); // no blocking I/O here
+  }
+});
+
+// Two-phase: a creator that must load/fetch/generate first does the blocking work in
+// prepare() and consumes its handle on the region thread. RTP already invokes prepare()
+// on the pipeline's load (non-region) thread, so do the blocking work INLINE and return a
+// completed future - do NOT spin up your own executor or CompletableFuture.supplyAsync
+// (all async work on a backend JVM must go through RTP.scheduler, never a raw thread pool).
+RTPAPI.hooks().platformCreator().bind(new PlatformCreator() {
+  @Override public String creatorName() { return "MyStructurePad"; }
+  @Override public CompletableFuture<?> prepare(RTPLocation at) {
+    return CompletableFuture.completedFuture(loadStructure(at)); // blocking I/O is fine here
+  }
+  @Override public boolean createPlatform(RTPLocation at, Object prepared) {
+    if (prepared == null) return false;              // declined -> default platform
+    return ((Structure) prepared).writeAt(at);       // region thread: block writes only
+  }
+});
+```
+
+`SchematicPaster` (which `extends PlatformCreator`) is the bundled file-backed example of the same two-phase shape, adding typed `load(...)` / `paste(...)` / `supports(...)` methods for the region-specific `schematics/<region>.schem` path; bind it the same way.
 
 ---
 
@@ -181,6 +225,8 @@ These `Class.forName` / `getMethod` sites exist for **platform compatibility det
 | Placeholders | `PlaceholderAPI` not present → `PAPI_expansion` is not constructed; placeholders are not exported. |
 | World border | No bound provider → fall back to platform `World#getWorldBorder()` and config radius. |
 | Anvil pre-filter | No bound provider → `ScanTask` falls back to per-attempt chunk loads (slower but correct). |
+| Arrival platform creator | No bound creator (or one whose `prepare`/`createPlatform` declines) → `buildArrivalPlatform` falls back to the region-specific schematic path (if any) and ultimately to `RTPWorld#platform(RTPLocation)` (the emergency block disc). |
+| PvP combat state (PvPManager / CombatLogX / Simple Combat Log) | Each adapter is gated on `Bukkit.getPluginManager().isPluginEnabled(...)`; `PvPIntegrations.setup` binds nothing when none is enabled, so `PvPGate` falls back to `NativePvPCombatTracker`. A reflective failure (API/version drift) disables that adapter for the session (logged once) and the player is treated as not-in-combat. |
 | Fabric permissions (`fabric-permissions-api`) | No implementer registered → `Permissions.check(player, node, 2)` returns the vanilla op-level verdict (op level ≥ 2 grants). On `LinkageError` (perms-api jar genuinely absent at runtime) `FabricRTPPlayer#hasPermission` falls back to `PlayerList#isOp(GameProfile)`, preserving the previous op-only behaviour. |
 
 In every case, RTP shall not silently swallow a failure (REQ-RTP-S-004); fall-back paths log a single line at INFO/WARNING and continue.

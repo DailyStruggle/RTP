@@ -21,6 +21,7 @@ public final class MultiWorld {
             "Synthesise one region per world from the current default.",
             Map.of(),
             Map.of(),
+            Map.of(),
             true
     );
 

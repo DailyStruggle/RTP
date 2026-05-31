@@ -1,5 +1,5 @@
 # --- RTP Sicherheitskonfiguration ---
-# Dokumentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/SAFETY.md
+# Dokumentation: plugins/RTP/docs/admin/SAFETY.md
 # Sekunden der Unverwundbarkeit nach Abschluss eines Teleports.
 # 0 deaktiviert das Unverwundbarkeitsfenster nach dem Teleport.
 # @type: integer

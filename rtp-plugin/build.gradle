@@ -20,6 +20,10 @@ repositories {
     maven { url = 'https://repo.spongepowered.org/maven/' }
     maven { url = 'https://ci.ender.zone/plugin/repository/everything/' }
     maven { url = 'https://repo.dmulloy2.net/repository/public/' }
+    // Soft-dep repos for the bundled PvP / combat-tag integrations (ADR-055).
+    // CombatLogX API (SirBlobman public Nexus) and PvPManager API (CodeMC).
+    maven { url = 'https://nexus.sirblobman.xyz/public/' }
+    maven { url = 'https://repo.codemc.org/repository/maven-public/' }
 }
 
 // Bytecode-only configuration for the Java-25 v26_1_R1 adapter (2026-05-07).
@@ -226,6 +230,22 @@ dependencies {
         exclude group: 'net.ess3', module: 'EssentialsX'
     }
 
+    // Bundled PvP / combat-tag integrations (ADR-055; compile-only, runtime via Bukkit soft-depends).
+    // Both plugins ship stable, published developer APIs, so the adapters compile against the
+    // real interfaces rather than reflection -- this makes the package-private-impl bug class
+    // (an IllegalAccessException at invoke() time, silently swallowed) impossible. SimpleCombatLog
+    // has no published artifact and stays reflective in SimpleCombatLogChecker.
+    // CombatLogX's ICombatLogX extends BlueSlimeCore framework interfaces (IMultiVersionPlugin /
+    // IResourceHolder) that javac must resolve to verify the instanceof/cast, so the core artifact
+    // is left transitive (compileOnly -> never shaded). The api/core versions are intentionally
+    // pinned to the older (2023) SNAPSHOTs: the latest (core 2.9 / api 11.7) ship Java 25 bytecode
+    // (class file v69) which this Java-21 (`--release 21`, v65) compile rejects. The getCombatManager()
+    // and isInCombat(Player) signatures are stable across 11.x, and the installed plugin supplies the
+    // actual classes at runtime, so compiling against the older API is binary-compatible with 11.6+.
+    compileOnly 'com.github.sirblobman.api:core:2.8-SNAPSHOT'
+    compileOnly 'com.github.sirblobman.combatlogx:api:11.2-SNAPSHOT'
+    compileOnly('me.chancesd.pvpmanager:pvpmanager:4.0.8') { transitive = false }
+
     implementation 'org.bstats:bstats-bukkit:3.0.3'
     implementation 'xyz.tozymc.spigot:title-api:1.0'
 
@@ -277,13 +297,13 @@ processResources.dependsOn copyDocs
 shadowJar.dependsOn processResources
 
 
-// ADR-024: the existing shadowJar produces the FULL/Pro edition (RTP-Pro).
+// ADR-024: the existing shadowJar produces the FULL/Pro edition (LeafRTP-Pro).
 // A sibling `shadowLiteJar` task below produces the lite edition under the
-// unclassified `RTP-<version>.jar` name. Both are built by `assemble`.
+// unclassified `LeafRTP-<version>.jar` name. Both are built by `assemble`.
 shadowJar {
-    archiveBaseName.set('RTP-Pro')
+    archiveBaseName.set('LeafRTP-Pro')
     // Mojang-mapped intermediate; remapJar consumes this and writes the
-    // unclassified `RTP-Pro-<version>.jar` (intermediary-mapped, the
+    // unclassified `LeafRTP-Pro-<version>.jar` (intermediary-mapped, the
     // released artifact). See remapJar block below.
     archiveClassifier.set('dev')
     archiveVersion.set(project.version.toString())
@@ -377,7 +397,7 @@ shadowJar {
 remapJar {
     dependsOn shadowJar
     inputFile.set(shadowJar.archiveFile)
-    archiveBaseName.set('RTP-Pro')
+    archiveBaseName.set('LeafRTP-Pro')
     archiveClassifier.set('')
     archiveVersion.set(project.version.toString())
 }
@@ -536,8 +556,8 @@ assemble.dependsOn remapJar
 // =============================================================================
 // ADR-024 -- RTP-lite assembly variant.
 //
-// Lite produces the unclassified `RTP-<version>.jar` (the "default" artifact);
-// the pre-existing shadowJar above produces `RTP-Pro-<version>.jar`. Both are
+// Lite produces the unclassified `LeafRTP-<version>.jar` (the "default" artifact);
+// the pre-existing shadowJar above produces `LeafRTP-Pro-<version>.jar`. Both are
 // built whenever `assemble` runs.
 //
 // See docs/adr/ADR-024-rtp-lite-assembly-variant.md for the scope contract.
@@ -635,12 +655,12 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
             'artifact is produced by `remapLiteJar`, which feeds Loom intermediary remap + ' +
             'the v26_1_R1 / *-unobf bytecode merge onto this jar.'
 
-    // The released lite artifact is `RTP-<version>.jar` (unclassified, produced by
+    // The released lite artifact is `LeafRTP-<version>.jar` (unclassified, produced by
     // `remapLiteJar` below — mirrors Pro's `shadowJar` -> `remapJar` chain). This task's
     // output is the pre-remap input; it carries the `-dev` classifier to avoid clashing
     // with the released artifact's filename, identical in spirit to Loom's own
     // `jar` / `remapJar` split.
-    archiveBaseName.set('RTP')
+    archiveBaseName.set('LeafRTP')
     archiveClassifier.set('dev')
     archiveVersion.set(project.ext.liteVersion.toString())
 
@@ -871,7 +891,7 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     dependsOn ':effects-api:effects-api-fabric-unobf:jar'
 
     inputFile.set(tasks.named('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar).flatMap { it.archiveFile })
-    archiveBaseName.set('RTP')
+    archiveBaseName.set('LeafRTP')
     archiveClassifier.set('')
     archiveVersion.set(project.ext.liteVersion.toString())
 

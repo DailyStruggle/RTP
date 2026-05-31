@@ -94,6 +94,9 @@ comandoConsoleNonPermesso: "&c[P0] Devi essere un giocatore in gioco per eseguir
 # il plugin è occupato a ricaricare
 busy: "&c[P0] occupato"
 
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] You cannot random-teleport while in combat."
+
 # il plugin non ha il sottocomando o parametro richiesto dall'utente
 # segnaposto: [arg] - l'argomento tentato
 invalidCommand: "&c[P0] comando non valido - [arg]"

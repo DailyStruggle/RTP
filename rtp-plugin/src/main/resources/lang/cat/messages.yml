@@ -96,6 +96,9 @@ tall_human_forbidden: "&c[P0] only an in-game kitty can do that, tall human."
 # kitty is grooming and busy
 busy: "&c[P0] busy grooming"
 
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] You cannot random-teleport while in combat."
+
 # unknown subcommand
 # placeholder: [arg] - the argument attempted
 silly_meow: "&c[P0] silly meow, kitty - [arg]"

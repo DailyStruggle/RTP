@@ -60,18 +60,18 @@ datenbank:
 # Netzwerk- und Synchronisationskonfiguration
 netzwerk:
   redis:
-    # Redis-gestützte Netzwerkstatus-Bindung aktivieren.
+    # Enable Redis-backed network state binding.
     # @type: boolean
     # @default: false
     enabled: false
-    # Redis-Host.
+    # Redis host.
     # @type: string
     host: "127.0.0.1"
-    # Redis-Port.
+    # Redis port.
     # @type: integer
     # @range: [1, 65535]
     port: 6379
-    # Redis-Passwort. Eine leere Zeichenkette deaktiviert die Authentifizierung.
+    # Redis password. Empty string disables auth.
     # @type: string
     password: ""
 

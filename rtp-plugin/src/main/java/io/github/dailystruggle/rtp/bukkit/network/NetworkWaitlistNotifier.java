@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.network;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
-import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
@@ -10,8 +9,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.logging.Level;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 
 /**
  * Slice 4 (ADR-015 / REQ-RTP-NET-015): periodic player-facing notifier for
@@ -162,10 +159,11 @@ public class NetworkWaitlistNotifier {
      * advancing the dedup state).
      */
     boolean emit(UUID uuid, String body) {
-        Player p = Bukkit.getPlayer(uuid);
+        io.github.dailystruggle.rtp.api.entity.RTPPlayer p =
+                RTP.serverAccessor == null ? null : RTP.serverAccessor.getPlayer(uuid);
         if (p == null || !p.isOnline()) return false;
         try {
-            SendMessage.sendMessage(p, body);
+            p.sendMessage(body);
             return true;
         } catch (Throwable t) {
             // S-004: never silently swallow.

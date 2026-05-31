@@ -1,5 +1,5 @@
 # --- RTP World Configuration ---
-# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/WORLDS.md
+# Documentation: plugins/RTP/docs/admin/WORLDS.md
 
 # Default region for this world
 region: "default"

@@ -1,5 +1,5 @@
 # --- Impostazioni economiche di RTP ---
-# Documentazione: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/ECONOMY.md
+# Documentazione: plugins/RTP/docs/admin/ECONOMY.md
 # Rimborsa il costo detratto se il teletrasporto viene annullato (movimento durante
 # teleportDelay, fallimento della pipeline, ecc.).
 # @type: boolean

@@ -94,6 +94,9 @@ consoleCmdNotAllowed: "&c[P0] You must be an in-game player to execute this comm
 # plugin is busy reloading
 busy: "&c[P0] occupé"
 
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] You cannot random-teleport while in combat."
+
 # plugin doesn't have the subcommand or parameter the user requested
 # placeholder: [arg] - the argument attempted
 invalidCommand: "&c[P0] commande invalide - [arg]"

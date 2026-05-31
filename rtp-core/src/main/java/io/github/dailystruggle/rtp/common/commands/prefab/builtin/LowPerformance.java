@@ -23,6 +23,7 @@ public final class LowPerformance {
                     "minTPS", 19.5,
                     "loginCacheEnabled", false
             ),
+            Map.of(),
             Map.of("default", Map.of(
                     "cacheCap", 10,
                     "activeChunkCap", 4

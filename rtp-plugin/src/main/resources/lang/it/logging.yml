@@ -1,5 +1,5 @@
 # --- Interruttori di logging del plugin ---
-# Documentazione: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# Documentazione: plugins/RTP/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
 # Registra tutti i file ricaricati durante /rtp reload
 ricarica_dettagliata: false
 # Registra i dettagli di inizializzazione della regione

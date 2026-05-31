@@ -111,4 +111,31 @@ class SpongeSchematicDecoderTest {
     assertTrue(placements.stream().anyMatch(p -> p.blockState().equals(CHEST)),
         "chest block is placed");
   }
+
+  @Test
+  void plannerResolvesBlockEntityToAbsoluteCoordsWithItems() throws IOException {
+    DecodedSchematic schem = decodeFixture();
+    RTPLocation at = new RTPLocation(null, 100, 64, 200);
+
+    List<PlacedBlockEntity> placed =
+        SchematicPlacementPlanner.planBlockEntities(schem, at, PasteOptions.defaults());
+    assertEquals(1, placed.size(), "one chest block entity");
+
+    PlacedBlockEntity chest = placed.get(0);
+    BlockEntityData data = chest.data();
+    // BOTTOM_CENTER: baseX=100-3, baseY=64, baseZ=200-3; absolute = base + relative.
+    assertEquals(100 - 3 + data.x(), chest.x(), "absolute X = baseX + relative");
+    assertEquals(64 + data.y(), chest.y(), "absolute Y = baseY + relative");
+    assertEquals(200 - 3 + data.z(), chest.z(), "absolute Z = baseZ + relative");
+    // The chest must lie inside the anchored bounding box.
+    assertTrue(chest.x() >= 100 - 3 && chest.x() <= 100 - 3 + 7);
+    assertTrue(chest.y() >= 64 && chest.y() <= 64 + 9);
+    assertTrue(chest.z() >= 200 - 3 && chest.z() <= 200 - 3 + 6);
+
+    // The decoded Items payload is carried through unchanged for the paster to restore.
+    @SuppressWarnings("unchecked")
+    List<Object> items = (List<Object>) data.nbt().get("Items");
+    assertNotNull(items, "chest Items preserved on the placed block entity");
+    assertEquals(3, items.size(), "ice + lava_bucket + obsidian stacks");
+  }
 }

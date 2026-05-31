@@ -97,6 +97,9 @@ consoleCmdNotAllowed: "&c[P0] You must be an in-game player to execute this comm
 # plugin is busy reloading
 busy: "&c[P0] busy"
 
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] You cannot random-teleport while in combat."
+
 # plugin doesn't have the subcommand or parameter the user requested
 # placeholder: [arg] - the argument attempted
 invalidCommand: "&c[P0] invalid command - [arg]"
@@ -250,116 +253,116 @@ menuHoverFallbackType: "type: [type]"
 # small curated value set. Placeholder: [values] - comma-joined accepted values.
 menuHoverFallbackBounds: "accepted: [values]"
 # Label for the "go back one level" navigation row prepended to every non-root menu page.
-menuBack: "&7Â« back"
+menuBack: "&7« back"
 # Label template for the "execute the assembled command" row prepended to every
 # runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
-menuExecute: "&aâ–¶ run [command]"
+menuExecute: "&a▶ run [command]"
 # Header row at the top of a parameter-value picker sub-page (Stage A.2).
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
 menuPickValue: "&7pick a value for [param] (will run: /rtp [command] [param]:<value>)"
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list.
-menuTypeValue: "&7âœŽ type a custom value..."
+menuTypeValue: "&7✎ type a custom value..."
 # Non-clickable header row at the top of every non-root menu page (Stage A.4).
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
 menuConstructed: "&7building: #7E9CC8/rtp [command]"
 # Non-clickable title row prepended to the root /rtp menu page (Stage A.5).
 # Provides a welcoming header before the player descends into any subcommand.
-menuRootTitle: "#5FB3B3&lâš¡ RTP menu"
+menuRootTitle: "#5FB3B3&l⚡ RTP menu"
 # Non-clickable subtitle/hint row prepended to the root /rtp menu page below
 # menuRootTitle (Stage A.5). Short orientation text for first-time users.
 menuRootHint: "&7click an option below to begin"
-# Navigation rows appended to paginated menu pages (Stage A.6) â€” clicking
+# Navigation rows appended to paginated menu pages (Stage A.6) — clicking
 # them moves to the previous/next page of the same model. Placeholder:
 # [page] - the 1-based human-readable target page number.
-menuPagePrev: "&7Â« previous page ([page])"
-menuPageNext: "&7next page ([page]) Â»"
+menuPagePrev: "&7« previous page ([page])"
+menuPageNext: "&7next page ([page]) »"
 # Section divider on the front page above teleport rows (player view).
-menuFrontPageSectionTeleport: "&8Â» &7teleport"
+menuFrontPageSectionTeleport: "&8» &7teleport"
 # Front-page rows. No placeholders.
-menuFrontPageRowTeleport: "&aâ–¶ /rtp &7- teleport to a random location"
-menuFrontPageRowRegion: "&aâ–¶ /rtp region:&7... &7- pick a region"
-menuFrontPageRowBiome: "&aâ–¶ /rtp biome:&7... &7- pick a biome"
-menuFrontPageRowHelp: "&aâ–¶ /rtp help &7- list commands"
+menuFrontPageRowTeleport: "&a▶ /rtp &7- teleport to a random location"
+menuFrontPageRowRegion: "&a▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- pick a biome"
+menuFrontPageRowHelp: "&a▶ /rtp help &7- list commands"
 # Front-page admin entry row: the only inline
 # admin-visible row on the front page; click descends into the curated admin
 # panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
-menuFrontPageRowAdmin: "#9D7CD8â–¶ admin panel &7- operator tools"
+menuFrontPageRowAdmin: "#9D7CD8▶ admin panel &7- operator tools"
 # Hover text for the admin-panel entry row. No placeholders.
 menuFrontPageHoverAdmin: "&7operator tools: config, scans, diagnostics, reload"
 # --- Admin panel book page ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
-menuAdminPanelTitle: "#9D7CD8&lâš™ admin panel"
+menuAdminPanelTitle: "#9D7CD8&l⚙ admin panel"
 # Non-clickable hint row below menuAdminPanelTitle. No placeholders.
 menuAdminPanelHint: "&7click an option below"
 # Section dividers on the admin panel. No placeholders.
-menuAdminPanelSectionConfig: "&8Â» &7configuration"
-menuAdminPanelSectionDiagnostics: "&8Â» &7diagnostics"
-menuAdminPanelSectionLifecycle: "&8Â» &7lifecycle"
-menuAdminPanelSectionBrowse: "&8Â» &7browse"
+menuAdminPanelSectionConfig: "&8» &7configuration"
+menuAdminPanelSectionDiagnostics: "&8» &7diagnostics"
+menuAdminPanelSectionLifecycle: "&8» &7lifecycle"
+menuAdminPanelSectionBrowse: "&8» &7browse"
 # Admin-panel rows + hovers. No placeholders.
-menuAdminPanelRowConfig: "#5FB3B3â–¶ config editor"
+menuAdminPanelRowConfig: "#5FB3B3▶ config editor"
 menuAdminPanelHoverConfig: "&7open the curated config selector"
-menuAdminPanelRowRegions: "#5FB3B3â–¶ regions"
+menuAdminPanelRowRegions: "#5FB3B3▶ regions"
 menuAdminPanelHoverRegions: "&7add, remove, or edit per-region configs"
-menuAdminPanelRowWorlds: "#5FB3B3â–¶ worlds"
+menuAdminPanelRowWorlds: "#5FB3B3▶ worlds"
 menuAdminPanelHoverWorlds: "&7add, remove, or edit per-world configs"
-menuAdminPanelRowEffects: "#5FB3B3â–¶ effects"
+menuAdminPanelRowEffects: "#5FB3B3▶ effects"
 menuAdminPanelHoverEffects: "&7add, remove, or edit per-group teleport effects"
-menuAdminPanelRowInfo: "#5FB3B3â–¶ server info"
+menuAdminPanelRowInfo: "#5FB3B3▶ server info"
 menuAdminPanelHoverInfo: "&7show plugin version, region counts, and queue state"
-menuAdminPanelRowDiagnostics: "&câ–¶ full diagnostics"
+menuAdminPanelRowDiagnostics: "&c▶ full diagnostics"
 menuAdminPanelHoverDiagnostics: "&7runs the full diagnostic suite; may be expensive"
-menuAdminPanelRowMemory: "#5FB3B3â–¶ memory tracker snapshot"
+menuAdminPanelRowMemory: "#5FB3B3▶ memory tracker snapshot"
 menuAdminPanelHoverMemory: "&7dump active chunk-ticket and pipeline allocations"
-menuAdminPanelRowScan: "#5FB3B3â–¶ scan control"
+menuAdminPanelRowScan: "#5FB3B3▶ scan control"
 menuAdminPanelHoverScan: "&7open the scan submenu (start / pause / cancel)"
-menuAdminPanelRowReload: "&câ–¶ reload"
+menuAdminPanelRowReload: "&c▶ reload"
 menuAdminPanelHoverReload: "&7reloads all config files; in-flight teleports may be affected"
-menuAdminPanelRowBrowse: "#5FB3B3â–¶ browse all commands"
+menuAdminPanelRowBrowse: "#5FB3B3▶ browse all commands"
 menuAdminPanelHoverBrowse: "&7open the reflected /rtp command tree"
-menuAdminPanelRowBack: "&7Â« back"
+menuAdminPanelRowBack: "&7« back"
 # --- Visualizations submenu (admin map of bad locations per region) ---
 # Admin-panel row: open the Visualizations submenu. No placeholders.
-menuAdminPanelRowVisualizations: "#5FB3B3â–¶ visualizations"
+menuAdminPanelRowVisualizations: "#5FB3B3▶ visualizations"
 # Hover text for the admin-panel Visualizations row. No placeholders.
 menuAdminPanelHoverVisualizations: "&7open maps and other operator-facing visualizations"
 # Section divider above the Visualizations block on the admin panel.
-menuAdminPanelSectionVisualizations: "&8Â» &7visualizations"
+menuAdminPanelSectionVisualizations: "&8» &7visualizations"
 # Non-clickable title row at the top of the Visualizations submenu.
-menuVisualizationsTitle: "#9D7CD8&lâŒ– visualizations"
+menuVisualizationsTitle: "#9D7CD8&l⌖ visualizations"
 # Non-clickable hint row below the title.
 menuVisualizationsHint: "&7pick a region to view its bad-locations map"
 # Visualizations row template; [region] - region name.
-menuVisualizationsRowRegion: "#5FB3B3â–¶ [region] &7- region shape map"
+menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- region shape map"
 # Hover text for a Visualizations region row; [region] - region name.
 menuVisualizationsHoverRegion: "&7open a map showing bad locations in &b[region]"
 # Non-clickable hint row shown when no regions are configured.
 menuVisualizationsEmpty: "&7(no regions configured)"
 # Visualizations submenu back row (returns to the admin panel).
-menuVisualizationsRowBack: "&7Â« back"
+menuVisualizationsRowBack: "&7« back"
 # --- Admin panel Setup section: curated prefabs ---
 # Section divider above the Setup (quick start) block on the admin panel.
-menuAdminPanelSectionSetup: "&8Â» &7setup (quick start)"
+menuAdminPanelSectionSetup: "&8» &7setup (quick start)"
 # Setup row + hover: survival-default identity overlay (reset to shipped defaults).
-menuPrefabSurvivalDefaultRow: "#5FB3B3â–¶ survival-default"
+menuPrefabSurvivalDefaultRow: "#5FB3B3▶ survival-default"
 menuPrefabSurvivalDefaultHover: "&7reset to the shipped defaults (identity overlay)"
 # Setup row + hover: low-performance (longer pulse, smaller caches, login cache off).
-menuPrefabLowPerformanceRow: "#5FB3B3â–¶ low-performance"
+menuPrefabLowPerformanceRow: "#5FB3B3▶ low-performance"
 menuPrefabLowPerformanceHover: "&7underpowered hosts / shared-CPU VPSes: longer pulse, smaller caches, login cache off"
 # Setup row + hover: high-performance (short pulse, large caches, login cache on).
-menuPrefabHighPerformanceRow: "#5FB3B3â–¶ high-performance"
+menuPrefabHighPerformanceRow: "#5FB3B3▶ high-performance"
 menuPrefabHighPerformanceHover: "&7dedicated hardware / large player counts: short pulse, large caches, login cache on"
 # Setup row + hover: folia-tuned (regional scheduler tuning).
-menuPrefabFoliaTunedRow: "#5FB3B3â–¶ folia-tuned"
+menuPrefabFoliaTunedRow: "#5FB3B3▶ folia-tuned"
 menuPrefabFoliaTunedHover: "&7folia regional scheduler: faster per-region pulses, fewer concurrent chunk tickets"
 # Setup row + hover: multi-world (one region per world from current default).
-menuPrefabMultiWorldRow: "#5FB3B3â–¶ multi-world"
+menuPrefabMultiWorldRow: "#5FB3B3▶ multi-world"
 menuPrefabMultiWorldHover: "&7synthesise one region per world from the current default"
 # Confirmation menu title. Placeholder: [prefab] - prefab id or display name.
-menuPrefabConfirmTitle: "#9D7CD8&lâš™ confirm prefab: #5FB3B3[prefab]"
+menuPrefabConfirmTitle: "#9D7CD8&l⚙ confirm prefab: #5FB3B3[prefab]"
 # Confirmation menu non-clickable hint row below the title. No placeholders.
 menuPrefabConfirmHint: "&7review the changes below, then click confirm or cancel"
 # Confirmation menu footer row: confirm and write the prefab to disk.
@@ -385,14 +388,14 @@ infoBookOverflowFooter: "&7(content truncated - click to view full output in cha
 infoBookAutoRefreshDeferredNote: "&8(auto-refresh not yet supported; click Refresh to update)"
 # Non-clickable title row at the top of the config-file selector page (Stage C.1).
 # Shown when an admin clicks "/rtp config" from the front page.
-configSelectorTitle: "#5FB3B3&lâš™ config files"
+configSelectorTitle: "#5FB3B3&l⚙ config files"
 # Label for the "back to /rtp menu root" navigation row on the config selector page.
-configSelectorBackRow: "&7Â« back to menu"
+configSelectorBackRow: "&7« back to menu"
 # Non-clickable title row at the top of a single config-file page (Stage C.2).
 # Placeholder: [file] - the config file name (e.g. "performance", "safety").
-configFileTitle: "#5FB3B3&lâš™ config: #9D7CD8[file]"
+configFileTitle: "#5FB3B3&l⚙ config: #9D7CD8[file]"
 # Label for the "back to config selector" navigation row on a single config-file page.
-configFileBackRow: "&7Â« back to config files"
+configFileBackRow: "&7« back to config files"
 # Non-clickable hint row shown when a config file has no editable keys.
 configFileEmptyHint: "&7(no editable keys in this file)"
 # Per-key row label on a config-file page. Placeholders:
@@ -403,10 +406,10 @@ configKeyRowFormat: "#7E9CC8[key]&7: #B084DC[value]"
 configKeyHoverFormat: "&7click to edit #7E9CC8[key] &7(type: [type])"
 # Non-clickable title row at the top of a shape/vert type-picker page (Stage C.3a).
 # Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
-configTypePickerTitle: "#5FB3B3&lâš™ pick [param] type &7(current: #9D7CD8[current]&7)"
+configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: #9D7CD8[current]&7)"
 # Non-clickable title row at the top of a shape/vert sub-parameter page (Stage C.3b).
 # Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
-configSubParamPageTitle: "#5FB3B3&lâš™ [param] &7- #9D7CD8[type] &7sub-parameters"
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- #9D7CD8[type] &7sub-parameters"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
 configViewRawHint: "&7[P0] book view unavailable; falling back to raw dump."
@@ -580,5 +583,5 @@ version: 1.0
 # ###############################################################################
 # Section 12: Developer Options
 # ###############################################################################
-# set to true to append a dev tag (e.g. Â§8(RTP:ClassName)) to every message
+# set to true to append a dev tag (e.g. §8(RTP:ClassName)) to every message
 showDevTag: false

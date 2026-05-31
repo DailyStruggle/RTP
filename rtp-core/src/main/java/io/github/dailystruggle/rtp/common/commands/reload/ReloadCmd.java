@@ -79,6 +79,10 @@ public class ReloadCmd extends BaseRTPCmdImpl {
       boolean b = RTP.configs.reload();
       if (!b) throw new IllegalStateException("reload failed");
 
+      // Drop the decoded-schematic cache so a swapped/edited <region>.schem file on disk is
+      // re-read on the next teleport instead of serving the stale in-memory copy (ADR-058).
+      io.github.dailystruggle.rtp.api.schematic.AbstractFileSchematicPaster.clearCache();
+
       String msgReloaded = msg(MessagesKeys.reloaded, "");
       if (!msgReloaded.isEmpty()) {
         msgReloaded =

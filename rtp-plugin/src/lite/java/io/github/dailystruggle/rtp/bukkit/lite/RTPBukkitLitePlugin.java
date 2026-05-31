@@ -238,6 +238,16 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
             "[LIFECYCLE-LITE] Failed to initialize claim-plugin integrations; continuing without them.",
             t);
       }
+      // Bundled combat-tag plugin integrations for the optional PvP gate (ADR-055).
+      // Binds the first enabled combat plugin (PvPManager / CombatLogX / Simple Combat
+      // Log) to PvPCombatStateRegistry; no-op when none is present (native fallback).
+      try {
+        io.github.dailystruggle.rtp.bukkit.tools.softdepends.pvp.PvPIntegrations.setup(this);
+      } catch (Throwable t) {
+        RTP.log(Level.WARNING,
+            "[LIFECYCLE-LITE] Failed to initialize combat-tag integrations; continuing with the native PvP tracker.",
+            t);
+      }
     }, 1);
 
     // Lite OMITS:

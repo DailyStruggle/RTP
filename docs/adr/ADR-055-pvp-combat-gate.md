@@ -1,7 +1,7 @@
 # ADR-055 - Optional PvP / combat-tag pre-flight gate
 
-**Status:** Proposed
-**Date:** 2026-05-30
+**Status:** Accepted
+**Date:** 2026-05-30 (wiring landed 2026-05-31)
 
 ## Context
 
@@ -31,7 +31,17 @@ Introduce an optional combat gate built on the same replaceable-provider pattern
 ## Consequences
 
 - **Positive:** Feature-parity with EzRTP plus a zero-dependency native path; one replaceable seam consistent with the existing hook architecture; safe failure mode; off by default so no behavior change for existing servers.
-- **Negative / Trade-offs:** Native tracking only sees damage the platform listener observes (direct melee/projectile PvP), not damage routed through other plugins - operators wanting authoritative combat state should bind an external provider. Delivered incrementally, so the gate is inert until the platform listeners and command/execution wiring land in the follow-up increment.
+- **Negative / Trade-offs:** Native tracking only sees damage the platform listener observes (direct melee/projectile PvP, incl. projectile shooter and primed-TNT igniter), not damage routed through other plugins - operators wanting authoritative combat state should bind an external provider. The pre-dispatch gate refuses a *new* `/rtp` for a combat-tagged player; aborting an already-running countdown/queued teleport mid-flight (the full `CANCEL`/`DELAY` semantics) is a later increment, so at the pre-dispatch surface `DENY`/`CANCEL`/`DELAY` all collapse to "refuse this request".
+
+## Implementation status (2026-05-31)
+
+The gate is no longer inert. Wiring landed across all in-scope platforms:
+
+- **Command pre-dispatch** (`rtp-core`): `RTPCmd.compute` consults `PvPGate.evaluate(senderId)` before enrolling the requester, refusing with the configurable `messages.yml#pvpInCombat` string and a REQ-RTP-S-004 WARNING audit on a non-`ALLOW` action; `ALLOW`-and-in-combat is logged for operator visibility. Skipped for the console sender and cross-player (`player=`) targeting.
+- **Native damage listeners**: Bukkit/Paper/Folia `OnPlayerCombatTag` (`EntityDamageByEntityEvent`) and Fabric `FabricEventBridge` (`ServerLivingEntityEvents.AFTER_DAMAGE`, reflection-guarded) stamp `PvPGate.nativeTracker()` for player-vs-player damage per `pvpTagVictim`/`pvpTagAggressor`. Both short-circuit when the gate is disabled.
+- **Session hygiene**: `OnPlayerQuit` (Bukkit) and the Fabric disconnect handler clear the tracker on disconnect.
+- **Config / locale**: new baseline `messages.yml#pvpInCombat`, propagated to every shipped locale via the locale TSV pipeline.
+- **Tests**: `RTPCmdPvPGateTest` (pre-dispatch wiring) on top of the existing `PvPGateTest` / `NativePvPCombatTrackerTest`.
 
 ## References
 

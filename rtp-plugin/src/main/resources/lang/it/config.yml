@@ -1,5 +1,5 @@
 # --- Configurazione principale di RTP ---
-# Documentazione: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CORE_CONFIG.md
+# Documentazione: plugins/RTP/docs/admin/CORE_CONFIG.md
 # La selezione della lingua ora risiede in language.yml (caricato prima di config.yml).
 # Tempo di attesa prima che un teletrasporto in coda venga eseguito.
 # 0 teletrasporta immediatamente (salta la finestra di annullamento per movimento).

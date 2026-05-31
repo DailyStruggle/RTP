@@ -1,5 +1,5 @@
 # --- RTP Region Configuration ---
-# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/REGIONS.md
+# Documentation: plugins/RTP/docs/admin/REGIONS.md
 
 # Target world. [0] = main world.
 world: "[0]"

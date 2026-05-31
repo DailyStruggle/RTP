@@ -16,7 +16,12 @@ api-version: 1.13
 prefix: 'RTP'
 authors: [ leaf26 ]
 description: 'a fast and flexible random teleportation plugin'
-softdepend: [ WorldGuard, WorldEdit, PlaceholderAPI, Vault, Chunky, ChunkyBorder, GriefDefender, GriefPrevention, Towny, HuskTowns, Factions, Lands, RedProtect ]
+# CombatLogX / PvPManager / SimpleCombatLog are listed so the PvP gate's bundled
+# combat-tag adapters (ADR-055) can load those plugins' API classes at runtime:
+# on Paper/Folia a plugin may only resolve another plugin's classes when it
+# declares a dependency on it, otherwise the CombatLogX/PvPManager adapters hit a
+# NoClassDefFoundError at query time and silently report "not in combat".
+softdepend: [ WorldGuard, WorldEdit, PlaceholderAPI, Vault, Chunky, ChunkyBorder, GriefDefender, GriefPrevention, Towny, HuskTowns, Factions, Lands, RedProtect, CombatLogX, PvPManager, SimpleCombatLog ]
 folia-supported: true
 
 # --- Commands ---

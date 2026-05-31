@@ -20,6 +20,10 @@ public final class OnPlayerQuit implements Listener {
     RTP.getInstance().invulnerablePlayers.remove(uuid);
     RTP.getInstance().processingPlayers.remove(uuid);
 
+    // ADR-055: forget any native PvP combat tag so a reconnecting player is
+    // never spuriously gated and the tracker map does not leak across sessions.
+    io.github.dailystruggle.rtp.common.pvp.PvPGate.nativeTracker().clear(uuid);
+
     TeleportData data = RTP.getInstance().latestTeleportData.get(uuid);
     if (data != null && !data.completed) {
       if (data.nextTask instanceof TeleportPipelineTask task) {

@@ -1477,16 +1477,21 @@ public class ScanTask extends RTPRunnable {
     }
     int py = picked.y();
 
-    // Center-column biome check. On reject record biomeRecall for later lookup.
+    // Center-column biome check. The biome of every readable point is recorded
+    // below (accept or reject) so the shape always carries biome data.
     String probeBiome = probe.biomeAt(py);
     if (probeBiome != null) {
       String ub = probeBiome.toUpperCase();
+      // Fill in biome data for every point whose biome we can read, regardless
+      // of whether the point is ultimately accepted or rejected. The biome map
+      // is keyed by location, so re-recording an already-known position is
+      // idempotent ("if it doesn't already").
+      shape.addBiomeLocation(pos, 1, ub);
       if (!BiomeNames.matches(defaultBiomes, ub)) {
         probeOutcomeBiomeReject.incrementAndGet();
         // addBadChunk: chunk-uniform — biome is a per-chunk property in the anvil probe;
         // the twin spiral index decodes to the same chunk and is guaranteed to fail.
         shape.addBadChunk(pos);
-        if (biomeRecall) shape.addBiomeLocation(pos, 1, ub);
         res.complete(false);
         return true;
       }
@@ -1591,12 +1596,15 @@ public class ScanTask extends RTPRunnable {
                   // rejects out-of-biome candidates there).
                   if (resolvedChunk.isSelfContained()) {
                     String midBiome = resolvedChunk.getBiome(blockX, midY, blockZ).toUpperCase();
+                    // Fill in biome data for every point whose biome we can
+                    // read, regardless of accept/reject. Keyed by location, so
+                    // re-recording is idempotent ("if it doesn't already").
+                    shape.addBiomeLocation(pos, 1, midBiome);
                     if (!BiomeNames.matches(defaultBiomes, midBiome)) {
                       // addBadChunk: chunk-uniform — mid-Y biome read from the resolved
                       // (anvil-backed self-contained) chunk; biome is per-chunk so the twin
                       // spiral index in the same chunk is guaranteed to fail.
                       shape.addBadChunk(pos);
-                      if (biomeRecall) shape.addBiomeLocation(pos, 1, midBiome);
                       fullLoadOutcomeMidBiome.incrementAndGet();
                       res.complete(false);
                       return;
@@ -1626,6 +1634,10 @@ public class ScanTask extends RTPRunnable {
                       // `anvilProbeSupport.takeCached` so an evicted cache entry cannot
                       // cause a fallthrough to the seed-synth getter on a loaded chunk.
                       String actualBiome = chunk.getBiome(localCursor.x, localCursor.y, localCursor.z);
+                      // Fill in biome data for every point whose biome we can
+                      // read, regardless of accept/reject. Keyed by location,
+                      // so re-recording is idempotent ("if it doesn't already").
+                      shape.addBiomeLocation(pos, 1, actualBiome.toUpperCase());
 
                       if (!BiomeNames.matches(defaultBiomes, actualBiome.toUpperCase())) {
                         // addBadChunk: chunk-uniform — authoritative biome read from the

@@ -14,12 +14,17 @@ import java.util.Map;
  *       destination sits at the same Y (mid-air placement, no terrain scan
  *       and no sky-light requirement - a void world has no terrain to dig
  *       out of, and the platform tool builds the foothold on arrival).</li>
- *   <li><strong>Unique-placements radius</strong> ({@code shape}): turns on
- *       {@code uniquePlacements} so each island spot is consumed once, and
+ *   <li><strong>Unique-placements radius</strong> ({@code shape}): pins the
+ *       shape to {@code SQUARE} so both knobs below always apply, sets
+ *       {@code uniquePlacements} to {@code 16} (the boolean {@code true} form
+ *       is deprecated) so each island spot is consumed once, and
  *       widens {@code radius} so islands are spread far apart.</li>
  *   <li><strong>Skyblock schematic</strong> ({@code schematic}): names the
- *       per-region schematic knob (ADR-058) that the paster resolves to an
- *       on-disk {@code .schem}; {@code "skyblock"} is the bundled island.</li>
+ *       <em>bundled</em> {@code .schem} resource ({@code "skyblock"} is the
+ *       island shipped in the jar). On confirm, {@code PrefabSchematicInstaller}
+ *       extracts it to {@code <pluginDir>/schematics/default.schem} (keyed by the
+ *       overlaid region, since core resolves the arrival schematic by region name
+ *       per ADR-058 Amendment 2 - the file's presence is the only knob).</li>
  * </ul>
  *
  * <p>The overlay is sparse and targets the existing {@code default} region
@@ -36,12 +41,14 @@ public final class Skyblock {
             "menuPrefabSkyblockHover",
             "Skyblock: fixed-height vertical adjustor, unique island placements, and the skyblock schematic.",
             Map.of(),
+            Map.of(),
             Map.of("default", Map.of(
                     "vert", Map.of(
                             "name", "fixed",
                             "y", 64
                     ),
                     "shape", Map.of(
+                            "name", "SQUARE",
                             "uniquePlacements", 16,
                             "radius", 10000
                     ),

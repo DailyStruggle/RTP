@@ -22,6 +22,7 @@ public final class FoliaTuned {
                     "asyncAllottedTime", 25,
                     "minTPS", 19.0
             ),
+            Map.of(),
             Map.of("default", Map.of(
                     "cacheCap", 15,
                     "activeChunkCap", 4
