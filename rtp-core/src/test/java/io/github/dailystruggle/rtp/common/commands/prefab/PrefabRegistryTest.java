@@ -40,14 +40,16 @@ class PrefabRegistryTest {
             "low-performance",
             "high-performance",
             "folia-tuned",
-            "multi-world"
+            "multi-world",
+            "skyblock",
+            "oneblock"
     );
 
     @Test
-    @DisplayName("registry ships exactly five prefabs in the curated panel order")
+    @DisplayName("registry ships exactly seven prefabs in the curated panel order")
     void registryOrderAndSize() {
         List<Prefab> prefabs = PrefabRegistry.list();
-        assertEquals(5, prefabs.size(), "expected exactly five bundled prefabs");
+        assertEquals(7, prefabs.size(), "expected exactly seven bundled prefabs");
         assertEquals(EXPECTED_ORDER, prefabs.stream().map(Prefab::id).toList(),
                 "panel order does not match the locked curated ordering");
     }

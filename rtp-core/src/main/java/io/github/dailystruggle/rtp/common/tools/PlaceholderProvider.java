@@ -14,6 +14,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
@@ -1044,6 +1045,55 @@ public class PlaceholderProvider {
             }
             return "false";
         });
+
+        // --- Persistent learned-state ([mem*]) placeholders -----------------
+        // Read-only roll-up of a region's MemoryShape learned state (the same
+        // data exportDebugJson persists). Surfaced by /rtp info region:<name>.
+        // Resolve to "N/A" when the region's selector is not a MemoryShape or
+        // has not been scanned yet. No chunk I/O, no scan is triggered.
+        placeholders.put("memCoveragePct", uuid -> {
+            MemoryShape.LearnedStateSummary s = memSummary(RTP.regionContext.get());
+            return s == null ? "N/A" : formatPercent(s.coveragePercent());
+        });
+
+        placeholders.put("memBadPct", uuid -> {
+            MemoryShape.LearnedStateSummary s = memSummary(RTP.regionContext.get());
+            return s == null ? "N/A" : formatPercent(s.badPercent());
+        });
+
+        placeholders.put("memBadCount", uuid -> {
+            MemoryShape.LearnedStateSummary s = memSummary(RTP.regionContext.get());
+            return s == null ? "N/A" : String.valueOf(s.badCount());
+        });
+
+        placeholders.put("memTopCause", uuid -> {
+            MemoryShape.LearnedStateSummary s = memSummary(RTP.regionContext.get());
+            return s == null ? "N/A" : s.topCause();
+        });
+
+        placeholders.put("memTopCausePct", uuid -> {
+            MemoryShape.LearnedStateSummary s = memSummary(RTP.regionContext.get());
+            return s == null ? "N/A" : formatPercent(s.topCausePercent());
+        });
+    }
+
+    /**
+     * Returns the learned-state summary for {@code region}'s shape, or
+     * {@code null} when the region is {@code null} or its selector is not a
+     * {@link MemoryShape} (e.g. a non-memory shape build, or before any scan).
+     */
+    private static MemoryShape.LearnedStateSummary memSummary(Region region) {
+        if (region == null) return null;
+        if (region.getShape() instanceof MemoryShape<?> shape) {
+            return shape.learnedStateSummary();
+        }
+        return null;
+    }
+
+    /** Two-decimal percent with a trailing {@code %}; {@code "N/A"} when not sampled. */
+    private static String formatPercent(double v) {
+        if (Double.isNaN(v) || Double.isInfinite(v)) return "N/A";
+        return String.format(java.util.Locale.ROOT, "%.2f%%", v);
     }
 
     public static String fillPlaceholders(String text, UUID uuid) {

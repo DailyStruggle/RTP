@@ -197,6 +197,7 @@ infoRegion: "  #52B2BF[region]"
 
 # sub-info listings
 # placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
+# learned-state placeholders (resolve to N/A when the region has no memory shape or has not been scanned): [memCoveragePct], [memBadPct], [memBadCount], [memTopCause], [memTopCausePct]
 worldInfo:
   - "#21ADA8[world]:"
   - "#99EEBB  - region: [region]"
@@ -214,6 +215,8 @@ regionInfo:
   - "#58CCED  - unkeptCache (L2): [unkeptCache]"
   - "#58CCED  - backlogCache (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - cached: [cached]"
+  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
+  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # Section 8: Command Descriptions

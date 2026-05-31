@@ -211,6 +211,8 @@ regionInfo:
   - "#58CCED  - cacheLibere (L2) : [unkeptCache]"
   - "#58CCED  - cacheArriere (L3) : [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - enCache : [cached]"
+  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
+  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # Section 8 : Descriptions des commandes

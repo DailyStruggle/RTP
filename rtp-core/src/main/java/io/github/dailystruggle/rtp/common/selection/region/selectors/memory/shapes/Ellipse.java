@@ -51,7 +51,7 @@ public class Ellipse extends MemoryShape<EllipseMemoryShapeParams> {
       defaults.put(EllipseMemoryShapeParams.centerX, 0);
       defaults.put(EllipseMemoryShapeParams.centerZ, 0);
       defaults.put(EllipseMemoryShapeParams.weight, 1.0);
-      defaults.put(EllipseMemoryShapeParams.uniquePlacements, false);
+      defaults.put(EllipseMemoryShapeParams.uniquePlacements, 0);
       defaults.put(EllipseMemoryShapeParams.expand, false);
 
       subParameters.put("mode", new EnumParameter<>(
@@ -74,8 +74,8 @@ public class Ellipse extends MemoryShape<EllipseMemoryShapeParams> {
           "rtp.params", "weigh towards or away from center", (sender, s) -> true, 0.1, 1.0, 10.0));
       subParameters.put("expand", new BooleanParameter(
           "rtp.params", "expand region to keep a constant amount of usable land", (sender, s) -> true));
-      subParameters.put("uniqueplacements", new BooleanParameter(
-          "rtp.params", "ensure each selection is unique from prior selections", (sender, s) -> true));
+      subParameters.put("uniqueplacements", new IntegerParameter(
+          "rtp.params", "chunk radius cleared around each selection (0 = off, 1 = landing chunk)", (sender, s) -> true, 0, 1, 2, 4, 8));
     } catch (Exception e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
     }
@@ -322,14 +322,9 @@ public class Ellipse extends MemoryShape<EllipseMemoryShapeParams> {
         }
     }
 
-    Object unique = data.getOrDefault(EllipseMemoryShapeParams.uniquePlacements, false);
-    boolean u;
-    if (unique instanceof Boolean) u = (Boolean) unique;
-    else {
-      u = Boolean.parseBoolean(String.valueOf(unique));
-      data.put(EllipseMemoryShapeParams.uniquePlacements, u);
-    }
-    if (u) addBadChunk(location);
+    int uniqueRadius =
+        uniquePlacementsRadius(data.getOrDefault(EllipseMemoryShapeParams.uniquePlacements, 0));
+    if (uniqueRadius > 0) addBadChunkRadius(location, uniqueRadius);
 
     return location;
   }

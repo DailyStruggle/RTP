@@ -263,7 +263,17 @@ Displays the current runtime state of the plugin: loaded worlds, permanent regio
 |---|---|
 | *(none)* | List all loaded worlds and permanent regions. In-game players receive clickable suggest-click entries; console receives full inline detail. |
 | `world:<name>` | Display the `worldInfo` message template for each named world. Inactive or non-existent worlds are silently skipped. |
-| `region:<name>` | Display the `regionInfo` message template for each named region, including queue depth, in-flight calculations, shape, and cache cap. |
+| `region:<name>` | Display the `regionInfo` message template for each named region, including queue depth, in-flight calculations, shape, cache cap, and a persistent learned-state summary (coverage, bad fraction, top rejection cause). |
+
+**Persistent learned-state placeholders** (usable in the `regionInfo` template in `messages.yml`): these summarize the region's persisted learned state - the same data written to `database/regionData/debug/<region>.json` on each scan. They resolve to `N/A` when the region's shape does not keep learned state or has not been scanned yet. No chunk loading is performed.
+
+| Placeholder | Description |
+|---|---|
+| `[memCoveragePct]` | Percentage of the region's candidate cells that have been learned (flagged bad + recorded good). |
+| `[memBadPct]` | Percentage of candidate cells currently flagged bad. |
+| `[memBadCount]` | Number of cells currently flagged bad. |
+| `[memTopCause]` | Rejection cause covering the most flagged cells (e.g. `safety`, `biome`, `worldBorder`), or `none`. |
+| `[memTopCausePct]` | That cause's share of all flagged-bad cells. |
 
 > Players with `rtp.admin` or `rtp.support` additionally see DRM/licensing metadata (downloader ID and download nonce) appended at the end of every `/rtp info` response.
 

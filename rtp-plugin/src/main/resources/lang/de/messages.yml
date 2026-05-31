@@ -211,6 +211,8 @@ regionInfo:
   - "#58CCED  - UngehaltenerCache (L2): [unkeptCache]"
   - "#58CCED  - RueckstauCache (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - ImCache: [cached]"
+  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
+  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # Abschnitt 8: Befehlsbeschreibungen

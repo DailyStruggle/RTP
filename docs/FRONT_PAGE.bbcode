@@ -1,8 +1,9 @@
 [CENTER]
 [SIZE=7][B][COLOR=#2C3E50]RTP[/COLOR][COLOR=#2980B9]-Pro[/COLOR][/B][/SIZE]
-[SIZE=4][B][COLOR=#555555]Deterministic, bounded-latency Random Teleport for production Minecraft servers[/COLOR][/B][/SIZE]
-[I]For operators who edit YAML, version-control configs, and read profiler output.[/I]
-[I]Folia-native - multi-server / proxy - audited safety - drop-in upgrade from the free RTP build.[/I]
+[SIZE=4][B][COLOR=#555555]High-Performance Random Teleport (RTP) Plugin for Folia, Paper & Spigot[/COLOR][/B][/SIZE]
+[I]The fastest Folia-native random teleport plugin - instant /rtp, safe landings, multi-server / proxy support, and audited safety.[/I]
+[I]Supported: Paper, Folia, Spigot, Fabric (Arclight / Mohist for Forge / NeoForge) - Minecraft 1.20.x / 1.21.x / 26.x.[/I]
+[I]For operators who edit YAML, version-control configs, and read profiler output. Drop-in upgrade from the free RTP build.[/I]
 [/CENTER]
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
@@ -56,7 +57,7 @@ On [B]Paper 1.21[/B], measured on the in-repo harness, 2 OPed clients spamming [
 
 [I]Methodology: Paper 1.21, 2 OPed clients spamming [I]/rtp[/I] continuously, in-repo harness linked below. Folia and Spigot results in the full benchmark section.[/I]
 
-Same throughput as the next-best plugin at [B]~17x lower worst-case tick spike and 35% less CPU per teleport.[/B] On Folia, RTP-Pro is the only plugin in the field that hits double-digit TP/s (9.87 TP/s @ 99.97% success). Raw harness: [URL='https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP'][I]helpers/StressTestRTP/[/I][/URL].
+Same throughput as the next-best plugin at [B]~17x lower worst-case tick spike and 35% less CPU per teleport.[/B] Raw harness: [URL='https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP'][I]helpers/StressTestRTP/[/I][/URL].
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
@@ -364,7 +365,7 @@ RTP-Pro is engineered for the servers that push the platform hardest. If any of 
 
 [B]Caveats.[/B] 2 clients only (the number is a floor, not a ceiling). Hardware, view distance, world state, and other plugins will move the numbers. Competitor plugins update frequently; corrections welcome via GitHub issue with a contradicting repro or doc link. Feature breadth, GUI, and claim-integration count are not benchmarked - several competitors trade speed for those, which is a legitimate choice.
 
-Full methodology, raw CSVs, per-run analyses: [URL='https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP'][I]helpers/StressTestRTP/[/I][/URL].
+Full methodology, raw CSVs, per-run analyses: [URL='https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP'][I]helpers/StressTestRTP/[/I][/URL]. Video benchmark of [I]/rtp[/I] on a custom world generator: [URL='https://youtu.be/V0NyNK9JydM']youtu.be/V0NyNK9JydM[/URL].
 [/SPOILER]
 
 [SPOILER='Architecture - five pillars + chunk-loading by platform']
@@ -471,11 +472,14 @@ File a GitHub issue if you hit something not on the list.
 [/SPOILER]
 
 [SPOILER='FAQ']
-[B]Q: Why does this respond faster than other RTP plugins?[/B]
+[B]Q: How do I stop /rtp from lagging my server, and why is RTP-Pro faster than other RTP plugins?[/B]
 A: Pre-warmed queue. In most cases a verified destination is ready before you type [I]/rtp[/I]. Two design choices keep that queue cheap to refill: a [B]persistent spatial memory[/B] per region (the plugin remembers which sectors failed safety checks, so the spiral selector skips known-bad ground instead of rerolling indefinitely) and an [B]off-tick async pre-filter[/B] (Anvil region files are read directly to reject unsafe biomes/blocks [I]before[/I] any chunk is loaded, so candidate verification never blocks the main thread).
 
 [B]Q: How do I set up teleportation between worlds?[/B]
 A: See the admin guide. Resolution order: player's current world (or [I]world:[/I] param) -> world's target region -> region's target world.
+
+[B]Q: Does RTP work on Folia?[/B]
+A: Yes - RTP-Pro is the only RTP plugin benchmarked at double-digit TP/s on Folia (9.87 TP/s @ 99.97 % success), running on the Region Scheduler with an off-tick pre-filter so no region stalls.
 
 [B]Q: Iris / Terra / custom datapack generators?[/B]
 A: Yes - deliberate 3.0 design goal. The Anvil pre-filter reads [I].mca[/I] palette data directly, so populated custom-generator chunks evaluate off-tick like vanilla. That's [I]strictly more accurate[/I] than the live Bukkit view, which collapses modded IDs to vanilla cousins. Un-populated chunks fall through to a live load as the authoritative safety net.
@@ -483,7 +487,7 @@ A: Yes - deliberate 3.0 design goal. The Anvil pre-filter reads [I].mca[/I] pale
 [B]Q: Existing safety.yml on upgrade?[/B]
 A: Plain-material entries keep working unchanged; the new grammar is strictly additive.
 
-[B]Q: Best setup for performance?[/B]
+[B]Q: Best RTP plugin / setup for Paper 1.21 performance?[/B]
 A: Paper, with memory to spare for the location cache. RTP works particularly well on pre-generated worlds.
 
 [B]Q: Can I downgrade to the free RTP build?[/B]
@@ -504,10 +508,11 @@ A: Yes - same configuration, same data files, same commands. You lose Folia, pro
 
 [SIZE=6][B][COLOR=#7F8C8D]Links[/COLOR][/B][/SIZE]
 [LIST]
-[*][URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md'][B]Admin guide[/B][/URL] - install, configure, command reference
-[*][URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md'][B]Addon developer guide[/B][/URL] - API & examples
-[*][URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md'][B]Changelog & roadmap[/B][/URL]
-[*][URL='https://github.com/dailystruggle/RTP'][B]Source on GitHub[/B][/URL] - star, watch, contribute, file issues
+[*][URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md'][B]RTP admin & configuration guide[/B][/URL] - install, configure, command reference
+[*][URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md'][B]RTP addon / API developer guide[/B][/URL] - [I]rtp-api[/I] & examples
+[*][URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md'][B]RTP changelog & roadmap[/B][/URL]
+[*][URL='https://github.com/dailystruggle/RTP'][B]RTP source on GitHub[/B][/URL] - star, watch, contribute, file issues
+[*][URL='https://modrinth.com/plugin/rtpv3'][B]Free RTP plugin (download)[/B][/URL] - the open, single-server build of this same random teleport engine
 [/LIST]
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]

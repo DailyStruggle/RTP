@@ -94,6 +94,32 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         this.id = UUID.nameUUIDFromBytes(this.name.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * ADR-058 — swappable region-schematic paster, mirroring the Bukkit/Folia
+     * {@code setBiomeGetter} idiom (on Fabric the biome getter lives on
+     * {@code FabricServerAccessor}; the schematic paster holder lives here for
+     * parity with the other world adapters). Defaults to
+     * {@link io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster}
+     * (never {@code null}, S-006).
+     */
+    private static @NotNull io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster =
+            io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster.INSTANCE;
+
+    public static void setSchematicPaster(
+            @NotNull io.github.dailystruggle.rtp.api.schematic.SchematicPaster paster) {
+        FabricRTPWorld.schematicPaster = java.util.Objects.requireNonNull(paster, "paster");
+    }
+
+    public static @NotNull io.github.dailystruggle.rtp.api.schematic.SchematicPaster
+            getSchematicPaster() {
+        return schematicPaster;
+    }
+
+    @Override
+    public io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster() {
+        return schematicPaster;
+    }
+
     @Override
     public String name() {
         return name;

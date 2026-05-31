@@ -129,6 +129,9 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
                 databaseDirectory);
         RTP.configs.reloadRegions();
         RTP.scheduler.runTaskLater(() -> RTP.getInstance().databaseAccessor.startup(), 1);
+        // ADR-060: emergency-platform restore reaper (in-memory only under yaml persistence).
+        RTP.scheduler.runTaskLater(
+            io.github.dailystruggle.rtp.common.platform.PlatformRestoreManager::startGlobal, 2);
       } catch (Exception e) {
         RTP.log(Level.WARNING,
             "[LIFECYCLE-LITE] yaml-only persistence wiring failed", e);

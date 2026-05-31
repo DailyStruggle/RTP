@@ -71,6 +71,27 @@ public final class MapDispatch {
   /** Max lifespan (ms) for a {@link MemoryTracker} entry opened by {@link #paint}. */
   static final long MEMORY_TRACKER_TTL_MS = 30_000L;
 
+  /**
+   * Chart kinds that {@link #paint} drives through {@link MapBinding#bindLive}
+   * (a self-refreshing live binding) instead of a one-shot
+   * {@link MapBinding#renderEphemeral}. Every other kind renders once.
+   *
+   * <ul>
+   *   <li>{@link ChartSpec.Kind#METRIC_SPARKLINE}: MSPT / heap evolve over
+   *       time, so the chart is only useful when it refreshes.</li>
+   *   <li>{@link ChartSpec.Kind#REGION_BAD_LOCATIONS_SHAPE}: a running
+   *       world-scan ({@code ScanTask}) flags new unsafe sectors into the
+   *       region's {@code MemoryShape} bad-keys cache; binding live lets an
+   *       admin watch the bad-locations map fill in as the scan progresses
+   *       (ROADMAP Tier 2: world-scan UX). The resolver is pure and
+   *       re-runnable per tick (no chunk I/O; REQ-RTP-S-005).</li>
+   * </ul>
+   */
+  private static final java.util.EnumSet<ChartSpec.Kind> LIVE_REFRESH_KINDS =
+      java.util.EnumSet.of(
+          ChartSpec.Kind.METRIC_SPARKLINE,
+          ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE);
+
   private MapDispatch() {}
 
   /**
@@ -277,19 +298,24 @@ public final class MapDispatch {
     // the MapView reference forever. Untracked on every exit path below.
     UUID trackingId = MemoryTracker.track(handle, MEMORY_TRACKER_LABEL, MEMORY_TRACKER_TTL_MS);
     try {
-      if (spec.kind() == ChartSpec.Kind.METRIC_SPARKLINE) {
-        // Live-refresh path: the sparkline pulls a fresh model from the
+      if (LIVE_REFRESH_KINDS.contains(spec.kind())) {
+        // Live-refresh path: the chart pulls a fresh model from the
         // resolver on every CraftMapView tick (~1 Hz while held), so the
-        // viewer sees MSPT + heap evolve in real time. The Supplier
-        // re-invokes resolver.resolve(spec); any UnresolvableChartSpec /
-        // runtime fault inside the supplier is caught by
-        // LiveChartRenderer and logged to stderr without crashing the
+        // viewer sees the underlying state evolve in real time. For
+        // METRIC_SPARKLINE this surfaces MSPT + heap; for
+        // REGION_BAD_LOCATIONS_SHAPE it surfaces newly-flagged unsafe
+        // sectors as a world-scan (ScanTask) records them into the
+        // region's MemoryShape bad-keys cache (ROADMAP Tier 2: world-scan
+        // UX). The Supplier re-invokes resolver.resolve(spec); any
+        // UnresolvableChartSpec / runtime fault inside the supplier is
+        // caught by LiveChartRenderer and logged without crashing the
         // tick. Initial Resolution is discarded (its model is a stale
         // snapshot by the next tick anyway); the supplier is the source
         // of truth from here on.
         final ChartSpecResolver resolverRef = resolver;
         RTP.log(Level.FINE,
-            "[viz/sparkline] binding.bindLive invoking for viewer=" + viewer);
+            "[viz/live] binding.bindLive invoking for kind=" + spec.kind()
+                + " viewer=" + viewer);
         binding.bindLive(handle,
             resolution.renderer(),
             () -> {
@@ -300,7 +326,8 @@ public final class MapDispatch {
               }
             });
         RTP.log(Level.FINE,
-            "[viz/sparkline] binding.bindLive OK for viewer=" + viewer);
+            "[viz/live] binding.bindLive OK for kind=" + spec.kind()
+                + " viewer=" + viewer);
       } else {
         RTP.log(Level.FINE,
             "[viz/bad-locations] binding.renderEphemeral invoking for viewer="

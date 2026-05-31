@@ -911,6 +911,10 @@ public class RTP {
     }
     log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop CancelInflight cancelled=" + inflight);
 
+    // ADR-060: stop the emergency-platform restore reaper before the DB is flushed/closed so
+    // it cannot touch a connection mid-shutdown. Persisted rows resume on next startup.
+    io.github.dailystruggle.rtp.common.platform.PlatformRestoreManager.stopGlobal();
+
     if (instance.databaseAccessor != null) {
       if (instance.databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDatabaseAccessor) {
         log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop SQL accessor flush (WAL checkpoint)");

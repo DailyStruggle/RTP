@@ -1,0 +1,33 @@
+# JitPack build configuration for RTP.
+#
+# RTP is a large multi-module build. Several Fabric/Loom submodules (notably
+# rtp-fabric:*-v26_1_R1 and the *-unobf carriers) require JDK 25 and Loom, which
+# JitPack's default `./gradlew build publishToMavenLocal` would try (and fail) to
+# build. We only need the addon-facing API closure published, so we override the
+# install command to publish exactly those modules with JDK 21.
+#
+# `-PexcludeJdk25` drops the JDK-25 / unobfuscated-Loom modules from the build
+# graph entirely (see settings.gradle). Without it, Gradle still *configures*
+# those modules and fails resolving their Java 25 toolchain, which is absent on
+# JitPack's JDK-21-only host. The published closure never depends on them.
+#
+# Consumers reference the individual modules as:
+#   com.github.DailyStruggle.RTP:<module>:<tag>
+# e.g. com.github.DailyStruggle.RTP:rtp-api:3.0.1
+#      com.github.DailyStruggle.RTP:rtp-core:3.0.1
+#
+# See docs/dev/PUBLISHING.md for the full story (and the Maven Central path).
+
+jdk:
+  - openjdk21
+
+install:
+  - ./gradlew --no-daemon -PexcludeJdk25
+      :commands-api:publishToMavenLocal
+      :yaml-api:publishToMavenLocal
+      :metrics-api:publishToMavenLocal
+      :maps-api:publishToMavenLocal
+      :effects-api:publishToMavenLocal
+      :rtp-proxy:rtp-proxy-common:publishToMavenLocal
+      :rtp-api:publishToMavenLocal
+      :rtp-core:publishToMavenLocal

@@ -251,6 +251,41 @@ public class ShapeEdgeCaseTest {
     // -------------------------------------------------------------------------
 
     @Test
+    void uniquePlacementsRadius_coercesAllSupportedTypes() {
+        assertEquals(0, MemoryShape.uniquePlacementsRadius(null));
+        assertEquals(0, MemoryShape.uniquePlacementsRadius(false));
+        assertEquals(1, MemoryShape.uniquePlacementsRadius(true));
+        assertEquals(0, MemoryShape.uniquePlacementsRadius(0));
+        assertEquals(3, MemoryShape.uniquePlacementsRadius(3));
+        assertEquals(0, MemoryShape.uniquePlacementsRadius(-5));
+        assertEquals(0, MemoryShape.uniquePlacementsRadius("false"));
+        assertEquals(1, MemoryShape.uniquePlacementsRadius("true"));
+        assertEquals(4, MemoryShape.uniquePlacementsRadius("4"));
+        assertEquals(0, MemoryShape.uniquePlacementsRadius("garbage"));
+    }
+
+    @Test
+    void circle_uniquePlacementsRadius_marksMoreThanSingleChunk() {
+        // A location well inside the region so its 3x3 chunk neighbourhood is also in-shape.
+        Circle r1 = new Circle();
+        r1.set(GenericMemoryShapeParams.radius, 64L);
+        r1.set(GenericMemoryShapeParams.centerRadius, 0L);
+        long loc1 = r1.xzToLocation(10, 10);
+        int marked1 = r1.addBadChunkRadius(loc1, 1);
+
+        Circle r2 = new Circle();
+        r2.set(GenericMemoryShapeParams.radius, 64L);
+        r2.set(GenericMemoryShapeParams.centerRadius, 0L);
+        long loc2 = r2.xzToLocation(10, 10);
+        int marked2 = r2.addBadChunkRadius(loc2, 2);
+
+        assertTrue(marked1 > 0, "radius-1 unique placement should mark the landing chunk");
+        assertTrue(marked2 > marked1,
+                "radius-2 unique placement must clear more indices than the single landing chunk "
+                        + "(radius-1=" + marked1 + ", radius-2=" + marked2 + ")");
+    }
+
+    @Test
     void circle_uniquePlacements_noDuplicatesInSmallRange() {
         Circle shape = new Circle();
         shape.set(GenericMemoryShapeParams.uniquePlacements, true);

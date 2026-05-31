@@ -4,6 +4,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 
 ## Top-level entry points
 - [`FOR_ADDON_DEVELOPERS.md`](FOR_ADDON_DEVELOPERS.md) — router for addon authors (depends only on `rtp-api`).
+- [`ADDON_QUICKSTART.md`](ADDON_QUICKSTART.md) — one-page "register a custom shape in ~20 lines" addon tutorial.
 - [`FOR_CONTRIBUTORS.md`](FOR_CONTRIBUTORS.md) — router for core contributors.
 - [`FOR_SERVER_ADMINS.md`](FOR_SERVER_ADMINS.md) — router to `admin/`.
 
@@ -22,6 +23,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`dev/MULTI_SERVER_PLAN.md`](dev/MULTI_SERVER_PLAN.md) — proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated.
 - [`dev/METRICS_PLAN.md`](dev/METRICS_PLAN.md) — runtime metrics SPI (TPS / MSPT / heap / queue / pipeline); implementation eligible.
 - [`dev/ROADMAP.md`](dev/ROADMAP.md) — forward-looking work.
+- [`dev/PUBLISHING.md`](dev/PUBLISHING.md) — publishing `rtp-api`/`rtp-core` for out-of-repo addons (JitPack active; Maven Central how-to).
 - [`dev/STAKEHOLDERS.md`](dev/STAKEHOLDERS.md) — roles.
 
 ## Decisions (`adr/`)

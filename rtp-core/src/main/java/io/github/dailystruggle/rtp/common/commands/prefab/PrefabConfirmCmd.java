@@ -134,6 +134,38 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
             }
         }
 
+        // Best-effort schematic install: if the applied prefab references a
+        // bundled `.schem` (the per-region `schematic` knob, ADR-058), extract
+        // it from the jar into `<pluginDir>/schematics/` so the paste resolves
+        // to a real file. Existing files are left untouched; a missing bundled
+        // resource is audited (S-004), never fatal to the apply.
+        List<String> installedSchematics = new ArrayList<>();
+        PrefabRegistry.byId(entry.prefabId()).ifPresent(prefab -> {
+            try {
+                PrefabSchematicInstaller.Result sr =
+                        PrefabSchematicInstaller.install(pluginDir, prefab);
+                installedSchematics.addAll(sr.installed());
+                if (!sr.installed().isEmpty()) {
+                    RTP.log(Level.INFO,
+                            "[prefab] schematic install: caller=" + callerId
+                                    + " prefab=" + entry.prefabId()
+                                    + " installed=" + sr.installed());
+                }
+                if (!sr.missingResource().isEmpty()) {
+                    RTP.log(Level.WARNING,
+                            "[prefab] schematic install: caller=" + callerId
+                                    + " prefab=" + entry.prefabId()
+                                    + " missing bundled resource(s)=" + sr.missingResource()
+                                    + " - paste will be a no-op until the file is supplied.");
+                }
+            } catch (IOException ioe) {
+                RTP.log(Level.WARNING,
+                        "[prefab] schematic install FAILED: caller=" + callerId
+                                + " prefab=" + entry.prefabId()
+                                + " - " + ioe.getMessage(), ioe);
+            }
+        });
+
         // Best-effort reload: not fatal if it fails (the files are correct on
         // disk; the operator can /rtp reload manually). Mirror ReloadCmd's
         // user-facing chatter (MessagesKeys.reloading / reloaded with
@@ -174,6 +206,10 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
                 + writtenFiles.size() + " file(s), " + changeCount + " change(s).");
         if (!writtenBaks.isEmpty()) {
             send(callerId, "&7Backups: &f" + String.join(", ", writtenBaks));
+        }
+        if (!installedSchematics.isEmpty()) {
+            send(callerId, "&7Installed schematic(s): &f"
+                    + String.join(", ", installedSchematics));
         }
         if (reloaded) {
             send(callerId, "&7Config reload completed.");

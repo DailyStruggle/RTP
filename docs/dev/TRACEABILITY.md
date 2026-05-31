@@ -87,6 +87,7 @@ This document connects each requirement to the design decision that motivated it
 | REQ-CORE-F-007 | Task lifespan | DESIGN.md §6 | MemoryTracker | - |
 | REQ-CORE-F-008 | Orphaned chunk recovery | DESIGN.md §6 | ChunkUnloadProcessor | - |
 | REQ-CORE-F-009 | L3 backlog cache (order-preserving FIFO; head-blocking promotion on `UNVERIFIED`; head-drop on `INVALIDATED`; one `.mca` bin verified per `Region.execute()` pulse) | DESIGN.md §1.1, [ADR-028](../adr/ADR-028-l3-backlog-cache.md) | `BacklogLocationBuffer`, `WorldBacklogBinIndex`, `RegionQueueManager.backlogLocations`, `Region.processBacklog` | `BacklogLocationBufferTest`, `WorldBacklogBinIndexTest` |
+| REQ-CORE-F-010 | Emergency-platform block-restoration timeout (chunk-loaded countdown, no force-load per REQ-RTP-S-005; DB-persisted resume; row removed on completion; restore failure audited per REQ-RTP-S-004) | [ADR-060](../adr/ADR-060-emergency-platform-block-restoration-timeout.md) | `PlatformRestoreManager`, `PlatformRestoreSqlStore` (`rtp-core`); `BlockDelta`, `PendingPlatformRestore`, `RTPWorld.restoreBlocks` (`rtp-api`); `BukkitRTPWorld.platform`/`restoreBlocks`, `FoliaRTPWorld.platform`/`restoreBlocks`; `SafetyKeys.platformRestoreSeconds` | `ReqRtpAdr060PlatformRestoreTest` (7 cases) |
 | REQ-CORE-ARCH-001 | Lock-free config | DESIGN.md §1 | FactoryValue | ConfigParserLanguageTest |
 | REQ-CORE-ARCH-002 | Data access pattern | DESIGN.md §1 | FactoryValue.getData() | MultiConfigParserIsolationTest |
 | REQ-CORE-ARCH-003 | Fault encapsulation | DESIGN.md §6 | TeleportPipelineTask | - |

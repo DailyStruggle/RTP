@@ -21,6 +21,7 @@ import io.github.dailystruggle.rtp.common.tools.MessageTagger;
 import io.github.dailystruggle.rtp.bukkitplatform.entity.BukkitRTPCommandSender;
 import io.github.dailystruggle.rtp.bukkitplatform.entity.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitRTPWorld;
+import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitSchematicPaster;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
 import org.bukkit.plugin.Plugin;
@@ -82,6 +83,9 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   public AbstractServerAccessor() {
+    // ADR-058: install the native (WorldEdit-free) region-schematic paster. Inert until a
+    // region's `schematic` knob is set and rtp-core invokes it on the confirmed-arrival path.
+    BukkitRTPWorld.setSchematicPaster(new BukkitSchematicPaster());
     shapeFunction =
         s -> {
           World world = Bukkit.getWorld(s);

@@ -128,6 +128,71 @@ class SafetyTokenParserTest {
       assertEquals("true", p.properties().get("waterlogged"));
       assertEquals("top", p.properties().get("type"));
     }
+
+    @Test
+    @DisplayName("numeric range predicate parses operator and integer bound")
+    void numericRangePredicate() {
+      SafetyToken t = soleAccepted(SafetyTokenParser.parse("LAVA[level<=3]"));
+      assertEquals("LAVA", t.identifier());
+      StatePredicate p = t.predicates().get(0);
+      assertTrue(p.properties().isEmpty(), "range-only predicate has no equalities");
+      assertEquals(1, p.comparisons().size());
+      StatePredicate.NumericComparison c = p.comparisons().get(0);
+      assertEquals("level", c.key());
+      assertEquals(StatePredicate.Comparator.LE, c.op());
+      assertEquals(3L, c.bound());
+    }
+
+    @Test
+    @DisplayName("all four comparison operators round-trip")
+    void allComparisonOperators() {
+      assertEquals(StatePredicate.Comparator.GE,
+          soleAccepted(SafetyTokenParser.parse("FIRE[age>=10]")).predicates().get(0)
+              .comparisons().get(0).op());
+      assertEquals(StatePredicate.Comparator.GT,
+          soleAccepted(SafetyTokenParser.parse("FIRE[age>10]")).predicates().get(0)
+              .comparisons().get(0).op());
+      assertEquals(StatePredicate.Comparator.LE,
+          soleAccepted(SafetyTokenParser.parse("FIRE[age<=10]")).predicates().get(0)
+              .comparisons().get(0).op());
+      assertEquals(StatePredicate.Comparator.LT,
+          soleAccepted(SafetyTokenParser.parse("FIRE[age<10]")).predicates().get(0)
+              .comparisons().get(0).op());
+    }
+
+    @Test
+    @DisplayName("equality and range predicates combine in one token")
+    void mixedEqualityAndRange() {
+      SafetyToken t = soleAccepted(
+          SafetyTokenParser.parse("WATER[waterlogged=true,level>=5]"));
+      StatePredicate p = t.predicates().get(0);
+      assertEquals("true", p.properties().get("waterlogged"));
+      assertEquals(1, p.comparisons().size());
+      assertEquals("level", p.comparisons().get(0).key());
+    }
+
+    @Test
+    @DisplayName("two range bounds on the same key (a bounded interval) are allowed")
+    void boundedInterval() {
+      SafetyToken t = soleAccepted(SafetyTokenParser.parse("LAVA[level>=2,level<=5]"));
+      StatePredicate p = t.predicates().get(0);
+      assertEquals(2, p.comparisons().size());
+    }
+
+    @Test
+    @DisplayName("negative integer bound is accepted")
+    void negativeBound() {
+      SafetyToken t = soleAccepted(SafetyTokenParser.parse("FOO[bar>=-3]"));
+      assertEquals(-3L, t.predicates().get(0).comparisons().get(0).bound());
+    }
+
+    @Test
+    @DisplayName("wildcard with range-only predicate is accepted")
+    void wildcardRange() {
+      SafetyToken t = soleAccepted(SafetyTokenParser.parse("*[level>=8]"));
+      assertTrue(t.isWildcard());
+      assertEquals(1, t.predicates().get(0).comparisons().size());
+    }
   }
 
   @Nested
@@ -221,6 +286,30 @@ class SafetyTokenParserTest {
     void predicateReservedCharInValue() {
       assertTrue(SafetyTokenParser.parse("OAK_SLAB[waterlogged=[true]]").hasRejections());
       assertTrue(SafetyTokenParser.parse("OAK_SLAB[waterlogged=t=r]").hasRejections());
+    }
+
+    @Test
+    @DisplayName("range predicate with a non-integer bound is rejected")
+    void rangeNonIntegerBound() {
+      Rejection r = soleRejection(SafetyTokenParser.parse("LAVA[level>=high]"));
+      assertTrue(r.reason().contains("integer"),
+          () -> "reason should mention integer: " + r.reason());
+      assertTrue(SafetyTokenParser.parse("LAVA[level>=1.5]").hasRejections());
+    }
+
+    @Test
+    @DisplayName("range predicate with an empty bound is rejected")
+    void rangeEmptyBound() {
+      assertTrue(SafetyTokenParser.parse("LAVA[level>=]").hasRejections());
+      assertTrue(SafetyTokenParser.parse("LAVA[level<]").hasRejections());
+    }
+
+    @Test
+    @DisplayName("duplicate range operator on the same key is rejected")
+    void duplicateRangeOperator() {
+      Rejection r = soleRejection(SafetyTokenParser.parse("LAVA[level>=2,level>=3]"));
+      assertTrue(r.reason().contains("duplicate"),
+          () -> "reason: " + r.reason());
     }
   }
 

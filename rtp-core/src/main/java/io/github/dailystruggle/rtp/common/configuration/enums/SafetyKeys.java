@@ -19,6 +19,16 @@ public enum SafetyKeys {
   platformAirHeight,
   platformDepth,
   platformMaterial,
+  /**
+   * Optional timeout, in seconds, after which the emergency landing platform's footprint is
+   * restored to the blocks that were there before it was built (ADR-060 / REQ-RTP-S-005).
+   * {@code -1} (default) disables restoration entirely - the platform is permanent, exactly as
+   * before. {@code 0} restores on the first reaper pulse at which the footprint chunk is loaded;
+   * {@code > 0} restores after that many seconds of <i>chunk-loaded</i> time have elapsed. The
+   * countdown is frozen while the footprint chunk is unloaded (the reaper never force-loads).
+   * Pending restores are persisted to the database and resumed across restarts.
+   */
+  platformRestoreSeconds,
   airBlocks,
   unsafeBlocks,
   /**

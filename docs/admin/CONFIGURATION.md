@@ -58,7 +58,7 @@ The `shape` block defines how horizontal coordinates are selected. The `name` ke
 | `mode` | String | Selection logic. See table below. |
 | `centerX` | Integer | Chunk X coordinate of the region centre (default `0`). |
 | `centerZ` | Integer | Chunk Z coordinate of the region centre (default `0`). |
-| `uniquePlacements` | Boolean | If `true`, each used location is marked bad so the same spot is never reused. |
+| `uniquePlacements` | Integer | Chunk radius cleared around each used location so it is never reused. `0` = off (default), `1` = the landing chunk only, `N` = an `(2N-1)x(2N-1)` chunk square centred on the landing chunk. (Legacy `true`/`false` are still accepted and map to `1`/`0`.) |
 
 **`mode` options:**
 
@@ -145,7 +145,7 @@ shape:
   centerX: 0
   centerZ: 0
   weight: 1.0
-  uniquePlacements: false
+  uniquePlacements: 0
   expand: false
 vert:
   name: "JUMP"

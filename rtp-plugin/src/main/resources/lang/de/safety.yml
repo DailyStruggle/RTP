@@ -56,6 +56,19 @@ platformAirHeight: 2
 # @default: GLASS
 platformMaterial: "GLASS"
 
+# Optionaler Timeout in Sekunden, nach dem der Fußabdruck der Notfall-Landeplattform
+# wieder auf die Blöcke zurückgesetzt wird, die vorher dort waren.
+# -1 deaktiviert die Wiederherstellung (die Plattform ist dauerhaft, das bisherige Verhalten).
+# 0 stellt wieder her, sobald der Plattform-Chunk erneut geladen ist; ein positiver Wert
+# stellt nach so vielen Sekunden geladener Zeit wieder her. Der Countdown läuft nur weiter,
+# während der Plattform-Chunk geladen ist (er pausiert, solange der Bereich entladen ist),
+# und ausstehende Wiederherstellungen überstehen einen Server-Neustart.
+# @type: integer
+# @range: [-1, null]
+# @unit: seconds
+# @default: -1
+platformRestoreSeconds: -1
+
 # Blöcke, die bei Lande-Sicherheitsprüfungen als begehbare Luft behandelt werden.
 # Akzeptiert Bukkit-Material-Namen und "#minecraft:<tag>"-Tag-Referenzen.
 # @type: list<material>

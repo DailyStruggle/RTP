@@ -104,6 +104,12 @@ public class LocationGenerator implements ILocationGenerator {
          * how often the pregenerated-area bias dropped a candidate vs. the
          * other reject buckets. */
         ungenerated,
+        /** Candidate location (and, for a {@code uniquePlacements} radius &gt; 1,
+         * the surrounding chunks) was marked bad to enforce unique placements:
+         * a successfully-used spot is consumed so the same area is not handed
+         * out again. Tracked separately from {@link #misc} so operators can see
+         * how much of the region the unique-placements knob has retired. */
+        uniquePlacement,
         misc
     }
 

@@ -33,7 +33,7 @@ The `shape` block defines the horizontal area where players can land.
   - `REROLL`: Simple random selection with retries. Even but unbounded.
   - `NONE`: No pre-check. Fastest but ignores pre-computed safety data.
 - `centerX` / `centerZ`: The center of the region in **chunks**.
-- `uniquePlacements`: If true, a spot is never reused once a player lands there.
+- `uniquePlacements`: Chunk radius cleared around a spot once a player lands there so it is never reused. `0` = off, `1` = the landing chunk only, `N` = an `(2N-1)x(2N-1)` chunk square. (Legacy `true`/`false` still work and map to `1`/`0`.)
 
 ### Shape Engines and Parameters
 

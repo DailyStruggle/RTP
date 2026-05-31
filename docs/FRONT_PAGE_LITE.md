@@ -1,16 +1,20 @@
 <!--
 Markdown mirror of FRONT_PAGE_LITE.bbcode (free RTP front page).
 Kept in sync with the BBCode source by hand; update both when changing copy.
+
+Marketplace listing metadata (current, for SEO reference):
+  Title:   "RTP"
+  Tagline: "Deterministic Random Teleportation engine"
 -->
 
 <div align="center">
 
-# RTP
+# RTP - Free Random Teleport (RTP) Plugin for Paper, Spigot & Fabric
 
-### Deterministic, bounded-latency Random Teleport - the engine
-*For server administrators optimizing Paper, Fabric, Spigot, Purpur, and Pufferfish infrastructure.*
+### Deterministic, bounded-latency random teleport (`/rtp` / `/wild`) engine
+*The fastest free random teleport plugin for Paper, Spigot, and Bukkit-family servers - instant `/rtp`, safe random-spawn landings, no lag spikes.*
 
-*Send your players to a safe, random spot - fast, fair, and engineered to maintain 20.0 TPS without lag spikes.*
+*Supported: Paper, Spigot, Fabric, Arclight / Mohist - Minecraft 1.20.x / 1.21.x / 26.x. Send your players to a safe, random spot - fast, fair, and engineered to maintain 20.0 TPS without lag spikes.*
 
 **100% Free.** Same engine as the paid [**RTP-Pro**](https://builtbybit.com/resources/rtp-pro.105418) build. No paywalled `/rtp`, no nag screens, no ads - just anonymous [bStats](https://bstats.org/) usage stats (server-admin opt-out via `plugins/bStats/config.yml`).
 
@@ -33,7 +37,6 @@ Kept in sync with the BBCode source by hand; update both when changing copy.
 - **Works on plain Bukkit servers at Paper-class speed.** Off-tick `.mca` Anvil pre-filter, worst tick stays at 3 ms while competitors spike past 3 seconds.
 - **Eight claim-plugin integrations bundled** (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect) - no add-ons to install.
 - **Audited safety**: no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures (REQ-RTP-S-001..S-007).
-- **Truly free.** No paywalled `/rtp`, no nag screens, no ads - only anonymous bStats usage stats (admin opt-out).
 
 On **Paper 1.21**, measured on the in-repo benchmark harness, two clients spamming `/rtp` back-to-back:
 
@@ -189,7 +192,7 @@ A lot of what people install companion plugins for is already in the free engine
 
 **Caveats.** 2 clients only (the number is a floor, not a ceiling); hardware, view distance, world state, and other plugins will move them. Paper RTP row reproduced n=2; other rows are n=1 on a single rig. Competitor plugins update frequently - corrections welcome via GitHub issue with a contradicting repro or doc link. Feature breadth, GUI, and claim-integration counts are not benchmarked; several competitors trade speed for those, which is a legitimate design choice.
 
-Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP).
+Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP). Video benchmark of `/rtp` on a custom world generator: [youtu.be/V0NyNK9JydM](https://youtu.be/V0NyNK9JydM).
 
 </details>
 
@@ -218,7 +221,7 @@ Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https:/
 <details>
 <summary><b>FAQ</b></summary>
 
-**Q: Why is this so much faster than other RTP plugins?**
+**Q: How do I stop `/rtp` from lagging my server, and why is RTP faster than other RTP plugins?**
 A: Most `/rtp` calls serve from a pre-warmed queue - chunks are already loaded and safety-checked before you type the command. Two design choices make that queue cheap to keep full: a **persistent spatial memory** per region (the plugin remembers which sectors of the world failed safety checks, so the spiral selector skips known-bad ground instead of rerolling forever), and an **off-tick async pre-filter** (Anvil region files are read directly to reject unsafe biomes/blocks *before* any chunk is loaded, so candidate verification never blocks the main thread). The pre-warmed queue is just the visible tip - the spatial memory keeps candidate selection bounded, and the async pre-filter keeps verification off the tick loop.
 
 **Q: Does it work with Iris / Terra / custom datapack generators?**
@@ -300,10 +303,11 @@ Live list: [CHANGELOG](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md
 
 ## Links
 
-- [**Admin guide**](https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md) - install, configure, command reference
-- [**Addon developer guide**](https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md) - API and examples
-- [**Changelog & roadmap**](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md)
-- [**Source on GitHub**](https://github.com/dailystruggle/RTP) - star, watch, contribute, file issues
+- [**RTP admin & configuration guide**](https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md) - install, configure, command reference
+- [**RTP addon / API developer guide**](https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md) - `rtp-api` and examples
+- [**RTP changelog & roadmap**](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md)
+- [**RTP source on GitHub**](https://github.com/dailystruggle/RTP) - star, watch, contribute, file issues
+- [**RTP-Pro (Folia, proxy, SQL/Redis)**](https://builtbybit.com/resources/rtp-pro.105418) - the high-performance paid build of this random teleport engine
 
 ---
 

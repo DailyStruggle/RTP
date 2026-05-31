@@ -88,8 +88,31 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     }
   }
 
+  /**
+   * ADR-058 — swappable region-schematic paster, mirroring {@link #setBiomeGetter}.
+   * Defaults to {@link io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster}
+   * (never {@code null}, S-006).
+   */
+  private static @NotNull io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster =
+      io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster.INSTANCE;
+
   public static void setBiomeGetter(@NotNull Function<Location, String> getBiome) {
     FoliaRTPWorld.getBiome = getBiome;
+  }
+
+  public static void setSchematicPaster(
+      @NotNull io.github.dailystruggle.rtp.api.schematic.SchematicPaster paster) {
+    FoliaRTPWorld.schematicPaster = java.util.Objects.requireNonNull(paster, "paster");
+  }
+
+  public static @NotNull io.github.dailystruggle.rtp.api.schematic.SchematicPaster
+      getSchematicPaster() {
+    return schematicPaster;
+  }
+
+  @Override
+  public io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster() {
+    return schematicPaster;
   }
 
   public static void setBiomesGetter(@NotNull Function<RTPWorld<?>, Set<String>> getBiomes) {
@@ -803,6 +826,8 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       if (radius < 0) return;
       int airHeight = safety.getNumber(SafetyKeys.platformAirHeight, 0).intValue();
       int depth = safety.getNumber(SafetyKeys.platformDepth, 0).intValue();
+      // ADR-060: optional block-restoration timeout (-1 disables, skips capture).
+      final int restoreSeconds = safety.getNumber(SafetyKeys.platformRestoreSeconds, -1).intValue();
       final Material materialFinal;
       Material material;
       try {
@@ -837,15 +862,33 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
           final int chunkMinZ = Math.max(lz - radiusFinal, cz << 4);
           final int chunkMaxZ = Math.min(lz + radiusFinal, (cz << 4) + 15);
           RTP.scheduler.runTask(this, chunkX, chunkZ, () -> {
+            java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> diff =
+                restoreSeconds >= 0 ? new java.util.ArrayList<>() : null;
             for (int x = chunkMinX; x <= chunkMaxX; x++) {
               for (int z = chunkMinZ; z <= chunkMaxZ; z++) {
                 for (int dy = -depthFinal; dy < 0; dy++) {
-                  world.getBlockAt(x, ly + dy, z).setType(materialFinal);
+                  org.bukkit.block.Block b = world.getBlockAt(x, ly + dy, z);
+                  if (diff != null) {
+                    diff.add(new io.github.dailystruggle.rtp.api.platform.BlockDelta(
+                        b.getX(), b.getY(), b.getZ(), b.getBlockData().getAsString()));
+                  }
+                  b.setType(materialFinal);
                 }
                 for (int dy = 0; dy < airHeightFinal; dy++) {
-                  world.getBlockAt(x, ly + dy, z).setType(Material.AIR);
+                  org.bukkit.block.Block b = world.getBlockAt(x, ly + dy, z);
+                  if (diff != null) {
+                    diff.add(new io.github.dailystruggle.rtp.api.platform.BlockDelta(
+                        b.getX(), b.getY(), b.getZ(), b.getBlockData().getAsString()));
+                  }
+                  b.setType(Material.AIR);
                 }
               }
+            }
+            if (diff != null && !diff.isEmpty()
+                && io.github.dailystruggle.rtp.common.platform.PlatformRestoreManager.instance != null) {
+              io.github.dailystruggle.rtp.common.platform.PlatformRestoreManager.instance.enroll(
+                  new io.github.dailystruggle.rtp.api.platform.PendingPlatformRestore(
+                      java.util.UUID.randomUUID(), name(), chunkX, chunkZ, diff, restoreSeconds));
             }
           });
         }
@@ -853,6 +896,23 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     } finally {
       if (location.getReservation() != null) location.getReservation().close();
     }
+  }
+
+  @Override
+  @RegionThread
+  public boolean restoreBlocks(
+      java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+    if (world == null || blocks == null || blocks.isEmpty()) return false;
+    for (io.github.dailystruggle.rtp.api.platform.BlockDelta delta : blocks) {
+      try {
+        org.bukkit.block.data.BlockData data = Bukkit.createBlockData(delta.token());
+        world.getBlockAt(delta.x(), delta.y(), delta.z()).setBlockData(data, false);
+      } catch (IllegalArgumentException e) {
+        RTP.log(java.util.logging.Level.WARNING,
+            "[RTP] could not decode block-state token during platform restore: " + delta.token());
+      }
+    }
+    return true;
   }
 
   @Override

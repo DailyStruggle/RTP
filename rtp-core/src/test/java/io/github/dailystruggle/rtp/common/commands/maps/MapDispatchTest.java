@@ -117,6 +117,31 @@ class MapDispatchTest {
   }
 
   @Test
+  @DisplayName("World-scan UX (ROADMAP Tier 2): REGION_BAD_LOCATIONS_SHAPE is driven live, not one-shot")
+  void badLocationsShape_bindsLive() {
+    boolean ok = MapDispatch.paint(
+        ChartSpec.of(ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE, "default"),
+        UUID.randomUUID());
+    assertTrue(ok, "paint shall return true for the bad-locations shape chart");
+    assertEquals(1, binding.allocateCalls, "allocate shall be called once");
+    assertEquals(1, binding.bindLiveCalls,
+        "REGION_BAD_LOCATIONS_SHAPE shall be bound live so the scan updates it");
+    assertEquals(0, binding.renderCalls,
+        "a live-bound chart shall not also take the one-shot renderEphemeral path");
+  }
+
+  @Test
+  @DisplayName("Non-live kinds stay one-shot: BAD_POINTS_HEATMAP uses renderEphemeral, not bindLive")
+  void badPointsHeatmap_staysEphemeral() {
+    boolean ok = MapDispatch.paint(
+        ChartSpec.of(ChartSpec.Kind.BAD_POINTS_HEATMAP, "default"),
+        UUID.randomUUID());
+    assertTrue(ok);
+    assertEquals(1, binding.renderCalls, "renderEphemeral shall be called once");
+    assertEquals(0, binding.bindLiveCalls, "BAD_POINTS_HEATMAP shall not be bound live");
+  }
+
+  @Test
   @DisplayName("Failure: NoopMapBinding active -> paint() returns false, no allocate")
   void noopBinding_returnsFalse() {
     MapDispatch.setMapBinding(new NoopMapBinding());
@@ -315,6 +340,7 @@ class MapDispatchTest {
   private static final class CountingMapBinding implements MapBinding {
     int allocateCalls = 0;
     int renderCalls = 0;
+    int bindLiveCalls = 0;
     boolean failAllocate = false;
 
     @Override
@@ -336,8 +362,20 @@ class MapDispatchTest {
     public <M extends ChartModel> Cancellation bindLive(MapHandle handle,
                                                         ChartRenderer<M> renderer,
                                                         Supplier<M> modelSupplier) {
-      throw new UnsupportedOperationException("not under test");
+      bindLiveCalls++;
+      // Pull one model the way a refresh tick would, exercising the
+      // re-runnable resolver supplier, and render it once.
+      M model = modelSupplier.get();
+      if (model != null) renderer.render(new NoopCanvas(), model);
+      return new NoopCancellation();
     }
+  }
+
+  /** Minimal in-test {@link Cancellation}; tracks a single cancel flag. */
+  private static final class NoopCancellation implements Cancellation {
+    private volatile boolean cancelled = false;
+    @Override public void cancel() { cancelled = true; }
+    @Override public boolean cancelled() { return cancelled; }
   }
 
   /** Minimal in-test canvas; commit/setPixel/etc. are no-ops. */

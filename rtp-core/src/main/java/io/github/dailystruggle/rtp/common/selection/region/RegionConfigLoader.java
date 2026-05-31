@@ -205,12 +205,20 @@ public class RegionConfigLoader {
     private static boolean getBoolean(Object o) {
         if (o instanceof Boolean) return (boolean) o;
         if (o == null) return false;
-        return Boolean.parseBoolean(o.toString());
+        // Tolerant int -> boolean coercion: any non-zero number (and the
+        // "0"/"1" string forms) maps the way a YAML author expects.
+        if (o instanceof Number) return ((Number) o).intValue() != 0;
+        String s = o.toString().trim();
+        if (s.equals("0")) return false;
+        if (s.equals("1")) return true;
+        return Boolean.parseBoolean(s);
     }
 
     private static Number getNumber(Object o) {
         if (o instanceof Number) return (Number) o;
         if (o == null) return 0;
+        // Tolerant boolean -> int coercion (true -> 1, false -> 0).
+        if (o instanceof Boolean) return ((Boolean) o) ? 1 : 0;
         try {
             return Double.parseDouble(o.toString());
         } catch (NumberFormatException e) {

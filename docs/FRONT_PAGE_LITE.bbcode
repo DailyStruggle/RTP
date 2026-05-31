@@ -1,9 +1,10 @@
 [CENTER]
 [SIZE=7][B][COLOR=#E74C3C]R[/COLOR][COLOR=#F39C12]T[/COLOR][COLOR=#27AE60]P[/COLOR][/B][/SIZE]
-[SIZE=4][B][COLOR=#7F8C8D]Deterministic, bounded-latency Random Teleport - the engine[/COLOR][/B][/SIZE]
-[I]For operators who edit YAML, version-control configs, and read profiler output.[/I]
+[SIZE=4][B][COLOR=#7F8C8D]Free Random Teleport (RTP) Plugin for Paper, Spigot & Fabric[/COLOR][/B][/SIZE]
+[I]The fastest free random teleport plugin for Paper, Spigot, and Bukkit-family servers - instant /rtp, safe random-spawn landings, no lag spikes.[/I]
+[I]Supported: Paper, Spigot, Fabric, Arclight / Mohist - Minecraft 1.20.x / 1.21.x / 26.x.[/I]
 
-[I]Send your players to a safe, random spot - fast, fair, and engineered not to lag your server.[/I]
+[I]For operators who edit YAML, version-control configs, and read profiler output. Send your players to a safe, random spot - fast, fair, and engineered not to lag your server.[/I]
 
 [SIZE=4][COLOR=#27AE60][B]100% Free.[/B][/COLOR] Same engine as the paid [URL='https://builtbybit.com/resources/rtp-pro.105418'][B]RTP-Pro[/B][/URL] build. No paywalled [I]/rtp[/I], no nag screens, no ads - just anonymous [URL='https://bstats.org/']bStats[/URL] usage stats (server-admin opt-out via [I]plugins/bStats/config.yml[/I]).[/SIZE]
 
@@ -21,7 +22,6 @@
 [*][B]Works on plain Bukkit servers at Paper-class speed.[/B] Off-tick [I].mca[/I] Anvil pre-filter, worst tick stays at 3 ms while competitors spike past 3 seconds.
 [*][B]Eight claim-plugin integrations bundled[/B] (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect) - no add-ons to install.
 [*][B]Audited safety[/B]: no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures (REQ-RTP-S-001..S-007).
-[*][B]Truly free.[/B] No paywalled [I]/rtp[/I], no nag screens, no ads - only anonymous bStats usage stats (admin opt-out).
 [/LIST]
 
 On [B]Paper 1.21[/B], measured on the in-repo benchmark harness, two clients spamming [I]/rtp[/I] back-to-back:
@@ -158,7 +158,7 @@ That's it. Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/
 
 [B]Caveats.[/B] 2 clients only (the number is a floor, not a ceiling); hardware, view distance, world state, and other plugins will move them. Paper RTP row reproduced n=2; other rows are n=1 on a single rig. Competitor plugins update frequently — corrections welcome via GitHub issue with a contradicting repro or doc link. Feature breadth, GUI, and claim-integration counts are not benchmarked; several competitors trade speed for those, which is a legitimate design choice.
 
-Full methodology, raw CSVs, per-run analyses: [URL=https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP][I]helpers/StressTestRTP/[/I][/URL].
+Full methodology, raw CSVs, per-run analyses: [URL=https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP][I]helpers/StressTestRTP/[/I][/URL]. Video benchmark of [I]/rtp[/I] on a custom world generator: [URL=https://youtu.be/V0NyNK9JydM]youtu.be/V0NyNK9JydM[/URL].
 [/SPOILER]
 
 
@@ -183,7 +183,7 @@ Full methodology, raw CSVs, per-run analyses: [URL=https://github.com/dailystrug
 [/SPOILER]
 
 [SPOILER='❓ FAQ']
-[B]Q: Why is this so much faster than other RTP plugins?[/B]
+[B]Q: How do I stop /rtp from lagging my server, and why is RTP faster than other RTP plugins?[/B]
 A: Most [I]/rtp[/I] calls serve from a pre-warmed queue — chunks are already loaded and safety-checked before you type the command. Two design choices make that queue cheap to keep full: a [B]persistent spatial memory[/B] per region (the plugin remembers which sectors of the world failed safety checks, so the spiral selector skips known-bad ground instead of rerolling forever), and an [B]off-tick async pre-filter[/B] (Anvil region files are read directly to reject unsafe biomes/blocks [I]before[/I] any chunk is loaded, so candidate verification never blocks the main thread). The pre-warmed queue is just the visible tip — the spatial memory keeps candidate selection bounded, and the async pre-filter keeps verification off the tick loop.
 
 [B]Q: Does it work with Iris / Terra / custom datapack generators?[/B]
@@ -241,10 +241,11 @@ Live list: [URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md#known
 
 [SIZE=6][B][COLOR=#7F8C8D]Links[/COLOR][/B][/SIZE]
 [LIST]
-[*][URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md'][B]Admin guide[/B][/URL] - install, configure, command reference
-[*][URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md'][B]Addon developer guide[/B][/URL] - API and examples
-[*][URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md'][B]Changelog & roadmap[/B][/URL]
-[*][URL='https://github.com/dailystruggle/RTP'][B]Source on GitHub[/B][/URL] - star, watch, contribute, file issues
+[*][URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md'][B]RTP admin & configuration guide[/B][/URL] - install, configure, command reference
+[*][URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md'][B]RTP addon / API developer guide[/B][/URL] - [I]rtp-api[/I] and examples
+[*][URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md'][B]RTP changelog & roadmap[/B][/URL]
+[*][URL='https://github.com/dailystruggle/RTP'][B]RTP source on GitHub[/B][/URL] - star, watch, contribute, file issues
+[*][URL='https://builtbybit.com/resources/rtp-pro.105418'][B]RTP-Pro (Folia, proxy, SQL/Redis)[/B][/URL] - the high-performance paid build of this random teleport engine
 [/LIST]
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]

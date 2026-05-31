@@ -48,6 +48,19 @@ pluginManagement {
 
 rootProject.name = 'RTP'
 
+// JDK-25 / unobfuscated-Loom modules can be excluded from the build graph by
+// passing `-PexcludeJdk25` (or setting the JITPACK env var). These modules
+// (effects-api-fabric-unobf, rtp-fabric-common-unobf, rtp-fabric-v26_1_R1)
+// pin a Java 25 toolchain that is unavailable on JDK-21-only build hosts such
+// as JitPack. Merely *configuring* them forces Gradle to resolve their
+// `javaCompiler` toolchain, which fails the whole build even when the
+// requested tasks (the addon-API publish closure) do not depend on them.
+// The published closure (rtp-api/rtp-core + their project deps) never depends
+// on these modules, so excluding them is safe. Keep the list in sync with
+// jitpack.yml. See docs/dev/PUBLISHING.md.
+def excludeJdk25 = startParameter.projectProperties.containsKey('excludeJdk25') ||
+        System.getenv('JITPACK') != null
+
 include 'rtp-api'
 // yaml-api -- in-house zero-dependency YAML substrate (ADR-025), extracted from
 // rtp-core so rtp-api can host the configurable selection model without a core
@@ -78,7 +91,9 @@ include 'metrics-api'
 // :rtp-fabric:rtp-fabric-common-unobf precedent. Requires JDK 25 +
 // fabric-loom 1.15+ (same toolchain as v26_1_R1). See effects-api-ADR-006
 // (amendment 2026-05-09) and rtp-fabric-ADR-009.
-include 'effects-api:effects-api-fabric-unobf'
+if (!excludeJdk25) {
+    include 'effects-api:effects-api-fabric-unobf'
+}
 include 'rtp-anvil'
 include 'rtp-tags'
 include 'rtp-core'
@@ -96,7 +111,14 @@ include 'rtp-folia:rtp-folia-v1_21_R1'
 include 'rtp-bukkit:rtp-bukkit-v26_1_R1'
 include 'rtp-paper:rtp-paper-v26_1_R1'
 include 'rtp-folia:rtp-folia-v26_1_R1'
-include 'rtp-plugin'
+// rtp-plugin is the shaded Bukkit-family aggregator. It bundles the JDK-25
+// Fabric carriers (rtp-fabric-v26_1_R1 / *-unobf / effects-api-fabric-unobf)
+// via project(...) dependencies, so it cannot be configured when those modules
+// are excluded. It is not part of the addon-API publish closure and nothing
+// depends on it, so it is dropped alongside the JDK-25 modules.
+if (!excludeJdk25) {
+    include 'rtp-plugin'
+}
 
 // Fabric platform adapter — first-class in-scope as of 2026-04-30 per ADR-022.
 // rtp-fabric-common applies fabric-loom (see its build.gradle); Loom is
@@ -120,7 +142,9 @@ include 'rtp-fabric:rtp-fabric-common'
 // constant-pool entries survive on a deobf MC 26.x runtime; consumed by
 // V26_*_R1FabricVersionAdapter via `api project(...)`. Requires JDK 25 +
 // fabric-loom 1.15+ (same toolchain as v26_1_R1).
-include 'rtp-fabric:rtp-fabric-common-unobf'
+if (!excludeJdk25) {
+    include 'rtp-fabric:rtp-fabric-common-unobf'
+}
 include 'rtp-fabric:rtp-fabric-v1_20_R1'
 include 'rtp-fabric:rtp-fabric-v1_21_R1'
 include 'rtp-fabric:rtp-fabric-v1_21_R5'
@@ -150,7 +174,9 @@ include 'rtp-fabric:rtp-fabric-v1_21_R11'
 // JDK 25 is provisioned per-subproject via Gradle's toolchain plugin --
 // the rest of the build remains on JDK 21. CI must have JDK 25 installed
 // (or `org.gradle.java.installations.auto-download=true`).
-include 'rtp-fabric:rtp-fabric-v26_1_R1'
+if (!excludeJdk25) {
+    include 'rtp-fabric:rtp-fabric-v26_1_R1'
+}
 
 // Multi-server proxy support — umbrella ADR-036 Accepted 2026-05-14.
 // Phase 1: rtp-proxy-common ships the host-independent SPI, the reference

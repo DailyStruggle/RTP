@@ -232,6 +232,7 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
             case biome, prefilterBiome -> YELLOW;
             case worldBorder -> CREAM;
             case nullChunk, ungenerated, timeout -> PaletteIndex.WHITE;
+            case uniquePlacement -> CREAM;
             case misc -> PaletteIndex.RED;
         };
     }
