@@ -183,31 +183,40 @@ reproducible by readers".
   landed (no config knob - the presence of a file is the knob):** `RegionSchematicService` resolves
   `<pluginDir>/schematics/<region>.schem` (or `.schematic`) by file presence, and
   `TeleportPipelineTask` loads/decodes it off the region thread (`runLoad`) then pastes it at
-  `BOTTOM_CENTER` on the region thread (`runTeleport`) in place of the emergency platform, falling
-  back to the platform whenever nothing is pasted (S-004); core reaches the active paster through a
-  new instance accessor `RTPWorld.schematicPaster()` (default no-op, overridden on
+  `SURFACE_CENTER` on the arrival region's owning thread (`runTeleport`, dispatched via
+  `RTP.scheduler.runTask(location, ...)` for Folia region-safety) in place of the emergency
+  platform, falling back to the platform whenever nothing is pasted (S-004); core reaches the active
+  paster through a new instance accessor `RTPWorld.schematicPaster()` (default no-op, overridden on
   `BukkitRTPWorld`/`FoliaRTPWorld`/`FabricRTPWorld`). Verified end-to-end by
-  `RegionSchematicServiceTest` against the committed `skyblock_island.schem`. **Remaining:** the
-  footprint claim check (S-003) ahead of the paste; the Folia native paster (region-thread
-  `EditSession`-free placement) and the Fabric native paster (`BlockArgumentParser` through the
-  obf/unobf carrier per
+  `RegionSchematicServiceTest` against the committed `skyblock_island.schem`. **Also landed:** the
+  Folia native paster (`BukkitSchematicPaster` installed by `AbstractFoliaServerAccessor`; the
+  support gate keys on the underlying `org.bukkit.World` so `FoliaRTPWorld` is accepted); container
+  block-entity restore (chest inventories rebuilt from the decoded `Items` NBT straight into the
+  live tile); the `SURFACE_CENTER` anchor (drops the structure to a standable surface in one pass,
+  no re-paste, keeping players inside roofed structures); and a decode cache in
+  `AbstractFileSchematicPaster` (each `.schem` decoded once, cleared on `/rtp reload`).
+  **Remaining:** the footprint claim check (S-003) ahead of the paste; the Fabric native paster
+  (`BlockArgumentParser` through the obf/unobf carrier per
   [rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md));
-  block-entity NBT reconstruction (chest contents, sign text - currently placed as empty blocks,
-  audited); and a `docs/admin/` page plus traceability rows for the paste-on-region-thread
-  regression test.
-- [ ] **Optional PvP / combat-tag check.** Optional pre-flight check that refuses (or delays) `/rtp`
-  when the requesting player has recently taken or dealt PvP damage, so players cannot `/rtp` to
-  escape mid-fight. Off by default. No ADR yet — open one before implementation per Rule D-005. New
-  `safety.yml` block (`pvp: { enabled: false, combatTagSeconds: 15, source: native|external }`) plus
-  a configurable refusal message under `messages.yml` per REQ-RTP-F-013 (routed through the locale
-  TSV pipeline); a `PvPCombatState` SPI in `rtp-api` with per-platform listeners recording "last PvP
-  damage ts" (`EntityDamageByEntityEvent` on Bukkit/Paper/Folia, equivalent event hook or mixin on
-  Fabric); a soft-depend adapter for combat-tag plugins (CombatLogX, CombatTagPlus) with a catalog
-  row in [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) per
-  [ADR-026](../adr/ADR-026-external-hook-api-surface.md); gating wired into the `/rtp` pre-dispatch
-  surface (`BukkitBaseRTPCmd` and platform peers) ahead of queue enrolment, emitting an S-004 audit
-  on refusal. Add `ReqRtp*PvP*` tests, traceability rows, and a `docs/admin/` section describing the
-  knob and the native-vs-external trade-off.
+  non-container block-entity NBT (sign text, custom data - still placed as empty blocks, audited);
+  and a `docs/admin/` page plus traceability rows for the paste-on-region-thread regression test.
+- [x] ~~**Optional PvP / combat-tag check.** Optional pre-flight check that refuses (or delays)
+  `/rtp` when the requesting player has recently taken or dealt PvP damage, so players cannot `/rtp`
+  to escape mid-fight. Off by default.~~ Delivered via
+  [ADR-055](../adr/ADR-055-pvp-combat-gate.md): a `PvPCombatStateRegistry` SPI + `PvPCombatAction`
+  in
+  `rtp-api`, the native `NativePvPCombatTracker`, and the `PvPGate` evaluator in `rtp-core`, gated
+  by
+  `safety.yml` knobs (`pvpCheckEnabled` default false, `pvpCombatTagSeconds`, `pvpOnCombat`
+  DENY/DELAY, and a combat-state source preference) and the configurable `messages.yml#pvpInCombat`
+  (locale TSV pipeline, REQ-RTP-F-013). The gate is consulted at the `/rtp` pre-dispatch surface
+  (`RTPCmd.compute`) and again in `TeleportPipelineTask` ahead of enrolment, fails open, and emits
+  an
+  S-004 audit on refusal. Soft-depend adapters for PvPManager / CombatLogX / Simple Combat Log
+  (`PvPIntegrations` + per-plugin checkers) with a catalog row in
+  [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) per
+  [ADR-026](../adr/ADR-026-external-hook-api-surface.md). Tests: `PvPGateTest`,
+  `NativePvPCombatTrackerTest`, `RTPCmdPvPGateTest`, `PvPCombatAdapterTest`.
 
 ---
 
@@ -218,9 +227,9 @@ reproducible by readers".
   publish target and write the "why this lives alone" ADR.
 - [ ] **`SECURITY.md` audit before release traffic hits.** Confirm contact address, disclosure
   window, and scope are all current.
-- [ ] **Glossary hygiene.** Once Fabric re-enters scope, audit `docs/dev/GLOSSARY.md` and the
-  Multipurpose Terms table for platform-specific terms that now need disambiguation (`Region` means
-  different things on Folia and Fabric).
+- [ ] **Glossary hygiene.** Now that Fabric is an in-scope, supported platform (see 1.D), audit
+  `docs/dev/GLOSSARY.md` and the Multipurpose Terms table for platform-specific terms that now need
+  disambiguation (`Region` means different things on Folia and Fabric).
 - [ ] **`README.md` shapes section refresh.** The `user-images.githubusercontent.com` URLs for the
   shape-distribution plots are pinned to a legacy account hash; re-host in the repo's own
   `docs/img/` to survive future GitHub UI changes.
@@ -240,4 +249,5 @@ reproducible by readers".
   explicitly declined with a one-line rationale.
 - This file is the only TODO source of truth for release planning. Do not duplicate it into
   CHANGELOG or per-module requirements.
+
 
