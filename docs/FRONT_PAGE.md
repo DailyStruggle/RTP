@@ -191,10 +191,11 @@ LeafRTP-Pro plots your world's geometry as it evaluates candidates. When it hits
 <details>
 <summary><b>safety.yml token grammar - Pro exclusive</b></summary>
 
-`safety.yml` has a first-class token grammar. Five shapes can be mixed freely in `unsafeBlocks` and `airBlocks`:
+`safety.yml` has a first-class token grammar. Six shapes can be mixed freely in `unsafeBlocks` and `airBlocks`:
 
 - **Plain material:** `LAVA`, `MAGMA_BLOCK`.
 - **Material + state predicate:** `OAK_SLAB[waterlogged=true]`. Multiple predicates AND together: `OAK_SLAB[waterlogged=true,type=top]`.
+- **Numeric range predicate:** `WATER[level>=5]`, `LIGHT[level<8]`. Operators `>=` / `<=` / `>` / `<` bound fluid levels, light levels, and any integer block-state property; fail-open on an absent or non-numeric value.
 - **Vanilla block tag:** `#minecraft:leaves`, `#minecraft:fire`, `#minecraft:campfires`. Live-registry expansion at config-load lands in `3.0.0` final - use explicit names alongside tag tokens during the beta.
 - **Tag + state predicate:** `#minecraft:slabs[waterlogged=true]` - "any slab, but only when waterlogged".
 - **Wildcard + state predicate:** `*[waterlogged=true]` - "any block, matched when waterlogged". One line replaces the entire waterloggable enumeration.
@@ -216,7 +217,7 @@ LeafRTP-Pro plots your world's geometry as it evaluates candidates. When it hits
 **Engine:**
 
 - Any number of teleport regions per world; per-region shape (Square, Circle, Rectangle), radius, center, curve weighting, vertical bounds, world override, permission gates.
-- Vertical adjustors (Linear, Jump) for sky islands, void worlds, Nether ceilings.
+- Vertical adjustors (Linear, Jump, Fixed) for sky islands, void worlds, Nether ceilings.
 - Multi-dimensional (Overworld, Nether, End, custom).
 - Hot-reloadable YAML; clickable `/rtp menu` (book on Paper / Folia, chat-paginated fallback elsewhere) hardened in 3.0.0-beta.3, with `/rtp config <file> view` as a per-file deep-link.
 - Fully async chunk loading on Paper / Folia; off-tick Anvil pre-filter on Spigot.
@@ -230,6 +231,7 @@ LeafRTP-Pro plots your world's geometry as it evaluates candidates. When it hits
 - Configurable countdown/warmup messages during pre-teleport.
 - Particles, sounds, fireworks, potions, note-block effects via `effects-api`, attached to lifecycle phases, gated by `rtp.effects.<name>` permissions.
 - Movement-cancel, damage-cancel, invulnerability-after-teleport timers.
+- **Optional PvP / combat-tag gate.** Off by default; when enabled, `/rtp` is refused or delayed for players who recently dealt or took PvP damage, so a teleport can't be used to escape a fight. Native combat tracking works out of the box, with optional PvPManager / CombatLogX / Simple Combat Log integration; the refusal message is fully localizable (`messages.yml`).
 - Optional landing platform with configurable material and decay timer.
 - **Per-region arrival schematics.** Drop a `.schem` named after a region into `plugins/RTP/schematics/` (e.g. `schematics/default.schem`) and every teleport into that region pastes it - a lobby pad, arrival shrine, or custom platform - centered on the landing spot. Cross-platform Sponge `.schem`, decoded in-house (no WorldEdit required), claim-aware (never overwrites protected land) and audited; the bundled Skyblock prefab ships one ready to go.
 - PlaceholderAPI: queue depth (total/public/personal), last-teleport coordinates, player status.

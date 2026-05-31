@@ -93,6 +93,7 @@ Tune `plugins/RTP/config.yml` and `plugins/RTP/regions/*.yml` later - via `/rtp 
 - **Spatial memory that persists across restarts** - LeafRTP *learns* which sectors keep failing and stops trying them.
 - Most `/rtp` calls serve instantly from a **pre-generated location queue** - destinations are chunk-loaded and verified before you type the command.
 - **Safety pipeline** - radius check, invulnerability timer, optional landing platform, movement / damage cancel timers, material allow/deny list.
+- **Optional PvP / combat-tag gate** - off by default; when enabled, `/rtp` is refused or delayed for players who recently dealt or took PvP damage, so a teleport can't be used to escape a fight. Native combat tracking, with optional PvPManager / CombatLogX / Simple Combat Log integration.
 - **Per-region arrival schematics** - drop a `.schem` named after a region into `plugins/RTP/schematics/` and every teleport into that region pastes it (a lobby pad, arrival shrine, or custom platform) on the landing spot. Cross-platform Sponge `.schem`, decoded in-house (no WorldEdit required), claim-aware and audited.
 - **Per-region, per-world config** - shapes (square / circle / rectangle), curve weighting, vertical adjustors, sky-light check, world overrides, hot-reloadable YAML.
 - **Effects on every lifecycle phase** - particles, sounds, fireworks, potion, note effects via the in-tree `effects-api`, gated by `rtp.effects.<name>` permissions.
@@ -272,7 +273,6 @@ Live list: [CHANGELOG](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md
 <details>
 <summary><b>TODO list</b></summary>
 
-- pvp detection outside of damage detection
 - more book menus
 - more charts
 - better polygon shape setup

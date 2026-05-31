@@ -1,10 +1,10 @@
 [CENTER]
 [SIZE=7][B][COLOR=#E74C3C]R[/COLOR][COLOR=#F39C12]T[/COLOR][COLOR=#27AE60]P[/COLOR][/B][/SIZE]
 [SIZE=4][B][COLOR=#7F8C8D]Free Random Teleport (RTP) Plugin for Paper, Spigot & Fabric[/COLOR][/B][/SIZE]
+[SIZE=3][B][COLOR=#7F8C8D]Deterministic, bounded-latency random teleport (/rtp or /wild) engine[/COLOR][/B][/SIZE]
 [I]The fastest free random teleport plugin for Paper, Spigot, and Bukkit-family servers - instant /rtp and safe random-spawn landings, with no lag spikes under load.[/I]
-[I]Supported: Paper, Spigot, Fabric, Arclight / Mohist - Minecraft 1.20.x / 1.21.x / 26.x.[/I]
 
-[I]For operators who edit YAML, version-control configs, and read profiler output. Send your players to a safe, random spot, engineered not to lag your server.[/I]
+[I]Supported: Paper, Spigot, Fabric, Arclight / Mohist - Minecraft 1.20.x / 1.21.x / 26.x. Send your players to a safe, random spot, engineered to maintain 20.0 TPS without lag spikes.[/I]
 
 [SIZE=4][COLOR=#27AE60][B]100% Free.[/B][/COLOR] Same engine as the paid [URL='https://builtbybit.com/resources/rtp-pro.105418'][B]LeafRTP-Pro[/B][/URL] build. No paywalled [I]/rtp[/I] or nag screens, and no ads - just anonymous [URL='https://bstats.org/']bStats[/URL] usage stats (server-admin opt-out via [I]plugins/bStats/config.yml[/I]).[/SIZE]
 
@@ -80,6 +80,7 @@ Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/I] later - 
 [*]🧠 [B]Spatial memory that persists across restarts[/B] — LeafRTP [I]learns[/I] which sectors keep failing and stops trying them.
 [*]⏱️ Most [I]/rtp[/I] calls serve instantly from a [B]pre-generated location queue[/B] — destinations are chunk-loaded and verified before you type the command.
 [*]🛡️ [B]Safety pipeline[/B] — radius check, invulnerability timer, optional landing platform, movement / damage cancel timers, material allow/deny list.
+[*][B]Optional PvP / combat-tag gate[/B] - off by default; when enabled, /rtp is refused or delayed for players who recently dealt or took PvP damage, so a teleport can't be used to escape a fight. Native combat tracking, with optional PvPManager / CombatLogX / Simple Combat Log integration.
 [*]🏛️ [B]Per-region arrival schematics[/B] — drop a [I].schem[/I] named after a region into [I]plugins/RTP/schematics/[/I] and every teleport into that region pastes it (a lobby pad, arrival shrine, or custom platform) on the landing spot. Cross-platform Sponge [I].schem[/I], decoded in-house (no WorldEdit required), claim-aware and audited.
 [*]🌍 [B]Per-region, per-world config[/B] — shapes (square / circle / rectangle), curve weighting, vertical adjustors, sky-light check, world overrides, hot-reloadable YAML.
 [*]✨ [B]Effects on every lifecycle phase[/B] — particles, sounds, fireworks, potion, note effects via the in-tree [I]effects-api[/I], gated by [I]rtp.effects.<name>[/I] permissions.
@@ -104,7 +105,7 @@ Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/I] later - 
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
-[SPOILER='📊 Full benchmark vs. 4 alternative random teleport plugins on Paper, Spigot, and Folia']
+[SPOILER='📊 Full benchmark vs. alternative random teleport plugins on Paper, Spigot, and Folia']
 [I]2 OPed real clients spamming [I]/rtp[/I] back-to-back, queues enabled where the plugin offers them, cooldowns/delays zeroed. LeafRTP and LeafRTP-Pro share the same engine on Spigot/Paper; only the Folia adapter differs.[/I]
 
 [B]Confidence legend:[/B] 🧪 = measured locally · 📖 = read from plugin docs · ❓ = inferred from architecture.
@@ -197,7 +198,7 @@ A: Same engine, same source tree. [B]LeafRTP-Pro[/B] adds the Folia adapter, mul
 A: Run [B]Arclight[/B] or [B]Mohist[/B] (officially supported) and use this jar. A native Forge adapter is not planned.
 
 [B]Q: Memory and MSPT — should I worry?[/B]
-A: LeafRTP trades a bounded amount of RAM (the queue, bounded by cacheCap) for speed. TPS should not drop below ~19 from LeafRTP alone on a healthy server; MSPT spikes during new-area generation are expected — that's the cost of generating chunks, not RTP.
+A: LeafRTP trades a bounded amount of RAM (the queue, bounded by [I]cacheCap[/I]) for speed. TPS should not drop below ~19 from LeafRTP alone on a healthy server; MSPT spikes during new-area generation are expected — that's the cost of generating chunks, not RTP.
 
 [B]Q: How do I report a bug?[/B]
 A: GitHub issue with server version, LeafRTP version, platform, relevant config files, and the error log section. See the [URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md']admin guide[/URL] for the full reproduction template.
@@ -223,6 +224,21 @@ Support for the free build is [B]community-tier and best-effort[/B] — a solo m
 [*]Emergency landing platform default is now [I]platformRadius: -1[/I] (disabled). Set to [I]0[/I] or higher to restore legacy 2.x behavior.
 [/LIST]
 Live list: [URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md#known-issues']CHANGELOG[/URL].
+[/SPOILER]
+
+[SPOILER='TODO list']
+[LIST]
+[*]more book menus
+[*]more charts
+[*]better polygon shape setup
+[*]finish translating
+[*]verify against modded data
+[*]neoforge support
+[*]drop 1.20.1 due to performance issues, favor 1.21-26.2 when it comes out
+[*]create support mechanisms for transferring from other plugins
+[*]steady-state and burst usage statistics for admins
+[*]biome and player analytics for world builders
+[/LIST]
 [/SPOILER]
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
