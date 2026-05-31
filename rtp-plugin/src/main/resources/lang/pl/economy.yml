@@ -1,5 +1,5 @@
 # --- RTP Economy Settings ---
-# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/ECONOMY.md
+# Documentation: plugins/RTP/docs/admin/ECONOMY.md
 # Refund the deducted cost if the teleport is cancelled (move during
 # teleportDelay, pipeline failure, etc.).
 # @type: boolean

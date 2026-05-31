@@ -87,6 +87,9 @@ comandoConsolaNoPermitido: "&c[P0] Debes ser un jugador en el juego para ejecuta
 # busy y invalidCommand no se traducen en messages.lang.yml -> se usan las claves en inglés (fallback al baseline).
 busy: "&c[P0] ocupado"
 
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] You cannot random-teleport while in combat."
+
 # plugin doesn't have the subcommand or parameter the user requested
 # placeholder: [arg] - the argument attempted
 invalidCommand: "&c[P0] comando no válido - [arg]"

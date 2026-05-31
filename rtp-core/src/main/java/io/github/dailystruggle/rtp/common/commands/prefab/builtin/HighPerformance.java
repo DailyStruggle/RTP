@@ -23,6 +23,7 @@ public final class HighPerformance {
                     "loginCacheEnabled", true,
                     "postTeleportQueueing", true
             ),
+            Map.of(),
             Map.of("default", Map.of(
                     "cacheCap", 200,
                     "activeChunkCap", 40

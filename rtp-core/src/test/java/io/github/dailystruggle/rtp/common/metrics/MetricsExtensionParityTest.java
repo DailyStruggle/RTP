@@ -3,7 +3,9 @@ package io.github.dailystruggle.rtp.common.metrics;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.metrics.api.Metrics;
 import io.github.dailystruggle.metrics.api.MetricsExtension;
+import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,6 +28,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * <p>See {@code metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md}.
  */
 class MetricsExtensionParityTest {
+
+    /**
+     * {@link MemoryTracker} is a process-wide static whose entry count flows into
+     * {@code RTPMetricsExtension.memoryTrackerEntries}. Earlier tests in the shared
+     * JVM can leave tracked entries behind, so reset to a known-empty state before
+     * each parity assertion that expects an absolute zero count.
+     */
+    @BeforeEach
+    void clearMemoryTracker() {
+        MemoryTracker.reset();
+    }
 
     @Test
     void noopAttachesZeroRtpExtension() {

@@ -86,6 +86,9 @@
 # busy 와 invalidCommand 는 messages.lang.yml 에서 번역되지 않음 -> 영어 키 이름 (영어 기준선으로 폴백).
 busy: "&c[P0] 처리 중"
 
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] You cannot random-teleport while in combat."
+
 # plugin doesn't have the subcommand or parameter the user requested
 # placeholder: [arg] - the argument attempted
 invalidCommand: "&c[P0] 잘못된 명령어 - [arg]"

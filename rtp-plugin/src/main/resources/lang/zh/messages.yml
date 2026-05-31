@@ -86,6 +86,9 @@
 # busy 与 invalidCommand 未在 messages.lang.yml 中翻译 -> 使用英文键名（回退到基础英文）。
 繁忙: "&c[P0] 忙"
 
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] You cannot random-teleport while in combat."
+
 # plugin doesn't have the subcommand or parameter the user requested
 # placeholder: [arg] - the argument attempted
 无效命令: "&c[P0] 无效命令 - [arg]"

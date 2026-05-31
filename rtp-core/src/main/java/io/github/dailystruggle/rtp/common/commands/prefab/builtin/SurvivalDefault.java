@@ -21,6 +21,7 @@ public final class SurvivalDefault {
             "Reset to the shipped defaults (identity overlay).",
             Map.of(),
             Map.of(),
+            Map.of(),
             false
     );
 

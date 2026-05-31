@@ -111,6 +111,17 @@ public class MemoryTracker {
   }
 
   /**
+   * Clears every tracked entry. Intended for test isolation only: the tracker
+   * is a process-wide static, so a unit test that asserts an absolute
+   * {@code trackedCount()} (e.g. metrics-snapshot parity) must start from a
+   * known-empty state rather than inherit entries leaked by earlier tests in
+   * the same JVM. Not for production decision-making.
+   */
+  public static void reset() {
+    trackedObjects.clear();
+  }
+
+  /**
    * Returns the count of tracked entries whose label equals {@code label}.
    * Used by {@code rtp test chunk-ticket} to isolate its own sentinels from
    * any unrelated live teleport activity on the server.

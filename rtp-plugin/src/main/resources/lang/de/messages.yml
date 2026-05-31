@@ -94,6 +94,9 @@ konsolenBefehlNichtErlaubt: "&c[P0] Du musst ein Spieler im Spiel sein, um diese
 # das Plugin ist mit dem Neuladen beschäftigt
 beschaeftigt: "&c[P0] beschäftigt"
 
+# Wird gesendet, wenn die optionale PvP-Kampfprüfung /rtp ablehnt, weil sich der Spieler im Kampf befindet
+pvpImKampf: "&c[P0] Du kannst dich im Kampf nicht zufällig teleportieren."
+
 # das Plugin kennt den vom Benutzer angeforderten Unterbefehl oder Parameter nicht
 # Platzhalter: [arg] - das versuchte Argument
 ungueltigerBefehl: "&c[P0] ungültiger Befehl - [arg]"

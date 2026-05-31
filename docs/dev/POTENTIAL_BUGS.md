@@ -37,14 +37,6 @@ Append to the *Open* section below using the template. Keep entries short — on
 
 ## Open
 
-### 2026-05-30 - `RegionCacheKeyTest.allowlist_covers_every_enum_constant` fails: six new `pvp*` SafetyKeys constants are unclassified
-
-- **Discovered during:** ADR-058 (region-schematic SPI) implementation full build. The `:rtp-core:test` task fails on this single test; my change touches only `rtp-api` schematic types + world-adapter getters + docs and cannot affect `SafetyKeys`.
-- **Location:** `rtp-core/src/test/java/io/github/dailystruggle/rtp/common/selection/region/RegionCacheKeyTest.java` `allowlist_covers_every_enum_constant` (line ~188); enum at `rtp-core/.../configuration/enums/SafetyKeys.java`.
-- **Symptom / hypothesis:** The committed `SafetyKeys` enum now carries the in-progress PvP combat-tag constants `pvpCheckEnabled`, `pvpCombatTagSeconds`, `pvpOnCombat`, `pvpSource`, `pvpTagVictim`, `pvpTagAggressor` (ROADMAP Tier 2 "Optional PvP / combat-tag check"), but the test's `included` / `excluded` `EnumSet`s were not updated, so all six are "unclassified" and the guard correctly fails.
-- **Impact:** Red `:rtp-core:test` / full build on the committed baseline, independent of this task. No runtime defect — the guard is a maintenance tripwire by design.
-- **Suggested next step:** As part of the PvP combat-tag feature, classify each `pvp*` key into the test's `included` (cache-invalidating) or `excluded` (cache-stable) set — these are pre-flight gate knobs that do not change which destinations are "bad", so they almost certainly belong in `excluded`. Confirm against `RegionCacheKey.SAFETY_HASH_KEYS` and add to the test's lists accordingly.
-
 ### 2026-05-24 - `BukkitRTPWorld.getBiomes(world)` / `FoliaRTPWorld.getBiomes(world)` return empty set when the platform setter is null-returning instead of falling back to the world enumeration
 
 - **Discovered during:** /rtp biome=minecraft:BADLANDS namespace-parity fix (this session). User flagged the empty-set fallback explicitly.

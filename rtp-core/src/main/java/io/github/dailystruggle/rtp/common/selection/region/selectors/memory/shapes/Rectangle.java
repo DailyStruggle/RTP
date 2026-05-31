@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.CoordinateParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;

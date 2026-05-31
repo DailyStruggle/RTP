@@ -73,12 +73,12 @@ jobs:
       - name: Locate lite jar
         id: artifact
         run: |
-          # ADR-024: the lite artifact is the unclassified `RTP-<version>.jar`
+          # ADR-024: the lite artifact is the unclassified `LeafRTP-<version>.jar`
           # produced by `remapLiteJar` in rtp-plugin/build/libs/. The
           # classified `*-dev.jar` is the pre-remap intermediate and is NOT
           # the release artifact.
-          LITE_JAR=$(find rtp-plugin/build/libs -maxdepth 1 -type f -name 'RTP-*.jar' \
-            ! -name 'RTP-Pro-*' ! -name '*-dev.jar' ! -name '*-sources.jar' \
+          LITE_JAR=$(find rtp-plugin/build/libs -maxdepth 1 -type f -name 'LeafRTP-*.jar' \
+            ! -name 'LeafRTP-Pro-*' ! -name '*-dev.jar' ! -name '*-sources.jar' \
             ! -name '*-javadoc.jar' | head -n 1)
           if [ -z "$LITE_JAR" ]; then
             echo "::error::Could not locate the lite jar under rtp-plugin/build/libs/"

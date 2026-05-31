@@ -1,5 +1,5 @@
 # --- RTP Leistungseinstellungen ---
-# Dokumentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/PERFORMANCE.md
+# Dokumentation: plugins/RTP/docs/admin/PERFORMANCE.md
 # Maximale Suchversuche pro /rtp-Aufruf, bevor aufgegeben wird.
 # @type: integer
 # @range: [1, null]

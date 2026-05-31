@@ -18,6 +18,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tools.SupportLogger;
+import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 
 import java.util.ArrayList;
@@ -110,6 +111,26 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private java.util.concurrent.CompletableFuture<
       io.github.dailystruggle.rtp.api.schematic.LoadedSchematic> schematicLoad;
   private io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster;
+  /**
+   * ADR-058 / S-004 — the schematic source resolved for this teleport, kept so {@link #runTeleport}
+   * can emit an operator-visible WARNING if a region had a schematic file on disk but it never
+   * reached a successful paste (decode failure, no paster, or zero placed blocks). Stays
+   * {@code null} when no {@code schematics/<region>.schem} file exists (the silent, expected case).
+   */
+  private io.github.dailystruggle.rtp.api.schematic.SchematicSource schematicSource;
+
+  /**
+   * ADR-026 / ADR-058 — addon-bound arrival platform creator (the {@code RTPHooks#platformCreator()}
+   * registry). Resolved once in {@link #runLoad} (off the region thread) so its two-phase
+   * contract can run its blocking {@link io.github.dailystruggle.rtp.api.platform.PlatformCreator#prepare}
+   * phase off-thread; the resulting handle is consumed by
+   * {@link io.github.dailystruggle.rtp.api.platform.PlatformCreator#createPlatform(RTPLocation, Object)}
+   * on the region thread in {@link #buildArrivalPlatform}. Both stay {@code null} when no creator
+   * is bound. This is the same two-phase shape the region schematic uses — a {@code SchematicPaster}
+   * is no longer special-cased at the dispatch site.
+   */
+  private io.github.dailystruggle.rtp.api.platform.PlatformCreator platformCreator;
+  private java.util.concurrent.CompletableFuture<?> platformPrepare;
 
   public TeleportPipelineTask(GenerationContext context) {
     this.context = context;
@@ -406,20 +427,73 @@ public final class TeleportPipelineTask extends RTPRunnable {
         try {
           RTPWorld<?> schemWorld = RTP.serverAccessor.getRTPWorld(coords.worldName());
           if (schemWorld == null) schemWorld = region.getWorld();
-          if (schemWorld != null) {
-            io.github.dailystruggle.rtp.api.schematic.SchematicSource src =
-                RegionSchematicService.resolveSource(region.name);
-            if (src != null) {
-              io.github.dailystruggle.rtp.api.schematic.SchematicPaster paster =
-                  schemWorld.schematicPaster();
-              if (paster != null && paster.supports(src)) {
-                schematicPaster = paster;
-                schematicLoad = paster.load(src);
+          io.github.dailystruggle.rtp.api.schematic.SchematicSource src =
+              (schemWorld != null) ? RegionSchematicService.resolveSource(region.name) : null;
+          if (src != null) {
+            // A schematic file exists for this region: from here on, any failure to actually
+            // paste it is operator-relevant and must be logged (S-004), not silently dropped.
+            schematicSource = src;
+            io.github.dailystruggle.rtp.api.schematic.SchematicPaster paster =
+                schemWorld.schematicPaster();
+            if (paster == null
+                || paster instanceof io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster) {
+              RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' resolved to '"
+                  + src.path() + "' but no schematic paster is installed on this platform "
+                  + "(" + (paster == null ? "null" : paster.getClass().getSimpleName())
+                  + "); falling back to default platform (S-004).");
+            } else if (!paster.supports(src)) {
+              RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' file '"
+                  + src.path() + "' (format '" + src.formatHint() + "') is not supported by "
+                  + paster.getClass().getSimpleName() + "; falling back to default platform (S-004).");
+            } else {
+              schematicPaster = paster;
+              schematicLoad = paster.load(src);
+              // load() never throws (it returns a null-completed future on decode failure),
+              // so detect that here and surface it; the underlying cause is logged by the
+              // paster's load() implementation.
+              if (schematicLoad != null && schematicLoad.isDone()
+                  && schematicLoad.join() == null) {
+                RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' file '"
+                    + src.path() + "' failed to decode; falling back to default platform "
+                    + "(S-004). See the preceding schematic-decode log line for the cause.");
+              } else {
+                RTP.log(Level.FINE, "[PIPELINE_TRACE] runLoad resolved region schematic '"
+                    + region.name + "' from '" + src.path() + "'");
               }
             }
           }
         } catch (Exception e) {
-          SupportLogger.logException(Level.FINE, "region schematic load dispatch failed", e);
+          SupportLogger.logException(Level.WARNING,
+              "region schematic load dispatch failed for region '" + region.name + "'", e);
+        }
+      }
+
+      // ADR-026 — addon-bound arrival platform creator. Resolve it here, on the load (non-region)
+      // thread, and kick off its blocking prepare() phase off-thread so the region-thread paste in
+      // buildArrivalPlatform only has to write blocks (S-005). A bound SchematicPaster is driven
+      // through this same two-phase path — it is no longer special-cased at the dispatch site; its
+      // default prepare()/createPlatform() decline gracefully when no source applies.
+      if (platformCreator == null) {
+        try {
+          platformCreator = io.github.dailystruggle.rtp.api.RTPAPI.hooks().platformCreator().current();
+        } catch (IllegalStateException ignored) {
+          // Hooks facade not loaded yet (REQ-RTP-S-006): no creator, use the default platform.
+        } catch (Exception e) {
+          SupportLogger.logException(Level.WARNING, "platform creator resolution failed", e);
+        }
+        if (platformCreator != null) {
+          try {
+            RTPWorld<?> platWorld = RTP.serverAccessor.getRTPWorld(coords.worldName());
+            if (platWorld == null) platWorld = region.getWorld();
+            RTPLocation platAt =
+                new RTPLocation(platWorld, coords.x(), coords.y(), coords.z());
+            platformPrepare = platformCreator.prepare(platAt);
+          } catch (Exception e) {
+            SupportLogger.logException(Level.WARNING, "platform creator '"
+                + platformCreator.creatorName() + "' prepare() dispatch failed; "
+                + "falling back to default platform (S-004)", e);
+            platformPrepare = null;
+          }
         }
       }
 
@@ -497,6 +571,43 @@ public final class TeleportPipelineTask extends RTPRunnable {
     }
     UUID playerId = player.uuid();
 
+    // --- Optional PvP / combat-tag execution prefilter (ADR-055) -------------
+    // Re-consult the combat authority immediately before the chosen destination
+    // is applied. A player who entered combat after the request was enrolled (or
+    // who was waiting in a queue) must not be teleported out of a fight, so the
+    // pre-dispatch check in RTPCmd is not sufficient on its own. No-op when the
+    // gate is disabled (pvpCheckEnabled=false, the default) or the player is not
+    // in combat. At this surface there is an in-progress teleport, so any
+    // non-ALLOW action (DENY / DELAY / CANCEL) collapses to "do not apply this
+    // destination": abort to CLEANUP, surface the configurable pvpInCombat
+    // message, and audit at WARNING (REQ-RTP-S-004: never a silent discard).
+    // The gate fails open (PvPGate guards its own provider call), and the call
+    // site is guarded too, so a broken integration never blocks a teleport.
+    io.github.dailystruggle.rtp.api.hooks.PvPCombatAction pvpAction;
+    try {
+      pvpAction = io.github.dailystruggle.rtp.common.pvp.PvPGate.evaluate(playerId);
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP] PvP gate evaluation threw at execution prefilter; allowing teleport", t);
+      pvpAction = io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW;
+    }
+    if (pvpAction != io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW) {
+      RTP.serverAccessor.sendMessage(playerId, MessagesKeys.pvpInCombat);
+      // S-004: the abort is never silent.
+      RTP.log(Level.WARNING, "[RTP] PvP gate aborted teleport at execution prefilter for "
+          + playerId + " (action=" + pvpAction + ", in combat)");
+      RTP.getInstance().processingPlayers.remove(playerId);
+      currentPhase = Phase.CLEANUP;
+      runCleanup();
+      return;
+    } else if (io.github.dailystruggle.rtp.common.pvp.PvPGate.isEnabled()
+        && io.github.dailystruggle.rtp.common.pvp.PvPGate.isInCombat(playerId)) {
+      // ALLOW-and-audit: operator wants visibility without changing behaviour.
+      RTP.log(Level.INFO, "[RTP] PvP gate: " + playerId
+          + " is in combat at execution but pvpOnCombat=ALLOW; permitting teleport");
+    }
+    // --- end PvP execution prefilter -----------------------------------------
+
     try {
       RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
       if (world == null) world = region.getWorld();
@@ -513,28 +624,79 @@ public final class TeleportPipelineTask extends RTPRunnable {
       // player never lands without footing.
       boolean pastedSchematic = false;
       io.github.dailystruggle.rtp.api.schematic.LoadedSchematic loadedSchematic =
-          (schematicLoad != null) ? schematicLoad.getNow(null) : null;
+          (schematicLoad != null && schematicLoad.isDone()) ? schematicLoad.join() : null;
+      // S-004 — a region with a schematic file on disk that nonetheless reaches this point
+      // with nothing loaded must not fall through to the platform silently: tell the operator
+      // why the island/structure they configured did not appear.
+      if (loadedSchematic == null && schematicSource != null) {
+        RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' file '"
+            + schematicSource.path() + "' was present but produced no loaded schematic ("
+            + (schematicLoad == null ? "resolution/support failed in runLoad"
+                : (!schematicLoad.isDone() ? "decode still pending at paste time"
+                    : "decode returned no data"))
+            + "); falling back to default platform (S-004).");
+      }
       if (loadedSchematic != null && schematicPaster != null) {
-        try {
-          io.github.dailystruggle.rtp.api.schematic.PasteResult pasteResult =
-              schematicPaster.paste(loadedSchematic, location,
-                  io.github.dailystruggle.rtp.api.schematic.PasteOptions.defaults());
-          if (pasteResult != null && pasteResult.placed()) {
-            pastedSchematic = true;
-            RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport pasted region schematic '"
-                + region.name + "'");
-          } else {
+        // Folia threading rule (and ADR-058): schematic block writes must run on the region
+        // that owns the *destination* chunk(s), not on whatever scheduler thread invoked
+        // runTeleport (typically the player's current entity-region thread). Pasting directly
+        // here throws Folia's "Cannot read world asynchronously" TickThread check whenever the
+        // destination region differs from the player's current region. Bounce the paste — and
+        // its platform fallback — to the destination region via RTP.scheduler.runTask(location).
+        // On non-Folia platforms this dispatches to the main thread / runs inline.
+        final io.github.dailystruggle.rtp.api.schematic.LoadedSchematic loadedFinal =
+            loadedSchematic;
+        final RTPLocation locFinal = location;
+        final boolean buildPlatformFinal = buildPlatform;
+        final String worldNameFinal = coords.worldName();
+        pastedSchematic = true; // platform fallback is handled inside the region task below
+        RTP.scheduler.runTask(locFinal, () -> {
+          boolean pasted = false;
+          // ADR-058 — anchor SURFACE_CENTER (not the BOTTOM_CENTER default): the schematic is
+          // dropped so the player lands on a standable floor in its center column instead of
+          // being buried under blocks pasted around their feet. The drop is computed from the
+          // schematic data in one pass, so the arrival point is standable without re-pasting.
+          io.github.dailystruggle.rtp.api.schematic.PasteOptions pasteOptions =
+              new io.github.dailystruggle.rtp.api.schematic.PasteOptions(
+                  io.github.dailystruggle.rtp.api.schematic.PasteAnchor.SURFACE_CENTER,
+                  false, true);
+          // ADR-058 / REQ-RTP-S-003 — footprint claim check. Before writing any block, verify
+          // the schematic's horizontal footprint against the GlobalRegionVerifiers registry (the
+          // sanctioned claim/protection mechanism — never an inline claim-plugin call). If any
+          // footprint cell intersects protected land, the paste is suppressed and the default
+          // platform path runs instead, so the paste never overwrites a claim.
+          if (pasteOptions.claimAware()
+              && !schematicFootprintClear(loadedFinal, locFinal, pasteOptions, worldNameFinal)) {
             RTP.log(Level.INFO, "[RTP] region schematic '" + region.name
-                + "' not pasted (" + pasteResult + "); falling back to default platform (S-004).");
+                + "' footprint intersects a claim; paste suppressed (S-003), falling back to "
+                + "default platform.");
+          } else {
+            try {
+              io.github.dailystruggle.rtp.api.schematic.PasteResult pasteResult =
+                  schematicPaster.paste(loadedFinal, locFinal, pasteOptions);
+              if (pasteResult != null && pasteResult.placed()) {
+                pasted = true;
+                RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport pasted region schematic '"
+                    + region.name + "'");
+              } else {
+                RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name
+                    + "' not pasted (" + pasteResult + "); falling back to default platform "
+                    + "(S-004). See the preceding schematic-paste log line for the per-block "
+                    + "cause.");
+              }
+            } catch (Exception e) {
+              SupportLogger.logException(Level.WARNING,
+                  "region schematic paste failed for '" + region.name + "'", e);
+            }
           }
-        } catch (Exception e) {
-          SupportLogger.logException(Level.WARNING,
-              "region schematic paste failed for '" + region.name + "'", e);
-        }
+          if (!pasted && buildPlatformFinal) {
+            buildArrivalPlatform(locFinal);
+          }
+        });
       }
 
       if (!pastedSchematic && buildPlatform) {
-        location.world().platform(location);
+        buildArrivalPlatform(location);
       }
       RTP.getInstance().invulnerablePlayers.put(playerId, System.currentTimeMillis());
 
@@ -698,6 +860,113 @@ public final class TeleportPipelineTask extends RTPRunnable {
       SupportLogger.logException(Level.FINE, "shouldBuildPlatform evaluation failed", e);
       return false;
     }
+  }
+
+  /**
+   * Build the arrival platform at {@code at}, preferring the addon-bound
+   * {@link io.github.dailystruggle.rtp.api.platform.PlatformCreator} (ADR-026/ADR-058) resolved
+   * in {@link #runLoad} over the built-in emergency block disc.
+   *
+   * <p>The creator is driven through its uniform two-phase contract: the blocking
+   * {@link io.github.dailystruggle.rtp.api.platform.PlatformCreator#prepare prepare} phase
+   * already ran off-thread in {@code runLoad} (its handle is {@link #platformPrepare}); here, on
+   * the region-owning thread, only
+   * {@link io.github.dailystruggle.rtp.api.platform.PlatformCreator#createPlatform(RTPLocation, Object)}
+   * runs. A {@code SchematicPaster} is no longer special-cased — it is just a creator whose
+   * default two-phase methods decline when no region source applies. Any failure is logged and
+   * falls back to the default platform; the creator is never allowed to abort the teleport
+   * (S-004).
+   *
+   * <p>Invoked on the region-owning thread, mirroring the platform write it replaces.
+   */
+  private void buildArrivalPlatform(RTPLocation at) {
+    if (at == null || at.world() == null) return;
+    if (platformCreator != null) {
+      boolean built;
+      try {
+        // The prepare() future was kicked off off-thread in runLoad; join its handle only if it
+        // has already completed so the region thread never blocks (S-005). A still-pending or
+        // failed prepare yields a null handle, which a well-behaved creator treats as "decline".
+        Object prepared =
+            (platformPrepare != null && platformPrepare.isDone()) ? platformPrepare.join() : null;
+        built = platformCreator.createPlatform(at, prepared);
+      } catch (Exception e) {
+        SupportLogger.logException(Level.WARNING,
+            "platform creator '" + platformCreator.creatorName()
+                + "' threw; falling back to default platform (S-004)", e);
+        built = false;
+      }
+      if (built) {
+        RTP.log(Level.FINE, "[PIPELINE_TRACE] arrival platform built by '"
+            + platformCreator.creatorName() + "'");
+        return;
+      }
+      RTP.log(Level.FINE, "[PIPELINE_TRACE] platform creator '" + platformCreator.creatorName()
+          + "' declined; using default platform");
+    }
+    at.world().platform(at);
+  }
+
+  /**
+   * ADR-058 / REQ-RTP-S-003 — footprint claim guard for region schematic pastes.
+   *
+   * <p>Walks the schematic's horizontal footprint (the same anchor math the
+   * {@link io.github.dailystruggle.rtp.api.schematic.SchematicPlacementPlanner} applies) and
+   * runs each cell through {@link GlobalRegionVerifiers}, the sanctioned claim/protection
+   * registry (never an inline claim-plugin call). Returns {@code false} as soon as one cell is
+   * reported inside a claim, so the caller can suppress the paste before any block is written.
+   * The registered claim verifiers are synchronous, so the per-cell future is normally already
+   * complete; an in-flight async verifier is awaited and any failure of the check itself is
+   * treated as "protected" (fail-safe, S-003).
+   *
+   * @return {@code true} when the whole footprint is clear (or no verifiers are registered)
+   */
+  static boolean schematicFootprintClear(
+      io.github.dailystruggle.rtp.api.schematic.LoadedSchematic schematic,
+      RTPLocation at,
+      io.github.dailystruggle.rtp.api.schematic.PasteOptions options,
+      String fallbackWorldName) {
+    int width = schematic.width();
+    int length = schematic.length();
+    if (width <= 0 || length <= 0) {
+      return true;
+    }
+    int baseX;
+    int baseZ;
+    switch (options.anchor()) {
+      case ORIGIN:
+        baseX = at.x() + schematic.offsetX();
+        baseZ = at.z() + schematic.offsetZ();
+        break;
+      case CENTER:
+      case BOTTOM_CENTER:
+      default:
+        baseX = at.x() - (width - 1) / 2;
+        baseZ = at.z() - (length - 1) / 2;
+        break;
+    }
+    String worldName = (at.world() != null) ? at.world().name() : fallbackWorldName;
+    int y = at.y();
+    for (int dz = 0; dz < length; dz++) {
+      for (int dx = 0; dx < width; dx++) {
+        RTPCoords cell = new RTPCoords(worldName, baseX + dx, y, baseZ + dz);
+        try {
+          CompletableFuture<Boolean> check =
+              GlobalRegionVerifiers.checkGlobalRegionVerifiers(cell);
+          Boolean ok = check.join();
+          if (ok != null && !ok) {
+            return false;
+          }
+        } catch (Throwable t) {
+          // Fail-safe (S-003): if the footprint claim check itself errors, treat the cell as
+          // protected and suppress the paste rather than risk overwriting a claim.
+          SupportLogger.logException(Level.FINE,
+              "schematic footprint claim check failed; suppressing paste", t);
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   private void runCleanup() {

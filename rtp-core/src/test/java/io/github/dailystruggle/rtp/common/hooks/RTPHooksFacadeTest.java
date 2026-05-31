@@ -89,6 +89,7 @@ class RTPHooksFacadeTest {
     assertNotNull(h.worldBorder());
     assertNotNull(h.anvilPrefilter());
     assertNotNull(h.pvpCombatState());
+    assertNotNull(h.platformCreator());
   }
 
   @Test
@@ -184,5 +185,65 @@ class RTPHooksFacadeTest {
     hooks.pvpCombatState().clear();
     assertNull(hooks.pvpCombatState().current());
     assertThrows(IllegalArgumentException.class, () -> hooks.pvpCombatState().bind(null));
+  }
+
+  @Test
+  @DisplayName("Platform-creator registry binds, reports the bound creator, and clears (null-guarded)")
+  void platformCreatorRegistry_roundTrip() {
+    Class<?> ignored = RTP.class;
+    assertNotNull(ignored);
+    RTPHooks hooks = RTPAPI.hooks();
+
+    assertNull(hooks.platformCreator().current(), "no creator bound -> platform default");
+
+    AtomicInteger built = new AtomicInteger();
+    io.github.dailystruggle.rtp.api.platform.PlatformCreator creator =
+        new io.github.dailystruggle.rtp.api.platform.PlatformCreator() {
+          @Override public String creatorName() { return "TestPad"; }
+          @Override public boolean createPlatform(
+              io.github.dailystruggle.rtp.api.world.RTPLocation at) {
+            built.incrementAndGet();
+            return true;
+          }
+        };
+    hooks.platformCreator().bind(creator);
+    assertSame(creator, hooks.platformCreator().current());
+    assertEquals("TestPad", hooks.platformCreator().current().creatorName());
+    assertTrue(hooks.platformCreator().current().createPlatform(null));
+    assertEquals(1, built.get());
+
+    // The base interface's defaults decline: createPlatform(at) -> false, the two-phase
+    // createPlatform(at, prepared) delegates to it, and prepare(at) yields a null handle.
+    io.github.dailystruggle.rtp.api.platform.PlatformCreator base =
+        new io.github.dailystruggle.rtp.api.platform.PlatformCreator() {};
+    assertEquals(false, base.createPlatform(null));
+    assertEquals(false, base.createPlatform(null, new Object()));
+    assertNull(base.prepare(null).join(), "default prepare() completes with a null handle");
+
+    // A two-phase creator: prepare() supplies the handle, createPlatform(at, prepared) consumes
+    // it. This is the uniform path RTP drives for every creator (SchematicPaster included).
+    AtomicInteger pasted = new AtomicInteger();
+    io.github.dailystruggle.rtp.api.platform.PlatformCreator twoPhase =
+        new io.github.dailystruggle.rtp.api.platform.PlatformCreator() {
+          @Override public java.util.concurrent.CompletableFuture<?> prepare(
+              io.github.dailystruggle.rtp.api.world.RTPLocation at) {
+            return java.util.concurrent.CompletableFuture.completedFuture("handle");
+          }
+          @Override public boolean createPlatform(
+              io.github.dailystruggle.rtp.api.world.RTPLocation at, Object prepared) {
+            if (!"handle".equals(prepared)) return false;
+            pasted.incrementAndGet();
+            return true;
+          }
+        };
+    assertEquals("handle", twoPhase.prepare(null).join());
+    assertTrue(twoPhase.createPlatform(null, twoPhase.prepare(null).join()));
+    assertEquals(1, pasted.get());
+    // A null handle (failed/incomplete prepare) makes the two-phase creator decline.
+    assertEquals(false, twoPhase.createPlatform(null, null));
+
+    hooks.platformCreator().clear();
+    assertNull(hooks.platformCreator().current());
+    assertThrows(IllegalArgumentException.class, () -> hooks.platformCreator().bind(null));
   }
 }

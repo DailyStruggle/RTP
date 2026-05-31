@@ -537,6 +537,8 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     if (onEventParsing) Bukkit.getPluginManager().registerEvents(new OnEventTeleports(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerChangeWorld(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerDamage(), this);
+    // ADR-055: feed the native PvP combat tracker for the optional combat gate.
+    Bukkit.getPluginManager().registerEvents(new OnPlayerCombatTag(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerJoin(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerMove(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerQuit(), this);
@@ -605,6 +607,19 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       RTP.log(
           java.util.logging.Level.WARNING,
           "[RTP] Failed to initialize claim-plugin integrations; continuing without them.",
+          t);
+    }
+
+    // Bundled combat-tag plugin integrations for the optional PvP gate (ADR-055).
+    // Binds the first enabled combat plugin (PvPManager / CombatLogX / Simple Combat
+    // Log) to PvPCombatStateRegistry; no-op when none is present (native fallback).
+    try {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] setupIntegrations invoking PvPIntegrations.setup");
+      io.github.dailystruggle.rtp.bukkit.tools.softdepends.pvp.PvPIntegrations.setup(this);
+    } catch (Throwable t) {
+      RTP.log(
+          java.util.logging.Level.WARNING,
+          "[RTP] Failed to initialize combat-tag integrations; continuing with the native PvP tracker.",
           t);
     }
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] setupIntegrations EXIT");

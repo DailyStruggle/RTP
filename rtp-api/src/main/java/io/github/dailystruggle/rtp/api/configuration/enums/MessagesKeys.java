@@ -73,6 +73,12 @@ public enum MessagesKeys {
   consoleCmdNotAllowed,
   /** Sent when a command is issued while the plugin is reloading or busy. */
   busy,
+  /**
+   * Sent when the optional PvP / combat-tag gate refuses (or aborts) a {@code /rtp}
+   * because the player is currently considered in combat. Configurable per
+   * REQ-RTP-F-013, surfaces S-007. No placeholders.
+   */
+  pvpInCombat,
   /** Sent when an unrecognized subcommand or parameter is provided. */
   invalidCommand,
   /** Sent when the sender lacks the required permission for the requested command. */

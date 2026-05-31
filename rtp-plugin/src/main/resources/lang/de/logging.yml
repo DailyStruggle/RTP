@@ -1,5 +1,5 @@
 # --- Plugin-Logging-Einstellungen ---
-# Dokumentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# Dokumentation: plugins/RTP/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
 # Protokolliert alle Dateien, die während /rtp reload neu geladen wurden
 detailliertesNeuladen: false
 # Details zur Regionsinitialisierung protokollieren

@@ -38,13 +38,14 @@ class PrefabSchematicInstallerTest {
         Prefab plain = new Prefab(
                 "plain", "k", "h", "d",
                 Map.of(),
+                Map.of(),
                 Map.of("default", Map.of("shape", Map.of("radius", 100))),
                 false);
         assertTrue(PrefabSchematicInstaller.schematicNames(plain).isEmpty());
     }
 
     @Test
-    @DisplayName("install copies the bundled skyblock.schem into <pluginDir>/schematics/")
+    @DisplayName("install copies the bundled skyblock.schem to <pluginDir>/schematics/<region>.schem")
     void installExtractsBundledSchematic(@TempDir Path pluginDir) throws IOException {
         PrefabSchematicInstaller.Result r =
                 PrefabSchematicInstaller.install(pluginDir.toFile(), Skyblock.INSTANCE);
@@ -53,16 +54,21 @@ class PrefabSchematicInstallerTest {
         assertTrue(r.skippedExisting().isEmpty());
         assertTrue(r.missingResource().isEmpty());
 
-        File dest = pluginDir.resolve("schematics").resolve("skyblock.schem").toFile();
-        assertTrue(dest.isFile(), "schematic must be extracted to disk");
+        // The Skyblock prefab overlays the "default" region, and core resolves the
+        // arrival schematic by region name, so the bundled skyblock.schem must land
+        // as schematics/default.schem (not schematics/skyblock.schem).
+        File dest = pluginDir.resolve("schematics").resolve("default.schem").toFile();
+        assertTrue(dest.isFile(), "schematic must be extracted to the region-named file");
         assertTrue(dest.length() > 0, "extracted schematic must not be empty");
+        assertFalse(pluginDir.resolve("schematics").resolve("skyblock.schem").toFile().exists(),
+                "must not write under the resource name; resolution is by region name");
     }
 
     @Test
     @DisplayName("install does not overwrite an existing schematic file")
     void installSkipsExisting(@TempDir Path pluginDir) throws IOException {
         Path dir = Files.createDirectories(pluginDir.resolve("schematics"));
-        Path dest = dir.resolve("skyblock.schem");
+        Path dest = dir.resolve("default.schem");
         byte[] sentinel = "operator-edited".getBytes();
         Files.write(dest, sentinel);
 
@@ -81,6 +87,7 @@ class PrefabSchematicInstallerTest {
         Prefab missing = new Prefab(
                 "missing", "k", "h", "d",
                 Map.of(),
+                Map.of(),
                 Map.of("default", Map.of("schematic", "does-not-exist")),
                 false);
 
@@ -89,7 +96,7 @@ class PrefabSchematicInstallerTest {
 
         assertEquals(java.util.List.of("does-not-exist"), r.missingResource());
         assertTrue(r.installed().isEmpty());
-        assertFalse(pluginDir.resolve("schematics").resolve("does-not-exist.schem")
+        assertFalse(pluginDir.resolve("schematics").resolve("default.schem")
                 .toFile().exists());
     }
 }

@@ -310,6 +310,47 @@ public interface RTPCmd extends BaseRTPCmd {
             + " args=" + rtpArgs
             + " thread=" + Thread.currentThread().getName());
 
+    // --- Optional PvP / combat-tag pre-flight gate (ADR-055) -----------------
+    // Consult the combat authority BEFORE enrolling the requester. No-op when
+    // the gate is disabled (pvpCheckEnabled=false, the default) or the player
+    // is not in combat. A non-ALLOW action refuses the request with the
+    // configurable pvpInCombat message and audits at WARNING (REQ-RTP-S-004);
+    // the gate never blocks a teleport because an integration broke (PvPGate
+    // fails open). Skipped for the console sender and for cross-player rtp
+    // targeting (the requesting console is never "in combat").
+    if (!senderId.equals(new java.util.UUID(0, 0)) && !rtpArgs.containsKey("player")) {
+      io.github.dailystruggle.rtp.api.hooks.PvPCombatAction pvpAction;
+      try {
+        pvpAction = io.github.dailystruggle.rtp.common.pvp.PvPGate.evaluate(senderId);
+      } catch (Throwable t) {
+        // Defensive: the gate is fail-open, but guard the call site too.
+        RTP.log(Level.WARNING, "[RTP] PvP gate evaluation threw; allowing teleport", t);
+        pvpAction = io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW;
+      }
+      if (pvpAction != io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW) {
+        // DENY / CANCEL / DELAY all collapse to "refuse this new request" at the
+        // pre-dispatch surface (there is no in-progress teleport to abort yet).
+        ConfigParser<MessagesKeys> langParser =
+                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+        String msg = (String) langParser.getConfigValue(MessagesKeys.pvpInCombat,
+                "&c[RTP] You cannot use /rtp while in combat.");
+        if (msg != null && !msg.isEmpty()) {
+          if (messageMethod != null) messageMethod.accept(msg);
+          else RTP.serverAccessor.sendMessage(senderId, MessagesKeys.pvpInCombat);
+        }
+        // S-004: the refusal is never silent.
+        RTP.log(Level.WARNING, "[RTP] PvP gate refused /rtp for " + senderId
+                + " (action=" + pvpAction + ", in combat)");
+        return true;
+      } else if (io.github.dailystruggle.rtp.common.pvp.PvPGate.isEnabled()
+              && io.github.dailystruggle.rtp.common.pvp.PvPGate.isInCombat(senderId)) {
+        // ALLOW-and-audit: operator wants visibility without changing behaviour.
+        RTP.log(Level.INFO, "[RTP] PvP gate: " + senderId
+                + " is in combat but pvpOnCombat=ALLOW; permitting /rtp");
+      }
+    }
+    // --- end PvP gate --------------------------------------------------------
+
     if (!senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.add(senderId);
 
     List<String> toggletargetpermsList = rtpArgs.get("toggletargetperms");

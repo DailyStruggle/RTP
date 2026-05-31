@@ -1,5 +1,5 @@
 # --- Paramètres de journalisation du plugin ---
-# Documentation : https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# Documentation : plugins/RTP/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
 # Journaliser tous les fichiers rechargés lors de /rtp reload
 rechargementDetaille: false
 # Journaliser les détails de l'initialisation des régions

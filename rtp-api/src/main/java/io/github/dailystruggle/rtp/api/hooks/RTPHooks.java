@@ -21,6 +21,8 @@ package io.github.dailystruggle.rtp.api.hooks;
  *       native PvP damage tracker for the {@code /rtp} combat gate.</li>
  *   <li>{@link #rootAction()} — optional override for what a bare {@code /rtp}
  *       (no arguments) does, e.g. open an addon GUI instead of teleporting.</li>
+ *   <li>{@link #platformCreator()} — optional override for the arrival platform
+ *       a player lands on (schematic paste, procedural pad, …; ADR-058).</li>
  * </ul>
  *
  * <p><b>Effects extension</b> (particles/potions/sounds) is intentionally not
@@ -53,4 +55,7 @@ public interface RTPHooks {
 
   /** @return the bare-{@code /rtp} root-action registry; never {@code null}. */
   RootActionRegistry rootAction();
+
+  /** @return the arrival platform-creator registry; never {@code null}. */
+  PlatformCreatorRegistry platformCreator();
 }

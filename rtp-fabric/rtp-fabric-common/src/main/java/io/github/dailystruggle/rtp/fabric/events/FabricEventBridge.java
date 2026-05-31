@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.fabric.events;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.pvp.PvPGate;
 import io.github.dailystruggle.rtp.fabric.database.FabricDatabaseHandler;
 import io.github.dailystruggle.rtp.fabric.scheduling.FabricScheduler;
 import io.github.dailystruggle.rtp.fabric.server.FabricServerAccessor;
@@ -61,6 +62,12 @@ public final class FabricEventBridge {
         // which can fail to resolve at link time on 26.1's deobfuscated runtime,
         // aborting onInitialize before any useful work happens.
         registerPlayConnectionEventsReflective();
+
+        // ── PvP combat tag (ADR-055) ─────────────────────────────────
+        // Feed the native PvP combat tracker from ServerLivingEntityEvents.
+        // Reflection-guarded for the same link-safety reason as above; the
+        // whole handler is a no-op unless the operator enabled the gate.
+        registerLivingEntityDamageEventsReflective();
     }
 
     /**
@@ -159,6 +166,9 @@ public final class FabricEventBridge {
                                     // UUID off the live ServerPlayer.
                                     accessor.getFabricPlayerLifecycleHook()
                                             .fireQuitFromPlayer(player);
+                                    // ADR-055 — forget any native PvP combat tag
+                                    // so the tracker does not leak across sessions.
+                                    clearPvpCombatTag(player);
                                     accessor.unregisterPlayerObject(player);
                                 }
                             }
@@ -616,6 +626,144 @@ public final class FabricEventBridge {
         } catch (Throwable t) {
             RTP.log(Level.WARNING, "[RTP] FabricEventBridge.onWorldUnload failed for "
                     + level.dimension().location(), t);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // ADR-055 — native PvP combat tag plumbing
+    // -------------------------------------------------------------------------
+
+    /**
+     * Best-effort registration of {@code ServerLivingEntityEvents.AFTER_DAMAGE}
+     * via reflection. Any failure (class missing, field missing, signature
+     * drift across fabric-api / MC versions) is logged and swallowed so
+     * {@code onInitialize} can still complete; the combat gate then has no
+     * native authority on this runtime (an external combat-tag provider, if
+     * bound, still works). Mirrors {@code OnPlayerCombatTag} on Bukkit.
+     */
+    private void registerLivingEntityDamageEventsReflective() {
+        try {
+            Class<?> sleeCls = Class.forName(
+                    "net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents");
+            Class<?> eventCls = Class.forName("net.fabricmc.fabric.api.event.Event");
+            java.lang.reflect.Method register = eventCls.getMethod("register", Object.class);
+
+            Class<?> afterDamageCallback = Class.forName(
+                    "net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents$AfterDamage");
+            Object afterDamageEvent = sleeCls.getField("AFTER_DAMAGE").get(null);
+
+            Object proxy = java.lang.reflect.Proxy.newProxyInstance(
+                    afterDamageCallback.getClassLoader(),
+                    new Class<?>[]{afterDamageCallback},
+                    (p, method, args) -> {
+                        // args[0] = LivingEntity victim, args[1] = DamageSource source.
+                        try {
+                            if (PvPGate.isEnabled()
+                                    && args != null && args.length >= 2) {
+                                onPvpAfterDamage(args[0], args[1]);
+                            }
+                        } catch (Throwable t) {
+                            RTP.log(Level.FINER,
+                                    "[RTP] FabricEventBridge AFTER_DAMAGE handler raised "
+                                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+                        }
+                        return null;
+                    });
+
+            register.invoke(afterDamageEvent, proxy);
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[RTP][Fabric] ServerLivingEntityEvents.AFTER_DAMAGE not available ("
+                            + t.getClass().getSimpleName() + "): native PvP combat tracking disabled."
+                            + " The combat gate still works if an external provider is bound.");
+        }
+    }
+
+    /**
+     * Stamp the native PvP combat tracker for a player-vs-player damage event.
+     * Resolves the responsible attacker (the source's owning entity, e.g. the
+     * shooter of a projectile) reflectively and stamps victim / aggressor per
+     * the {@code pvpTagVictim} / {@code pvpTagAggressor} knobs. Both objects are
+     * NM-typed ({@code LivingEntity}, {@code DamageSource}), so this stays
+     * reflective to keep {@code rtp-fabric-common} NM-free.
+     *
+     * @param victim the damaged {@code LivingEntity} (NM-typed)
+     * @param source the {@code DamageSource} (NM-typed)
+     */
+    private void onPvpAfterDamage(Object victim, Object source) {
+        java.util.UUID victimId = playerUuidOrNull(victim);
+        if (victimId == null) return; // victim is not a player -> not PvP-relevant
+        Object attacker = resolveDamageSourceEntity(source);
+        java.util.UUID attackerId = playerUuidOrNull(attacker);
+        if (attackerId == null) return; // environmental / mob damage
+        if (attackerId.equals(victimId)) return; // self-damage
+
+        long now = System.currentTimeMillis();
+        if (PvPGate.tagVictim()) PvPGate.nativeTracker().stamp(victimId, now);
+        if (PvPGate.tagAggressor()) PvPGate.nativeTracker().stamp(attackerId, now);
+    }
+
+    /**
+     * Reflectively resolve the responsible entity behind a {@code DamageSource}
+     * (mojmap {@code getEntity()} / intermediary {@code method_5529}). Returns
+     * the projectile shooter / TNT igniter for indirect damage, the direct
+     * attacker otherwise, or {@code null} when no entity is responsible.
+     */
+    private static Object resolveDamageSourceEntity(Object source) {
+        if (source == null) return null;
+        String[] candidates = { "getEntity", "method_5529" };
+        for (String name : candidates) {
+            try {
+                java.lang.reflect.Method m = source.getClass().getMethod(name);
+                return m.invoke(source);
+            } catch (NoSuchMethodException ignored) {
+                // try next
+            } catch (Throwable ignored) {
+                // best-effort; never throw into the event bus
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Return the player UUID for {@code entity} when it is a {@code ServerPlayer},
+     * else {@code null}. Class-name guards before the typed adapter call so a
+     * non-player entity never trips a cast-failure log inside the adapter.
+     */
+    private static java.util.UUID playerUuidOrNull(Object entity) {
+        if (entity == null) return null;
+        if (!isServerPlayer(entity)) return null;
+        try {
+            io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+                    io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+            if (adapter == null) return null;
+            return adapter.getPlayerUUID(entity);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * Heuristic, mapping-agnostic "is this a server player?" check by walking the
+     * class hierarchy for the mojmap ({@code ServerPlayer}) or intermediary
+     * ({@code class_3222}) simple name. Avoids referencing the NM type directly.
+     */
+    private static boolean isServerPlayer(Object entity) {
+        if (entity == null) return false;
+        for (Class<?> c = entity.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+            String simple = c.getSimpleName();
+            if ("ServerPlayer".equals(simple) || "class_3222".equals(simple)) return true;
+        }
+        return false;
+    }
+
+    /** ADR-055 — clear a player's native combat tag on disconnect. */
+    private static void clearPvpCombatTag(Object player) {
+        try {
+            java.util.UUID uuid = playerUuidOrNull(player);
+            if (uuid != null) PvPGate.nativeTracker().clear(uuid);
+        } catch (Throwable ignored) {
+            // never throw from the disconnect handler
         }
     }
 }

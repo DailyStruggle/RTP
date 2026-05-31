@@ -1,5 +1,5 @@
 # --- Impostazioni di prestazione di RTP ---
-# Documentazione: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/PERFORMANCE.md
+# Documentazione: plugins/RTP/docs/admin/PERFORMANCE.md
 # Numero massimo di tentativi di ricerca per invocazione di /rtp prima di rinunciare.
 # @type: integer
 # @range: [1, null]

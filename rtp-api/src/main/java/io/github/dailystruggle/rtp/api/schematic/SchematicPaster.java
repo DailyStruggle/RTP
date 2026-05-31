@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.api.schematic;
 
+import io.github.dailystruggle.rtp.api.platform.PlatformCreator;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 
 import java.util.concurrent.CompletableFuture;
@@ -22,8 +23,14 @@ import java.util.concurrent.CompletableFuture;
  * <p>Implementations never throw to abort a teleport: every non-success condition is
  * reported as a {@link PasteResult} so the core invocation point can audit it (S-004)
  * and proceed with the teleport unmodified.
+ *
+ * <p>A {@code SchematicPaster} is the bundled, file-backed specialisation of the general
+ * {@link PlatformCreator} extension point: it creates the arrival platform by decoding and
+ * pasting a {@code .schem} structure. Addons may instead implement {@code PlatformCreator}
+ * directly for a non-schematic platform (e.g. a procedural pad) and bind it through
+ * {@code RTPHooks#platformCreator()}.
  */
-public interface SchematicPaster {
+public interface SchematicPaster extends PlatformCreator {
   /**
    * Loads and decodes a schematic source off-thread. Implementations MUST NOT touch the
    * world or load chunks here (S-005).

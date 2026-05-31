@@ -16,6 +16,8 @@ import io.github.dailystruggle.rtp.api.schematic.SchematicPlacementPlanner;
 import io.github.dailystruggle.rtp.api.schematic.SchematicSource;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.prefab.PrefabSchematicInstaller;
+import io.github.dailystruggle.rtp.common.commands.prefab.builtin.Skyblock;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import java.io.File;
 import java.io.InputStream;
@@ -139,5 +141,32 @@ class RegionSchematicServiceTest {
         "every placement lies within the anchored bounding box");
     assertEquals(64, placements.stream().mapToInt(BlockPlacement::y).min().orElseThrow(),
         "bottom layer sits at the arrival Y (player stands on top, before any vert overwrite)");
+  }
+
+  @Test
+  @DisplayName("Skyblock prefab bakes the island in and core resolves it for the default region")
+  void skyblockPrefabInstallIsResolvedByRegionName() throws Exception {
+    // Before applying the prefab the default region has no arrival schematic.
+    assertNull(RegionSchematicService.resolveSource("default"),
+        "no schematic before the prefab is applied");
+
+    // Applying the Skyblock prefab extracts the bundled /schematics/skyblock.schem.
+    PrefabSchematicInstaller.Result r =
+        PrefabSchematicInstaller.install(pluginDir, Skyblock.INSTANCE);
+    assertEquals(List.of("skyblock"), r.installed(), "the bundled island must be installed");
+
+    // It lands under the *region* name (default.schem), so the file-presence knob in
+    // RegionSchematicService now resolves for the "default" region the prefab overlays.
+    SchematicSource src = RegionSchematicService.resolveSource("default");
+    assertNotNull(src, "Skyblock prefab must make the default region resolve a schematic");
+    assertEquals("default", src.name());
+    assertTrue(Files.isRegularFile(src.path()));
+
+    // And the resolved file really is the island (decodes to the known dims).
+    LoadedSchematic loaded = new RecordingPaster().load(src).getNow(null);
+    assertNotNull(loaded, "installed schematic must decode");
+    assertEquals(8, loaded.width());
+    assertEquals(10, loaded.height());
+    assertEquals(7, loaded.length());
   }
 }

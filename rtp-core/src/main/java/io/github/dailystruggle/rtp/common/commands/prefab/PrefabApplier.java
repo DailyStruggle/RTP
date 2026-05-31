@@ -96,6 +96,17 @@ public final class PrefabApplier {
             }
         }
 
+        // safety.yml
+        Map<String, Object> safetyOverlay = prefab.safetyOverlay();
+        if (!safetyOverlay.isEmpty()) {
+            Map<String, Object> base = newTrees.computeIfAbsent("safety", k -> new LinkedHashMap<>());
+            List<Change> fileDiff = new ArrayList<>();
+            mergeInto(base, safetyOverlay, "", fileDiff);
+            if (!fileDiff.isEmpty()) {
+                diff.put("safety", fileDiff);
+            }
+        }
+
         // regions/<id>.yml
         for (Map.Entry<String, Map<String, Object>> reg : prefab.regionOverlays().entrySet()) {
             String fileId = "regions/" + reg.getKey();
@@ -157,6 +168,7 @@ public final class PrefabApplier {
                 prefab.hoverKey(),
                 prefab.description(),
                 prefab.performanceOverlay(),
+                prefab.safetyOverlay(),
                 expandedOverlays,
                 false
         );

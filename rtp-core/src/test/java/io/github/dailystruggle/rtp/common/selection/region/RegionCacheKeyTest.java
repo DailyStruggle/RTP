@@ -194,6 +194,13 @@ public class RegionCacheKeyTest {
         java.util.EnumSet<SafetyKeys> excluded = java.util.EnumSet.of(
                 SafetyKeys.invulnerabilityTime,
                 SafetyKeys.staleChunkRetryLimit,
+                SafetyKeys.platformRestoreSeconds,
+                SafetyKeys.pvpCheckEnabled,
+                SafetyKeys.pvpCombatTagSeconds,
+                SafetyKeys.pvpOnCombat,
+                SafetyKeys.pvpSource,
+                SafetyKeys.pvpTagVictim,
+                SafetyKeys.pvpTagAggressor,
                 SafetyKeys.version);
         java.util.EnumSet<SafetyKeys> included = java.util.EnumSet.of(
                 SafetyKeys.safetyRadius,
