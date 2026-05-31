@@ -1,19 +1,25 @@
 package io.github.dailystruggle.rtp.api.safety;
 
+import io.github.dailystruggle.rtp.api.block.BlockStateString;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
  * Pure-string grammar parser for safety-list tokens (ADR-017 §1). Accepts
  * {@code LAVA}, {@code #minecraft:leaves}, {@code OAK_SLAB[waterlogged=true]},
  * {@code #minecraft:slabs[waterlogged=true]}, {@code *[waterlogged=true]}.
+ * Predicate bodies accept string equalities ({@code key=value}) and numeric range
+ * comparisons ({@code key>=n}, {@code key<=n}, {@code key>n}, {@code key<n}) such as
+ * {@code LAVA[level<=3]} or {@code FIRE[age>=10]}; range bounds must be integers.
  * Every reject (empty, bare {@code *}, unbalanced brackets, malformed body,
  * empty tag ns/path, bad identifier) is reported via {@link ParseResult#rejected()}
  * with a reason — never silent (REQ-RTP-S-004). No registry reconciliation here;
@@ -89,24 +95,15 @@ public final class SafetyTokenParser {
       return;
     }
 
-    // Split into head and optional bracketed body.
-    int open = token.indexOf('[');
-    int close = token.lastIndexOf(']');
+    // Structural head/body split, shared with the schematic decoder (ADR-058 Amendment 1).
     String head;
-    String body = null;
-    if (open < 0 && close < 0) {
-      head = token;
-    } else if (open >= 0 && close > open && close == token.length() - 1) {
-      head = token.substring(0, open);
-      body = token.substring(open + 1, close);
-    } else {
-      rejected.add(new Rejection(source,
-          "unbalanced or misplaced '[' / ']' brackets; expected 'IDENT[pred,...]'"));
-      return;
-    }
-
-    if (head.isEmpty()) {
-      rejected.add(new Rejection(source, "token has no identifier before '['"));
+    String body;
+    try {
+      BlockStateString.Split split = BlockStateString.split(token);
+      head = split.head();
+      body = split.body();
+    } catch (IllegalArgumentException e) {
+      rejected.add(new Rejection(source, e.getMessage()));
       return;
     }
 
@@ -193,6 +190,10 @@ public final class SafetyTokenParser {
       return null;
     }
     Map<String, String> kv = new LinkedHashMap<>();
+    List<StatePredicate.NumericComparison> comparisons = new ArrayList<>();
+    // Track (key|operator) signatures so a range like 'level>=2,level<=5' is allowed while
+    // a genuine duplicate ('waterlogged=true,waterlogged=false', 'level>=2,level>=3') is not.
+    Set<String> seen = new HashSet<>();
     // Simple split on ',' — values that contain commas are out of scope (ADR-017 &sect;1).
     String[] parts = trimmed.split(",", -1);
     for (String rawPart : parts) {
@@ -201,39 +202,85 @@ public final class SafetyTokenParser {
         rejected.add(new Rejection(source, "empty predicate between commas in '[" + body + "]'"));
         return null;
       }
-      int eq = part.indexOf('=');
-      if (eq <= 0 || eq == part.length() - 1) {
+      // Locate the comparison operator: the first '=', '<' or '>'. A '<' or '>' followed
+      // by '=' is the two-character form ('<=' / '>=').
+      int opIdx = -1;
+      for (int i = 0; i < part.length(); i++) {
+        char c = part.charAt(i);
+        if (c == '=' || c == '<' || c == '>') {
+          opIdx = i;
+          break;
+        }
+      }
+      if (opIdx <= 0) {
         rejected.add(new Rejection(source,
-            "malformed predicate '" + part + "'; expected 'key=value' with non-empty sides"));
+            "malformed predicate '" + part + "'; expected 'key=value' or 'key>=n' "
+                + "(operators: =, >=, <=, >, <) with non-empty sides"));
         return null;
       }
-      String key = part.substring(0, eq).trim();
-      String value = part.substring(eq + 1).trim();
+      char opChar = part.charAt(opIdx);
+      StatePredicate.Comparator comparator = null;
+      int valueStart;
+      if (opChar == '=') {
+        valueStart = opIdx + 1;
+      } else {
+        boolean twoChar = opIdx + 1 < part.length() && part.charAt(opIdx + 1) == '=';
+        if (opChar == '>') {
+          comparator = twoChar ? StatePredicate.Comparator.GE : StatePredicate.Comparator.GT;
+        } else {
+          comparator = twoChar ? StatePredicate.Comparator.LE : StatePredicate.Comparator.LT;
+        }
+        valueStart = opIdx + (twoChar ? 2 : 1);
+      }
+      String key = part.substring(0, opIdx).trim();
+      String value = part.substring(valueStart).trim();
       if (!PROPERTY_KEY.matcher(key).matches()) {
         rejected.add(new Rejection(source,
             "predicate key '" + key + "' does not match [A-Za-z0-9_]+"));
         return null;
       }
       if (value.isEmpty()) {
-        rejected.add(new Rejection(source, "predicate '" + key + "=' has empty value"));
-        return null;
-      }
-      // Reserved characters in values would break the string form produced by
-      // BlockData.getAsString(); reject them explicitly.
-      if (value.indexOf('[') >= 0 || value.indexOf(']') >= 0 || value.indexOf('=') >= 0) {
-        rejected.add(new Rejection(source,
-            "predicate value '" + value + "' contains a reserved character ('[', ']', or '=')"));
+        rejected.add(new Rejection(source, "predicate '" + key + "' has empty value"));
         return null;
       }
       String lcKey = key.toLowerCase(Locale.ROOT);
-      if (kv.containsKey(lcKey)) {
-        rejected.add(new Rejection(source,
-            "duplicate predicate key '" + lcKey + "' within one token"));
-        return null;
+      if (comparator == null) {
+        // String-equality predicate (existing behaviour).
+        // Reserved characters in values would break the string form produced by
+        // BlockData.getAsString(); reject them explicitly.
+        if (value.indexOf('[') >= 0 || value.indexOf(']') >= 0
+            || value.indexOf('=') >= 0 || value.indexOf('<') >= 0 || value.indexOf('>') >= 0) {
+          rejected.add(new Rejection(source,
+              "predicate value '" + value + "' contains a reserved character "
+                  + "('[', ']', '=', '<', or '>')"));
+          return null;
+        }
+        if (!seen.add(lcKey + "|=")) {
+          rejected.add(new Rejection(source,
+              "duplicate predicate key '" + lcKey + "' within one token"));
+          return null;
+        }
+        kv.put(lcKey, value.toLowerCase(Locale.ROOT));
+      } else {
+        // Numeric range predicate (ADR-017 §1 extension): the bound must be an integer.
+        long bound;
+        try {
+          bound = Long.parseLong(value);
+        } catch (NumberFormatException e) {
+          rejected.add(new Rejection(source,
+              "numeric predicate '" + key + comparator.symbol() + value
+                  + "' requires an integer bound; '" + value + "' is not an integer"));
+          return null;
+        }
+        if (!seen.add(lcKey + "|" + comparator.symbol())) {
+          rejected.add(new Rejection(source,
+              "duplicate predicate '" + lcKey + comparator.symbol() + "' within one token"));
+          return null;
+        }
+        comparisons.add(new StatePredicate.NumericComparison(lcKey, comparator, bound));
       }
-      kv.put(lcKey, value.toLowerCase(Locale.ROOT));
     }
-    return Collections.singletonList(new StatePredicate(kv, source));
+    return Collections.singletonList(new StatePredicate(kv, comparisons, source));
   }
 
   /**

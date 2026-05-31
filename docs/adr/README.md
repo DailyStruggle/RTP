@@ -51,6 +51,9 @@ An ADR captures a significant architectural decision: the context that forced it
 | [ADR-053](ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit.md) | Pipeline Latency Percentiles and Slow-Teleport Audit (extends ADR-032; `/rtp info` readout) | Accepted |
 | [ADR-054](ADR-054-rtprunnable-self-scheduling-thread-routing.md) | RTPRunnable Self-Scheduling Thread Routing (`target`/`location` + `schedule()` entity/region/async dispatch) | Accepted |
 | [ADR-057](ADR-057-platform-agnostic-addon-spi.md) | Platform-agnostic addon SPI (`RTPAddon` + `AddonRegistry` ServiceLoader discovery; replaces Bukkit `JavaPlugin` addon loading) | Accepted |
+| [ADR-058](ADR-058-region-specific-schematic-paste.md) | Region-Specific Schematic (`.schem`) Paste at the Arrival Location (`SchematicPaster` SPI + swappable per-adapter getter; load-async/paste-on-region-thread) | Accepted |
+| [ADR-059](ADR-059-relative-ground-distance-safety-predicate.md) | Relative Ground-Distance Safety Predicate (synthetic `_groundDistance` block-state property consumed by the ADR-017 numeric-range grammar; ground leaves/roots safe, tall-tree canopy unsafe) | Proposed |
+| [ADR-060](ADR-060-emergency-platform-block-restoration-timeout.md) | Emergency-Platform Block-Restoration Timeout (`safety.yml` `platformRestoreSeconds`, -1 disables; per-coordinate diff capture; DB-persisted, chunk-loaded countdown reaper; row removed on completion) | Accepted |
 
 ## Subproject ADRs
 

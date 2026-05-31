@@ -200,6 +200,8 @@ dadosRegiao:
   - "#58CCED  - cacheLiberada (L2): [unkeptCache]"
   - "#58CCED  - cacheAcumulada (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - emCache: [cached]"
+  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
+  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # Seção 8: Descrições de comandos

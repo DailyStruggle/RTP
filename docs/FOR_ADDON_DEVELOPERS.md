@@ -5,6 +5,14 @@
 This page guides third-party plugin developers who extend RTP using the `rtp-api` module.
 If you are implementing a custom shape, vertical adjustor, biome filter, or claim-check hook, start here.
 
+> **In a hurry?** Jump to the [Addon Quickstart](ADDON_QUICKSTART.md) - a one-page tutorial that
+> registers a custom region shape in about 20 lines (Gradle dependency, `ServiceLoader` descriptor,
+> and an `RTPAddon` that calls `RTP.addShape(...)`).
+>
+> **Building outside this repository?** Both `rtp-api` and `rtp-core` are published on JitPack as
+> `com.github.DailyStruggle.RTP:rtp-api:<tag>` / `:rtp-core:<tag>`. See
+> [dev/PUBLISHING.md](dev/PUBLISHING.md) for the dependency snippet and the Maven Central path.
+
 ---
 
 ## Recommended Reading Order

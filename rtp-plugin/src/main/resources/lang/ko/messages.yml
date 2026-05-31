@@ -197,6 +197,8 @@ infoFoliaRegion: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]
   - "#58CCED  - 해제 캐시 (L2): [unkeptCache]"
   - "#58CCED  - 백로그 캐시 (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - 캐시됨: [cached]"
+  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
+  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # 섹션 8: 명령어 설명

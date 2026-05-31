@@ -197,6 +197,8 @@ infoFailureBreakdown: "&7Rejections by Cause: #7E9CC8[genFailureBreakdown]"
   - "#58CCED  - 已释放缓存 (L2): [unkeptCache]"
   - "#58CCED  - 积压缓存 (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - 已缓存: [cached]"
+  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
+  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # 第 8 节: 命令说明

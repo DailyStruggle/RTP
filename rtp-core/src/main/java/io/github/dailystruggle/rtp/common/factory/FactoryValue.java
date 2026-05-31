@@ -240,7 +240,12 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     if (resObj instanceof Number n) return n;
 
     Number res;
-    if (resObj instanceof String s) {
+    if (resObj instanceof Boolean b) {
+      // Tolerant boolean -> int coercion: a YAML author who writes a legacy
+      // {@code true}/{@code false} for a knob that is now numeric (e.g.
+      // {@code uniquePlacements}) gets 1/0 rather than a thrown NaN.
+      res = b ? 1 : 0;
+    } else if (resObj instanceof String s) {
       String coerced = s.replaceAll(",", ".");
       try {
         res = Double.parseDouble(coerced);

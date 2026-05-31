@@ -211,6 +211,8 @@ infoRegioneDati:
   - "#58CCED  - cacheNonConservata (L2): [unkeptCache]"
   - "#58CCED  - cacheArretrata (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - inCache: [cached]"
+  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
+  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # Sezione 8: Descrizioni dei comandi

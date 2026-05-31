@@ -31,6 +31,8 @@ OAK_SLAB[waterlogged=true]           # material + state predicate(s)
 
 The `Set<String>` wire type on `RTPChunk.isSafe` is preserved; an `isSafe(int, int, int, CompiledUnsafeSet)` overload carries the compiled form, and the legacy overload delegates through the compiler.
 
+> **Edition note (full edition only).** Everything beyond the bare-material token shape - block-tag references (`#namespace:path`), state predicates (`MATERIAL[...]`), the wildcard (`*[...]`), and the numeric range predicates of the amendment below - is a full-edition feature. The **rtp-lite** assembly variant ([ADR-024](ADR-024-rtp-lite-assembly-variant.md)) parses `unsafeBlocks` / `airBlocks` as a flat material allow/deny list and does not ship the tag resolver, the `tags/` snapshot, `tagsRefresh.yml`, or the predicate grammar. Lite tokens that contain a `#` prefix or a `[...]` body are treated as plain (and almost certainly unmatched) material names. This split is a packaging decision, not a grammar one: the parser and `CompiledUnsafeSet` are unconditionally present in `rtp-api`; lite simply does not wire the tag snapshot or advertise the grammar in its bundled docs.
+
 ### 1. Token grammar (normative)
 
 ```
@@ -61,7 +63,7 @@ path       := [a-z0-9_/.-]+
   candidate block matches the predicated token iff every listed property
   equals (case-insensitively) the live block's property of the same
   name.
-- Negation, disjunction, and numeric ranges are **out of scope** for this grammar. A future ADR may add them via a separate safety-list key rather than complicating the token grammar.
+- Negation and disjunction are **out of scope** for this grammar. Numeric ranges were originally deferred here as well; see the **Amendment (numeric range predicates)** section below, which adds them in-grammar.
 - **Wildcard material.** The identifier `*` is reserved as a wildcard
   material that matches any block regardless of `Material.name()`. A
   bare `*` (no predicate) is **rejected at parse time with a WARNING**
@@ -188,6 +190,25 @@ The `/rtp config set/add/remove` surface round-trips new tokens verbatim. Every 
   - Tag-expansion snapshot introduces a one-shot cross-module hand-off (`rtp-bukkit-common` → `rtp-anvil`) at enable time. A null snapshot degrades to "no tag match" (fail-open, logged once).
   - The `airBlocks` key uses the same compiler; enabling the grammar there is a one-call wiring change.
   - Lowercase-string property comparison: the compiler lowercases both sides so `FACE=CEILING` matches the live `face=ceiling` property; documentation calls out the normalization.
+
+## Amendment (numeric range predicates)
+
+**Date:** 2026-05-30 — closes the ROADMAP Tier 2 "Safety-list grammar expansion → numeric range predicates" item. The set-subtraction and hot-reload follow-ups from the same ROADMAP entry are explicitly **not** adopted.
+
+The predicate grammar of §1 is extended so a `pred` may use a numeric comparison operator in addition to string equality:
+
+```
+pred       := propertyName ( '=' propertyValue | compareOp integer )
+compareOp  := '>=' | '<=' | '>' | '<'
+integer    := '-'? [0-9]+
+```
+
+- `=` retains its existing case-insensitive string-equality semantics; the value is unconstrained except for the reserved characters `[`, `]`, `=`, `<`, `>`.
+- The four comparison operators parse the bound as a signed integer (`long`) at config-load time. A non-integer bound is a **malformed token** (single startup `WARNING`, token dropped — §3, REQ-RTP-S-004), consistent with the existing malformed-token handling.
+- At evaluation time the live property value is parsed as a `long`; an absent or non-numeric live value is a **miss**, not a match (the fail-open policy of §4 is preserved — a range predicate can never cause an over-rejection).
+- Multiple conditions in one `[ … ]` still combine with **logical AND**, so two bounds on the same key express an interval (`LAVA[level>=2,level<=5]`). Duplicate detection is per `(key, operator)`: `level>=2,level<=5` is accepted; `level>=2,level>=3` and `waterlogged=true,waterlogged=false` are rejected as duplicates.
+
+Implementation: `StatePredicate` gains an immutable `NumericComparison` (key, `Comparator` operator, `long` bound) list alongside the existing equality map; `SafetyTokenParser` locates the operator and routes equalities vs. comparisons. No change to `CompiledUnsafeSet` bucket structure (range predicates ride inside the same per-material / per-tag / wildcard `StatePredicate` buckets), so the §4 hot-path fast-path and `hasWildcardStatePredicate` flag are unaffected. The Anvil path (§5) reads the same NBT `Properties` compound. This stays pure and Bukkit-free in `rtp-api`. Regression coverage: `SafetyTokenParserTest`, `CompiledUnsafeSetTest`.
 
 ## References
 

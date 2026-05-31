@@ -148,5 +148,9 @@ public final class FabricDatabaseHandler {
 
         RTP.configs.reloadRegions();
         RTP.scheduler.runTaskLater(() -> RTP.getInstance().databaseAccessor.startup(), 1);
+        // ADR-060: start the emergency-platform restore reaper once the DB is up so any
+        // persisted restore jobs resume across the restart.
+        RTP.scheduler.runTaskLater(
+                io.github.dailystruggle.rtp.common.platform.PlatformRestoreManager::startGlobal, 2);
     }
 }

@@ -89,6 +89,19 @@ anvilPrefilterEnabled: true
 # @default: GLASS
 플랫폼재질: "GLASS"
 
+# Optional timeout, in seconds, after which the emergency landing platform's
+# footprint is restored to the blocks that were there before it was built.
+# -1 disables restoration (the platform is permanent, the previous behaviour).
+# 0 restores as soon as the footprint chunk is loaded again; a positive value
+# restores after that many seconds of loaded time. The countdown only advances
+# while the footprint chunk is loaded (it pauses while the area is unloaded),
+# and pending restores survive a server restart.
+# @type: integer
+# @range: [-1, null]
+# @unit: seconds
+# @default: -1
+platformRestoreSeconds: -1
+
 # 공기 블록
 # 통과 가능/플레이어 신체를 막지 않는 것으로 간주되는 재질. 전방 호환성을 위해
 # 가능한 한 바닐라 블록 태그를 우선하세요

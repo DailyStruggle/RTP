@@ -58,7 +58,7 @@ Check the `centerRadius` value in the region's `shape:` block. This is measured 
 ### Players are always landing in the same area.
 
 This can happen if:
-- `uniquePlacements: false` and the region is small; try increasing `radius`.
+- `uniquePlacements: 0` and the region is small; try increasing `radius`.
 - The bad-sector memory has marked most of the region as invalid. Reset it by deleting `rtp-core/database/regionData/<regionName>` and restarting.
 - `mode: NEAREST` is set, which can cluster landings near unblocked edges. Switch to `mode: ACCUMULATE` for even distribution.
 

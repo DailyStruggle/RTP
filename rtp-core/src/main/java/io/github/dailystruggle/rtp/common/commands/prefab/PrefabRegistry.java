@@ -4,6 +4,8 @@ import io.github.dailystruggle.rtp.common.commands.prefab.builtin.FoliaTuned;
 import io.github.dailystruggle.rtp.common.commands.prefab.builtin.HighPerformance;
 import io.github.dailystruggle.rtp.common.commands.prefab.builtin.LowPerformance;
 import io.github.dailystruggle.rtp.common.commands.prefab.builtin.MultiWorld;
+import io.github.dailystruggle.rtp.common.commands.prefab.builtin.OneBlock;
+import io.github.dailystruggle.rtp.common.commands.prefab.builtin.Skyblock;
 import io.github.dailystruggle.rtp.common.commands.prefab.builtin.SurvivalDefault;
 
 import java.util.List;
@@ -17,10 +19,10 @@ import java.util.Optional;
  * (2026-05-22 trim to five).
  *
  * <p>Listing order is the curated panel order: identity, the two
- * performance axes, the Folia tuning, then the one-region-per-world
- * expander. The earlier {@code Lightweight} / {@code FastPaced} pair was
- * dropped on 2026-05-22 as redundant with {@code LowPerformance} on the
- * low-end-server axis.
+ * performance axes, the Folia tuning, the one-region-per-world expander,
+ * then the {@code Skyblock} and {@code OneBlock} game-mode overlays. The
+ * earlier {@code Lightweight} / {@code FastPaced} pair was dropped on 2026-05-22 as
+ * redundant with {@code LowPerformance} on the low-end-server axis.
  */
 public final class PrefabRegistry {
 
@@ -29,7 +31,9 @@ public final class PrefabRegistry {
             LowPerformance.INSTANCE,
             HighPerformance.INSTANCE,
             FoliaTuned.INSTANCE,
-            MultiWorld.INSTANCE
+            MultiWorld.INSTANCE,
+            Skyblock.INSTANCE,
+            OneBlock.INSTANCE
     );
 
     private PrefabRegistry() {

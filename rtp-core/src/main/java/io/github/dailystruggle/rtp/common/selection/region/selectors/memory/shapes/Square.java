@@ -31,7 +31,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
     defaults.put(GenericMemoryShapeParams.centerZ, 0);
     defaults.put(GenericMemoryShapeParams.weight, 1.0);
     defaults.put(GenericMemoryShapeParams.expand, false);
-    defaults.put(GenericMemoryShapeParams.uniquePlacements, false);
+    defaults.put(GenericMemoryShapeParams.uniquePlacements, 0);
 
     // Curated tab-completion suggestions for /rtp shape:square <TAB>.
     // Mirrors V2 sub-parameter UX so users see the format and scale.
@@ -49,8 +49,8 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
         "rtp.params", "weigh towards or away from center", (sender, s) -> true, 0.1, 1.0, 10.0));
     subParameters.put("expand", new BooleanParameter(
         "rtp.params", "expand region to keep a constant amount of usable land", (sender, s) -> true));
-    subParameters.put("uniqueplacements", new BooleanParameter(
-        "rtp.params", "ensure each selection is unique from prior selections", (sender, s) -> true));
+    subParameters.put("uniqueplacements", new IntegerParameter(
+        "rtp.params", "chunk radius cleared around each selection (0 = off, 1 = landing chunk)", (sender, s) -> true, 0, 1, 2, 4, 8));
   }
 
   /** Default constructor for Square */
@@ -424,18 +424,13 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
         }
     }
 
-    Object unique = data.getOrDefault(GenericMemoryShapeParams.uniquePlacements, false);
-    boolean u;
-    if (unique instanceof Boolean) u = (Boolean) unique;
-    else {
-      u = Boolean.parseBoolean(String.valueOf(unique));
-      data.put(GenericMemoryShapeParams.uniquePlacements, u);
-    }
-    // addBadChunk: chunk-uniform (uniqueplacements knob) — within a chunk the per-column
+    int uniqueRadius =
+        uniquePlacementsRadius(data.getOrDefault(GenericMemoryShapeParams.uniquePlacements, 0));
+    // addBadChunkRadius: chunk-uniform (uniqueplacements knob) — within a chunk the per-column
     // selection order is deterministic, so re-rolling onto the same chunk produces the
-    // same effective placement. Marking the twin spiral index prevents that chunk-level
-    // re-roll and is the correct semantics for "unique" placements.
-    if (u) addBadChunk(location);
+    // same effective placement. Marking the landing chunk (radius 1) prevents that chunk-level
+    // re-roll; a larger radius additionally clears the surrounding chunks so placements spread out.
+    if (uniqueRadius > 0) addBadChunkRadius(location, uniqueRadius);
 
     return location;
   }

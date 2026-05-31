@@ -213,6 +213,8 @@ territory_info:
   - "#58CCED  - cold_pile (L2): [unkeptCache]"
   - "#58CCED  - backlog_pile (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - warm_spots: [cached]"
+  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
+  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # Section 8: Command Descriptions

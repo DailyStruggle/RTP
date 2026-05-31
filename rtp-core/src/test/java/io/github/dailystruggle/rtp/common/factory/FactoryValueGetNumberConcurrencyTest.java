@@ -9,6 +9,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,7 +26,9 @@ class FactoryValueGetNumberConcurrencyTest {
     NUMERIC,        // pre-seeded as Long → hot path, never writes back
     STRINGY,        // pre-seeded as String → first read parses + writes
     OTHER_NUMERIC,
-    OTHER_STRINGY
+    OTHER_STRINGY,
+    BOOL_TRUE,      // pre-seeded as Boolean true → coerces to 1
+    BOOL_FALSE      // pre-seeded as Boolean false → coerces to 0
   }
 
   /** Concrete subclass exposing only the inherited surface we test. */
@@ -36,7 +39,24 @@ class FactoryValueGetNumberConcurrencyTest {
       data.put(K.STRINGY, "3.14");
       data.put(K.OTHER_NUMERIC, 7L);
       data.put(K.OTHER_STRINGY, "1.5");
+      data.put(K.BOOL_TRUE, Boolean.TRUE);
+      data.put(K.BOOL_FALSE, Boolean.FALSE);
     }
+  }
+
+  /**
+   * Tolerant boolean -> int coercion: a legacy YAML {@code true}/{@code false}
+   * written for a knob that is now numeric (e.g. {@code uniquePlacements})
+   * resolves to 1/0 instead of throwing the pre-fix {@code NaN}
+   * {@link IllegalArgumentException}.
+   */
+  @Test
+  void getNumber_onBooleanValue_coercesToOneOrZero() {
+    Probe probe = new Probe();
+    assertEquals(1, probe.getNumber(K.BOOL_TRUE, 0).intValue(),
+        "boolean true must coerce to 1");
+    assertEquals(0, probe.getNumber(K.BOOL_FALSE, 1).intValue(),
+        "boolean false must coerce to 0");
   }
 
   /**

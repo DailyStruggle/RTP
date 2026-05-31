@@ -56,6 +56,19 @@ platformAirHeight: 2
 # @default: GLASS
 platformMaterial: "GLASS"
 
+# Optional timeout, in seconds, after which the emergency landing platform's
+# footprint is restored to the blocks that were there before it was built.
+# -1 disables restoration (the platform is permanent, the previous behaviour).
+# 0 restores as soon as the footprint chunk is loaded again; a positive value
+# restores after that many seconds of loaded time. The countdown only advances
+# while the footprint chunk is loaded (it pauses while the area is unloaded),
+# and pending restores survive a server restart.
+# @type: integer
+# @range: [-1, null]
+# @unit: seconds
+# @default: -1
+platformRestoreSeconds: -1
+
 # Blocks treated as passable air for landing-safety checks.
 # Accepts Bukkit Material names and "#minecraft:<tag>" tag references
 #.

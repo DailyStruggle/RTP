@@ -255,4 +255,34 @@ public class MemoryShapeTest {
         assertEquals(7, shape.getBadSum());
         assertEquals(7, shape.getEffectiveBadCount());
     }
+
+    @Test
+    public void testLearnedStateSummary() {
+        TestShape shape = new TestShape();
+        // Three non-overlapping single-cell bad locations, all tagged safety.
+        shape.addBadLocation(10L, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety);
+        shape.addBadLocation(20L, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety);
+        shape.addBadLocation(30L, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety);
+        shape.flushAndRebuild(1);
+
+        MemoryShape.LearnedStateSummary summary = shape.learnedStateSummary();
+        assertEquals(100L, summary.range());
+        assertEquals(3L, summary.badCount());
+        assertEquals(0L, summary.goodCount());
+        assertEquals(3.0, summary.coveragePercent(), 1e-9);
+        assertEquals(3.0, summary.badPercent(), 1e-9);
+        assertEquals("safety", summary.topCause());
+        assertEquals(100.0, summary.topCausePercent(), 1e-9);
+    }
+
+    @Test
+    public void testLearnedStateSummary_emptyShape() {
+        TestShape shape = new TestShape();
+        shape.flushAndRebuild(1);
+
+        MemoryShape.LearnedStateSummary summary = shape.learnedStateSummary();
+        assertEquals(0L, summary.badCount());
+        assertEquals("none", summary.topCause());
+        assertTrue(Double.isNaN(summary.topCausePercent()));
+    }
 }

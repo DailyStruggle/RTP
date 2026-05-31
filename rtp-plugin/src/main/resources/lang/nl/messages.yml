@@ -197,6 +197,8 @@ regioGegevens:
   - "#58CCED  - vrijgegevenCache (L2): [unkeptCache]"
   - "#58CCED  - achterstandCache (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - inCache: [cached]"
+  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
+  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # Sectie 8: Opdrachtbeschrijvingen

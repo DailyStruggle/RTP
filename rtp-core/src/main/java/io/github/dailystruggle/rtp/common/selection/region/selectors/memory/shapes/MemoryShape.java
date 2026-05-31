@@ -831,6 +831,77 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     return marked;
   }
 
+  /**
+   * Coerces a raw {@code uniquePlacements} config value into a non-negative
+   * chunk radius. The knob is an integer (default {@code 0} = off), but the
+   * loader may hand back a {@link Boolean} (legacy {@code true}/{@code false}
+   * configs), a {@link Number}, or a {@link String}. Coercion rules:
+   *
+   * <ul>
+   *   <li>{@code null} -&gt; {@code 0}</li>
+   *   <li>{@link Boolean}: {@code true} -&gt; {@code 1}, {@code false} -&gt; {@code 0}</li>
+   *   <li>{@link Number}: truncated to {@code int}, clamped to {@code >= 0}</li>
+   *   <li>{@link String}: {@code "true"}/{@code "false"} map to {@code 1}/{@code 0};
+   *       otherwise parsed as an integer (unparseable -&gt; {@code 0})</li>
+   * </ul>
+   *
+   * <p>A return of {@code 0} means unique-placement marking is disabled; a
+   * value {@code n >= 1} marks a {@code (2n-1) x (2n-1)} chunk square centered
+   * on the landing chunk (so {@code 1} == the legacy single-chunk behavior).
+   *
+   * @param raw the raw config value (any type, or {@code null}).
+   * @return a non-negative chunk radius.
+   */
+  public static int uniquePlacementsRadius(Object raw) {
+    if (raw == null) return 0;
+    if (raw instanceof Boolean b) return b ? 1 : 0;
+    if (raw instanceof Number n) return Math.max(0, n.intValue());
+    String s = String.valueOf(raw).trim();
+    if (s.equalsIgnoreCase("true")) return 1;
+    if (s.equalsIgnoreCase("false") || s.isEmpty()) return 0;
+    try {
+      return Math.max(0, Integer.parseInt(s));
+    } catch (NumberFormatException e) {
+      return 0;
+    }
+  }
+
+  /**
+   * Marks every chunk within Chebyshev radius {@code chunkRadius - 1} of the
+   * chunk containing {@code location} as bad (a {@code (2r-1) x (2r-1)} square
+   * of chunks, where {@code r == chunkRadius}). Used for the
+   * {@code uniquePlacements} knob: {@code chunkRadius == 1} marks only the
+   * landing chunk (equivalent to {@link #addBadChunk(long)}), while larger
+   * values clear a radius of chunks around the selection so subsequent
+   * placements are spread out.
+   *
+   * @param location any 1D index that decodes to the center chunk.
+   * @param chunkRadius the unique-placements radius ({@code <= 0} is a no-op).
+   * @return number of indices newly marked bad across all touched chunks.
+   */
+  public int addBadChunkRadius(long location, int chunkRadius) {
+    if (chunkRadius <= 0) return 0;
+    if (chunkRadius == 1) {
+      return addBadChunk(location, LocationGenerator.FailTypes.uniquePlacement);
+    }
+    int[] center = locationToXZ(location);
+    int reach = chunkRadius - 1;
+    int marked = 0;
+    for (int dx = -reach; dx <= reach; dx++) {
+      for (int dz = -reach; dz <= reach; dz++) {
+        long[] preimage = chunkToLocations(center[0] + dx, center[1] + dz);
+        for (long p : preimage) {
+          if (p < 0L) continue;
+          if (!isKnownBad(p)) {
+            addBadLocation(p, LocationGenerator.FailTypes.uniquePlacement);
+            marked++;
+          }
+        }
+      }
+    }
+    return marked;
+  }
+
   public void addBiomeLocation(Long location, long width, String biome) {
     // Canonicalise the biome key so that `FOREST` and `MINECRAFT:FOREST`
     // alias to the same per-biome bucket; the lookup side (PregenTask
@@ -916,6 +987,92 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    */
   public long getEffectiveGoodCount() {
     return totalBiomeCount.get();
+  }
+
+  /**
+   * Immutable, human-oriented roll-up of this shape's persistent learned state.
+   * Backs the per-region {@code [mem*]} placeholders surfaced by
+   * {@code /rtp info region:<name>} (see {@code docs/admin/COMMANDS.md} and the
+   * placeholder catalog in {@code PlaceholderProvider}). All figures are derived
+   * from the same data {@link #exportDebugJson} writes; no chunk I/O, no scan is
+   * triggered.
+   *
+   * @param range          total candidate cells the shape can address
+   * @param badCount        cells currently flagged bad (learned rejects)
+   * @param goodCount       cells with a recorded biome (learned good)
+   * @param coveragePercent percentage of {@code range} that has been learned
+   *                        (bad + good), {@code NaN} when {@code range == 0}
+   * @param badPercent      percentage of {@code range} flagged bad, {@code NaN}
+   *                        when {@code range == 0}
+   * @param topCause        name of the rejection cause covering the most bad
+   *                        cells, or {@code "none"} when nothing is flagged
+   * @param topCausePercent that cause's share of all bad cells, {@code NaN} when
+   *                        nothing is flagged
+   */
+  public record LearnedStateSummary(
+      long range,
+      long badCount,
+      long goodCount,
+      double coveragePercent,
+      double badPercent,
+      String topCause,
+      double topCausePercent) {}
+
+  /**
+   * Builds a {@link LearnedStateSummary} from a single write-locked snapshot of
+   * the bad-location arrays (the same snapshot strategy as {@link #save} /
+   * {@link #exportDebugJson}). The per-cause tally is cell-weighted via the
+   * prefix sums, so a long run counts proportionally more than a short one.
+   *
+   * @return a fresh summary; never {@code null}
+   */
+  public LearnedStateSummary learnedStateSummary() {
+    long[] sBadKeys;
+    long[] sBadSums;
+    byte[] sBadCauses;
+    writeLock.lock();
+    try {
+      sBadKeys = Arrays.copyOf(badKeysCache, badKeysCache.length);
+      sBadSums = Arrays.copyOf(badPrefixSumsCache, badPrefixSumsCache.length);
+      sBadCauses = Arrays.copyOf(badCauseCache, badCauseCache.length);
+    } finally {
+      writeLock.unlock();
+    }
+
+    long range = getRange();
+    long badCount = getEffectiveBadCount();
+    long goodCount = getEffectiveGoodCount();
+    long learned = badCount + goodCount;
+    double coveragePercent =
+        range > 0 ? Math.min(100.0, 100.0 * learned / range) : Double.NaN;
+    double badPercent = range > 0 ? 100.0 * badCount / range : Double.NaN;
+
+    LocationGenerator.FailTypes[] failTypes = LocationGenerator.FailTypes.values();
+    long[] perCause = new long[failTypes.length];
+    long prev = 0L;
+    long totalRunCells = 0L;
+    for (int i = 0; i < sBadKeys.length; i++) {
+      long len = sBadSums[i] - prev;
+      prev = sBadSums[i];
+      int causeOrd = (i < sBadCauses.length) ? (sBadCauses[i] & 0xFF) : (MISC_CAUSE & 0xFF);
+      if (causeOrd < 0 || causeOrd >= failTypes.length) causeOrd = MISC_CAUSE & 0xFF;
+      perCause[causeOrd] += len;
+      totalRunCells += len;
+    }
+
+    String topCause = "none";
+    double topCausePercent = Double.NaN;
+    long topCells = 0L;
+    for (int i = 0; i < perCause.length; i++) {
+      if (perCause[i] > topCells) {
+        topCells = perCause[i];
+        topCause = failTypes[i].name();
+      }
+    }
+    if (totalRunCells > 0) topCausePercent = 100.0 * topCells / totalRunCells;
+
+    return new LearnedStateSummary(
+        range, badCount, goodCount, coveragePercent, badPercent, topCause, topCausePercent);
   }
 
   public void flushAndRebuild(long spatialResolution) {

@@ -204,6 +204,8 @@ infoFoliaRegion: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]
   - "#58CCED  - освобождённыйКэш (L2): [unkeptCache]"
   - "#58CCED  - накопленныйКэш (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - вКэше: [cached]"
+  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
+  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # Section 8: Command Descriptions

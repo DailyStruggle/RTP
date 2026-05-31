@@ -10,9 +10,11 @@ For the supersession history: legacy Minecraft and Java versions are out of scop
 - Forge, NeoForge, and other non-Fabric mod loaders. Re-evaluation deferred until Fabric is stable (Phase 4 below).
 - Networked Fabric setups (Velocity / BungeeCord in front of a Fabric backend) as a prioritized feature. Decision recorded 2026-05-24: the `rtp-proxy-common` dispatcher is platform-agnostic and the devstack's `backend-c` Fabric instance exercises the SPI, so a Fabric backend in a proxied fleet is not actively broken, but no Fabric-specific proxy work is on the roadmap and no operator-facing forwarding-mode recipe ships until a modpack operator files a concrete request. Vanilla Minecraft does not implement Velocity modern forwarding; today's only path is Velocity legacy forwarding + the third-party FabricProxy-Lite mod, at operator risk. See also the matching non-goal in `MULTI_SERVER_PLAN.md`.
 
-## Remaining Work Checklist *(updated 2026-05-01)*
+## Remaining Work Checklist *(updated 2026-05-30)*
 
 Quick scan of what's done and what's left across Phases 0–3. Each Phase 2 step links to its detailed status block below. Tick boxes are authoritative — sub-bullets are scope reminders.
+
+**Status (2026-05-30):** the bulk of Fabric parity is done and verified running end-to-end on each supported runtime (`v1_20_R1`, `v1_21_R1`, `v1_21_R5`, `v1_21_R11`, `v26_1_R1`) — core teleport pipeline, scheduler, database, event bridge, anvil pre-filter, login reserve cache, permissions, the full Brigadier command tree, and the chat-based menu renderer all ship. Three areas remain open: **metrics** (cross-platform consolidation follow-up C6 below; the `FabricMetricsBinding` itself already landed), **networking** (Step J — network-mode backend parity so a proxied player arriving on a Fabric backend can redeem a reservation token), and **book menus** (Step I Session 3 — the 1.21+ `FabricBookMenuRenderer` un-defer; 1.20.x stays on the chat renderer).
 
 ### ✅ Done
 
@@ -326,7 +328,7 @@ This means **most of the parity gap closes for free** as soon as `RTP.scheduler`
 | PAPI registration | N/A (Bukkit-only) | — |
 | `JarUtils.extractDocs(getDataFolder(), version)` | ❌ missing | **E3-4: port `JarUtils.extractDocs` to a `FabricJarUtils` (no `JavaPlugin` dep), seed `<configDir>/rtp/docs/`.** |
 | `initLoginReserveCache()` (ADR-023) | ✅ landed 2026-05-11 — `FabricEventBridge.initLoginReserveCache(server)` + `refillLoginReserveOnQuit()` + `FabricOnEventTeleports.onJoin` (see ADR-023 *Fabric port*). | E3-5 closed. |
-| `metrics = new Metrics(this, 30865)` *(bStats)* | N/A (Bukkit-only — bStats has a separate Fabric module if pursued later) | Track separately; not blocking `/rtp`. |
+| `metrics = new Metrics(this, 30865)` *(bStats)* | ❌ missing — no bStats submission on Fabric runtime | **TODO (deferred, not blocking `/rtp`):** bStats *is* possible on Fabric. There is no official `bstats-fabric` artifact, so implement via either (a) a shaded/community copy of the bStats `Metrics`/`MetricsBase` class, or (b) a small custom JSON submitter to the bStats v2 data endpoint on an `RTP.scheduler` async timer. Register RTP's existing chart catalogue through the platform-neutral `metrics-api` (`MetricsSnapshot` / `FabricMetricsBinding`) so charts are shared with the Bukkit path. Lives in `rtp-fabric` only — never `rtp-core`/`rtp-api`. Gated by Rule D-005 (multi-module). |
 
 #### Required `RTPFabricMod.onInitialize()` changes (in order)
 

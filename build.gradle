@@ -90,3 +90,52 @@ subprojects {
         duplicatesStrategy = DuplicatesStrategy.INCLUDE
     }
 }
+
+// ---------------------------------------------------------------------------
+// Addon-facing artifact publishing (JitPack / Maven Local).
+//
+// Both rtp-api and rtp-core are supported addon-development dependencies, so
+// out-of-repo addon authors need them (and their inter-module project-dependency
+// closure) resolvable from a public Maven coordinate rather than `project(...)`
+// references that only exist inside this build. This block applies `maven-publish`
+// to exactly that closure and nothing else, deliberately excluding the platform
+// adapters, the Fabric/Loom (JDK 25) modules, and the shaded plugin jar.
+//
+// On JitPack (see jitpack.yml) the resulting modules are consumed as
+//   com.github.DailyStruggle.RTP:<module>:<tag>
+// For a "real" registry (Maven Central) see docs/dev/PUBLISHING.md.
+//
+// Closure rationale (transitive `api`/`implementation` project edges):
+//   rtp-api  -> commands-api, yaml-api, metrics-api
+//   rtp-core -> rtp-api, yaml-api, commands-api, effects-api, metrics-api,
+//               maps-api, rtp-proxy:rtp-proxy-common
+//   effects-api        -> commands-api, rtp-api
+//   rtp-proxy-common   -> rtp-api
+// Every coordinate that can appear in a generated POM must itself be published,
+// otherwise a consumer's transitive resolution fails.
+def publishedModulePaths = [
+        ':rtp-api',
+        ':rtp-core',
+        ':commands-api',
+        ':yaml-api',
+        ':metrics-api',
+        ':effects-api',
+        ':maps-api',
+        ':rtp-proxy:rtp-proxy-common',
+]
+
+configure(publishedModulePaths.collect { project(it) }) {
+    apply plugin: 'maven-publish'
+
+    // Publish after evaluation so each module's `java`/`java-library` component
+    // (and any withSourcesJar/withJavadocJar wiring) is fully registered first.
+    afterEvaluate {
+        publishing {
+            publications {
+                mavenJava(MavenPublication) {
+                    from components.java
+                }
+            }
+        }
+    }
+}

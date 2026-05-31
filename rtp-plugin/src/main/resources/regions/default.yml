@@ -14,7 +14,9 @@ shape:
   centerX: 0
   centerZ: 0
   weight: 1.0
-  uniquePlacements: false
+  # Chunk radius cleared around each used spot so it is never reused.
+  # 0 = off, 1 = the landing chunk only, N = an (2N-1)x(2N-1) chunk square.
+  uniquePlacements: 0
   expand: false
 
 vert:

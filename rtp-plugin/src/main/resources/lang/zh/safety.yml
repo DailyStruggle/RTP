@@ -84,6 +84,19 @@ anvilPrefilterEnabled: true
 # @default: GLASS
 平台材质: "GLASS"
 
+# Optional timeout, in seconds, after which the emergency landing platform's
+# footprint is restored to the blocks that were there before it was built.
+# -1 disables restoration (the platform is permanent, the previous behaviour).
+# 0 restores as soon as the footprint chunk is loaded again; a positive value
+# restores after that many seconds of loaded time. The countdown only advances
+# while the footprint chunk is loaded (it pauses while the area is unloaded),
+# and pending restores survive a server restart.
+# @type: integer
+# @range: [-1, null]
+# @unit: seconds
+# @default: -1
+platformRestoreSeconds: -1
+
 # 空气方块
 # 视为可通行/不阻挡身体的材质。尽量使用原版方块标签以保留前向兼容性
 # (例如未来 MC 新增的花种会自动通过 #minecraft:small_flowers 被识别)。

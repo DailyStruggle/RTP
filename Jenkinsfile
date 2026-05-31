@@ -7,6 +7,16 @@ pipeline {
     buildDiscarder(logRotator(numToKeepStr: '20'))
   }
 
+  environment {
+    // Addon-facing API closure published for out-of-repo addon authors.
+    // Keep in sync with `publishedModulePaths` in the root build.gradle and the
+    // `install:` block in jitpack.yml.
+    PUBLISH_TASKS = ':commands-api:publishToMavenLocal :yaml-api:publishToMavenLocal ' +
+                    ':metrics-api:publishToMavenLocal :maps-api:publishToMavenLocal ' +
+                    ':effects-api:publishToMavenLocal :rtp-proxy:rtp-proxy-common:publishToMavenLocal ' +
+                    ':rtp-api:publishToMavenLocal :rtp-core:publishToMavenLocal'
+  }
+
   stages {
     stage('Traceability Check') {
       steps {
@@ -44,9 +54,31 @@ pipeline {
       }
     }
 
+    // Publish the addon-facing API closure (rtp-api/rtp-core + their
+    // project-dependency closure) on every push or merge to the V3 line.
+    // JitPack serves these branch snapshots on demand as
+    // `com.github.DailyStruggle.RTP:<module>:V3-SNAPSHOT`; this stage both
+    // validates the publication graph and primes the local Maven repo. A
+    // remote-repo upload (Maven Central snapshots / GitHub Packages) can be
+    // swapped in by replacing the publish tasks with the credentialed target.
+    stage('Publish API Artifacts') {
+      when {
+        anyOf {
+          branch 'V3'
+          branch 'V3-beta'
+        }
+      }
+      steps {
+        sh "./gradlew --no-daemon ${PUBLISH_TASKS}"
+      }
+    }
+
     stage('Archive Artifacts') {
       when {
-        branch 'main'
+        anyOf {
+          branch 'main'
+          branch 'V3'
+        }
       }
       steps {
         archiveArtifacts artifacts: 'build/libs/*.jar, addons/*/build/libs/*.jar',

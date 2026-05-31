@@ -197,6 +197,8 @@ infoFoliaRegion: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]
   - "#58CCED  - 解放キャッシュ (L2): [unkeptCache]"
   - "#58CCED  - バックログキャッシュ (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - キャッシュ済み: [cached]"
+  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
+  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # セクション 8: コマンド説明

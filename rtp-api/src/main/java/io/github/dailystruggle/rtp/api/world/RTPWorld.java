@@ -398,6 +398,45 @@ public abstract class RTPWorld<T> {
   public abstract void platform(RTPLocation location);
 
   /**
+   * The region-schematic paster active for this platform (ADR-058). Used by {@code rtp-core}
+   * at teleport commit to load (off-thread) and paste (on the region-owning thread) a
+   * region-specific arrival structure when one is present on disk.
+   *
+   * <p>The default returns the platform-neutral
+   * {@link io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster} (never {@code null},
+   * S-006), so a platform with no paster installed simply reports
+   * {@link io.github.dailystruggle.rtp.api.schematic.PasteResult#SKIPPED_UNSUPPORTED} and the
+   * teleport proceeds unchanged. Adapters that ship a paster
+   * ({@code BukkitRTPWorld}, {@code FoliaRTPWorld}, {@code FabricRTPWorld}) override this to
+   * return their swappable static paster (mirroring the {@code setBiomeGetter} idiom).
+   *
+   * @return the active paster; never {@code null}
+   */
+  public io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster() {
+    return io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster.INSTANCE;
+  }
+
+  /**
+   * Writes a list of recorded original blocks back into this world, reversing an emergency
+   * landing platform built by {@link #platform(RTPLocation)}. See ADR-060.
+   *
+   * <p>MUST be invoked on the thread that owns the footprint region (Folia region thread;
+   * Bukkit/Paper main thread) - the caller schedules it through {@code RTP.scheduler}. The
+   * implementation performs only block writes and never loads chunks: the caller invokes it
+   * only when the footprint chunk is already loaded (S-005).
+   *
+   * <p>The default implementation is a no-op returning {@code false} (the platform does not
+   * support block restoration); {@code .schem}-free adapters with a serializable block-state
+   * token ({@code BukkitRTPWorld}, {@code FoliaRTPWorld}, Fabric peer) override it.
+   *
+   * @param blocks the recorded original blocks to write back; never {@code null}
+   * @return {@code true} when the blocks were applied; {@code false} when unsupported or failed
+   */
+  public boolean restoreBlocks(java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+    return false;
+  }
+
+  /**
    * Checks if this world is considered inactive (e.g., has no players).
    *
    * @return {@code true} if the world is inactive, {@code false} otherwise

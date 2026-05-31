@@ -104,6 +104,12 @@ public class RegionConfigLoaderTest {
                 Arguments.of(RegionKeys.cacheCap, -10, -10L, "Negative number for cacheCap (currently accepted as is)"),
                 Arguments.of(RegionKeys.activeChunkCap, "invalid", 0, "String instead of Integer for activeChunkCap"),
                 Arguments.of(RegionKeys.worldBorderOverride, null, false, "null for worldBorderOverride"),
+                // Tolerant int -> boolean coercion: 1 -> true, 0 -> false.
+                Arguments.of(RegionKeys.worldBorderOverride, 1, true, "Integer 1 coerced to true for worldBorderOverride"),
+                Arguments.of(RegionKeys.worldBorderOverride, 0, false, "Integer 0 coerced to false for worldBorderOverride"),
+                // Tolerant boolean -> int coercion: true -> 1, false -> 0.
+                Arguments.of(RegionKeys.cacheCap, true, 1L, "Boolean true coerced to 1 for cacheCap"),
+                Arguments.of(RegionKeys.activeChunkCap, true, 1, "Boolean true coerced to 1 for activeChunkCap"),
                 Arguments.of(RegionKeys.shape, null, null, "null for shape")
         );
     }

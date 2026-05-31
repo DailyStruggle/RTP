@@ -11,9 +11,12 @@ name: Release rtp-lite to Modrinth
 # Required repo secret:
 #   MODRINTH_TOKEN -- Modrinth PAT with the `Create version` scope.
 #
-# Release notes are taken from CHANGELOG-lite.md (the section matching the
-# tag's version string). See AGENTS.md `CHANGELOG Hygiene` for the
-# net-delta-from-last-released-tag rule that keeps that section honest.
+# Release notes are taken from CHANGELOG.md (the section matching the tag's
+# version string), with any bullet tagged `**(Pro)**` stripped out so the
+# lite notes only describe features that actually ship in rtp-lite. See
+# AGENTS.md `CHANGELOG Hygiene` for the net-delta-from-last-released-tag rule
+# that keeps each section honest, and the `Pro-exclusive tagging rule` at the
+# top of CHANGELOG.md for the marker contract.
 
 on:
   push:
@@ -85,29 +88,46 @@ jobs:
           echo "lite_jar=${LITE_JAR}" >> "$GITHUB_OUTPUT"
           echo "Found lite jar: ${LITE_JAR}"
 
-      - name: Extract release notes from CHANGELOG-lite.md
+      - name: Extract release notes from CHANGELOG.md
         id: notes
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Extract the section for this version. Heading shape:
+          # Extract the section for this version from the shared CHANGELOG.md.
+          # Heading shape:
           #   ## [1.0.0] - YYYY-MM-DD
           # or
           #   ## [1.0.0-beta.1] - Unreleased
-          # Stop at the next `## [` heading.
-          if [ ! -f CHANGELOG-lite.md ]; then
-            echo "::warning::CHANGELOG-lite.md not found; falling back to generic release notes."
+          # Stop at the next `## [` heading. Bullets tagged `**(Pro)**` (and
+          # their wrapped continuation lines) are dropped so the lite notes
+          # only describe features that ship in rtp-lite -- see the
+          # `Pro-exclusive tagging rule` at the top of CHANGELOG.md.
+          if [ ! -f CHANGELOG.md ]; then
+            echo "::warning::CHANGELOG.md not found; falling back to generic release notes."
             echo "rtp-lite ${VERSION}" > release-notes.md
           else
             awk -v ver="$VERSION" '
-              BEGIN { capture = 0 }
+              BEGIN { capture = 0; skip = 0 }
               /^## \[/ {
                 if (capture) { exit }
                 if (index($0, "[" ver "]") > 0) { capture = 1; next }
               }
-              capture == 1 { print }
-            ' CHANGELOG-lite.md > release-notes.md
+              capture != 1 { next }
+              # A new bullet resets the skip state; drop it if Pro-tagged.
+              /^[ \t]*[-*] / {
+                if (index($0, "**(Pro)**") > 0) { skip = 1; next }
+                skip = 0
+                print
+                next
+              }
+              # Section headings always print and clear any active skip.
+              /^### / { skip = 0; print; next }
+              # Continuation / blank lines: suppressed only while skipping a
+              # Pro-tagged bullet.
+              skip == 1 { next }
+              { print }
+            ' CHANGELOG.md > release-notes.md
             if [ ! -s release-notes.md ]; then
-              echo "::warning::No CHANGELOG-lite.md section matched [${VERSION}]; using a placeholder."
+              echo "::warning::No CHANGELOG.md section matched [${VERSION}]; using a placeholder."
               echo "rtp-lite ${VERSION}" > release-notes.md
             fi
           fi

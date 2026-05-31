@@ -101,6 +101,16 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private ChunkReservation reservation;
   private ChunkSet chunkSet;
 
+  /**
+   * ADR-058 — region-specific schematic paste. When a {@code schematics/<region>.schem} file
+   * is present, {@link #runLoad} (off the region thread) kicks off the decode into this future
+   * and {@link #runTeleport} (on the region thread) pastes the result in place of the emergency
+   * platform. Both stay {@code null} when no schematic file exists for the region.
+   */
+  private java.util.concurrent.CompletableFuture<
+      io.github.dailystruggle.rtp.api.schematic.LoadedSchematic> schematicLoad;
+  private io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster;
+
   public TeleportPipelineTask(GenerationContext context) {
     this.context = context;
     this.immediateTeleport = true;
@@ -387,6 +397,32 @@ public final class TeleportPipelineTask extends RTPRunnable {
         return;
       }
 
+      // ADR-058 — region-specific schematic. The presence of <pluginDir>/schematics/<region>.schem
+      // is the knob (no config key). The file read + decode is blocking I/O, so it is started here
+      // on the load (non-region) thread; the resulting blocks are written on the region thread in
+      // runTeleport. Resolution / decode failure is best-effort and never aborts the teleport
+      // (S-004): a missing file leaves schematicLoad null and the default platform path runs.
+      if (schematicLoad == null) {
+        try {
+          RTPWorld<?> schemWorld = RTP.serverAccessor.getRTPWorld(coords.worldName());
+          if (schemWorld == null) schemWorld = region.getWorld();
+          if (schemWorld != null) {
+            io.github.dailystruggle.rtp.api.schematic.SchematicSource src =
+                RegionSchematicService.resolveSource(region.name);
+            if (src != null) {
+              io.github.dailystruggle.rtp.api.schematic.SchematicPaster paster =
+                  schemWorld.schematicPaster();
+              if (paster != null && paster.supports(src)) {
+                schematicPaster = paster;
+                schematicLoad = paster.load(src);
+              }
+            }
+          }
+        } catch (Exception e) {
+          SupportLogger.logException(Level.FINE, "region schematic load dispatch failed", e);
+        }
+      }
+
       if (chunkSet == null && reservation != null) {
         chunkSet = reservation.getChunkSet();
       }
@@ -469,7 +505,35 @@ public final class TeleportPipelineTask extends RTPRunnable {
       boolean buildPlatform = shouldBuildPlatform(world, coords);
       RTP.log(Level.FINER, "[PIPELINE_TRACE] runTeleport platformDecision=" + buildPlatform
               + " worldNull=" + (world == null));
-      if (buildPlatform) {
+
+      // ADR-058 — region-specific schematic paste (region thread). When the region has a
+      // schematic file, paste it at the arrival location instead of the emergency platform:
+      // the schematic provides the footing the platform would have. The paste is best-effort
+      // (S-004) — any skip/failure is audited and the default platform path still runs so the
+      // player never lands without footing.
+      boolean pastedSchematic = false;
+      io.github.dailystruggle.rtp.api.schematic.LoadedSchematic loadedSchematic =
+          (schematicLoad != null) ? schematicLoad.getNow(null) : null;
+      if (loadedSchematic != null && schematicPaster != null) {
+        try {
+          io.github.dailystruggle.rtp.api.schematic.PasteResult pasteResult =
+              schematicPaster.paste(loadedSchematic, location,
+                  io.github.dailystruggle.rtp.api.schematic.PasteOptions.defaults());
+          if (pasteResult != null && pasteResult.placed()) {
+            pastedSchematic = true;
+            RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport pasted region schematic '"
+                + region.name + "'");
+          } else {
+            RTP.log(Level.INFO, "[RTP] region schematic '" + region.name
+                + "' not pasted (" + pasteResult + "); falling back to default platform (S-004).");
+          }
+        } catch (Exception e) {
+          SupportLogger.logException(Level.WARNING,
+              "region schematic paste failed for '" + region.name + "'", e);
+        }
+      }
+
+      if (!pastedSchematic && buildPlatform) {
         location.world().platform(location);
       }
       RTP.getInstance().invulnerablePlayers.put(playerId, System.currentTimeMillis());

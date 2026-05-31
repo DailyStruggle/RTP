@@ -176,6 +176,52 @@ class CompiledUnsafeSetTest {
   }
 
   @Test
+  @DisplayName("numeric range predicate: material rejected only when bound is satisfied")
+  void numericRangeMaterial() {
+    CompiledUnsafeSet c = compile("LAVA[level<=3]");
+    assertEquals(Set.of("LAVA"), c.materialStatePredicates().keySet());
+    assertTrue(c.isUnsafe("LAVA", props("level", "0")));
+    assertTrue(c.isUnsafe("LAVA", props("level", "3")));
+    assertFalse(c.isUnsafe("LAVA", props("level", "4")),
+        "level above the bound → safe");
+    assertFalse(c.isUnsafe("LAVA", props("level", "notanumber")),
+        "non-numeric live value → miss (fail-open)");
+    assertFalse(c.isUnsafe("LAVA", null),
+        "missing property map → miss (fail-open)");
+  }
+
+  @Test
+  @DisplayName("bounded interval (two bounds on one key) requires both to hold")
+  void numericRangeInterval() {
+    CompiledUnsafeSet c = compile("LAVA[level>=2,level<=5]");
+    assertFalse(c.isUnsafe("LAVA", props("level", "1")));
+    assertTrue(c.isUnsafe("LAVA", props("level", "2")));
+    assertTrue(c.isUnsafe("LAVA", props("level", "5")));
+    assertFalse(c.isUnsafe("LAVA", props("level", "6")));
+  }
+
+  @Test
+  @DisplayName("equality and range combine: both must match")
+  void mixedEqualityAndRangeEval() {
+    CompiledUnsafeSet c = compile("WATER[falling=true,level>=5]");
+    assertTrue(c.isUnsafe("WATER", props("falling", "true", "level", "5")));
+    assertFalse(c.isUnsafe("WATER", props("falling", "false", "level", "5")),
+        "equality mismatch → miss");
+    assertFalse(c.isUnsafe("WATER", props("falling", "true", "level", "4")),
+        "range mismatch → miss");
+  }
+
+  @Test
+  @DisplayName("wildcard numeric range fires for any material on the bound")
+  void wildcardNumericRange() {
+    CompiledUnsafeSet c = compile("*[level>=8]");
+    assertTrue(c.hasWildcardStatePredicate());
+    assertTrue(c.isUnsafe("LAVA", props("level", "8")));
+    assertTrue(c.isUnsafe("WATER", props("level", "15")));
+    assertFalse(c.isUnsafe("WATER", props("level", "7")));
+  }
+
+  @Test
   @DisplayName("null/empty material name never matches")
   void nullMaterial() {
     CompiledUnsafeSet c = compile("LAVA", "*[waterlogged=true]");
