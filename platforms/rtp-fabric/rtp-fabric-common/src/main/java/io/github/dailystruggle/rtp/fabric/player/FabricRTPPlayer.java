@@ -33,7 +33,7 @@ import java.util.concurrent.CompletableFuture;
  *
  * <p>No {@code org.bukkit.*} imports — ADR-022 §4 invariant.
  */
-public final class FabricRTPPlayer implements RTPPlayer, FabricBookOpener {
+public final class FabricRTPPlayer implements RTPPlayer, FabricBookOpener, FabricMapSink {
 
     private final UUID uuid;
     private final String name;
@@ -98,6 +98,50 @@ public final class FabricRTPPlayer implements RTPPlayer, FabricBookOpener {
         FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
         if (adapter == null) return false;
         return adapter.openBookMenu(p, spec);
+    }
+
+    /**
+     * Render an RTP chart onto a vanilla filled-map for this player and ship it
+     * (maps-api parity, MULTI_PLATFORM_PLAN Step K). Mirrors {@link #openBookMenu}:
+     * the maps path flows player-first, so the raw {@link ServerPlayer} handle
+     * never leaves this class. We resolve the active {@link FabricVersionAdapter},
+     * hop to the server tick thread via {@code RTP.scheduler} (map saved-data
+     * allocation, packet dispatch, and inventory mutation all require
+     * server-thread affinity), then delegate to the carrier's NM-free seam with
+     * the live handle. Server/level state is reached <em>through</em> this player
+     * (the carrier derives {@code sp.level()} / {@code sp.connection} /
+     * {@code sp.getInventory()}); no standalone {@code MinecraftServer} is needed.
+     *
+     * @param chartKey    stable per-chart key (carrier reuses one {@code MapId}
+     *                    across live-refresh frames)
+     * @param argb        row-major 128x128 ARGB pixel buffer
+     * @param locked      request a write-locked map
+     * @param deliverItem place a {@code FILLED_MAP} item into the inventory
+     * @return {@code true} if the request was accepted (dispatched onto the
+     *         server thread); {@code false} if the player is offline or the
+     *         active carrier does not support map charts
+     */
+    public boolean renderMapChart(String chartKey, int[] argb, boolean locked, boolean deliverItem) {
+        if (!isOnline() || chartKey == null || argb == null) return false;
+        FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
+        if (adapter == null || !adapter.supportsMapCharts()) return false;
+        RTP.scheduler.runTask(() -> {
+            ServerPlayer p = handle;
+            if (p == null) return; // viewer went offline before the hop
+            adapter.renderMapChart(p, chartKey, argb, locked, deliverItem);
+        });
+        return true;
+    }
+
+    /**
+     * Release any per-chart {@code MapId} cache the active carrier holds for
+     * {@code chartKey} (REQ-RTP-MAP-003). Pure server-side cache cleanup keyed
+     * by the chart id; needs neither the server nor this player's handle, but
+     * lives here so the maps lifecycle stays anchored on {@code RTPPlayer}.
+     */
+    public void releaseMapChart(String chartKey) {
+        FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
+        if (adapter != null) adapter.releaseMapChart(chartKey);
     }
 
     @Override

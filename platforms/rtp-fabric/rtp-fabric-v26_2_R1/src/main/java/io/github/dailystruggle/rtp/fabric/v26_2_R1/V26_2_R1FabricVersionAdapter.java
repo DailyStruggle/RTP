@@ -379,51 +379,59 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     @Override
-    public void releaseMapChart(Object server, String chartKey) {
+    public void releaseMapChart(String chartKey) {
         if (chartKey != null) {
             mapIds.remove(chartKey);
         }
     }
 
     @Override
-    public boolean renderMapChart(Object server,
-                                  java.util.UUID viewer,
+    public boolean renderMapChart(Object serverPlayer,
                                   String chartKey,
                                   int[] argb,
                                   boolean locked,
                                   boolean deliverItem) {
-        if (!(server instanceof MinecraftServer mc) || viewer == null
+        // Maps flow player-first: the viewer arrives as the raw NM ServerPlayer
+        // that FabricRTPPlayer resolved and owns, so all server/level state is
+        // reached through the player handle (sp.level()) rather than a
+        // standalone MinecraftServer. The caller (FabricRTPPlayer#renderMapChart)
+        // has already hopped to the server tick thread via RTP.scheduler, so map
+        // allocation, colour writes, packet dispatch, and inventory mutation are
+        // all server-thread-safe here.
+        if (!(serverPlayer instanceof ServerPlayer sp)
                 || chartKey == null || argb == null) {
             return false;
         }
-        // Hop to the server tick thread: map allocation, colour writes, packet
-        // dispatch, and inventory mutation all require server-thread affinity.
-        mc.execute(() -> {
-            try {
-                ServerPlayer sp = mc.getPlayerList().getPlayer(viewer);
-                if (sp == null) return; // viewer went offline before the hop
+        try {
                 ServerLevel level = (ServerLevel) sp.level();
 
+                // Client-only "fake map": we deliberately do NOT register any
+                // MapItemSavedData on the server (no level.setMapData). The
+                // server therefore has no saved data to tick, so vanilla's
+                // held-map terrain scan (MapItem.inventoryTick -> update, which
+                // first resolves getMapData(id) and bails when it is null)
+                // never runs and can never overwrite our custom chart pixels.
+                // Earlier attempts that DID register saved data and tried to
+                // suppress the scan via the `locked` flag and via a sentinel
+                // `dimension` both failed on this runtime (the map briefly
+                // showed our drawing then reverted to a terrain render every
+                // tick). The client maintains its own per-MapId colour cache
+                // populated purely from the ClientboundMapItemDataPacket we
+                // push below, so chart fidelity is unaffected by the absence of
+                // server-side saved data. We only need a stable MapId per chart
+                // so live frames target the same client-side map.
                 net.minecraft.world.level.saveddata.maps.MapId id = mapIds.get(chartKey);
-                net.minecraft.world.level.saveddata.maps.MapItemSavedData data = null;
-                if (id != null) {
-                    data = level.getMapData(id);
-                }
-                if (data == null) {
+                if (id == null) {
                     id = level.getFreeMapId();
-                    data = net.minecraft.world.level.saveddata.maps.MapItemSavedData.createFresh(
-                            sp.getX(), sp.getZ(), (byte) 0, false, false, level.dimension());
-                    level.setMapData(id, data);
                     mapIds.put(chartKey, id);
                 }
 
-                // Translate the ARGB buffer to vanilla MapColor packed bytes,
-                // writing both the persistent saved-data colour array (so the
-                // server can re-send on relog) and a full-canvas patch we push
-                // immediately. setColorsDirty / getUpdatePacket are private, so
-                // we build a 128x128 MapPatch and send it ourselves.
+                // Translate the ARGB buffer to vanilla MapColor packed bytes and
+                // push them as a full-canvas patch. setColorsDirty /
+                // getUpdatePacket are private, so we build a 128x128 MapPatch
+                // and send it ourselves.
                 int side = 128;
-                int n = Math.min(argb.length, data.colors.length);
+                int n = Math.min(argb.length, side * side);
                 byte[] patchColors = new byte[side * side];
                 for (int i = 0; i < n; i++) {
                     int pixel = argb[i];
@@ -431,8 +439,7 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
                     byte packed = (alpha == 0)
                             ? 0 // MapColor.NONE -> transparent
                             : matchColor((pixel >> 16) & 0xFF, (pixel >> 8) & 0xFF, pixel & 0xFF);
-                    data.colors[i] = packed;
-                    if (i < patchColors.length) patchColors[i] = packed;
+                    patchColors[i] = packed;
                 }
                 net.minecraft.world.level.saveddata.maps.MapItemSavedData.MapPatch patch =
                         new net.minecraft.world.level.saveddata.maps.MapItemSavedData.MapPatch(
@@ -452,13 +459,13 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
                         sp.drop(map, false);
                     }
                 }
-            } catch (Throwable t) {
-                // S-004: never silently swallow — log loud, but do not rethrow
-                // into the server tick (would disconnect the viewer).
-                RTP.log(Level.WARNING, "[RTP][Fabric 26.2.x] renderMapChart failed for chartKey="
-                        + chartKey + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
-            }
-        });
+        } catch (Throwable t) {
+            // S-004: never silently swallow: log loud, but do not rethrow into
+            // the server tick (would disconnect the viewer).
+            RTP.log(Level.WARNING, "[RTP][Fabric 26.2.x] renderMapChart failed for chartKey="
+                    + chartKey + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return false;
+        }
         return true;
     }
 

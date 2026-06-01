@@ -47,7 +47,6 @@ public final class BStatsChartIds {
   public static final String CACHE_POOL_HEALTH = "cache_pool_health";
   public static final String TPS_BUCKETS = "tps_buckets";
   public static final String MSPT_BUCKETS = "mspt_buckets";
-  public static final String PIPELINE_LATENCY_BUCKETS = "pipeline_latency_buckets";
   public static final String MEMORY_TRACKER_PRESSURE = "memory_tracker_pressure";
   public static final String CHUNK_LOAD_BACKLOG_PRESSURE = "chunk_load_backlog_pressure";
   public static final String QUEUE_DEPTH_PRESSURE = "queue_depth_pressure";

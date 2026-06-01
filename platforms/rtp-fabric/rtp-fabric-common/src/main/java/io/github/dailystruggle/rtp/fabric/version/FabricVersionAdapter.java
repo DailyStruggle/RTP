@@ -592,17 +592,23 @@ public interface FabricVersionAdapter {
     // delivery) placing a FILLED_MAP item referencing the map into the
     // viewer's inventory.
     //
-    // Threading: implementations MUST hop to the server tick thread
-    // themselves (e.g. MinecraftServer#execute) before touching map /
-    // inventory / connection state; the caller may invoke these from an
-    // async scheduler thread (live-chart refresh loop).
+    // Threading: the caller ({@code FabricRTPPlayer#renderMapChart}) hops to
+    // the server tick thread via {@code RTP.scheduler} before invoking this
+    // seam, so implementations may touch map / inventory / connection state
+    // directly. The maps path flows player-first: the viewer is supplied as
+    // the raw NM {@code ServerPlayer} the {@code FabricRTPPlayer} owns, and the
+    // adapter reaches all server/level state through that handle
+    // ({@code sp.level()}) rather than a standalone {@code MinecraftServer}.
     // -------------------------------------------------------------------------
 
     /**
      * Render an RTP chart onto a per-viewer vanilla filled-map and deliver it.
      *
-     * @param server      the raw {@code MinecraftServer} (NM-typed as Object)
-     * @param viewer      the target player's UUID
+     * @param serverPlayer the raw NM {@code ServerPlayer} for the viewer
+     *                     (NM-typed as Object; resolved and owned by
+     *                     {@code FabricRTPPlayer}). The adapter derives the
+     *                     {@code ServerLevel}, network connection, and inventory
+     *                     from this handle.
      * @param chartKey    stable per-viewer-per-chart key; the adapter reuses the
      *                    same {@code MapId} across live-refresh frames keyed by
      *                    this string
@@ -615,12 +621,10 @@ public interface FabricVersionAdapter {
      *                    live-refresh frames that only resend pixel data)
      * @return {@code true} if the adapter handled the request; {@code false} if
      *         it does not implement map charts (caller falls back to the
-     *         {@code NoopMapBinding} skip path). Note: a {@code true} return is
-     *         optimistic (the NM work is dispatched onto the server thread and
-     *         may still fail there; logged, never silently swallowed per S-004).
+     *         {@code NoopMapBinding} skip path) or the NM work failed (logged,
+     *         never silently swallowed per S-004).
      */
-    default boolean renderMapChart(Object server,
-                                   java.util.UUID viewer,
+    default boolean renderMapChart(Object serverPlayer,
                                    String chartKey,
                                    int[] argb,
                                    boolean locked,
@@ -631,9 +635,10 @@ public interface FabricVersionAdapter {
     /**
      * Release any per-chart {@code MapId} state cached for {@code chartKey}.
      * Called on viewer disconnect / chart cancellation (REQ-RTP-MAP-003).
-     * Default is a no-op.
+     * This is pure server-side cache cleanup keyed by {@code chartKey}; it
+     * needs neither the server nor the player handle. Default is a no-op.
      */
-    default void releaseMapChart(Object server, String chartKey) {
+    default void releaseMapChart(String chartKey) {
         // no-op: adapters that implement renderMapChart override this.
     }
 

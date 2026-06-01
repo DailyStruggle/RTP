@@ -366,6 +366,141 @@ public final class V26_1_R1FabricVersionAdapter implements FabricVersionAdapter 
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Maps-api parity — rtp-fabric-ADR-014 / MULTI_PLATFORM_PLAN Step K.
+    // Vanilla filled-map rendering for the deobf MC 26.1.x runtime. Mirrors the
+    // v26_2_R1 carrier (compile mappings == runtime mappings on the deobf line,
+    // so the typed binding links directly).
+    // -------------------------------------------------------------------------
+
+    /** chartKey -> the vanilla MapId allocated for that chart (reused across live frames). */
+    private final java.util.Map<String, net.minecraft.world.level.saveddata.maps.MapId> mapIds =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Override
+    public boolean supportsMapCharts() {
+        return true;
+    }
+
+    @Override
+    public void releaseMapChart(String chartKey) {
+        if (chartKey != null) {
+            mapIds.remove(chartKey);
+        }
+    }
+
+    @Override
+    public boolean renderMapChart(Object serverPlayer,
+                                  String chartKey,
+                                  int[] argb,
+                                  boolean locked,
+                                  boolean deliverItem) {
+        // Maps flow player-first: the viewer arrives as the raw NM ServerPlayer
+        // that the per-version FabricRTPPlayer resolved and owns, so all
+        // server/level state is reached through the player handle (sp.level())
+        // rather than a standalone MinecraftServer. The caller has already
+        // hopped to the server tick thread via RTP.scheduler, so map allocation,
+        // colour writes, packet dispatch, and inventory mutation are all
+        // server-thread-safe here.
+        if (!(serverPlayer instanceof ServerPlayer sp)
+                || chartKey == null || argb == null) {
+            return false;
+        }
+        try {
+                ServerLevel level = (ServerLevel) sp.level();
+
+                // Client-only "fake map": we deliberately do NOT register any
+                // MapItemSavedData on the server (no level.setMapData). The
+                // server therefore has no saved data to tick, so vanilla's
+                // held-map terrain scan (MapItem.inventoryTick -> update, which
+                // first resolves getMapData(id) and bails when it is null)
+                // never runs and can never overwrite our custom chart pixels.
+                // Earlier attempts that DID register saved data and tried to
+                // suppress the scan via the `locked` flag and via a sentinel
+                // `dimension` both failed on this runtime (the map briefly
+                // showed our drawing then reverted to a terrain render every
+                // tick). The client maintains its own per-MapId colour cache
+                // populated purely from the ClientboundMapItemDataPacket we
+                // push below, so chart fidelity is unaffected by the absence of
+                // server-side saved data. We only need a stable MapId per chart
+                // so live frames target the same client-side map.
+                net.minecraft.world.level.saveddata.maps.MapId id = mapIds.get(chartKey);
+                if (id == null) {
+                    id = level.getFreeMapId();
+                    mapIds.put(chartKey, id);
+                }
+
+                // Translate the ARGB buffer to vanilla MapColor packed bytes and
+                // push them as a full-canvas patch. setColorsDirty /
+                // getUpdatePacket are private, so we build a 128x128 MapPatch
+                // and send it ourselves.
+                int side = 128;
+                int n = Math.min(argb.length, side * side);
+                byte[] patchColors = new byte[side * side];
+                for (int i = 0; i < n; i++) {
+                    int pixel = argb[i];
+                    int alpha = (pixel >>> 24) & 0xFF;
+                    byte packed = (alpha == 0)
+                            ? 0 // MapColor.NONE -> transparent
+                            : matchColor((pixel >> 16) & 0xFF, (pixel >> 8) & 0xFF, pixel & 0xFF);
+                    patchColors[i] = packed;
+                }
+                net.minecraft.world.level.saveddata.maps.MapItemSavedData.MapPatch patch =
+                        new net.minecraft.world.level.saveddata.maps.MapItemSavedData.MapPatch(
+                                0, 0, side, side, patchColors);
+                sp.connection.send(new net.minecraft.network.protocol.game.ClientboundMapItemDataPacket(
+                        id, (byte) 0, locked,
+                        (java.util.Collection<net.minecraft.world.level.saveddata.maps.MapDecoration>) null,
+                        patch));
+
+                if (deliverItem) {
+                    net.minecraft.world.item.ItemStack map =
+                            new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.FILLED_MAP);
+                    map.set(net.minecraft.core.component.DataComponents.MAP_ID, id);
+                    if (!sp.getInventory().add(map)) {
+                        // Inventory full: drop at the player's feet (parity with
+                        // BukkitMapBinding.deliverTo's dropItem fallback).
+                        sp.drop(map, false);
+                    }
+                }
+        } catch (Throwable t) {
+            // S-004: never silently swallow: log loud, but do not rethrow into
+            // the server tick (would disconnect the viewer).
+            RTP.log(Level.WARNING, "[RTP][Fabric 26.1.x] renderMapChart failed for chartKey="
+                    + chartKey + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Match an RGB triple to the nearest vanilla map-colour packed byte by
+     * walking every {@code MapColor} x {@code Brightness} pair and minimising
+     * squared Euclidean distance in RGB space. Mirrors the role of Bukkit's
+     * {@code MapPalette.matchColor} but against the mojmap {@code MapColor}
+     * table (deobf carrier: compile mappings == runtime mappings).
+     */
+    private static byte matchColor(int r, int g, int b) {
+        int best = 0;
+        long bestDist = Long.MAX_VALUE;
+        for (int packed = 0; packed < 256; packed++) {
+            net.minecraft.world.level.material.MapColor color =
+                    net.minecraft.world.level.material.MapColor.byId(packed >> 2);
+            if (color == null || color.id == 0) continue; // skip NONE (transparent)
+            int rgb = net.minecraft.world.level.material.MapColor.getColorFromPackedId(packed);
+            int rr = (rgb >> 16) & 0xFF;
+            int gg = (rgb >> 8) & 0xFF;
+            int bb = rgb & 0xFF;
+            long dr = r - rr, dg = g - gg, db = b - bb;
+            long dist = dr * dr + dg * dg + db * db;
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = packed;
+            }
+        }
+        return (byte) best;
+    }
+
     @Override
     public CompletableFuture<Void> releaseTicket(RTPLevelHandle level, int cx, int cz) {
         if (level == null) {

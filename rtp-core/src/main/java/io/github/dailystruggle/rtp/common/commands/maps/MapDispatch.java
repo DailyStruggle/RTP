@@ -85,12 +85,20 @@ public final class MapDispatch {
    *       admin watch the bad-locations map fill in as the scan progresses
    *       (ROADMAP Tier 2: world-scan UX). The resolver is pure and
    *       re-runnable per tick (no chunk I/O; REQ-RTP-S-005).</li>
+   *   <li>{@link ChartSpec.Kind#REGION_BIOMES}: a running world-scan
+   *       ({@code ScanTask}) records newly-sampled biomes into the
+   *       region's {@code MemoryShape} saved biome-location cache; binding
+   *       live lets an admin watch the biome map fill in as the scan
+   *       progresses. {@code RegionBiomesResolver} is pure and re-runnable
+   *       per tick (no chunk I/O; it reads only the in-memory, persisted
+   *       biome cache via {@code biomeAt()}; REQ-RTP-S-005).</li>
    * </ul>
    */
   private static final java.util.EnumSet<ChartSpec.Kind> LIVE_REFRESH_KINDS =
       java.util.EnumSet.of(
           ChartSpec.Kind.METRIC_SPARKLINE,
-          ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE);
+          ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE,
+          ChartSpec.Kind.REGION_BIOMES);
 
   private MapDispatch() {}
 

@@ -89,6 +89,20 @@ public class ScanTask extends RTPRunnable {
   private static final int MAX_PENDING_CHUNKS = 50;
   private final Semaphore inFlightGate = new Semaphore(MAX_PENDING_CHUNKS);
 
+  // Upper bound (ms) on how long a cancel/pause drain will block the caller
+  // (typically the command / main thread) waiting for in-flight chunk futures
+  // to settle. A hung or timing-out chunk load must never freeze the server, so
+  // the drain is bounded: once the cancelled/pause flag is set, late callbacks
+  // are already guarded (they check isCancelled()/pause and complete false
+  // without mutating shape state), so proceeding after the timeout is safe.
+  private static final long DRAIN_TIMEOUT_MS = 5_000L;
+
+  // In-flight chunk-load futures dispatched by runFullLoadPath. Tracked so a
+  // cancel/pause can actively cancel them instead of waiting out the per-future
+  // 30s orTimeout one by one — cancelling completes our future chain promptly,
+  // releases the inFlightGate, and stops the timeout-exception log spam.
+  private final Set<CompletableFuture<?>> inFlightChunkFutures = ConcurrentHashMap.newKeySet();
+
   /*
    * [TRACE] PR-8 diagnostics: concurrency gauge for the scan driver. Incremented at dispatch,
    * decremented on future completion. `peakInFlight` tracks the max observed in a batch; both are
@@ -1458,6 +1472,19 @@ public class ScanTask extends RTPRunnable {
             // adjustNull tail into a zero-cost reject.
             probeOutcomeAdjustNullScan.incrementAndGet();
             probeOutcomeAdjustNullScanShortCircuit.incrementAndGet();
+            // Always record the biome for this position even though no
+            // acceptable Y was found. Biome is a per-chunk property in the
+            // anvil probe, so a mid-window read is representative; keyed by
+            // location, so the record stays idempotent.
+            try {
+              int midProbeY = (vert.maxY() + vert.minY()) / 2;
+              String scanMissBiome = probe.biomeAt(midProbeY);
+              if (scanMissBiome != null) {
+                shape.addBiomeLocation(pos, 1, scanMissBiome.toUpperCase());
+              }
+            } catch (Throwable ignored) {
+              // Biome read is best-effort; a failure must not change the verdict.
+            }
             // addBadChunk: chunk-uniform — SCAN_MISS means the multi-column probe sweep
             // iterated every testCoords column in this chunk and found no acceptable Y on
             // any of them; the twin spiral index targets a column already covered by the
@@ -1565,19 +1592,38 @@ public class ScanTask extends RTPRunnable {
       // ungenerated-chunk cases transparently load on demand and cached
       // anvil/live data is used when available (ADR-016 §13.1 follow-up,
       // 2026-04-20).
-      world.getOrLoadChunk(cx, cz)
-              .orTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+      final CompletableFuture<RTPChunk<?>> chunkFuture =
+              world.getOrLoadChunk(cx, cz)
+                      .orTimeout(30, java.util.concurrent.TimeUnit.SECONDS);
+      // Track so a cancel/pause can abort this load instead of waiting out the
+      // 30s timeout; cancellation completes the chain promptly and releases the
+      // inFlightGate (see drainInFlight).
+      inFlightChunkFutures.add(chunkFuture);
+      chunkFuture
               .whenComplete((resolvedChunk, throwable) -> {
+                inFlightChunkFutures.remove(chunkFuture);
                 try {
                   if (throwable != null || resolvedChunk == null || isCancelled() || pause.get()) {
+                    // Suppress the warning once cancelled/paused: a cancel
+                    // actively aborts in-flight loads, so the resulting
+                    // CancellationException/TimeoutException is expected and
+                    // logging it would spam the console during shutdown of a scan.
+                    // A CancellationException is always benign (it can only come
+                    // from us aborting the load), so suppress it unconditionally.
+                    boolean stopping = isCancelled() || pause.get()
+                            || unwrap(throwable) instanceof CancellationException;
                     if (throwable != null) {
-                      RTP.log(Level.WARNING, "[ScanTask] Chunk generation exception at " + pos, throwable);
+                      if (!stopping) {
+                        RTP.log(Level.WARNING, "[ScanTask] Chunk generation exception at " + pos, throwable);
+                      }
                       fullLoadOutcomeTimeoutOrNull.incrementAndGet();
                     } else if (resolvedChunk == null) {
-                      RTP.log(Level.WARNING, "[ScanTask] INSTANT BYPASS: Chunk manager returned a null chunk for " + pos);
+                      if (!stopping) {
+                        RTP.log(Level.WARNING, "[ScanTask] INSTANT BYPASS: Chunk manager returned a null chunk for " + pos);
+                      }
                       fullLoadOutcomeTimeoutOrNull.incrementAndGet();
                     } else {
-                        if (!isCancelled() && !pause.get()) {
+                        if (!stopping) {
                           RTP.log(Level.WARNING, "[ScanTask] undetermined failure at " + pos);
                           fullLoadOutcomeTimeoutOrNull.incrementAndGet();
                         }
@@ -1618,6 +1664,25 @@ public class ScanTask extends RTPRunnable {
 
                       MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
                       localCursor.setWorldName(world.name());
+
+                      // Always record the biome for this position, even when a
+                      // later check (vert.adjust, safety scan, etc.) rejects it.
+                      // For self-contained chunks the mid-Y biome was already
+                      // recorded above; for live-backed chunks the biome read has
+                      // to happen on this region thread, so do it here before any
+                      // reject path can short-circuit. Keyed by location, so
+                      // re-recording the picked-Y biome below stays idempotent.
+                      if (!chunk.isSelfContained()) {
+                        try {
+                          String midBiomeLive = chunk.getBiome(blockX, midY, blockZ);
+                          if (midBiomeLive != null) {
+                            shape.addBiomeLocation(pos, 1, midBiomeLive.toUpperCase());
+                          }
+                        } catch (Throwable ignored) {
+                          // Biome read is best-effort; a failure here must not
+                          // abort the authoritative scan below.
+                        }
+                      }
 
                       if (!vert.adjust(chunk, localCursor)) {
                         // addBadChunk: chunk-uniform — within a chunk the per-column
@@ -1718,18 +1783,61 @@ public class ScanTask extends RTPRunnable {
               });
   }
 
+  /** Unwraps {@link CompletionException}/{@link java.util.concurrent.ExecutionException} layers to the root cause. */
+  private static Throwable unwrap(Throwable t) {
+    while ((t instanceof CompletionException || t instanceof java.util.concurrent.ExecutionException)
+            && t.getCause() != null && t.getCause() != t) {
+      t = t.getCause();
+    }
+    return t;
+  }
+
+  /**
+   * Bounded drain of the in-flight chunk-load futures. Waits up to {@code timeoutMs}
+   * for outstanding chunk callbacks to settle so no ghost callback mutates the shape
+   * after {@code flushAndRebuild}/{@code save}, but never blocks the caller (command /
+   * main thread) indefinitely — a hung or timing-out chunk load must not freeze the
+   * server. The cancelled/pause flag already guards late callbacks (they complete
+   * false without mutating shape state), so proceeding after a timeout is safe.
+   *
+   * <p>Any still-tracked chunk futures are cancelled first so the drain does not have
+   * to wait out their per-future 30s {@code orTimeout} one at a time; cancellation
+   * completes the chain promptly, releases the gate, and suppresses the
+   * timeout-exception log spam (the completion guards check the cancelled flag).</p>
+   */
+  private void drainInFlight(String reason, long timeoutMs) {
+    // Actively abort outstanding chunk loads so the gate frees up promptly.
+    for (CompletableFuture<?> f : inFlightChunkFutures) {
+      try {
+        f.cancel(true);
+      } catch (Throwable ignored) { }
+    }
+    long drainStart = System.nanoTime();
+    boolean drained = false;
+    try {
+      drained = inFlightGate.tryAcquire(MAX_PENDING_CHUNKS, timeoutMs, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException ignored) {
+      Thread.currentThread().interrupt();
+    } finally {
+      if (drained) inFlightGate.release(MAX_PENDING_CHUNKS);
+    }
+    long drainMs = (System.nanoTime() - drainStart) / 1_000_000L;
+    if (drained) {
+      RTP.log(Level.FINER, "[ScanTask] " + reason + " drain complete region=" + region.name
+              + " drainMs=" + drainMs);
+    } else {
+      RTP.log(Level.FINE, "[ScanTask] " + reason + " drain timed out region=" + region.name
+              + " after " + drainMs + "ms inFlight=" + inFlight.get()
+              + " — proceeding (cancelled/pause flag guards late callbacks)");
+    }
+  }
+
   public void pause() {
     RTP.log(Level.FINE, "[ScanTask] pause requested region=" + region.name
             + " inFlight=" + inFlight.get());
     pause.set(true);
-    // Drain in-flight chunk futures before saving to prevent ghost callbacks
-    long drainStart = System.nanoTime();
-    try {
-      inFlightGate.acquire(MAX_PENDING_CHUNKS);
-      inFlightGate.release(MAX_PENDING_CHUNKS);
-    } catch (InterruptedException ignored) { }
-    RTP.log(Level.FINER, "[ScanTask] pause drain complete region=" + region.name
-            + " drainMs=" + ((System.nanoTime() - drainStart) / 1_000_000L));
+    // Drain in-flight chunk futures before saving to prevent ghost callbacks.
+    drainInFlight("pause", DRAIN_TIMEOUT_MS);
     MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
     shape.flushAndRebuild(shape.spatialResolution);
     save();
@@ -1741,18 +1849,21 @@ public class ScanTask extends RTPRunnable {
     if (cancelled) {
       RTP.log(Level.FINE, "[ScanTask] cancellation requested region=" + region.name
               + " inFlight=" + inFlight.get());
+      // Mark cancelled BEFORE draining: drainInFlight actively cancels the
+      // tracked chunk futures, which fires their whenComplete handlers
+      // synchronously on this thread. Those handlers suppress the
+      // timeout/cancellation WARNING only when isCancelled() is already true,
+      // so the flag must be set first or the cancel spams the very exceptions
+      // we are trying to silence.
+      super.setCancelled(true);
       try {
         done.cancel(true);
       } catch (CancellationException | CompletionException ignored) { }
       // Drain all in-flight chunk futures before saving, so no ghost callbacks
-      // can call addBadLocation() after flushAndRebuild/save.
-      long drainStart = System.nanoTime();
-      try {
-        inFlightGate.acquire(MAX_PENDING_CHUNKS);
-        inFlightGate.release(MAX_PENDING_CHUNKS);
-      } catch (InterruptedException ignored) { }
-      RTP.log(Level.FINER, "[ScanTask] cancel drain complete region=" + region.name
-              + " drainMs=" + ((System.nanoTime() - drainStart) / 1_000_000L));
+      // can call addBadLocation() after flushAndRebuild/save. Bounded so a hung
+      // chunk load cannot freeze the server, and outstanding loads are cancelled
+      // up front to stop the per-future 30s timeout-exception spam.
+      drainInFlight("cancel", DRAIN_TIMEOUT_MS);
       MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
       if (shape != null) {
         shape.flushAndRebuild(shape.spatialResolution);

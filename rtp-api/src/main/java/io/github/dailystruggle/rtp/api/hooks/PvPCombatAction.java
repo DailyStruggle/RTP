@@ -30,14 +30,13 @@ public enum PvPCombatAction {
 
   /**
    * Postpone the request: keep re-checking combat state and proceed automatically
-   * once the combat tag expires (or give up after a bounded wait). Equivalent to
-   * EzRTP's {@code cancel-countdown-on-pvp-tag} when paired with a countdown.
+   * once the combat tag expires (or give up after a bounded wait).
    */
   DELAY,
 
   /**
    * Abort an in-progress teleport (countdown or already-queued request) for a
-   * player who entered combat after issuing {@code /rtp}. Equivalent to EzRTP's
+   * player who entered combat after issuing {@code /rtp}.
    * {@code cancel-queued-on-pvp-tag}.
    */
   CANCEL;

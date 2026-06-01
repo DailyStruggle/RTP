@@ -641,7 +641,7 @@ Mapped to bStats v3 chart types (`SimplePie`, `AdvancedPie`, `DrilldownPie`, `Si
 | `cache_pool_health` | `MultiLineChart` | `keptLocations` (L1) and `unkeptLocations` (L2) average fill ratio across regions |
 | `tps_buckets` | `AdvancedPie` | bucketised: `<10` / `10-15` / `15-19` / `19-20+` over the last submission window (preserves shape without leaking exact values) |
 | `mspt_buckets` | `AdvancedPie` | bucketised: `<25` / `25-50` / `50-100` / `100+` ms |
-| `pipeline_latency_buckets` | `AdvancedPie` | bucketised `avgPipelineMs`: `<100` / `100-500` / `500-2000` / `2000+` |
+| `pipeline_latency_buckets` | _removed_ | Withdrawn: `avgPipelineMs` is the mean of every `TeleportPipelineTask`, whose sample window starts at task construction and so includes at-rate queue-wait / configured-delay time (ADR-032 / [ADR-053](../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit.md) §2). Bucketising that mean misrepresents pipeline latency across the fleet, so the bStats chart was dropped. The honest per-teleport latency signal remains operator-local via `/rtp info` percentiles (immediate/unqueued-gated slow-teleport audit). |
 | `memory_tracker_pressure` | `AdvancedPie` | bucketised `memoryTrackerEntries`: `<10` / `10-50` / `50-200` / `200+` |
 | `chunk_load_backlog_pressure` | `AdvancedPie` | bucketised `chunkLoadBacklog`: `0` / `1-5` / `6-20` / `21+` |
 | `s005_violations_recent` | `SingleLineChart` | count of S-005 attribution events surfaced via `ReqRtpS004NullChunkAttributionTest`-style runtime guards in the last submission window. **Rare but high-signal**: a sustained nonzero count across the bStats fleet flags a regression we'd want to know about. |

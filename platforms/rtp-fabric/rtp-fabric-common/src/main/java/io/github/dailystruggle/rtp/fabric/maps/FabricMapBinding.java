@@ -8,7 +8,9 @@ import io.github.dailystruggle.mapsapi.MapCanvas;
 import io.github.dailystruggle.mapsapi.MapHandle;
 import io.github.dailystruggle.mapsapi.model.ChartModel;
 import io.github.dailystruggle.mapsapi.render.ChartRenderer;
+import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.fabric.player.FabricMapSink;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry;
 
@@ -31,7 +33,8 @@ import java.util.logging.Level;
  * {@code FILLED_MAP} item delivery.
  *
  * <p>This class contains <b>no</b> {@code net.minecraft.*} reference (the
- * server handle is obtained reflectively and every NM touch is delegated to
+ * viewer is resolved through {@code RTP.serverAccessor} as a
+ * {@code FabricRTPPlayer} and every NM touch is delegated to that player and
  * the carrier), so its bytecode links cleanly on every supported runtime
  * (1.20.x through the deobf 26.x line). Carriers that do not implement
  * {@link FabricVersionAdapter#supportsMapCharts()} are filtered out at
@@ -40,8 +43,9 @@ import java.util.logging.Level;
  *
  * <p>Threading: {@code allocate} / {@code renderEphemeral} run on the caller's
  * (async) thread and only mutate in-memory buffers. {@code deliverTo} and the
- * live-refresh loop hand off to the carrier, which hops to the server tick
- * thread before touching map / inventory / connection state
+ * live-refresh loop hand off to the {@code FabricRTPPlayer} map sink, which
+ * hops to the server tick thread via {@code RTP.scheduler} before the carrier
+ * touches map / inventory / connection state
  * (REQ-RTP-MAP-002 / S-005: no chunk I/O, no blocking on this class's paths).
  *
  * @see FabricMapCanvas
@@ -195,37 +199,37 @@ public final class FabricMapBinding implements MapBinding, MapBindingLifecycle {
      */
     private boolean dispatch(String chartId, UUID viewer, int[] buf,
                              boolean locked, boolean deliverItem) {
-        FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
-        if (adapter == null || !adapter.supportsMapCharts()) return false;
-        Object server = resolveServer();
-        if (server == null) {
-            throw new IllegalStateException(
-                    "FabricMapBinding.dispatch: MinecraftServer not yet bound (chartId=" + chartId + ")");
-        }
+        // Player-first: resolve the viewer through RTP's server accessor and
+        // hand the snapshot to FabricRTPPlayer's map sink, which owns the raw
+        // handle and hops to the server thread. No standalone MinecraftServer
+        // is resolved here (the prior reflective resolveServer() path, and its
+        // "server not yet bound" race, are gone).
+        FabricMapSink player = resolveFabricPlayer(viewer);
+        if (player == null) return false;
         int[] snapshot;
         synchronized (buf) {
             snapshot = buf.clone();
         }
-        return adapter.renderMapChart(server, viewer, chartId, snapshot, locked, deliverItem);
+        return player.renderMapChart(chartId, snapshot, locked, deliverItem);
     }
 
     /**
-     * Obtain the raw {@code MinecraftServer} reflectively via
-     * {@code FabricServerAccessor#getServer()} so this class's constant pool
-     * names no {@code net.minecraft.*} type (keeps it link-clean on the deobf
-     * 26.x runtime where intermediary aliases are absent).
+     * Resolve the viewer to a {@link FabricMapSink} through
+     * {@code RTP.serverAccessor} (the maps path never touches the NM player
+     * list directly). Returns {@code null} if the accessor is unbound, the
+     * viewer is offline, or the active carrier does not support map charts.
      */
-    private static Object resolveServer() {
-        try {
-            Object accessor = RTP.serverAccessor;
-            if (accessor == null) return null;
-            return accessor.getClass().getMethod("getServer").invoke(accessor);
-        } catch (Throwable t) {
-            RTP.log(Level.WARNING,
-                    "[RTP][Fabric maps] could not resolve MinecraftServer: "
-                            + t.getClass().getSimpleName() + ": " + t.getMessage());
-            return null;
-        }
+    private static FabricMapSink resolveFabricPlayer(UUID viewer) {
+        FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
+        if (adapter == null || !adapter.supportsMapCharts()) return null;
+        RTPPlayer rtpPlayer = RTP.serverAccessor == null ? null
+                : RTP.serverAccessor.getPlayer(viewer);
+        // Resolve through the FabricMapSink capability rather than the concrete
+        // common FabricRTPPlayer: on the deobf MC 26.x runtime the online player
+        // is a per-version sink (V26_x_R1FabricRTPPlayer / FabricRTPPlayerUnobf)
+        // that implements RTPPlayer + FabricMapSink directly and does NOT extend
+        // the common FabricRTPPlayer.
+        return (rtpPlayer instanceof FabricMapSink sink) ? sink : null;
     }
 
     private void cancelLiveTask(String chartId) {
@@ -244,15 +248,14 @@ public final class FabricMapBinding implements MapBinding, MapBindingLifecycle {
         if (viewer == null) return;
         Set<String> chartIds = chartIdsByViewer.remove(viewer);
         if (chartIds == null) return;
-        Object server = resolveServer();
         FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
         for (String chartId : chartIds) {
             cancelLiveTask(chartId);
             buffers.remove(chartId);
             lockedByChart.remove(chartId);
-            if (adapter != null && server != null) {
+            if (adapter != null) {
                 try {
-                    adapter.releaseMapChart(server, chartId);
+                    adapter.releaseMapChart(chartId);
                 } catch (Throwable ignored) {
                     // release is best-effort cache cleanup; never throw from quit
                 }
@@ -266,12 +269,11 @@ public final class FabricMapBinding implements MapBinding, MapBindingLifecycle {
         for (String chartId : liveTasks.keySet()) {
             cancelLiveTask(chartId);
         }
-        Object server = resolveServer();
         FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
-        if (adapter != null && server != null) {
+        if (adapter != null) {
             for (String chartId : buffers.keySet()) {
                 try {
-                    adapter.releaseMapChart(server, chartId);
+                    adapter.releaseMapChart(chartId);
                 } catch (Throwable ignored) {
                     // best-effort
                 }

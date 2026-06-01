@@ -137,13 +137,6 @@ public final class RTPCostMetricsCharts {
       return b;
     }));
 
-    metrics.addCustomChart(new AdvancedPie(BStatsChartIds.PIPELINE_LATENCY_BUCKETS, () -> {
-      Map<String, Integer> b = new HashMap<>();
-      double avg = rtpExt(RTP.metrics.snapshot()).avgPipelineMs;
-      b.put(pipelineLatencyBucket(avg), 1);
-      return b;
-    }));
-
     metrics.addCustomChart(new AdvancedPie(BStatsChartIds.MEMORY_TRACKER_PRESSURE, () -> {
       Map<String, Integer> b = new HashMap<>();
       int n = rtpExt(RTP.metrics.snapshot()).memoryTrackerEntries;
@@ -673,14 +666,6 @@ public final class RTPCostMetricsCharts {
     if (mspt < 50.0) return "25-50";
     if (mspt < 100.0) return "50-100";
     return "100+";
-  }
-
-  private static String pipelineLatencyBucket(double ms) {
-    if (Double.isNaN(ms)) return "unknown";
-    if (ms < 100.0) return "<100";
-    if (ms < 500.0) return "100-500";
-    if (ms < 2000.0) return "500-2000";
-    return "2000+";
   }
 
   private static String memoryTrackerBucket(int n) {

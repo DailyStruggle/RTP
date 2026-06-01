@@ -163,8 +163,8 @@ reproducible by readers".
   actually drives third-party adoption.~~ Added [`docs/ADDON_QUICKSTART.md`](../ADDON_QUICKSTART.md)
   (Gradle dep + `ServiceLoader` descriptor + `RTPAddon.onLoad()` calling `RTP.addShape(...)`),
   linked from `FOR_ADDON_DEVELOPERS.md`.
-- [ ] **Region-specific schematic (`.schem`) support.** Per-region arrival structures (small
-  platform, lobby pad, arrival shrine) pasted at the chosen `RTPLocation` from a `.schem` file.
+- [x] ~~**Region-specific schematic (`.schem`) support.** Per-region arrival structures (small
+  platform, lobby pad, arrival shrine) pasted at the chosen `RTPLocation` from a `.schem` file.~~
   Design ADR accepted: [ADR-058](../adr/ADR-058-region-specific-schematic-paste.md) (Amendment 1,
   2026-05-30: single cross-platform `.schem` format decoded in-house; native block-state paste; no
   WorldEdit hard-dependency; the `.nbt`-on-Fabric split is withdrawn). **Foundation landed:** the
@@ -195,7 +195,7 @@ reproducible by readers".
   live tile); the `SURFACE_CENTER` anchor (drops the structure to a standable surface in one pass,
   no re-paste, keeping players inside roofed structures); and a decode cache in
   `AbstractFileSchematicPaster` (each `.schem` decoded once, cleared on `/rtp reload`).
-  **Remaining:** the footprint claim check (S-003) ahead of the paste; the Fabric native paster
+  **Deferred follow-ups (tracked separately):** the footprint claim check (S-003) ahead of the paste; the Fabric native paster
   (`BlockArgumentParser` through the obf/unobf carrier per
   [rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md));
   non-container block-entity NBT (sign text, custom data - still placed as empty blocks, audited);
@@ -217,6 +217,19 @@ reproducible by readers".
   [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) per
   [ADR-026](../adr/ADR-026-external-hook-api-surface.md). Tests: `PvPGateTest`,
   `NativePvPCombatTrackerTest`, `RTPCmdPvPGateTest`, `PvPCombatAdapterTest`.
+- [ ] **Rich book-menu drawing via resource-pack soft-dependencies.** The written-book menu renderer
+  (Paper's `BookMenuRenderer`, Fabric's `FabricBookMenuRenderer` on the 1.21+ / deobf 26.x carriers)
+  currently renders text, colour, and click/hover only. Native books cannot draw images; plugins
+  like vBestiary achieve "images in a book" purely through resource-pack glyph fonts supplied by
+  ItemsAdder / Nexo / Oraxen. Add optional soft-dependencies on those glyph providers and, when one
+  is detected at runtime, conditionally substitute their custom-font glyphs (icons, dividers, region
+  thumbnails) into the book menu fragments; when none is present, fall back to the current
+  text-and-numbered rendering with no behaviour change. Scope notes: soft-depend only (no hard
+  dependency, no bundled assets), catalog each provider in
+  [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) per [ADR-026](../adr/ADR-026-external-hook-api-surface.md),
+  and route detection through `RTPHooks` so the chat renderer and unsupported carriers degrade
+  cleanly. Fabric 1.20.x stays on the chat renderer (book renderer off there for performance
+  reasons) and therefore opts out of this feature.
 
 ---
 
