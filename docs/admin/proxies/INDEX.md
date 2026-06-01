@@ -15,7 +15,7 @@ Each row links to the design source until the admin doc is authored.
 | File | Topic | Source / status |
 |------|-------|-----------------|
 | [`SINGLE_BACKEND_VERIFICATION.md`](SINGLE_BACKEND_VERIFICATION.md) | Single-backend operator smoke test: `rtp test network` against real Redis (no proxy required) | **Available** (Phase 2e-Redis A1/A2 shipped) |
-| [`CROSS_SERVER_VERIFICATION.md`](CROSS_SERVER_VERIFICATION.md) | Multi-proxy / multi-backend round-trip verification (claim → transfer → redeem); paired devstack at [`rtp-proxy/devstack/`](../../../rtp-proxy/devstack/README.md) | **Available** (Phase 2 L3) |
+| [`CROSS_SERVER_VERIFICATION.md`](CROSS_SERVER_VERIFICATION.md) | Multi-proxy / multi-backend round-trip verification (claim → transfer → redeem); paired devstack at [`platforms/rtp-proxy/devstack/`](../../../platforms/rtp-proxy/devstack/README.md) | **Available** (Phase 2 L3) |
 | `QUICK_START.md` | Minimal Velocity + 2× Paper setup with Redis transport | Phase 2 |
 | `CONFIGURATION.md` | `network.yml` reference (transport, triggers, reservation, security) | Phase 2 |
 | `LOAD_BALANCING.md` | Configurable weighted-average heuristics, curve catalogue, **rendered curve plots** | Phase 2 spec / Phase 3 visuals (see *Documentation follow-up* in `MULTI_SERVER_PLAN.md`) |

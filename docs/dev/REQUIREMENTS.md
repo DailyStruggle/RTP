@@ -9,10 +9,10 @@ For term definitions, see [GLOSSARY.md](GLOSSARY.md).
 For specific code-level and platform-specific requirements, please refer to the individual module specifications:
 - [rtp-api Requirements](../../rtp-api/REQUIREMENTS.md)
 - [rtp-core Requirements](../../rtp-core/REQUIREMENTS.md)
-- [rtp-bukkit Requirements](../../rtp-bukkit/REQUIREMENTS.md)
-- [rtp-paper Requirements](../../rtp-paper/REQUIREMENTS.md)
-- [rtp-folia Requirements](../../rtp-folia/REQUIREMENTS.md)
-- [rtp-fabric Requirements](../../rtp-fabric/REQUIREMENTS.md)
+- [rtp-bukkit Requirements](../../platforms/rtp-bukkit/REQUIREMENTS.md)
+- [rtp-paper Requirements](../../platforms/rtp-paper/REQUIREMENTS.md)
+- [rtp-folia Requirements](../../platforms/rtp-folia/REQUIREMENTS.md)
+- [rtp-fabric Requirements](../../platforms/rtp-fabric/REQUIREMENTS.md)
 
 ## 0. Scope
 
@@ -30,7 +30,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 - **Anti-cheat:** RTP does not detect or prevent cheating. It is the responsibility of the server operator to configure compatible anti-cheat plugins.
 - **GUI / inventory menus:** RTP does not provide a graphical interface. All interaction is command- and config-based.
 - **Cross-server teleportation:** RTP operates within a single server instance. BungeeCord/Velocity network teleportation is out of scope.
-- **Unsupported platforms:** RTP shall target Bukkit-derived software (Spigot, Paper, Folia), Fabric, and NeoForge. Legacy Forge, Sponge, Minestom, hybrid servers (Mohist, Magma, Arclight), and Bedrock-native servers (PocketMine-MP, Nukkit, BDS) shall not be supported. Rationale and the phased adapter plans are recorded in [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md), [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md), and [MULTI_PLATFORM_PLAN.md](MULTI_PLATFORM_PLAN.md).
+- **Unsupported platforms:** RTP shall target Bukkit-derived software (Spigot, Paper, Folia), Fabric, and NeoForge. Legacy Forge, Sponge, Minestom, hybrid servers (Mohist, Magma, Arclight), and Bedrock-native servers (PocketMine-MP, Nukkit, BDS) shall not be supported. Rationale and the phased adapter plans are recorded in [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md), [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md), and [MULTI_PLATFORM_PLAN.md](MULTI_PLATFORM_PLAN.md).
 - **Legacy Minecraft and Java versions:** RTP targets Java 21+ (REQ-RTP-SYS-001) and the Minecraft versions enumerated by the shipped versioned platform adapter submodules (ADR-010). Older Minecraft versions and older Java runtimes are out of scope; users on legacy servers shall be directed to the last RTP release that supported their server. Revisit conditions and rationale are recorded in [ADR-021](../adr/ADR-021-legacy-mc-and-java-support-scope.md).
 
 ## 1. Functional Requirements

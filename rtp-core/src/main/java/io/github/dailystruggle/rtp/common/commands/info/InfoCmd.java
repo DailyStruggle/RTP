@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.info;
 
+import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
@@ -167,7 +168,10 @@ public class InfoCmd extends BaseRTPCmdImpl {
         for (RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
           try {
             RTP.worldContext.set(world);
-            emitAndSuggest(callerId, worlds, "/rtp info world:" + world.name());
+            emitAndSuggest(
+                callerId,
+                worlds,
+                "/rtp info world" + CommandsAPI.parameterDelimiter + world.name());
           } finally {
             RTP.worldContext.remove();
           }
@@ -183,7 +187,11 @@ public class InfoCmd extends BaseRTPCmdImpl {
                           try {
                             RTP.regionContext.set(region);
                             emitAndSuggest(
-                                    callerId, regions, "/rtp info region:" + region.name);
+                                    callerId,
+                                    regions,
+                                    "/rtp info region"
+                                            + CommandsAPI.parameterDelimiter
+                                            + region.name);
                           } finally {
                             RTP.regionContext.remove();
                           }

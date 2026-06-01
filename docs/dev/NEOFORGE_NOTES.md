@@ -10,8 +10,8 @@
 
 - **Audience.** NeoForge is the active successor to legacy Forge and currently the dominant modded-Java platform on 1.20.4+. Large-modpack servers (technical/exploration packs) are exactly the user profile that benefits most from a bounded-distribution RTP.
 - **Strategic ordering.** Fabric first (in flight), NeoForge second. Reasons:
-  - `rtp-fabric`'s obf/unobf carrier split and Mojmap-decoupling work ([rtp-fabric-ADR-007](../../rtp-fabric/docs/adr/rtp-fabric-ADR-007-mojmap-name-decoupling.md), [rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)) directly informs NeoForge's mappings problem.
-  - The anvil-prefilter parity work ([rtp-fabric-ADR-005](../../rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md)) and non-blocking chunk generation ([rtp-fabric-ADR-008](../../rtp-fabric/docs/adr/rtp-fabric-ADR-008-non-blocking-chunk-generation.md)) are the same problems on NeoForge, with slightly different APIs.
+  - `rtp-fabric`'s obf/unobf carrier split and Mojmap-decoupling work ([rtp-fabric-ADR-007](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-007-mojmap-name-decoupling.md), [rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)) directly informs NeoForge's mappings problem.
+  - The anvil-prefilter parity work ([rtp-fabric-ADR-005](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md)) and non-blocking chunk generation ([rtp-fabric-ADR-008](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-008-non-blocking-chunk-generation.md)) are the same problems on NeoForge, with slightly different APIs.
 - **Forge (legacy ≤1.20.1).** Out of scope. Sunsetting. If we ever feel pressure here, address via a NeoForge backport, not a parallel module tree.
 
 ## 2. API surface differences from Fabric (the part that matters for adapter design)
@@ -24,16 +24,16 @@ These are the things that make NeoForge a genuinely distinct adapter, not a Fabr
 - **Mod metadata.** `META-INF/neoforge.mods.toml` vs `fabric.mod.json`. Trivial.
 - **Mappings.** NeoForge is Mojmap-at-runtime (same as modern Fabric without Yarn). The Mojmap-decoupling discipline from `rtp-fabric-ADR-007` carries over: keep `rtp-core` / `rtp-api` free of NM-typed surfaces; isolate NM in a per-version carrier.
 - **Threading.** NeoForge servers are single-main-thread, same as vanilla / Fabric (no Folia-style regions). All S-005 reasoning carries over unchanged. **No region-ownership checks needed.** Bukkit's `Entity#teleport` semantics don't exist; we'd be calling `Entity.teleportTo` / the `TeleportTransition` API directly.
-- **Chunk tickets.** Same vanilla `DistanceManager` / `ChunkHolder` substrate as Fabric. The non-persistent ticket work ([rtp-fabric-ADR-003](../../rtp-fabric/docs/adr/rtp-fabric-ADR-003-non-persistent-chunk-tickets.md)) and ticket-radius work ([rtp-fabric-ADR-006](../../rtp-fabric/docs/adr/rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md)) should port near-verbatim; if anything, NeoForge sometimes provides slightly friendlier accessors.
+- **Chunk tickets.** Same vanilla `DistanceManager` / `ChunkHolder` substrate as Fabric. The non-persistent ticket work ([rtp-fabric-ADR-003](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-003-non-persistent-chunk-tickets.md)) and ticket-radius work ([rtp-fabric-ADR-006](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md)) should port near-verbatim; if anything, NeoForge sometimes provides slightly friendlier accessors.
 
 ## 3. What we can reuse from `rtp-fabric` (high)
 
 - `rtp-core`, `rtp-api`, `rtp-anvil`, `commands-api`, `effects-api` — all platform-neutral. Reused 1:1.
-- The **obf/unobf carrier split** ([rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)) pattern. NeoForge is Mojmap-at-runtime for 1.20.4+, so we may not need an obf carrier — but the **structural separation** (NM-typed surfaces in a per-version carrier; deobf top-level) still applies, because runtime class names will shift across MC versions and we don't want `rtp-core` linked to a specific MC rev.
-- The **multi-version submodule layout** ([rtp-fabric-ADR-001](../../rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md)): per-MC-version carriers (`rtp-neoforge-v1_20_R1`, `rtp-neoforge-v1_21_R1`, …) dispatched by a `NeoForgeVersionAdapter`. Mirror the rtp-fabric naming.
-- **Anvil prefilter** ([rtp-fabric-ADR-005](../../rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md)) — same `.mca` substrate, same code. No work.
-- **Non-blocking chunk generation** ([rtp-fabric-ADR-008](../../rtp-fabric/docs/adr/rtp-fabric-ADR-008-non-blocking-chunk-generation.md)) — same vanilla async generation primitives.
-- **Typed block-tag snapshot** ([rtp-fabric-ADR-010](../../rtp-fabric/docs/adr/rtp-fabric-ADR-010-typed-block-tag-snapshot.md)) — same registry concept; the snapshot reader will adapt cleanly.
+- The **obf/unobf carrier split** ([rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)) pattern. NeoForge is Mojmap-at-runtime for 1.20.4+, so we may not need an obf carrier — but the **structural separation** (NM-typed surfaces in a per-version carrier; deobf top-level) still applies, because runtime class names will shift across MC versions and we don't want `rtp-core` linked to a specific MC rev.
+- The **multi-version submodule layout** ([rtp-fabric-ADR-001](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md)): per-MC-version carriers (`rtp-neoforge-v1_20_R1`, `rtp-neoforge-v1_21_R1`, …) dispatched by a `NeoForgeVersionAdapter`. Mirror the rtp-fabric naming.
+- **Anvil prefilter** ([rtp-fabric-ADR-005](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md)) — same `.mca` substrate, same code. No work.
+- **Non-blocking chunk generation** ([rtp-fabric-ADR-008](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-008-non-blocking-chunk-generation.md)) — same vanilla async generation primitives.
+- **Typed block-tag snapshot** ([rtp-fabric-ADR-010](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-010-typed-block-tag-snapshot.md)) — same registry concept; the snapshot reader will adapt cleanly.
 
 ## 4. What we cannot reuse (must rewrite per platform)
 
@@ -94,7 +94,7 @@ Mod-side land protection (FTB Chunks, OpenPartiesAndClaims, Argonauts, etc.) is 
 In order, do not skip:
 
 1. **D-005 proposal** referencing this notes file.
-2. **ADR**: *NeoForge platform in-scope* (mirror [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md)), under `rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-…`.
+2. **ADR**: *NeoForge platform in-scope* (mirror [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md)), under `rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-…`.
 3. **`MULTI_PLATFORM_PLAN.md`** phase rows for NeoForge (Phases 0–4 mirror layout).
 4. **Module skeleton** + dev-launch + a single `/rtp` round-trip on the default world before any optimization or anvil work.
 5. **REQ-traceable tests** for S-005 and S-006 first (`ReqRtpNeoforgeS005ChunkLoadingTest`, `ReqRtpNeoforgeS006EarlyApiTest`).

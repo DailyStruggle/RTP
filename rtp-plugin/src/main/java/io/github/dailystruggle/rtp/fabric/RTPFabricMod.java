@@ -147,6 +147,49 @@ public final class RTPFabricMod implements ModInitializer {
             new FabricEventBridge(accessor).register();
 
             // ----------------------------------------------------------------
+            // MULTI_PLATFORM_PLAN Step K / rtp-fabric-ADR-014 — install the
+            // Fabric map binding so /rtp visualization charts render to a
+            // vanilla filled-map instead of bottoming out on NoopMapBinding
+            // ("no concrete MapBinding installed"). Mirrors RTPBukkitPlugin's
+            // BukkitMapBinding install. Only install when the active version
+            // adapter actually implements the renderMapChart seam
+            // (supportsMapCharts); otherwise leave MapDispatch on the
+            // NoopMapBinding sentinel so the configurable mapBindingMissing
+            // message still surfaces on un-ported MC lines (1.20.x, etc.).
+            // FabricMapBinding is net.minecraft-free (it routes through the
+            // adapter SPI), so referencing it here keeps the entrypoint clean
+            // per rtp-fabric-ADR-002 / ADR-007.
+            // ----------------------------------------------------------------
+            try {
+                FabricVersionAdapter mapAdapter = FabricVersionAdapterRegistry.peek();
+                if (mapAdapter != null && mapAdapter.supportsMapCharts()) {
+                    io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding mapBinding =
+                            new io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding();
+                    io.github.dailystruggle.rtp.common.commands.maps.MapDispatch
+                            .setMapBinding(mapBinding);
+                    // REQ-RTP-MAP-003 — release per-viewer map state on disconnect
+                    // (parity with Bukkit's OnPlayerQuit -> MapDispatch.firePlayerQuit).
+                    accessor.getFabricPlayerLifecycleHook().onPlayerQuit(uuid ->
+                            io.github.dailystruggle.rtp.common.commands.maps.MapDispatch
+                                    .firePlayerQuit(uuid));
+                    RTP.log(Level.INFO,
+                            "[RTP] Fabric map binding installed (FabricMapBinding, carrier="
+                                    + mapAdapter.mcVersion() + ").");
+                } else {
+                    RTP.log(Level.INFO,
+                            "[RTP] Fabric map binding NOT installed: version adapter "
+                                    + (mapAdapter == null ? "<none>" : mapAdapter.mcVersion())
+                                    + " does not support map charts; /rtp charts will report"
+                                    + " mapBindingMissing (NoopMapBinding active).");
+                }
+            } catch (Throwable t) {
+                RTP.log(Level.WARNING,
+                        "[RTP] onInitialize MapBinding install failed; MapDispatch will fall back"
+                                + " to NoopMapBinding: " + t.getClass().getSimpleName() + ": "
+                                + t.getMessage(), t);
+            }
+
+            // ----------------------------------------------------------------
             // effects-api-ADR-003 — wire the Fabric effects layer.
             // FabricEffectsHandler.setupEffects:
             //   1. Binds the MinecraftServer into FabricEffectRuntime so
@@ -734,7 +777,7 @@ public final class RTPFabricMod implements ModInitializer {
         if (adapterFqn == null) {
             throw new IllegalStateException(
                     "No Fabric version adapter is mapped for running MC version '" + mcVersion
-                            + "'. Supported lines: 1.20.x, 1.21.x, 26.1.x. See rtp-fabric-ADR-001.");
+                            + "'. Supported lines: 1.20.x, 1.21.x, 26.1.x, 26.2.x. See rtp-fabric-ADR-001.");
         }
 
         try {
@@ -810,6 +853,15 @@ public final class RTPFabricMod implements ModInitializer {
         if (mcVersion.startsWith("26.1")) {
             // Java 25 bytecode — never named on a Java 21 JVM, so never resolved.
             return "io.github.dailystruggle.rtp.fabric.v26_1_R1.V26_1_R1FabricVersionAdapter";
+        }
+        if (mcVersion.startsWith("26.2")) {
+            // EARLY/EXPERIMENTAL MC 26.2 line. FabricLoader's friendly string
+            // for the pre-release (e.g. "26.2-pre-2") begins with "26.2", so
+            // this prefix match catches both the pre-release builds and the
+            // eventual 26.2.x finals. Re-verify the pin and this matcher when
+            // 26.2 ships final (rtp-fabric-ADR-014). Java 25 bytecode — never
+            // named on a Java 21 JVM, so never resolved there.
+            return "io.github.dailystruggle.rtp.fabric.v26_2_R1.V26_2_R1FabricVersionAdapter";
         }
         return null;
     }

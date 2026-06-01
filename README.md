@@ -4,16 +4,18 @@ The Folia-native, region-aware random teleport plugin for production Minecraft s
 
 **Supported:** Spigot, Paper, Folia 1.20+ (stable). Fabric 1.21+ (in development).
 
-🔗 **[Get RTP Pro on BuiltByBit](https://builtbybit.com/resources/rtp-pro.105418/)** — supports continued development and unlocks the Pro feature set.
+🔗 **[Get RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** — supports continued development and unlocks the Pro feature set.
 
 [![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
 [![Release](https://img.shields.io/github/v/release/DailyStruggle/RTP)](https://github.com/DailyStruggle/RTP/releases)
 [![Java](https://img.shields.io/badge/Java-21-blue)](https://adoptium.net/)
-[![SpigotMC](https://img.shields.io/badge/SpigotMC-RTP-orange)](https://www.spigotmc.org/resources/rtp.94812/)
-[![BuiltByBit](https://img.shields.io/badge/BuiltByBit-RTP%20Pro-blue)](https://builtbybit.com/resources/rtp-pro.105418/)
+[![SpigotMC](https://img.shields.io/badge/SpigotMC-RTP-orange)](https://www.spigotmc.org/resources/leafrtp.94812/)
+[![BuiltByBit](https://img.shields.io/badge/BuiltByBit-RTP%20Pro-blue)](https://builtbybit.com/resources/leafrtp-pro.105418/)
+[![Modrinth](https://img.shields.io/badge/Modrinth-LeafRTP-green)](https://modrinth.com/plugin/leafrtp)
 
-🔗 [SpigotMC Resource Page](https://www.spigotmc.org/resources/rtp.94812/)
-🔗 [BuiltByBit Resource Page](https://builtbybit.com/resources/rtp-pro.105418/)
+🔗 [SpigotMC Resource Page](https://www.spigotmc.org/resources/leafrtp.94812/)
+🔗 [BuiltByBit Resource Page](https://builtbybit.com/resources/leafrtp-pro.105418/)
+🔗 [Modrinth Resource Page](https://modrinth.com/plugin/leafrtp)
 
 ---
 
@@ -98,10 +100,10 @@ Custom shapes can be registered at runtime via the `rtp-api`. See the `addons/` 
 | `effects-api/` | Unified multi-platform visual/particle effects framework. |
 | `rtp-core/` | Platform-agnostic core logic: regions, shapes, queues, database, memory tracking. |
 | `rtp-plugin/` | Plugin entry point for Bukkit platforms. Bridges core with Spigot/Paper/Folia adapters. |
-| `rtp-bukkit/` | Spigot platform adapter. |
-| `rtp-paper/` | Paper platform adapter (async chunk loading). |
-| `rtp-folia/` | Folia platform adapter (regional thread scheduling). |
-| `rtp-fabric/` | Fabric platform adapter and mod entry point (Planned). |
+| `platforms/rtp-bukkit/` | Spigot platform adapter. |
+| `platforms/rtp-paper/` | Paper platform adapter (async chunk loading). |
+| `platforms/rtp-folia/` | Folia platform adapter (regional thread scheduling). |
+| `platforms/rtp-fabric/` | Fabric platform adapter and mod entry point (Planned). |
 | `addons/` | Example addons: Iris integration, Glide. (Claim plugin integrations are folded into the core). |
 | `Python Test Scripts/` | Visualisation scripts for distribution math and geometry validation. |
 

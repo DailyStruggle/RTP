@@ -62,6 +62,14 @@ def excludeJdk25 = startParameter.projectProperties.containsKey('excludeJdk25') 
         System.getenv('JITPACK') != null
 
 include 'rtp-api'
+// Non-rtp-exclusive, platform-neutral API modules are grouped under the
+// api/ folder to declutter the repo root. The Gradle project paths and
+// Maven coordinates are intentionally KEPT FLAT (':yaml-api', ':commands-api',
+// ':effects-api', ':maps-api', ':metrics-api', and the nested
+// ':effects-api:effects-api-fabric-unobf'); only the on-disk location moves,
+// applied via projectDir overrides at the bottom of this section. This keeps
+// every existing project(':...') dependency, Maven coordinate, and ADR/doc
+// reference valid.
 // yaml-api -- in-house zero-dependency YAML substrate (ADR-025), extracted from
 // rtp-core so rtp-api can host the configurable selection model without a core
 // dependency. Pure Java, no platform/Loom dependency.
@@ -81,6 +89,16 @@ include 'maps-api'
 // BukkitTpsSampler, FoliaMetricsBinding + FoliaRegionTpsSampler,
 // FabricMetricsBinding) stay in their respective platform adapters.
 include 'metrics-api'
+// anvil-api -- platform-neutral vanilla Anvil region-file decode / NBT
+// pre-filter (ADR-016). No RTP-module or platform dependency, so it groups
+// under api/ with the other non-rtp-exclusive modules. Renamed from the
+// former ':rtp-anvil' coordinate; on-disk at api/anvil-api.
+include 'anvil-api'
+// tags-api -- platform-neutral Minecraft block-tag JSON resolver (ADR-017).
+// No RTP-module or platform dependency (hand-rolled JSON reader, no third-party
+// JSON lib), so it groups under api/ with the other non-rtp-exclusive modules.
+// Renamed from the former ':rtp-tags' coordinate; on-disk at api/tags-api.
+include 'tags-api'
 // effects-api-fabric-unobf -- nested sibling Gradle module hosting the
 // Mojmap-unobfuscated carrier for effectsapi/fabric_unobf/*. Compiled under
 // unobfuscated 1.15 Loom (same regime as rtp-fabric-v26_1_R1 and
@@ -94,10 +112,33 @@ include 'metrics-api'
 if (!excludeJdk25) {
     include 'effects-api:effects-api-fabric-unobf'
 }
-include 'rtp-anvil'
-include 'rtp-tags'
+
+// Relocate the grouped api/ modules on disk while keeping their flat Gradle
+// project paths (see the comment block above the include lines). The nested
+// unobf carrier inherits no projectDir from its parent in Gradle, so it is
+// overridden explicitly.
+project(':yaml-api').projectDir     = file('api/yaml-api')
+project(':commands-api').projectDir = file('api/commands-api')
+project(':effects-api').projectDir  = file('api/effects-api')
+project(':maps-api').projectDir     = file('api/maps-api')
+project(':metrics-api').projectDir  = file('api/metrics-api')
+project(':anvil-api').projectDir    = file('api/anvil-api')
+project(':tags-api').projectDir     = file('api/tags-api')
+if (!excludeJdk25) {
+    project(':effects-api:effects-api-fabric-unobf').projectDir = file('api/effects-api/effects-api-fabric-unobf')
+}
+
 include 'rtp-core'
 
+// RTP-exclusive server-side platform adapters are grouped under the
+// platforms/ folder to declutter the repo root, mirroring the api/ grouping.
+// The Gradle project paths and Maven coordinates are intentionally KEPT FLAT
+// (':rtp-bukkit:rtp-bukkit-common', ':rtp-fabric:rtp-fabric-common', etc.);
+// only the on-disk location moves, applied via the projectDir overrides at the
+// bottom of this section. This keeps every existing project(':...') dependency,
+// Maven coordinate, and ADR/doc reference valid. rtp-plugin (the shaded
+// deliverable, not an adapter) stays at the repo root; rtp-proxy (the proxy
+// side) is also grouped under platforms/ but keeps its flat Gradle paths.
 include 'rtp-bukkit:rtp-bukkit-common'
 include 'rtp-paper:rtp-paper-common'
 include 'rtp-folia:rtp-folia-common'
@@ -122,7 +163,7 @@ if (!excludeJdk25) {
 
 // Fabric platform adapter — first-class in-scope as of 2026-04-30 per ADR-022.
 // rtp-fabric-common applies fabric-loom (see its build.gradle); Loom is
-// scoped per ADR-022 §3 to rtp-fabric/** and rtp-plugin only — it must
+// scoped per ADR-022 §3 to platforms/rtp-fabric/** and rtp-plugin only — it must
 // not leak into rtp-core, rtp-api, commands-api, effects-api, or any
 // Bukkit-family adapter.
 //
@@ -177,6 +218,48 @@ include 'rtp-fabric:rtp-fabric-v1_21_R11'
 if (!excludeJdk25) {
     include 'rtp-fabric:rtp-fabric-v26_1_R1'
 }
+// v26_2_R1 -- EARLY/EXPERIMENTAL, pinned to the MC 26.2 pre-release
+// (26.2-pre-2). Same deobf regime as v26_1_R1 (Loom 1.15, JDK 25, no
+// mappings), cloned from it. See rtp-fabric-ADR-014. Re-pin the MC /
+// loader / fabric-api versions when 26.2 reaches final.
+if (!excludeJdk25) {
+    include 'rtp-fabric:rtp-fabric-v26_2_R1'
+}
+
+// Relocate the grouped platforms/ adapters on disk while keeping their flat
+// Gradle project paths (see the comment block above the platform include lines).
+// Setting an intermediate parent's projectDir does not move its children in
+// Gradle, so every project (parent and per-version child) is overridden
+// explicitly. JDK-25 / unobf Fabric carriers are overridden only when included.
+project(':rtp-bukkit').projectDir                = file('platforms/rtp-bukkit')
+project(':rtp-bukkit:rtp-bukkit-common').projectDir   = file('platforms/rtp-bukkit/rtp-bukkit-common')
+project(':rtp-bukkit:rtp-bukkit-v1_20_R1').projectDir = file('platforms/rtp-bukkit/rtp-bukkit-v1_20_R1')
+project(':rtp-bukkit:rtp-bukkit-v1_21_R1').projectDir = file('platforms/rtp-bukkit/rtp-bukkit-v1_21_R1')
+project(':rtp-bukkit:rtp-bukkit-v26_1_R1').projectDir = file('platforms/rtp-bukkit/rtp-bukkit-v26_1_R1')
+
+project(':rtp-paper').projectDir                = file('platforms/rtp-paper')
+project(':rtp-paper:rtp-paper-common').projectDir   = file('platforms/rtp-paper/rtp-paper-common')
+project(':rtp-paper:rtp-paper-v1_20_R1').projectDir = file('platforms/rtp-paper/rtp-paper-v1_20_R1')
+project(':rtp-paper:rtp-paper-v1_21_R1').projectDir = file('platforms/rtp-paper/rtp-paper-v1_21_R1')
+project(':rtp-paper:rtp-paper-v26_1_R1').projectDir = file('platforms/rtp-paper/rtp-paper-v26_1_R1')
+
+project(':rtp-folia').projectDir                = file('platforms/rtp-folia')
+project(':rtp-folia:rtp-folia-common').projectDir   = file('platforms/rtp-folia/rtp-folia-common')
+project(':rtp-folia:rtp-folia-v1_20_R1').projectDir = file('platforms/rtp-folia/rtp-folia-v1_20_R1')
+project(':rtp-folia:rtp-folia-v1_21_R1').projectDir = file('platforms/rtp-folia/rtp-folia-v1_21_R1')
+project(':rtp-folia:rtp-folia-v26_1_R1').projectDir = file('platforms/rtp-folia/rtp-folia-v26_1_R1')
+
+project(':rtp-fabric').projectDir                  = file('platforms/rtp-fabric')
+project(':rtp-fabric:rtp-fabric-common').projectDir     = file('platforms/rtp-fabric/rtp-fabric-common')
+project(':rtp-fabric:rtp-fabric-v1_20_R1').projectDir   = file('platforms/rtp-fabric/rtp-fabric-v1_20_R1')
+project(':rtp-fabric:rtp-fabric-v1_21_R1').projectDir   = file('platforms/rtp-fabric/rtp-fabric-v1_21_R1')
+project(':rtp-fabric:rtp-fabric-v1_21_R5').projectDir   = file('platforms/rtp-fabric/rtp-fabric-v1_21_R5')
+project(':rtp-fabric:rtp-fabric-v1_21_R11').projectDir  = file('platforms/rtp-fabric/rtp-fabric-v1_21_R11')
+if (!excludeJdk25) {
+    project(':rtp-fabric:rtp-fabric-common-unobf').projectDir = file('platforms/rtp-fabric/rtp-fabric-common-unobf')
+    project(':rtp-fabric:rtp-fabric-v26_1_R1').projectDir     = file('platforms/rtp-fabric/rtp-fabric-v26_1_R1')
+    project(':rtp-fabric:rtp-fabric-v26_2_R1').projectDir     = file('platforms/rtp-fabric/rtp-fabric-v26_2_R1')
+}
 
 // Multi-server proxy support — umbrella ADR-036 Accepted 2026-05-14.
 // Phase 1: rtp-proxy-common ships the host-independent SPI, the reference
@@ -190,6 +273,13 @@ if (!excludeJdk25) {
 // rtp-proxy-ADR-008 ratifies (still Proposed).
 include 'rtp-proxy:rtp-proxy-common'
 include 'rtp-proxy:rtp-proxy-velocity'
+
+// Relocate the rtp-proxy tree on disk under platforms/ while keeping its flat
+// Gradle project paths. The implicit parent and each included child are
+// overridden explicitly (parent projectDir does not cascade to children).
+project(':rtp-proxy').projectDir                = file('platforms/rtp-proxy')
+project(':rtp-proxy:rtp-proxy-common').projectDir   = file('platforms/rtp-proxy/rtp-proxy-common')
+project(':rtp-proxy:rtp-proxy-velocity').projectDir = file('platforms/rtp-proxy/rtp-proxy-velocity')
 
 include 'addons:RTP_ExampleAddon'
 // RTP_GuiAddon — reference inventory (chest) destination picker built ONLY on the

@@ -161,6 +161,14 @@ permissions:
   rtp.info:
     description: see plugin info and settings
     default: op
+  rtp.admin:
+    description: allow player to use /rtp clearcache and grant all other admin tooling
+    default: op
+    children:
+      rtp.reload: true
+      rtp.config: true
+      rtp.scan: true
+      rtp.info: true
   rtp.*:
     description: access all rtp subcommands
     default: op
@@ -184,3 +192,4 @@ permissions:
       rtp.biome: true
       rtp.biome.*: true
       rtp.scan: true
+      rtp.admin: true

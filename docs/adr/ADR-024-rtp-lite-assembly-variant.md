@@ -122,7 +122,7 @@ RTP-lite:
    - Persistent storage backends: `H2DatabaseAccessor`, `SQLiteDatabaseAccessor`, `MySQLDatabaseAccessor`, `PostgreSQLDatabaseAccessor`, `AbstractSQLDatabaseAccessor`, `RedisManager`, and the corresponding shaded driver jars (`com.h2database`, `org.xerial:sqlite-jdbc`, `mysql`, `org.postgresql`, `redis.clients`). Lite uses `YamlFileDatabase` (or an in-memory no-op accessor) only.
    - Shutdown-flush lifecycle (`docs/architecture/10`).
    - Tags module (`rtp-tags`).
-   - Folia adapter (`rtp-folia/**`). Lite is Spigot+Paper only.
+   - Folia adapter (`platforms/rtp-folia/**`). Lite is Spigot+Paper only.
    - Economy / Vault hook + `economy.yml`.
    - Login reserve cache (ADR-023): `LoginCacheTask`, `RegionQueueManager.enableLoginCache`/`disableLoginCache`, the join-prime hook in `OnEventTeleports`, and `PerformanceKeys.loginCacheEnabled` / `loginCacheCap`.
    - Visitor / observation mode: `PerformanceKeys.visitorEnabled` and the `Region.isObservationalModeEnabled` branch.
@@ -185,7 +185,7 @@ ADR-024 is **additive**, not a superseder: each prior ADR continues to govern th
   - The full edition retains every existing feature; no operator is forced to migrate.
 - **Negative / Trade-offs.**
   - Two bootstrap classes (`RTPBukkitPlugin`, `RTPBukkitLitePlugin`) must be kept in sync for the steps both editions perform. Mitigation: the shared steps live in helper methods on the bootstrap or in `rtp-core`; both classes call the same helpers. Genuine divergence (login cache, language bootstrap, integrations) belongs only to the full bootstrap and never appears in lite.
-  - CI matrix grows: lite needs its own assembly + smoke test. Mitigation: a single `liteJarStructureTest` task that asserts the produced lite JAR contains no classes / resources from the lite-exclude list (`tags/`, `folia/`, `H2*`, `SQLite*`, `MySQL*`, `PostgreSQL*`, `AbstractSQLDatabaseAccessor`, `RedisManager`, `LoginCacheTask`, `lang/`, `docs/`, `economy.yml`, `integrations.yml`, `logging.yml`, `language.yml`). The anvil package (`rtp-anvil`) and the Paper adapter (`rtp-paper/**`) are allowed in lite.
+  - CI matrix grows: lite needs its own assembly + smoke test. Mitigation: a single `liteJarStructureTest` task that asserts the produced lite JAR contains no classes / resources from the lite-exclude list (`tags/`, `folia/`, `H2*`, `SQLite*`, `MySQL*`, `PostgreSQL*`, `AbstractSQLDatabaseAccessor`, `RedisManager`, `LoginCacheTask`, `lang/`, `docs/`, `economy.yml`, `integrations.yml`, `logging.yml`, `language.yml`). The anvil package (`rtp-anvil`) and the Paper adapter (`platforms/rtp-paper/**`) are allowed in lite.
   - Hidden hard-imports in `rtp-core` to lite-excluded classes would cause `NoClassDefFoundError` at runtime in lite. Mitigation: a pre-flight audit (`search_project` over `rtp-core` for `import io.github.dailystruggle.rtp.tags`, `H2DatabaseAccessor`, `RedisManager`, `import dev.folia`) is required before this ADR is accepted; any hits other than legitimate strategy-pattern wiring are blocking refactors. Imports of `io.github.dailystruggle.rtp.anvil`, `io.papermc`, and `com.destroystokyo.paper` are explicitly allowed because the Paper adapter and anvil module ship in lite.
   - Lite cannot run on Folia; operators on Folia must use the full JAR. Paper operators get full Paper-native behavior via the bundled Paper adapter, matching v2 parity.
   - Iris compatibility on lite is functionally equivalent to full, because the anvil pre-filter is retained in lite.

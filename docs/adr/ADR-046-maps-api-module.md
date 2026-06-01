@@ -21,7 +21,7 @@ Three structural facts shape the decision:
 2. The *delivery* of those pixels is platform-specific: Bukkit
    `MapRenderer.render(...)`, Folia map-items with no owning region, Fabric
    NM-typed packets that must be dispatched through obf/unobf carriers
-   ([rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md),
+   ([rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md),
    [effects-api-ADR-006](../../effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md)).
 3. The chart data sources (`MemoryTracker` samples, `FailTypes` counters,
    anvil-prefilter biome rasters, the Archimedean spiral
@@ -38,7 +38,7 @@ The shape that *does* fit is the one `effects-api` and `commands-api` already
 prove: a top-level module with platform-neutral SPI, a Noop default for
 test/Lite, and per-platform bindings — including a Mojmap obf/unobf carrier
 split for Fabric per
-[rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md).
+[rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md).
 
 The Folia case requires special note: a `MapView` is not entity-owned and has
 no region. Refresh writes must therefore route through the Global Region
@@ -72,17 +72,17 @@ subsystem. It is structured in three layers:
    - `BukkitMapBinding` in `maps-api/.../mapsapi/bukkit/` — uses
      `MapView` + `MapRenderer`. The only file in this module permitted to
      import `org.bukkit.*`. Shared by Spigot, Paper, Folia.
-   - `FoliaMapBinding` in `rtp-folia/rtp-folia-common/` — thin override that
+   - `FoliaMapBinding` in `platforms/rtp-folia/rtp-folia-common/` — thin override that
      routes the `commit()` step through the **Global Region Scheduler**
      (map-items have no owning region) and entity-scheduler hops to the
      viewer for any per-viewer mutation. Refresh ticks use
      `RTP.scheduler.runTaskTimerAsynchronously`.
    - `FabricMapBinding` via dispatcher in `maps-api/.../mapsapi/fabric/`,
      with a Mojmap-unobf carrier `maps-api-fabric-unobf/` and per-version
-     NM-typed obf carriers under `rtp-fabric/rtp-fabric-common/.../maps/`,
+     NM-typed obf carriers under `platforms/rtp-fabric/rtp-fabric-common/.../maps/`,
      following the dispatch contract in
      [effects-api-ADR-006](../../effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md)
-     and [rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md).
+     and [rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md).
 
 The single admin command is wired through the existing **`commands-api`
 Brigadier bridge** ([commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md)),
@@ -164,7 +164,7 @@ during Stage 2.
 | Fold into `commands-api` | `commands-api` is a Brigadier bridge; pixel rendering is not a command concern. The `/rtp map` command is one consumer, not the subsystem. |
 | Fold the `MapCanvas` SPI into `rtp-api` (public addon surface) only | `rtp-api` is the addon-facing contract; binding implementations carry platform imports and a non-trivial lifecycle that addons should consume, not author. Re-evaluate after Phase 3 if addons ask for it. |
 | Per-platform fork (separate map renderer in each adapter) | Already proven anti-pattern by `effects-api` and `commands-api`; *Architecture Boundaries §3* explicitly says "extend these, don't fork per-platform." |
-| Skip the Fabric obf/unobf split and use reflection in a single common module | Loom's intermediary remap fundamentally requires the split for 1.20.x / 1.21.x runtimes; reflection from deobf MC 26.x is unsafe ([rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)). |
+| Skip the Fabric obf/unobf split and use reflection in a single common module | Loom's intermediary remap fundamentally requires the split for 1.20.x / 1.21.x runtimes; reflection from deobf MC 26.x is unsafe ([rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)). |
 | Render to a custom client-side surface (resource pack / mod overlay) | Requires a client mod, breaking vanilla-compatibility. Cartography maps work for every connecting client out of the box. |
 | Defer to bStats only | bStats charts are off-server analytics, anonymized and aggregated. They cannot answer "what does the spiral look like on *my* server right now" or be inspected in-world by operators. The two pipelines stay independent. |
 | Render Mermaid via a bundled Node.js / headless-browser / GraalJS runtime | Adds a multi-MB native or scripting dependency, breaks Java-21-only toolchain promise, breaks reproducibility across MC platforms, breaks Lite assembly trim. The in-house subset covers every diagram RTP itself authors. |
@@ -190,7 +190,7 @@ during Stage 2.
     must pick a fixed RTP palette mapping to stay deterministic across MC
     versions.
   - Fabric carriers duplicate code across `maps-api-fabric-unobf/` and
-    per-version `rtp-fabric/rtp-fabric-common/.../maps/` modules. Same cost
+    per-version `platforms/rtp-fabric/rtp-fabric-common/.../maps/` modules. Same cost
     as `effects-api`; mitigated by mechanical translation rather than
     inventing a second pattern.
   - Folia map-items have no owning region, requiring the binding to take an
@@ -222,4 +222,4 @@ during Stage 2.
 - [ADR-026](ADR-026-external-hook-api-surface.md) — `RTPHooks` registry pattern.
 - [commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md) — Brigadier bridge for `/rtp map`.
 - [effects-api-ADR-006](../../effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md) — obf/unobf split precedent.
-- [rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md) — Fabric carrier dispatch precedent.
+- [rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md) — Fabric carrier dispatch precedent.

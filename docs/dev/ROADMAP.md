@@ -94,7 +94,7 @@ should be updated to reflect that Fabric is supported, not out of scope.
   - [x] ~~**Null stub in `FabricServerAccessor.getLocationGenerator`.**~~ — fully wired; throws
     `IllegalStateException` per `REQ-RTP-S-006` when called pre-init.
   - [x] ~~**Unresolved Loom dependency.**~~ — resolved via the obf/unobf carrier split
-    ([rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)).
+    ([rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)).
 - [x] ~~**Update front-page / requirements wording.** `docs/FRONT_PAGE.bbcode` and `REQUIREMENTS.md
   §0 Out of Scope` still describe Fabric as unsupported; reframe to first-class supported
   platform.~~
@@ -197,7 +197,7 @@ reproducible by readers".
   `AbstractFileSchematicPaster` (each `.schem` decoded once, cleared on `/rtp reload`).
   **Remaining:** the footprint claim check (S-003) ahead of the paste; the Fabric native paster
   (`BlockArgumentParser` through the obf/unobf carrier per
-  [rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md));
+  [rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md));
   non-container block-entity NBT (sign text, custom data - still placed as empty blocks, audited);
   and a `docs/admin/` page plus traceability rows for the paste-on-region-thread regression test.
 - [x] ~~**Optional PvP / combat-tag check.** Optional pre-flight check that refuses (or delays)

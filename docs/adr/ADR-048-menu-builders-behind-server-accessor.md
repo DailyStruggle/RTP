@@ -2,8 +2,8 @@
 
 - **Status:** Proposed (2026-05-23)
 - **Scope:** `rtp-api` (`menu/`, `server/RTPServerAccessor`), `rtp-core` (`common/commands/menu/`), `rtp-bukkit-common`, `rtp-fabric-common` (+ `-common-unobf`), `rtp-plugin` (Paper + Fabric command roots).
-- **Supersedes:** none. Amends the platform-shaped wiring contract assumed by [ADR-035](ADR-035-interactive-menus-book-first.md), [ADR-044](ADR-044-command-tree-menu-reflector.md), [ADR-045](ADR-045-rtp-docs-menu-consumer.md), [rtp-fabric-ADR-012](../../rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md).
-- **Related:** [ADR-035](ADR-035-interactive-menus-book-first.md) (menu rollout - Paper book renderer + Fabric chat renderer), [ADR-044](ADR-044-command-tree-menu-reflector.md) (`MenuModel` reflector), [rtp-fabric-ADR-011](../../rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md) (Fabric effective-permission resolver, feeds the accessor), [rtp-fabric-ADR-012](../../rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md) (Fabric chat-first renderer; ADR-012 will be amended to consume the accessor introduced here).
+- **Supersedes:** none. Amends the platform-shaped wiring contract assumed by [ADR-035](ADR-035-interactive-menus-book-first.md), [ADR-044](ADR-044-command-tree-menu-reflector.md), [ADR-045](ADR-045-rtp-docs-menu-consumer.md), [rtp-fabric-ADR-012](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md).
+- **Related:** [ADR-035](ADR-035-interactive-menus-book-first.md) (menu rollout - Paper book renderer + Fabric chat renderer), [ADR-044](ADR-044-command-tree-menu-reflector.md) (`MenuModel` reflector), [rtp-fabric-ADR-011](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md) (Fabric effective-permission resolver, feeds the accessor), [rtp-fabric-ADR-012](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md) (Fabric chat-first renderer; ADR-012 will be amended to consume the accessor introduced here).
 
 ## Context
 
@@ -14,12 +14,12 @@ The interactive-menu rollout is split across two layers today:
 
 The builders are *nominally* platform-neutral (they live in `rtp-core`, which forbids `org.bukkit.*` imports) but in practice they couple to platform-shaped data through ad-hoc seams:
 
-1. **Permission visibility filter.** Every builder filters command-tree rows by a `Predicate<String>` permission probe. Today the probe is constructed inline at each command-root call site (Paper: `RTPCmdBukkit` lines 213 / 239 / 246 / 259 / 303; Fabric per [rtp-fabric-ADR-012](../../rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md) plan). The construction logic differs per platform (Paper delegates to `Player#hasPermission`; Fabric routes through the three-tier chain from [rtp-fabric-ADR-011](../../rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md)).
-2. **Effective-permission enumeration.** `AdminPanelBuilder` and the param-picker page need the granted-node set to decide what config rows / param values to expose. Available on `RTPPlayer#getEffectivePermissions()` today, but each builder reaches for the player via `RTP.serverAccessor.getPlayer(uuid)` ad-hoc and assumes the result is non-empty - a Fabric pre-[rtp-fabric-ADR-011](../../rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md) regression that the ADR-011 resolver fixed but did not lift to a stable accessor surface.
+1. **Permission visibility filter.** Every builder filters command-tree rows by a `Predicate<String>` permission probe. Today the probe is constructed inline at each command-root call site (Paper: `RTPCmdBukkit` lines 213 / 239 / 246 / 259 / 303; Fabric per [rtp-fabric-ADR-012](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md) plan). The construction logic differs per platform (Paper delegates to `Player#hasPermission`; Fabric routes through the three-tier chain from [rtp-fabric-ADR-011](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md)).
+2. **Effective-permission enumeration.** `AdminPanelBuilder` and the param-picker page need the granted-node set to decide what config rows / param values to expose. Available on `RTPPlayer#getEffectivePermissions()` today, but each builder reaches for the player via `RTP.serverAccessor.getPlayer(uuid)` ad-hoc and assumes the result is non-empty - a Fabric pre-[rtp-fabric-ADR-011](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md) regression that the ADR-011 resolver fixed but did not lift to a stable accessor surface.
 3. **Player locale.** Builders embed strings through `LangParser` / `messages.yml`. The lookup is platform-neutral, but the *fallback chain* (client locale -> world default -> server default) is not - Paper reads `Player#getLocale()`, Fabric resolves through the carrier split.
 4. **Region / world descriptor.** `FrontPageBuilder` shows a "you are here" line. On a single-server backend this reads `Player#getWorld()`; on a network-mode backend (ADR-036) the answer is proxy-routed. Each builder currently reaches for whatever it can find.
 
-The result is that *each* platform's command root re-wires the same seven things inline: build a `LocalMenuTokenRegistry`, construct a `menuPermissionProbe`, attach `MenuRedeemSubcommand`, instantiate each builder, and connect them to the renderer. Adding a new platform (the Fabric work in [rtp-fabric-ADR-012](../../rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md), or any future Forge / Sponge port) means re-implementing that wiring from scratch. The five builders themselves are mostly platform-neutral, but the platform-shaped seams keep them from being directly reusable.
+The result is that *each* platform's command root re-wires the same seven things inline: build a `LocalMenuTokenRegistry`, construct a `menuPermissionProbe`, attach `MenuRedeemSubcommand`, instantiate each builder, and connect them to the renderer. Adding a new platform (the Fabric work in [rtp-fabric-ADR-012](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md), or any future Forge / Sponge port) means re-implementing that wiring from scratch. The five builders themselves are mostly platform-neutral, but the platform-shaped seams keep them from being directly reusable.
 
 The user-raised question - "can we extract this into a `menu-api` module and use the `RTPServerAccessor` / `effects-api` model?" - distils to: where do the platform-shaped seams belong, and is a new Gradle module warranted? This ADR answers both.
 
@@ -89,7 +89,7 @@ These methods live on `RTPServerAccessor` (not a new sibling accessor) because:
 - Each method is the *menu-shaped projection* of an existing accessor / `RTPPlayer` capability. They are not a new subsystem, they are convenience views.
 - `effects-api` has a separate `EffectFactory` because effects are third-party-registerable. Menu builders are not third-party-registerable (per [ADR-044](ADR-044-command-tree-menu-reflector.md) the model reflects the command tree, not user-registered pages), so the symmetry does not apply.
 
-If a fifth or sixth method joins the list (e.g. `boolean isViewingMenu(UUID)` for [rtp-fabric-ADR-012](../../rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md)'s chat-prompt callback, or `void runOnPlayerThread(UUID, Runnable)` for Folia region-affinity actions), this ADR is amended to split the menu surface into a sibling `RTPMenuAccessor` retrieved via `RTPServerAccessor#menuAccessor()`. The split threshold is documented as **>=5 menu-specific methods on `RTPServerAccessor`**; today's four sit below it.
+If a fifth or sixth method joins the list (e.g. `boolean isViewingMenu(UUID)` for [rtp-fabric-ADR-012](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md)'s chat-prompt callback, or `void runOnPlayerThread(UUID, Runnable)` for Folia region-affinity actions), this ADR is amended to split the menu surface into a sibling `RTPMenuAccessor` retrieved via `RTPServerAccessor#menuAccessor()`. The split threshold is documented as **>=5 menu-specific methods on `RTPServerAccessor`**; today's four sit below it.
 
 ### 2. Move the five builders into `rtp-api/.../menu/builders/`
 
@@ -149,14 +149,14 @@ MenuModel model = new FrontPageBuilder(view, tokens).build();
 RTP.serverAccessor.openMenu(callerUuid, model);  // existing dispatch path
 ```
 
-The seven inline construction sites in `RTPCmdBukkit` (token registry + permission probe + redeem subcommand + four builder call sites) collapse to one accessor lookup per build call. The same pattern applies to Fabric, which lets [rtp-fabric-ADR-012](../../rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md)'s `RTPCmdFabricRoot` wiring section be drastically simplified - the ADR will be amended to delete its `menuPermissionProbe` sub-item (now subsumed) and reference this ADR for the builder wiring.
+The seven inline construction sites in `RTPCmdBukkit` (token registry + permission probe + redeem subcommand + four builder call sites) collapse to one accessor lookup per build call. The same pattern applies to Fabric, which lets [rtp-fabric-ADR-012](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md)'s `RTPCmdFabricRoot` wiring section be drastically simplified - the ADR will be amended to delete its `menuPermissionProbe` sub-item (now subsumed) and reference this ADR for the builder wiring.
 
 ### 4. Platform adapter changes
 
 | Platform | Adapter delta |
 |---|---|
 | `BukkitServerAccessor` (rtp-bukkit-common) | Override the four default methods. `menuPermissionProbe(uuid)` -> `node -> Bukkit.getPlayer(uuid).hasPermission(node)`. `menuEffectivePermissions(uuid)` -> walks `Player#getEffectivePermissions()`. `menuLocale(uuid)` -> `Player#getLocale()`. `menuRegionDescriptor(uuid)` -> `Player#getWorld().getName()` (or empty string when network mode is active and the player is on a different backend). |
-| `FabricServerAccessor` (rtp-fabric-common + -common-unobf) | Override the four default methods. `menuPermissionProbe(uuid)` and `menuEffectivePermissions(uuid)` delegate to `FabricEffectivePermissionsResolver` from [rtp-fabric-ADR-011](../../rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md). `menuLocale(uuid)` reads `ServerPlayer#clientInformation().language()` through the carrier split. `menuRegionDescriptor(uuid)` reads `ServerPlayer#serverLevel().dimension().location().toString()`. |
+| `FabricServerAccessor` (rtp-fabric-common + -common-unobf) | Override the four default methods. `menuPermissionProbe(uuid)` and `menuEffectivePermissions(uuid)` delegate to `FabricEffectivePermissionsResolver` from [rtp-fabric-ADR-011](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md). `menuLocale(uuid)` reads `ServerPlayer#clientInformation().language()` through the carrier split. `menuRegionDescriptor(uuid)` reads `ServerPlayer#serverLevel().dimension().location().toString()`. |
 | Folia | Inherits `BukkitServerAccessor`. No delta in this ADR; a follow-up may add `runOnPlayerThread(UUID, Runnable)` for region-affinity click actions, but the four methods above are platform-thread-agnostic. |
 | `rtp-proxy-*` | Out of scope. The proxy SPI in `rtp-proxy-common` does not implement `RTPServerAccessor` and does not render menus directly - menus on proxy-routed players are still rendered backend-side per the 2026-05-15 ADR-035 amendment. |
 
@@ -169,7 +169,7 @@ The move is mechanical but non-trivial because the builders are referenced from 
 3. **Copy** the five builders into `rtp-api/.../menu/builders/` with the new constructor signature, alongside the existing copies in `rtp-core`. Both work for one cycle.
 4. **Switch call sites** in `RTPCmdBukkit` to the new builders + `MenuPlatformView.of(...)`.
 5. **Delete** the old builders from `rtp-core`. ArchUnit guard ([MULTI_PLATFORM_PLAN.md Step H](../dev/MULTI_PLATFORM_PLAN.md)) is unchanged - the new package is in `rtp-api`, which is under neither `bukkit/` nor `fabric/`.
-6. **Wire Fabric** in `RTPCmdFabricRoot` per the amended [rtp-fabric-ADR-012](../../rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md).
+6. **Wire Fabric** in `RTPCmdFabricRoot` per the amended [rtp-fabric-ADR-012](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md).
 
 Steps 1-2 are independently committable; steps 3-6 land together to avoid split-brain builders.
 
@@ -182,7 +182,7 @@ Steps 1-2 are independently committable; steps 3-6 land together to avoid split-
 - **Cross-cutting menu concerns funnel through one surface.** Any future "show 'you are here' as proxy-routed server id" change is a single override in the network-mode-aware accessor variant, not five builders.
 - **Aligns with the existing `RTPServerAccessor` convention.** No new accessor pattern for contributors to learn.
 - **No new Gradle module.** Build times, publish coordinates, and ArchUnit guards unchanged.
-- **Retroactively cleans Paper's `menuPermissionProbe` ad-hoc field** (the implicit pattern that [rtp-fabric-ADR-012](../../rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md) inherits).
+- **Retroactively cleans Paper's `menuPermissionProbe` ad-hoc field** (the implicit pattern that [rtp-fabric-ADR-012](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md) inherits).
 
 ### Negative
 
@@ -205,9 +205,9 @@ The implementation is a separate change after this ADR is accepted. Sketch:
 2. Override the four methods in `BukkitServerAccessor` and `FabricServerAccessor` (+ `-common-unobf` variant). Wire Fabric overrides to the existing `FabricEffectivePermissionsResolver`.
 3. Move the five builders from `rtp-core/.../common/commands/menu/` to `rtp-api/.../menu/builders/`. Update constructors to take `MenuPlatformView` + `MenuTokenRegistry`.
 4. Update `RTPCmdBukkit` call sites to `MenuPlatformView.of(...)` + new builder package.
-5. Amend [rtp-fabric-ADR-012](../../rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md): delete the `menuPermissionProbe` sub-item, simplify the `RTPCmdFabricRoot` wiring section to reference ADR-048, keep the chat-renderer decision intact.
+5. Amend [rtp-fabric-ADR-012](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md): delete the `menuPermissionProbe` sub-item, simplify the `RTPCmdFabricRoot` wiring section to reference ADR-048, keep the chat-renderer decision intact.
 6. New `ServerAccessorMenuSurfaceTest` in `rtp-api/src/test/`: pins the four-method contract against a mock accessor; asserts `MenuPlatformView.of` snapshots correctly; asserts default `menuPermissionProbe` is conservative for unresolved players.
-7. New `BukkitMenuPlatformViewParityTest` and `FabricMenuPlatformViewParityTest`: each builds a known `MenuModel` against a real platform accessor and asserts the rendered page set matches an oracle (covers the regression where Fabric's permission probe was always-true pre-[rtp-fabric-ADR-011](../../rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md)).
+7. New `BukkitMenuPlatformViewParityTest` and `FabricMenuPlatformViewParityTest`: each builds a known `MenuModel` against a real platform accessor and asserts the rendered page set matches an oracle (covers the regression where Fabric's permission probe was always-true pre-[rtp-fabric-ADR-011](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md)).
 8. CHANGELOG entry under `[3.0.0-beta.4] - Unreleased`: "Menu page builders moved from `rtp-core` to `rtp-api`; platform-shaped seams (permission probe, effective permissions, locale, region descriptor) lifted to `RTPServerAccessor` default methods. Out-of-tree accessor implementations gain the new surface via defaults; explicit overrides recommended for production platforms."
 9. `TRACEABILITY.md` rows added if the new tests target a REQ-* (likely a new `REQ-RTP-MENU-NNN` for "menu visibility filter shall use the platform's effective-permission view"; needs a REQ wording pass first).
 
@@ -226,7 +226,7 @@ The implementation is a separate change after this ADR is accepted. Sketch:
 - [ADR-035 - Interactive Menus via Written Book](ADR-035-interactive-menus-book-first.md)
 - [ADR-044 - Command-Tree Menu Reflector](ADR-044-command-tree-menu-reflector.md)
 - [ADR-045 - `rtp-docs` Menu Consumer](ADR-045-rtp-docs-menu-consumer.md)
-- [rtp-fabric-ADR-011 - Effective-permission enumeration on Fabric](../../rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md)
-- [rtp-fabric-ADR-012 - Menu renderer parity on Fabric](../../rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md)
+- [rtp-fabric-ADR-011 - Effective-permission enumeration on Fabric](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md)
+- [rtp-fabric-ADR-012 - Menu renderer parity on Fabric](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md)
 - [`MULTI_PLATFORM_PLAN.md`](../dev/MULTI_PLATFORM_PLAN.md) (Step I gating context)
 - [`RTPServerAccessor.java`](../../rtp-api/src/main/java/io/github/dailystruggle/rtp/api/server/RTPServerAccessor.java) (the interface being extended)

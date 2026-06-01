@@ -2,7 +2,7 @@
 
 Operator-facing manual verification of the cross-server `/rtp` round-trip on
 a multi-proxy, multi-backend network. The dev-facing automated fixture for
-the same scenarios lives at [`rtp-proxy/devstack/`](../../../rtp-proxy/devstack/README.md).
+the same scenarios lives at [`platforms/rtp-proxy/devstack/`](../../../platforms/rtp-proxy/devstack/README.md).
 
 Single-backend / in-memory transport precursor:
 [`SINGLE_BACKEND_VERIFICATION.md`](SINGLE_BACKEND_VERIFICATION.md).

@@ -2,14 +2,14 @@
 
 **Status:** Accepted
 **Date:** 2026-05-23
-**Supersedes:** [rtp-fabric-ADR-013](../../rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md) (was Proposed 2026-05-22; the rejected-alternatives analysis in that ADR is based on an incorrect coupling estimate, see Context below)
-**Related:** [ADR-036](ADR-036-network-mode-multi-server-multi-proxy.md) (umbrella network-mode ADR), [rtp-proxy-ADR-014](../../rtp-proxy/docs/adr/rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md), [rtp-proxy-ADR-015](../../rtp-proxy/docs/adr/rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md), [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (Fabric in scope), [`MULTI_SERVER_PLAN.md`](../dev/MULTI_SERVER_PLAN.md), [`MULTI_PLATFORM_PLAN.md`](../dev/MULTI_PLATFORM_PLAN.md) Step J.
+**Supersedes:** [rtp-fabric-ADR-013](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md) (was Proposed 2026-05-22; the rejected-alternatives analysis in that ADR is based on an incorrect coupling estimate, see Context below)
+**Related:** [ADR-036](ADR-036-network-mode-multi-server-multi-proxy.md) (umbrella network-mode ADR), [rtp-proxy-ADR-014](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md), [rtp-proxy-ADR-015](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md), [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (Fabric in scope), [`MULTI_SERVER_PLAN.md`](../dev/MULTI_SERVER_PLAN.md), [`MULTI_PLATFORM_PLAN.md`](../dev/MULTI_PLATFORM_PLAN.md) Step J.
 
 ## Context
 
 Network-mode multi-server support landed end-to-end on Paper in this cycle (user-confirmed working 2026-05-22). The Phase 1 SPI in `rtp-proxy-common` is platform-agnostic and already reachable from any backend JVM, but the Phase 2 backend integration currently lives under `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/network/` (`NetworkModeBootstrap` and twelve neighbouring classes). A Velocity-routed player arriving on a Fabric backend with a reservation token has no listener to redeem it: the lookup happens but the redeem-side handler is Bukkit-only. The cross-server flow therefore silently degrades on Fabric, violating the Phase 2 acceptance criterion in `MULTI_SERVER_PLAN.md` that says "a backend that advertises `RtpTriggerSource` MUST redeem reservation tokens on join".
 
-[rtp-fabric-ADR-013](../../rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md) proposed solving this by reimplementing `NetworkModeBootstrap` as a parallel `FabricNetworkModeBootstrap`. Its central rejection of the refactor path leaned on the claim that the Bukkit class has "eight independent coupling points to `org.bukkit.*` (`Plugin`, `BukkitScheduler`, `PluginManager`, `Listener`, `PlayerJoinEvent`, `EventHandler`, `EventPriority`, `Bukkit.getOnlinePlayers()`)" and that a base-class refactor would produce "a near-equal amount of Fabric-side code anyway".
+[rtp-fabric-ADR-013](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md) proposed solving this by reimplementing `NetworkModeBootstrap` as a parallel `FabricNetworkModeBootstrap`. Its central rejection of the refactor path leaned on the claim that the Bukkit class has "eight independent coupling points to `org.bukkit.*` (`Plugin`, `BukkitScheduler`, `PluginManager`, `Listener`, `PlayerJoinEvent`, `EventHandler`, `EventPriority`, `Bukkit.getOnlinePlayers()`)" and that a base-class refactor would produce "a near-equal amount of Fabric-side code anyway".
 
 This claim was re-audited on 2026-05-23 and is incorrect. A precise count of `org.bukkit.*` imports in every file under `rtp-plugin/.../bukkit/network/`:
 
@@ -118,7 +118,7 @@ Moved to `rtp-core/.../common/network/` with their event-registration surface re
 ### 5. Platform shims
 
 - `BukkitPlayerLifecycleHook` in `rtp-bukkit-common`. Implements `PlayerLifecycleHook`. Constructs a `Listener` with `@EventHandler` methods on `PlayerJoinEvent` and `PlayerQuitEvent`, registers it via `Bukkit.getPluginManager().registerEvents(...)` on first subscription, and routes events to the registered `Consumer<UUID>` handlers. Each `AutoCloseable` returned unsubscribes the handler; closing the last handler unregisters the listener. `AbstractServerAccessor.getPlayerLifecycleHook()` returns a lazily-created singleton.
-- `FabricPlayerLifecycleHook` in `rtp-fabric-common`. Implements `PlayerLifecycleHook` by hooking `ServerPlayConnectionEvents.JOIN` and `ServerPlayConnectionEvents.DISCONNECT`. On the obf carrier the same events are reached through the intermediary surface per [rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md); on the unobf carrier through the deobf API directly. The dispatch can go through `FabricVersionAdapter` so the shim class itself does not need an obf / unobf split. `FabricServerAccessor.getPlayerLifecycleHook()` returns the singleton.
+- `FabricPlayerLifecycleHook` in `rtp-fabric-common`. Implements `PlayerLifecycleHook` by hooking `ServerPlayConnectionEvents.JOIN` and `ServerPlayConnectionEvents.DISCONNECT`. On the obf carrier the same events are reached through the intermediary surface per [rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md); on the unobf carrier through the deobf API directly. The dispatch can go through `FabricVersionAdapter` so the shim class itself does not need an obf / unobf split. `FabricServerAccessor.getPlayerLifecycleHook()` returns the singleton.
 
 ### 6. Wiring
 
@@ -147,7 +147,7 @@ They lose their Bukkit imports (where any exist) and exercise the lifted classes
 |---|---|
 | Reimplement `NetworkModeBootstrap` as a parallel `FabricNetworkModeBootstrap` (rtp-fabric-ADR-013) | Predicated on an "8 Bukkit coupling points in the bootstrap" estimate that does not hold: the bootstrap has zero Bukkit imports, and the actual surface is one missing SPI primitive (player join / quit). The reimplement path would duplicate ~1108 lines of platform-neutral bootstrap plus ~300 lines of helpers, on a code path that will keep evolving through `MULTI_SERVER_PLAN.md` Phase 3 (Postgres `LISTEN/NOTIFY`, BungeeCord transport, multi-transport composition). Each future phase would land twice. |
 | Refactor `NetworkModeBootstrap` into a platform-neutral abstract base class with a Bukkit subclass and a Fabric subclass | Abstract-base inheritance is heavier than this case warrants. The only platform-varying primitive is "subscribe to player join / quit"; a one-method interface plus composition is simpler than an abstract base with subclass-only overrides, and lets `MockRTPServerAccessor` plug a synthetic hook in for tests without subclassing. |
-| Defer Fabric network mode until Phase 3 | Step J of `MULTI_PLATFORM_PLAN.md` is the missing acceptance criterion that downgrades Fabric from "first-class platform" to "single-server only" backend. Deferring violates [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md). |
+| Defer Fabric network mode until Phase 3 | Step J of `MULTI_PLATFORM_PLAN.md` is the missing acceptance criterion that downgrades Fabric from "first-class platform" to "single-server only" backend. Deferring violates [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md). |
 | Share `JoinTriggerSource` between platforms via a `Listener` shim on Fabric | Forces a non-trivial event-system shim on Fabric (Fabric has no `Listener` concept). The `PlayerLifecycleHook` SPI is the cleaner inversion: platform owns event wiring, core owns the handler body. |
 | Place the lifted classes in `rtp-network-common` (new module) | A new Gradle module costs setup overhead and adds a build edge for no benefit; `rtp-core` already depends on `rtp-proxy-common` (this is established by the existing Bukkit class's imports from `io.github.dailystruggle.rtp.proxy.common.*`). The classes belong in `rtp-core/.../common/network/` next to the existing `network/` subpackage. |
 | Defer the `NetworkWaitlistGuard` signature change | `Predicate<CommandSender>` is unsafe to keep once the class is in `rtp-core` (which forbids `org.bukkit.*` imports). The single caller in `RTPCmdBukkit` is a 1-line adapter wrap. |
@@ -202,10 +202,10 @@ The implementation is a separate change after this ADR is accepted. Updated 2026
 ## References
 
 - [ADR-036 - Network mode (multi-server, multi-proxy)](ADR-036-network-mode-multi-server-multi-proxy.md)
-- [rtp-fabric-ADR-013 - Network-mode backend parity on Fabric (superseded by this ADR)](../../rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md)
-- [rtp-proxy-ADR-014 - Backend-owned RTP with network queue](../../rtp-proxy/docs/adr/rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md)
-- [rtp-proxy-ADR-015 - Shared network waitlist and dynamic batched dispatch](../../rtp-proxy/docs/adr/rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md)
-- [rtp-fabric-ADR-002 - Platform in scope](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md)
-- [rtp-fabric-ADR-009 - Obf / unobf common split](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)
+- [rtp-fabric-ADR-013 - Network-mode backend parity on Fabric (superseded by this ADR)](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md)
+- [rtp-proxy-ADR-014 - Backend-owned RTP with network queue](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md)
+- [rtp-proxy-ADR-015 - Shared network waitlist and dynamic batched dispatch](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md)
+- [rtp-fabric-ADR-002 - Platform in scope](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md)
+- [rtp-fabric-ADR-009 - Obf / unobf common split](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)
 - [`MULTI_SERVER_PLAN.md`](../dev/MULTI_SERVER_PLAN.md)
 - [`MULTI_PLATFORM_PLAN.md`](../dev/MULTI_PLATFORM_PLAN.md) Step J

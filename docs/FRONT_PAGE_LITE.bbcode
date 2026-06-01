@@ -1,5 +1,5 @@
 [CENTER]
-[SIZE=7][B][COLOR=#E74C3C]R[/COLOR][COLOR=#F39C12]T[/COLOR][COLOR=#27AE60]P[/COLOR][/B][/SIZE]
+[SIZE=7][B][COLOR=#27AE60]Leaf[/COLOR][COLOR=#2C3E50]RTP[/COLOR][/B][/SIZE]
 [SIZE=4][B][COLOR=#7F8C8D]Free Random Teleport (RTP) Plugin for Paper, Spigot & Fabric[/COLOR][/B][/SIZE]
 [SIZE=3][B][COLOR=#7F8C8D]Deterministic, bounded-latency random teleport (/rtp or /wild) engine[/COLOR][/B][/SIZE]
 [I]The fastest free random teleport plugin for Paper, Spigot, and Bukkit-family servers - instant /rtp and safe random-spawn landings, with no lag spikes under load.[/I]
@@ -170,7 +170,7 @@ Full methodology, raw CSVs, per-run analyses: [URL=https://github.com/dailystrug
 [*][B]/rtp[/B] — teleport to the default region for your current world.
 [*][B]/rtp [parameter]:[value][/B] — specify [I]region:[/I], [I]world:[/I], [I]player:[/I], or temporary overrides.
 [*][B]/rtp reload[/B] — reload all configuration from disk.
-[*][B]/rtp scan start|pause|resume|reset|cancel[/B] — pre-warm spatial memory by walking a region (renamed from [I]/rtp fill[/I] in 2.x).
+[*][B]/rtp scan start|pause|resume|reset|cancel[/B] — pre-warm spatial memory by walking a region (renamed from [I]/rtp fill[/I] in 2.x). Demo: [URL=https://youtu.be/Ftjy1zw_S04]youtu.be/Ftjy1zw_S04[/URL].
 [*][B]/rtp menu[/B] — interactive admin menu; book on Paper / Folia, chat-paginated fallback elsewhere. Hardened in [I]3.0.0-beta.3[/I].
 [/LIST]
 
@@ -187,6 +187,9 @@ Full methodology, raw CSVs, per-run analyses: [URL=https://github.com/dailystrug
 [SPOILER='❓ FAQ']
 [B]Q: How do I stop /rtp from lagging my server, and why is LeafRTP faster than other random teleport plugins?[/B]
 A: Most [I]/rtp[/I] calls serve from a pre-warmed queue — chunks are already loaded and safety-checked before you type the command. Two design choices make that queue cheap to keep full: a [B]persistent spatial memory[/B] per region (the plugin remembers which sectors of the world failed safety checks, so the spiral selector skips known-bad ground instead of rerolling forever), and an [B]off-tick async pre-filter[/B] (Anvil region files are read directly to reject unsafe biomes/blocks [I]before[/I] any chunk is loaded, so candidate verification never blocks the main thread). The pre-warmed queue is just the visible tip — the spatial memory keeps candidate selection bounded, and the async pre-filter keeps verification off the tick loop.
+
+[B]Q: Why is it called "LeafRTP" now instead of just "RTP"?[/B]
+A: "RTP" is the generic term for random teleport, so the old name was nearly impossible to find — it collided with every other random-teleport plugin, command, and forum thread in search and marketplace indexes. "LeafRTP" is a distinct, indexable name that points unambiguously at this plugin while keeping the [I]/rtp[/I] command, [I]rtp-api[/I], config paths, and data files exactly as they were. Nothing changes for existing installs — only the public name.
 
 [B]Q: Does it work with Iris / Terra / custom datapack generators?[/B]
 A: Yes. Region files are read directly, so modded and namespaced biome and block IDs are preserved. No configuration needed.

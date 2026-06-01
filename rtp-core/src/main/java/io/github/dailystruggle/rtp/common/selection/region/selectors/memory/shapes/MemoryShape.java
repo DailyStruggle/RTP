@@ -938,6 +938,61 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
+   * Returns the saved biome identifier recorded for the location run that
+   * contains {@code (x, z)}, or {@code null} if no saved biome data covers
+   * that coordinate. Reads only the in-memory, persisted biome-location cache
+   * ({@link #biomeKeysCache} / {@link #biomePrefixSumsCache}); performs no
+   * chunk I/O. Used by the region biome chart bridge to colorize each pixel
+   * from saved region data rather than live / on-disk anvil reads.
+   *
+   * @param x the x coordinate
+   * @param z the z coordinate
+   * @return the canonical biome name, or {@code null} if not recorded
+   */
+  public String biomeAt(int x, int z) {
+    return biomeAt((long) xzToLocation(x, z));
+  }
+
+  /**
+   * Returns the saved biome identifier recorded for the location run that
+   * contains {@code location}, or {@code null} if no saved biome data covers
+   * it. Mirrors the floor-search used by {@link #causeAt(long)} but scans each
+   * per-biome run table in {@link #biomeKeysCache} /
+   * {@link #biomePrefixSumsCache}. Reads only persisted, in-memory data; no
+   * chunk I/O.
+   *
+   * @param location the location value
+   * @return the canonical biome name, or {@code null} if not recorded
+   */
+  public String biomeAt(long location) {
+    for (Map.Entry<String, long[]> e : biomeKeysCache.entrySet()) {
+      long[] keys = e.getValue();
+      if (keys == null || keys.length == 0) continue;
+      long[] sums = biomePrefixSumsCache.get(e.getKey());
+      if (sums == null || sums.length != keys.length) continue;
+
+      int floorIdx = -1;
+      for (int k = 0; k < keys.length; k++) {
+        if (keys[k] <= location) {
+          floorIdx = k;
+        } else {
+          break;
+        }
+      }
+
+      if (floorIdx >= 0) {
+        long key = keys[floorIdx];
+        long sum = sums[floorIdx];
+        long prevSum = (floorIdx > 0) ? sums[floorIdx - 1] : 0L;
+        if (key == location || location < (key + (sum - prevSum))) {
+          return e.getKey();
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * Returns the union of biome identifiers that have been observed producing at least one
    * candidate within this shape. The returned set is a live, unmodifiable view of
    * {@link #biomePrefixSumsCache}'s key set and reflects subsequent updates.
