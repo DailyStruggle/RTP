@@ -62,12 +62,10 @@ public final class VisualizationsSubmenuBuilder {
                 new KindRow("bad-locations",
                         "&1\u25b6 Bad locations &7- per-region shape map",
                         "&7open a map of bad-locations samples per region"));
-        // REGION_BIOMES intentionally omitted: the biomes visualization is
-        // disabled in the menu surface until the rendering / sampling
-        // strategy is finalised. The typed `/rtp visualization biomes`
-        // command is also gated (see VisualizationBiomesCmd) so neither
-        // entry point dispatches today. Resolver + dispatcher remain
-        // wired so re-enabling is a one-line revert here + in the leaf.
+        m.put(ChartSpec.Kind.REGION_BIOMES,
+                new KindRow("biomes",
+                        "&2\u25b6 Biomes &7- per-region biome map",
+                        "&7open a map of sampled biomes per region"));
         m.put(ChartSpec.Kind.METRIC_SPARKLINE,
                 new KindRow("sparkline",
                         "&4\u25b6 Pipeline health &7- MSPT + heap sparkline",

@@ -131,6 +131,20 @@ class MapDispatchTest {
   }
 
   @Test
+  @DisplayName("World-scan UX: REGION_BIOMES is driven live, not one-shot")
+  void regionBiomes_bindsLive() {
+    boolean ok = MapDispatch.paint(
+        ChartSpec.of(ChartSpec.Kind.REGION_BIOMES, "default"),
+        UUID.randomUUID());
+    assertTrue(ok, "paint shall return true for the region-biomes chart");
+    assertEquals(1, binding.allocateCalls, "allocate shall be called once");
+    assertEquals(1, binding.bindLiveCalls,
+        "REGION_BIOMES shall be bound live so the scan updates it");
+    assertEquals(0, binding.renderCalls,
+        "a live-bound chart shall not also take the one-shot renderEphemeral path");
+  }
+
+  @Test
   @DisplayName("Non-live kinds stay one-shot: BAD_POINTS_HEATMAP uses renderEphemeral, not bindLive")
   void badPointsHeatmap_staysEphemeral() {
     boolean ok = MapDispatch.paint(

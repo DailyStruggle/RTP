@@ -36,7 +36,8 @@ import java.util.logging.Level;
  */
 public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
         io.github.dailystruggle.rtp.fabric.player.FabricInteractiveMessageSink,
-        io.github.dailystruggle.rtp.fabric.player.FabricBookOpener {
+        io.github.dailystruggle.rtp.fabric.player.FabricBookOpener,
+        io.github.dailystruggle.rtp.fabric.player.FabricMapSink {
 
     private final UUID uuid;
     private final String name;
@@ -88,6 +89,35 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
                 io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
         if (adapter == null) return false;
         return adapter.openBookMenu(p, spec);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Renders the chart on 26.x by hopping to the server tick thread and
+     * delegating to the active deobf carrier's {@code renderMapChart} with this
+     * player's deobf-linkable {@code ServerPlayer} (this player does not extend
+     * the common {@code FabricRTPPlayer}).
+     */
+    @Override
+    public boolean renderMapChart(String chartKey, int[] argb, boolean locked, boolean deliverItem) {
+        if (!isOnline() || chartKey == null || argb == null) return false;
+        io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+                io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+        if (adapter == null || !adapter.supportsMapCharts()) return false;
+        RTP.scheduler.runTask(() -> {
+            ServerPlayer p = handle;
+            if (p == null) return; // viewer went offline before the hop
+            adapter.renderMapChart(p, chartKey, argb, locked, deliverItem);
+        });
+        return true;
+    }
+
+    @Override
+    public void releaseMapChart(String chartKey) {
+        io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+                io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+        if (adapter != null) adapter.releaseMapChart(chartKey);
     }
 
     @Override public UUID uuid() { return uuid; }

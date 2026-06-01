@@ -442,10 +442,11 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         // the timeout completes `dispatch` exceptionally — which fires the
         // whenComplete in attachDispatchCompletion, releasing the gate permit,
         // removing the inFlightLiveLoads entry, and propagating the failure to
-        // the caller's result CF. Tuned just under the orchestration layer's
-        // 5 s orTimeout (QueueTask:153 / QueueTask:282) so we surface the
-        // failure as an exceptional inner future rather than letting upstream
-        // see a stale null while the inner work is still pinned.
+        // the caller's result CF. Sized (30 s) to let vanilla finish a cold
+        // generation rather than abandoning an in-progress chunk; ScanTask's
+        // full-load path waits 30 s and QueueTask no longer wraps the load in
+        // its own orTimeout, so this adapter-owned deadline is the single
+        // authoritative per-chunk ceiling.
         dispatch = dispatch.orTimeout(LIVE_LOAD_DEADLINE_MS, TimeUnit.MILLISECONDS);
         attachDispatchCompletion(dispatch, key, result, /*acquiredPermit=*/true);
     }
@@ -469,12 +470,22 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * inFlightLiveLoads entry) live forever. See the bridge-watchdog javadoc
      * above for the failure mode this prevents.
      *
-     * <p>Tuned just under the orchestration layer's 5 s orTimeout
-     * (QueueTask:153 / QueueTask:282 / PregenTask reservation:452) so the
-     * inner failure surfaces before upstream gives up; mismatched deadlines
-     * were how 2026-05-08's CF leak avoided detection for so long.</p>
+     * <p>Sized to let vanilla finish generating a cold, never-before-explored
+     * coordinate. Fabric vanilla cold-start generation routinely runs 5-10 s
+     * under early-server scan/pre-fill load (see LESSONS_LEARNED 2026-05-08),
+     * so the earlier 4 s ceiling abandoned ungenerated chunks before they
+     * finished — surfacing as the "rtp scan" generation failures this value
+     * was raised to fix. The orchestration layer no longer undercuts this:
+     * {@code QueueTask} dropped its 5 s {@code orTimeout} (per the 2026-05-08
+     * decision that per-chunk deadlines live in the adapter) and
+     * {@code ScanTask}'s full-load path already waits 30 s, so a 30 s adapter
+     * ceiling lets generation run to completion while still bounding a truly
+     * stuck coordinate. The bridge-dispatch watchdog
+     * ({@link #BRIDGE_DISPATCH_DEADLINE_MS}) still guards the enqueue step,
+     * so a server-shutdown drop is detected promptly regardless of this
+     * generation deadline.</p>
      */
-    private static final long LIVE_LOAD_DEADLINE_MS = 4_000L;
+    private static final long LIVE_LOAD_DEADLINE_MS = 30_000L;
 
     /**
      * Wires the unified whenComplete handler that performs lifecycle bookkeeping,
