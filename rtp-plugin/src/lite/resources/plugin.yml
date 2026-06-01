@@ -110,6 +110,14 @@ permissions:
   rtp.info:
     description: see plugin info and settings
     default: op
+  rtp.admin:
+    description: allow player to use /rtp clearcache and grant all other admin tooling
+    default: op
+    children:
+      rtp.reload: true
+      rtp.config: true
+      rtp.scan: true
+      rtp.info: true
   rtp.*:
     description: access all rtp subcommands available in lite
     default: op
@@ -130,3 +138,4 @@ permissions:
       rtp.regions.*: true
       rtp.params: true
       rtp.unqueued: true
+      rtp.admin: true

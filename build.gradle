@@ -124,6 +124,34 @@ def publishedModulePaths = [
         ':rtp-proxy:rtp-proxy-common',
 ]
 
+// ---------------------------------------------------------------------------
+// Root `build/libs` artifact aggregation.
+//
+// The root project applies the `java` plugin (for Spotless / convenience), so
+// its `jar` task produces an empty `RTP-<version>.jar` in `build/libs` (the
+// root source tree has no `src/main/java`). The shippable artifacts (the shaded
+// + Loom-remapped Pro and lite jars) are produced by `:rtp-plugin`. Mirror
+// them into the root `build/libs` so `build/libs` holds the real jars rather
+// than a blank one.
+tasks.register('copyPluginJars', Copy) {
+    group = 'build'
+    description = 'Copies the shippable :rtp-plugin jars into the root build/libs.'
+    from(project(':rtp-plugin').layout.buildDirectory.dir('libs'))
+    into layout.buildDirectory.dir('libs')
+    // The root `jar` task drops an empty RTP-<version>.jar here; remove it so
+    // build/libs only contains the real plugin artifacts.
+    doFirst {
+        delete fileTree(layout.buildDirectory.dir('libs')) {
+            include "${rootProject.name}-${project.version}.jar"
+        }
+    }
+}
+
+// Build the plugin jars before copying, and run the copy as part of the root
+// build so `.\gradlew build` leaves the real artifacts in build/libs.
+copyPluginJars.dependsOn ':rtp-plugin:assemble'
+tasks.named('assemble').configure { finalizedBy copyPluginJars }
+
 configure(publishedModulePaths.collect { project(it) }) {
     apply plugin: 'maven-publish'
 

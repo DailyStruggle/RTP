@@ -39,8 +39,8 @@
 param(
     [string[]] $Roots = @(
         'rtp-core', 'rtp-api', 'rtp-plugin',
-        'rtp-bukkit', 'rtp-paper', 'rtp-folia', 'rtp-fabric',
-        'rtp-anvil', 'commands-api', 'effects-api', 'rtp-tags', 'addons'
+        'platforms',
+        'api', 'addons'
     ),
     [int]    $MinLines = 6,
     [int]    $MinChars = 400,

@@ -144,7 +144,7 @@ java_pid*.hprof
 /archive_rtp.html
 
 # Loom (Fabric) per-module gradle cache
-rtp-fabric/**/.gradle/
+platforms/rtp-fabric/**/.gradle/
 
 # StressTestRTP raw run data and analysis artifacts (not source)
 helpers/StressTestRTP/runs_analysis/input/

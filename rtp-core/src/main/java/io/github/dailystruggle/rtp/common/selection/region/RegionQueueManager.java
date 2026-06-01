@@ -1,9 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.playerData.TeleportData;
-import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
-import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -503,27 +500,17 @@ public class RegionQueueManager {
         if (playerLocationQueue != null && !playerLocationQueue.isEmpty()) {
             RTPLocation loc = playerLocationQueue.poll();
             if (loc != null) {
+                // Consume the personal-queue entry from the cache (it is about to be
+                // served), then hand it back to the caller. The poll is driven
+                // synchronously by the player's own in-flight TeleportPipelineTask
+                // (QueueTask.pollNext -> here); that task IS latestTeleportData's
+                // nextTask, so it must NOT be cancelled or re-dispatched here -- doing
+                // so aborts the very teleport this poll is serving. The shared
+                // keptLocations branch below likewise just returns the location and
+                // lets the pipeline carry it through to completion.
                 if (RTP.getInstance().databaseAccessor != null) {
                     RTP.getInstance().databaseAccessor.deleteCachedLocation(region.name, loc);
                 }
-                RTP.getInstance().queuedPlayers.remove(uuid);
-                RTP.getInstance().invulnerablePlayers.remove(uuid);
-                RTP.getInstance().processingPlayers.remove(uuid);
-
-                TeleportData data = RTP.getInstance().latestTeleportData.get(uuid);
-                if (data != null && !data.completed) {
-                    if (data.nextTask instanceof TeleportPipelineTask task) {
-                        task.setCancelled(true);
-                        if (task.coords() != null) {
-                            RTP.scheduler.runTask(
-                                    task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
-                        } else {
-                            RTP.scheduler.runTask(task);
-                        }
-                    }
-                }
-
-                new RTPTeleportCancel(uuid).run();
                 return CompletableFuture.completedFuture(loc);
             }
         }
@@ -575,6 +562,20 @@ public class RegionQueueManager {
         if (queue != null) res += queue.size();
         if (fastLocations.containsKey(uuid)) res++;
         return res;
+    }
+
+    /**
+     * Clear the L1 (kept), L2 (unkept), and L3 (backlog) caches for this region,
+     * releasing any held chunk reservations and dropping persisted rows via the
+     * buffers' configured callbacks. Unlike {@link #shutDown()} this keeps the
+     * region live: callbacks are left attached so the on-disk cache is purged in
+     * step with the in-memory clear, and the scan/queue machinery is free to
+     * refill the caches afterwards. Backs {@code /rtp clearcache}.
+     */
+    public void clearCaches() {
+        keptLocations.clear();
+        unkeptLocations.clear();
+        if (backlogLocations != null) backlogLocations.clear();
     }
 
     public void shutDown() {

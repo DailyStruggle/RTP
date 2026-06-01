@@ -1,0 +1,65 @@
+// Phase 1 — Fabric platform adapter, version-agnostic common module.
+//
+// Per ADR-022 §3 (Build Discipline) Loom is applied here AND in :rtp-plugin
+// (the multi-loader bootstrap), and nowhere else. Mojang official mappings
+// are used; Yarn is reserved for re-evaluation.
+//
+// Architectural invariants (ADR-022 §4):
+//   * No org.bukkit.* imports in this module.
+//   * Shared business logic remains in :rtp-core / :rtp-api — this module
+//     contains Fabric platform glue only.
+//
+// Note: the root build.gradle's `subprojects { apply plugin: 'java-library' }`
+// would normally collide with Loom, which provides its own java setup. We
+// don't apply java-library here; Loom configures the Java plugin itself.
+// The root subprojects block is harmless because applying the same plugin
+// twice is a no-op in Gradle.
+plugins {
+    // Version pinned in settings.gradle pluginManagement.plugins {} so all
+    // Loom-using subprojects share one plugin classloader (avoids the
+    // LoomGradleExtension ClassCastException).
+    id 'fabric-loom'
+}
+
+// Loom-specific MC + Yarn/Mojmap + Fabric API versions. Pinned to the
+// current target MC line; bump in lockstep with the Bukkit-family
+// :rtp-*-v<MC> submodules when a new MC version is added.
+//
+// Versions are declared as ext properties so :rtp-plugin's Loom block can
+// reuse them without drift.
+ext {
+    minecraftVersion   = '1.21.1'
+    loaderVersion      = '0.16.5'
+    fabricApiVersion   = '0.115.0+1.21.1'
+    permissionsApiVersion = '0.3.1'
+}
+
+dependencies {
+    // Mojang official mappings — see ADR-022 §3.
+    minecraft "com.mojang:minecraft:${minecraftVersion}"
+    mappings  loom.officialMojangMappings()
+
+    // rtp-fabric-ADR-001: rtp-fabric-common ships no MC / loader / fabric-api classes —
+    // each rtp-fabric-vXX_YY_R1 submodule carries its own runtime mod jar
+    // with its own pinned MC version. Common compiles against the 1.21.1
+    // mojmap line above purely to typecheck; flipping these to
+    // `modCompileOnly` is what makes the "compile-only common" guarantee real.
+    modCompileOnly "net.fabricmc:fabric-loader:${loaderVersion}"
+    modCompileOnly "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
+
+    // Soft-depend permissions API (Step F). compileOnly so LuckPerms-Fabric
+    // satisfies it at runtime when present, and absence is non-fatal.
+    modCompileOnly "me.lucko:fabric-permissions-api:${permissionsApiVersion}"
+
+    // Platform-free abstractions consumed by every Fabric adapter class.
+    api project(':rtp-api')
+    api project(':rtp-core')
+    // commands-api-ADR-001 — Brigadier Bridge. The bridge classes live in :commands-api;
+    // this module supplies the Fabric-side registration shim (RTPCmdFabric).
+    api project(':commands-api')
+    // ADR-016 — anvil pre-filter. Platform-neutral .mca decoder used by
+    // FabricRTPWorld#probeChunkColumn so the ScanTask refill loop can serve
+    // most candidates without a synchronous tick-thread chunk generation.
+    // See rtp-fabric-ADR-005-anvil-prefilter-parity.md.
+    api project(':anvil-api')
+}

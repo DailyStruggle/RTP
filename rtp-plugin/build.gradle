@@ -43,6 +43,19 @@ configurations {
             attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
         }
     }
+    // EARLY/EXPERIMENTAL sibling of fabric26Bytecode for the MC 26.2
+    // pre-release adapter (rtp-fabric-v26_2_R1). Same JDK-25 deobf regime
+    // and same post-remap merge story; kept in its own configuration so the
+    // merge closure's `singleFile` resolution stays unambiguous (one jar per
+    // configuration). See rtp-fabric-ADR-014.
+    fabric262Bytecode {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+        attributes {
+            attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
+        }
+    }
     // Bytecode-only configuration for the JDK-25 / unobf-Loom-compiled
     // `rtp-fabric-common-unobf` carrier. Same variant-incompatibility
     // story as `fabric26Bytecode` above: the module's published variant
@@ -149,6 +162,11 @@ dependencies {
     // configuration that targets the Java-25 jar variant explicitly and
     // is consumed only by `shadowJar` (see configurations block below).
     fabric26Bytecode project(':rtp-fabric:rtp-fabric-v26_1_R1')
+
+    // EARLY/EXPERIMENTAL MC 26.2 pre-release adapter. Resolved by FQN at
+    // runtime (RTPFabricMod#adapterFqnFor), merged post-remap like v26_1_R1.
+    // See rtp-fabric-ADR-014.
+    fabric262Bytecode project(':rtp-fabric:rtp-fabric-v26_2_R1')
 
     // Sibling to fabric26Bytecode above. The unobf carrier hosts the
     // Mojang-named NM-typed surfaces (FabricEffectsHandlerUnobf, the
@@ -531,18 +549,25 @@ ext.mergeFabricUnobfBytecodeIntoJar = { File out, String editionLabel, File v26,
 // and link cleanly on the deobfuscated MC 26.1.2 runtime.
 remapJar {
     dependsOn ':rtp-fabric:rtp-fabric-v26_1_R1:jar'
+    dependsOn ':rtp-fabric:rtp-fabric-v26_2_R1:jar'
     dependsOn ':rtp-fabric:rtp-fabric-common-unobf:jar'
     dependsOn ':effects-api:effects-api-fabric-unobf:jar'
     // Resolve carrier jars and capture the merge closure at configuration
     // time so doLast does not invoke Task.project at execution time
     // (deprecated in Gradle 9, fatal in Gradle 10).
     def v26Jar = project.configurations.fabric26Bytecode
+    def v262Jar = project.configurations.fabric262Bytecode
     def commonUnobfJar = project.configurations.fabricCommonUnobfBytecode
     def effectsUnobfJar = project.configurations.effectsApiFabricUnobfBytecode
     def mergeFn = project.ext.mergeFabricUnobfBytecodeIntoJar
     doLast {
         mergeFn(remapJar.archiveFile.get().asFile, 'Pro',
                 v26Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
+        // Second pass merges the 26.2 pre-release adapter; the unobf carriers
+        // are already present from the first pass and are skipped (existing
+        // check), so only the v26_2_R1 adapter classes are added.
+        mergeFn(remapJar.archiveFile.get().asFile, 'Pro (26.2)',
+                v262Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
     }
 }
 
@@ -887,6 +912,7 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
 
     dependsOn tasks.named('shadowLiteJar')
     dependsOn ':rtp-fabric:rtp-fabric-v26_1_R1:jar'
+    dependsOn ':rtp-fabric:rtp-fabric-v26_2_R1:jar'
     dependsOn ':rtp-fabric:rtp-fabric-common-unobf:jar'
     dependsOn ':effects-api:effects-api-fabric-unobf:jar'
 
@@ -899,6 +925,7 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     // so doLast does not reach Task.project at execution time
     // (deprecated in Gradle 9, fatal in Gradle 10).
     def v26Jar = project.configurations.fabric26Bytecode
+    def v262Jar = project.configurations.fabric262Bytecode
     def commonUnobfJar = project.configurations.fabricCommonUnobfBytecode
     def effectsUnobfJar = project.configurations.effectsApiFabricUnobfBytecode
     def mergeFn = project.ext.mergeFabricUnobfBytecodeIntoJar
@@ -906,6 +933,10 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     doLast {
         mergeFn(remapLiteJar.archiveFile.get().asFile, 'lite',
                 v26Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
+        // Second pass merges the 26.2 pre-release adapter (carriers already
+        // present from the first pass are skipped). See rtp-fabric-ADR-014.
+        mergeFn(remapLiteJar.archiveFile.get().asFile, 'lite (26.2)',
+                v262Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
     }
 }
 

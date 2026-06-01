@@ -4,7 +4,7 @@ Mermaid-rendered overview of RTP's network mode: the topology, the cross-server 
 
 - [`../dev/MULTI_SERVER_PLAN.md`](../dev/MULTI_SERVER_PLAN.md): roadmap, design rules, config surface.
 - [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md): umbrella decision.
-- [rtp-proxy-ADR-014](../../rtp-proxy/docs/adr/rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md): backend-owned `/rtp` + network wait queue (L6, the current shape).
+- [rtp-proxy-ADR-014](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md): backend-owned `/rtp` + network wait queue (L6, the current shape).
 - [`../dev/GLOSSARY.md`](../dev/GLOSSARY.md): canonical terms (`backend`, `proxy`, `transport`, `network snapshot`, `backend selector`, `reservation token`).
 
 Diagrams below describe the **L6 architecture** as accepted on 2026-05-21. Earlier L1-L5 shapes (proxy-hosted `/rtp`) are superseded.
@@ -197,7 +197,7 @@ The `cacheCap` budget on each region is the upper bound for `keptLocations + net
 ## 5. Where to go next
 
 - For per-key config semantics: `network.yml` section of [`MULTI_SERVER_PLAN.md`](../dev/MULTI_SERVER_PLAN.md).
-- For the SPI shapes (`NetworkTransport`, `NetworkRequestQueue`, `BackendSelector`, `ReservationClient`): [rtp-proxy-ADR-001](../../rtp-proxy/docs/adr/rtp-proxy-ADR-001-spi-shape.md) and [rtp-proxy-ADR-014](../../rtp-proxy/docs/adr/rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md).
-- For Redis Lua envelope atomicity: [rtp-proxy-ADR-005](../../rtp-proxy/docs/adr/rtp-proxy-ADR-005-redis-binding.md).
-- For SQL binding: [rtp-proxy-ADR-011](../../rtp-proxy/docs/adr/rtp-proxy-ADR-011-sql-network-state-binding.md).
+- For the SPI shapes (`NetworkTransport`, `NetworkRequestQueue`, `BackendSelector`, `ReservationClient`): [rtp-proxy-ADR-001](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-001-spi-shape.md) and [rtp-proxy-ADR-014](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md).
+- For Redis Lua envelope atomicity: [rtp-proxy-ADR-005](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-005-redis-binding.md).
+- For SQL binding: [rtp-proxy-ADR-011](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-011-sql-network-state-binding.md).
 - For glossary disambiguation (`fast cache` vs `kept cache` vs `network wait queue` vs `personal queue`): [`AGENTS.md` *Domain Analogies & Aliases*](../../.junie/AGENTS.md) and [`GLOSSARY.md`](../dev/GLOSSARY.md).

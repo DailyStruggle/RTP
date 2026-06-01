@@ -182,6 +182,8 @@ Without spatial indexing, teleportation is a guessing game and the numbers are u
 
 LeafRTP-Pro plots your world's geometry as it evaluates candidates. When it hits a massive ocean or unsafe biome, it remembers that sector and shrinks the searchable area, so known bad sectors never get loaded again. The longer it runs, the faster it gets - and `/rtp scan` keeps the learning going during idle periods.
 
+Watch the background scan crawl the spiral and accumulate spatial memory in real time: [youtu.be/Ftjy1zw_S04](https://youtu.be/Ftjy1zw_S04).
+
 **Persistence across restarts:** learned bad-sector state survives a JVM bounce - `MemoryShape.save` / `load` writes per-region spatial memory to disk on shutdown and reloads on startup, alongside the configuration cache (compiled safety sets, region geometry). H2, SQLite, MySQL, and PostgreSQL backends support shared multi-server state.
 
 *Local-profile estimate from a vanilla 1.21 seed set; Nether and End are still qualitative. Anonymous opt-in telemetry is on the roadmap to source this number properly.*

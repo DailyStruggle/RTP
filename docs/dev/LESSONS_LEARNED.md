@@ -576,7 +576,7 @@ Durable consequences:
 - **Loom build implication.** `fabric-loom`'s remapping does not reach into project dependencies. A multi-module Loom build where module A is compiled against MC vX and module B (depending on A) compiles against MC vY will fail on any Mojmap symbol renamed between vX and vY. There is no `remapDependencies` knob; the only mechanical fix is to keep MC types out of cross-module API.
 - **Diagnostic signature.** A user-visible `NoClassDefFoundError: net/minecraft/class_<NNNN>$class_<NNNN>` at Fabric mod startup, on a runtime newer than the adapter's compile target, is the symptom — confirms the runtime Mojang jar no longer contains the inner class the older adapter's `<clinit>` references. Always check whether the inner class was renamed (intermediary number changed) or removed entirely (became an `@interface` marker, became a top-level class, or was inlined into the outer class).
 
-Cross-references: `rtp-fabric/docs/adr/rtp-fabric-ADR-007-mojmap-name-decoupling.md` (the ADR), `rtp-fabric/docs/adr/rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md` (the radius/flag analysis for 1.21.5+ that fed into the R11 flag computation).
+Cross-references: `platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-007-mojmap-name-decoupling.md` (the ADR), `platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md` (the radius/flag analysis for 1.21.5+ that fed into the R11 flag computation).
 
 **Operator-confirmed (2026-05-06):** `/rtp` functional on a live 1.21.11 Fabric server via the wrapper SPI + R11 adapter; observed average latency ~4 ms (high relative to Paper but within acceptable range for Fabric). Closes the 1.21.11 multiversion track started at the top of this entry.
 

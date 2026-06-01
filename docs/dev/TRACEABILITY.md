@@ -165,7 +165,7 @@ This document connects each requirement to the design decision that motivated it
 
 ## Network / Proxy Requirements
 
-Most rows below are **unimplemented**; the multi-server / proxy subsystem is governed by the ratified umbrella [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (Accepted 2026-05-14) and ten subproject ADRs under [`rtp-proxy/docs/adr/`](../../rtp-proxy/docs/adr/) (Phase 1 set `rtp-proxy-ADR-001..004` Accepted; `005..010` Proposed). Design source: [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md). Phase 1 D3 plumbing (network-state member of `AbstractSQLDatabaseAccessor`) and the parity-when-disabled gate landed 2026-05-18 (REQ-RTP-NET-002, REQ-RTP-NET-013).
+Most rows below are **unimplemented**; the multi-server / proxy subsystem is governed by the ratified umbrella [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (Accepted 2026-05-14) and ten subproject ADRs under [`platforms/rtp-proxy/docs/adr/`](../../platforms/rtp-proxy/docs/adr/) (Phase 1 set `rtp-proxy-ADR-001..004` Accepted; `005..010` Proposed). Design source: [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md). Phase 1 D3 plumbing (network-state member of `AbstractSQLDatabaseAccessor`) and the parity-when-disabled gate landed 2026-05-18 (REQ-RTP-NET-002, REQ-RTP-NET-013).
 
 | Req ID | Summary | Design Ref | Implementing Class(es) | Test(s) |
 |---|---|---|---|---|
@@ -189,16 +189,16 @@ Most rows below are **unimplemented**; the multi-server / proxy subsystem is gov
 
 ## rtp-proxy Requirements (umbrella module)
 
-All rows below are **unimplemented**. Umbrella: [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (Accepted). Subproject ADRs: [`rtp-proxy/docs/adr/`](../../rtp-proxy/docs/adr/).
+All rows below are **unimplemented**. Umbrella: [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (Accepted). Subproject ADRs: [`platforms/rtp-proxy/docs/adr/`](../../platforms/rtp-proxy/docs/adr/).
 
 | Req ID | Summary | Design Ref | Implementing Class(es) | Test(s) |
 |---|---|---|---|---|
-| REQ-RTP-PROXY-001 | Adapter SPI Conformance | ADR-036 §7; `rtp-proxy/REQUIREMENTS.md` | — (unimplemented) | — |
-| REQ-RTP-PROXY-002 | No World State | ADR-036 §2 Non-Goals; `rtp-proxy/REQUIREMENTS.md` | — (unimplemented) | — |
-| REQ-RTP-PROXY-003 | Non-Blocking Event Loop | ADR-036 §7; `rtp-proxy/REQUIREMENTS.md` | — (unimplemented) | — |
-| REQ-RTP-PROXY-004 | Reservation Claim Idempotency | ADR-036 §5; `rtp-proxy/REQUIREMENTS.md` | `InMemoryNetworkStateBinding` (reference) | `InMemoryNetworkStateBindingTest` (claim atomicity / per-player idempotency) |
-| REQ-RTP-PROXY-005 | Proxy Heartbeat Publication | ADR-036 §5; `rtp-proxy/REQUIREMENTS.md` | — (unimplemented) | — |
-| REQ-RTP-PROXY-006 | Configurable Messaging | ADR-036 §3 Locked-In; `rtp-proxy/REQUIREMENTS.md` | — (unimplemented) | — |
+| REQ-RTP-PROXY-001 | Adapter SPI Conformance | ADR-036 §7; `platforms/rtp-proxy/REQUIREMENTS.md` | — (unimplemented) | — |
+| REQ-RTP-PROXY-002 | No World State | ADR-036 §2 Non-Goals; `platforms/rtp-proxy/REQUIREMENTS.md` | — (unimplemented) | — |
+| REQ-RTP-PROXY-003 | Non-Blocking Event Loop | ADR-036 §7; `platforms/rtp-proxy/REQUIREMENTS.md` | — (unimplemented) | — |
+| REQ-RTP-PROXY-004 | Reservation Claim Idempotency | ADR-036 §5; `platforms/rtp-proxy/REQUIREMENTS.md` | `InMemoryNetworkStateBinding` (reference) | `InMemoryNetworkStateBindingTest` (claim atomicity / per-player idempotency) |
+| REQ-RTP-PROXY-005 | Proxy Heartbeat Publication | ADR-036 §5; `platforms/rtp-proxy/REQUIREMENTS.md` | — (unimplemented) | — |
+| REQ-RTP-PROXY-006 | Configurable Messaging | ADR-036 §3 Locked-In; `platforms/rtp-proxy/REQUIREMENTS.md` | — (unimplemented) | — |
 | REQ-RTP-PROXY-007 | Authenticated Transport | ADR-036 §3 D4; `rtp-proxy-ADR-010` (Proposed) | — (unimplemented) | — |
 | REQ-RTP-PROXY-008 | Disabled-Mode No-Op | ADR-036 §1 (REQ-RTP-NET-002 release gate) | — (unimplemented) | — |
 | REQ-RTP-PROXY-009 | Single-Artifact Activation | ADR-036 §7; `rtp-fabric-ADR-002` precedent | — (unimplemented) | — |
@@ -230,7 +230,7 @@ Subproject ADR `rtp-proxy-ADR-006-velocity-bootstrap` Accepted 2026-05-18. REQ-R
 
 | Req ID | Summary | Design Ref | Implementing Class(es) | Test(s) |
 |---|---|---|---|---|
-| REQ-RTP-PROXY-VELOCITY-001 | Velocity Runtime | `rtp-proxy-ADR-006` (Accepted 2026-05-18) | `rtp-proxy/rtp-proxy-velocity/src/main/java/io/github/dailystruggle/rtp/proxy/velocity/RtpVelocityPlugin.java` (Phase 2a no-op shell) | `rtp-proxy/rtp-proxy-velocity/src/test/java/io/github/dailystruggle/rtp/proxy/velocity/ReqRtpProxyVelocity001SmokeTest.java` |
+| REQ-RTP-PROXY-VELOCITY-001 | Velocity Runtime | `rtp-proxy-ADR-006` (Accepted 2026-05-18) | `platforms/rtp-proxy/rtp-proxy-velocity/src/main/java/io/github/dailystruggle/rtp/proxy/velocity/RtpVelocityPlugin.java` (Phase 2a no-op shell) | `platforms/rtp-proxy/rtp-proxy-velocity/src/test/java/io/github/dailystruggle/rtp/proxy/velocity/ReqRtpProxyVelocity001SmokeTest.java` |
 | REQ-RTP-PROXY-VELOCITY-002 | Brigadier Command Hosting | `commands-api-ADR-001`; ADR-036 §3 Locked-In; MULTI_SERVER_PLAN.md *Phase 2d* (2026-05-19) | `RtpVelocityPlugin#registerRtpCommand` (Velocity `BrigadierCommand` for `/rtp` with optional `<world>` literal; player-only; fires `CommandTriggerSource`); `RtpVelocityPlugin#onCommandTrigger` (selector -> `transport.claim` -> `player.createConnectionRequest`, with `ServerPreConnectEvent` redeeming at the connect boundary) | `RtpVelocityPluginPhase2dTest` (3/3: `registerRtpCommand` shape, `onCommandTrigger` shape, test-accessor presence); behavioural pipeline covered indirectly by `RtpVelocityPluginPhase2cTest` + `CommandTriggerSourceTest` |
 | REQ-RTP-PROXY-VELOCITY-003 | Server Rewrite via `ServerPreConnectEvent` | `rtp-proxy-ADR-006`; MULTI_SERVER_PLAN.md *Coordinate Resolution Timing*, *Phase 2 - Velocity adapter* (Phase 2c-α 2026-05-19) | `RtpVelocityPlugin#onServerPreConnect` (rewrites target via `NetworkTransport#findReservation`, transitions `CLAIMED -> CONSUMED`, S-004 fall-through on miss/expiry/unknown-server); `NetworkTransport#findReservation` SPI default + `InMemoryNetworkStateBinding`/`SqlNetworkStateBinding` overrides | `RtpVelocityPluginPhase2cTest` (4/4: disabled-no-op, no-reservation-fallthrough, active-reservation-rewrites, unknown-target-fallthrough); `SqlNetworkStateBindingH2Test#findReservationCrossesInstances` |
 | REQ-RTP-PROXY-VELOCITY-004 | Player Session Continuity | ADR-036 §1 Headline Goals | — (unimplemented) | — |

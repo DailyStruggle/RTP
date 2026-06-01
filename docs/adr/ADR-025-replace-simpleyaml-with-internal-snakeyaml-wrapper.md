@@ -416,7 +416,7 @@ Fabric mod jar gets the same in-house parser as every other variant.
   lite variant *also* drops simpleyaml; the previous platform-deferral
   of SnakeYAML becomes irrelevant (no SnakeYAML dependency anywhere).
   The lite footprint promise is **strengthened**, not relaxed.
-- [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md)
+- [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md)
   — Fabric Platform In Scope (renumbered from project-wide ADR-022 on
   2026-05-05). The "Fabric YAML packaging is deferred to a follow-up
   ADR" carve-out is **closed** by this revision: the in-house parser

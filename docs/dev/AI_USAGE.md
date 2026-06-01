@@ -40,7 +40,7 @@ The V2 branch was written without AI, mostly because generative AI wasn't really
 
 Two pieces of tooling in this repo are worth calling out because they look like human workflows and aren't. The locale TSV pipeline under `scripts/out/` is only used by AI. A human translator fluent in the target language can just open `lang/<locale>/<file>.yml` and edit it, and the TSV layer is unnecessary overhead. The pipeline exists because AI-based translation benefits from a single condensed table of every locale's translation of every key, comments included, with placeholders pre-masked. That's the shape of input an LLM can review without losing track. So the pipeline is tooling I built for AI specifically, with the simpler human path left alone.
 
-The devstack at `rtp-proxy/devstack/` is the reverse case. I designed it to help me run integration tests and code reviews. AI didn't design it. AI wrote the Docker Compose YAML, the entrypoint shims, and the reset script after I told it the topology (1 Redis, 2 proxies, 2 lobbies, 3 platform-asymmetric backends).
+The devstack at `platforms/rtp-proxy/devstack/` is the reverse case. I designed it to help me run integration tests and code reviews. AI didn't design it. AI wrote the Docker Compose YAML, the entrypoint shims, and the reset script after I told it the topology (1 Redis, 2 proxies, 2 lobbies, 3 platform-asymmetric backends).
 
 What AI is *not* used for, as a rule:
 

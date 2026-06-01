@@ -211,6 +211,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     addSubCommand(new ConfigCmd(this));
     addSubCommand(new ScanCmd(this));
     addSubCommand(new InfoCmd(this));
+    addSubCommand(new io.github.dailystruggle.rtp.common.commands.admin.ClearCacheCmd(this));
     addSubCommand(new BukkitTestCmd(this));
 
     // /rtp menu — full ADR-035 / ADR-044 / ADR-050 menu surface, installed

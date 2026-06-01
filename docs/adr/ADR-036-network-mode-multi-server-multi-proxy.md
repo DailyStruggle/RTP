@@ -8,16 +8,16 @@
 
 `docs/dev/MULTI_SERVER_PLAN.md` has accumulated the full design intent for cross-backend, cross-proxy RTP — Phase 0 is partially complete (`REQ-RTP-NET-001…014` authored; GLOSSARY entries pending) but the plan itself is a *plan*, not a decision record. Per D-005 (Propose Before Implementation) and the project's ADR conventions, every architecturally significant decision must be captured in an ADR before code lands. Phase 1 of the plan is gated on this ADR existing.
 
-The plan covers concerns at very different layers — wire format, transport bindings, reservation-token semantics, load-balancer math, multi-proxy idempotency, deployment topology, single-artifact activation, security. Folding every one of them into a single ADR would produce a document larger than the plan it ratifies and obscure the decisions that matter most. The pragmatic path is to use **this ADR as the network-mode umbrella** — ratifying scope, headline goals, locked-in decisions, and module shape — and to spin out **subproject ADRs under `rtp-proxy/docs/adr/`** for narrower concerns (SPI shape, transport bindings, reservation-token state machine, load-balancer scoring, multi-proxy idempotency contract) as Phases 1–4 land them. This mirrors how `effects-api`, `commands-api`, and `rtp-fabric` already maintain their own per-subproject ADR sequences alongside the global one.
+The plan covers concerns at very different layers — wire format, transport bindings, reservation-token semantics, load-balancer math, multi-proxy idempotency, deployment topology, single-artifact activation, security. Folding every one of them into a single ADR would produce a document larger than the plan it ratifies and obscure the decisions that matter most. The pragmatic path is to use **this ADR as the network-mode umbrella** — ratifying scope, headline goals, locked-in decisions, and module shape — and to spin out **subproject ADRs under `platforms/rtp-proxy/docs/adr/`** for narrower concerns (SPI shape, transport bindings, reservation-token state machine, load-balancer scoring, multi-proxy idempotency contract) as Phases 1–4 land them. This mirrors how `effects-api`, `commands-api`, and `rtp-fabric` already maintain their own per-subproject ADR sequences alongside the global one.
 
 Cross-references this ADR ratifies in absolute-state form:
 
 - `MULTI_SERVER_PLAN.md` — full design narrative, phased roadmap, open items.
 - `REQUIREMENTS.md §1.6` — `REQ-RTP-NET-001…014`.
-- `rtp-proxy/REQUIREMENTS.md` — `REQ-RTP-PROXY-001…011`.
-- `rtp-proxy/rtp-proxy-common/REQUIREMENTS.md` — `REQ-RTP-PROXY-COMMON-001…008`.
-- `rtp-proxy/rtp-proxy-velocity/REQUIREMENTS.md` — `REQ-RTP-PROXY-VELOCITY-001…007`.
-- `rtp-proxy/rtp-proxy-bungee/REQUIREMENTS.md` — `REQ-RTP-PROXY-BUNGEE-001…007`.
+- `platforms/rtp-proxy/REQUIREMENTS.md` — `REQ-RTP-PROXY-001…011`.
+- `platforms/rtp-proxy/rtp-proxy-common/REQUIREMENTS.md` — `REQ-RTP-PROXY-COMMON-001…008`.
+- `platforms/rtp-proxy/rtp-proxy-velocity/REQUIREMENTS.md` — `REQ-RTP-PROXY-VELOCITY-001…007`.
+- `platforms/rtp-proxy/rtp-proxy-bungee/REQUIREMENTS.md` — `REQ-RTP-PROXY-BUNGEE-001…007`.
 - `docs/admin/proxies/INDEX.md` — admin-facing roster (stub until Phase 3).
 
 ## Decision
@@ -90,7 +90,7 @@ Fallback chain (Linux CFS-inspired): `maxRetries: 3`, `attemptTimeoutMs: 1500`, 
 ### 7. Module Shape
 
 ```
-rtp-proxy/
+platforms/rtp-proxy/
 ├── rtp-proxy-common/      # SPI, dispatcher, BackendSelector, transport iface
 ├── rtp-proxy-velocity/    # Phase 2 (primary)
 └── rtp-proxy-bungee/      # Phase 3 (secondary; BungeeCord + Waterfall)
@@ -104,7 +104,7 @@ Single-artifact activation shall use loader-detection (analogue of `rtp-fabric-A
 
 Phases are inherited from `MULTI_SERVER_PLAN.md`; this ADR ratifies the *order* and the *spin-out points* for subproject ADRs.
 
-| Phase | Scope | Subproject ADRs to author (under `rtp-proxy/docs/adr/`) |
+| Phase | Scope | Subproject ADRs to author (under `platforms/rtp-proxy/docs/adr/`) |
 |---|---|---|
 | **0** | Scope unlock (docs only) | `rtp-proxy-ADR-001-spi-shape` |
 | **1** | Core SPI, in-memory binding, weighted-average selector, no-op contract test | `rtp-proxy-ADR-002-network-yml-schema`, `rtp-proxy-ADR-003-in-memory-binding`, `rtp-proxy-ADR-004-weighted-average-selector` |
@@ -112,14 +112,14 @@ Phases are inherited from `MULTI_SERVER_PLAN.md`; this ADR ratifies the *order* 
 | **3** | Postgres + join trigger + BungeeCord adapter | `rtp-proxy-ADR-007-postgres-binding`, `rtp-proxy-ADR-008-bungee-bootstrap` |
 | **4** | Generic SQL + hardening + release | `rtp-proxy-ADR-009-generic-sql-binding`, `rtp-proxy-ADR-010-security-hardening` |
 
-Subproject ADR numbering restarts at `001` inside `rtp-proxy/docs/adr/` per the per-directory naming rule in `AGENTS.md > Self-Updating Protocol`. The global `docs/adr/` sequence shall not be used for narrower network-mode concerns once this umbrella ADR is accepted; only umbrella-level reversals or successors (e.g., a future ADR that supersedes this one) shall consume global ADR numbers.
+Subproject ADR numbering restarts at `001` inside `platforms/rtp-proxy/docs/adr/` per the per-directory naming rule in `AGENTS.md > Self-Updating Protocol`. The global `docs/adr/` sequence shall not be used for narrower network-mode concerns once this umbrella ADR is accepted; only umbrella-level reversals or successors (e.g., a future ADR that supersedes this one) shall consume global ADR numbers.
 
 ## Alternatives Considered
 
 | Alternative | Why Rejected |
 |---|---|
 | One mega-ADR covering wire format, transports, scoring, security, deployment | Would exceed the plan in size; obscures the decisions that matter most; violates ADR template intent (one decision per record). |
-| Inline every subproject ADR's content here and forgo `rtp-proxy/docs/adr/` | Loses the per-subproject ADR convention already used by `effects-api`, `commands-api`, `rtp-fabric`; couples narrow technical reversals (e.g., swapping Lettuce for Redisson) to an umbrella reversal. |
+| Inline every subproject ADR's content here and forgo `platforms/rtp-proxy/docs/adr/` | Loses the per-subproject ADR convention already used by `effects-api`, `commands-api`, `rtp-fabric`; couples narrow technical reversals (e.g., swapping Lettuce for Redisson) to an umbrella reversal. |
 | Postpone umbrella ratification until every subproject ADR is drafted | Blocks Phase 1 indefinitely; `REQ-RTP-NET-001…014` and the four `REQUIREMENTS.md` files would remain D-005-pending with no upper-bound. The umbrella exists precisely to unblock incremental subproject work. |
 | Skip the umbrella; promote each subproject ADR to a global ADR | Pollutes the global ADR sequence with narrow proxy concerns; breaks the established per-subproject convention; makes it impossible to point external readers at "the network-mode decision" with a single link. |
 | Treat proxy-side and backend-side as two separate umbrella ADRs | The reservation-token contract, schema negotiation, and HMAC are inseparable across the wire; splitting the umbrella along the proxy/backend boundary produces two ADRs that mutually reference each other on every clause. |
@@ -134,19 +134,19 @@ Subproject ADR numbering restarts at `001` inside `rtp-proxy/docs/adr/` per the 
   - `TRACEABILITY.md` rows for `REQ-RTP-NET-*` and `REQ-RTP-PROXY-*` can be opened (unimplemented status) and linked to this ADR.
 - **Negative / Trade-offs:**
   - The umbrella becomes a single point of revision for headline-goal changes; reversing a locked decision (e.g., dropping Bungee) requires a superseding global ADR rather than a local subproject ADR.
-  - Readers must traverse two levels (umbrella + subproject ADR) to understand a single concern end-to-end. Mitigated by a cross-reference table in `rtp-proxy/docs/adr/README.md` (to be created in Phase 1).
-  - Subproject ADRs that touch backend-side state (e.g., the network-state member schema formalised under `rtp-proxy-ADR-003-in-memory-binding`) live under `rtp-proxy/docs/adr/` for cohesion with the proxy story even though they technically describe a `rtp-core` member. The trade-off is consistency-of-narrative over strict directory-by-owner; documented here so future contributors don't re-litigate the placement.
+  - Readers must traverse two levels (umbrella + subproject ADR) to understand a single concern end-to-end. Mitigated by a cross-reference table in `platforms/rtp-proxy/docs/adr/README.md` (to be created in Phase 1).
+  - Subproject ADRs that touch backend-side state (e.g., the network-state member schema formalised under `rtp-proxy-ADR-003-in-memory-binding`) live under `platforms/rtp-proxy/docs/adr/` for cohesion with the proxy story even though they technically describe a `rtp-core` member. The trade-off is consistency-of-narrative over strict directory-by-owner; documented here so future contributors don't re-litigate the placement.
   - Acceptance of this ADR is *not* a green light for code: each phase still requires its subproject ADR(s) under D-005 before implementation in that phase begins.
 
 ## References
 
 - `docs/dev/MULTI_SERVER_PLAN.md` — full plan narrative and phased roadmap.
 - `docs/dev/REQUIREMENTS.md §1.6` — `REQ-RTP-NET-001…014`.
-- `rtp-proxy/REQUIREMENTS.md`, `rtp-proxy/rtp-proxy-common/REQUIREMENTS.md`, `rtp-proxy/rtp-proxy-velocity/REQUIREMENTS.md`, `rtp-proxy/rtp-proxy-bungee/REQUIREMENTS.md`.
+- `platforms/rtp-proxy/REQUIREMENTS.md`, `platforms/rtp-proxy/rtp-proxy-common/REQUIREMENTS.md`, `platforms/rtp-proxy/rtp-proxy-velocity/REQUIREMENTS.md`, `platforms/rtp-proxy/rtp-proxy-bungee/REQUIREMENTS.md`.
 - `docs/admin/proxies/INDEX.md` — admin-facing roster (stub).
 - `docs/adr/ADR-018-agents-md-public-release-structure.md` — public release / docs structure.
 - `docs/adr/ADR-026-external-hook-api-surface.md` — external integration boundaries (claim / economy / PAPI / world border / anvil prefilter).
-- `rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md` — loader-detection precedent for single-artifact activation.
+- `platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md` — loader-detection precedent for single-artifact activation.
 - `effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md` — per-subproject ADR numbering precedent.
 - `commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md` — Brigadier-bridge reuse rationale.
 - `.junie/AGENTS.md` — D-005, Self-Updating Protocol, per-subproject ADR naming rule.

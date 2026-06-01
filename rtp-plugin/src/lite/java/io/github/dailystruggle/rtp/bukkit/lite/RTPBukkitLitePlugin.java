@@ -267,8 +267,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     extractBundledLiteDocs();
     RTP.log(Level.INFO,
         "[RTP-lite] Documentation extracted to "
-            + new java.io.File(getDataFolder(), "lite-docs").getAbsolutePath()
-            + " -- see ADR-024 for scope.");
+            + new java.io.File(getDataFolder(), "lite-docs").getAbsolutePath());
   }
 
   /**

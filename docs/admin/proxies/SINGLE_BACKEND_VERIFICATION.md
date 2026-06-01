@@ -7,9 +7,9 @@ This page documents how a single Paper/Folia backend operator can verify the RTP
 Related design docs:
 
 - [`docs/dev/MULTI_SERVER_PLAN.md`](../../dev/MULTI_SERVER_PLAN.md) - phase status, Phase 2e-Redis A1/A2 slice notes.
-- [`rtp-proxy-ADR-005`](../../../rtp-proxy/docs/adr/rtp-proxy-ADR-005-redis-binding.md) - Redis binding key layout and Lua scripts.
-- [`rtp-proxy-ADR-002`](../../../rtp-proxy/docs/adr/rtp-proxy-ADR-002-network-yml-schema.md) - `network.yml` schema and validation rules.
-- [`rtp-proxy-ADR-010`](../../../rtp-proxy/docs/adr/rtp-proxy-ADR-010-security-hardening.md) - HMAC + kill switch (deferred for single-backend).
+- [`rtp-proxy-ADR-005`](../../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-005-redis-binding.md) - Redis binding key layout and Lua scripts.
+- [`rtp-proxy-ADR-002`](../../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-002-network-yml-schema.md) - `network.yml` schema and validation rules.
+- [`rtp-proxy-ADR-010`](../../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-010-security-hardening.md) - HMAC + kill switch (deferred for single-backend).
 - REQ-RTP-NET-002 (parity when disabled), REQ-RTP-PROXY-007 (`secretEnv` fail-fast).
 
 ---
