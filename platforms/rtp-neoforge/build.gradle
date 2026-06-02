@@ -1,0 +1,21 @@
+// rtp-neoforge — NeoForge platform adapter (parent marker project).
+//
+// In-scope per ADR-033 (NeoForge platform in-scope) and the subproject ADR
+// rtp-neoforge-ADR-001-platform-in-scope.md. Phase N1 bring-up: this tree is a
+// sibling to platforms/rtp-fabric (NOT nested under it) and mirrors the Fabric
+// multiversion submodule layout (rtp-fabric-ADR-001): a version-agnostic
+// `rtp-neoforge-common` plus per-MC carrier submodules.
+//
+// IMPORTANT (build discipline): the NeoForge toolchain (ModDevGradle) and the
+// NeoForge runtime artifacts are resolved from network repositories that are
+// NOT available on every build host (and were unavailable in the sandbox where
+// this skeleton was authored). To keep the default multi-module build green
+// without network access, the NeoForge modules are included in settings.gradle
+// ONLY when `-PincludeNeoforge` is passed (see settings.gradle). This parent
+// project itself holds no build logic — each submodule applies ModDevGradle.
+//
+// See:
+//   docs/adr/ADR-033-neoforge-platform-in-scope.md
+//   platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md
+//   docs/dev/NEOFORGE_NOTES.md
+//   docs/dev/scratch/PROPOSAL-neoforge-bringup.md

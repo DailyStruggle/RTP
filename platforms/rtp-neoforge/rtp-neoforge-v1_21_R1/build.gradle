@@ -1,0 +1,48 @@
+// Phase N1 — NeoForge per-MC carrier for the 1.21.x line (NeoForge 21.1.x).
+//
+// Mirrors platforms/rtp-fabric/rtp-fabric-v1_21_R1 (rtp-fabric-ADR-001): this
+// submodule supplies the actual runtime mod jar pinned to its MC version and
+// hosts any NM-typed surfaces that drift across MC revs (the version adapter).
+// rtp-neoforge-common holds the version-agnostic glue and compiles against the
+// same 1.21.1 Mojmap line purely to typecheck.
+//
+// NeoForge is Mojmap-at-runtime on 1.20.4+, so unlike the Fabric v26_*_R1
+// carriers there is no obf/unobf split here (NEOFORGE_NOTES.md §5); the
+// per-version isolation is purely about absorbing Mojmap name drift, never
+// leaking it into rtp-core / rtp-api.
+//
+// Included only under `-PincludeNeoforge` (see settings.gradle) — the NeoForge
+// userdev artifacts require network access not present on every build host.
+
+plugins {
+    id 'net.neoforged.moddev' version '2.0.78'
+}
+
+ext {
+    minecraftVersion = '1.21.1'
+    neoforgeVersion  = '21.1.95'
+}
+
+neoForge {
+    version = neoforgeVersion
+
+    // Dev-launch run config (NEOFORGE_NOTES.md §8). The Phase N1 exit gate is a
+    // single /rtp round-trip on a dev server launched via `:rtp-neoforge:rtp-neoforge-v1_21_R1:runServer`.
+    runs {
+        server {
+            server()
+        }
+    }
+
+    mods {
+        rtp {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    // Version-agnostic NeoForge glue + the platform-neutral RTP modules it
+    // re-exports (rtp-api / rtp-core / commands-api / anvil-api).
+    implementation project(':rtp-neoforge:rtp-neoforge-common')
+}

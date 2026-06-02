@@ -281,6 +281,29 @@ project(':rtp-proxy').projectDir                = file('platforms/rtp-proxy')
 project(':rtp-proxy:rtp-proxy-common').projectDir   = file('platforms/rtp-proxy/rtp-proxy-common')
 project(':rtp-proxy:rtp-proxy-velocity').projectDir = file('platforms/rtp-proxy/rtp-proxy-velocity')
 
+// NeoForge platform adapter — in-scope per ADR-033 and rtp-neoforge-ADR-001.
+// Phase N1 bring-up skeleton. The NeoForge toolchain (ModDevGradle,
+// net.neoforged.moddev) resolves NeoForge userdev artifacts from network
+// repositories that are NOT available on every build host (CI, JitPack, the
+// sandbox where the skeleton was authored). Merely *configuring* these modules
+// forces ModDevGradle to resolve those artifacts, which would fail the whole
+// build offline — exactly like the JDK-25 Loom carriers above. So the NeoForge
+// modules are an OPT-IN island: included only when `-PincludeNeoforge` is
+// passed (or the INCLUDE_NEOFORGE env var is set). Nothing in the default
+// build graph depends on them. The named maintainer (project lead, @leaf_26)
+// builds/verifies them on a network-capable host.
+// See platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md.
+def includeNeoforge = startParameter.projectProperties.containsKey('includeNeoforge') ||
+        System.getenv('INCLUDE_NEOFORGE') != null
+if (includeNeoforge) {
+    include 'rtp-neoforge:rtp-neoforge-common'
+    include 'rtp-neoforge:rtp-neoforge-v1_21_R1'
+
+    project(':rtp-neoforge').projectDir                          = file('platforms/rtp-neoforge')
+    project(':rtp-neoforge:rtp-neoforge-common').projectDir      = file('platforms/rtp-neoforge/rtp-neoforge-common')
+    project(':rtp-neoforge:rtp-neoforge-v1_21_R1').projectDir    = file('platforms/rtp-neoforge/rtp-neoforge-v1_21_R1')
+}
+
 include 'addons:RTP_ExampleAddon'
 // RTP_GuiAddon — reference inventory (chest) destination picker built ONLY on the
 // stable rtp-api GUI-author surface (getAllowedTargets / getTargetStatus /
