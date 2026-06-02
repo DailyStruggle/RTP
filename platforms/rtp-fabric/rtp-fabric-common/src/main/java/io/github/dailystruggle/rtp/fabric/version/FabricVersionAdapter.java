@@ -46,21 +46,6 @@ public interface FabricVersionAdapter {
     // -------------------------------------------------------------------------
 
     /**
-     * Returns the registry key registered for the given block, or
-     * {@code null} if not registered. Common-side callers consume the
-     * {@code namespace:path} form via {@link RTPRegistryKey#key()}.
-     */
-    @Nullable RTPRegistryKey blockKey(RTPBlockHandle block);
-
-    /**
-     * Returns the registry key for the biome at the given block coordinates
-     * in the given level, or {@code null} if the biome holder cannot be
-     * resolved. Coordinates pass as primitives so the SPI stays
-     * Mojmap-name-stable even if {@code BlockPos} ever renames.
-     */
-    @Nullable RTPRegistryKey biomeKeyAt(RTPLevelHandle level, int x, int y, int z);
-
-    /**
      * Snapshot of the runtime's {@code minecraft:block} tag bindings, in the
      * {@code namespace:path -> upper-case "namespace:path"} multimap shape
      * documented on {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#blockTagSnapshot()}.
@@ -105,13 +90,6 @@ public interface FabricVersionAdapter {
      * complete it inline.</p>
      */
     CompletableFuture<RTPChunkHandle> getChunkFull(RTPLevelHandle level, int cx, int cz);
-
-    /**
-     * Cheap, non-loading existence check. Mirrors
-     * {@code ServerLevel#getChunkSource().hasChunk(cx, cz)} but lets
-     * v-submodules absorb any rename of {@code hasChunk}.
-     */
-    boolean hasChunk(RTPLevelHandle level, int cx, int cz);
 
     /**
      * <b>Non-blocking</b> dispatch of a FULL chunk generation request.
@@ -162,19 +140,6 @@ public interface FabricVersionAdapter {
         // without the deadlock fix). RTP-shipped adapters all override.
         return getChunkFull(level, cx, cz);
     }
-
-    // -------------------------------------------------------------------------
-    // Misc convenience — small stable shims that nonetheless protect callers
-    // from per-version method renames.
-    // -------------------------------------------------------------------------
-
-    /**
-     * Returns the air state for the runtime's registry. Used as a sentinel
-     * by safety predicates that need to compare to "vanilla AIR" without
-     * pulling in {@code Blocks.AIR} directly (the {@code Blocks} class has
-     * been re-keyed across versions).
-     */
-    RTPBlockStateHandle airState();
 
     // -------------------------------------------------------------------------
     // Non-persistent chunk tickets — see rtp-fabric-ADR-003 / -004 / -006.

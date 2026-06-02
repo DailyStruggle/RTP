@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
-import io.github.dailystruggle.rtp.fabric.unobf.anvil.FabricPaletteNormalizer;
+import io.github.dailystruggle.rtp.common.anvil.PaletteNormalizer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -69,7 +69,7 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
     private final @Nullable AnvilChunkView anvilView;
     /**
      * Anvil mode only: a pre-reconciled unsafe-block set produced by
-     * {@link FabricPaletteNormalizer#reconcileAll}. {@code null} when the chunk
+     * {@link PaletteNormalizer#reconcileAll}. {@code null} when the chunk
      * was built without a caller-supplied unsafe list — in which case
      * {@link #isSafe(int, int, int, Set)} reconciles the per-call set.
      */
@@ -275,7 +275,7 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
                     raw.add(token);
                 }
             }
-            Set<String> reconciled = FabricPaletteNormalizer.reconcileAll(raw);
+            Set<String> reconciled = PaletteNormalizer.reconcileAll(raw);
             AIR_BLOCKS_CACHE.set(reconciled);
             return reconciled;
         } catch (Throwable ignored) {
@@ -298,7 +298,7 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
             Block block = state.getBlock();
             Identifier id = BuiltInRegistries.BLOCK.getKey(block);
             if (id == null) return false;
-            return FabricPaletteNormalizer.matches(id.toString(), airSet);
+            return PaletteNormalizer.matches(id.toString(), airSet);
         } catch (Throwable t) {
             return false;
         }
@@ -368,7 +368,7 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
             // chunk without supplying a reconciled set).
             Set<String> set = (reconciledUnsafe != null)
                     ? reconciledUnsafe
-                    : FabricPaletteNormalizer.reconcileAll(unsafeBlocks);
+                    : PaletteNormalizer.reconcileAll(unsafeBlocks);
             return anvilView.isSafe(x & 0xF, y, z & 0xF, set);
         }
         if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;

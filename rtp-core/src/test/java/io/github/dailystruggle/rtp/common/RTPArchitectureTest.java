@@ -104,6 +104,16 @@ public class RTPArchitectureTest {
      *       ({@code scheduler.runTaskAsynchronously}) and never on a region/primary
      *       tick thread, so S-005 is preserved. A timeout is reported as a tier
      *       failure rather than swallowed (S-004 compliant).</li>
+     *   <li><b>NetworkModeBootstrap</b> – {@code .get(2s, ...)} on transport
+     *       futures ({@code readSnapshot()}, {@code flushPending(...)},
+     *       {@code pollStatus(...)}). ADR-049 lifted this class from the Bukkit-only
+     *       {@code rtp-plugin} into platform-neutral {@code rtp-core}; the bounded waits
+     *       were vetted there and are unchanged. Each runs either on the async scheduler
+     *       tier ({@code RTP.scheduler.runTaskAsynchronously} snapshot refresher, the
+     *       enrolment-buffer flush timer, the status-poll timer) or during the off-tick
+     *       backend boot, never on a region/primary tick thread, so S-005 is preserved.
+     *       Every wait has a hard 2s deadline and a {@code catch (Throwable)} that logs
+     *       (S-004 compliant) rather than blocking indefinitely or swallowing silently.</li>
      * </ul>
      */
     @ArchTest
@@ -119,6 +129,7 @@ public class RTPArchitectureTest {
                     .and().haveSimpleNameNotContaining("PlaceholderProvider")
                     .and().haveSimpleNameNotContaining("ChunkReservation")
                     .and().haveSimpleNameNotContaining("TestSchedulerCmd")
+                    .and().haveSimpleNameNotContaining("NetworkModeBootstrap")
                     .should().callMethodWhere(
                             target(owner(assignableTo(CompletableFuture.class)))
                                     .and(target(nameMatching("get|join")))

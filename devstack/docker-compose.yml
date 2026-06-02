@@ -1,0 +1,430 @@
+# rtp-proxy devstack: 1 Redis + 2 Velocity proxies + 2 Paper lobbies + 3 backends
+# (backend-a Paper, backend-b Folia, backend-c Fabric). See README.md for the
+# rationale behind the heterogeneous backend trio.
+#
+# The two "lobby" Paper servers have an empty `regions/` directory: they are
+# valid network participants (role: backend, unique serverId) but cannot serve
+# /rtp locally. Running /rtp on a lobby exercises the cross-server dispatch
+# path to backend-a / backend-b / backend-c. See `README.md` ("Lobbies").
+#
+# First runtime verification of the cross-server `/rtp` round-trip
+# (CHECKLIST-cross-server-rtp.md L3, rows 21-29).
+#
+# Boot:  docker compose up -d
+# Tear:  docker compose down -v
+#
+# Operator notes:
+# - Drop the built plugin jar(s) into `./jars/` before `up`. See `jars/README.md`.
+# - Copy `.env.example` to `.env` and set `RTP_NET_SECRET` (32+ bytes, base64 or hex).
+# - Ports exposed on the host: 25577 (proxy-a), 25578 (proxy-b), ${REDIS_HOST_PORT:-6380} (redis).
+#   Backends are reachable only on the compose network; connect Minecraft to a proxy.
+# - If host port 6379 is already in use (you have a local Redis), the default
+#   REDIS_HOST_PORT=6380 sidesteps the collision. Override in `.env` if needed.
+#   All in-stack services reach Redis via the compose-internal hostname `redis:6379`,
+#   so this only affects host-side access (e.g., `redis-cli -p 6380`).
+# - Forwarding is `modern`; backends must accept the same `forwarding-secret`.
+#   The example uses a shared file mounted into both proxies and both backends.
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: rtp-devstack-redis
+    ports:
+      - "${REDIS_HOST_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+
+  proxy-a:
+    image: itzg/mc-proxy:java21
+    # itzg/mc-proxy supports TYPE=VELOCITY to run Velocity (vs BUNGEECORD/WATERFALL).
+    # SKIP_CHOWN=TRUE: the itzg entrypoint chowns /server on boot, which fails on
+    # Windows/Docker-Desktop bind mounts (host files aren't owned by the container UID,
+    # and read-only single-file mounts reject chown outright). Skipping is safe here:
+    # the process runs as the same uid that already owns the host files.
+    environment:
+      TYPE: VELOCITY
+      MEMORY: 512M
+      SKIP_CHOWN: "TRUE"
+      RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
+    ports:
+      - "25577:25577"
+    volumes:
+      # itzg/mc-proxy chowns every mounted path on boot; :ro single-file mounts
+      # reject chown with exit 1 on Windows/Docker-Desktop. SKIP_CHOWN is honored
+      # by itzg/minecraft-server but NOT by itzg/mc-proxy, so we drop :ro on all
+      # bind mounts and rely on the container only reading them.
+      - ./proxy-a/velocity.toml:/server/velocity.toml
+      - ./shared/forwarding.secret:/server/forwarding.secret
+      - ./proxy-a/plugins:/server/plugins
+    depends_on:
+      redis:
+        condition: service_healthy
+  proxy-b:
+    image: itzg/mc-proxy:java21
+    environment:
+      TYPE: VELOCITY
+      MEMORY: 512M
+      SKIP_CHOWN: "TRUE"
+      RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
+    ports:
+      - "25578:25577"
+    volumes:
+      - ./proxy-b/velocity.toml:/server/velocity.toml
+      - ./shared/forwarding.secret:/server/forwarding.secret
+      - ./proxy-b/plugins:/server/plugins
+    depends_on:
+      redis:
+        condition: service_healthy
+  backend-a:
+    # Java 25 image + Paper 1.21.11: required because RTP-Pro ships a Fabric
+    # unobf-carrier compiled with Java 25 toolchain (class file v69). Paper's
+    # plugin remapper (AutoRenamingTool / ASM) on Java 21 + Paper 1.21.1 throws
+    # `Unsupported class file major version 69` and aborts the boot. Paper 1.21.11
+    # ships ASM 9.8+ and runs on Java 25, which reads v69 cleanly.
+    image: itzg/minecraft-server:java25
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.21.11"
+      # Devstack backends run with 6G heap: Paper 1.21.11 + RTP-Pro + remap cache
+      # routinely peak at 2-3G during world-gen on the first run, and tighter
+      # caps (1G) caused OOM-driven GC thrash that pushed first-boot heartbeat
+      # past the harness budget. 6G sits in the 4-8G band tested locally and
+      # leaves headroom for /rtp pre-fill bursts without bloating host RAM.
+      MEMORY: 6G
+      ONLINE_MODE: "FALSE"        # proxies front auth; backends trust forwarding-secret
+      # OPS: comma-separated list of player names or UUIDs to seed into ops.json
+      # on container start. itzg/minecraft-server reads this and writes ops.json
+      # before the server boots, so the listed accounts are op on first join.
+      # Defaulted to empty so a missing OPS in .env is a no-op (no devstack regression);
+      # set OPS=YourIGN in .env (or export OPS=YourIGN before run-acceptance.ps1) to
+      # grant op for command testing. Devstack convenience only; do NOT use in prod.
+      OPS: ${OPS:-}
+      # OVERRIDE_OPS=TRUE forces itzg to re-write ops.json on every boot from
+      # the OPS env var, instead of only seeding it once on a fresh world.
+      # Without this, changing OPS in .env after the first run is a silent
+      # no-op because ops.json already exists in the persistent world volume.
+      OVERRIDE_OPS: "TRUE"
+      # Run as root (UID 0) to sidestep the named-volume ownership problem:
+      # Docker creates fresh named volumes root-owned, and itzg's entrypoint
+      # chowns /data but NOT nested mountpoints like /data/world (a separate
+      # bind from the named volume). Running as root means session.lock,
+      # region files, and all world I/O succeed regardless of volume ownership.
+      # Safe for a local devstack; do NOT replicate in production.
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+      RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
+      # PATCH_DEFINITIONS: applied AFTER mc-image-helper's mcopy downloads the
+      # upstream Paper config defaults, so our velocity.enabled=true setting
+      # survives every boot. Hand-editing /data/config/paper-global.yml is futile
+      # because the helper re-downloads it from raw.githubusercontent.com each run.
+      PATCH_DEFINITIONS: /paper-patches
+      # REPLACE_ENV_VARIABLES + ENV_VARIABLE_PREFIX expand ${CFG_*} placeholders
+      # inside patch JSON values. We inject the velocity forwarding secret here so
+      # the upstream-default `secret: ''` field gets the real value via a plain
+      # $set op (which only works on existing fields - $put on a missing field
+      # gave PathNotFoundException). The harness reads shared/forwarding.secret
+      # and exports CFG_VELOCITY_FORWARDING_SECRET before `docker compose up`.
+      REPLACE_ENV_VARIABLES: "TRUE"
+      ENV_VARIABLE_PREFIX: "CFG_"
+      CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET:?set CFG_VELOCITY_FORWARDING_SECRET (harness does this automatically)}
+    user: "0:0"
+    # Seed RTP/network.yml by COPY (not bind) so the plugin's runtime
+    # rewrites stay inside the container's writable layer and cannot
+    # backpropagate to the host devstack tree. The host file is mounted
+    # read-only at /seed/network.yml and copied into /data/plugins/RTP/
+    # before /start runs. On `docker compose down` the writable layer is
+    # discarded, so the next `up` re-seeds from the host's pristine copy.
+    entrypoint:
+      - /bin/bash
+      - -c
+      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+    volumes:
+      # Plugin jars: bind a PER-BACKEND plugins dir into /data/plugins (writable).
+      # We MUST NOT share ./jars/plugin between backend-a and backend-b: Paper writes
+      # its remap cache to /data/plugins/.paper-remapped/ on boot, and two backends
+      # racing on the same host directory corrupt that cache (ZipException: invalid
+      # LOC header). Each backend gets its own plugins dir; drop new plugin jars into
+      # both ./backend-a/plugins/ and ./backend-b/plugins/ before `up`.
+      - ./backend-a/plugins:/data/plugins
+      # Seed-only mount (read-only): copied into /data/plugins/RTP/network.yml
+      # by the entrypoint shim above. Runtime edits by the plugin land in the
+      # container's writable layer and are discarded on `docker compose down`,
+      # so the host devstack tree is never mutated by a running container.
+      - ./backend-a/rtp-config/network.yml:/seed/network.yml:ro
+      # PATCH_DEFINITIONS source: a single JSON patch shared across both backends
+      # that flips velocity.enabled=true + sets secret-file. mc-image-helper applies
+      # it after refreshing the upstream Paper defaults, so the setting is permanent.
+      - ./shared/paper-patches:/paper-patches:ro
+      - ./shared/forwarding.secret:/data/forwarding.secret
+      # Shared mc-image-helper download cache. Without this mount, /data/.cache
+      # lives in the container's ephemeral writable layer and is destroyed on
+      # every `docker compose down`, forcing each MC service to re-download the
+      # Paper build + Mojang server.jar (~110 MB per service x 4 services) on
+      # every cold `up`. The named volume is shared across all four MC services
+      # because itzg cache filenames are content-addressed by (type, version,
+      # build / sha) and writes are file-per-artifact (no shared mutable index),
+      # so concurrent reads/writes are safe. `docker compose down -v` clears it
+      # together with everything else, which is the intended "truly fresh"
+      # reset semantics.
+      - mc-image-cache:/data/.cache
+      # World dir as a HOST bind (not a named volume): Docker Desktop on Windows
+      # gives bind mounts full rwx to the container regardless of internal UID,
+      # so Paper can always acquire ./world/session.lock. Named volumes preserved
+      # root-owned dirs from prior failed boots across `docker compose down`
+      # (only `-v` wiped them), which kept causing AccessDeniedException on the
+      # lock file. Bind mounts also auto-clear on `down -v` via host rm fallback
+      # below; for plain `down`, the dir simply persists on disk and is reused.
+      - ./backend-a/world:/data/world
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Lobbies: Paper backends whose RTP install ships NO local destination region
+  # (`./lobby-{a,b}/rtp-config/regions/` is intentionally empty). They participate
+  # in the network as `role: backend` with unique `serverId`s so they can dispatch
+  # /rtp to backend-a/backend-b via the cross-server pipeline. This exercises the
+  # lobby use case: a player joins a lobby, runs /rtp, and the request is routed
+  # to whichever real backend the BackendSelector picks (or one named explicitly).
+  # Each velocity.toml lists the lobby first in `try`, so fresh connections land
+  # on a lobby by default.
+  lobby-a:
+    # See backend-a for Java 25 / Paper 1.21.11 rationale.
+    image: itzg/minecraft-server:java25
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.21.11"
+      # Lobbies do no world-gen and no /rtp pre-fill; 2G is plenty.
+      MEMORY: 2G
+      ONLINE_MODE: "FALSE"
+      # Lobbies run in creative mode so demos can visually distinguish a
+      # lobby (creative, flight, instant block break) from a backend
+      # (survival) without inspecting the network state.
+      MODE: creative
+      DIFFICULTY: peaceful
+      OPS: ${OPS:-}
+      OVERRIDE_OPS: "TRUE"
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+      RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
+      PATCH_DEFINITIONS: /paper-patches
+      REPLACE_ENV_VARIABLES: "TRUE"
+      ENV_VARIABLE_PREFIX: "CFG_"
+      CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET:?set CFG_VELOCITY_FORWARDING_SECRET (harness does this automatically)}
+    user: "0:0"
+    # See backend-a: copy-not-mount entrypoint shim.
+    entrypoint:
+      - /bin/bash
+      - -c
+      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+    volumes:
+      - ./lobby-a/plugins:/data/plugins
+      # Seed-only (read-only); copied into /data/plugins/RTP/network.yml at boot.
+      - ./lobby-a/rtp-config/network.yml:/seed/network.yml:ro
+      - ./shared/paper-patches:/paper-patches:ro
+      - ./shared/forwarding.secret:/data/forwarding.secret
+      # Expose user-dropped schematics (shared/lobby-world/*.schem) to
+      # FastAsyncWorldEdit's pickup dir so `//schem load <name>` works from
+      # an in-game session without having to copy the file into
+      # lobby-a/plugins/FastAsyncWorldEdit/schematics/ by hand. FAWE creates
+      # /data/plugins/FastAsyncWorldEdit/schematics on first boot; mounting
+      # `shared/lobby-world` there as :ro means every schematic the operator
+      # drops into shared/lobby-world/ is immediately visible to `//schem list`.
+      - ./shared/lobby-world:/data/plugins/FastAsyncWorldEdit/schematics:ro
+      # See backend-a: shared mc-image-helper download cache.
+      - mc-image-cache:/data/.cache
+      # NOTE: /data/world intentionally NOT bind-mounted for lobbies.
+      # itzg's FORCE_WORLD_COPY=TRUE (used by docker-compose.lobby-world.yml)
+      # does `rm -rf /data/world` before re-extracting the seed zip, and the
+      # kernel returns EBUSY on `rm` of any mountpoint directory (host bind
+      # OR anonymous/named volume), so /data/world must live in the
+      # container's writable layer for the bake-zip workflow to function.
+      # Vanilla (no overlay) lobbies also work fine without persistence:
+      # the world is regenerated on every boot, matching dev-fixture intent.
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  lobby-b:
+    # See lobby-a / backend-a notes.
+    image: itzg/minecraft-server:java25
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.21.11"
+      MEMORY: 2G
+      ONLINE_MODE: "FALSE"
+      # See lobby-a: creative mode for demo differentiation from backends.
+      MODE: creative
+      DIFFICULTY: peaceful
+      OPS: ${OPS:-}
+      OVERRIDE_OPS: "TRUE"
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+      RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
+      PATCH_DEFINITIONS: /paper-patches
+      REPLACE_ENV_VARIABLES: "TRUE"
+      ENV_VARIABLE_PREFIX: "CFG_"
+      CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET:?set CFG_VELOCITY_FORWARDING_SECRET (harness does this automatically)}
+    user: "0:0"
+    # See backend-a: copy-not-mount entrypoint shim.
+    entrypoint:
+      - /bin/bash
+      - -c
+      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+    volumes:
+      - ./lobby-b/plugins:/data/plugins
+      # Seed-only (read-only); copied into /data/plugins/RTP/network.yml at boot.
+      - ./lobby-b/rtp-config/network.yml:/seed/network.yml:ro
+      - ./shared/paper-patches:/paper-patches:ro
+      - ./shared/forwarding.secret:/data/forwarding.secret
+      # See lobby-a: expose shared/lobby-world/*.schem to FAWE's pickup dir.
+      - ./shared/lobby-world:/data/plugins/FastAsyncWorldEdit/schematics:ro
+      # See backend-a: shared mc-image-helper download cache.
+      - mc-image-cache:/data/.cache
+      # See lobby-a: /data/world intentionally NOT bind-mounted for lobbies.
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  backend-b:
+    # Folia 1.21.11 (asymmetric backend pair). backend-a stays on Paper so the
+    # acceptance harness exercises the cross-platform dispatch path: one Paper
+    # backend + one Folia backend through the same Velocity proxies. Folia's
+    # region-thread model is where RTP's S-005 / threading rules actually bite
+    # (entity scheduler for teleports, region-owned writes, ThreadAccessException
+    # on cross-region work); without a Folia node in devstack nothing here
+    # catches a Paper-compiles-but-Folia-blows-up regression before users do.
+    #
+    # Same itzg image and Java 25 / 1.21.11 toolchain as backend-a (see backend-a
+    # for the v69-class-file rationale). Folia honors the same paper-global.yml
+    # velocity-forwarding patch, so PATCH_DEFINITIONS works unchanged. RTP-Pro
+    # ships rtp-folia shaded into the same plugin jar, so no jar swap is needed.
+    image: itzg/minecraft-server:java25
+    environment:
+      EULA: "TRUE"
+      TYPE: FOLIA
+      VERSION: "1.21.11"
+      # See backend-a: 6G heap for first-boot world-gen + RTP pre-fill headroom.
+      MEMORY: 6G
+      ONLINE_MODE: "FALSE"
+      # See backend-a OPS note. Same var, applied to both backends so whichever
+      # backend the proxy routes you to first will have you op.
+      OPS: ${OPS:-}
+      # See backend-a OVERRIDE_OPS note - required to re-seed ops.json on
+      # every boot, otherwise itzg only writes ops.json once per world.
+      OVERRIDE_OPS: "TRUE"
+      # See backend-a: run as root to sidestep named-volume ownership.
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+      RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
+      # See backend-a: PATCH_DEFINITIONS makes velocity.enabled=true survive the
+      # mc-image-helper template re-download on every boot.
+      PATCH_DEFINITIONS: /paper-patches
+      REPLACE_ENV_VARIABLES: "TRUE"
+      ENV_VARIABLE_PREFIX: "CFG_"
+      CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET:?set CFG_VELOCITY_FORWARDING_SECRET (harness does this automatically)}
+    user: "0:0"
+    # See backend-a: copy-not-mount entrypoint shim.
+    entrypoint:
+      - /bin/bash
+      - -c
+      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+    volumes:
+      # See backend-a: per-backend plugins dir (shared host bind corrupts the
+      # .paper-remapped cache when both backends race on it).
+      - ./backend-b/plugins:/data/plugins
+      # Seed-only (read-only); copied into /data/plugins/RTP/network.yml at boot.
+      - ./backend-b/rtp-config/network.yml:/seed/network.yml:ro
+      - ./shared/paper-patches:/paper-patches:ro
+      - ./shared/forwarding.secret:/data/forwarding.secret
+      # See backend-a: shared mc-image-helper download cache.
+      - mc-image-cache:/data/.cache
+      # See backend-a: world dir as a host bind, not a named volume.
+      - ./backend-b/world:/data/world
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  backend-c:
+    # Fabric 1.21.11. Third backend that intentionally tests the rtp-fabric
+    # adapter under the same Velocity + Redis topology as the Paper / Folia
+    # backends. rtp-fabric is currently marked unstable in
+    # docs/dev/MULTI_PLATFORM_PLAN.md (known S-005 nuance in FabricWorld and a
+    # null stub in FabricServerAccessor.getLocationGenerator); the explicit
+    # purpose of this service is to surface and exercise those issues in
+    # acceptance instead of waiting for them to be reported by users.
+    # Stability cannot be verified without testing - this is the testing.
+    #
+    # Same Java 25 image so the unobf-carrier (Java 25 toolchain, class file
+    # v69) loads cleanly. itzg's TYPE=FABRIC handles Fabric Loader install;
+    # the RTP-Pro Fabric mod jar must be dropped into ./backend-c/mods/
+    # (NOT plugins/) before `up` - see backend-c/mods/README.md.
+    image: itzg/minecraft-server:java25
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      VERSION: "1.21.11"
+      # Same 6G envelope as the Paper/Folia backends: Fabric world-gen plus
+      # RTP pre-fill have the same memory profile as Paper.
+      MEMORY: 6G
+      ONLINE_MODE: "FALSE"
+      OPS: ${OPS:-}
+      OVERRIDE_OPS: "TRUE"
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+      RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
+      # Fabric does NOT use Paper's velocity.enabled toggle - it relies on the
+      # FabricProxy-Lite mod (or equivalent) for modern forwarding. The shared
+      # paper-patches/ JSON is therefore not relevant here and is not mounted.
+      # The forwarding secret is exposed as a file (mounted at
+      # /data/forwarding.secret below); FabricProxy-Lite reads it via its own
+      # FABRIC_PROXY_SECRET_FILE env var. Without this the mod's secret stays
+      # empty and the modern-forwarding handshake fails with
+      # "Secret check failed ... Empty key" (the backend rejects every proxied
+      # login as "Unable to verify player details").
+      FABRIC_PROXY_SECRET_FILE: /data/forwarding.secret
+    user: "0:0"
+    # Fabric mods live in /data/mods, not /data/plugins. The entrypoint shim
+    # seeds network.yml under /data/config/rtp/ (lowercase): the Fabric build
+    # of rtp-fabric resolves its config dir via
+    # `FabricLoader.getConfigDir().resolve("rtp")` -> `<server>/config/rtp/`
+    # (see FabricDatabaseHandler#resolveConfigDirectory and
+    # rtp-fabric-ADR-013 `FabricNetworkModeBootstrap.ensureNetworkYml`).
+    # Note: the directory name is lowercase `rtp`, NOT `RTP` like the Bukkit
+    # `/data/plugins/RTP/` path - that asymmetry is on the runtime adapter
+    # side, not a typo here.
+    entrypoint:
+      - /bin/bash
+      - -c
+      # chown/chmod the WHOLE /data/config (not just the rtp subdir): the JVM
+      # runs as uid 1000 (itzg's minecraft user), and FabricProxy-Lite writes
+      # its merged config to /data/config/FabricProxy-Lite.toml on load. If the
+      # parent /data/config stays root-owned (created by this mkdir), the mod
+      # cannot create that file and crashes with
+      # "./config/FabricProxy-Lite.toml (Permission denied)".
+      - 'mkdir -p /data/config/rtp && cp -f /seed/network.yml /data/config/rtp/network.yml && chown -R 1000:1000 /data/config && chmod -R u+rwX /data/config && exec /start'
+    volumes:
+      # Fabric mods directory (NOT plugins).
+      - ./backend-c/mods:/data/mods
+      # Seed-only (read-only); copied into /data/config/rtp/network.yml at boot.
+      - ./backend-c/rtp-config/network.yml:/seed/network.yml:ro
+      - ./shared/forwarding.secret:/data/forwarding.secret
+      # See backend-a: shared mc-image-helper download cache.
+      - mc-image-cache:/data/.cache
+      # See backend-a: world dir as a host bind, not a named volume.
+      - ./backend-c/world:/data/world
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  # Shared itzg/minecraft-server download cache (/data/.cache). Persists Paper
+  # build jars + Mojang server.jar across `docker compose down`/`up` cycles so
+  # we don't redownload ~110 MB per service on every boot. Cleared on
+  # `docker compose down -v` together with the rest of the volumes.
+  mc-image-cache:

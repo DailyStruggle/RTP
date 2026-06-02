@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.fabric;
 
 import io.github.dailystruggle.commandsapi.brigadier.BrigadierBridgeContext;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
 import io.github.dailystruggle.rtp.fabric.commands.RTPCmdFabricRoot;
 import io.github.dailystruggle.rtp.fabric.database.FabricDatabaseHandler;
 import io.github.dailystruggle.rtp.fabric.events.FabricEventBridge;
@@ -38,6 +39,14 @@ import java.util.logging.Level;
  * @see io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin
  */
 public final class RTPFabricMod implements ModInitializer {
+
+    /**
+     * ADR-049 / rtp-fabric-ADR-013: backend-side network-mode bootstrap.
+     * Platform-neutral (lives in rtp-core); the Fabric entrypoint owns its
+     * lifecycle exactly as {@code RTPBukkitPlugin} owns the Bukkit one.
+     * No-op when {@code network.yml} is absent or {@code network.enabled=false}.
+     */
+    private final NetworkModeBootstrap networkBootstrap = new NetworkModeBootstrap();
 
     @Override
     public void onInitialize() {
@@ -93,6 +102,38 @@ public final class RTPFabricMod implements ModInitializer {
             RTP rtp = RTP.getInstance();
             if (rtp == null) {
                 rtp = new RTP();
+            }
+
+            // ----------------------------------------------------------------
+            // ADR-049 step 4 — install the platform sampler factory so
+            // NetworkModeBootstrap.boot(...) can construct a backend heartbeat
+            // sampler that reads live Fabric host state (TPS / MSPT / player
+            // count / loaded worlds). Mirrors AbstractServerAccessor.start's
+            // RTP.backendStateSamplerFactory = BukkitBackendStateSampler::new.
+            // ----------------------------------------------------------------
+            RTP.backendStateSamplerFactory =
+                    io.github.dailystruggle.rtp.fabric.network.FabricBackendStateSampler::new;
+
+            // L6 Slice J: read routing.lobbyMode from network.yml early (before
+            // the startupTasks drain constructs Region instances) so a pure
+            // cross-server lobby skips local region prefill. Defensive: any
+            // failure resolves to lobbyMode=false, preserving non-lobby
+            // behaviour. Mirrors RTPBukkitPlugin.onEnable's early read.
+            try {
+                java.io.File earlyNetworkYml = NetworkModeBootstrap.ensureNetworkYml(
+                        accessor.getPluginDirectory(), RTPFabricMod.class);
+                RTP.lobbyMode = NetworkModeBootstrap.readLobbyModeEarly(earlyNetworkYml);
+                if (RTP.lobbyMode) {
+                    RTP.log(Level.INFO,
+                            "[RTP][fabric] routing.lobbyMode=true -- local region processing"
+                                    + " will be skipped; this backend acts as a pure"
+                                    + " cross-server dispatcher.");
+                }
+            } catch (Throwable t) {
+                RTP.lobbyMode = false;
+                RTP.log(Level.FINE,
+                        "[RTP][fabric] lobbyMode early-read failed; defaulting to false: "
+                                + t.getMessage());
             }
 
             // Step D wiring — Configuration & Database setup. Mirrors
@@ -252,6 +293,33 @@ public final class RTPFabricMod implements ModInitializer {
                                     "[RTP] DatabaseProcessing.start failed: "
                                             + t.getClass().getSimpleName() + ": " + t.getMessage());
                         }
+
+                        // ------------------------------------------------
+                        // ADR-049 / rtp-fabric-ADR-013 — boot backend-side
+                        // network mode AFTER the DB is up (the SQL transport
+                        // reuses the same accessor's DataSource). Strict
+                        // REQ-RTP-NET-002 parity with RTPBukkitPlugin: no-op
+                        // when network.yml is absent or network.enabled=false.
+                        // Failure here is logged but never aborts startup
+                        // (network mode is strictly optional). After boot,
+                        // register the join-time reservation-token redeem
+                        // listener + the cross-server waitlist quit listener
+                        // onto the FabricPlayerLifecycleHook so a Velocity-
+                        // routed player arriving on this Fabric backend
+                        // redeems its reservation token exactly as on Paper.
+                        // ------------------------------------------------
+                        try {
+                            java.io.File networkYml = NetworkModeBootstrap.ensureNetworkYml(
+                                    RTP.serverAccessor.getPluginDirectory(), RTPFabricMod.class);
+                            networkBootstrap.boot(networkYml);
+                            networkBootstrap.registerJoinTriggerSource();
+                            networkBootstrap.registerWaitlistQuitListener();
+                        } catch (Throwable t) {
+                            RTP.log(Level.WARNING,
+                                    "[RTP][fabric] network-mode boot failed; continuing without it: "
+                                            + t.getMessage(), t);
+                        }
+
                         try {
                             // Give the per-version adapter first crack at effects
                             // wiring — on deobfuscated 26.1.x the default obf path
@@ -304,6 +372,18 @@ public final class RTPFabricMod implements ModInitializer {
             // ----------------------------------------------------------------
             net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
                     .SERVER_STOPPING.register(server -> {
+                        // ADR-049 / rtp-fabric-ADR-013 — reverse-order teardown
+                        // of network mode BEFORE the DB drain stops, mirroring
+                        // RTPBukkitPlugin.onDisable (stop publisher, close
+                        // transport, unregister the lifecycle-hook listeners).
+                        // Idempotent; safe if network mode was never enabled.
+                        try {
+                            networkBootstrap.shutdown();
+                        } catch (Throwable t) {
+                            RTP.log(Level.WARNING,
+                                    "[RTP][fabric] network-mode shutdown failed (continuing): "
+                                            + t.getMessage(), t);
+                        }
                         try {
                             io.github.dailystruggle.rtp.common.server
                                     .DatabaseProcessing.kill();

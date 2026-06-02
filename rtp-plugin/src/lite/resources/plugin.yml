@@ -6,7 +6,7 @@
 #
 # Lite scope (per ADR-024):
 #   - No SQL/Redis persistence, no shutdown flush.
-#   - No Folia, no anvil, no tags, no claim integrations, no Vault/economy.
+#   - No Folia, no anvil, no tags.
 #   - No multilingual support; locale hardcoded to English.
 #   - No on-event/effect permission parsing; no login reserve cache; no visitor mode.
 #
@@ -23,12 +23,13 @@ authors: [ leaf26 ]
 description: 'Random teleport, lite edition (no SQL, no Folia) -- see ADR-024'
 # Claim-plugin softdepends are included in lite as of 2026-05-11: lite is the
 # small-server target and claim-protection support is a baseline operator
-# expectation there. Vault/economy, Chunky/ChunkyBorder, and PlaceholderAPI
-# remain Pro-only. See ADR-024 (claim-plugin amendment).
+# expectation there. Vault is included as of 2026-06-01 so optional per-region
+# teleport charging works in lite (ADR-024 economy amendment). Chunky/ChunkyBorder
+# and PlaceholderAPI remain Pro-only. See ADR-024.
 # CombatLogX / PvPManager / SimpleCombatLog are listed so the PvP gate's bundled
 # combat-tag adapters (ADR-055) can resolve those plugins' API classes at runtime
 # (Paper/Folia gates cross-plugin class access behind a declared dependency).
-softdepend: [ GriefDefender, GriefPrevention, Towny, HuskTowns, Factions, Lands, RedProtect, WorldGuard, CombatLogX, PvPManager, SimpleCombatLog ]
+softdepend: [ Vault, GriefDefender, GriefPrevention, Towny, HuskTowns, Factions, Lands, RedProtect, WorldGuard, CombatLogX, PvPManager, SimpleCombatLog ]
 folia-supported: false
 
 commands:
@@ -51,7 +52,7 @@ permissions:
     description: allow player to use /rtp
     default: true
   rtp.free:
-    description: use /rtp for free (no-op in lite -- economy is not present)
+    description: use /rtp for free (bypass the optional Vault economy charge)
     default: op
   rtp.reload:
     description: allow player to use /rtp reload

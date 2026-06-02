@@ -2,6 +2,10 @@ package io.github.dailystruggle.rtp.bukkit.network;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult;
+import io.github.dailystruggle.rtp.common.network.BukkitNetworkCommandHook;
+import io.github.dailystruggle.rtp.common.network.NetworkEnrolmentBuffer;
+import io.github.dailystruggle.rtp.common.network.NetworkRouter;
+import io.github.dailystruggle.rtp.common.network.PeerRegionRegistry;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import org.junit.jupiter.api.Test;

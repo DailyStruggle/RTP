@@ -243,8 +243,45 @@ public final class FabricChatPromptCallback implements MenuRedeemSubcommand.Anvi
                 allowChatType.getClassLoader(),
                 new Class<?>[] { allowChatType },
                 new ChatMessageInterceptor());
-        event.getClass().getMethod("register", allowChatType).invoke(event, proxy);
+        // Event<T>.register(T) erases to register(Object) at runtime, so a
+        // direct getMethod("register", allowChatType) lookup fails with
+        // NoSuchMethodException. Resolve the single-arg register(..) method by
+        // name and assignability instead of by the specific listener type.
+        java.lang.reflect.Method register = findRegisterMethod(event.getClass(), allowChatType);
+        if (register == null) {
+            RTP.log(Level.WARNING,
+                    "[RTP][Fabric] no single-argument register(..) method found on "
+                            + event.getClass().getName()
+                            + "; menu anvil-input substitute disabled.");
+            return false;
+        }
+        register.setAccessible(true);
+        register.invoke(event, proxy);
         return true;
+    }
+
+    /**
+     * Locates the single-argument {@code register(..)} method on the Fabric
+     * {@code Event} runtime class whose parameter type can accept the listener
+     * proxy. The generic {@code Event<T>.register(T)} erases to
+     * {@code register(Object)}, so the lookup must be by name and arity rather
+     * than by the concrete {@code AllowChatMessage} type.
+     */
+    private static java.lang.reflect.@Nullable Method findRegisterMethod(
+            Class<?> eventClass, Class<?> allowChatType) {
+        java.lang.reflect.Method fallback = null;
+        Class<?> cursor = eventClass;
+        while (cursor != null) {
+            for (java.lang.reflect.Method m : cursor.getDeclaredMethods()) {
+                if (!"register".equals(m.getName())) continue;
+                if (m.getParameterCount() != 1) continue;
+                Class<?> param = m.getParameterTypes()[0];
+                if (param.isAssignableFrom(allowChatType)) return m;
+                if (fallback == null) fallback = m;
+            }
+            cursor = cursor.getSuperclass();
+        }
+        return fallback;
     }
 
     /**

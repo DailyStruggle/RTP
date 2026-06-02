@@ -413,7 +413,112 @@ public final class FabricRTPPlayer implements RTPPlayer, FabricBookOpener, Fabri
         ServerLevel lvl = p.serverLevel();
         net.minecraft.server.MinecraftServer srv = lvl == null ? null : lvl.getServer();
         if (srv == null) return;
-        srv.getCommands().performPrefixedCommand(p.createCommandSourceStack(), command);
+        net.minecraft.commands.CommandSourceStack source = buildCommandSource(p, lvl, srv);
+        if (source == null) {
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP] performCommand: could not build a command source for " + name
+                            + " on this MC version; '" + command + "' not dispatched");
+            return;
+        }
+        srv.getCommands().performPrefixedCommand(source, command);
+    }
+
+    /**
+     * Build a {@link net.minecraft.commands.CommandSourceStack} for the player in a way
+     * that survives Yarn/intermediary drift across MC patch releases. On 1.21.11 the
+     * {@code ServerPlayer#createCommandSourceStack()} intermediary {@code method_5671}
+     * is missing (NoSuchMethodError), and so is {@code Entity#position()}
+     * ({@code method_19538}) - same family as the {@code field_13995} /
+     * {@code method_5682} / {@code method_14251} drifts already worked around in this
+     * file.
+     *
+     * <p>The drift only affects the intermediary symbols WE call directly across the
+     * Loom module boundary; Minecraft's own internal calls (within its jar) resolve
+     * consistently. So the most robust path is to let the server build the source and
+     * attach the player itself ({@code MinecraftServer#createCommandSourceStack()} then
+     * {@code CommandSourceStack#withEntity(player)}) - that pushes the position / name
+     * lookups inside MC. We try the direct player call first, then the server-built
+     * source, and only as a last resort hand-construct the stack from individually
+     * guarded accessors (any of which may drift, so each is defaulted).
+     */
+    @Nullable
+    private net.minecraft.commands.CommandSourceStack buildCommandSource(
+            ServerPlayer p, ServerLevel lvl, net.minecraft.server.MinecraftServer srv) {
+        // Attempt 1: the direct ServerPlayer#createCommandSourceStack(). Present on
+        // most 1.20.x / 1.21.x builds; absent on 1.21.11.
+        try {
+            return p.createCommandSourceStack();
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.FINE,
+                    "[RTP][trace] FabricRTPPlayer createCommandSourceStack() drift: " + t);
+        }
+        // Attempt 2: have the server build a console-level source, then re-anchor it on
+        // the player via withEntity(...). MC performs the position / rotation / name
+        // lookups internally (no cross-module intermediary call from us), so this
+        // survives the position()/getName() drift that breaks the manual constructor.
+        try {
+            net.minecraft.commands.CommandSourceStack base = srv.createCommandSourceStack();
+            return base.withEntity(p);
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.FINE,
+                    "[RTP][trace] FabricRTPPlayer server.createCommandSourceStack().withEntity drift: " + t);
+        }
+        // Attempt 3: hand-construct the source stack. Every accessor here can drift on a
+        // given runtime, so each is individually guarded and defaulted - the position /
+        // rotation are irrelevant to a self-targeting '/rtp', so neutral defaults are
+        // acceptable (RTP computes its own destination).
+        try {
+            net.minecraft.world.phys.Vec3 pos = safePosition(p);
+            net.minecraft.world.phys.Vec2 rot = safeRotation(p);
+            net.minecraft.network.chat.Component display = safeDisplayName(p);
+            return new net.minecraft.commands.CommandSourceStack(
+                    p,
+                    pos,
+                    rot,
+                    lvl,
+                    4,
+                    name,
+                    display,
+                    srv,
+                    p);
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP][trace] FabricRTPPlayer manual CommandSourceStack build failed", t);
+            return null;
+        }
+    }
+
+    /** Player position with drift-tolerant fallbacks; defaults to origin (irrelevant for '/rtp'). */
+    private static net.minecraft.world.phys.Vec3 safePosition(ServerPlayer p) {
+        try {
+            return p.position();
+        } catch (Throwable ignored) {
+            // method_19538 drift; fall through.
+        }
+        try {
+            return new net.minecraft.world.phys.Vec3(p.getX(), p.getY(), p.getZ());
+        } catch (Throwable ignored) {
+            // getX/getY/getZ drift; fall through.
+        }
+        return net.minecraft.world.phys.Vec3.ZERO;
+    }
+
+    /** Player rotation with drift-tolerant fallbacks; defaults to (0,0). */
+    private static net.minecraft.world.phys.Vec2 safeRotation(ServerPlayer p) {
+        try {
+            return new net.minecraft.world.phys.Vec2(p.getXRot(), p.getYRot());
+        } catch (Throwable ignored) {
+            return net.minecraft.world.phys.Vec2.ZERO;
+        }
+    }
+
+    /** Player display name with drift-tolerant fallback to a literal of the cached name. */
+    private net.minecraft.network.chat.Component safeDisplayName(ServerPlayer p) {
+        try {
+            return p.getName();
+        } catch (Throwable ignored) {
+            return net.minecraft.network.chat.Component.literal(name == null ? "" : name);
+        }
     }
 
     @Override

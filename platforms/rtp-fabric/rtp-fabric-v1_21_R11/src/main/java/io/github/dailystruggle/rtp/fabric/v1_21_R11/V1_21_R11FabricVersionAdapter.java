@@ -2,11 +2,8 @@ package io.github.dailystruggle.rtp.fabric.v1_21_R11;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
-import io.github.dailystruggle.rtp.fabric.version.RTPBlockHandle;
-import io.github.dailystruggle.rtp.fabric.version.RTPBlockStateHandle;
 import io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle;
 import io.github.dailystruggle.rtp.fabric.version.RTPLevelHandle;
-import io.github.dailystruggle.rtp.fabric.version.RTPRegistryKey;
 import io.github.dailystruggle.rtp.fabric.menu.FabricBookSpec;
 import io.github.dailystruggle.rtp.fabric.tools.FabricLegacyText;
 import net.minecraft.core.BlockPos;
@@ -57,10 +54,10 @@ import java.util.logging.Level;
  * to load on a 1.21.11 runtime with {@code NoClassDefFoundError:
  * net/minecraft/class_3230$class_10558}.</p>
  *
- * <p><b>Mojmap-name decoupling (ADR-007):</b> the SPI is now wrapper-typed
- * — {@code RTPLevelHandle}, {@code RTPBlockHandle}, etc. — so 1.21.11's
- * {@code ResourceLocation → Identifier} rename does not affect the
- * interface. This adapter unwraps via {@code handle.as(MojmapType.class)}
+ * <p><b>Mojmap-name decoupling (ADR-007):</b> the chunk/ticket SPI is
+ * wrapper-typed — {@code RTPLevelHandle}, {@code RTPChunkHandle} — so
+ * 1.21.11's {@code ResourceLocation → Identifier} rename does not affect
+ * the interface. This adapter unwraps via {@code handle.as(MojmapType.class)}
  * on entry and wraps results on exit.</p>
  *
  * <p><b>Implementation:</b> direct typed Mojang-mappings calls — no
@@ -99,14 +96,6 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
         return "1.21.11+";
     }
 
-    @Override
-    public @Nullable RTPRegistryKey blockKey(RTPBlockHandle block) {
-        if (block == null) return null;
-        Block b = block.as(Block.class);
-        if (b == null) return null;
-        Identifier id = BuiltInRegistries.BLOCK.getKey(b);
-        return id == null ? null : new RTPRegistryKey(id.getNamespace(), id.getPath());
-    }
 
     /**
      * Typed block-tag snapshot for MC 1.21.11+ (rtp-fabric-ADR-010). Walks
@@ -152,18 +141,6 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
         }
     }
 
-    @Override
-    public @Nullable RTPRegistryKey biomeKeyAt(RTPLevelHandle level, int x, int y, int z) {
-        if (level == null) return null;
-        try {
-            ServerLevel sl = level.as(ServerLevel.class);
-            Holder<Biome> holder = sl.getBiome(new BlockPos(x, y, z));
-            Identifier id = holder.unwrapKey().map(ResourceKey::identifier).orElse(null);
-            return id == null ? null : new RTPRegistryKey(id.getNamespace(), id.getPath());
-        } catch (Throwable t) {
-            return null;
-        }
-    }
 
     @Override
     public CompletableFuture<RTPChunkHandle> getChunkFull(RTPLevelHandle level, int cx, int cz) {
@@ -179,15 +156,6 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
         }
     }
 
-    @Override
-    public boolean hasChunk(RTPLevelHandle level, int cx, int cz) {
-        if (level == null) return false;
-        try {
-            return level.as(ServerLevel.class).getChunkSource().hasChunk(cx, cz);
-        } catch (Throwable t) {
-            return false;
-        }
-    }
 
     // Non-blocking chunk-future dispatch — see rtp-fabric-ADR-008.
     private static volatile Method GET_CHUNK_FUTURE_METHOD;
@@ -287,10 +255,6 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
         }
     }
 
-    @Override
-    public RTPBlockStateHandle airState() {
-        return RTPBlockStateHandle.of(Blocks.AIR.defaultBlockState());
-    }
 
     @Override
     public CompletableFuture<Void> applyTicket(RTPLevelHandle level, int cx, int cz) {

@@ -75,13 +75,14 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @GlobalRegionThread
   public AbstractFoliaServerAccessor() {
-    // ADR-058: install the native (WorldEdit-free) region-schematic paster, mirroring
+    // ADR-058: install the platform-neutral (WorldEdit-free) region-schematic paster, mirroring
     // AbstractServerAccessor on Bukkit/Paper. Folia does not extend that accessor, so without
     // this call FoliaRTPWorld stays on NoOpSchematicPaster and every region schematic falls back
-    // to the default platform. BukkitSchematicPaster places blocks via the Bukkit World wrapped
-    // by FoliaRTPWorld and is invoked on the region-owning thread by the teleport pipeline.
+    // to the default platform. The shared WorldBlockSchematicPaster drives FoliaRTPWorld's native
+    // block-write primitives (setBlocks / restoreBlockEntities, which place blocks via the wrapped
+    // Bukkit World) and is invoked on the region-owning thread by the teleport pipeline.
     FoliaRTPWorld.setSchematicPaster(
-        new io.github.dailystruggle.rtp.bukkitplatform.world.BukkitSchematicPaster());
+        new io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster());
     for (World world : Bukkit.getWorlds()) {
       worldMap.put(world.getUID(), new FoliaRTPWorld(world));
     }
@@ -450,6 +451,19 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   private Object plugin;
 
+  // ADR-049: Folia is a Bukkit-API platform, so it reuses the Bukkit-family
+  // join/quit listener hook. Folia's AbstractFoliaServerAccessor does NOT
+  // extend the Bukkit AbstractServerAccessor (separate region-threaded
+  // implementation), so the lifecycle-hook registration and the backend
+  // sampler-factory install that the Bukkit accessor performs in start(Object)
+  // must be mirrored here, otherwise network mode aborts its boot on Folia
+  // ("no BackendStateSampler factory installed") and a proxied player arriving
+  // on a Folia backend never redeems its reservation token (no teleport).
+  private final io.github.dailystruggle.rtp.bukkitplatform.server.BukkitPlayerLifecycleHook
+      playerLifecycleHook =
+          new io.github.dailystruggle.rtp.bukkitplatform.server.BukkitPlayerLifecycleHook();
+  private boolean playerLifecycleHookRegistered = false;
+
   @Override
   @GlobalRegionThread
   public void stop() {
@@ -466,6 +480,22 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @GlobalRegionThread
   public void start(Object plugin) {
     this.plugin = plugin;
+    if (plugin instanceof Plugin foliaPlugin && !playerLifecycleHookRegistered) {
+      playerLifecycleHook.register(foliaPlugin);
+      playerLifecycleHookRegistered = true;
+    }
+    // ADR-049: install the platform backend-heartbeat sampler factory so the
+    // platform-neutral NetworkModeBootstrap (rtp-core) can build a sampler
+    // without importing a platform class. BukkitBackendStateSampler is on the
+    // Folia classpath (rtp-folia-common -> rtp-paper-common -> rtp-bukkit-common)
+    // and uses only Folia-safe Bukkit API (Bukkit.getWorlds() + RTP internals).
+    RTP.backendStateSamplerFactory = lobbyMode ->
+        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler(lobbyMode);
+  }
+
+  @Override
+  public io.github.dailystruggle.rtp.api.server.PlayerLifecycleHook getPlayerLifecycleHook() {
+    return playerLifecycleHook;
   }
 
   @Override

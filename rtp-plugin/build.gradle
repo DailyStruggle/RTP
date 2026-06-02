@@ -849,7 +849,10 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // who do not write a language.yml or do not run /rtp lang -- locale defaults to
     // English. LanguageBootstrap.resolve() is invoked unconditionally from
     // Configs#reloadConfigs(); shipping the resources is sufficient to activate it.
-    exclude 'economy.yml'
+    // economy.yml is INTENTIONALLY KEPT in lite as of 2026-06-01 (ADR-024
+    // economy amendment): optional Vault per-region teleport charging is wired
+    // in the lite bootstrap (RTPBukkitLitePlugin.onEnable) identically to the
+    // full edition, so the lite jar ships economy.yml for it to read.
     // integrations.yml is INTENTIONALLY KEPT in lite as of 2026-05-11 (ADR-024
     // claim-plugin amendment): the bundled claim-plugin integrations (ADR-019)
     // are wired in lite as well, and ClaimIntegrations#buildParser loads its
@@ -968,7 +971,8 @@ tasks.register('liteJarStructureCheck') {
             ~'^io/github/dailystruggle/rtp/common/selection/region/LoginCacheTask\\.class$',
             // lang/** and language.yml intentionally present in lite as of the
             // 2026-05-11 ADR-024 language-options amendment -- see shadowLiteJar comment.
-            ~'^economy\\.yml$',
+            // economy.yml intentionally present in lite as of the 2026-06-01
+            // ADR-024 economy amendment -- Vault charging is wired in lite.
 //            ~'^integrations\\.yml$',
             // logging.yml intentionally present in lite -- see shadowLiteJar comment.
             // fabric.mod.json intentionally present in lite as of the 2026-05-07

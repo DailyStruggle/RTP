@@ -2,11 +2,8 @@ package io.github.dailystruggle.rtp.fabric.v1_20_R1;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
-import io.github.dailystruggle.rtp.fabric.version.RTPBlockHandle;
-import io.github.dailystruggle.rtp.fabric.version.RTPBlockStateHandle;
 import io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle;
 import io.github.dailystruggle.rtp.fabric.version.RTPLevelHandle;
-import io.github.dailystruggle.rtp.fabric.version.RTPRegistryKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -62,28 +59,6 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     @Override
-    public @Nullable RTPRegistryKey blockKey(RTPBlockHandle block) {
-        if (block == null) return null;
-        Block b = block.as(Block.class);
-        if (b == null) return null;
-        ResourceLocation rl = BuiltInRegistries.BLOCK.getKey(b);
-        return rl == null ? null : new RTPRegistryKey(rl.getNamespace(), rl.getPath());
-    }
-
-    @Override
-    public @Nullable RTPRegistryKey biomeKeyAt(RTPLevelHandle level, int x, int y, int z) {
-        if (level == null) return null;
-        try {
-            ServerLevel sl = level.as(ServerLevel.class);
-            Holder<Biome> holder = sl.getBiome(new BlockPos(x, y, z));
-            ResourceLocation rl = holder.unwrapKey().map(ResourceKey::location).orElse(null);
-            return rl == null ? null : new RTPRegistryKey(rl.getNamespace(), rl.getPath());
-        } catch (Throwable t) {
-            return null;
-        }
-    }
-
-    @Override
     public CompletableFuture<RTPChunkHandle> getChunkFull(RTPLevelHandle level, int cx, int cz) {
         if (level == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("null ServerLevel"));
@@ -97,15 +72,6 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
         }
     }
 
-    @Override
-    public boolean hasChunk(RTPLevelHandle level, int cx, int cz) {
-        if (level == null) return false;
-        try {
-            return level.as(ServerLevel.class).getChunkSource().hasChunk(cx, cz);
-        } catch (Throwable t) {
-            return false;
-        }
-    }
 
     // -------------------------------------------------------------------------
     // Non-blocking chunk-future dispatch — see rtp-fabric-ADR-008 and the
@@ -255,10 +221,6 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
         }
     }
 
-    @Override
-    public RTPBlockStateHandle airState() {
-        return RTPBlockStateHandle.of(Blocks.AIR.defaultBlockState());
-    }
 
     // -------------------------------------------------------------------------
     // Non-persistent chunk-ticket support — see V1_21_R1FabricVersionAdapter

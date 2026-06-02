@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
-import io.github.dailystruggle.rtp.fabric.unobf.anvil.FabricAnvilColumnProbeAdapter;
+import io.github.dailystruggle.rtp.common.anvil.AnvilColumnProbeAdapter;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.core.BlockPos;
@@ -189,7 +189,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                     java.util.Set<String> rawUnsafe = currentUnsafeBlocks();
                     return anvilProbeSupport
                             .probeAndPublish(worldFolder, dim, chunkX, chunkZ, key, rawUnsafe,
-                                    io.github.dailystruggle.rtp.fabric.unobf.anvil.FabricPaletteNormalizer::reconcile)
+                                    io.github.dailystruggle.rtp.common.anvil.PaletteNormalizer::reconcile)
                             .thenCompose(result -> {
                                 io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
                                 if (view != null) {
@@ -860,7 +860,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                     io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
                         regionBytes, rx, rz, finalMinY, finalMaxY);
                 if (probe == null) return null;
-                return (ChunkColumnProbe) new FabricAnvilColumnProbeAdapter(probe, cx, cz);
+                return (ChunkColumnProbe) new AnvilColumnProbeAdapter(probe, cx, cz);
             } catch (Throwable t) {
                 RTP.log(java.util.logging.Level.FINE,
                     "[RTP] FabricRTPWorldUnobf.probeChunkColumn failed for world=" + name
@@ -1284,7 +1284,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
             int cx = (int) (key & 0xffffffffL);
             int cz = (int) (key >> 32);
             java.util.Set<String> reconciled =
-                    io.github.dailystruggle.rtp.fabric.unobf.anvil.FabricPaletteNormalizer
+                    io.github.dailystruggle.rtp.common.anvil.PaletteNormalizer
                             .reconcileAll(currentUnsafeBlocks());
             return new FabricRTPChunkUnobf(view, cx, cz, id, reconciled);
         }
@@ -1360,7 +1360,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                     world.getBiome(new BlockPos(x, y, z));
             // Holder#unwrapKey()'s ResourceKey on 26.1.2 exposes identifier() (was location()).
             // Normalise through PaletteIdentifierNormalizer to match the form ScanTask /
-            // FabricServerAccessor.defaultBiomesFor / FabricAnvilColumnProbeAdapter use
+            // FabricServerAccessor.defaultBiomesFor / AnvilColumnProbeAdapter use
             // (namespace-stripped, upper-cased). Without normalisation FULLSCAN's
             // physical-biome check compares "MINECRAFT:PLAINS" against the
             // namespace-stripped "PLAINS" in defaultBiomes and rejects every candidate

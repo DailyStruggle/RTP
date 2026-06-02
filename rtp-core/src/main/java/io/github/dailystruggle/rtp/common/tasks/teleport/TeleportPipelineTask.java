@@ -120,6 +120,18 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private io.github.dailystruggle.rtp.api.schematic.SchematicSource schematicSource;
 
   /**
+   * ADR-058 / S-004 — regions for which a <em>platform-level</em> schematic fallback reason
+   * (no schematic paster installed, or the installed paster does not support the file's format)
+   * has already been logged. Both reasons are static for a given platform + region, so emitting
+   * them on every single teleport is pure log spam (observed on Fabric, which ships
+   * {@code NoOpSchematicPaster}). This guard collapses them to one WARNING per region per reason
+   * while still satisfying S-004 (the operator is told once, not silently). Keyed
+   * {@code <regionName>|<reason>}.
+   */
+  private static final java.util.Set<String> loggedSchematicPlatformFallback =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+  /**
    * ADR-026 / ADR-058 — addon-bound arrival platform creator (the {@code RTPHooks#platformCreator()}
    * registry). Resolved once in {@link #runLoad} (off the region thread) so its two-phase
    * contract can run its blocking {@link io.github.dailystruggle.rtp.api.platform.PlatformCreator#prepare}
@@ -437,14 +449,23 @@ public final class TeleportPipelineTask extends RTPRunnable {
                 schemWorld.schematicPaster();
             if (paster == null
                 || paster instanceof io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster) {
-              RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' resolved to '"
-                  + src.path() + "' but no schematic paster is installed on this platform "
-                  + "(" + (paster == null ? "null" : paster.getClass().getSimpleName())
-                  + "); falling back to default platform (S-004).");
+              // S-004 once-per-region: "no paster installed" is a static platform property, so it
+              // is logged a single time per region rather than on every teleport (Fabric spam).
+              if (loggedSchematicPlatformFallback.add(region.name + "|nopaster")) {
+                RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' resolved to '"
+                    + src.path() + "' but no schematic paster is installed on this platform "
+                    + "(" + (paster == null ? "null" : paster.getClass().getSimpleName())
+                    + "); falling back to default platform (S-004).");
+              }
             } else if (!paster.supports(src)) {
-              RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' file '"
-                  + src.path() + "' (format '" + src.formatHint() + "') is not supported by "
-                  + paster.getClass().getSimpleName() + "; falling back to default platform (S-004).");
+              // S-004 once-per-region: format support is static for a platform + file, so log once.
+              if (loggedSchematicPlatformFallback.add(
+                  region.name + "|unsupported:" + src.formatHint())) {
+                RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' file '"
+                    + src.path() + "' (format '" + src.formatHint() + "') is not supported by "
+                    + paster.getClass().getSimpleName()
+                    + "; falling back to default platform (S-004).");
+              }
             } else {
               schematicPaster = paster;
               schematicLoad = paster.load(src);
@@ -627,13 +648,15 @@ public final class TeleportPipelineTask extends RTPRunnable {
           (schematicLoad != null && schematicLoad.isDone()) ? schematicLoad.join() : null;
       // S-004 — a region with a schematic file on disk that nonetheless reaches this point
       // with nothing loaded must not fall through to the platform silently: tell the operator
-      // why the island/structure they configured did not appear.
-      if (loadedSchematic == null && schematicSource != null) {
+      // why the island/structure they configured did not appear. The {@code schematicLoad == null}
+      // sub-case (no paster installed / unsupported format) is deliberately NOT re-logged here:
+      // runLoad already audited it once per region via loggedSchematicPlatformFallback, so
+      // repeating it on every teleport would be the exact duplicate-spam this guard removes.
+      if (loadedSchematic == null && schematicSource != null && schematicLoad != null) {
         RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' file '"
             + schematicSource.path() + "' was present but produced no loaded schematic ("
-            + (schematicLoad == null ? "resolution/support failed in runLoad"
-                : (!schematicLoad.isDone() ? "decode still pending at paste time"
-                    : "decode returned no data"))
+            + (!schematicLoad.isDone() ? "decode still pending at paste time"
+                : "decode returned no data")
             + "); falling back to default platform (S-004).");
       }
       if (loadedSchematic != null && schematicPaster != null) {

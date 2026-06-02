@@ -95,6 +95,17 @@ platform-specific.
 
 ### SPI surface after the refactor
 
+> **Update (2026-06-01).** Three of the wrappers below were later removed as
+> dead code once their SPI methods proved to have no live callers anywhere in
+> the tree: `blockKey` (registry-key lookup), `biomeKeyAt`, `hasChunk`, and
+> `airState` were deleted from `FabricVersionAdapter` and every adapter
+> implementation, which in turn made `RTPBlockHandle`, `RTPBlockStateHandle`,
+> and `RTPRegistryKey` unused — those three records were deleted. The wrapper
+> seam itself is unchanged for the still-live chunk-load / ticket path:
+> `RTPLevelHandle` (param of `requestFullChunkAsync`, `getChunkFull`,
+> `applyTicket`, `releaseTicket`) and `RTPChunkHandle` (their return) remain.
+> The decision and rationale below are preserved as the original record.
+
 Wrapper inventory, derived from the **current** signatures of
 `FabricVersionAdapter` (not the broader `FabricRTP*` surface):
 

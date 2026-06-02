@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
-import io.github.dailystruggle.rtp.fabric.unobf.anvil.FabricAnvilColumnProbeAdapter;
+import io.github.dailystruggle.rtp.common.anvil.AnvilColumnProbeAdapter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.Identifier;
@@ -260,7 +260,7 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                         io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
                                 regionBytes, rx, rz, finalMinY, finalMaxY);
                 if (probe == null) return null;
-                return (ChunkColumnProbe) new FabricAnvilColumnProbeAdapter(probe, cx, cz);
+                return (ChunkColumnProbe) new AnvilColumnProbeAdapter(probe, cx, cz);
             } catch (Throwable t) {
                 RTP.log(Level.FINE,
                         "[RTP][v26_1_R1] probeChunkColumn failed for world=" + name
@@ -481,7 +481,7 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
             Holder<Biome> holder = level.getBiome(new BlockPos(x, y, z));
             // Holder#unwrapKey()'s ResourceKey on 26.1.2 exposes identifier() (was location()).
             // Normalise through PaletteIdentifierNormalizer to match the form ScanTask /
-            // FabricServerAccessor.defaultBiomesFor / FabricAnvilColumnProbeAdapter use
+            // FabricServerAccessor.defaultBiomesFor / AnvilColumnProbeAdapter use
             // (namespace-stripped, upper-cased). Without normalisation FULLSCAN's
             // physical-biome check compares "MINECRAFT:PLAINS" against the
             // namespace-stripped "PLAINS" in defaultBiomes and rejects every candidate.
@@ -513,6 +513,70 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     public void platform(RTPLocation location) {
         // No-op — safety platform placement is a follow-up phase. Pipeline still
         // works without it (commit-time recheck remains authoritative).
+    }
+
+    /**
+     * ADR-058 — region-schematic paster. The decode/plan half is platform-neutral
+     * ({@link io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster}); the native
+     * block writes route back through {@link #setBlocks(java.util.List)} below. Shared instance —
+     * the paster is stateless.
+     */
+    private static final io.github.dailystruggle.rtp.api.schematic.SchematicPaster SCHEMATIC_PASTER =
+            new io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster();
+
+    @Override
+    public io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster() {
+        return SCHEMATIC_PASTER;
+    }
+
+    /**
+     * Native bulk block write (ADR-058). Parses each {@link io.github.dailystruggle.rtp.api.platform.BlockDelta}
+     * token through the vanilla {@code BlockStateParser} (the same parser {@code /setblock} uses,
+     * so the in-repo Sponge decoder's canonical {@code namespace:id[props]} tokens are accepted)
+     * and writes the resulting {@code BlockState} via {@link ServerLevel#setBlock}.
+     *
+     * <p>Invoked on the server thread by the caller (the teleport pipeline dispatches the paste
+     * through {@code RTP.scheduler.runTask(location, ...)}). Performs block writes only and never
+     * loads chunks (S-005). A single undecodable token is counted as a skip and audited, never
+     * thrown (S-004).
+     *
+     * @return the number of blocks successfully placed
+     */
+    @Override
+    public int setBlocks(java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+        ServerLevel level = world;
+        if (level == null || blocks == null || blocks.isEmpty()) return 0;
+        net.minecraft.core.HolderLookup<net.minecraft.world.level.block.Block> blockLookup;
+        try {
+            blockLookup = level.registryAccess()
+                    .lookupOrThrow(net.minecraft.core.registries.Registries.BLOCK);
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING, "[RTP][V26_1_R1] setBlocks could not resolve the block registry "
+                    + "lookup: " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return 0;
+        }
+        int placed = 0;
+        String firstFailedToken = null;
+        for (io.github.dailystruggle.rtp.api.platform.BlockDelta delta : blocks) {
+            try {
+                net.minecraft.world.level.block.state.BlockState state =
+                        net.minecraft.commands.arguments.blocks.BlockStateParser
+                                .parseForBlock(blockLookup, delta.token(), false)
+                                .blockState();
+                // flags=2 (Block.UPDATE_CLIENTS): send to clients without triggering neighbour
+                // physics updates — a bulk world rewrite, not a player edit.
+                level.setBlock(new BlockPos(delta.x(), delta.y(), delta.z()), state, 2);
+                placed++;
+            } catch (Throwable e) {
+                if (firstFailedToken == null) firstFailedToken = delta.token();
+            }
+        }
+        if (firstFailedToken != null) {
+            RTP.log(Level.WARNING, "[RTP][V26_1_R1] setBlocks placed " + placed + " of "
+                    + blocks.size() + " block(s); at least one block-state token could not be "
+                    + "parsed and was skipped (S-004). First failure: '" + firstFailedToken + "'.");
+        }
+        return placed;
     }
 
     @Override
