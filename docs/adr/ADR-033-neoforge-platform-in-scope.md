@@ -1,7 +1,8 @@
 # ADR-033 — NeoForge Platform In-Scope (Deferred Until Fabric Stabilizes)
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-11
+**Activated:** 2026-06-01 (Fabric stabilization gate per §2 confirmed clear; bring-up sequence §3 started — D-005 proposal `docs/dev/scratch/PROPOSAL-neoforge-bringup.md` and subproject `rtp-neoforge-ADR-001` on file)
 
 ## Context
 

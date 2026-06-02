@@ -135,6 +135,29 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     return schematicPaster;
   }
 
+  /**
+   * ADR-058 native block write. Delegates to the shared {@link BukkitBlockWriter} so the
+   * platform-neutral {@code WorldBlockSchematicPaster} can paste block states without a
+   * Bukkit-specific {@code SchematicPaster}. Invoked on the main thread by the caller; writes only
+   * loaded blocks (S-005); per-block parse failures are audited, never thrown (S-004).
+   */
+  @Override
+  public int setBlocks(
+      java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+    return BukkitBlockWriter.setBlocks(world, blocks);
+  }
+
+  /**
+   * ADR-058 native block-entity restore (container inventories, ...). Delegates to the shared
+   * {@link BukkitBlockWriter}; invoked on the main thread after {@link #setBlocks} (S-005-clean,
+   * per-entity failures audited per S-004).
+   */
+  @Override
+  public int restoreBlockEntities(
+      java.util.List<io.github.dailystruggle.rtp.api.schematic.PlacedBlockEntity> entities) {
+    return BukkitBlockWriter.restoreBlockEntities(world, entities);
+  }
+
   public static void setBiomesGetter(@NotNull Function<RTPWorld<?>, Set<String>> getBiomes) {
     BukkitRTPWorld.getBiomes = getBiomes;
   }

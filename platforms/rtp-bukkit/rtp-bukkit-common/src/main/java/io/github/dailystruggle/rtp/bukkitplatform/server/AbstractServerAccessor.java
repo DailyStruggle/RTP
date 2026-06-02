@@ -21,7 +21,6 @@ import io.github.dailystruggle.rtp.common.tools.MessageTagger;
 import io.github.dailystruggle.rtp.bukkitplatform.entity.BukkitRTPCommandSender;
 import io.github.dailystruggle.rtp.bukkitplatform.entity.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitRTPWorld;
-import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitSchematicPaster;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
 import org.bukkit.plugin.Plugin;
@@ -83,9 +82,12 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   public AbstractServerAccessor() {
-    // ADR-058: install the native (WorldEdit-free) region-schematic paster. Inert until a
+    // ADR-058: install the platform-neutral (WorldEdit-free) region-schematic paster. It drives
+    // the world's native block-write primitives (BukkitRTPWorld#setBlocks /
+    // #restoreBlockEntities), so a single shared translator serves every platform. Inert until a
     // region's `schematic` knob is set and rtp-core invokes it on the confirmed-arrival path.
-    BukkitRTPWorld.setSchematicPaster(new BukkitSchematicPaster());
+    BukkitRTPWorld.setSchematicPaster(
+        new io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster());
     shapeFunction =
         s -> {
           World world = Bukkit.getWorld(s);
@@ -559,6 +561,11 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       playerLifecycleHook.register(bukkitPlugin);
       playerLifecycleHookRegistered = true;
     }
+    // ADR-049: install the platform backend-heartbeat sampler factory so the
+    // platform-neutral NetworkModeBootstrap (rtp-core) can build a sampler
+    // without importing this Bukkit-family class. Idempotent across reloads.
+    RTP.backendStateSamplerFactory = lobbyMode ->
+        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler(lobbyMode);
   }
 
   @Override

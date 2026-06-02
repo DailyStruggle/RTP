@@ -4,12 +4,9 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.fabric.unobf.effects.FabricEffectsHandlerUnobf;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
-import io.github.dailystruggle.rtp.fabric.version.RTPBlockHandle;
-import io.github.dailystruggle.rtp.fabric.version.RTPBlockStateHandle;
 import io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle;
 import io.github.dailystruggle.rtp.fabric.version.RTPLevelHandle;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.fabric.version.RTPRegistryKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
@@ -62,19 +59,6 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
         return "26.1.2";
     }
 
-    @Override
-    public @Nullable RTPRegistryKey blockKey(RTPBlockHandle block) {
-        // TODO(rtp-fabric-ADR-001): cast block.as(Block.class), then
-        // BuiltInRegistries.BLOCK.getKey(b) → RTPRegistryKey.
-        throw new UnsupportedOperationException("V26_2_R1 adapter not yet implemented (rtp-fabric-ADR-001)");
-    }
-
-    @Override
-    public @Nullable RTPRegistryKey biomeKeyAt(RTPLevelHandle level, int x, int y, int z) {
-        // TODO(rtp-fabric-ADR-001): port from V1_21_R1FabricVersionAdapter; Holder<Biome>
-        // pattern is expected to survive deobfuscation but verify.
-        throw new UnsupportedOperationException("V26_2_R1 adapter not yet implemented (rtp-fabric-ADR-001)");
-    }
 
     @Override
     public CompletableFuture<RTPChunkHandle> getChunkFull(RTPLevelHandle level, int cx, int cz) {
@@ -84,17 +68,6 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
                 new UnsupportedOperationException("V26_2_R1 adapter not yet implemented (rtp-fabric-ADR-001)"));
     }
 
-    @Override
-    public boolean hasChunk(RTPLevelHandle level, int cx, int cz) {
-        // TODO(rtp-fabric-ADR-001): port from V1_21_R1FabricVersionAdapter.
-        throw new UnsupportedOperationException("V26_2_R1 adapter not yet implemented (rtp-fabric-ADR-001)");
-    }
-
-    @Override
-    public RTPBlockStateHandle airState() {
-        // TODO(rtp-fabric-ADR-001): RTPBlockStateHandle.of(Blocks.AIR.defaultBlockState()).
-        throw new UnsupportedOperationException("V26_2_R1 adapter not yet implemented (rtp-fabric-ADR-001)");
-    }
 
     @Override
     public void installEffectsDispatchers() {

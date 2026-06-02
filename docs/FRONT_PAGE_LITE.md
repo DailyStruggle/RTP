@@ -35,7 +35,9 @@ Marketplace listing metadata (current, for SEO reference):
 - **No lag spikes when players spam `/rtp`.** Worst-case main-thread tick stays at 4 ms (vs. 70-771 ms for the next plugins) - your TPS holds at 20.00 during a teleport burst.
 - **Instant teleports, no "Finding a safe location..." wait.** Pre-verified location queue serves `/rtp` in one tick instead of loading chunks on demand.
 - **Works on plain Bukkit servers at Paper-class speed.** Off-tick `.mca` Anvil pre-filter, worst tick stays at 3 ms while competitors spike past 3 seconds.
+- **Clickable `/rtp menu` GUI world & region selection** - players pick worlds and regions from an interactive book menu (Paper / Folia; chat-paginated elsewhere), no commands to memorize.
 - **Eight claim-plugin integrations bundled** (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect) - no add-ons to install.
+- **Per-player cooldowns & usage limits** - per-permission cooldown and limit nodes out of the box, so `/rtp` spam is capped without an extra plugin.
 - **Audited safety**: no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures (REQ-RTP-S-001..S-007).
 
 On **Paper 1.21**, measured on the in-repo benchmark harness, two clients spamming `/rtp` back-to-back:
@@ -72,7 +74,7 @@ A few hard requirements. If any are a **no**, EssentialsX `/rtp` or HuskHomes ar
 - ✅ **Java 21+** on your host (REQ-RTP-SYS-001, non-negotiable).
 - ✅ **Paper, Spigot, or a Bukkit-family fork** (Arclight / Mohist supported for Forge / NeoForge bridges). Fabric is supported and regularly tested, with its featureset lagging the Bukkit family by a release or two.
 - ✅ **In-game editing or YAML, your call.** Browse and tune config from the clickable `/rtp menu` (book on Paper / Folia, chat-paginated elsewhere), or edit the plain YAML files directly and version-control them.
-- ❌ Folia, proxy/cross-server, SQL/Redis, Vault economy -> those live in **LeafRTP-Pro**.
+- ❌ Folia, proxy/cross-server, SQL/Redis -> those live in **LeafRTP-Pro**. (Vault economy works in the free build.)
 
 ---
 
@@ -99,6 +101,7 @@ Tune `plugins/RTP/config.yml` and `plugins/RTP/regions/*.yml` later - via `/rtp 
 - **Effects on every lifecycle phase** - particles, sounds, fireworks, potion, note effects via the in-tree `effects-api`, gated by `rtp.effects.<name>` permissions.
 - **Eight claim-plugin integrations bundled** - GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect.
 - Iris, Terra, and custom datapack generators work out of the box, with modded biome IDs preserved. **PlaceholderAPI** and **ProtocolLib** are supported as optional soft-deps.
+- **Optional Vault economy** - charge players per `/rtp` with per-region price, `priceOther`, params/biome surcharges, and a balance floor (`economy.yml`); dormant when Vault is not installed.
 - **Public `rtp-api`** - same surface as Pro. Trigger LeafRTP from a GUI, NPC, or quest; build your own UX without forking.
 
 <details>
@@ -118,7 +121,7 @@ A lot of what people install companion plugins for is already in the free engine
 | Self-scheduling API tasks | `RTPRunnable` routes work onto the correct region / async thread automatically via `schedule()` - addon authors get correct scheduling for free. |
 | Live config reload (no restart) | Retune regions/safety/effects without a restart: `/rtp reload` (all) or `/rtp reload <file>` (one file); `/rtp config <file> set k=v` saves and reloads automatically. |
 
-*(Folia, multi-server / proxy, SQL/Redis, Vault economy, and multilingual `lang/**` live in [LeafRTP-Pro](https://builtbybit.com/resources/rtp-pro.105418) - not engine gaps.)*
+*(Folia, multi-server / proxy, and SQL/Redis live in [LeafRTP-Pro](https://builtbybit.com/resources/rtp-pro.105418) - not engine gaps.)*
 
 </details>
 
@@ -216,7 +219,7 @@ Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https:/
 - **%rtp_total_queue_length%**, **%rtp_public_queue_length%**, **%rtp_personal_queue_length%**
 - **%rtp_teleport_world%**, **%rtp_teleport_x%**, **%rtp_teleport_y%**, **%rtp_teleport_z%**
 
-**Soft dependencies (all optional):** PlaceholderAPI, ProtocolLib. *PaperLib is no longer required. Vault economy ships in **LeafRTP-Pro**.*
+**Soft dependencies (all optional):** Vault (for the optional economy charge), PlaceholderAPI, ProtocolLib. *PaperLib is no longer required.*
 
 </details>
 
@@ -233,7 +236,7 @@ A: "RTP" is the generic term for random teleport, so the old name was nearly imp
 A: Yes. Region files are read directly, so modded and namespaced biome and block IDs are preserved. No configuration needed.
 
 **Q: What's the difference between LeafRTP and LeafRTP-Pro?**
-A: Same engine, same source tree. **LeafRTP-Pro** adds the Folia adapter, multi-server / proxy support (Velocity), SQL/Redis backends, Vault economy, multilingual `lang/**`, the richer block-tag/state-predicate `safety.yml` grammar, and priority support. The free build is fully sufficient for single-server deployments. Drop in the Pro jar later - same config, same data, same commands.
+A: Same engine, same source tree. **LeafRTP-Pro** adds the Folia adapter, multi-server / proxy support (Velocity), SQL/Redis backends, multilingual `lang/**`, the richer block-tag/state-predicate `safety.yml` grammar, and priority support. The free build is fully sufficient for single-server deployments. Drop in the Pro jar later - same config, same data, same commands.
 
 **Q: I'm on Forge / NeoForge.**
 A: Run **Arclight** or **Mohist** (officially supported) and use this jar. A native Forge adapter is not planned.
@@ -298,7 +301,7 @@ Live list: [CHANGELOG](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md
 - **Folia** adapter (Region Scheduler + off-tick pre-filter, no 1-tick stalls)
 - **Multi-server / proxy** support (Velocity), validated on the in-repo devstack (2 proxies, 2 lobbies, 2 backends behind shared Redis)
 - SQL / Redis shared-state backends (H2, SQLite, MySQL, PostgreSQL, Jedis)
-- **Vault** economy, multilingual `lang/**`, login-reserve cache, visitor mode
+- Multilingual `lang/**`, login-reserve cache, visitor mode
 - The richer `safety.yml` grammar: vanilla block tags (`#minecraft:leaves`), state predicates (`OAK_SLAB[waterlogged=true]`), wildcards (`*[waterlogged=true]`)
 - Earliest releases on each version + priority support within a documented response window
 

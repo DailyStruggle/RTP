@@ -71,17 +71,17 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
               }
               // Path 2: qualified `server:region` (H2). Parse strictly; on
               // any malformed input fall through to reject.
-              io.github.dailystruggle.rtp.bukkit.network.NetworkRouter.ParsedRegion parsed;
+              io.github.dailystruggle.rtp.common.network.NetworkRouter.ParsedRegion parsed;
               try {
-                parsed = io.github.dailystruggle.rtp.bukkit.network.NetworkRouter.parseRegionArgQualified(s);
+                parsed = io.github.dailystruggle.rtp.common.network.NetworkRouter.parseRegionArgQualified(s);
               } catch (IllegalArgumentException malformed) {
                 return false;
               }
               if (parsed == null || parsed.serverHint() == null) return false;
-              io.github.dailystruggle.rtp.bukkit.network.NetworkModeBootstrap live =
-                  io.github.dailystruggle.rtp.bukkit.network.NetworkModeBootstrap.LIVE;
+              io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap live =
+                  io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE;
               if (live == null) return false;
-              io.github.dailystruggle.rtp.bukkit.network.PeerRegionRegistry registry =
+              io.github.dailystruggle.rtp.common.network.PeerRegionRegistry registry =
                   live.peerRegionRegistry();
               if (registry == null) return false;
               if (!registry.isReachableHardPin(parsed.serverHint(), parsed.regionKey())) {
@@ -93,10 +93,10 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
               return sender.hasPermission("rtp.regions." + parsed.regionKey());
             },
             () -> {
-              io.github.dailystruggle.rtp.bukkit.network.NetworkModeBootstrap live =
-                  io.github.dailystruggle.rtp.bukkit.network.NetworkModeBootstrap.LIVE;
+              io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap live =
+                  io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE;
               if (live == null) return java.util.Set.of();
-              io.github.dailystruggle.rtp.bukkit.network.PeerRegionRegistry registry =
+              io.github.dailystruggle.rtp.common.network.PeerRegionRegistry registry =
                   live.peerRegionRegistry();
               return registry == null ? java.util.Set.<String>of() : registry.peerEntries();
             });

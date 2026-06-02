@@ -1,7 +1,36 @@
 # ADR-024 — RTP-lite Assembly Variant
 
-**Status:** Accepted (amended 2026-05-11 — language options + claim-plugin integrations in scope for lite)
+**Status:** Accepted (amended 2026-06-01 — Vault economy in scope for lite)
 **Date:** 2026-04-30
+
+## 2026-06-01 amendment — Vault economy in scope for lite
+
+The original decision below, and the 2026-05-11 claim-plugin amendment, scoped
+Vault economy as Pro-only — lite shipped no `economy.yml` and did not wire the
+Vault hook. That gating was never an intentional monetization boundary: optional
+per-teleport charging is a baseline expectation on the small Spigot/Paper servers
+lite primarily serves, costs nothing at runtime when Vault is absent, and the
+`VaultChecker` class already shipped in the lite jar. As of 2026-06-01 that scope
+is corrected: **Vault economy ships in lite**.
+
+Concretely:
+
+- `RTPBukkitLitePlugin.onEnable` wires `VaultChecker.setupEconomy()` /
+  `setupPermissions()` and binds `VaultChecker` through the `RTPHooks` economy
+  facade when Vault is present, identically to the full bootstrap
+  (`RTPBukkitPlugin.setupIntegrations`).
+- `economy.yml` ships in the lite jar so the economy parser reads its defaults
+  from the classpath.
+- The `liteJarStructureCheck` audit no longer forbids `economy.yml`.
+- When Vault is not installed the economy hook is dormant (zero runtime cost),
+  mirroring the claim-plugin integrations.
+
+Bullets below (and in the 2026-05-11 claim-plugin amendment) referring to
+"economy / Vault" as a lite drop, and to `economy.yml` as a packaging drop, are
+superseded by this amendment. The remainder of the ADR (SQL/Redis drops, Folia
+drop, login cache, visitor mode, etc.) still applies.
+
+---
 
 ## 2026-05-11(b) amendment — language options in scope for lite
 
@@ -59,8 +88,9 @@ Concretely:
   Towny, HuskTowns, Factions, Lands, RedProtect, WorldGuard ]`.
 - `integrations.yml` ships in the lite jar so `ClaimIntegrations#buildParser`
   can load its defaults from the classpath.
-- Vault/economy wiring stays Pro-only — lite still ships no `economy.yml` and
-  the Vault soft-dep is not declared in the lite descriptor.
+- Vault/economy wiring was scoped Pro-only at the time of this amendment, but
+  that gating is superseded by the 2026-06-01 amendment above: lite now ships
+  `economy.yml` and wires the Vault hook.
 
 Bullets below referring to "claim-plugin softdepend integrations" as a lite
 drop, and to `integrations.yml` as a packaging drop, are superseded by this
@@ -123,7 +153,7 @@ RTP-lite:
    - Shutdown-flush lifecycle (`docs/architecture/10`).
    - Tags module (`rtp-tags`).
    - Folia adapter (`platforms/rtp-folia/**`). Lite is Spigot+Paper only.
-   - Economy / Vault hook + `economy.yml`.
+   - ~~Economy / Vault hook + `economy.yml`.~~ (superseded — see the 2026-06-01 amendment above; Vault economy ships in lite.)
    - Login reserve cache (ADR-023): `LoginCacheTask`, `RegionQueueManager.enableLoginCache`/`disableLoginCache`, the join-prime hook in `OnEventTeleports`, and `PerformanceKeys.loginCacheEnabled` / `loginCacheCap`.
    - Visitor / observation mode: `PerformanceKeys.visitorEnabled` and the `Region.isObservationalModeEnabled` branch.
    - `effectParsing` startup permission parse (`BukkitEffectsHandler` permission-tree build).

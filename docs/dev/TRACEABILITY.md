@@ -163,6 +163,17 @@ This document connects each requirement to the design decision that motivated it
 
 ---
 
+## rtp-neoforge Requirements
+
+All rows below are **unimplemented** (planning placeholders). NeoForge is in-scope per [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md) and [rtp-neoforge-ADR-001](../../platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md) (Proposed). Per ADR-033 §3.4 the S-005 and S-006 guards shall be authored **before** anvil / ticket parity work; the rows are reserved here so the obligation is visible. Phase N1 code is gated on D-005 proposal approval ([`scratch/PROPOSAL-neoforge-bringup.md`](scratch/PROPOSAL-neoforge-bringup.md)) and maintainer assignment.
+
+| Req ID | Summary | Design Ref | Implementing Class(es) | Test(s) |
+|---|---|---|---|---|
+| REQ-NEOFORGE-ARCH-S005 | No synchronous chunk I/O on the main thread (`NeoForgeRTPWorld.getChunkAt` returns `CompletableFuture`; routes through `MinecraftServer#submit`) | ADR-033 §3.4; rtp-neoforge-ADR-001 §6; REQ-RTP-S-005 | — (unimplemented) | `ReqRtpNeoforgeS005ChunkLoadingTest` (planned) |
+| REQ-NEOFORGE-ARCH-S006 | Fail-loud on early API access (`IllegalStateException`, never null / no-op) pre-init | ADR-033 §3.4; rtp-neoforge-ADR-001 §6; REQ-RTP-S-006 | — (unimplemented) | `ReqRtpNeoforgeS006EarlyApiTest` (planned) |
+
+---
+
 ## Network / Proxy Requirements
 
 Most rows below are **unimplemented**; the multi-server / proxy subsystem is governed by the ratified umbrella [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (Accepted 2026-05-14) and ten subproject ADRs under [`platforms/rtp-proxy/docs/adr/`](../../platforms/rtp-proxy/docs/adr/) (Phase 1 set `rtp-proxy-ADR-001..004` Accepted; `005..010` Proposed). Design source: [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md). Phase 1 D3 plumbing (network-state member of `AbstractSQLDatabaseAccessor`) and the parity-when-disabled gate landed 2026-05-18 (REQ-RTP-NET-002, REQ-RTP-NET-013).

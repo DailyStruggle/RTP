@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
-import io.github.dailystruggle.rtp.fabric.anvil.FabricAnvilColumnProbeAdapter;
+import io.github.dailystruggle.rtp.common.anvil.AnvilColumnProbeAdapter;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.core.BlockPos;
@@ -215,7 +215,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                     java.util.Set<String> rawUnsafe = currentUnsafeBlocks();
                     return anvilProbeSupport
                             .probeAndPublish(worldFolder, dim, chunkX, chunkZ, key, rawUnsafe,
-                                    io.github.dailystruggle.rtp.fabric.anvil.FabricPaletteNormalizer::reconcile)
+                                    io.github.dailystruggle.rtp.common.anvil.PaletteNormalizer::reconcile)
                             .thenCompose(result -> {
                                 io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
                                 if (view != null) {
@@ -886,7 +886,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                     io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
                         regionBytes, rx, rz, finalMinY, finalMaxY);
                 if (probe == null) return null;
-                return (ChunkColumnProbe) new FabricAnvilColumnProbeAdapter(probe, cx, cz);
+                return (ChunkColumnProbe) new AnvilColumnProbeAdapter(probe, cx, cz);
             } catch (Throwable t) {
                 RTP.log(java.util.logging.Level.FINE,
                     "[RTP] FabricRTPWorld.probeChunkColumn failed for world=" + name
@@ -1321,7 +1321,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
             int cx = (int) (key & 0xffffffffL);
             int cz = (int) (key >> 32);
             java.util.Set<String> reconciled =
-                    io.github.dailystruggle.rtp.fabric.anvil.FabricPaletteNormalizer
+                    io.github.dailystruggle.rtp.common.anvil.PaletteNormalizer
                             .reconcileAll(currentUnsafeBlocks());
             return new FabricRTPChunk(view, cx, cz, id, reconciled);
         }

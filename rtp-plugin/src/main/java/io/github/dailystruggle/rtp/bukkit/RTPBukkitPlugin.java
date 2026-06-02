@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.bukkit;
 
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.database.BukkitDatabaseHandler;
-import io.github.dailystruggle.rtp.bukkit.network.NetworkModeBootstrap;
+import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
 import io.github.dailystruggle.rtp.bukkit.effects.BukkitEffectsHandler;
 import io.github.dailystruggle.rtp.bukkit.events.*;
 import io.github.dailystruggle.rtp.bukkit.bukkitListeners.*;
@@ -555,7 +555,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // the other listeners. No-op when network mode is disabled (boot() left
     // joinTriggerSource null).
     try {
-      networkBootstrap.registerJoinTriggerSource(this);
+      networkBootstrap.registerJoinTriggerSource();
     } catch (Throwable t) {
       RTP.log(java.util.logging.Level.WARNING,
           "[LIFECYCLE] setupBukkitEvents JoinTriggerSource registration failed; continuing: "
@@ -568,12 +568,20 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // is disabled (waitlistQuitListener / waitlistCommandGuard() are
     // null on the disabled-mode path) and idempotent on re-register.
     try {
-      networkBootstrap.registerWaitlistQuitListener(this);
-      java.util.function.Predicate<org.bukkit.command.CommandSender> guard =
+      networkBootstrap.registerWaitlistQuitListener();
+      java.util.function.Predicate<io.github.dailystruggle.rtp.api.entity.RTPCommandSender> guard =
           networkBootstrap.waitlistCommandGuard();
       if (guard != null
           && RTP.baseCommand instanceof io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit cmd) {
-        cmd.addSenderCheck(guard);
+        // ADR-049: the guard is now platform-neutral (Predicate<RTPCommandSender>).
+        // Adapt at the Bukkit boundary: non-player senders always pass; players
+        // are wrapped via the RTPCommandSender adapter before the predicate runs.
+        cmd.addSenderCheck(s -> {
+          if (!(s instanceof org.bukkit.entity.Player p)) return true;
+          io.github.dailystruggle.rtp.api.entity.RTPCommandSender rs =
+              RTP.serverAccessor.getSender(p.getUniqueId());
+          return rs == null || guard.test(rs);
+        });
       }
     } catch (Throwable t) {
       RTP.log(java.util.logging.Level.WARNING,

@@ -2,7 +2,7 @@
 
 > **Status:** Pre-proposal scratch. **Not** a plan, **not** an ADR, **not** a commitment. These notes exist so we don't have to re-derive the landscape every time NeoForge comes up. Anything here that turns into actual work must go through a D-005 proposal first and (likely) a formal ADR + an entry in `MULTI_PLATFORM_PLAN.md`.
 >
-> **Current scope reminder:** NeoForge is **out of scope** until `rtp-fabric` stabilizes (Phase 4 per `MULTI_PLATFORM_PLAN.md` / *Current Development Focus*). Do not start implementation work without explicit user approval.
+> **Current scope reminder (updated 2026-06-01):** NeoForge is **in scope** per [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md) (Accepted), and the Fabric stabilization gate is **clear** (Fabric confirmed stable 2026-06-01). The bring-up sequence (ADR-033 §3) has started: the D-005 proposal ([`scratch/PROPOSAL-neoforge-bringup.md`](scratch/PROPOSAL-neoforge-bringup.md)) and the subproject ADR ([rtp-neoforge-ADR-001](../../platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md)) are on file. Phase N1 implementation work still requires **explicit approval of the proposal** and **assignment of a named maintainer** before any `rtp-neoforge/**` code lands.
 
 ---
 

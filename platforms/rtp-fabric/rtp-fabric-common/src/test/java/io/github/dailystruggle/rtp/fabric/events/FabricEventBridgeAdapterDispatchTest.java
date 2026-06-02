@@ -2,11 +2,8 @@ package io.github.dailystruggle.rtp.fabric.events;
 
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry;
-import io.github.dailystruggle.rtp.fabric.version.RTPBlockHandle;
-import io.github.dailystruggle.rtp.fabric.version.RTPBlockStateHandle;
 import io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle;
 import io.github.dailystruggle.rtp.fabric.version.RTPLevelHandle;
-import io.github.dailystruggle.rtp.fabric.version.RTPRegistryKey;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -96,13 +93,9 @@ class FabricEventBridgeAdapterDispatchTest {
         StubAdapter(Extract extract) { this.extract = extract; }
 
         @Override public String mcVersion() { return "test-stub"; }
-        @Override public RTPRegistryKey blockKey(RTPBlockHandle block) { return null; }
-        @Override public RTPRegistryKey biomeKeyAt(RTPLevelHandle level, int x, int y, int z) { return null; }
         @Override public CompletableFuture<RTPChunkHandle> getChunkFull(RTPLevelHandle level, int cx, int cz) {
             return CompletableFuture.completedFuture(null);
         }
-        @Override public boolean hasChunk(RTPLevelHandle level, int cx, int cz) { return false; }
-        @Override public RTPBlockStateHandle airState() { return null; }
 
         @Override public Object extractPlayerFromConnection(Object handler) { return extract.apply(handler); }
     }

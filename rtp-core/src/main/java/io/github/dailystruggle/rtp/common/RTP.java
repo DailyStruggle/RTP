@@ -109,6 +109,30 @@ public class RTP {
           io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY;
 
   /**
+   * Platform-supplied factory for the backend heartbeat sampler (ADR-049
+   * step 4). Each backend platform adapter (Bukkit / Paper / Folia / Fabric)
+   * installs a factory during startup that builds a
+   * {@link io.github.dailystruggle.rtp.common.network.BackendStateSampler}
+   * reading live host state (TPS / MSPT / player count / loaded worlds). The
+   * boolean argument is the {@code routing.lobbyMode} flag so the sampler can
+   * advertise an empty region inventory + {@code acceptingRequests=false}
+   * when this backend is a pure cross-server lobby.
+   *
+   * <p>The factory lives on {@code RTP} (rtp-core) rather than
+   * {@code RTPServerAccessor} (rtp-api) because {@code BackendStateSampler}
+   * produces a {@code rtp-proxy-common} {@code BackendHeartbeat}, a type
+   * rtp-api does not depend on. Remains {@code null} until a platform installs
+   * one; {@code NetworkModeBootstrap.boot(...)} treats a {@code null} factory
+   * as "platform has no sampler" and logs rather than throwing, so a missing
+   * factory degrades network mode gracefully instead of crashing startup.
+   *
+   * @since 3.0.0-beta.4 (ADR-049)
+   */
+  public static volatile java.util.function.Function<Boolean,
+      io.github.dailystruggle.rtp.common.network.BackendStateSampler>
+      backendStateSamplerFactory;
+
+  /**
    * L6 Slice J: when {@code true}, this backend is configured as a pure
    * cross-server lobby and skips all local region processing - the per-region
    * pre-fill ({@link io.github.dailystruggle.rtp.common.tasks.ScanTask}

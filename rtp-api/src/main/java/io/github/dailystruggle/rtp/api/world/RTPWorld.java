@@ -437,6 +437,55 @@ public abstract class RTPWorld<T> {
   }
 
   /**
+   * Best-effort native bulk block write (ADR-058). Writes each entry of a block-location map
+   * - a {@link io.github.dailystruggle.rtp.api.platform.BlockDelta} carrying world block
+   * coordinates plus the adapter's canonical block-state token - into this world, and returns
+   * the number of blocks actually placed.
+   *
+   * <p>This is the platform-neutral primitive the region-schematic paster
+   * ({@code WorldBlockSchematicPaster}) drives: core plans the schematic into placements off the
+   * region thread, then calls this on the region-owning thread (Folia region thread; Bukkit/Paper
+   * main thread; Fabric server thread) to write the blocks. The caller invokes it only when the
+   * footprint chunk is already loaded, so the implementation performs block writes only and never
+   * loads chunks (S-005).
+   *
+   * <p>A single undecodable token must be counted as a skip and audited, never thrown (S-004); the
+   * paste is best-effort and never aborts the teleport. The default implementation is a no-op
+   * returning {@code 0} (the platform does not support native block writes); adapters with a
+   * serializable block-state token override it.
+   *
+   * @param blocks the block-location map to write; never {@code null}
+   * @return the count of blocks successfully placed ({@code 0} when unsupported or none applied)
+   */
+  public int setBlocks(java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+    return 0;
+  }
+
+  /**
+   * Best-effort native restore of block-entity payloads (chest/container contents, ...) for a
+   * schematic paste (ADR-058). Called by the region-schematic paster
+   * ({@code WorldBlockSchematicPaster}) after {@link #setBlocks(java.util.List)} has written the
+   * block states, on the region-owning thread, with each block entity already resolved to its
+   * absolute world coordinates by {@code SchematicPlacementPlanner#planBlockEntities}.
+   *
+   * <p>This is the second half of the platform-neutral paster's symmetric two-primitive contract:
+   * {@link #setBlocks} writes block states and this restores their inhabited payloads, so a single
+   * shared {@code SchematicPaster} can serve every platform without a per-platform paster subclass.
+   * The implementation performs writes against blocks that are already loaded and placed; it never
+   * loads chunks (S-005) and a per-entity failure is counted and audited, never thrown (S-004).
+   *
+   * <p>The default implementation is a no-op returning {@code 0} (the platform restores block
+   * states only); platforms with a native container API (e.g. Bukkit/Paper/Folia) override it.
+   *
+   * @param entities the planned block entities to restore; never {@code null}
+   * @return the count of block entities (containers) successfully restored
+   */
+  public int restoreBlockEntities(
+      java.util.List<io.github.dailystruggle.rtp.api.schematic.PlacedBlockEntity> entities) {
+    return 0;
+  }
+
+  /**
    * Checks if this world is considered inactive (e.g., has no players).
    *
    * @return {@code true} if the world is inactive, {@code false} otherwise

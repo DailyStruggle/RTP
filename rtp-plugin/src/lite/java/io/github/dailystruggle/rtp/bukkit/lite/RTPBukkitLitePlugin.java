@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.lite;
 import io.github.dailystruggle.rtp.bukkit.BootstrapSupport;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.effects.BukkitEffectsHandler;
+import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.claims.ClaimIntegrations;
 import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnPlayerJoin;
 import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnPlayerQuit;
@@ -228,9 +229,25 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     // claim-plugin verifiers identically to the full bootstrap: each enabled
     // soft-dep (Lands, GriefDefender, GriefPrevention, Towny, HuskTowns,
     // Factions, RedProtect, WorldGuard) contributes a GlobalRegionVerifier.
-    // Vault/economy is intentionally NOT wired here -- lite still ships no
-    // economy.yml and the Vault soft-dep is Pro-only (ADR-024).
+    // Vault/economy is wired here identically to the full bootstrap: when Vault
+    // is present and no economy provider is bound yet, bind VaultChecker through
+    // the public RTPHooks facade. Lite ships economy.yml, so optional per-region
+    // teleport charging works out of the box (ADR-024, 2026-06-01 amendment).
     RTP.scheduler.runTaskLater(() -> {
+      try {
+        if (RTP.economy == null
+            && Bukkit.getServer().getPluginManager().getPlugin("Vault") != null) {
+          VaultChecker.setupEconomy();
+          VaultChecker.setupPermissions();
+          if (VaultChecker.getEconomy() != null) {
+            io.github.dailystruggle.rtp.api.RTPAPI.hooks().economy().bind(new VaultChecker());
+          }
+        }
+      } catch (Throwable t) {
+        RTP.log(Level.WARNING,
+            "[LIFECYCLE-LITE] Failed to initialize Vault economy; continuing without it.",
+            t);
+      }
       try {
         ClaimIntegrations.setup(this);
       } catch (Throwable t) {
@@ -252,7 +269,6 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
 
     // Lite OMITS:
     //   - initLoginReserveCache()                (ADR-023)
-    //   - Vault/economy wiring                   (ADR-024; economy.yml not shipped)
     //   - PlaceholderAPI hook
     //   - Visitor-mode wiring                    (PerformanceKeys.visitorEnabled)
     //

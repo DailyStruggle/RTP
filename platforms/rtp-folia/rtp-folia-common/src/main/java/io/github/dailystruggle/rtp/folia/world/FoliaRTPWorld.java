@@ -115,6 +115,35 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     return schematicPaster;
   }
 
+  /**
+   * ADR-058 native block write. Delegates to the shared
+   * {@link io.github.dailystruggle.rtp.bukkitplatform.world.BukkitBlockWriter} so the
+   * platform-neutral {@code WorldBlockSchematicPaster} can paste block states without a
+   * Folia-specific {@code SchematicPaster}. Invoked on the region-owning thread by the caller;
+   * writes only loaded blocks (S-005); per-block parse failures are audited, never thrown (S-004).
+   */
+  @Override
+  @RegionThread
+  public int setBlocks(
+      java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+    return io.github.dailystruggle.rtp.bukkitplatform.world.BukkitBlockWriter
+        .setBlocks(world, blocks);
+  }
+
+  /**
+   * ADR-058 native block-entity restore (container inventories, ...). Delegates to the shared
+   * {@link io.github.dailystruggle.rtp.bukkitplatform.world.BukkitBlockWriter}; invoked on the
+   * region-owning thread after {@link #setBlocks} (S-005-clean, per-entity failures audited per
+   * S-004).
+   */
+  @Override
+  @RegionThread
+  public int restoreBlockEntities(
+      java.util.List<io.github.dailystruggle.rtp.api.schematic.PlacedBlockEntity> entities) {
+    return io.github.dailystruggle.rtp.bukkitplatform.world.BukkitBlockWriter
+        .restoreBlockEntities(world, entities);
+  }
+
   public static void setBiomesGetter(@NotNull Function<RTPWorld<?>, Set<String>> getBiomes) {
     FoliaRTPWorld.getBiomes = getBiomes;
   }
