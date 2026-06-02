@@ -1,0 +1,37 @@
+# NeoForge mod metadata (NEOFORGE_NOTES.md §2: neoforge.mods.toml vs fabric.mod.json).
+# Phase N1 skeleton — the entry point is the @Mod-annotated RTPNeoForgeMod.
+#
+# NOTE: the carrier submodules (rtp-neoforge-vXX_YY_R1) supply the runtime jar
+# and may override the `versionRange` fields below to pin their MC line. This
+# common descriptor declares the loader/entry contract shared across carriers.
+
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "GPL-3.0-or-later"
+issueTrackerURL = "https://github.com/DailyStruggle/RTP/issues"
+
+[[mods]]
+modId = "rtp"
+version = "${file.jarVersion}"
+displayName = "RTP"
+authors = "DailyStruggle"
+description = '''
+Bounded-distribution random teleport. NeoForge platform adapter (in-scope per ADR-033).
+'''
+
+# NeoForge runtime dependency. versionRange pinned per carrier; the common
+# module compiles against the 1.21.1 / NeoForge 21.1.x typecheck line.
+[[dependencies.rtp]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+# Minecraft runtime dependency.
+[[dependencies.rtp]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,)"
+ordering = "NONE"
+side = "BOTH"

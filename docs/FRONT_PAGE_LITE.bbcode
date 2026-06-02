@@ -1,5 +1,4 @@
 [CENTER]
-[IMG width="140px"]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/leaf_icon_with_background.png[/IMG]
 [SIZE=7][B][COLOR=#27AE60]Leaf[/COLOR][COLOR=#2C3E50]RTP[/COLOR][/B][/SIZE]
 [SIZE=4][B][COLOR=#7F8C8D]Free Random Teleport (RTP) Plugin for Paper, Spigot & Fabric[/COLOR][/B][/SIZE]
 [SIZE=3][B][COLOR=#7F8C8D]Deterministic, bounded-latency random teleport (/rtp or /wild) engine[/COLOR][/B][/SIZE]
@@ -40,7 +39,7 @@ On [B]Paper 1.21[/B], measured on the in-repo benchmark harness, two clients spa
 
 [I]Methodology: Paper 1.21, 2 OPed clients spamming [I]/rtp[/I] continuously, in-repo harness linked below. Spigot and Folia results in the full benchmark section.[/I]
 
-[CENTER][IMG width="560px"]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/teleport_title.webp[/IMG]
+[CENTER][IMG]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/teleport_title.webp[/IMG]
 [I]A real [I]/rtp[/I] landing: pre-verified destination served in [B]0 attempts, 49 ms[/B] - no "Finding a safe location..." wait. The title, sound, and effects shown are fully configurable.[/I][/CENTER]
 
 Same throughput as the next-best plugin, [B]~17x lower worst-case tick spike, 35% less CPU per teleport.[/B] On Spigot, LeafRTP's worst tick stays at 3 ms while competitors spike past 3 seconds. Reproduce on your own rig: [URL=https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP][I]helpers/StressTestRTP/[/I][/URL].
@@ -97,7 +96,7 @@ Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/I] later - 
 [*]🛠️ [B]Public [I]rtp-api[/I][/B] - same surface as Pro. Trigger LeafRTP from a GUI, NPC, or quest; build your own UX without forking.
 [/LIST]
 
-[CENTER][IMG width="300px"]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/menu_1.png[/IMG] [IMG width="300px"]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/menu_2.png[/IMG]
+[CENTER][IMG]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/menu_1.png[/IMG] [IMG]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/menu_2.png[/IMG]
 [I]The clickable [I]/rtp menu[/I] book UI: admin panel (left) and the in-game config-file browser (right) - everything tunable without leaving the game.[/I][/CENTER]
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
@@ -173,7 +172,7 @@ Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/I] later - 
 
 Full methodology, raw CSVs, per-run analyses: [URL=https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP][I]helpers/StressTestRTP/[/I][/URL]. Video benchmark of [I]/rtp[/I] on a custom world generator: [URL=https://youtu.be/V0NyNK9JydM]youtu.be/V0NyNK9JydM[/URL].
 
-[CENTER][IMG width="360px"]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/mspt_map.webp[/IMG] [IMG width="360px"]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/bad_locations_map.webp[/IMG]
+[CENTER][IMG]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/mspt_map.webp[/IMG] [IMG]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/bad_locations_map.webp[/IMG]
 [I]Built-in [I]/rtp[/I] visualizations: live MSPT / heap graphs while a scan runs (left), and a land-vs-water heatmap of the region (right) - the same diagnostics behind the numbers above.[/I][/CENTER]
 [/SPOILER]
 

@@ -1,0 +1,61 @@
+// Phase N1 — NeoForge platform adapter, version-agnostic common module.
+//
+// Mirrors platforms/rtp-fabric/rtp-fabric-common (rtp-fabric-ADR-001): this
+// module holds version-agnostic NeoForge glue and compiles against a single
+// Mojmap MC line purely to typecheck; each rtp-neoforge-vXX_YY_R1 carrier
+// ships its own runtime jar pinned to its MC version.
+//
+// Toolchain: ModDevGradle (net.neoforged.moddev) per NEOFORGE_NOTES.md §8 and
+// rtp-neoforge-ADR-001. ModDevGradle is the newer official NeoForge build path
+// and is closest to Loom in spirit. It is applied ONLY under
+// platforms/rtp-neoforge/** (build discipline parity with Loom, ADR-022 §3) —
+// it must not leak into rtp-core / rtp-api / commands-api / any Bukkit-family
+// or Fabric adapter.
+//
+// Architectural invariants (mirrors ADR-022 §4, applied to NeoForge):
+//   * No org.bukkit.* and no net.fabricmc.* imports in this module.
+//   * Shared business logic stays in :rtp-core / :rtp-api — this module is
+//     NeoForge platform glue only.
+//   * NeoForge is Mojmap-at-runtime (1.20.4+), so no obf carrier is required
+//     (NEOFORGE_NOTES.md §5), but NM-typed surfaces that drift across MC revs
+//     are still isolated in the per-version carriers, never in rtp-core.
+//
+// NOTE: this skeleton is included in the build graph ONLY when `-PincludeNeoforge`
+// is passed (see settings.gradle). The NeoForge userdev artifacts resolved by
+// ModDevGradle require network access that is not available on every build host;
+// gating the include keeps the default `.\gradlew build` green. The named
+// maintainer (project lead, @leaf_26) owns filling in the adapter surfaces and
+// proving the build on a network-capable host.
+
+plugins {
+    // ModDevGradle. Version intentionally declared here (NeoForge modules are
+    // an opt-in island; they do not share a plugin classloader with the
+    // Loom-based Fabric modules, so no pluginManagement pin is required).
+    id 'net.neoforged.moddev' version '2.0.78'
+}
+
+// NeoForge / MC versions for the common typecheck line. Bump in lockstep with
+// the rtp-neoforge-vXX_YY_R1 carriers when a new MC version is added.
+ext {
+    minecraftVersion = '1.21.1'
+    neoforgeVersion  = '21.1.95'
+}
+
+neoForge {
+    version = neoforgeVersion
+    // No runs configured on common — the carriers own dev-launch run configs.
+}
+
+dependencies {
+    // Platform-free abstractions consumed by every NeoForge adapter class.
+    // Reused 1:1 from the platform-neutral modules (NEOFORGE_NOTES.md §3).
+    api project(':rtp-api')
+    api project(':rtp-core')
+    // commands-api-ADR-001 — Brigadier Bridge. The bridge classes live in
+    // :commands-api; this module supplies the NeoForge-side registration
+    // trampoline (RegisterCommandsEvent), see NeoForgeCommandRegistrar.
+    api project(':commands-api')
+    // ADR-016 — anvil pre-filter. Platform-neutral .mca decoder; same .mca
+    // substrate as Fabric (NEOFORGE_NOTES.md §3), reused unchanged.
+    api project(':anvil-api')
+}
