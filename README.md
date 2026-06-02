@@ -17,6 +17,14 @@ The Folia-native, region-aware random teleport plugin for production Minecraft s
 🔗 [BuiltByBit Resource Page](https://builtbybit.com/resources/leafrtp-pro.105418/)
 🔗 [Modrinth Resource Page](https://modrinth.com/plugin/leafrtp)
 
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/teleport_title.webp" alt="An RTP teleport completing in 0 attempts, 49 ms" width="560" />
+
+<sub>A real `/rtp` landing: a pre-verified destination served in <b>0 attempts, 49 ms</b> - no "Finding a safe location..." wait.</sub>
+
+</div>
+
 ---
 
 ## Why RTP?
@@ -67,6 +75,19 @@ For best results, pregenerate each RTP world (Chunky / WorldBorder) sized to you
 - **Runtime config reload:** Adjust region settings by command without restarting the server.
 - **Persistent state:** Spatial memory and region shape data survive server restarts, avoiding cold-start rebuild penalties.
 - **Built-in diagnostics:** `MemoryTracker` accounts for chunk tickets and pipeline allocations on every exit path; spark-compatible profiling surface for production tuning.
+- **Interactive `/rtp menu`:** A clickable in-game book UI for world/region selection and live config editing (Paper / Folia; chat-paginated fallback elsewhere).
+
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/menu_1.png" alt="The /rtp menu admin panel book UI" width="280" /> <img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/menu_2.png" alt="The /rtp menu config-files browser" width="280" />
+
+<sub>The clickable <code>/rtp menu</code> book UI: admin panel (left) and the in-game config-file browser (right).</sub>
+
+<img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/mspt_map.webp" alt="In-game MSPT and heap visualization during a region scan" width="340" /> <img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/bad_locations_map.webp" alt="In-game land-vs-water map built from a region scan" width="340" />
+
+<sub>Built-in scan visualizations: live MSPT / heap graphs (left) and a land-vs-water heatmap of the region (right).</sub>
+
+</div>
 
 ---
 
