@@ -165,12 +165,12 @@ This document connects each requirement to the design decision that motivated it
 
 ## rtp-neoforge Requirements
 
-All rows below are **unimplemented** (planning placeholders). NeoForge is in-scope per [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md) and [rtp-neoforge-ADR-001](../../platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md) (Proposed). Per ADR-033 §3.4 the S-005 and S-006 guards shall be authored **before** anvil / ticket parity work; the rows are reserved here so the obligation is visible. Phase N1 code is gated on D-005 proposal approval ([`scratch/PROPOSAL-neoforge-bringup.md`](scratch/PROPOSAL-neoforge-bringup.md)) and maintainer assignment.
+NeoForge is in-scope per [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md) and [rtp-neoforge-ADR-001](../../platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md) (Accepted). Per ADR-033 §3.4 the S-005 and S-006 guards are authored as part of the Phase N2 platform-adapter bring-up; both rows below are now **implemented**. Remaining NeoForge functional parity (the `/rtp` round-trip exit gate and the final `-PincludeNeoforge` build) is tracked in [`scratch/CHECKLIST-neoforge-phase-n2.md`](scratch/CHECKLIST-neoforge-phase-n2.md).
 
 | Req ID | Summary | Design Ref | Implementing Class(es) | Test(s) |
 |---|---|---|---|---|
-| REQ-NEOFORGE-ARCH-S005 | No synchronous chunk I/O on the main thread (`NeoForgeRTPWorld.getChunkAt` returns `CompletableFuture`; routes through `MinecraftServer#submit`) | ADR-033 §3.4; rtp-neoforge-ADR-001 §6; REQ-RTP-S-005 | — (unimplemented) | `ReqRtpNeoforgeS005ChunkLoadingTest` (planned) |
-| REQ-NEOFORGE-ARCH-S006 | Fail-loud on early API access (`IllegalStateException`, never null / no-op) pre-init | ADR-033 §3.4; rtp-neoforge-ADR-001 §6; REQ-RTP-S-006 | — (unimplemented) | `ReqRtpNeoforgeS006EarlyApiTest` (planned) |
+| REQ-NEOFORGE-ARCH-S005 | No synchronous chunk I/O on the main thread (`NeoForgeRTPWorld.getChunkAt` returns `CompletableFuture`; anvil-backed `NeoForgeRTPChunk` answers block queries from the decoded view without a live load) | ADR-033 §3.4; rtp-neoforge-ADR-001 §6; REQ-RTP-S-005 | `NeoForgeRTPChunk` (anvil dual-mode dispatch); `NeoForgeVersionAdapter#requestFullChunkAsync` (async path) | `ReqRtpNeoforgeS005ChunkLoadingTest` (6 tests: anvil-mode flags, null-view rejection, view-routed block queries, isSafe short-circuit + delegation, keep/unload no-ops) |
+| REQ-NEOFORGE-ARCH-S006 | Fail-loud on early API access (`IllegalStateException`, never null / no-op) pre-init | ADR-033 §3.4; rtp-neoforge-ADR-001 §6; REQ-RTP-S-006 | `NeoForgeVersionAdapterRegistry#require`; `NeoForgeServerAccessor#getLocationGenerator` | `ReqRtpNeoforgeS006ApiBeforeCoreTest` (3 tests: registry not-installed, `require()` throws, `getLocationGenerator()` throws pre-core) |
 
 ---
 

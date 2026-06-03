@@ -68,10 +68,17 @@ import java.util.logging.Level;
  * That flag set ({@code = 6}) is identical to vanilla
  * {@link TicketType#FORCED}'s flags <b>minus</b> {@code FLAG_PERSIST} and
  * {@code FLAG_KEEP_DIMENSION_ACTIVE}, yielding a non-persistent (S-002
- * safe), no-expiry, fully-ticking ticket.
- * Radius {@code 3} resolves to effective ticket level {@code 33 - 3 = 30}
- * ({@code ENTITY_TICKING}) — parity with Bukkit's
- * {@code addPluginChunkTicket} on the Bukkit-family adapters. See
+ * safe), no-expiry ticket. The effective tier is gated by the radius below,
+ * not the flags.
+ * Radius {@code 1} resolves to effective ticket level {@code 33 - 1 = 32}
+ * ({@code FULL}/BORDER but below {@code ENTITY_TICKING}): the chunk stays
+ * pinned and block-readable for {@code RTPChunk#isSafe}, but its
+ * entity-ticking pipeline (mob spawning, AI, scheduled ticks) does not run,
+ * so a player-less kept-cache chunk costs effectively zero MSPT; a player's
+ * own arrival ticket promotes it to {@code ENTITY_TICKING} on teleport
+ * without a regen. This supersedes {@code rtp-fabric-ADR-006}'s
+ * {@code ENTITY_TICKING} end-state for the kept cache. See
+ * {@code rtp-fabric-ADR-016-kept-cache-non-entity-ticking.md} and
  * {@code rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md}.</p>
  *
  * <p><b>S-002 / non-persistent guarantee:</b> the {@code FLAG_PERSIST} bit
@@ -80,7 +87,7 @@ import java.util.logging.Level;
  */
 public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter {
 
-    private static final int RTP_TICKET_RADIUS = 3;
+    private static final int RTP_TICKET_RADIUS = 1;
 
     // 1.21.11 Mojmap: TicketType(long timeout, int flags) where flags is a bitfield over
     // FLAG_PERSIST | FLAG_LOADING | FLAG_SIMULATION | FLAG_KEEP_DIMENSION_ACTIVE | FLAG_CAN_EXPIRE_IF_UNLOADED.

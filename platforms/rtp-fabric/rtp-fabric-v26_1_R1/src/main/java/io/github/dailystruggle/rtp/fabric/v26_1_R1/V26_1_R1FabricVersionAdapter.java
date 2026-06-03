@@ -45,10 +45,15 @@ import java.util.logging.Level;
  */
 public final class V26_1_R1FabricVersionAdapter implements FabricVersionAdapter {
 
-    // Non-persistent RTP-owned chunk ticket — see rtp-fabric-ADR-003 / -006.
+    // Non-persistent RTP-owned chunk ticket — see rtp-fabric-ADR-003 / -006 / -016.
     // Same TicketType shape as 1.21.11: (long timeout, int flags). Omit
     // FLAG_PERSIST so the ticket is never written to level.dat (S-002 safe).
-    private static final int RTP_TICKET_RADIUS = 3;
+    // radius=1 → effective level 33-1=32 (FULL/BORDER, below ENTITY_TICKING):
+    // chunk stays pinned and block-readable for isSafe but does not entity-tick,
+    // so a player-less kept chunk costs ~0 MSPT; the player's arrival ticket
+    // promotes it to ENTITY_TICKING on teleport without a regen. Supersedes
+    // ADR-006's ENTITY_TICKING end-state for the kept cache (rtp-fabric-ADR-016).
+    private static final int RTP_TICKET_RADIUS = 1;
     private static final int RTP_TICKET_FLAGS =
             TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION;
     private static final TicketType RTP_TICKET_TYPE =

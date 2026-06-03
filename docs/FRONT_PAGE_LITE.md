@@ -121,7 +121,7 @@ A lot of what people install companion plugins for is already in the free engine
 | Self-scheduling API tasks | `RTPRunnable` routes work onto the correct region / async thread automatically via `schedule()` - addon authors get correct scheduling for free. |
 | Live config reload (no restart) | Retune regions/safety/effects without a restart: `/rtp reload` (all) or `/rtp reload <file>` (one file); `/rtp config <file> set k=v` saves and reloads automatically. |
 
-*(Folia, multi-server / proxy, and SQL/Redis live in [LeafRTP-Pro](https://builtbybit.com/resources/rtp-pro.105418) - not engine gaps.)*
+*(Folia, multi-server / proxy, and SQL/Redis live in **LeafRTP-Pro** - not engine gaps.)*
 
 </details>
 
@@ -136,7 +136,7 @@ A lot of what people install companion plugins for is already in the free engine
 | **Arclight / Mohist** (Forge / NeoForge bridges)            | ✅ Officially supported | Use the Spigot/Paper jar. Recommended way to run on Forge/NeoForge.                         |
 | **Folia**                                                   | ❌ Not in this build    | Folia adapter ships in **LeafRTP-Pro**.                                                         |
 | **Multi-server / proxy** (Velocity)                         | ❌ Not in this build    | Cross-server queue ships in **LeafRTP-Pro**.                                                    |
-| **Fabric**                                                  | ✅ Supported            | First-class in-scope platform; tested regularly. Featureset lags the Bukkit family by a release or two. |
+| **Fabric**                                                  | ✅ Supported            | First-class, stable, in-scope platform; tested regularly, at feature parity with the Bukkit family. |
 | **Native Forge / NeoForge**                                 | 🔁 Use Arclight / Mohist | No native adapter planned.                                                                 |                                                                  |
 
 ---
@@ -236,7 +236,7 @@ A: "RTP" is the generic term for random teleport, so the old name was nearly imp
 A: Yes. Region files are read directly, so modded and namespaced biome and block IDs are preserved. No configuration needed.
 
 **Q: What's the difference between LeafRTP and LeafRTP-Pro?**
-A: Same engine, same source tree. **LeafRTP-Pro** adds the Folia adapter, multi-server / proxy support (Velocity), SQL/Redis backends, multilingual `lang/**`, the richer block-tag/state-predicate `safety.yml` grammar, and priority support. The free build is fully sufficient for single-server deployments. Drop in the Pro jar later - same config, same data, same commands.
+A: Same engine, same source tree. The free build already ships multilingual locale switching and bundled (trimmed) `lang/**` packs. **LeafRTP-Pro** adds the Folia adapter, multi-server / proxy support (Velocity), SQL/Redis backends, the full curated `lang/**` locale set, the richer block-tag/state-predicate `safety.yml` grammar, and priority support. The free build is fully sufficient for single-server deployments. Drop in the Pro jar later - same config, same data, same commands.
 
 **Q: I'm on Forge / NeoForge.**
 A: Run **Arclight** or **Mohist** (officially supported) and use this jar. A native Forge adapter is not planned.
@@ -266,7 +266,7 @@ Support for the free build is **community-tier and best-effort** - a solo mainta
 <details>
 <summary><b>Known limitations</b></summary>
 
-- Free build does not ship Folia, SQL/Redis, multi-server, or the tag/state-predicate `safety.yml` grammar - all are in **LeafRTP-Pro**.
+- Free build ships multilingual locale switching and bundled (trimmed) `lang/**` packs, but does not ship Folia, SQL/Redis, multi-server, the full curated `lang/**` locale set, or the tag/state-predicate `safety.yml` grammar - those are in **LeafRTP-Pro**.
 - `safety.yml` here accepts flat material names (`LAVA`, `MAGMA_BLOCK`, `CACTUS`, `FIRE`). Unknown materials log one warning, never silently dropped.
 - Edits to `safety.yml` and biome filters do not yet invalidate the persisted shape cache - workaround: `/rtp scan reset <region>`.
 - Emergency landing platform default is now `platformRadius: -1` (disabled). Set to `0` or higher to restore legacy 2.x behavior.
@@ -301,7 +301,7 @@ Live list: [CHANGELOG](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md
 - **Folia** adapter (Region Scheduler + off-tick pre-filter, no 1-tick stalls)
 - **Multi-server / proxy** support (Velocity), validated on the in-repo devstack (2 proxies, 2 lobbies, 2 backends behind shared Redis)
 - SQL / Redis shared-state backends (H2, SQLite, MySQL, PostgreSQL, Jedis)
-- Multilingual `lang/**`, login-reserve cache, visitor mode
+- Full curated `lang/**` locale set (free ships a trimmed set), login-reserve cache, visitor mode
 - The richer `safety.yml` grammar: vanilla block tags (`#minecraft:leaves`), state predicates (`OAK_SLAB[waterlogged=true]`), wildcards (`*[waterlogged=true]`)
 - Earliest releases on each version + priority support within a documented response window
 

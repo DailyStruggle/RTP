@@ -314,16 +314,26 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
      * and block reads are valid), {@code effectiveLevel} must be {@code <= 33};
      * for {@code TICKING} {@code <= 32}; for {@code ENTITY_TICKING} {@code <= 31}.</p>
      *
-     * <p>{@code distance = 3} matches {@code TicketType.FORCED}'s built-in
-     * distance and resolves to effective level {@code 30} = {@code ENTITY_TICKING},
-     * the same end state Bukkit's {@code World#addPluginChunkTicket} produces.
-     * Earlier revisions of this adapter passed {@code 31} into this slot under
-     * the mistaken belief it was the ticket level — that yielded effective
-     * level {@code 2} which the chunk system clamps/rejects, leaving kept-cache
-     * entries unpinned and silently evicted. See
-     * {@code rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md}.</p>
+     * <p>{@code distance = 1} resolves to effective level {@code 32}
+     * ({@code FULL}/BORDER but below {@code ENTITY_TICKING}): the chunk stays
+     * pinned and block-readable for {@code RTPChunk#isSafe}, but its
+     * entity-ticking pipeline (mob spawning, AI, scheduled ticks) does not run,
+     * so a player-less kept-cache chunk costs effectively zero MSPT. The
+     * player's own arrival ticket promotes it to {@code ENTITY_TICKING} on
+     * teleport without a regen, preserving immediacy. This mirrors the
+     * 2026-05-08 1.20.1 fix (which dropped {@code 3 → 1} for the same reason)
+     * and supersedes {@code rtp-fabric-ADR-006}'s {@code ENTITY_TICKING}
+     * end-state for the kept cache. See
+     * {@code rtp-fabric-ADR-016-kept-cache-non-entity-ticking.md}.</p>
+     *
+     * <p>Earlier revisions passed {@code 31} into this slot under the mistaken
+     * belief it was the ticket level — that yielded effective level {@code 2}
+     * which the chunk system clamps/rejects, leaving kept-cache entries unpinned
+     * and silently evicted; {@code distance = 0} (level {@code 33}) sits exactly
+     * on the eviction boundary and is avoided for the same drop-risk reason.
+     * See {@code rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md}.</p>
      */
-    private static final int RTP_TICKET_DISTANCE = 3;
+    private static final int RTP_TICKET_DISTANCE = 1;
 
     private static TicketType<ChunkPos> ticketType() {
         TicketType<ChunkPos> t = RTP_TICKET_TYPE;

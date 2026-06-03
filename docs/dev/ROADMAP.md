@@ -230,6 +230,83 @@ reproducible by readers".
   and route detection through `RTPHooks` so the chat renderer and unsupported carriers degrade
   cleanly. Fabric 1.20.x stays on the chat renderer (book renderer off there for performance
   reasons) and therefore opts out of this feature.
+- [ ] **Claim/faction-anchored RTP (`/rtp faction`-style).** EzRTP exposes RTP around a selected
+  faction/claim center; this is the one EzRTP destination feature with no RTP equivalent (named
+  centers, GUI selector, and `/rtp fake` are deliberately out of scope or already covered).
+  Settled design (pending a D-005 ADR before implementation):
+  - **Pin the center on first use.** Resolve the faction's claim centroid once, snap it to a usable
+    center, and cache it keyed by faction ID. Reuse on every later request; recompute only on a real
+    faction-change event (claim/unclaim/sethome/disband) or a cheap lazy fingerprint mismatch, not
+    per call. Evict via a capped LRU so thousands of factions cannot grow unbounded (evicted ones
+    re-pin on next use).
+  - **Keep full `MemoryShape`, not a memoryless variant.** Because the center is pinned (no drift),
+    the persisted bad-sector / biome index stays valid and drift-aware learning is retained.
+  - **Vary outer radius freely; never the center point or inner/center radius.** The Archimedean
+    spiral 1D mapping keys each (x,z) off the center + parameterization, so growing/shrinking the
+    outer `getRange()` bound only appends/truncates the tail of the same 1D sequence: every key,
+    prefix sum, and `.bin` run keeps its meaning. The radius can therefore track the faction's claim
+    extent dynamically with no remap. A center move or disband is the only event that forces a full
+    rebuild (rare, by design).
+  - Reuses the existing `RegionQueueManager` caches (kept/unkept/backlog) and the `rtp-anvil`
+    prefilter unchanged; route faction lookup through `RTPHooks` soft-depend per
+    [ADR-026](../adr/ADR-026-external-hook-api-surface.md), keeping the selection path free of a hard
+    faction-plugin dependency (S-003 / [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)).
+  - **Out of scope for this item:** transferring bad-location memory across overlapping regions. It
+    is mechanically possible on overlap but not common enough in practice to be worth the
+    complexity; the pinned-center model above avoids needing it.
+- [ ] **Cross-platform destination-selector seam + bundled default menu.** EzRTP ships an inventory
+  GUI world selector and BetterRTP relies on third-party menu plugins built against it; RTP should
+  lower that operator burden by shipping its own menu rather than outsourcing it. Two deliverables:
+  - **(1) Platform-neutral selector API** (`rtp-api` / `commands-api`): expose the
+    world/destination choice + `RTP`-side resolution path so a server or addon can render selection
+    in any UI (chat, book, inventory, web, external). This is the single source of truth both the
+    bundled menu and any third-party UI bind to, so they cannot drift apart.
+  - **(2) Bundled, opt-in default destination menu** built on the existing book/chat
+    `CommandTreeMenuBuilder` (and the Fabric 1.21+ book renderer): lists the worlds/regions a player
+    may RTP into with price/cooldown shown, click-to-teleport, working cross-platform out of the box
+    with no second plugin. Because the menu foundation already exists, this is largely a new view
+    over data we already model (worlds, regions, permissions, prices), not new infrastructure.
+  RTP should *not* bundle or endorse an inventory GUI; inventory-GUI rendering, if anyone wants it,
+  lives in an addon against deliverable (1), never in core.
+- [ ] **BetterRTP API compatibility shim (absorb the inventory-GUI menu ecosystem).** Inventory-GUI
+  menu plugins (which capture more admin attention than book menus) are commonly built against
+  BetterRTP. Rather than rebuild that ecosystem, RTP can register a stand-in for BetterRTP's public
+  surface so those menu plugins transparently drive RTP. Design constraints:
+  - **Absent-only, default off.** Register only when BetterRTP is not installed/enabled
+    (`!isPluginEnabled("BetterRTP")`) to avoid command/service collisions; stand down completely if
+    the real plugin is present. Never shadow BetterRTP.
+  - **Thin adapter, correct module.** Translate BetterRTP's public entry points (its `/rtp [player]
+    [world]` command forms and any Bukkit-Services API menu plugins call) into our existing `RTPCmd`
+    / selection path. Lives in `rtp-plugin` (Bukkit-family) or an addon, never in `rtp-core` /
+    `rtp-api`.
+  - **Pin a documented subset.** Emulate only the API surface menu plugins actually call (player /
+    world targeting, biome / price flags), not all of BetterRTP; document the emulated version.
+  - **Permissions + honesty.** Map `betterrtp.*` permission checks onto our permission model (or
+    honor both); be explicit in logs/metrics that RTP is serving the request, not BetterRTP.
+  - **Catalog + ADR.** Third-party-accommodating surface: catalog in
+    [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) per
+    [ADR-026](../adr/ADR-026-external-hook-api-surface.md); emulating a competitor's API is a
+    cross-module, D-005-gated decision requiring a dedicated ADR before implementation. Complements
+    (does not replace) the selector seam + bundled menu item above.
+- [ ] **BetterRTP parity: cooldown usage cap (`LockAfter` equivalent).** BetterRTP can lock a player
+  in an indefinite cooldown after a configured number of RTPs. Adds a per-player success counter to
+  the existing cooldown surface; reset semantics (per session, per day, never) are the real design
+  question, not the counter itself. Usability is debatable (see analysis below); implement only
+  behind a default-off knob, with a configurable reset window so it is a rate cap rather than a
+  permanent ban. Pairs with `messages.yml` (REQ-RTP-F-013).
+- [ ] **BetterRTP parity: persist RTP destination as a permanent spawn anchor (`SetAsRespawn`
+  equivalent).** On a first-join (or any configured event) RTP, optionally set the landed location as
+  the player's persistent spawn/bed anchor, not just the respawn-event location. Default off; one
+  config flag. Minor, low-risk.
+- [ ] **BetterRTP parity: widen built-in claim-plugin coverage.** BetterRTP ships ~18 respect-targets
+  out of the box; RTP ships ~7. This is integration breadth, not architecture: each new target is a
+  soft-depend adapter on the existing claim-exclusion seam (S-003 /
+  [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)), cataloged in
+  [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) per [ADR-026](../adr/ADR-026-external-hook-api-surface.md).
+  Candidate gap list (audit each for current upstream API before adding): MinePlots, RedProtect,
+  KingdomsX, hClaims, UltimateClaims, Pueblos, SaberFactions, HuskClaims, FactionsBridge, CrashClaim,
+  Residence. Folds into the existing "Claim-plugin integration audit" item above — same workstream,
+  this just sharpens the target list.
 
 ---
 

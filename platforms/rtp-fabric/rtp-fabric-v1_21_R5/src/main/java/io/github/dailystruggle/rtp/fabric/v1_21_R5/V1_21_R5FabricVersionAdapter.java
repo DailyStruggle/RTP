@@ -87,19 +87,27 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
      *
      * <p>Vanilla translates this to an effective ticket level via
      * {@code effectiveLevel = ChunkMap.MAX_CHUNK_DISTANCE - radius} (i.e.
-     * {@code 33 - radius}). {@code radius = 3} resolves to effective level
-     * {@code 30} = {@code ENTITY_TICKING}, the same end state Bukkit's
-     * {@code World#addPluginChunkTicket} produces and the same value
-     * {@code TicketType.FORCED} uses.</p>
+     * {@code 33 - radius}). {@code radius = 1} resolves to effective level
+     * {@code 32} ({@code FULL}/BORDER but below {@code ENTITY_TICKING}): the
+     * chunk stays pinned and block-readable for {@code RTPChunk#isSafe}, but
+     * its entity-ticking pipeline (mob spawning, AI, scheduled ticks) does not
+     * run, so a player-less kept-cache chunk costs effectively zero MSPT. The
+     * player's own arrival ticket promotes it to {@code ENTITY_TICKING} on
+     * teleport without a regen, preserving immediacy. This supersedes
+     * {@code rtp-fabric-ADR-006}'s {@code ENTITY_TICKING} end-state for the
+     * kept cache; see
+     * {@code rtp-fabric-ADR-016-kept-cache-non-entity-ticking.md}.</p>
      *
      * <p>Earlier revisions of this adapter passed {@code 31} as the radius
      * under the mistaken belief it was a ticket level — that would have
      * force-loaded a {@code (2*31+1)² = 3969}-chunk square per kept
      * location, which the chunk system clamps/rejects, leaving kept-cache
-     * entries unpinned and silently evicted. See
+     * entries unpinned and silently evicted; {@code radius = 0} (level
+     * {@code 33}) sits exactly on the eviction boundary and is avoided for the
+     * same drop-risk reason. See
      * {@code rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md}.</p>
      */
-    private static final int RTP_TICKET_RADIUS = 3;
+    private static final int RTP_TICKET_RADIUS = 1;
 
     /**
      * RTP-owned non-persistent, no-timeout {@link TicketType} used for both

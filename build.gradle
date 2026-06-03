@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'io.github.dailystruggle'
-version = '3.1.1'
+version = '3.1.2'
 
 spotless {
     java {
@@ -19,13 +19,13 @@ spotless {
 
 allprojects {
     group = 'io.github.dailystruggle'
-    version = '3.1.1'
+    version = '3.1.2'
 
     // RTP-lite ships a separate version line from Pro. Pro tracks the
-    // root `version` above (currently 3.1.1); lite is pinned via
+    // root `version` above (currently 3.1.2); lite is pinned via
     // `ext.liteVersion` and applied to the lite shadow/remap tasks and
     // `processLiteResources` token expansion in `rtp-plugin/build.gradle`.
-    ext.liteVersion = '3.1.1'
+    ext.liteVersion = '3.1.2'
 
     repositories {
         mavenCentral()
@@ -133,24 +133,32 @@ def publishedModulePaths = [
 // + Loom-remapped Pro and lite jars) are produced by `:rtp-plugin`. Mirror
 // them into the root `build/libs` so `build/libs` holds the real jars rather
 // than a blank one.
-tasks.register('copyPluginJars', Copy) {
-    group = 'build'
-    description = 'Copies the shippable :rtp-plugin jars into the root build/libs.'
-    from(project(':rtp-plugin').layout.buildDirectory.dir('libs'))
-    into layout.buildDirectory.dir('libs')
-    // The root `jar` task drops an empty RTP-<version>.jar here; remove it so
-    // build/libs only contains the real plugin artifacts.
-    doFirst {
-        delete fileTree(layout.buildDirectory.dir('libs')) {
-            include "${rootProject.name}-${project.version}.jar"
+// `:rtp-plugin` is the shaded Bukkit-family aggregator. It bundles the JDK-25
+// Fabric carriers via project(...) dependencies, so settings.gradle drops it
+// from the build graph whenever the JDK-25 modules are excluded (e.g. the
+// `-PexcludeJdk25` JitPack publish run). Only wire the aggregation task when
+// the module is actually part of this build, otherwise `project(':rtp-plugin')`
+// fails configuration with "Project with path ':rtp-plugin' could not be found".
+if (findProject(':rtp-plugin') != null) {
+    tasks.register('copyPluginJars', Copy) {
+        group = 'build'
+        description = 'Copies the shippable :rtp-plugin jars into the root build/libs.'
+        from(project(':rtp-plugin').layout.buildDirectory.dir('libs'))
+        into layout.buildDirectory.dir('libs')
+        // The root `jar` task drops an empty RTP-<version>.jar here; remove it so
+        // build/libs only contains the real plugin artifacts.
+        doFirst {
+            delete fileTree(layout.buildDirectory.dir('libs')) {
+                include "${rootProject.name}-${project.version}.jar"
+            }
         }
     }
-}
 
-// Build the plugin jars before copying, and run the copy as part of the root
-// build so `.\gradlew build` leaves the real artifacts in build/libs.
-copyPluginJars.dependsOn ':rtp-plugin:assemble'
-tasks.named('assemble').configure { finalizedBy copyPluginJars }
+    // Build the plugin jars before copying, and run the copy as part of the root
+    // build so `.\gradlew build` leaves the real artifacts in build/libs.
+    copyPluginJars.dependsOn ':rtp-plugin:assemble'
+    tasks.named('assemble').configure { finalizedBy copyPluginJars }
+}
 
 configure(publishedModulePaths.collect { project(it) }) {
     apply plugin: 'maven-publish'

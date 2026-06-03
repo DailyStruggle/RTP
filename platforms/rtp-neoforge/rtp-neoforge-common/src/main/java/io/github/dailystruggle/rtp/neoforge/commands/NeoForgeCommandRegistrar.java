@@ -1,28 +1,33 @@
 package io.github.dailystruggle.rtp.neoforge.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import io.github.dailystruggle.commandsapi.brigadier.BrigadierBridgeContext;
+import io.github.dailystruggle.commandsapi.brigadier.BrigadierCommandAdapter;
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
-import java.util.logging.Level;
+import io.github.dailystruggle.rtp.neoforge.tools.NeoForgeBrigadierSourceBridge;
 import net.minecraft.commands.CommandSourceStack;
 
+import java.util.UUID;
+import java.util.logging.Level;
+
 /**
- * NeoForge command-registration trampoline (Phase N1 scaffold).
+ * NeoForge command-registration trampoline (Phase N2.4 — Step NG).
  *
  * <p>NeoForge fires {@code RegisterCommandsEvent} on the game bus, exposing the
  * vanilla {@link CommandDispatcher} of {@link CommandSourceStack}
- * (NEOFORGE_NOTES.md §2). Both NeoForge and Fabric terminate in vanilla
+ * ({@code NEOFORGE_NOTES.md} §2). Both NeoForge and Fabric terminate in vanilla
  * Brigadier, so the {@code commands-api} Brigadier bridge
- * ({@code commands-api-ADR-001}) is reusable verbatim — this class is only the
- * platform-specific trampoline that hands the dispatcher to that bridge,
- * mirroring {@code FabricCommandRegistrar}.</p>
+ * ({@code commands-api-ADR-001}) is reused verbatim — this class is the
+ * platform-specific trampoline that builds the shared {@code /rtp} tree, wraps
+ * the NeoForge {@link CommandSourceStack} via {@link NeoForgeBrigadierSourceBridge},
+ * and registers the literal against the dispatcher.</p>
  *
- * <p><b>Phase N1 TODO (@leaf_26):</b> port {@code FabricCommandRegistrar} /
- * {@code RTPCmdFabricRoot}: build the shared command tree, wrap the NeoForge
- * {@link CommandSourceStack} in the {@code commands-api} source bridge, and
- * register the {@code /rtp} literal against {@code dispatcher}. The S-007
- * configurable busy/invalid-command messages are inherited from the shared
- * command tree. The exit gate for Phase N1 is a single {@code /rtp} round-trip
- * on the default world.</p>
+ * <p>Unlike Fabric's {@code FabricCommandRegistrar}, no reflective {@code Proxy}
+ * dance is required: NeoForge is Mojmap-at-runtime, so {@link CommandSourceStack}
+ * is a stable typed reference and the bytecode never carries an intermediary
+ * name that could fail JVM verification (rtp-neoforge-ADR-001).</p>
  */
 public final class NeoForgeCommandRegistrar {
 
@@ -30,17 +35,55 @@ public final class NeoForgeCommandRegistrar {
   }
 
   /**
-   * Registers the {@code /rtp} command tree against the NeoForge dispatcher.
+   * Builds the {@code /rtp} command tree and registers it against the NeoForge
+   * dispatcher supplied by {@code RegisterCommandsEvent}.
    *
-   * @param dispatcher the vanilla Brigadier dispatcher from {@code RegisterCommandsEvent}
+   * @param dispatcher the vanilla Brigadier dispatcher
    */
   public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-    // TODO(Phase N1, @leaf_26): wire the commands-api Brigadier bridge here.
-    // Until the bridge wiring lands, log loudly so the gap is visible at
-    // runtime rather than silently swallowed (S-004 posture).
-    RTP.log(Level.WARNING,
-        "[RTP/NeoForge] command registration is a Phase N1 scaffold — "
-            + "/rtp is not yet wired on NeoForge. See "
-            + "platforms/rtp-neoforge/REQUIREMENTS.md and NEOFORGE_NOTES.md §10.");
+    if (dispatcher == null) {
+      RTP.log(Level.WARNING, "[RTP][NeoForge] command registration skipped: null dispatcher.");
+      return;
+    }
+    try {
+      RTPCmdNeoForgeRoot root = new RTPCmdNeoForgeRoot();
+      // Expose the root so other subsystems (info / menu / network) can locate
+      // the canonical command tree, mirroring the Bukkit / Fabric entrypoints.
+      RTP.baseCommand = root;
+
+      BrigadierBridgeContext<CommandSourceStack> bridgeCtx =
+          new BrigadierBridgeContext<>(
+              NeoForgeBrigadierSourceBridge::resolveSenderUuid,
+              NeoForgeBrigadierSourceBridge::checkPermission,
+              (src, msg) -> {
+                if (msg == null) return;
+                try {
+                  UUID uuid = NeoForgeBrigadierSourceBridge.resolveSenderUuid(src);
+                  if (uuid != null && !uuid.equals(RTPAPI.serverId)) {
+                    // Player source — formats placeholders + legacy colour codes
+                    // and dispatches through the player's RTPCommandSender.
+                    RTP.serverAccessor.sendMessage(uuid, msg, null);
+                  } else {
+                    // Console / command-block / serverId sentinel: route through
+                    // RTP.log so the message lands in the server console with
+                    // colour codes preserved.
+                    RTP.log(Level.INFO, msg);
+                  }
+                } catch (Throwable t) {
+                  RTP.log(Level.WARNING,
+                      "[RTP][NeoForge] Brigadier sendMessage failed: " + t.getMessage());
+                }
+              });
+
+      LiteralArgumentBuilder<CommandSourceStack> builder =
+          BrigadierCommandAdapter.toBrigadier(root, bridgeCtx);
+      dispatcher.register(builder);
+      RTP.log(Level.INFO, "[RTP][NeoForge] /rtp command tree registered.");
+    } catch (Throwable t) {
+      // S-004: never silently swallow a registration failure.
+      RTP.log(Level.WARNING,
+          "[RTP][NeoForge] /rtp Brigadier registration failed: "
+              + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
+    }
   }
 }

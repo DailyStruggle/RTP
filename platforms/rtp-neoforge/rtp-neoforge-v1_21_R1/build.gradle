@@ -11,11 +11,17 @@
 // per-version isolation is purely about absorbing Mojmap name drift, never
 // leaking it into rtp-core / rtp-api.
 //
-// Included only under `-PincludeNeoforge` (see settings.gradle) — the NeoForge
-// userdev artifacts require network access not present on every build host.
+// Included BY DEFAULT and merged into the unified LeafRTP-Pro jar; drop it with
+// `-PexcludeNeoforge` (see settings.gradle) on hosts without network access for
+// the NeoForge userdev artifacts.
 
 plugins {
-    id 'net.neoforged.moddev' version '2.0.78'
+    // Version pinned centrally in settings.gradle pluginManagement.plugins {}
+    // (2.0.78 -- the proven, host-cached version this 1.21.x line builds with).
+    // Apply with a bare id so this carrier and rtp-neoforge-common share one
+    // moddev classloader. Only the experimental, JDK-25-gated 26.1 carrier
+    // overrides to a newer moddev (in its own build.gradle).
+    id 'net.neoforged.moddev'
 }
 
 ext {

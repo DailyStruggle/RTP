@@ -8,6 +8,17 @@ pluginManagement {
             name = 'Fabric'
             url = 'https://maven.fabricmc.net/'
         }
+        // NeoForged Maven hosts the ModDevGradle (net.neoforged.moddev) plugin
+        // implementation and its transitive dependencies. The gradlePluginPortal
+        // below only carries the plugin *marker*; without this repo Gradle
+        // resolves the marker for `net.neoforged.moddev` but then fails to find
+        // the plugin's own dependency artifacts, surfacing as
+        //   "Plugin [id: 'net.neoforged.moddev', version: '...'] was not found
+        //    in any of the following sources".
+        maven {
+            name = 'NeoForged'
+            url = 'https://maven.neoforged.net/releases'
+        }
         gradlePluginPortal()
     }
     // Declare fabric-loom's default version once here so every subproject
@@ -43,6 +54,27 @@ pluginManagement {
         id 'fabric-loom'                       version '1.15-SNAPSHOT'
         id 'net.fabricmc.fabric-loom'          version '1.15-SNAPSHOT'
         id 'net.fabricmc.fabric-loom-remap'    version '1.15-SNAPSHOT'
+        // NeoForge ModDevGradle: pin the version once here so the default
+        // NeoForge carriers (rtp-neoforge-common + rtp-neoforge-v1_21_R1, the
+        // JDK-21 1.21.x line that ships in the unified jar) share a single
+        // plugin classloader and version. They apply it with a bare
+        // `id 'net.neoforged.moddev'` (no per-module version).
+        //
+        // Version is 2.0.141: the single ModDevGradle 2 version shared by
+        // EVERY NeoForge carrier (the JDK-21 1.21.x line AND the JDK-25 26.1
+        // line). MC 26.1 requires moddev 2.0.134+, so the 26.1 carrier cannot
+        // build on anything older; pinning the whole NeoForge set to 2.0.141
+        // keeps all carriers in ONE plugin classloader (no per-module version
+        // override, no dual-classloader split) and lets the default build
+        // produce every platform adapter, 1.21.x and 26.1 alike. 2.0.141 is the
+        // latest published moddev (Gradle Plugin Portal) and resolves from the
+        // NeoForged + portal repositories declared above.
+        //
+        // Hosts that genuinely cannot reach 2.0.141 (fully offline, portal-
+        // blocked) cannot build the NeoForge adapters at all and must drop them
+        // with -PexcludeNeoforge (whole platform) or -PexcludeJdk25 (just the
+        // JDK-25 26.1 carrier). Both leave the rest of the build untouched.
+        id 'net.neoforged.moddev'              version '2.0.141'
     }
 }
 
@@ -282,26 +314,42 @@ project(':rtp-proxy:rtp-proxy-common').projectDir   = file('platforms/rtp-proxy/
 project(':rtp-proxy:rtp-proxy-velocity').projectDir = file('platforms/rtp-proxy/rtp-proxy-velocity')
 
 // NeoForge platform adapter — in-scope per ADR-033 and rtp-neoforge-ADR-001.
-// Phase N1 bring-up skeleton. The NeoForge toolchain (ModDevGradle,
-// net.neoforged.moddev) resolves NeoForge userdev artifacts from network
-// repositories that are NOT available on every build host (CI, JitPack, the
-// sandbox where the skeleton was authored). Merely *configuring* these modules
-// forces ModDevGradle to resolve those artifacts, which would fail the whole
-// build offline — exactly like the JDK-25 Loom carriers above. So the NeoForge
-// modules are an OPT-IN island: included only when `-PincludeNeoforge` is
-// passed (or the INCLUDE_NEOFORGE env var is set). Nothing in the default
-// build graph depends on them. The named maintainer (project lead, @leaf_26)
-// builds/verifies them on a network-capable host.
+// The NeoForge platform is part of the unified single-jar (rtp-plugin merges
+// its Mojmap bytecode + META-INF/neoforge.mods.toml post-remap, so one
+// LeafRTP-Pro-<ver>.jar loads on Bukkit/Fabric/Velocity AND NeoForge).
+//
+// The NeoForge toolchain (ModDevGradle, net.neoforged.moddev) resolves NeoForge
+// userdev artifacts from network repositories that are NOT available on every
+// build host (CI, JitPack, fully-offline sandboxes). Merely *configuring* these
+// modules forces ModDevGradle to resolve those artifacts, which would fail an
+// offline build — exactly like the JDK-25 Loom carriers above. So NeoForge is
+// included BY DEFAULT (network-capable hosts produce the full unified jar) and
+// can be dropped on network-constrained hosts by passing `-PexcludeNeoforge`
+// (or setting the EXCLUDE_NEOFORGE env var). When excluded, rtp-plugin omits
+// the NeoForge merge and the unified jar simply carries no neoforge.mods.toml.
 // See platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md.
-def includeNeoforge = startParameter.projectProperties.containsKey('includeNeoforge') ||
-        System.getenv('INCLUDE_NEOFORGE') != null
-if (includeNeoforge) {
+def excludeNeoforge = startParameter.projectProperties.containsKey('excludeNeoforge') ||
+        System.getenv('EXCLUDE_NEOFORGE') != null
+if (!excludeNeoforge) {
     include 'rtp-neoforge:rtp-neoforge-common'
     include 'rtp-neoforge:rtp-neoforge-v1_21_R1'
 
     project(':rtp-neoforge').projectDir                          = file('platforms/rtp-neoforge')
     project(':rtp-neoforge:rtp-neoforge-common').projectDir      = file('platforms/rtp-neoforge/rtp-neoforge-common')
     project(':rtp-neoforge:rtp-neoforge-v1_21_R1').projectDir    = file('platforms/rtp-neoforge/rtp-neoforge-v1_21_R1')
+
+    // EARLY/EXPERIMENTAL 26.x carrier (MC 26.1, NeoForge 26.1.x). MC 26.1 runs
+    // on Java 25, so this carrier pins a Java 25 toolchain and is gated by
+    // `-PexcludeJdk25` (alongside the JDK-25 Fabric carriers above) - a
+    // JDK-21-only host drops it even when the rest of NeoForge is built. It
+    // shares the central moddev 2.0.141 pin (no per-module override). The
+    // 1.21.1 carrier (Java 21) is unaffected and keeps the unified jar
+    // NeoForge-capable on JDK-21 hosts. See
+    // platforms/rtp-neoforge/rtp-neoforge-v26_1_R1/build.gradle.
+    if (!excludeJdk25) {
+        include 'rtp-neoforge:rtp-neoforge-v26_1_R1'
+        project(':rtp-neoforge:rtp-neoforge-v26_1_R1').projectDir = file('platforms/rtp-neoforge/rtp-neoforge-v26_1_R1')
+    }
 }
 
 include 'addons:RTP_ExampleAddon'
