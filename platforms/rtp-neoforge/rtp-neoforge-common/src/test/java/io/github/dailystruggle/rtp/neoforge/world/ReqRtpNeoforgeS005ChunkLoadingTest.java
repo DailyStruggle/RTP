@@ -1,0 +1,115 @@
+package io.github.dailystruggle.rtp.neoforge.world;
+
+import io.github.dailystruggle.rtp.anvil.AnvilChunkView;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.util.Collections;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * REQ-RTP-S-005 regression guard for the NeoForge anvil-backed
+ * {@link NeoForgeRTPChunk} path (ADR-016 pre-filter parity).
+ *
+ * <p>An Anvil-backed {@link NeoForgeRTPChunk} must answer every block-data
+ * query from the decoded {@link AnvilChunkView} without touching a live
+ * {@code ChunkAccess} / {@code ServerLevel} — i.e. without forcing a
+ * synchronous chunk load on the server tick thread. The anvil constructor
+ * passes {@code super(null)}, so any leak into the live branch would NPE on the
+ * null {@code chunk} field; that these queries return the view-derived answers
+ * (rather than NPE) is the proof of dual-mode dispatch.</p>
+ *
+ * <p>NeoForge analogue of {@code ReqRtpS005FabricAnvilChunkTest}. Because
+ * NeoForge ships Mojang-mapped names at runtime there is no obf/intermediary
+ * carrier split, but the S-005 invariant — no main-thread chunk I/O on the
+ * anvil path — is identical and is the regression this class pins.</p>
+ *
+ * <p>This test deliberately does NOT bootstrap the Minecraft registry; the
+ * anvil path must not depend on it. A regression that introduces a registry or
+ * live-chunk lookup on the anvil path fails here.</p>
+ */
+@DisplayName("REQ-RTP-S-005 — NeoForgeRTPChunk anvil-mode dispatch (no live load)")
+class ReqRtpNeoforgeS005ChunkLoadingTest {
+
+    private static final UUID WORLD_ID =
+            UUID.nameUUIDFromBytes("test-world".getBytes());
+
+    /** A self-contained, empty-sections view: no chunk data on disk. */
+    private static AnvilChunkView emptyView() {
+        // Two-arg constructor defaults biomeSections to an empty list and
+        // motionBlockingNoLeaves to null, which makes getSurfaceHeight return
+        // the floor (0).
+        return new AnvilChunkView(0, Collections.emptyList(), null);
+    }
+
+    @Test
+    @DisplayName("anvil-backed constructor sets isAnvilBacked / isSelfContained / isLoaded")
+    void modeFlags() {
+        NeoForgeRTPChunk c = new NeoForgeRTPChunk(emptyView(), 3, -7, WORLD_ID, null);
+        assertTrue(c.isAnvilBacked(), "must report anvil-backed");
+        assertTrue(c.isSelfContained(), "ADR-015: anvil-backed instances are self-contained");
+        assertFalse(c.isLoaded(), "an anvil-backed instance is by construction NOT loaded");
+        assertTrue(c.isGenerated(), "the region file entry exists => generated");
+        assertEquals(3, c.x());
+        assertEquals(-7, c.z());
+    }
+
+    @Test
+    @DisplayName("anvil-backed constructor rejects null view")
+    void rejectsNullView() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new NeoForgeRTPChunk(null, 0, 0, WORLD_ID, null));
+    }
+
+    @Test
+    @DisplayName("isAir / getSkyLight / getSurfaceHeight route through the view (no live access)")
+    void blockQueriesRouteThroughView() {
+        NeoForgeRTPChunk c = new NeoForgeRTPChunk(emptyView(), 0, 0, WORLD_ID, null);
+        // Empty sections => every (x,y,z) is "above the highest emitted section"
+        // => treated as air per AnvilChunkView contract. The live path would NPE
+        // on a null ChunkAccess — that this returns true is the proof of dispatch.
+        assertTrue(c.isAir(0, 64, 0));
+        assertTrue(c.isAir(15, 0, 15));
+        // Anvil-backed sky light is the vanilla "fully lit" default.
+        assertEquals(15, c.getSkyLight(0, 64, 0));
+        // Empty heightmap => floor (= minHeight = 0).
+        assertEquals(0, c.getSurfaceHeight(0, 0));
+    }
+
+    @Test
+    @DisplayName("isSafe with empty unsafe set short-circuits to true (no live access)")
+    void isSafeEmptySet() {
+        NeoForgeRTPChunk c = new NeoForgeRTPChunk(emptyView(), 0, 0, WORLD_ID, null);
+        assertTrue(c.isSafe(0, 64, 0, Collections.emptySet()));
+        assertTrue(c.isSafe(0, 64, 0, (Set<String>) null));
+    }
+
+    @Test
+    @DisplayName("isSafe with non-empty unsafe set delegates to view (no live access)")
+    void isSafeWithUnsafe() {
+        NeoForgeRTPChunk c = new NeoForgeRTPChunk(emptyView(), 0, 0, WORLD_ID, null);
+        // Empty view => blockIdAt returns null => AnvilChunkView treats out-of-range
+        // as safe (cannot carry unsafe blocks).
+        Set<String> reconciledUnsafe = Set.of("LAVA");
+        assertTrue(c.isSafe(0, 64, 0, reconciledUnsafe));
+    }
+
+    @Test
+    @DisplayName("keep / unload are no-ops on anvil-backed instances (no S-002 ticket churn)")
+    void keepAndUnloadAreNoOps() {
+        NeoForgeRTPChunk c = new NeoForgeRTPChunk(emptyView(), 0, 0, WORLD_ID, null);
+        // No NeoForgeRTPWorld registered against WORLD_ID and RTP.serverAccessor
+        // is unset — if dispatch leaked into the live branch, the world lookup
+        // would proceed (or NPE). The anvil branch returns immediately.
+        assertDoesNotThrow(() -> c.keep(true));
+        assertDoesNotThrow(() -> c.keep(false));
+        assertDoesNotThrow(c::unload);
+    }
+}

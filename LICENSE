@@ -1,8 +1,24 @@
 Required Notice: Copyright DailyStruggle (https://github.com/DailyStruggle/RTP)
 
-Pre-compiled releases of RTP are sold at: https://builtbybit.com/resources/rtp-pro.105418/
-Purchasing a release does not grant redistribution rights.
-Compiling from source for personal, non-commercial use is free and permitted under the terms below.
+This project is dual-licensed (open-core; see ADR-061):
+
+- MIT-licensed (see `LICENSE-MIT`): the publicly reusable core modules
+  `rtp-api` and `rtp-core`, and the RTP (lite) binary distribution. These may
+  be used, modified, and redistributed (including commercially) under the
+  terms of the MIT License.
+- PolyForm Noncommercial 1.0.0 (the terms below): all other source in this
+  repository, i.e. the Pro-only features (SQL/Redis persistence, the Folia
+  adapter, the login reserve cache, the multilingual bootstrap, claim-plugin
+  integrations, the proxy / network-mode modules, and the Pro plugin
+  assembly). This source is provided for personal, noncommercial use only.
+
+Where a module or file ships its own `LICENSE` / SPDX header, that grant
+governs the file. In the absence of a more specific grant, the PolyForm
+Noncommercial terms below apply.
+
+Pre-compiled Pro releases of RTP are sold at: https://builtbybit.com/resources/rtp-pro.105418/
+Purchasing a Pro release does not grant redistribution rights.
+Compiling the Pro source for personal, non-commercial use is free and permitted under the terms below.
 
 ---
 

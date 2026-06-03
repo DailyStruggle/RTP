@@ -1,0 +1,83 @@
+// EARLY/EXPERIMENTAL NeoForge per-MC carrier for the 26.x line (Minecraft 26.1).
+//
+// Mirrors platforms/rtp-neoforge/rtp-neoforge-v1_21_R1 (rtp-neoforge-ADR-001):
+// this submodule supplies the actual runtime mod jar pinned to its MC version
+// and hosts the version adapter (the only NM-typed surface that drifts across
+// MC revs). rtp-neoforge-common holds the version-agnostic glue.
+//
+// NeoForge is Mojmap-at-runtime, and the 26.x line is fully deobfuscated
+// (Mojang parameter names ship natively, Parchment removed - see the NeoForge
+// "for Minecraft 26.1" release notes), so - exactly like the 1.21.1 carrier -
+// there is NO obf/unobf split here (NEOFORGE_NOTES.md section 5). The per-version
+// isolation purely absorbs Mojmap name drift between 1.21.1 and 26.1, never
+// leaking it into rtp-core / rtp-api.
+//
+// IMPORTANT (parity with the Fabric v26_*_R1 carriers): Minecraft 26.1 runs on
+// Java 25, so this module pins a Java 25 toolchain and requires ModDevGradle
+// 2.0.134+ (NeoForge 26.1 snapshots). The whole NeoForge carrier set is pinned
+// centrally to ModDevGradle 2.0.141 in settings.gradle pluginManagement, so
+// this module applies the plugin with a bare `id 'net.neoforged.moddev'` (no
+// per-module version) and shares the single moddev classloader with the
+// JDK-21 1.21.x carrier. Contributors / build hosts without JDK 25 must drop
+// this module with -PexcludeJdk25 (settings.gradle gates it alongside the
+// JDK-25 Fabric carriers); the rest of the build (Java 21) is unaffected. A
+// Java 25 server loads the Java 21 bytecode from rtp-neoforge-common in the
+// same unified jar - bytecode compatibility is forward-only.
+//
+// WARNING: 26.1 is a moving target (latest stable build at authoring time:
+// MC 26.1.2 / NeoForge 26.1.2.65-beta). The pinned minecraftVersion /
+// neoforgeVersion below, plus the version matcher in
+// RTPNeoForgeMod#installVersionAdapter, must be re-verified when 26.1 settles
+// and again for 26.2. This carrier has NOT been compiled against the real
+// NeoForge 26.1 userdev artifacts (network-gated); the maintainer must run
+// `.\gradlew :rtp-neoforge:rtp-neoforge-v26_1_R1:build` on a network-capable
+// JDK-25 host to verify the Mojmap API surface still matches.
+
+plugins {
+    // ModDevGradle is pinned centrally to 2.0.141 in settings.gradle
+    // pluginManagement.plugins {} - the single version shared by every NeoForge
+    // carrier (the JDK-21 1.21.x line AND this JDK-25 26.1 line), because MC
+    // 26.1 requires moddev 2.0.134+. Apply it WITHOUT a version here so all
+    // carriers stay in one plugin classloader; do not reintroduce a per-module
+    // version override.
+    id 'net.neoforged.moddev'
+}
+
+ext {
+    minecraftVersion = '26.1.2'
+    neoforgeVersion  = '26.1.2.65-beta'
+}
+
+java {
+    toolchain {
+        // MC 26.1 requires Java 25 minimum (NeoForge "for Minecraft 26.1"
+        // release notes). The 1.21.1 carrier stays on Java 21.
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+neoForge {
+    version = neoforgeVersion
+
+    // Dev-launch run config (NEOFORGE_NOTES.md section 8). The carrier exit gate
+    // is a single /rtp round-trip on a dev server launched via
+    // `:rtp-neoforge:rtp-neoforge-v26_1_R1:runServer`.
+    runs {
+        server {
+            server()
+        }
+    }
+
+    mods {
+        rtp {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    // Version-agnostic NeoForge glue + the platform-neutral RTP modules it
+    // re-exports (rtp-api / rtp-core / commands-api / anvil-api). Compiled to
+    // Java 21 bytecode and fully loadable from this Java 25 module's runtime.
+    implementation project(':rtp-neoforge:rtp-neoforge-common')
+}

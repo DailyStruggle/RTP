@@ -85,6 +85,64 @@ LeafRTP-Pro is engineered for the servers that push the platform hardest. If any
 ---
 
 <details>
+<summary><b>Commands &amp; permissions reference</b></summary>
+
+**Commands** (registered aliases: `/rtp`, `/wild`):
+
+| Command | Description | Permission |
+| --- | --- | --- |
+| `/rtp` / `/wild` | Random teleport to the default region for your current world | `rtp.use` |
+| `/rtp region:<name>` | Teleport to a named region | `rtp.region` / `rtp.regions.*` |
+| `/rtp world:<world>` | Teleport within a specific world | `rtp.world` / `rtp.worlds.*` |
+| `/rtp player:<name>` | Teleport another player | `rtp.other` |
+| `/rtp biome:<biome>` | Teleport to a chosen biome | `rtp.biome` / `rtp.biome.*` |
+| `/rtp centerx=<x> centerz=<z> radius=<r>` | Ephemeral per-call overrides | `rtp.params` |
+| `/rtp menu` | Interactive book (Paper / Folia) or chat-paginated menu | `rtp.use` |
+| `/rtp info` | Operator diagnostics dashboard (queue, latency, leak rate, TPS/MSPT) | `rtp.info` |
+| `/rtp reload [file]` | Reload all configuration, or one file | `rtp.reload` |
+| `/rtp config <file> view\|set <k>=<v>` | View or set a config key, then auto-reload | `rtp.config` |
+| `/rtp scan start\|pause\|resume\|reset\|cancel` | Background spatial-memory crawl | `rtp.scan` |
+
+**Key permission nodes** (full set in `plugin.yml`):
+
+| Permission | Default | Grants |
+| --- | --- | --- |
+| `rtp.use` | `true` | Use `/rtp` and `/wild` |
+| `rtp.see` | `true` | Tab-complete `/rtp` |
+| `rtp.free` | `op` | Skip the Vault economy charge |
+| `rtp.params` | `op` | Custom per-call overrides (`centerx=`, `centerz=`, `radius=`) |
+| `rtp.personalqueue` | `false` | Reserve a per-player pre-warmed location |
+| `rtp.onevent.*` | `false` | Auto-RTP on join / firstjoin / respawn / changeworld / move / teleport |
+| `rtp.admin` | `op` | All admin tooling (`reload`, `config`, `scan`, `info`) |
+| `rtp.*` | `op` | Every subcommand |
+
+</details>
+
+<details>
+<summary><b>Configuration files at a glance</b></summary>
+
+LeafRTP-Pro splits configuration by concern under `plugins/RTP/`. Every file is hot-reloadable (`/rtp reload <file>`) and editable in-game via `/rtp config <file>`.
+
+| File | Scope | Example keys |
+| --- | --- | --- |
+| `config.yml` | Core / global behavior, database, menu renderer | `teleportDelay`, `teleportCooldown`, `cancelDistance`, `database.type`, `menu.renderer` |
+| `regions/<name>.yml` | Per-region shape, radius, center, queue, price, gates | `shape`, `vert`, `radius`, `cacheCap`, `price`, `requirePermission` |
+| `worlds/<name>.yml` | Per-world region routing and overrides | `region`, `override`, `requirePermission` |
+| `safety.yml` | Block / biome safety filter (Pro token grammar) | `unsafeBlocks`, `airBlocks` |
+| `economy.yml` | Vault pricing (Pro) | `price`, `priceOther`, `biomePrice`, `balanceFloor`, `refundOnCancel` |
+| `effects/<name>.yml` | Lifecycle effects (particles, sounds, fireworks, potions) | per-phase effect definitions |
+| `performance.yml` | Tick budgets, queue caps, caches | `maxAttempts`, `syncAllottedTime`, `minTPS`, `loginCacheEnabled` |
+| `network.yml` | Proxy / multi-server selector (Pro) | `enabled`, transport settings |
+| `integrations.yml` | Claim-plugin reroll toggles | `rerollWorldGuard`, `rerollGriefPrevention`, ... |
+| `logging.yml` | Log verbosity and channels | logging toggles |
+| `metrics.yml` | Runtime-health metrics | metrics toggles |
+| `language.yml` | Locale selection | `language` |
+| `messages.yml` | User-facing text (fully localizable, REQ-RTP-F-013) | message templates |
+| `lang/**` | Bundled translations (Pro) | per-locale value files |
+
+</details>
+
+<details>
 <summary><b>Full benchmark - Paper, Spigot, Folia head-to-head</b></summary>
 
 **Confidence:** measured; from plugin docs; inferred from architecture.
@@ -165,7 +223,7 @@ Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https:/
 - **Folia** - Anvil read-only pre-filter on `ForkJoinPool.commonPool()` *before* the Region Scheduler; rejected candidates never hop a thread. Confirmed candidates load through Folia's native async API; teleports dispatch through the Entity Scheduler.
 - **Spigot** - `.mca` region files parsed off-tick (`isAir`, `isSafe`, surface-height, sky-light, biome). Paper-class throughput on plain Spigot.
 - **Mohist / Arclight** - officially supported. Spigot code path applies.
-- **Fabric** - in-tree adapter, supported and regularly tested; featureset lags the Bukkit family by a release or two. Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x runtimes.
+- **Fabric** - first-class, stable, in-tree adapter; supported and regularly tested, at feature parity with the Bukkit family. Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x runtimes.
 
 **Honest fallback caveats.** The Anvil pre-filter is a data source, not a universal gate. It falls through to the platform's native chunk API in two cases: (1) the chunk is already loaded (live data wins), or (2) the probe returns *unknown* (no region file, unsupported data version, decode error, un-populated). On Spigot the fallback is one on-tick `getChunkAt`. On Folia it's one Region-Scheduler hop. Custom generators (Iris, Terra, datapacks) do **not** trigger the fallback - populated `.mca` palettes are read directly, preserving modded and namespaced IDs that the Bukkit enum would collapse.
 

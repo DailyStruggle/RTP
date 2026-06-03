@@ -30,8 +30,19 @@ public class ReloadCmd extends BaseRTPCmdImpl {
 
   public void addCommands() {
     final Configs configs = RTP.configs;
-    if (configs == null)
-      RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands, 1));
+    if (configs == null) {
+      // Configs are not loaded yet (e.g. the command tree is being built before
+      // the rtp-core singleton finished bootstrapping its Configs - this is the
+      // normal case on NeoForge, where RegisterCommandsEvent fires during the
+      // initial datapack load). Reschedule and bail; dereferencing `configs`
+      // below would NPE. RTP.getInstance() can itself be null this early, so
+      // guard it before queueing the retry.
+      RTP rtp = RTP.getInstance();
+      if (rtp != null) {
+        rtp.miscAsyncTasks.add(new RTPRunnable(this::addCommands, 1));
+      }
+      return;
+    }
     for (ConfigParser<?> value : configs.configParserMap.values()) {
       String name = value.name.replace(".yml", "");
       if (getCommandLookup().containsKey(name)) continue;

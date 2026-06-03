@@ -99,6 +99,24 @@ configurations {
             attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
         }
     }
+    // Bytecode-only configuration for the NeoForge platform carriers
+    // (rtp-neoforge-common + rtp-neoforge-v1_21_R1). Same merge-post-remap
+    // story as the Fabric unobf/v26 carriers above: NeoForge is Mojmap-at-
+    // runtime, so its `net.minecraft.*` references must NOT pass through Loom's
+    // intermediary remapJar (which would rewrite them to `class_NNNN` and fail
+    // to link on a NeoForge runtime). We pull these jars here (never onto the
+    // compile classpath -- rtp-plugin has no NeoForge import) and merge them
+    // into the released unified jar AFTER remapJar via `mergeNeoForgeBytecodeIntoJar`.
+    // The NeoForge modules are Java 21 (NeoForge 21.1.x), so no JVM-version
+    // attribute relaxation is required (unlike the JDK-25 Fabric carriers).
+    // Declared unconditionally; the project dependencies that feed it are added
+    // only when the NeoForge modules are in the build graph (see dependencies
+    // block) -- i.e. unless `-PexcludeNeoforge` was passed.
+    neoforgeBytecode {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+    }
 }
 
 dependencies {
@@ -182,6 +200,26 @@ dependencies {
     // on MC 26.1.2 via the v26_1_R1 adapter's installEffectsWiring path.
     // See effects-api-ADR-006 and POTENTIAL_BUGS.md 2026-05-08.
     effectsApiFabricUnobfBytecode project(':effects-api:effects-api-fabric-unobf')
+
+    // NeoForge platform carriers, merged into the unified jar post-remap (see
+    // the neoforgeBytecode configuration and mergeNeoForgeBytecodeIntoJar
+    // below). Added only when the NeoForge modules are in the build graph --
+    // i.e. unless `-PexcludeNeoforge` / EXCLUDE_NEOFORGE dropped them in
+    // settings.gradle. rtp-plugin never imports NeoForge classes (RTPNeoForgeMod
+    // is the @Mod entry point inside rtp-neoforge-common), so these stay off the
+    // compile classpath and are consumed only by remapJar's merge step.
+    if (findProject(':rtp-neoforge:rtp-neoforge-common') != null) {
+        neoforgeBytecode project(':rtp-neoforge:rtp-neoforge-common')
+        neoforgeBytecode project(':rtp-neoforge:rtp-neoforge-v1_21_R1')
+    }
+    // EARLY/EXPERIMENTAL 26.x carrier (Java 25). Present only on a JDK-25 host
+    // (settings.gradle drops it under -PexcludeJdk25), so it is merged
+    // independently of the Java-21 carriers above: a JDK-21 build still produces
+    // a NeoForge-capable jar (1.21.x only) without it. Its Java 25 bytecode is
+    // loaded only on a 26.x (Java 25) runtime, so co-shipping it is safe.
+    if (findProject(':rtp-neoforge:rtp-neoforge-v26_1_R1') != null) {
+        neoforgeBytecode project(':rtp-neoforge:rtp-neoforge-v26_1_R1')
+    }
 
     implementation project(':rtp-core')
     implementation project(':rtp-bukkit:rtp-bukkit-v1_20_R1')
@@ -542,6 +580,156 @@ ext.mergeFabricUnobfBytecodeIntoJar = { File out, String editionLabel, File v26,
     logger.lifecycle("[rtp-plugin] (${editionLabel}) Merged ${addedFromV26} v26_1_R1 adapter classes + ${addedFromCommonUnobf} rtp-fabric-common-unobf classes + ${addedFromEffectsUnobf} effects-api-fabric-unobf classes into ${out.name} (post-remap, Mojang names preserved).")
 }
 
+// Merge the NeoForge platform carriers (rtp-neoforge-common +
+// rtp-neoforge-v1_21_R1) INTO an already-Loom-remapped jar, so one unified
+// LeafRTP jar loads on Bukkit/Fabric/Velocity AND NeoForge. Same rationale as
+// the Fabric unobf merge above: NeoForge is Mojmap-at-runtime, so its
+// `net.minecraft.*` references must NOT be rewritten to intermediary by Loom's
+// remapJar (which would NoClassDefFoundError on a NeoForge runtime). We open
+// the post-remap jar and append the NeoForge classes verbatim, applying the
+// same `io.github.dailystruggle.{commandsapi,effectsapi}` ->
+// `io.github.dailystruggle.rtp.*` relocation Shadow performed on the rest of
+// the jar, and we carry `META-INF/neoforge.mods.toml` through unchanged so the
+// NeoForge ModDiscoverer recognises the jar as a NeoForge mod. On a non-NeoForge
+// runtime the @Mod entry point (RTPNeoForgeMod) and its net.neoforged.* / NM
+// references are simply never classloaded -- identical to how the Velocity and
+// Fabric entry points coexist in the same artifact.
+//
+// `carrierJars` are the resolved NeoForge module jars (common first so its
+// neoforge.mods.toml wins). Passed as explicit File args so the closure never
+// reaches Task.project at execution time (Gradle 9/10 + config-cache safe).
+ext.mergeNeoForgeBytecodeIntoJar = { File out, String editionLabel, List<File> carrierJars ->
+    def tmp = new File(out.parentFile, out.name + '.neoforgemerge.tmp')
+    // Skip metadata that belongs to the host (Bukkit/Fabric/Velocity) jar or
+    // the MC runtime; KEEP neoforge.mods.toml (that is the whole point).
+    def skipPatterns = [
+        ~'^fabric\\.mod\\.json$',
+        ~'^velocity-plugin\\.json$',
+        ~'^plugin\\.yml$',
+        ~'^META-INF/MANIFEST\\.MF$',
+        ~'^META-INF/mods\\.toml$',
+        ~'^META-INF/services/.*$',
+        ~'^pack\\.mcmeta$',
+        ~'^assets/.*$',
+        ~'^data/.*$',
+        ~'^mappings/.*$',
+        ~'^net/minecraft/.*$',
+        ~'^net/neoforged/.*$'
+    ]
+    def shouldSkip = { String name ->
+        for (p in skipPatterns) { if (name ==~ p) return true }
+        return false
+    }
+    // Libraries that NeoForge already provides as named JPMS modules on the
+    // boot module layer. The unified jar is treated as an automatic module
+    // (`rtp`) by NeoForge's ModuleLayerHandler, so any package it exports that
+    // a NeoForge-provided module also exports to `minecraft` triggers a fatal
+    // `ResolutionException: Modules <x> and rtp export package <x> to module
+    // minecraft`. The Pro shadowJar strips log4j/netty/guava/gson but NOT
+    // slf4j, so we drop the bundled slf4j (API + its maven metadata, incl.
+    // any multi-release copies) HERE while producing the NeoForge-capable
+    // unified jar. This mirrors the lite jar, which already excludes
+    // `org/slf4j/**` because every host (Spigot/Paper, Fabric, Velocity,
+    // NeoForge) provides slf4j on its own classpath/module path.
+    def hostStripPatterns = [
+        ~'^org/slf4j/.*$',
+        ~'^META-INF/versions/[^/]+/org/slf4j/.*$',
+        ~'^META-INF/maven/org\\.slf4j/.*$'
+    ]
+    def shouldStripFromHost = { String name ->
+        for (p in hostStripPatterns) { if (name ==~ p) return true }
+        return false
+    }
+    def pkgRemap = [
+        'io/github/dailystruggle/effectsapi/'  : 'io/github/dailystruggle/rtp/effectsapi/',
+        'io/github/dailystruggle/commandsapi/' : 'io/github/dailystruggle/rtp/commandsapi/'
+    ]
+    def remapEntryName = { String name ->
+        for (entry in pkgRemap.entrySet()) {
+            if (name.startsWith(entry.key)) {
+                return entry.value + name.substring(entry.key.length())
+            }
+        }
+        return name
+    }
+    def remapClassBytes = { byte[] input ->
+        def cr = new org.objectweb.asm.ClassReader(input)
+        def cw = new org.objectweb.asm.ClassWriter(0)
+        def remapper = new org.objectweb.asm.commons.Remapper() {
+            @Override
+            String map(String internalName) {
+                for (entry in pkgRemap.entrySet()) {
+                    if (internalName.startsWith(entry.key)) {
+                        return entry.value + internalName.substring(entry.key.length())
+                    }
+                }
+                return internalName
+            }
+        }
+        cr.accept(new org.objectweb.asm.commons.ClassRemapper(cw, remapper), 0)
+        return cw.toByteArray()
+    }
+    def existing = new HashSet<String>()
+    def added = 0
+    def strippedHost = 0
+    new java.util.zip.ZipFile(out).withCloseable { src ->
+        new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(tmp)).withCloseable { zos ->
+            def srcEntries = src.entries()
+            while (srcEntries.hasMoreElements()) {
+                def e = srcEntries.nextElement()
+                // Drop bundled libraries that NeoForge provides as JPMS modules
+                // (slf4j) so the unified jar does not split-package against the
+                // NeoForge boot layer. Skipped entries are NOT recorded in
+                // `existing`, so the carrier merge below is unaffected.
+                if (!e.isDirectory() && shouldStripFromHost(e.name)) {
+                    strippedHost++
+                    continue
+                }
+                existing.add(e.name)
+                def newEntry = new java.util.zip.ZipEntry(e.name)
+                newEntry.time = e.time
+                zos.putNextEntry(newEntry)
+                if (!e.isDirectory()) {
+                    src.getInputStream(e).withCloseable { ins -> ins.transferTo(zos) }
+                }
+                zos.closeEntry()
+            }
+            for (carrier in carrierJars) {
+                new java.util.zip.ZipFile(carrier).withCloseable { cz ->
+                    def es = cz.entries()
+                    while (es.hasMoreElements()) {
+                        def e = es.nextElement()
+                        if (e.isDirectory()) continue
+                        if (shouldSkip(e.name)) continue
+                        def outName = e.name.endsWith('.class') ? remapEntryName(e.name) : e.name
+                        if (existing.contains(outName)) continue
+                        byte[] payload = cz.getInputStream(e).withCloseable { ins -> ins.readAllBytes() }
+                        if (e.name.endsWith('.class')) {
+                            payload = remapClassBytes(payload)
+                        }
+                        def newEntry = new java.util.zip.ZipEntry(outName)
+                        newEntry.time = e.time
+                        zos.putNextEntry(newEntry)
+                        zos.write(payload)
+                        zos.closeEntry()
+                        existing.add(outName)
+                        added++
+                    }
+                }
+            }
+        }
+    }
+    if (!out.delete()) {
+        throw new GradleException("Failed to delete original jar output: " + out)
+    }
+    if (!tmp.renameTo(out)) {
+        java.nio.file.Files.copy(tmp.toPath(), out.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        tmp.delete()
+    }
+    logger.lifecycle("[rtp-plugin] (${editionLabel}) Merged ${added} NeoForge carrier entries (incl. META-INF/neoforge.mods.toml) into ${out.name}; stripped ${strippedHost} NeoForge-provided slf4j entries (post-remap, Mojang names preserved).")
+}
+
 // Post-process remapJar to merge in the v26_1_R1 adapter bytecode WITHOUT
 // passing it through Loom's intermediary remap. See the rationale comment in
 // shadowJar above. We open the just-remapped jar and append the v26 module's
@@ -560,6 +748,23 @@ remapJar {
     def commonUnobfJar = project.configurations.fabricCommonUnobfBytecode
     def effectsUnobfJar = project.configurations.effectsApiFabricUnobfBytecode
     def mergeFn = project.ext.mergeFabricUnobfBytecodeIntoJar
+    // NeoForge merge (unified single-jar): resolve the NeoForge carrier jars and
+    // the merge closure at configuration time. Present only when the NeoForge
+    // modules are in the build graph (i.e. `-PexcludeNeoforge` was NOT passed).
+    def neoforgeIncluded = findProject(':rtp-neoforge:rtp-neoforge-common') != null
+    if (neoforgeIncluded) {
+        dependsOn ':rtp-neoforge:rtp-neoforge-common:jar'
+        dependsOn ':rtp-neoforge:rtp-neoforge-v1_21_R1:jar'
+    }
+    // EARLY/EXPERIMENTAL 26.x carrier jar (Java 25) - only present on a JDK-25
+    // host (dropped under -PexcludeJdk25). Its bytecode is already in the
+    // neoforgeBytecode configuration, so the merge picks it up automatically;
+    // we just need it built before remapJar's doLast runs.
+    if (findProject(':rtp-neoforge:rtp-neoforge-v26_1_R1') != null) {
+        dependsOn ':rtp-neoforge:rtp-neoforge-v26_1_R1:jar'
+    }
+    def neoforgeCfg = neoforgeIncluded ? project.configurations.neoforgeBytecode : null
+    def mergeNeoForgeFn = project.ext.mergeNeoForgeBytecodeIntoJar
     doLast {
         mergeFn(remapJar.archiveFile.get().asFile, 'Pro',
                 v26Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
@@ -568,6 +773,13 @@ remapJar {
         // check), so only the v26_2_R1 adapter classes are added.
         mergeFn(remapJar.archiveFile.get().asFile, 'Pro (26.2)',
                 v262Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
+        // Final pass merges the NeoForge platform carriers + neoforge.mods.toml
+        // so the same LeafRTP-Pro jar loads on NeoForge too. Skipped entirely
+        // when NeoForge was excluded from the build graph.
+        if (neoforgeCfg != null) {
+            mergeNeoForgeFn(remapJar.archiveFile.get().asFile, 'Pro',
+                    neoforgeCfg.files.toList())
+        }
     }
 }
 
@@ -698,7 +910,13 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // does. Without this line, the lite JAR ships only RTPBukkitLitePlugin.class
     // and crashes on enable with NoClassDefFoundError for BukkitServerProvider.
     from sourceSets.main.output
-    from rootProject.file('LICENSE')
+    // The lite binary is MIT-licensed (ADR-061): ship the MIT text as the
+    // in-jar LICENSE, not the repo-root PolyForm Noncommercial LICENSE (which
+    // governs the Pro-only source). Renamed in-jar to `LICENSE` so existing
+    // consumers/tooling still find it at the conventional path.
+    from(rootProject.file('LICENSE-MIT')) {
+        rename { 'LICENSE' }
+    }
 
     // Reuse the full shadowJar's already-filtered configurations (Loom-aware
     // strips for `minecraft`, fabric-loader, fabric-api, etc.) and apply the
@@ -1014,6 +1232,28 @@ tasks.register('liteJarStructureCheck') {
             throw new GradleException(
                 "ADR-024 structure check FAILED. Forbidden entries in lite JAR:\n  " +
                 violations.unique().sort().join('\n  '))
+        }
+
+        // ADR-061: the lite binary is MIT-licensed. Assert the in-jar LICENSE
+        // is the MIT text and NOT the repo-root PolyForm Noncommercial license
+        // (which governs the Pro-only source).
+        new java.util.zip.ZipFile(jarFile).withCloseable { zip ->
+            def license = zip.getEntry('LICENSE')
+            if (license == null) {
+                throw new GradleException("ADR-061 license check: LICENSE missing from lite JAR")
+            }
+            def licenseText = zip.getInputStream(license).getText('UTF-8')
+            if (!licenseText.contains('MIT License')) {
+                throw new GradleException(
+                    "ADR-061 license check: lite JAR LICENSE is not the MIT text. " +
+                    "Expected the MIT license (LICENSE-MIT), got:\n  " +
+                    licenseText.readLines().take(3).join('\n  '))
+            }
+            if (licenseText.contains('PolyForm Noncommercial')) {
+                throw new GradleException(
+                    "ADR-061 license check: lite JAR LICENSE contains the PolyForm " +
+                    "Noncommercial text. The lite binary must ship the MIT license only.")
+            }
         }
 
         new java.util.zip.ZipFile(jarFile).withCloseable { zip ->

@@ -20,18 +20,25 @@
 //     (NEOFORGE_NOTES.md §5), but NM-typed surfaces that drift across MC revs
 //     are still isolated in the per-version carriers, never in rtp-core.
 //
-// NOTE: this skeleton is included in the build graph ONLY when `-PincludeNeoforge`
-// is passed (see settings.gradle). The NeoForge userdev artifacts resolved by
-// ModDevGradle require network access that is not available on every build host;
-// gating the include keeps the default `.\gradlew build` green. The named
-// maintainer (project lead, @leaf_26) owns filling in the adapter surfaces and
-// proving the build on a network-capable host.
+// NOTE: this module is included in the build graph BY DEFAULT and is merged
+// into the unified LeafRTP-Pro jar (rtp-plugin merges its Mojmap bytecode +
+// META-INF/neoforge.mods.toml post-remap). The NeoForge userdev artifacts
+// resolved by ModDevGradle require network access; on network-constrained
+// hosts (JitPack, fully-offline CI) drop the module with `-PexcludeNeoforge`
+// (or EXCLUDE_NEOFORGE) to keep `.\gradlew build` green. The named maintainer
+// (project lead, @leaf_26) owns the adapter surfaces and proving the build on a
+// network-capable host.
 
 plugins {
-    // ModDevGradle. Version intentionally declared here (NeoForge modules are
-    // an opt-in island; they do not share a plugin classloader with the
-    // Loom-based Fabric modules, so no pluginManagement pin is required).
-    id 'net.neoforged.moddev' version '2.0.78'
+    // ModDevGradle. Version pinned centrally in settings.gradle
+    // pluginManagement.plugins {} (2.0.78 -- the proven, host-cached version
+    // the 1.21.x line builds with) so this common module and the default
+    // rtp-neoforge-v1_21_R1 carrier share one moddev version/classloader.
+    // Apply with a bare id (no per-module version). The EARLY/EXPERIMENTAL
+    // 26.1 carrier overrides to 2.0.141 in its own build.gradle (leaf-module
+    // pattern, JDK-25 gated) -- do NOT raise the central pin to match it, or a
+    // host that can only reach/cache 2.0.78 fails the whole default build.
+    id 'net.neoforged.moddev'
 }
 
 // NeoForge / MC versions for the common typecheck line. Bump in lockstep with

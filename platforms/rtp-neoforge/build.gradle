@@ -9,9 +9,10 @@
 // IMPORTANT (build discipline): the NeoForge toolchain (ModDevGradle) and the
 // NeoForge runtime artifacts are resolved from network repositories that are
 // NOT available on every build host (and were unavailable in the sandbox where
-// this skeleton was authored). To keep the default multi-module build green
-// without network access, the NeoForge modules are included in settings.gradle
-// ONLY when `-PincludeNeoforge` is passed (see settings.gradle). This parent
+// this skeleton was authored). The NeoForge modules are merged into the unified
+// LeafRTP-Pro jar and are therefore included in settings.gradle BY DEFAULT; on
+// network-constrained hosts drop them with `-PexcludeNeoforge` to keep the
+// default multi-module build green (see settings.gradle). This parent
 // project itself holds no build logic — each submodule applies ModDevGradle.
 //
 // See:

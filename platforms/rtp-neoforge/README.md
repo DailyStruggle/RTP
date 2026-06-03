@@ -13,16 +13,36 @@ platforms/rtp-neoforge/
   rtp-neoforge-v1_21_R1/        # per-MC carrier (NeoForge 21.1.x / MC 1.21.1)
 ```
 
-### Build (opt-in)
+### Supported Minecraft / NeoForge versions
 
-The NeoForge toolchain ([ModDevGradle](https://github.com/neoforged/ModDevGradle)) resolves NeoForge userdev artifacts from network repositories that are not available on every build host. To keep the default `./gradlew build` green offline, the NeoForge modules are **included only when `-PincludeNeoforge` is passed** (or the `INCLUDE_NEOFORGE` env var is set) — see [`settings.gradle`](../../settings.gradle).
+NeoForge support targets **Minecraft 1.21.1 and up** only. NeoForge is Mojmap-at-runtime from 1.20.4+, which is the assumption baked into [rtp-neoforge-ADR-001](docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md) and [`NEOFORGE_NOTES.md`](../../docs/dev/NEOFORGE_NOTES.md) (no obf carrier required). The carrier roadmap:
+
+ Carrier | MC line | NeoForge line | Status | Rationale |
+---------|---------|---------------|--------|-----------|
+ `rtp-neoforge-v1_21_R1` | 1.21.1 | 21.1.x (pins 21.1.95) | Phase N1 skeleton | Highest-value target: 18 months on, 1.21 is still the most popular NeoForge version (16,000+ mods) and every modern kitchen-sink pack (All the Mods 10, FTB NeoTech) is on 1.21+ NeoForge. |
+ (rolling 1.21.x head) | latest 1.21.x (e.g. 1.21.11) | matching 21.x (e.g. 21.11) | planned (add once N2 is runtime-proven) | NeoForge ships a new minor per Mojang drop (21.5/21.6/21.8/21.9/21.10/21.11); keep one carrier tracking the latest 1.21.x so new servers are not pinned to 21.1. No carrier per point release. |
+ `rtp-neoforge-v26_1_R1` | 26.1 (pins 26.1.2) | 26.1.x (pins 26.1.2.65-beta) | early/experimental (authored, not yet runtime-verified) | 1.21 is the last `1.x` series; Mojang's 2026 scheme switches to `26.x`. NeoForge 26.1 is the next stable modding target replacing 1.21.1. The 26.x line is fully deobfuscated (Mojmap with native parameter names) and runs on **Java 25**, so this carrier pins a Java 25 toolchain and ModDevGradle 2.0.141, and is gated under `-PexcludeJdk25` (alongside the JDK-25 Fabric carriers) : a JDK-21-only build still produces a 1.21.x-capable NeoForge jar without it. Clone of the 1.21.1 carrier; the maintainer must verify the Mojmap API surface on a network-capable JDK-25 host and re-pin versions when 26.1 settles. |
+
+**Out of scope: Minecraft 1.20.1 (and earlier) on NeoForge.** 1.20.1 is overwhelmingly a **Forge** ecosystem (ATM9, FTB Inferno, Enigmatica 9 are all Forge), and legacy Forge is out of scope per [ADR-033](../../docs/adr/ADR-033-neoforge-platform-in-scope.md). NeoForge only became the default loader at 1.20.5+ (the post-1.20.4 fork point), and a 1.20.1 NeoForge build would re-enter the obf/mapping era avoided by starting at 1.21. Point 1.20.1 users at Forge (out of scope) or `rtp-fabric`.
+
+### Build (unified jar)
+
+The NeoForge platform ships inside the **unified `LeafRTP-Pro-<version>.jar`**: `rtp-plugin` merges the NeoForge carrier bytecode and `META-INF/neoforge.mods.toml` into the released jar after Loom's remap (Mojmap names preserved), so one artifact loads on Bukkit/Paper/Folia (`plugin.yml`), Fabric (`fabric.mod.json`), Velocity (`velocity-plugin.json`), **and** NeoForge (`neoforge.mods.toml`). Drop the same jar into a NeoForge server's `mods/` folder.
+
+The NeoForge toolchain ([ModDevGradle](https://github.com/neoforged/ModDevGradle)) resolves NeoForge userdev artifacts from network repositories that are not available on every build host, so the NeoForge modules are included **by default** and can be dropped on network-constrained hosts (JitPack, fully-offline CI) by passing `-PexcludeNeoforge` (or setting the `EXCLUDE_NEOFORGE` env var) — see [`settings.gradle`](../../settings.gradle). When excluded, the unified jar simply carries no `neoforge.mods.toml`.
 
 ```powershell
-# Configure + build the NeoForge modules (requires network for NeoForge artifacts)
-.\gradlew -PincludeNeoforge :rtp-neoforge:rtp-neoforge-v1_21_R1:build
+# Build the unified jar (includes NeoForge; requires network for NeoForge artifacts)
+.\gradlew :rtp-plugin:assemble
+
+# Build just the NeoForge carrier in isolation
+.\gradlew :rtp-neoforge:rtp-neoforge-v1_21_R1:build
 
 # Launch a dev server for the /rtp round-trip (Phase N1 exit gate)
-.\gradlew -PincludeNeoforge :rtp-neoforge:rtp-neoforge-v1_21_R1:runServer
+.\gradlew :rtp-neoforge:rtp-neoforge-v1_21_R1:runServer
+
+# Offline / network-constrained build (drops NeoForge from the graph)
+.\gradlew build -PexcludeNeoforge
 ```
 
 ### Phase N1 status
