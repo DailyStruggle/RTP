@@ -88,12 +88,6 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 - **Network mode now boots on Folia backends, and cross-server `/rtp` arrivals teleport there** ([ADR-049](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-049-network-mode-platform-neutral-lift.md)). After the network plumbing was lifted into `rtp-core`, the backend heartbeat sampler is obtained through `RTP.backendStateSamplerFactory`, which the Bukkit accessor installs in `AbstractServerAccessor.start(Object)`. Folia uses a separate `AbstractFoliaServerAccessor` (it does not extend the Bukkit accessor), and its `start(Object)` neither installed the factory nor registered a `PlayerLifecycleHook`. A Folia backend therefore aborted its network boot with `no BackendStateSampler factory installed by the platform adapter`, and because `getPlayerLifecycleHook()` fell back to the no-op default, a Velocity-routed player arriving on a Folia backend never had its join observed and never redeemed its reservation token (the player connected but was not teleported). Fix: `AbstractFoliaServerAccessor.start(Object)` now registers a `BukkitPlayerLifecycleHook` (Folia is a Bukkit-API platform; the hook is reachable via `rtp-folia-common` -> `rtp-paper-common` -> `rtp-bukkit-common`), overrides `getPlayerLifecycleHook()` to return it, and installs `RTP.backendStateSamplerFactory` with `BukkitBackendStateSampler` (which uses only Folia-safe `Bukkit.getWorlds()` + RTP internals), mirroring the Bukkit accessor.
 
-### Known Issues
-
-**NeoForge:**
-
-- **(Pro)** **NeoForge ships and teleports on the 1.21 carrier (`rtp-neoforge-v1_21_R1`), but the MC 26.x carrier (`rtp-neoforge-v26_1_R1`) is not yet runtime-functional.** On the 1.21.x line `/rtp` teleports end-to-end and the platform is shippable. On 26.1.2, despite the chain of chunk-loading fixes above (strong-reference chunk caches, the `getChunkFuture` resolver correction, removal of the blocking fallback and the 1.5s pre-dispatch timeout, and the transient `addTicketWithRadius` before `getChunkFuture(create=true)`), the L1 kept-cache still does not fill reliably and a live `/rtp` has not been confirmed to land. Treat NeoForge on the 26.x line as experimental / not production-ready for now; deploy the 1.21 build on a supported runtime instead. Tracking continues under [`MULTI_PLATFORM_PLAN.md`](https://github.com/DailyStruggle/RTP/tree/V3/docs/dev/MULTI_PLATFORM_PLAN.md) Phase 4.
-
 ## [3.1.0] - 2026-05-31
 
 ### Added
