@@ -1,13 +1,13 @@
 # FAQ (RTP-lite)
 
 > Stripped from `docs/admin/FAQ.md` to lite scope (ADR-024). Questions about
-> SQL persistence, Folia, claim plugins, economy, multilingual support, or
+> SQL persistence, Folia, claim plugins, multilingual support, or
 > the login reserve cache apply only to RTP-Pro.
 
 ### Q: How is "RTP" different from "RTP-Pro"?
 
 Same source tree, two shadow jars (ADR-024). Lite drops SQL/Redis persistence,
-the Folia adapter, claim integrations, economy/Vault, the localized `lang/**`
+the Folia adapter, claim integrations, the localized `lang/**`
 tree, the login reserve cache, visitor mode, and several `performance.yml`
 toggles. Both keep the same `name: RTP` plugin identifier so the data folder
 is interchangeable: you can swap jars without losing region/world configs.
@@ -19,7 +19,9 @@ in lite (Fabric is unstable — see `MULTI_PLATFORM_PLAN.md` in the Pro docs).
 
 ### Q: I want to charge for `/rtp`. Can lite do that?
 
-No. Economy / Vault is dropped from lite. Use RTP-Pro.
+Yes. Optional Vault economy ships in lite (ADR-024, 2026-06-01 amendment):
+install Vault + a compatible economy plugin and configure `economy.yml`. When
+Vault is absent the economy hook is dormant at zero runtime cost.
 
 ### Q: My claim plugin (GriefDefender, Lands, …) — does lite respect claims?
 
@@ -31,7 +33,7 @@ claims, run RTP-Pro.
 
 Yes. Both jars share `plugins/RTP/` and the `name: RTP` plugin identifier.
 Stop the server, swap the jar, start the server. Pro's first start may add
-files lite never created (`language.yml`, `economy.yml`, `integrations.yml`,
+files lite never created (`language.yml`, `integrations.yml`,
 `lang/**`); lite ignores them on the way back.
 
 ### Q: First few `/rtp`s are slow. Is this normal?
