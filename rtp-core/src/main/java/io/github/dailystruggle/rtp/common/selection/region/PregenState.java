@@ -44,6 +44,16 @@ final class PregenState {
     final int staleChunkRetryLimit;
     final boolean biomeRecall;
     final boolean biomeRecallForced;
+    /**
+     * ADR-062 biome-probability weighting. When {@code true} and biome steering is
+     * active (biomeRecall, non-default biomes), the recall draw selects a target
+     * biome with equal probability among those present in spatial memory rather
+     * than uniformly over all recorded runs. This counteracts the run-count
+     * dominance of common biomes so rare requested biomes are steered toward
+     * instead of being drowned out. The draw stays bounded (a weighted pick over
+     * a finite, pre-mapped, Anvil-sourced set; no unbounded reroll).
+     */
+    final boolean biomeWeighted;
     final long resolution;
     final long maxAttemptsBase;
     final ConfigParser<PerformanceKeys> performance;
@@ -97,6 +107,7 @@ final class PregenState {
             long maxAttempts,
             boolean biomeRecall,
             boolean biomeRecallForced,
+            boolean biomeWeighted,
             long resolution,
             ConfigParser<PerformanceKeys> performance) {
         this.region = region;
@@ -115,6 +126,7 @@ final class PregenState {
         this.maxAttemptsCeiling = Math.max(maxAttempts, maxAttemptsBase * 100L);
         this.biomeRecall = biomeRecall;
         this.biomeRecallForced = biomeRecallForced;
+        this.biomeWeighted = biomeWeighted;
         this.resolution = resolution;
         this.performance = performance;
 
@@ -213,6 +225,8 @@ final class PregenState {
                 performance.getConfigValue(PerformanceKeys.biomeRecall, false).toString());
         boolean biomeRecallForced = Boolean.parseBoolean(
                 performance.getConfigValue(PerformanceKeys.biomeRecallForced, false).toString());
+        boolean biomeWeighted = Boolean.parseBoolean(
+                performance.getConfigValue(PerformanceKeys.biomeWeighted, false).toString());
 
         return new PregenState(
                 region,
@@ -230,6 +244,7 @@ final class PregenState {
                 maxAttempts,
                 biomeRecall,
                 biomeRecallForced,
+                biomeWeighted,
                 resolution,
                 performance);
     }

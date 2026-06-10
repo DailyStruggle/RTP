@@ -161,6 +161,9 @@ permissions:
   rtp.info:
     description: see plugin info and settings
     default: op
+  rtp.version:
+    description: allow player to use /rtp version (alias /rtp about) to see plugin and server identity
+    default: true
   rtp.admin:
     description: allow player to use /rtp clearcache and grant all other admin tooling
     default: op
@@ -192,4 +195,5 @@ permissions:
       rtp.biome: true
       rtp.biome.*: true
       rtp.scan: true
+      rtp.version: true
       rtp.admin: true

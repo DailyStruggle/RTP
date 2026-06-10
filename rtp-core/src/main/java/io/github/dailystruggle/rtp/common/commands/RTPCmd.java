@@ -52,6 +52,37 @@ public interface RTPCmd extends BaseRTPCmd {
     return param.get(sel);
   }
 
+  /**
+   * Resolves a vanilla {@code /spreadplayers}-style relative coordinate token against a base
+   * coordinate. The Bukkit {@code CoordinateParameter} advertises {@code ~} / {@code -~} in its
+   * tab-completion, so these tokens must resolve to an actual coordinate rather than fall through
+   * to {@code Boolean.valueOf("~") == false} (which silently produced a {@code 0}/garbage center).
+   *
+   * <p>Supported forms (whitespace-trimmed): {@code ~} ({@code base}), {@code ~<n>}
+   * ({@code base + n}, where {@code n} may be negative e.g. {@code ~-5}), {@code -~}
+   * ({@code -base}), and {@code -~<n>} ({@code -base + n}). A token containing no {@code ~} is
+   * parsed as an absolute value.
+   *
+   * @param token the raw override token (must be non-null)
+   * @param base  the player's current coordinate on this axis
+   * @return the resolved absolute coordinate
+   * @throws NumberFormatException if the numeric offset is malformed
+   */
+  static long resolveRelativeCoordinate(String token, long base) {
+    String t = token.trim();
+    int tilde = t.indexOf('~');
+    if (tilde < 0) {
+      return (long) Double.parseDouble(t);
+    }
+    boolean negativeBase = tilde > 0 && t.charAt(tilde - 1) == '-';
+    long resolved = negativeBase ? -base : base;
+    String offsetStr = t.substring(tilde + 1).trim();
+    if (!offsetStr.isEmpty()) {
+      resolved += (long) Double.parseDouble(offsetStr);
+    }
+    return resolved;
+  }
+
   default void init() {}
 
     default boolean onCommand(
@@ -681,7 +712,25 @@ public interface RTPCmd extends BaseRTPCmd {
               String string = pickOne(rtpArgs.get(name), "");
 
               Object value;
-              if (string.equalsIgnoreCase("true")) {
+              boolean isCoord =
+                  name.equalsIgnoreCase("centerx") || name.equalsIgnoreCase("centerz");
+              if (isCoord && string.indexOf('~') >= 0) {
+                // Relative coordinate token (vanilla `/spreadplayers`-style `~`, `~<n>`, `-~`).
+                // Resolve against the teleporting player's current position; without this the
+                // token falls through to Boolean.valueOf("~") == false below and silently yields
+                // a garbage (0/false) center despite being advertised in tab-complete.
+                long base =
+                    name.equalsIgnoreCase("centerx")
+                        ? player.getLocation().x()
+                        : player.getLocation().z();
+                try {
+                  value = resolveRelativeCoordinate(string, base);
+                } catch (NumberFormatException badOffset) {
+                  // Malformed offset (e.g. `~abc`): fall back to the player's coordinate rather
+                  // than a non-numeric override value.
+                  value = base;
+                }
+              } else if (string.equalsIgnoreCase("true")) {
                 value = true;
               } else if (string.equalsIgnoreCase("false")) {
                 value = false;

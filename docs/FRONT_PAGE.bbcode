@@ -22,7 +22,7 @@ No menu, however polished, can make [I]/rtp[/I] fast - only the engine behind it
 [LIST]
 [*][B]No lag spikes when players spam [I]/rtp[/I].[/B] Worst-case main-thread tick stays at 4 ms (vs. 70-771 ms for the next plugins) - your TPS holds at 20.00 during a teleport burst.
 [*][B]Instant teleports, no "Finding a safe location..." wait.[/B] Pre-verified location queue serves [I]/rtp[/I] in one tick instead of loading chunks on demand.
-[*][B]The only LeafRTP plugin that runs natively on Folia at double-digit TP/s[/B] (9.87 TP/s @ 99.97 % success) - every competitor stalls regions or fails to load.
+[*][B]The only LeafRTP plugin that runs natively on Folia without stalling regions.[/B] Per-teleport work stays well under a single region tick; the throughput we measured (9.87 TP/s @ 99.97 % success) was bounded by Region-Scheduler hops in the harness, [I]not[/I] by computation - a floor set by the test rig, not a ceiling on the engine. Every competitor stalls regions or fails to load.
 [*][B]Automatic performance the moment the jar drops in.[/B] Pre-warmed location queue, persistent spatial memory, off-tick Anvil pre-filter and async chunk loading kick in on first start - no profiling, no tuning, no per-world hand-holding. Same [I]config.yml[/I], commands, and claim-plugin integrations (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect) as the free build, so the upgrade itself is risk-free.
 [*][B]Audited safety[/B]: no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures.
 [/LIST]
@@ -94,6 +94,14 @@ Each capability below is paired with the part of that architecture that makes it
 [TR]
 [TD][B]Multi-server proxy + SQL/Redis[/B] - cross-network [I]/rtp[/I], reservation tokens, shared state[/TD]
 [TD]State sync runs on async backends; the teleport hot path stays free of foreign-region and blocking API hops.[/TD]
+[/TR]
+[TR]
+[TD][B]Built-in visualizations & observability[/B] - [I]/rtp visualization[/I] region/biome maps and bad-location heatmaps painted onto real map items, MSPT / heap / pipeline-latency sparklines, plus live [I]/rtp info[/I] diagnostics[/TD]
+[TD]Charts render from in-memory state through the [I]maps-api[/I] / [I]metrics-api[/I] SPI, so analytics never touch the teleport hot path - no separate heatmap or metrics add-on needed.[/TD]
+[/TR]
+[TR]
+[TD][B]Optional PvP / combat-tag gate[/B] - refuse or delay [I]/rtp[/I] for players who recently dealt or took PvP damage, with native tracking plus PvPManager / CombatLogX / Simple Combat Log integration[/TD]
+[TD]Combat state is checked once at [I]/rtp[/I] pre-dispatch through the [I]rtp-api[/I] hook, so the anti-escape rule adds no per-tick cost to the teleport path.[/TD]
 [/TR]
 [TR]
 [TD][B]Developer API[/B] ([I]rtp-api[/I], [I]effects-api[/I]) - pre / mid / post teleport hooks[/TD]
@@ -477,20 +485,17 @@ LeafRTP-Pro splits configuration by concern under [I]plugins/RTP/[/I]. Every fil
 [TH]TP/s[/TH]
 [TH]MSPT p99 (ms)[/TH]
 [TH]Min TPS[/TH]
-[TH]CPU / TP (ms)[/TH]
 [/TR]
 [TR]
 [TD][B]LeafRTP-Pro[/B][/TD]
 [TD][B]1.52[/B][/TD]
 [TD][B]3[/B][/TD]
 [TD][B]6.4[/B][/TD]
-[TD]572[/TD]
 [/TR]
 [TR]
 [TD]JakesRTP[/TD]
 [TD]1.04[/TD]
 [TD]2 252[/TD]
-[TD]--[/TD]
 [TD]--[/TD]
 [/TR]
 [TR]
@@ -498,14 +503,12 @@ LeafRTP-Pro splits configuration by concern under [I]plugins/RTP/[/I]. Every fil
 [TD]1.33[/TD]
 [TD]3 790[/TD]
 [TD]2.18[/TD]
-[TD]584[/TD]
 [/TR]
 [TR]
 [TD]HuskHomes[/TD]
 [TD]0.93[/TD]
 [TD]4 939[/TD]
 [TD]2.59[/TD]
-[TD]868[/TD]
 [/TR]
 [/TABLE]
 
@@ -540,6 +543,8 @@ LeafRTP-Pro splits configuration by concern under [I]plugins/RTP/[/I]. Every fil
 [TD]28.4[/TD]
 [/TR]
 [/TABLE]
+
+[I]The LeafRTP-Pro Folia TP/s here is a harness floor, not an engine ceiling: at 18.0 ms compute per teleport the work is far from saturating a region tick, so throughput was bounded by Region-Scheduler hops in the 2-client rig rather than by computation. The competitors' lower TP/s come paired with second-scale region MSPT (compute/stall bound); ours does not.[/I]
 
 [B]Architecture support matrix:[/B]
 [TABLE]
@@ -730,7 +735,16 @@ A: Pre-warmed queue. In most cases a verified destination is ready before you ty
 A: See the admin guide. Resolution order: player's current world (or [I]world:[/I] param) -> world's target region -> region's target world.
 
 [B]Q: Does LeafRTP work on Folia?[/B]
-A: Yes - LeafRTP-Pro is the only LeafRTP plugin benchmarked at double-digit TP/s on Folia (9.87 TP/s @ 99.97 % success), running on the Region Scheduler with an off-tick pre-filter so no region stalls.
+A: Yes - LeafRTP-Pro runs on the Region Scheduler with an off-tick pre-filter so no region stalls. Per-teleport work stays comfortably under one region tick; the 9.87 TP/s @ 99.97 % success we measured was limited by Region-Scheduler hops in the test harness, not by the engine's computation, so treat it as a harness-imposed floor rather than a performance ceiling.
+
+[B]Q: Do you support triangle / diamond region shapes?[/B]
+A: Use the [I]Polygon[/I] shape. A triangle is a 3-vertex polygon and a diamond is a rotated square, so both are already expressible without a dedicated shape type - define the vertices you want and the bounded spiral fills it.
+
+[B]Q: Do I need Chunky (or another pre-generator)?[/B]
+A: No. [I]/rtp scan start|pause|resume|reset|cancel[/I] is a built-in, off-tick generator that walks the region and builds persistent spatial memory. The philosophy is different from whole-world pre-generation: instead of loading every chunk up front, LeafRTP pre-verifies and remembers which sectors are unsafe, so it avoids loading bad ground at all. You can still run Chunky alongside it if you want a fully pre-generated map.
+
+[B]Q: How does biome targeting behave on a pregenerated or upgraded world?[/B]
+A: LeafRTP reads biome data from the populated [I].mca[/I] region files via the Anvil pre-filter, so [I]/rtp biome:<x>[/I] reflects the biomes actually written to disk. Plugins that lean on the live generator/noise-map biome lookup can return the [I]wrong[/I] biome on a world that was pregenerated elsewhere or migrated across a Minecraft version, where seed-based assignment has drifted - the Anvil-first read stays authoritative in those cases.
 
 [B]Q: Iris / Terra / custom datapack generators?[/B]
 A: Yes - deliberate 3.0 design goal. The Anvil pre-filter reads [I].mca[/I] palette data directly, so populated custom-generator chunks evaluate off-tick like vanilla. That's [I]strictly more accurate[/I] than the live Bukkit view, which collapses modded IDs to vanilla cousins. Un-populated chunks fall through to a live load as the authoritative safety net.

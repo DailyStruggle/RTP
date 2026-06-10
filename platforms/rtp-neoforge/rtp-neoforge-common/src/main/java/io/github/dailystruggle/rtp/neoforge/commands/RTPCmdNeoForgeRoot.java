@@ -18,6 +18,7 @@ import io.github.dailystruggle.rtp.common.commands.parameters.VertParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
 import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
 import io.github.dailystruggle.rtp.common.commands.scan.ScanCmd;
+import io.github.dailystruggle.rtp.common.commands.version.VersionCmd;
 import io.github.dailystruggle.rtp.neoforge.server.NeoForgeServerAccessor;
 
 import java.util.Collections;
@@ -177,6 +178,9 @@ public final class RTPCmdNeoForgeRoot extends BaseRTPCmdImpl implements RTPCmd {
         addSubCommand(new ConfigCmd(this));
         addSubCommand(new ScanCmd(this));
         addSubCommand(new InfoCmd(this));
+        VersionCmd versionCmd = new VersionCmd(this);
+        addSubCommand(versionCmd);
+        getCommandLookup().put(VersionCmd.ALIAS.toUpperCase(), versionCmd);
         addSubCommand(new io.github.dailystruggle.rtp.common.commands.admin.ClearCacheCmd(this));
 
         // /rtp menu (N2.6) - mirror of RTPCmdFabricRoot. ADR-050: clicks carry

@@ -23,7 +23,17 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 ---
 
-## [3.1.2] - unreleased
+## [3.1.3] - unreleased
+
+### Added
+
+- **`/rtp version` (alias `/rtp about`) descriptive subcommand.** A new lightweight subcommand that reports the running RTP plugin version, the platform brand, and the host server version. Unlike `/rtp info`, it captures no live `MetricsSnapshot` and reads no runtime counters, so it is a purely descriptive identity readout rather than realtime telemetry. Registered on the Bukkit/Paper/Folia, Fabric, and NeoForge command roots (the alias `about` resolves to the same command). Gated by a new `rtp.version` permission (default `true`, also a child of `rtp.*`). Covered by `VersionCmdTest`.
+
+### Fixed
+
+- **Relative coordinate tokens (`/rtp centerx=~ centerz=~`) now resolve to the player's position instead of a garbage center.** The Bukkit `CoordinateParameter` advertises the vanilla `/spreadplayers`-style `~` / `-~` tokens in tab-completion, but the per-call shape-override path in `RTPCmd.compute` parsed override values with `Long.parseLong` -> `Double.parseDouble` -> `Boolean.valueOf`; a `~` value fell through to `Boolean.valueOf("~") == false`, so `centerx`/`centerz` silently became the boolean `false` (an effective `0` center) rather than the caller's coordinate. A new `RTPCmd.resolveRelativeCoordinate(token, base)` helper now resolves `~`, `~<n>` (e.g. `~-50`), `-~`, and `-~<n>` against the teleporting player's current X/Z before the generic coercion, with absolute (tilde-free) tokens unchanged and a malformed offset falling back to the player's coordinate. Covered by `RelativeCoordinateResolutionTest` (6 cases).
+
+## [3.1.2] - 2026-06-10
 
 ### Added
 
@@ -408,7 +418,8 @@ Earlier versions introduced the multi-module split (`rtp-api` / `rtp-core` / pla
 
 ---
 
-[3.1.2]: https://github.com/DailyStruggle/RTP/compare/v3.1.0...HEAD
+[3.1.3]: https://github.com/DailyStruggle/RTP/compare/v3.1.2...HEAD
+[3.1.2]: https://github.com/DailyStruggle/RTP/compare/v3.1.0...v3.1.2
 [3.1.0]: https://github.com/DailyStruggle/RTP/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/DailyStruggle/RTP/compare/v3.0.0-beta.4...v3.0.0
 [3.0.0-beta.4]: https://github.com/DailyStruggle/RTP/compare/v3.0.0-beta.3...v3.0.0-beta.4
