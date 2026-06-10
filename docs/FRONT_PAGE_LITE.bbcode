@@ -84,6 +84,10 @@ Each capability below is paired with the part of that architecture that makes it
 [TD]Metrics are sampled without blocking a tick, so the dashboard reads pre-collected numbers at no hot-path cost.[/TD]
 [/TR]
 [TR]
+[TD][B]Optional PvP / combat-tag gate[/B] - refuse or delay [I]/rtp[/I] for players who recently dealt or took PvP damage, with native tracking plus PvPManager / CombatLogX / Simple Combat Log integration[/TD]
+[TD]Combat state is checked once at [I]/rtp[/I] pre-dispatch through the [I]rtp-api[/I] hook, so the anti-escape rule adds no per-tick cost to the teleport path.[/TD]
+[/TR]
+[TR]
 [TD][B]Instant teleports[/B] - no "Finding a safe location..." wait[/TD]
 [TD]A pre-warmed, pre-verified location queue serves [I]/rtp[/I] in one tick instead of loading chunks on demand.[/TD]
 [/TR]
@@ -219,11 +223,11 @@ Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/I] later - 
 
 [B]Spigot 1.20.1[/B] — Spigot's platform-wide chunk-gen ceiling caps everyone in the 1–1.5 TP/s range during the burst; the latency tail is what matters.
 [TABLE]
-[TR][TH]Plugin[/TH][TH]TP/s[/TH][TH]MSPT p99 (ms)[/TH][TH]Min TPS[/TH][TH]CPU / TP (ms)[/TH][/TR]
-[TR][TD][B]🧪 LeafRTP[/B][/TD][TD][B]1.52[/B][/TD][TD][B]3[/B][/TD][TD][B]6.4[/B][/TD][TD]572[/TD][/TR]
-[TR][TD]🧪 JakesRTP[/TD][TD]1.04[/TD][TD]2 252[/TD][TD]7.5*[/TD][TD]—*[/TD][/TR]
-[TR][TD]🧪 BetterRTP[/TD][TD]1.33[/TD][TD]3 790[/TD][TD]2.18[/TD][TD]584[/TD][/TR]
-[TR][TD]🧪 HuskHomes[/TD][TD]0.93[/TD][TD]4 939[/TD][TD]2.59[/TD][TD]868[/TD][/TR]
+[TR][TH]Plugin[/TH][TH]TP/s[/TH][TH]MSPT p99 (ms)[/TH][TH]Min TPS[/TH][/TR]
+[TR][TD][B]🧪 LeafRTP[/B][/TD][TD][B]1.52[/B][/TD][TD][B]3[/B][/TD][TD][B]6.4[/B][/TD][/TR]
+[TR][TD]🧪 JakesRTP[/TD][TD]1.04[/TD][TD]2 252[/TD][TD]7.5*[/TD][/TR]
+[TR][TD]🧪 BetterRTP[/TD][TD]1.33[/TD][TD]3 790[/TD][TD]2.18[/TD][/TR]
+[TR][TD]🧪 HuskHomes[/TD][TD]0.93[/TD][TD]4 939[/TD][TD]2.59[/TD][/TR]
 [/TABLE]
 
 [B]Folia 1.21.11[/B] — [I]LeafRTP-Pro only; the Folia adapter is not bundled in the free build.[/I]

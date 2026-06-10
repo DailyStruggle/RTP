@@ -73,6 +73,7 @@ Each capability below is paired with the part of that architecture that makes it
 | **8 bundled claim integrations** - GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect | Claim checks reroll inside the async pipeline, not on the tick that teleports the player. |
 | **Live map heatmaps** (`/rtp scan`) - green/red safety painted on a real held map | The `.mca` Anvil pre-filter and chunk-load passes run off-tick and throttled, so a scan runs on a live server without tanking TPS. |
 | **Built-in `/rtp info` diagnostics** - TPS/MSPT, heap, latency percentiles, rejection breakdown | Metrics are sampled without blocking a tick, so the dashboard reads pre-collected numbers at no hot-path cost. |
+| **Optional PvP / combat-tag gate** - refuse or delay `/rtp` for players who recently dealt or took PvP damage, with native tracking plus PvPManager / CombatLogX / Simple Combat Log integration | Combat state is checked once at `/rtp` pre-dispatch through the `rtp-api` hook, so the anti-escape rule adds no per-tick cost to the teleport path. |
 | **Instant teleports** - no "Finding a safe location..." wait | A pre-warmed, pre-verified location queue serves `/rtp` in one tick instead of loading chunks on demand. |
 
 <details>
@@ -225,12 +226,12 @@ A lot of what people install companion plugins for is already in the free engine
 
 **Spigot 1.20.1** - Spigot's platform-wide chunk-gen ceiling caps everyone in the 1-1.5 TP/s range during the burst; the latency tail is what matters.
 
-| Plugin       | TP/s     | MSPT p99 (ms) | Min TPS  | CPU / TP (ms) |
-|--------------|----------|---------------|----------|----------------|
-| **🧪 LeafRTP**   | **1.52** | **3**         | **6.4**  | 572            |
-| 🧪 JakesRTP  | 1.04     | 2 252         | 7.5*     | --*            |
-| 🧪 BetterRTP | 1.33     | 3 790         | 2.18     | 584            |
-| 🧪 HuskHomes | 0.93     | 4 939         | 2.59     | 868            |
+| Plugin       | TP/s     | MSPT p99 (ms) | Min TPS  |
+|--------------|----------|---------------|----------|
+| **🧪 LeafRTP**   | **1.52** | **3**         | **6.4**  |
+| 🧪 JakesRTP  | 1.04     | 2 252         | 7.5*     |
+| 🧪 BetterRTP | 1.33     | 3 790         | 2.18     |
+| 🧪 HuskHomes | 0.93     | 4 939         | 2.59     |
 
 **Folia 1.21.11** - *LeafRTP-Pro only; the Folia adapter is not bundled in the free build.*
 
@@ -291,7 +292,13 @@ A: Most `/rtp` calls serve from a pre-warmed queue - chunks are already loaded a
 A: "RTP" is the generic term for random teleport, so the old name was nearly impossible to find - it collided with every other random-teleport plugin, command, and forum thread in search and marketplace indexes. "LeafRTP" is a distinct, indexable name that points unambiguously at this plugin while keeping the `/rtp` command, `rtp-api`, config paths, and data files exactly as they were. Nothing changes for existing installs - only the public name.
 
 **Q: Does it work with Iris / Terra / custom datapack generators?**
-A: Yes. Region files are read directly, so modded and namespaced biome and block IDs are preserved. No configuration needed.
+A: Yes. Region files are read directly, so modded and namespaced biome and block IDs are preserved. No configuration needed. Because biome data comes from the populated `.mca` files rather than the live generator/noise-map lookup, `/rtp biome:<x>` stays correct even on worlds that were pregenerated elsewhere or migrated across a Minecraft version, where seed-based biome assignment has drifted.
+
+**Q: Do you support triangle / diamond region shapes?**
+A: Use the `Polygon` shape - a triangle is a 3-vertex polygon and a diamond is a rotated square, so both are already expressible without a separate shape type.
+
+**Q: Do I need Chunky or another pre-generator?**
+A: No. `/rtp scan` is a built-in, off-tick generator that walks a region and builds persistent spatial memory. Rather than loading every chunk up front, LeafRTP pre-verifies and remembers which sectors are unsafe so it avoids loading bad ground at all. Run Chunky alongside it if you still want a fully pre-generated map.
 
 **Q: What's the difference between LeafRTP and LeafRTP-Pro?**
 A: Same engine, same source tree. The free build already ships multilingual locale switching and bundled (trimmed) `lang/**` packs. **LeafRTP-Pro** adds the Folia adapter, multi-server / proxy support (Velocity), SQL/Redis backends, the full curated `lang/**` locale set, the richer block-tag/state-predicate `safety.yml` grammar, and priority support. The free build is fully sufficient for single-server deployments. Drop in the Pro jar later - same config, same data, same commands.

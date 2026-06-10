@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.common.commands.menu.MenuRedeemSubcommand;
 import io.github.dailystruggle.rtp.common.commands.scan.ScanCmd;
 import io.github.dailystruggle.rtp.bukkit.commands.test.BukkitTestCmd;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
+import io.github.dailystruggle.rtp.common.commands.version.VersionCmd;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.ShapeParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.VertParameter;
@@ -211,6 +212,9 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     addSubCommand(new ConfigCmd(this));
     addSubCommand(new ScanCmd(this));
     addSubCommand(new InfoCmd(this));
+    VersionCmd versionCmd = new VersionCmd(this);
+    addSubCommand(versionCmd);
+    getCommandLookup().put(VersionCmd.ALIAS.toUpperCase(), versionCmd);
     addSubCommand(new io.github.dailystruggle.rtp.common.commands.admin.ClearCacheCmd(this));
     addSubCommand(new BukkitTestCmd(this));
 
