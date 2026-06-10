@@ -12,7 +12,6 @@ import io.github.dailystruggle.rtp.common.anvil.PaletteNormalizer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -53,14 +52,44 @@ public final class NeoForgeRTPChunk extends RTPChunk<ChunkAccess> {
     /** Anvil mode only: a pre-reconciled unsafe-block set. {@code null} forces per-call reconciliation. */
     private final @Nullable Set<String> reconciledUnsafe;
 
-    /** Live-chunk constructor (legacy / commit-time path). */
-    public NeoForgeRTPChunk(ChunkAccess chunk, ServerLevel level, UUID worldId) {
+    /**
+     * Live-chunk constructor. The caller passes the chunk coordinates
+     * explicitly rather than having this constructor read them from
+     * {@link ChunkAccess#getPos()}: {@code ChunkPos} has no coordinate accessor
+     * shape that is portable across the MC lines this single module is loaded on
+     * (1.21.1 exposes public fields {@code x}/{@code z} but no record accessors;
+     * 26.1 is a record whose {@code x}/{@code z} components are private, exposed
+     * only via the {@code x()}/{@code z()} accessors). Every caller already
+     * knows the coordinates (they drive the load), so taking them as parameters
+     * removes the reflection / cross-runtime fragility entirely.
+     *
+     * <p>Exposed as a static factory (backed by a 4-arg private constructor
+     * that packs the coordinates into a long) rather than a second 5-arg
+     * constructor: a 5-arg live constructor would collide in arity with the
+     * anvil-backed 5-arg constructor, forcing javac to resolve against the
+     * NeoMinecraft {@code ChunkAccess} / {@code ServerLevel} types even at
+     * anvil-only call sites in tests, where those classes are absent from the
+     * classpath.</p>
+     */
+    public static NeoForgeRTPChunk forLiveChunk(
+            ChunkAccess chunk, ServerLevel level, UUID worldId, int cx, int cz) {
+        // Pack the coordinates into a single long so the private constructor is
+        // 4-arg. A 5-arg (ChunkAccess, ServerLevel, UUID, int, int) constructor
+        // would collide in arity with the anvil-backed 5-arg constructor, and
+        // javac would then have to resolve the NeoMinecraft ChunkAccess /
+        // ServerLevel parameter types even for anvil-only call sites in tests,
+        // where those classes are absent from the classpath ("cannot access
+        // ChunkAccess"). x in the low 32 bits, z in the high 32 bits.
+        long packed = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+        return new NeoForgeRTPChunk(chunk, level, worldId, packed);
+    }
+
+    private NeoForgeRTPChunk(ChunkAccess chunk, ServerLevel level, UUID worldId, long packedCoord) {
         super(chunk);
         this.level = level;
         this.worldId = worldId;
-        ChunkPos pos = chunk.getPos();
-        this.cx = pos.x;
-        this.cz = pos.z;
+        this.cx = (int) (packedCoord & 0xffffffffL);
+        this.cz = (int) (packedCoord >> 32);
         this.anvilView = null;
         this.reconciledUnsafe = null;
     }

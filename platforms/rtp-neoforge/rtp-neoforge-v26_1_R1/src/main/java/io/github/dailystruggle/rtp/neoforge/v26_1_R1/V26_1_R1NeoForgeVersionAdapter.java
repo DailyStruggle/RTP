@@ -225,20 +225,20 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             // 30s deadline. The persistent kept-cache ticket is still applied
             // separately via applyTicket(...) after cold->hot promotion, so the
             // promoted chunk stays pinned (S-002 unaffected).
-            RTP.log(Level.INFO,
-                    "[RTP][NeoForge 26.1][CHUNKLOAD_DIAG] invoking getChunkFuture('" + getter.getName()
+            RTP.log(Level.FINER,
+                    "[RTP][NeoForge 26.1] invoking getChunkFuture('" + getter.getName()
                             + "', cx=" + cx + ", cz=" + cz + ", FULL, create=true) on "
                             + cache.getClass().getSimpleName() + " (tickThread=" + level.getServer().isSameThread() + ")");
             Object raw = getter.invoke(cache, cx, cz, ChunkStatus.FULL, /*create=*/ true);
             if (!(raw instanceof CompletableFuture<?> cf)) {
                 RTP.log(Level.WARNING,
-                        "[RTP][NeoForge 26.1][CHUNKLOAD_DIAG] getChunkFuture returned non-CompletableFuture: "
+                        "[RTP][NeoForge 26.1] getChunkFuture returned non-CompletableFuture: "
                                 + (raw == null ? "null" : raw.getClass()) + " for chunk=(" + cx + "," + cz + ")");
                 return CompletableFuture.failedFuture(new IllegalStateException(
                         "getChunkFuture returned non-CompletableFuture: " + (raw == null ? "null" : raw.getClass())));
             }
-            RTP.log(Level.INFO,
-                    "[RTP][NeoForge 26.1][CHUNKLOAD_DIAG] getChunkFuture returned future id@"
+            RTP.log(Level.FINER,
+                    "[RTP][NeoForge 26.1] getChunkFuture returned future id@"
                             + System.identityHashCode(cf) + " done=" + cf.isDone()
                             + " for chunk=(" + cx + "," + cz + ")");
             return cf.thenApply(either -> {
@@ -258,7 +258,7 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
                 // generation refusal ("Unloaded chunk ...") is distinguishable
                 // from an unrecognised unwrap shape.
                 if (either == null) {
-                    RTP.log(Level.INFO,
+                    RTP.log(Level.FINE,
                             "[RTP][NeoForge 26.1] requestFullChunkAsync: chunk-future (create=true) future "
                                     + "completed with a NULL result for chunk=(" + cx + "," + cz + ").");
                     return null;
@@ -278,7 +278,7 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
                 } catch (Throwable ignored) {
                     // no getError(); not a ChunkResult error-bearing shape
                 }
-                RTP.log(Level.INFO,
+                RTP.log(Level.FINE,
                         "[RTP][NeoForge 26.1] requestFullChunkAsync: chunk-future (create=true) resolved "
                                 + "but no ChunkAccess could be unwrapped for chunk=(" + cx + "," + cz
                                 + "). result=" + detail
