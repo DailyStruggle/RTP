@@ -16,14 +16,16 @@
 | `regions/<name>.yml` | One file per region (`default.yml` ships out of the box). |
 | `worlds/<world>.yml` | One file per loaded world; created automatically on first start. |
 | `effects/<name>.yml` | Optional per-permission effect bundles consumed by `effects-api`. |
+| `economy.yml` | Optional Vault per-teleport charging (ADR-024, 2026-06-01 amendment). Dormant at zero cost when Vault is absent. |
 | `lite-docs/` | This bundled doc set, extracted on first start. |
 
 ## Files NOT shipped in lite
 
-`economy.yml`. Lite does not wire the Vault hook. (Claim-plugin softdepend
-integrations and `integrations.yml` ship in lite as of the 2026-05-11
-ADR-024 claim-plugin amendment; `lang/**` and `language.yml` ship as of the
-2026-05-11 ADR-024 language-options amendment.)
+SQL/Redis persistence config has no lite counterpart. (`economy.yml` and the
+Vault hook ship in lite as of the 2026-06-01 ADR-024 economy amendment;
+claim-plugin softdepend integrations and `integrations.yml` ship as of the
+2026-05-11 ADR-024 claim-plugin amendment; `lang/**` and `language.yml` ship as
+of the 2026-05-11 ADR-024 language-options amendment.)
 
 ## `regions/<name>.yml` — key keys
 

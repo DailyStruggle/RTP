@@ -4,9 +4,9 @@ This folder is extracted from the lite jar on first start to
 `plugins/RTP/lite-docs/`. It is a **stripped** subset of the full RTP admin
 documentation, scoped to features that ship in the lite assembly (ADR-024).
 
-For the full documentation set (SQL persistence, Folia, claim integrations,
-multilingual support, login reserve cache, visitor mode, economy, etc.) use
-the **RTP-Pro** jar, which ships the complete `docs/` tree.
+For the full documentation set (SQL persistence, Folia, login reserve cache,
+visitor mode, etc.) use the **RTP-Pro** jar, which ships the complete `docs/`
+tree.
 
 ## Contents
 
@@ -24,9 +24,6 @@ Not present in lite (use RTP-Pro):
 
 - SQL / Redis persistence (`H2`, `SQLite`, `MySQL`, `PostgreSQL`, Jedis).
 - Folia adapter (Spigot / Paper / Fabric only).
-- Claim-plugin integrations (GriefDefender, GriefPrevention, Lands, WorldGuard,
-  Towny, Factions, HuskTowns, RedProtect).
-- Economy / Vault hook.
 - Multilingual support (`lang/**`, `language.yml`); locale is English only.
 - Login reserve cache (`PerformanceKeys.loginCacheEnabled` / `loginCacheCap`).
 - Visitor / observation mode (`PerformanceKeys.visitorEnabled`).
@@ -34,5 +31,6 @@ Not present in lite (use RTP-Pro):
 
 Lite still ships: full selection surface (all shapes/modes/adjustors), pregen
 queue, `MemoryTracker`, `S-005` stale-chunk guard, anvil pre-filter, scan task
-+ spatial memory, biomeRecall, `commands-api` + Brigadier bridge, and
-`effects-api` runtime.
++ spatial memory, biomeRecall, claim-plugin integrations (ADR-019), the optional
+Vault economy hook + `economy.yml` (ADR-024, 2026-06-01 amendment),
+`commands-api` + Brigadier bridge, and `effects-api` runtime.

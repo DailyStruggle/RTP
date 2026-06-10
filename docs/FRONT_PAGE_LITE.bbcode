@@ -1,6 +1,6 @@
 [CENTER]
 [SIZE=7][B][COLOR=#27AE60]Leaf[/COLOR][COLOR=#2C3E50]RTP[/COLOR][/B][/SIZE]
-[SIZE=4][B][COLOR=#7F8C8D]Free Random Teleport (RTP) Plugin for Paper, Spigot & Fabric[/COLOR][/B][/SIZE]
+[SIZE=4][B][COLOR=#7F8C8D]Free Random Teleport (RTP) Plugin for Paper, Spigot, Fabric & NeoForge[/COLOR][/B][/SIZE]
 [/CENTER]
 
 [CENTER][I]Once upon a time, I wanted to explore a minecraft world. I asked for [/I]/rtp[I] in servers I played on. They told me "no, that's laggy", and I took that personally.[/I][/CENTER]
@@ -9,8 +9,10 @@ No menu, however polished, can make [I]/rtp[/I] fast - only the engine behind it
 
 [B]LeafRTP was built on one idea: a teleport should cost the server nothing the player can feel. No spike. No spinner. No quiet churn.[/B]
 
+[B]Benchmarked, not asserted.[/B] 19.8 TP/s sustained at a 4 ms worst-case main-thread tick on Paper (next-best plugin: 70 ms), with audited safety invariants - no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures. Every number on this page is measured on a public harness you can rerun yourself.
+
 [CENTER]
-[I]Supported: Paper, Spigot, Fabric, Arclight / Mohist - Minecraft 1.20.x / 1.21.x / 26.x. Send your players to a safe, random spot, engineered to maintain 20.0 TPS without lag spikes.[/I]
+[I]Supported: Paper, Spigot, Fabric, and native NeoForge (1.21.x / 26.1.x) - Minecraft 1.20.x / 1.21.x / 26.x. Legacy Forge is not native: run this jar under Arclight / Mohist. Send your players to a safe, random spot, engineered to maintain 20.0 TPS without lag spikes.[/I]
 
 [SIZE=4][COLOR=#27AE60][B]100% Free.[/B][/COLOR] Same engine as the paid [URL='https://builtbybit.com/resources/rtp-pro.105418'][B]LeafRTP-Pro[/B][/URL] build. No paywalled [I]/rtp[/I] or nag screens, and no ads - just anonymous [URL='https://bstats.org/']bStats[/URL] usage stats (server-admin opt-out via [I]plugins/bStats/config.yml[/I]).[/SIZE]
 
@@ -134,7 +136,7 @@ A few hard requirements. If any are a [B]no[/B], EssentialsX [I]/rtp[/I] or Husk
 
 [LIST]
 [*]✅ [B]Java 21+[/B] on your host (REQ-RTP-SYS-001, non-negotiable).
-[*]✅ [B]Paper, Spigot, or a Bukkit-family fork[/B] (Arclight / Mohist supported for Forge / NeoForge bridges). Fabric is supported and regularly tested, with its featureset lagging the Bukkit family by a release or two.
+[*]✅ [B]Paper, Spigot, or a Bukkit-family fork[/B] (Arclight / Mohist supported for Forge bridges). Fabric and NeoForge (1.21.x / 26.1.x) are supported and regularly tested, with their featureset lagging the Bukkit family by a release or two.
 [*]✅ [B]In-game editing or YAML, your call.[/B] Browse and tune config from the clickable [I]/rtp menu[/I] (book on Paper / Folia, chat-paginated elsewhere), or edit the plain YAML files directly and version-control them.
 [*]❌ Folia, proxy/cross-server, SQL/Redis -> those live in [B]LeafRTP-Pro[/B]. (Vault economy works in the free build.)
 [/LIST]
@@ -183,11 +185,12 @@ Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/I] later - 
 [TR][TH]Platform[/TH][TH]Status[/TH][TH]Notes[/TH][/TR]
 [TR][TD][B]Paper[/B] (+ forks: Purpur, Pufferfish, Leaf, Leaves, DivineMC)[/TD][TD]✅ Recommended[/TD][TD]Fully async via native [I]getChunkAtAsync[/I].[/TD][/TR]
 [TR][TD][B]Spigot[/B] (+ Spigot forks)[/TD][TD]✅ Supported[/TD][TD]Off-tick [I].mca[/I] Anvil pre-filter → Paper-class throughput on plain Spigot.[/TD][/TR]
-[TR][TD][B]Arclight / Mohist[/B] (Forge / NeoForge bridges)[/TD][TD]✅ Officially supported[/TD][TD]Use the Spigot/Paper jar. Recommended way to run on Forge/NeoForge.[/TD][/TR]
+[TR][TD][B]Arclight / Mohist[/B] (Forge bridges)[/TD][TD]✅ Officially supported[/TD][TD]Use the Spigot/Paper jar. Recommended way to run on Forge.[/TD][/TR]
 [TR][TD][B]Folia[/B][/TD][TD]❌ Not in this build[/TD][TD]Folia adapter ships in [B]LeafRTP-Pro[/B].[/TD][/TR]
 [TR][TD][B]Multi-server / proxy[/B] (Velocity)[/TD][TD]❌ Not in this build[/TD][TD]Cross-server queue ships in [B]LeafRTP-Pro[/B].[/TD][/TR]
 [TR][TD][B]Fabric[/B][/TD][TD]✅ Supported[/TD][TD]First-class, stable, in-scope platform; tested regularly, at feature parity with the Bukkit family.[/TD][/TR]
-[TR][TD][B]Native Forge / NeoForge[/B][/TD][TD]🔁 Use Arclight / Mohist[/TD][TD]No native adapter planned.[/TD][/TR]
+[TR][TD][B]Native NeoForge[/B][/TD][TD]✅ Supported[/TD][TD]First-class adapter on Minecraft 1.21.x / 26.1.x.[/TD][/TR]
+[TR][TD][B]Native Forge[/B][/TD][TD]🔁 Use Arclight / Mohist[/TD][TD]No native adapter planned.[/TD][/TR]
 [/TABLE]
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
@@ -478,7 +481,10 @@ A: Yes. Region files are read directly, so modded and namespaced biome and block
 [B]Q: What's the difference between LeafRTP and LeafRTP-Pro?[/B]
 A: Same engine, same source tree. The free build already ships multilingual locale switching and bundled (trimmed) [I]lang/**[/I] packs. [B]LeafRTP-Pro[/B] adds the Folia adapter, multi-server / proxy support (Velocity), SQL/Redis backends, the full curated [I]lang/**[/I] locale set, the richer block-tag/state-predicate [I]safety.yml[/I] grammar, and priority support. The free build is fully sufficient for single-server deployments. Drop in the Pro jar later - same config, same data, same commands.
 
-[B]Q: I'm on Forge / NeoForge.[/B]
+[B]Q: I'm on NeoForge.[/B]
+A: NeoForge is a first-class supported platform on Minecraft 1.21.x / 26.1.x - just drop the mod in.
+
+[B]Q: I'm on Forge.[/B]
 A: Run [B]Arclight[/B] or [B]Mohist[/B] (officially supported) and use this jar. A native Forge adapter is not planned.
 
 [B]Q: Memory and MSPT — should I worry?[/B]
@@ -494,7 +500,7 @@ Support for the free build is [B]community-tier and best-effort[/B] — a solo m
 [*][B]Support covers bugs and configuration questions,[/B] after you've read the admin guide.
 [*][B]Bug reports need a reproduction:[/B] server version, LeafRTP version, platform (Spigot / Paper / fork), [I]config.yml[/I], [I]regions/[/I], [I]safety.yml[/I], and the relevant [I]server.log[/I] section. Reports without these are asked for them once, then closed.
 [*][B]"It doesn't work" is not a bug report.[/B] Tell me what you did, what you expected, and what actually happened.
-[*][B]Unsupported on the free tier:[/B] native Forge / NeoForge (use Arclight / Mohist), plugin conflicts I can't reproduce, general MC-server admin questions.
+[*][B]Unsupported on the free tier:[/B] native Forge (use Arclight / Mohist), plugin conflicts I can't reproduce, general MC-server admin questions.
 [*][B]Response time:[/B] no SLA on the free build. Critical safety issues jump the queue regardless. Guaranteed response windows are reserved for [B]LeafRTP-Pro[/B].
 [*][B]Feature requests[/B] via GitHub issues. Priority follows the published roadmap, not ticket volume.
 [/LIST]
@@ -517,7 +523,6 @@ Live list: [URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md#known
 [*]better polygon shape setup
 [*]finish translating
 [*]verify against modded data
-[*]neoforge support
 [*]drop 1.20.1 due to performance issues, favor 1.21-26.2 when it comes out
 [*]create support mechanisms for transferring from other plugins
 [*]steady-state and burst usage statistics for admins

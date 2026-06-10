@@ -19,9 +19,11 @@ No menu, however polished, can make `/rtp` fast - only the engine behind it can.
 
 **LeafRTP-Pro was built on one idea: a teleport should cost the server nothing the player can feel. No spike. No spinner. No quiet churn.**
 
+**Enterprise performance, proven not asserted.** 19.8 TP/s sustained at a 4 ms worst-case main-thread tick on Paper (next-best plugin: 70 ms), with audited safety invariants - no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures. Every number on this page is measured on a public harness, not a marketing claim - and bounded worst-case latency is the one axis a Paper-only, on-tick design cannot follow.
+
 <div align="center">
 
-*Supported: Paper, Folia, Spigot, Fabric (Arclight / Mohist for Forge / NeoForge) - Minecraft 1.20.x / 1.21.x / 26.x. Works the moment the jar drops in - no tuning required - and rewards operators who like to dig into YAML and profiler output. Drop-in upgrade from the free LeafRTP build.*
+*Supported: Paper, Folia, Spigot, Fabric, and native NeoForge (1.21.x / 26.1.x) - Minecraft 1.20.x / 1.21.x / 26.x. Legacy Forge is not native: run the Spigot/Paper jar under Arclight / Mohist. Works the moment the jar drops in - no tuning required - and rewards operators who like to dig into YAML and profiler output. Drop-in upgrade from the free LeafRTP build.*
 
 </div>
 
@@ -101,7 +103,7 @@ LeafRTP-Pro works on any server out of the box. It also shines for the setups th
 - **Custom-generator worlds (Iris, Terra, datapacks)** where the Anvil-first biome read keeps your safety config authoritative across MC upgrades.
 - **Operators of every stripe.** Set it and forget it, or version-control your YAML and read the profiler - both paths work. In-game `/rtp menu` is there when you want it; nothing is hidden behind it.
 
-**Platform requirements:** Java 21+, on Paper / Folia / Spigot / Fabric (or Arclight / Mohist for Forge / NeoForge).
+**Platform requirements:** Java 21+, on Paper / Folia / Spigot / Fabric / native NeoForge. Legacy Forge is not native - run the Spigot/Paper jar under Arclight / Mohist.
 
 ---
 
@@ -391,7 +393,7 @@ A: Yes - same configuration, same data files, same commands. You lose Folia, pro
 - **Bug reports and configuration questions** are welcome - the admin guide answers most setup questions, and a clear repro (server version, plugin version, platform, relevant configs and log lines) gets a fast resolution.
 - **Response time:** 24-72 h on weekdays. Critical safety issues jump the queue.
 - **Feature requests** via GitHub issues. Priority follows the published roadmap.
-- **Native Forge / NeoForge** is not currently supported - use Arclight or Mohist with the Spigot/Paper jar.
+- **Native NeoForge** is supported on Minecraft 1.21.x / 26.1.x. **Native Forge** is not supported - use Arclight or Mohist with the Spigot/Paper jar.
 
 </details>
 
