@@ -36,6 +36,16 @@ public final class NeoForgeResourceIds {
 
     private static final ConcurrentHashMap<String, Method> METHOD_CACHE = new ConcurrentHashMap<>();
 
+    /**
+     * Candidate no-arg accessor names for the identifier carried by a
+     * {@code ResourceKey} / {@code TagKey}. The method was named
+     * {@code location()} through MC 1.21.8 and was renamed to {@code getValue()}
+     * in the MC 1.21.11 mappings (alongside the {@code ResourceLocation} ->
+     * {@code Identifier} type rename). Trying both lets the single 1.21.x carrier
+     * serve the whole line regardless of which name the runtime uses.
+     */
+    private static final String[] LOCATION_ACCESSORS = { "location", "getValue" };
+
     private static Method noArg(Class<?> owner, String name) {
         String key = owner.getName() + "#" + name;
         Method cached = METHOD_CACHE.get(key);
@@ -57,12 +67,17 @@ public final class NeoForgeResourceIds {
      */
     public static Object location(Object keyWithLocation) {
         if (keyWithLocation == null) return null;
-        try {
-            Method m = noArg(keyWithLocation.getClass(), "location");
-            return m == null ? null : m.invoke(keyWithLocation);
-        } catch (Throwable t) {
-            return null;
+        for (String candidate : LOCATION_ACCESSORS) {
+            try {
+                Method m = noArg(keyWithLocation.getClass(), candidate);
+                if (m == null) continue;
+                Object r = m.invoke(keyWithLocation);
+                if (r != null) return r;
+            } catch (Throwable ignored) {
+                // try the next candidate name
+            }
         }
+        return null;
     }
 
     /** {@code key.location().toString()} ("namespace:path"), or {@code null}. */

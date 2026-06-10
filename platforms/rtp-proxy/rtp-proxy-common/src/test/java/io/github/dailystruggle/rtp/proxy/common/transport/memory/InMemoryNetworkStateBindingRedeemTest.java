@@ -14,8 +14,11 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * L2 of {@code CHECKLIST-cross-server-rtp.md}: exercises every
@@ -54,6 +57,36 @@ class InMemoryNetworkStateBindingRedeemTest {
         assertNotNull(second);
         assertEquals(RedeemOutcome.NOT_FOUND, second,
                 "InMemory wipes consumed rows; observed=" + second);
+    }
+
+    @Test
+    @DisplayName("Region-aware claim carries regionKey onto the token and findReservation")
+    void claimCarriesRegionKey() throws Exception {
+        // Cross-server /rtp region=<server>:<region> support: the requested
+        // region must survive the claim and be observable by the destination
+        // backend (via findReservation / listActiveForServer) so it can
+        // dispatch `rtp region=<regionKey>` on arrival.
+        UUID player = UUID.randomUUID();
+        ReservationToken token = binding
+                .claim("a", player, Duration.ofSeconds(30), Optional.of("nether")).get();
+        assertEquals(Optional.of("nether"), token.regionKey());
+
+        Optional<ReservationToken> found = binding.findReservation(player).get();
+        assertTrue(found.isPresent(), "active reservation must be findable");
+        assertEquals(Optional.of("nether"), found.get().regionKey(),
+                "regionKey must survive the claim round-trip");
+
+        assertTrue(binding.listActiveForServer("a").get().stream()
+                        .anyMatch(t -> t.regionKey().equals(Optional.of("nether"))),
+                "listActiveForServer must report the region-pinned token");
+    }
+
+    @Test
+    @DisplayName("Regionless claim leaves an empty regionKey")
+    void regionlessClaimHasEmptyRegionKey() throws Exception {
+        UUID player = UUID.randomUUID();
+        ReservationToken token = binding.claim("a", player, Duration.ofSeconds(30)).get();
+        assertEquals(Optional.empty(), token.regionKey());
     }
 
     @Test

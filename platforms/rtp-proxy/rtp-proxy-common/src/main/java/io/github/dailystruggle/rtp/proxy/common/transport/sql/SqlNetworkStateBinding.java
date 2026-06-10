@@ -200,11 +200,19 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
 
     @Override
     public CompletableFuture<ReservationToken> claim(String serverId, UUID playerId, Duration ttl) {
+        return claim(serverId, playerId, ttl, Optional.empty());
+    }
+
+    @Override
+    public CompletableFuture<ReservationToken> claim(String serverId, UUID playerId,
+                                                     Duration ttl, Optional<String> regionKey) {
         Objects.requireNonNull(serverId, "serverId");
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(ttl, "ttl");
+        Objects.requireNonNull(regionKey, "regionKey");
         checkOpen();
-        return CompletableFuture.supplyAsync(() -> claimSync(serverId, playerId, ttl), executor);
+        return CompletableFuture.supplyAsync(
+                () -> claimSync(serverId, playerId, ttl, regionKey.orElse(null)), executor);
     }
 
     @Override
@@ -325,7 +333,7 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
      */
     private List<ReservationToken> listActiveForServerSync(String serverId) {
         String sql = """
-                SELECT token_id, server_id, player_id, expires_at_ms, state, created_at_ms, hmac
+                SELECT token_id, server_id, player_id, expires_at_ms, state, created_at_ms, hmac, region_key
                 FROM rtp_network_tokens
                 WHERE server_id = ?
                   AND released_at_ms IS NULL
@@ -372,7 +380,8 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                             continue;
                         }
                     }
-                    out.add(new ReservationToken(tokenId, rowServerId, playerId, expires, state));
+                    out.add(new ReservationToken(tokenId, rowServerId, playerId, expires, state,
+                            rs.getString("region_key")));
                 }
             }
         } catch (SQLException e) {
@@ -600,16 +609,17 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
         return hb;
     }
 
-    private ReservationToken claimSync(String serverId, UUID playerId, Duration ttl) {
+    private ReservationToken claimSync(String serverId, UUID playerId, Duration ttl, String regionKey) {
         // Phase 2e-SQL first cut: atomic claim via INSERT on the unique
         // (player_id) index. Race losers see SQLSTATE 23xxx and are translated
         // into IllegalStateException to match the in-memory binding's contract.
         String tokenId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
         long expires = now + ttl.toMillis();
+        String region = (regionKey == null || regionKey.isEmpty()) ? null : regionKey;
         String sql = """
-                INSERT INTO rtp_network_tokens(token_id, server_id, player_id, expires_at_ms, state, created_at_ms, released_at_ms, hmac)
-                VALUES (?, ?, ?, ?, ?, ?, NULL, ?)
+                INSERT INTO rtp_network_tokens(token_id, server_id, player_id, expires_at_ms, state, created_at_ms, released_at_ms, hmac, region_key)
+                VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)
                 """;
         // A3 envelope: sign over the canonical token payload (field order
         // matches RedisNetworkStateBinding.canonicalToken).
@@ -629,6 +639,11 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
             } else {
                 ps.setString(7, hmac);
             }
+            if (region == null) {
+                ps.setNull(8, java.sql.Types.VARCHAR);
+            } else {
+                ps.setString(8, region);
+            }
             ps.executeUpdate();
         } catch (SQLException e) {
             String sqlState = e.getSQLState();
@@ -638,7 +653,8 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
             }
             throw new RuntimeException("SqlNetworkStateBinding.claim failed: " + e.getMessage(), e);
         }
-        return new ReservationToken(tokenId, serverId, playerId, expires, ReservationToken.State.CLAIMED);
+        return new ReservationToken(tokenId, serverId, playerId, expires,
+                ReservationToken.State.CLAIMED, region);
     }
 
     private void releaseSync(String tokenId, ReleaseReason reason) {
@@ -668,7 +684,7 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
         // expires_at_ms > now so the listener treats them as "no reservation" per
         // REQ-RTP-PROXY-VELOCITY-002.
         String sql = """
-                SELECT token_id, server_id, player_id, expires_at_ms, state, created_at_ms, hmac
+                SELECT token_id, server_id, player_id, expires_at_ms, state, created_at_ms, hmac, region_key
                 FROM rtp_network_tokens
                 WHERE player_id = ?
                   AND released_at_ms IS NULL
@@ -719,7 +735,8 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                         serverId,
                         UUID.fromString(rs.getString("player_id")),
                         expires,
-                        state));
+                        state,
+                        rs.getString("region_key")));
             }
         } catch (SQLException e) {
             throw new RuntimeException("SqlNetworkStateBinding.findReservation failed: " + e.getMessage(), e);

@@ -746,7 +746,7 @@ function Test-KillMidFlight {
   $backendId = 'backend-a'
   $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   $expiry = $now + 30000
-  $claim = Invoke-RedisCli EVALSHA b0937f1020b145e5efd45e9e4ca16621feb3eb9b 0 $tokenId $playerId $proxyId $backendId $now $expiry
+  $claim = Invoke-RedisCli EVALSHA dc7c1b0f2c85f26b513de303369728583aaf7dd1 0 $tokenId $playerId $proxyId $backendId $now $expiry
   Write-Evidence 'killmidflight.claim' "tokenId=$tokenId result=$claim"
   if ($claim -notmatch '^1$') {
     Write-Host "[killmidflight] FAIL - claim returned: $claim" -ForegroundColor Red
@@ -781,7 +781,7 @@ function Test-KillSwitch {
   $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   # The claim Lua treats KILL_SWITCH as a control-plane string-arg sentinel.
   # See claim.lua and ADR-036 §5 for the contract.
-  $result = Invoke-RedisCli EVALSHA b0937f1020b145e5efd45e9e4ca16621feb3eb9b 0 $tokenId $playerId 'KILL_SWITCH' 'backend-a' $now ($now + 30000)
+  $result = Invoke-RedisCli EVALSHA dc7c1b0f2c85f26b513de303369728583aaf7dd1 0 $tokenId $playerId 'KILL_SWITCH' 'backend-a' $now ($now + 30000)
   Write-Evidence 'killswitch' "result=$result"
   if ($result -match 'KILL_SWITCH' -or $result -match '^0$') {
     Write-Host '[killswitch] PASS (claim correctly rejected)' -ForegroundColor Green

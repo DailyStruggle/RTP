@@ -18,6 +18,10 @@
 --           expiresAtMs|createdAtMs|state=CLAIMED) and passes the hex
 --           digest in here; Lua stores it opaquely as the 'hmac' HSET
 --           field. Verification is Java-side on read paths.
+-- ARGV[8] = regionKey (string, optional - empty string when the request
+--           carried no region constraint). Stored opaquely as the
+--           'regionKey' HSET field for cross-server
+--           /rtp region=<server>:<region> support.
 --
 -- Returns 1 on win, 0 on race-loss (another active token already indexed).
 local existing = redis.call('GET', KEYS[2])
@@ -27,6 +31,8 @@ end
 local ttl = tonumber(ARGV[6])
 local hmac = ARGV[7]
 if hmac == nil then hmac = '' end
+local regionKey = ARGV[8]
+if regionKey == nil then regionKey = '' end
 redis.call('HSET', KEYS[1],
     'tokenId', ARGV[1],
     'serverId', ARGV[2],
@@ -35,7 +41,8 @@ redis.call('HSET', KEYS[1],
     'createdAtMs', ARGV[5],
     'state', 'CLAIMED',
     'releasedAtMs', '',
-    'hmac', hmac)
+    'hmac', hmac,
+    'regionKey', regionKey)
 if ttl > 0 then
     redis.call('EXPIRE', KEYS[1], ttl)
 end

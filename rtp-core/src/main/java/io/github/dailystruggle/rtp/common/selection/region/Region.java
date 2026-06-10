@@ -413,10 +413,71 @@ public class Region extends FactoryValue<RegionKeys> {
 
 
   /**
-   * execute - localized task for pre-generating locations
-   *
-   * @param availableTime available time in nanoseconds
+   * [PROMOTE_DIAG] Diagnostic for the cold->hot (L2->L1) promotion drop path.
+   * Emitted at INFO when {@code vert.adjust(chunk)} returns {@code null} during a
+   * promotion, which is otherwise a silent drop. Reports whether the cached chunk
+   * is live-backed or anvil-backed, whether it reports as generated/loaded, and a
+   * sample of surface height + air/biome reads at the chunk-centre column. A live,
+   * generated chunk with a sensible {@code surfaceY} but {@code adjust==null}
+   * points at the vertical adjustor; an anvil-backed view (or {@code surfaceY} at
+   * world-min with all-air reads) points at an ungenerated/empty chunk being
+   * verified instead of generated; a {@code null} cached chunk points at the
+   * world's chunk cache not retaining the (re)loaded chunk.
    */
+  private void logPromotionDropDiag(
+      RTPLocation coldLoc,
+      @Nullable io.github.dailystruggle.rtp.api.world.RTPChunk<?> rtpChunk,
+      int cx, int cz) {
+    try {
+      if (rtpChunk == null) {
+        RTP.log(Level.INFO,
+            "[RTP][PROMOTE_DIAG] region=" + name + " cold=(" + coldLoc.coords().x() + ","
+                + coldLoc.coords().y() + "," + coldLoc.coords().z() + ") chunk=(" + cx + "," + cz
+                + ") DROPPED: getCachedChunk returned null "
+                + "(world chunk cache did not retain the (re)loaded chunk).");
+        return;
+      }
+      int surfaceY = rtpChunk.getSurfaceHeight(8, 8);
+      String biome;
+      try {
+        biome = rtpChunk.getBiome(8, surfaceY, 8);
+      } catch (Throwable t) {
+        biome = "<biome-read-threw:" + t.getClass().getSimpleName() + ">";
+      }
+      boolean airBelow;
+      boolean airAt;
+      boolean airAbove;
+      try {
+        airBelow = rtpChunk.isAir(8, surfaceY - 1, 8);
+        airAt = rtpChunk.isAir(8, surfaceY, 8);
+        airAbove = rtpChunk.isAir(8, surfaceY + 1, 8);
+      } catch (Throwable t) {
+        RTP.log(Level.INFO,
+            "[RTP][PROMOTE_DIAG] region=" + name + " chunk=(" + cx + "," + cz
+                + ") DROPPED vert.adjust=null but isAir read THREW "
+                + t.getClass().getSimpleName() + ": " + t.getMessage()
+                + " (block reads are broken on this platform chunk).");
+        return;
+      }
+      RTP.log(Level.INFO,
+          "[RTP][PROMOTE_DIAG] region=" + name + " chunk=(" + cx + "," + cz
+              + ") DROPPED vert.adjust=null"
+              + " generated=" + rtpChunk.isGenerated()
+              + " loaded=" + rtpChunk.isLoaded()
+              + " anvilBacked=" + rtpChunk.isSelfContained()
+              + " surfaceY=" + surfaceY
+              + " biome=" + biome
+              + " isAir[y-1/y/y+1]=" + airBelow + "/" + airAt + "/" + airAbove
+              + " (live+generated+sensible surfaceY -> vertical adjustor issue;"
+              + " anvilBacked or surfaceY==minHeight+all-air -> ungenerated/empty chunk).");
+    } catch (Throwable diagEx) {
+      RTP.log(Level.INFO,
+          "[RTP][PROMOTE_DIAG] diagnostic itself failed for region=" + name
+              + " chunk=(" + cx + "," + cz + "): "
+              + diagEx.getClass().getSimpleName() + ": " + diagEx.getMessage());
+    }
+  }
+
   public void execute(long availableTime) {
     io.github.dailystruggle.rtp.common.tools.CfDiag.regionExecute.increment();
     // L6 Slice J: lobby backends advertise regions=[]/acceptingRequests=false
@@ -515,10 +576,10 @@ public class Region extends FactoryValue<RegionKeys> {
           Runnable verify = () -> {
             try {
               RTPCoords resolved = null;
+              io.github.dailystruggle.rtp.api.world.RTPChunk<?> rtpChunk = null;
               try {
                 long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
-                io.github.dailystruggle.rtp.api.world.RTPChunk<?> rtpChunk =
-                    getWorld().getCachedChunk(key);
+                rtpChunk = getWorld().getCachedChunk(key);
                 VerticalAdjustor<?> v = getVert();
                 if (rtpChunk != null && v != null) {
                   resolved = v.adjust(rtpChunk);
@@ -535,6 +596,15 @@ public class Region extends FactoryValue<RegionKeys> {
               }
 
               if (resolved == null) {
+                // [PROMOTE_DIAG] Cold->hot promotion rejected this candidate
+                // because the vertical adjustor found no safe standing column in
+                // the (re)loaded chunk. This is the silent drop that leaves L1
+                // (keptLocations) empty when every promotion fails. Log the
+                // chunk's backing mode + a sample of its block/biome reads so a
+                // broken platform chunk read (everything air / wrong block ids /
+                // ungenerated anvil view) is distinguishable from a genuinely
+                // unsafe column.
+                logPromotionDropDiag(coldLoc, rtpChunk, cx, cz);
                 // Drop the now-unsafe / placeholder-Y location. pollSilently
                 // above skipped the delete callback; fire offer+poll so the
                 // DB row is purged.

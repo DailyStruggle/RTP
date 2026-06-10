@@ -113,7 +113,7 @@ scanHervatten: "#10A5F5[P0] scantaak hervat voor regio's: [scan_regions]"
 scanActief: "&c[P0] er is al een scantaak actief voor regio's: [scan_regions]"
 scanNietActief: "&c[P0] er is geen scantaak actief voor regio's: [scan_regions]"
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanStatus: "&a[P0] [scan_chunks] / [scan_totalChunks] chunks voltooid voor regio's: [scan_regions]. [scan_cps] cps. Landpercentage: [scan_landPercentage]%. Resterende tijd: [scan_eta]"
+scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 land &8| &7ETA #7E9CC8[scan_eta]"
 
 # ###############################################################################
 # Sectie 7: Info-opdracht

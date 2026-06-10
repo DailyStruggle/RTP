@@ -11,8 +11,15 @@ Marketplace listing metadata (current, for SEO reference):
 
 # LeafRTP - Random Teleport for Paper, Spigot, Fabric
 
-### Deterministic, bounded-latency random teleport (`/rtp` / `/wild`) engine
-*The fastest free random teleport plugin for Paper, Spigot, and Bukkit-family servers - instant `/rtp` and safe random-spawn landings, with no lag spikes under load.*
+*Once upon a time, I wanted to explore a minecraft world. I asked for `/rtp` in servers I played on. They told me "no, that's laggy", and I took that personally.*
+
+</div>
+
+No menu, however polished, can make `/rtp` fast - only the engine behind it can. With most random-teleport plugins, **any** click can make the server load chunk after chunk after chunk: it picks a spot, loads it on the main thread, and - if it turns out unsafe - tries another, and another, with nothing telling it to stop. That lag spike never shows up in the menu. It shows up in your MSPT, in the stutter every other player feels, and eventually in the players who quietly stop logging in.
+
+**LeafRTP was built on one idea: a teleport should cost the server nothing the player can feel. No spike. No spinner. No quiet churn.**
+
+<div align="center">
 
 *Supported: Paper, Spigot, Fabric, Arclight / Mohist - Minecraft 1.20.x / 1.21.x / 26.x. Send your players to a safe, random spot, engineered to maintain 20.0 TPS without lag spikes.*
 
@@ -38,7 +45,7 @@ Marketplace listing metadata (current, for SEO reference):
 - **Clickable `/rtp menu` GUI world & region selection** - players pick worlds and regions from an interactive book menu (Paper / Folia; chat-paginated elsewhere), no commands to memorize.
 - **Eight claim-plugin integrations bundled** (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect) - no add-ons to install.
 - **Per-player cooldowns & usage limits** - per-permission cooldown and limit nodes out of the box, so `/rtp` spam is capped without an extra plugin.
-- **Audited safety**: no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures (REQ-RTP-S-001..S-007).
+- **Audited safety**: no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures.
 
 On **Paper 1.21**, measured on the in-repo benchmark harness, two clients spamming `/rtp` back-to-back:
 
@@ -53,17 +60,61 @@ On **Paper 1.21**, measured on the in-repo benchmark harness, two clients spammi
 
 Same throughput as the next-best plugin, **~17x lower worst-case tick spike, 35% less CPU per teleport.** On Spigot, LeafRTP's worst tick stays at 3 ms while competitors spike past 3 seconds. Reproduce on your own rig: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP).
 
+**And free doesn't mean bare-bones.** The same off-tick architecture that keeps your TPS steady also runs the clickable `/rtp menu`, eight bundled claim integrations, the full effects engine, live map heatmaps, and built-in `/rtp info` diagnostics - speed is what makes the feature set affordable, not a trade against it.
+
+Each capability below is paired with the part of that architecture that makes it cheap to run - the feature set and the performance are the same system, not opposite ends of a dial:
+
+| Feature you get | What makes it cost the server nothing |
+|-----------------|---------------------------------------|
+| **Clickable `/rtp menu`** - book UI (Paper / Folia) or chat-paginated menu | Menu rendering runs off the main thread, so opening it never touches your MSPT. |
+| **Lifecycle effects engine** - particles, sounds, fireworks, potions, titles | Effect math and packet work run async, so they never cost you TPS. |
+| **8 bundled claim integrations** - GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect | Claim checks reroll inside the async pipeline, not on the tick that teleports the player. |
+| **Live map heatmaps** (`/rtp scan`) - green/red safety painted on a real held map | The `.mca` Anvil pre-filter and chunk-load passes run off-tick and throttled, so a scan runs on a live server without tanking TPS. |
+| **Built-in `/rtp info` diagnostics** - TPS/MSPT, heap, latency percentiles, rejection breakdown | Metrics are sampled without blocking a tick, so the dashboard reads pre-collected numbers at no hot-path cost. |
+| **Instant teleports** - no "Finding a safe location..." wait | A pre-warmed, pre-verified location queue serves `/rtp` in one tick instead of loading chunks on demand. |
+
 <details>
 <summary><b>Verification & sources</b></summary>
 
 Every number on this page is anchored in the repo:
 
 - **Reproducible benchmarks** with raw CSVs and per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP)
-- **Requirements traced to tests** - every REQ-*, including the seven S-001...S-007 safety prohibitions (no unsafe-block landings, no force-loaded chunks, no claim-bypassing teleports, no main-thread chunk loading, no silently swallowed failures), has an implementing class and regression test: [`TRACEABILITY.md`](https://github.com/dailystruggle/RTP/blob/V3/docs/dev/TRACEABILITY.md)
+- **Requirements traced to tests** - every requirement, including the safety prohibitions (no unsafe-block landings, no force-loaded chunks, no claim-bypassing teleports, no main-thread chunk loading, no silently swallowed failures), has an implementing class and regression test: [`TRACEABILITY.md`](https://github.com/dailystruggle/RTP/blob/V3/docs/dev/TRACEABILITY.md)
 - **28+ ADRs**, dated and numbered, covering platform-in-scope decisions, the Anvil subsystem, the Brigadier bridge, supersession trails: [`docs/adr/`](https://github.com/dailystruggle/RTP/tree/V3/docs/adr)
 - **bStats** enabled - anonymous usage stats help prioritize platform work.
 
 </details>
+
+---
+
+## See the engine work: real-time visual diagnostics
+
+Most random-teleport plugins are a black box - you find out a region is full of unsafe ground only when players start complaining. LeafRTP turns that into something you can *watch*.
+
+Run `/rtp scan` on a region and hold the map: LeafRTP paints each sector green (safe) or red (unsafe) **as it verifies it**, live, on a real vanilla map item - while the chat readout streams `cps`, land %, and an **ETA** so you know exactly how long a pre-warm will take.
+
+<!-- TODO(asset): replace with a short looping clip/GIF of the scan painting the held map; source video below. -->
+[**Watch the scan paint a region live (video)**](https://youtu.be/Ftjy1zw_S04)
+
+- **Two passes, and the heavy one runs off-tick.** The first pass reads `.mca` Anvil region files on a background pool - it never touches the main thread (S-005) and throws out most of a region (ocean, wrong biome, obviously unsafe) before any chunk is loaded. Only the survivors reach the second pass, a throttled live chunk-load verification; because the Anvil pre-filter has already discarded the bulk of the region, that live pass is a small fraction of what a naive pre-generator would load, and it is paced so a scan can run on a live server without tanking TPS.
+- **It is a diagnostic, not a chore.** The red/green map and the rejection breakdown in `/rtp info` tell you *why* a region rejects coordinates (bad biome, unsafe block, claim), so you can tune `safety.yml` against evidence instead of guesswork.
+- **Free, and cross-platform.** The held-map heatmap ships in the free build on Paper, Spigot, Fabric, and NeoForge - not a static PNG you export to disk and open over FTP.
+
+---
+
+## Runtime observability built in (`/rtp info`)
+
+No metrics add-on, no external dashboard. `/rtp info` reports the numbers an operator actually watches, sampled without blocking a tick:
+
+- **TPS (1m / 5m / 15m) and live server MSPT** with tick-budget utilisation.
+- **JVM heap** used / max, and current chunk-ticket leak rate.
+- **Pipeline latency percentiles** (P50 / P75 / P90 / P95 / P99) and slow-teleport count.
+- **Generation success / failure rate** with the top coordinate-rejection cause and a full breakdown by cause.
+- **Queue depth and growth warnings**, plus database round-trip latency.
+
+<!-- TODO(asset): replace with a screenshot of /rtp info (TPS + MSPT + heap block). -->
+
+This is the part competitors describe as "enterprise-grade" in their listing copy. Here it is a command you can run, with every field traced to a requirement in [`TRACEABILITY.md`](https://github.com/dailystruggle/RTP/blob/V3/docs/dev/TRACEABILITY.md).
 
 ---
 
@@ -103,6 +154,10 @@ Tune `plugins/RTP/config.yml` and `plugins/RTP/regions/*.yml` later - via `/rtp 
 - Iris, Terra, and custom datapack generators work out of the box, with modded biome IDs preserved. **PlaceholderAPI** and **ProtocolLib** are supported as optional soft-deps.
 - **Optional Vault economy** - charge players per `/rtp` with per-region price, `priceOther`, params/biome surcharges, and a balance floor (`economy.yml`); dormant when Vault is not installed.
 - **Public `rtp-api`** - same surface as Pro. Trigger LeafRTP from a GUI, NPC, or quest; build your own UX without forking.
+- **Live map / heatmap visualizations** - `/rtp scan` paints region safety state (green safe / red unsafe) onto a real held map item while the chat readout streams cps, land %, and ETA; see *Real-Time Visual Diagnostics* above. Free on Paper, Spigot, Fabric, and NeoForge.
+- **Built-in runtime observability** - `/rtp info` reports TPS/MSPT, JVM heap, pipeline latency percentiles, and generation success/failure breakdown without a metrics add-on; see *Runtime observability* above.
+- **12 locales, parity-enforced** - shipped locales are CI-verified (`LocaleParityTest`) so a translated server never silently falls back to English on a new key.
+- **Unusually thorough engineering docs** - 28+ dated ADRs and a requirements-to-tests trace, public: [`docs/dev/INDEX.md`](https://github.com/dailystruggle/RTP/blob/V3/docs/dev/INDEX.md).
 
 <details>
 <summary><b>Already built in - the things operators usually bolt on with extra plugins</b></summary>
@@ -258,7 +313,7 @@ Support for the free build is **community-tier and best-effort** - a solo mainta
 - **Bug reports need a reproduction:** server version, LeafRTP version, platform (Spigot / Paper / fork), `config.yml`, `regions/`, `safety.yml`, and the relevant `server.log` section. Reports without these are asked for them once, then closed.
 - **"It doesn't work" is not a bug report.** Tell me what you did, what you expected, and what actually happened.
 - **Unsupported on the free tier:** native Forge / NeoForge (use Arclight / Mohist), plugin conflicts I can't reproduce, general MC-server admin questions.
-- **Response time:** no SLA on the free build. Critical safety issues (S-001...S-007 violations) jump the queue regardless. Guaranteed response windows are reserved for **LeafRTP-Pro**.
+- **Response time:** no SLA on the free build. Critical safety issues jump the queue regardless. Guaranteed response windows are reserved for **LeafRTP-Pro**.
 - **Feature requests** via GitHub issues. Priority follows the published roadmap, not ticket volume.
 
 </details>

@@ -105,7 +105,8 @@ public final class SqlNetworkStateSchema {
                 state            VARCHAR(16)  NOT NULL,
                 created_at_ms    BIGINT       NOT NULL,
                 released_at_ms   BIGINT,
-                hmac             VARCHAR(128)
+                hmac             VARCHAR(128),
+                region_key       VARCHAR(64)
             )
             """;
 
@@ -113,6 +114,18 @@ public final class SqlNetworkStateSchema {
             "ALTER TABLE rtp_network_tokens ADD COLUMN IF NOT EXISTS hmac VARCHAR(128)";
     private static final String DDL_TOKENS_ADD_HMAC_MYSQL =
             "ALTER TABLE rtp_network_tokens ADD COLUMN hmac VARCHAR(128)";
+
+    /**
+     * Cross-server region support: add the {@code region_key} column to
+     * pre-existing deployments so a {@code /rtp region=<server>:<region>}
+     * request can persist its requested region on the reservation row and
+     * the destination backend can re-attach it on arrival. Nullable;
+     * legacy rows carry {@code region_key=NULL} (regionless request).
+     */
+    private static final String DDL_TOKENS_ADD_REGION =
+            "ALTER TABLE rtp_network_tokens ADD COLUMN IF NOT EXISTS region_key VARCHAR(64)";
+    private static final String DDL_TOKENS_ADD_REGION_MYSQL =
+            "ALTER TABLE rtp_network_tokens ADD COLUMN region_key VARCHAR(64)";
 
     /**
      * Per-player active-state uniqueness. Postgres / SQLite / H2 honour the
@@ -195,6 +208,7 @@ public final class SqlNetworkStateSchema {
         addColumnIgnoringMissing(conn, DDL_PROXIES_ADD_HMAC, DDL_PROXIES_ADD_HMAC_MYSQL);
         addColumnIgnoringMissing(conn, DDL_BACKENDS_ADD_HMAC, DDL_BACKENDS_ADD_HMAC_MYSQL);
         addColumnIgnoringMissing(conn, DDL_TOKENS_ADD_HMAC, DDL_TOKENS_ADD_HMAC_MYSQL);
+        addColumnIgnoringMissing(conn, DDL_TOKENS_ADD_REGION, DDL_TOKENS_ADD_REGION_MYSQL);
         // Slice D row D5: wait-queue tables. Independent of the heartbeat /
         // reservation-token tables above; safe to bootstrap on every open
         // because the create statements are IF NOT EXISTS.

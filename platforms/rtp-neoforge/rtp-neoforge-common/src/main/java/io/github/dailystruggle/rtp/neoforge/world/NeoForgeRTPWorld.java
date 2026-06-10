@@ -19,7 +19,6 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.lang.ref.WeakReference;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.UUID;
@@ -51,20 +50,86 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     private final String name;
     private final UUID id;
 
-    private final ConcurrentHashMap<Long, WeakReference<ChunkAccess>> chunkCache = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Long, WeakReference<NeoForgeRTPChunk>> rtpChunkCache = new ConcurrentHashMap<>();
+    // Strong-reference chunk caches (NOT WeakReference). A freshly loaded chunk
+    // is only pinned by vanilla's transient generation ticket (getChunkFuture
+    // create=true), which is released as soon as the FULL-status future
+    // resolves; the persistent RTP keep-ticket is applied LATER, only after the
+    // cold->hot promotion verify (Region.execute) reads the chunk back via
+    // getCachedChunk and the vertical adjustor accepts it. With WeakReference
+    // maps the just-loaded wrapper could be reclaimed in that gap (deterministic
+    // under the deficit-dispatch GC burst of generating many candidate chunks at
+    // once), so getCachedChunk returned null for every promotion -> the L1 kept
+    // cache never filled and /rtp never landed. Strong references guarantee the
+    // loaded chunk survives the verify hop, mirroring the proven Fabric 26.1
+    // carrier (V26_1_R1FabricRTPWorld#chunkCache). Entries are evicted explicitly
+    // in forgetChunkAt / forgetChunks, so the map does not grow unbounded.
+    private final ConcurrentHashMap<Long, ChunkAccess> chunkCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, NeoForgeRTPChunk> rtpChunkCache = new ConcurrentHashMap<>();
     private final io.github.dailystruggle.rtp.anvil.AnvilProbeSupport anvilProbeSupport =
             new io.github.dailystruggle.rtp.anvil.AnvilProbeSupport();
 
     public NeoForgeRTPWorld(@NotNull ServerLevel level) {
         super(level);
-        this.name = io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds
-                .locationString(level.dimension());
+        this.name = resolveDimensionName(level, true);
         this.id = UUID.nameUUIDFromBytes(this.name.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * Resolve the stable RTP world name ("namespace:path") for a
+     * {@link ServerLevel}'s dimension, mirroring exactly the name used at
+     * registration time. Prefers the reflective identifier accessor and, when it
+     * returns {@code null} (e.g. the {@code ResourceLocation} -> {@code Identifier}
+     * rename in the MC 1.21.11 mappings), parses the trailing "namespace:path"
+     * token out of {@code ResourceKey#toString()}.
+     *
+     * <p>This must be the single source of truth for the world name: registration
+     * ({@link #NeoForgeRTPWorld(ServerLevel)}) and lookup
+     * ({@code NeoForgeRTPPlayer.getLocation()}) both go through here so a player's
+     * current world always resolves to the same registered name.</p>
+     *
+     * @param warnOnFallback emit the one-time fallback warning (true at
+     *                       registration, false on hot lookup paths)
+     */
+    @NotNull
+    public static String resolveDimensionName(@NotNull ServerLevel level, boolean warnOnFallback) {
+        String resolved = io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds
+                .locationString(level.dimension());
+        if (resolved != null) return resolved;
+        // Last-resort fallback so the world still resolves to a usable, stable
+        // name even if the reflective identifier accessor fails on a mappings
+        // rename. ResourceKey#toString() yields
+        // "ResourceKey[minecraft:dimension / minecraft:overworld]"; pull the
+        // trailing "namespace:path" token out of it.
+        String raw = String.valueOf(level.dimension());
+        int slash = raw.lastIndexOf('/');
+        int end = raw.lastIndexOf(']');
+        if (slash >= 0 && end > slash) {
+            resolved = raw.substring(slash + 1, end).trim();
+        } else {
+            resolved = raw;
+        }
+        if (warnOnFallback) {
+            // Expected on the MC 1.21.11 mappings (ResourceLocation -> Identifier
+            // rename): the reflective id accessor returns null and the stable
+            // ResourceKey#toString() parse below always yields the correct name.
+            // This is a routine fallback, not a fault, so keep it at FINE to avoid
+            // startup log spam (one line per loaded dimension).
+            RTP.log(java.util.logging.Level.FINE,
+                    "[RTP][NeoForge] dimension id accessor returned null; "
+                            + "falling back to parsed name '" + resolved + "'.");
+        }
+        return resolved;
+    }
+
+    /**
+     * ADR-058 — region-schematic paster. The decode/plan half is platform-neutral
+     * ({@link io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster}); the native
+     * block writes route back through {@link #setBlocks(java.util.List)} below. Defaulting to a
+     * real paster (rather than {@code NoOpSchematicPaster}) is what enables schematic parsing on
+     * NeoForge — parity with {@code V26_2_R1FabricRTPWorld}.
+     */
     private static @NotNull io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster =
-            io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster.INSTANCE;
+            new io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster();
 
     public static void setSchematicPaster(
             @NotNull io.github.dailystruggle.rtp.api.schematic.SchematicPaster paster) {
@@ -193,18 +258,61 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
             return result;
         }
 
-        liveLoadInFlight.incrementAndGet();
+        final int inFlightNow = liveLoadInFlight.incrementAndGet();
         totalChunkLoads.incrementAndGet();
+
+        // [CHUNKLOAD_DIAG] Trace the live-load dispatch end to end so we can tell
+        // whether the server.execute runnable ever runs on the tick thread, what
+        // the adapter handed back, and whether the chunk future ultimately
+        // resolves. Symptom under investigation: nothing reaches L1 and inFlight
+        // saturates at the deficit cap.
+        final long dispatchStartNanos = System.nanoTime();
+        RTP.log(java.util.logging.Level.INFO,
+                "[RTP][NeoForge][CHUNKLOAD_DIAG] dispatch SUBMIT world=" + name
+                        + " chunk=(" + chunkX + "," + chunkZ + ") inFlight=" + inFlightNow
+                        + " serverThread.isSameThread=" + server.isSameThread());
 
         CompletableFuture<CompletableFuture<ChunkAccess>> bridge = new CompletableFuture<>();
         server.execute(() -> {
+            RTP.log(java.util.logging.Level.INFO,
+                    "[RTP][NeoForge][CHUNKLOAD_DIAG] dispatch RUN (on tick thread) world=" + name
+                            + " chunk=(" + chunkX + "," + chunkZ + ") waitedMs="
+                            + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L));
             try {
-                bridge.complete(adapter.requestFullChunkAsync(world, chunkX, chunkZ));
+                CompletableFuture<ChunkAccess> adapterFuture = adapter.requestFullChunkAsync(world, chunkX, chunkZ);
+                RTP.log(java.util.logging.Level.INFO,
+                        "[RTP][NeoForge][CHUNKLOAD_DIAG] adapter.requestFullChunkAsync RETURNED future="
+                                + (adapterFuture == null ? "null" : "id@" + System.identityHashCode(adapterFuture)
+                                        + " done=" + adapterFuture.isDone())
+                                + " world=" + name + " chunk=(" + chunkX + "," + chunkZ + ")");
+                if (adapterFuture != null) {
+                    adapterFuture.whenComplete((ca, ex) -> RTP.log(java.util.logging.Level.INFO,
+                            "[RTP][NeoForge][CHUNKLOAD_DIAG] adapter future COMPLETE world=" + name
+                                    + " chunk=(" + chunkX + "," + chunkZ + ") chunk="
+                                    + (ca == null ? "null" : ca.getClass().getSimpleName())
+                                    + (ex == null ? "" : " ex=" + ex.getClass().getSimpleName() + ":" + ex.getMessage())
+                                    + " elapsedMs=" + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L)));
+                }
+                bridge.complete(adapterFuture);
             } catch (Throwable t) {
+                RTP.log(java.util.logging.Level.WARNING,
+                        "[RTP][NeoForge][CHUNKLOAD_DIAG] adapter.requestFullChunkAsync THREW world=" + name
+                                + " chunk=(" + chunkX + "," + chunkZ + "): "
+                                + t.getClass().getSimpleName() + ": " + t.getMessage());
                 bridge.completeExceptionally(t);
             }
         });
-        bridge.orTimeout(1_500L, TimeUnit.MILLISECONDS);
+        // NO short pre-dispatch timeout here. The bridge only completes once the
+        // server.execute runnable actually runs on the tick thread and returns
+        // the adapter's (pending) chunk future. A previous bridge.orTimeout(1_500ms)
+        // failed the whole load whenever the tick thread was momentarily behind:
+        // when the server logs "Running NNNNms behind" (e.g. first-chunk worldgen
+        // bursts), the execute runnable cannot start within 1.5s, so the bridge
+        // timed out and PregenTask attributed a spurious TimeoutException - L1
+        // never promoted and /rtp never landed. The proven Fabric 26.1 carrier has
+        // no such short pre-dispatch deadline; the only deadline is the generation
+        // bound below. We rely solely on the LIVE_LOAD_DEADLINE_MS deadline applied
+        // to the composed chain, which still bounds a genuinely dead dispatch.
         CompletableFuture<ChunkAccess> dispatch =
                 bridge.thenCompose(f -> f == null ? CompletableFuture.completedFuture(null) : f);
         dispatch = dispatch.orTimeout(LIVE_LOAD_DEADLINE_MS, TimeUnit.MILLISECONDS);
@@ -214,13 +322,35 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
             if (error != null) {
                 Throwable cause = (error instanceof CompletionException && error.getCause() != null)
                         ? error.getCause() : error;
+                RTP.log(java.util.logging.Level.INFO,
+                        "[RTP][NeoForge][CHUNKLOAD_DIAG] dispatch FAILED world=" + name
+                                + " chunk=(" + chunkX + "," + chunkZ + ") "
+                                + cause.getClass().getSimpleName() + ": " + cause.getMessage()
+                                + " elapsedMs=" + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L));
                 result.completeExceptionally(cause);
                 return;
             }
             if (chunk != null) {
-                chunkCache.put(key, new WeakReference<>(chunk));
-                rtpChunkCache.put(key, new WeakReference<>(new NeoForgeRTPChunk(chunk, world, id)));
+                RTP.log(java.util.logging.Level.INFO,
+                        "[RTP][NeoForge][CHUNKLOAD_DIAG] dispatch OK world=" + name
+                                + " chunk=(" + chunkX + "," + chunkZ + ") stored="
+                                + chunk.getClass().getSimpleName()
+                                + " elapsedMs=" + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L));
+                chunkCache.put(key, chunk);
+                rtpChunkCache.put(key, new NeoForgeRTPChunk(chunk, world, id));
                 anvilProbeSupport.evict(key);
+            } else {
+                // S-004: never silently discard. A null chunk here means the
+                // version adapter's getChunkFuture(create=true) resolved without
+                // a ChunkAccess (e.g. an unwrap miss on this runtime's
+                // ChunkResult shape), which would leave the promotion verify with
+                // no chunk to adjust. Make it visible rather than indistinguishable
+                // from a weak-ref eviction.
+                RTP.log(java.util.logging.Level.INFO,
+                        "[RTP][NeoForge] loadLiveChunk resolved a NULL ChunkAccess for " + name
+                                + " chunk=(" + ((int) (key & 0xffffffffL)) + ","
+                                + ((int) (key >> 32)) + ") - adapter.requestFullChunkAsync "
+                                + "completed without a chunk (no cache entry stored).");
             }
             result.complete(key);
         });
@@ -519,25 +649,17 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public RTPChunk<?> getCachedChunk(long key) {
-        WeakReference<NeoForgeRTPChunk> rtpRef = rtpChunkCache.get(key);
-        if (rtpRef != null) {
-            NeoForgeRTPChunk wrapper = rtpRef.get();
-            if (wrapper != null) {
-                anvilProbeSupport.evict(key);
-                return wrapper;
-            }
-            rtpChunkCache.remove(key);
+        NeoForgeRTPChunk wrapper = rtpChunkCache.get(key);
+        if (wrapper != null) {
+            anvilProbeSupport.evict(key);
+            return wrapper;
         }
-        WeakReference<ChunkAccess> ref = chunkCache.get(key);
-        if (ref != null) {
-            ChunkAccess chunk = ref.get();
-            if (chunk != null) {
-                NeoForgeRTPChunk wrapper = new NeoForgeRTPChunk(chunk, world, id);
-                rtpChunkCache.put(key, new WeakReference<>(wrapper));
-                anvilProbeSupport.evict(key);
-                return wrapper;
-            }
-            chunkCache.remove(key);
+        ChunkAccess chunk = chunkCache.get(key);
+        if (chunk != null) {
+            NeoForgeRTPChunk built = new NeoForgeRTPChunk(chunk, world, id);
+            rtpChunkCache.put(key, built);
+            anvilProbeSupport.evict(key);
+            return built;
         }
         io.github.dailystruggle.rtp.anvil.AnvilChunkView view = anvilProbeSupport.takeCached(key);
         if (view != null) {
@@ -610,6 +732,58 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         return world == null || world.getServer() == null;
     }
 
+    /**
+     * Native bulk block write (ADR-058). Parses each {@link io.github.dailystruggle.rtp.api.platform.BlockDelta}
+     * token through the vanilla {@code BlockStateParser} (the same parser {@code /setblock} uses,
+     * so the in-repo Sponge decoder's canonical {@code namespace:id[props]} tokens are accepted)
+     * and writes the resulting {@code BlockState} via {@link ServerLevel#setBlock}.
+     *
+     * <p>Invoked on the server thread by the caller (the teleport pipeline dispatches the paste
+     * through {@code RTP.scheduler.runTask(location, ...)}). Performs block writes only and never
+     * loads chunks (S-005). A single undecodable token is counted as a skip and audited, never
+     * thrown (S-004). Parity with {@code V26_2_R1FabricRTPWorld#setBlocks}.
+     *
+     * @return the number of blocks successfully placed
+     */
+    @Override
+    public int setBlocks(java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+        ServerLevel level = world;
+        if (level == null || blocks == null || blocks.isEmpty()) return 0;
+        net.minecraft.core.HolderLookup<net.minecraft.world.level.block.Block> blockLookup;
+        try {
+            blockLookup = level.registryAccess()
+                    .lookupOrThrow(net.minecraft.core.registries.Registries.BLOCK);
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP][NeoForge] setBlocks could not resolve the block registry lookup: "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return 0;
+        }
+        int placed = 0;
+        String firstFailedToken = null;
+        for (io.github.dailystruggle.rtp.api.platform.BlockDelta delta : blocks) {
+            try {
+                net.minecraft.world.level.block.state.BlockState state =
+                        net.minecraft.commands.arguments.blocks.BlockStateParser
+                                .parseForBlock(blockLookup, delta.token(), false)
+                                .blockState();
+                // flags=2 (Block.UPDATE_CLIENTS): send to clients without triggering neighbour
+                // physics updates — a bulk world rewrite, not a player edit.
+                level.setBlock(new BlockPos(delta.x(), delta.y(), delta.z()), state, 2);
+                placed++;
+            } catch (Throwable e) {
+                if (firstFailedToken == null) firstFailedToken = delta.token();
+            }
+        }
+        if (firstFailedToken != null) {
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP][NeoForge] setBlocks placed " + placed + " of " + blocks.size()
+                            + " block(s); at least one block-state token could not be parsed and "
+                            + "was skipped (S-004). First failure: '" + firstFailedToken + "'.");
+        }
+        return placed;
+    }
+
     @Override
     public void platform(io.github.dailystruggle.rtp.api.world.RTPLocation location) {
         try {
@@ -654,7 +828,6 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     }
 
     public @Nullable ChunkAccess peekChunk(long key) {
-        WeakReference<ChunkAccess> ref = chunkCache.get(key);
-        return ref == null ? null : ref.get();
+        return chunkCache.get(key);
     }
 }

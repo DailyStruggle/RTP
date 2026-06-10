@@ -1,6 +1,6 @@
 # maps-api-ADR-001 — Module Bootstrap, Package Layout, and Palette Policy
 
-- **Status:** Accepted (2026-05-16); §Palette policy and §Package layout amended 2026-05-23 (additive: see *Amendments* below).
+- **Status:** Accepted (2026-05-16); §Palette policy and §Package layout amended 2026-05-23 (additive); §3 Lite-assembly posture amended 2026-06-04 (REQ-RTP-MAP-004 reversed - map rendering ships in Lite). See *Amendments* below.
 - **Supersedes:** —
 - **Superseded by:** —
 - **Related:**
@@ -21,7 +21,7 @@ It deliberately did **not** lock the in-module bootstrap decisions that Stage 1 
 
 1. **Package layout** under `io.github.dailystruggle.mapsapi.*` — how the three layers, the Noop default, and the platform-binding subpackages partition the source tree, and which subpackage is permitted to import `org.bukkit.*` / `net.minecraft.*`.
 2. **Palette policy** — vanilla cartography maps use a 256-entry colour palette (`MapColor` on Bukkit, `MapColor.Brightness` × base colour on Mojmap) whose byte values are stable across MC versions for the documented entries but whose set has been extended in newer versions. Renderers must commit to *some* palette to produce deterministic byte output (per the existing Stage 1 deliverable 4.3 in the checklist).
-3. **Lite-assembly inclusion / exclusion mechanics** — `REQ-RTP-MAP-004` says the Lite assembly ships `NoopMapBinding` only; this ADR pins down whether the Lite trim is enforced at the assembly level (jar filtering, like `effects-api/effects-api-fabric-unobf`) or at the source level.
+3. **Lite-assembly inclusion / exclusion mechanics** — `REQ-RTP-MAP-004` originally said the Lite assembly ships `NoopMapBinding` only; this ADR pinned down whether the Lite trim is enforced at the assembly level (jar filtering, like `effects-api/effects-api-fabric-unobf`) or at the source level. *(Amended 2026-06-04: REQ-RTP-MAP-004 was reversed - the Lite jar ships the full `mapsapi/**` tree and the platform-backed binding, so there is no maps trim. See* §3 *and the* Amendments *section.)*
 
 These three are scoped to the module's bootstrap, do not affect the umbrella decisions in ADR-046, and do not impose a cross-module change. ADR-046 explicitly defers them here ("renderers must pick a fixed RTP palette mapping to stay deterministic across MC versions" appears in its Consequences but is not resolved).
 
@@ -70,14 +70,16 @@ This ADR therefore picks a **logical-palette-now, concrete-table-Stage-2** postu
 
 ### 3. Lite-assembly inclusion / exclusion
 
-Per REQ-RTP-MAP-004, the Lite assembly ships `NoopMapBinding` only. This is enforced **at the assembly level**, not at the source level:
+**Amended 2026-06-04:** Per the revised REQ-RTP-MAP-004, the Lite assembly ships the same platform-backed `MapBinding` as the full assembly - map rendering is **not** trimmed from Lite. The original "NoopMapBinding only" posture below is retained for the record but no longer in force.
+
+Current posture:
 
 - The `maps-api` Gradle module always compiles every subpackage listed in §1. There is no source-level Lite branch.
-- The `rtp-plugin` Lite shadow-jar excludes `io/github/dailystruggle/mapsapi/bukkit/**`, `io/github/dailystruggle/mapsapi/fabric/**`, `io/github/dailystruggle/mapsapi/render/mermaid/**`, and `io/github/dailystruggle/mapsapi/render/**` *except* `Palette.class` and a documented minimal subset (revisited in Stage 2). `mapsapi`, `mapsapi.model`, and `mapsapi.noop` are always included so addons that compile against the SPI still resolve at runtime.
-- The `RTPHooks` registry default (`NoopMapBinding`) is the only `MapBinding` reachable on Lite, satisfying REQ-RTP-MAP-001 (early-access calls throw `IllegalStateException` until — on Pro — `BukkitMapBinding`/`FabricMapBinding` installs).
-- The existing `liteJarStructureCheck` Gradle audit task (see [ADR-024](../../../docs/adr/ADR-024-rtp-lite-assembly-variant.md)) gains a `maps-api` clause in Stage 2 that asserts the excluded packages are absent from the Lite jar and `NoopMapBinding` is present.
+- The `rtp-plugin` Lite shadow-jar ships the full `mapsapi/**` tree (no maps exclusions). `RTPBukkitLitePlugin#onEnable` installs `BukkitMapBinding` unconditionally; `RTPFabricMod` installs `FabricMapBinding`; `RTPNeoForgeMod` installs `NeoForgeMapBinding`.
+- `NoopMapBinding` remains the require-by-contract default (REQ-RTP-MAP-001) and the fallback installed only when no platform binding is available on the active runtime - not the sole binding on Lite.
+- The `liteJarStructureCheck` Gradle audit task (see [ADR-024](../../../docs/adr/ADR-024-rtp-lite-assembly-variant.md)) asserts `mapsapi/**` is **not** excluded from the Lite jar.
 
-This mirrors the `effects-api` / `commands-api` pattern: one source tree, two assemblies, exclusions at the shadow-jar layer.
+*Superseded original posture (pre-2026-06-04):* the Lite shadow-jar was to exclude `io/github/dailystruggle/mapsapi/bukkit/**`, `io/github/dailystruggle/mapsapi/fabric/**`, `io/github/dailystruggle/mapsapi/render/mermaid/**`, and `io/github/dailystruggle/mapsapi/render/**` (except `Palette.class`), leaving `NoopMapBinding` as the only reachable binding on Lite. That trim was never an intentional monetization boundary and was reversed in lockstep with the Vault/economy reversal in [ADR-024](../../../docs/adr/ADR-024-rtp-lite-assembly-variant.md) (2026-06-01).
 
 ## Alternatives Considered
 

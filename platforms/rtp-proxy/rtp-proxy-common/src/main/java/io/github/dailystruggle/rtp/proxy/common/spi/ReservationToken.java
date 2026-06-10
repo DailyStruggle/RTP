@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.proxy.common.spi;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -34,13 +35,32 @@ public final class ReservationToken {
     private final long expiresEpochMs;
     private final AtomicReference<State> state;
 
+    /**
+     * Optional region constraint carried verbatim from the player's
+     * {@code /rtp region=<server>:<region>} command (parsed by
+     * {@code NetworkRouter.parseRegionArgQualified} into a {@code serverHint}
+     * + {@code regionKey}). {@code null} when the request carried no region
+     * constraint. The destination backend's {@code JoinTriggerSource}
+     * re-attaches it as {@code rtp region=<regionKey>} on arrival so the
+     * cross-server teleport lands in the requested region rather than the
+     * backend default. See the multi-region note in
+     * {@code JoinTriggerSource.findRegionForReservation}.
+     */
+    private final String regionKey;
+
     public ReservationToken(String tokenId, String serverId, UUID playerId,
                             long expiresEpochMs, State initial) {
+        this(tokenId, serverId, playerId, expiresEpochMs, initial, null);
+    }
+
+    public ReservationToken(String tokenId, String serverId, UUID playerId,
+                            long expiresEpochMs, State initial, String regionKey) {
         this.tokenId = Objects.requireNonNull(tokenId, "tokenId");
         this.serverId = Objects.requireNonNull(serverId, "serverId");
         this.playerId = Objects.requireNonNull(playerId, "playerId");
         this.expiresEpochMs = expiresEpochMs;
         this.state = new AtomicReference<>(Objects.requireNonNull(initial, "initial"));
+        this.regionKey = (regionKey == null || regionKey.isEmpty()) ? null : regionKey;
     }
 
     public String tokenId()            { return tokenId; }
@@ -48,6 +68,9 @@ public final class ReservationToken {
     public UUID playerId()             { return playerId; }
     public long expiresEpochMs()       { return expiresEpochMs; }
     public State state()               { return state.get(); }
+
+    /** Optional requested region key; empty when the request was regionless. */
+    public Optional<String> regionKey() { return Optional.ofNullable(regionKey); }
 
     /**
      * Atomic state transition. Returns {@code true} only when the witnessed
@@ -61,6 +84,7 @@ public final class ReservationToken {
     @Override
     public String toString() {
         return "ReservationToken[" + tokenId + " " + serverId + " " + playerId
-                + " " + state.get() + " exp=" + expiresEpochMs + "]";
+                + " " + state.get() + " exp=" + expiresEpochMs
+                + (regionKey == null ? "" : " region=" + regionKey) + "]";
     }
 }

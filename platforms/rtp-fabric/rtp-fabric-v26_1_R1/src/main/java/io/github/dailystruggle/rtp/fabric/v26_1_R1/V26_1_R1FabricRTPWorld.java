@@ -76,10 +76,24 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     }
 
     /**
-     * Loads {@code (cx, cz)} at {@code ChunkStatus.FULL} via the server tick
-     * thread (S-005-safe: dispatched through {@link MinecraftServer#submit}),
-     * caches a {@link V26_1_R1FabricRTPChunk} wrapper and resolves the future
-     * with the chunk key.
+     * Loads {@code (cx, cz)} at {@code ChunkStatus.FULL} and caches a
+     * {@link V26_1_R1FabricRTPChunk} wrapper, resolving the future with the
+     * chunk key.
+     *
+     * <p><b>Non-blocking dispatch (rtp-fabric-ADR-008).</b> The request is
+     * dispatched onto the server tick thread via {@link MinecraftServer#submit},
+     * but it calls vanilla's <i>non-blocking</i> generation entry point
+     * {@code ServerChunkCache#getChunkFuture(cx, cz, FULL, /*create=*&#47;true)}
+     * and chains on the returned future rather than blocking. The previous
+     * implementation called the synchronous-blocking
+     * {@code ServerLevel#getChunk(cx, cz, FULL, /*load=*&#47;true)} from inside
+     * a {@code submit()} task — when the calling thread is the tick thread
+     * (which it always is here) it ends up driving its own task queue from
+     * inside one of its own tasks, deadlocking against any other queued task
+     * in the chunk-generation dependency graph. On the 26.x chunk system that
+     * manifested as chunks never finishing generation (the "chunks are not
+     * getting loaded" symptom). {@code create=true} makes vanilla self-issue
+     * the transient generation ticket, so no extra ticket is required here.</p>
      */
     @Override
     public CompletableFuture<Long> getChunkAt(int cx, int cz) {
@@ -92,19 +106,121 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         if (chunkCache.containsKey(k)) {
             return CompletableFuture.completedFuture(k);
         }
-        return server.submit(() -> {
-            try {
-                ChunkAccess ca = level.getChunk(cx, cz, ChunkStatus.FULL, true);
-                if (ca == null) return null;
-                chunkCache.put(k, new V26_1_R1FabricRTPChunk(ca, level, id));
-                return k;
-            } catch (Throwable t) {
+        // (1) Dispatch the non-blocking generation request on the tick thread.
+        //     server.submit returns CompletableFuture<CompletableFuture<...>>;
+        //     thenCompose flattens to the inner future that vanilla completes
+        //     off-thread when generation finishes.
+        return server.submit(() -> requestChunkFuture(level, cx, cz))
+                .thenCompose(inner -> inner == null
+                        ? CompletableFuture.completedFuture((ChunkAccess) null)
+                        : inner)
+                .thenApply(ca -> {
+                    if (ca == null) return null;
+                    chunkCache.put(k, new V26_1_R1FabricRTPChunk(ca, level, id));
+                    return k;
+                })
+                .exceptionally(t -> {
+                    RTP.log(Level.WARNING,
+                            "[RTP][v26_1_R1] getChunkAt(" + cx + "," + cz + ") failed for "
+                                    + name + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+                    return null;
+                });
+    }
+
+    /** Cached resolver for {@code ServerChunkCache#getChunkFuture(int,int,ChunkStatus,boolean)}. */
+    private static volatile java.lang.reflect.Method GET_CHUNK_FUTURE_METHOD;
+
+    /**
+     * Invoke vanilla's non-blocking {@code getChunkFuture(cx, cz, FULL, true)}
+     * and adapt the result to a {@code CompletableFuture<ChunkAccess>}. MUST be
+     * called on the server tick thread. The vanilla return type drifted
+     * ({@code Either<ChunkAccess,...>} on old lines, {@code ChunkResult<ChunkAccess>}
+     * on 1.20.5+), so the inner value is unwrapped reflectively (see
+     * {@link #unwrapChunk}). Returns {@code null} (an absent future) on a
+     * resolution failure so the caller attributes it through the standard
+     * {@code FailTypes.nullChunk} path (S-004 — no silent discard).
+     */
+    @SuppressWarnings("unchecked")
+    private CompletableFuture<ChunkAccess> requestChunkFuture(ServerLevel level, int cx, int cz) {
+        try {
+            ServerChunkCache cache = level.getChunkSource();
+            java.lang.reflect.Method getter = resolveGetChunkFutureMethod(cache);
+            Object raw = getter.invoke(cache, cx, cz, ChunkStatus.FULL, /*create=*/ true);
+            if (!(raw instanceof CompletableFuture<?> cf)) {
                 RTP.log(Level.WARNING,
-                        "[RTP][v26_1_R1] getChunkAt(" + cx + "," + cz + ") failed for "
-                                + name + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+                        "[RTP][v26_1_R1] getChunkFuture returned non-CompletableFuture for chunk=("
+                                + cx + "," + cz + "): " + (raw == null ? "null" : raw.getClass()));
                 return null;
             }
-        });
+            return ((CompletableFuture<Object>) cf).thenApply(V26_1_R1FabricRTPWorld::unwrapChunk);
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[RTP][v26_1_R1] requestChunkFuture(" + cx + "," + cz + ") failed for "
+                            + name + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return null;
+        }
+    }
+
+    private static java.lang.reflect.Method resolveGetChunkFutureMethod(ServerChunkCache cache)
+            throws ReflectiveOperationException {
+        java.lang.reflect.Method cached = GET_CHUNK_FUTURE_METHOD;
+        if (cached != null) return cached;
+        synchronized (V26_1_R1FabricRTPWorld.class) {
+            cached = GET_CHUNK_FUTURE_METHOD;
+            if (cached != null) return cached;
+            java.lang.reflect.Method found = null;
+            for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
+                for (java.lang.reflect.Method m : c.getDeclaredMethods()) {
+                    if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
+                    Class<?>[] p = m.getParameterTypes();
+                    if (p.length != 4) continue;
+                    if (p[0] != int.class || p[1] != int.class) continue;
+                    if (p[2] != ChunkStatus.class) continue;
+                    if (p[3] != boolean.class) continue;
+                    m.setAccessible(true);
+                    found = m;
+                    break;
+                }
+            }
+            if (found == null) {
+                throw new NoSuchMethodException(
+                        "ServerChunkCache#getChunkFuture(int,int,ChunkStatus,boolean) not found on "
+                                + cache.getClass().getName());
+            }
+            GET_CHUNK_FUTURE_METHOD = found;
+            return found;
+        }
+    }
+
+    /**
+     * Unwrap the {@link ChunkAccess} from vanilla's {@code getChunkFuture}
+     * result, tolerant of both the {@code ChunkResult<ChunkAccess>} (1.20.5+)
+     * and legacy {@code Either<ChunkAccess,...>} shapes.
+     */
+    private static ChunkAccess unwrapChunk(Object result) {
+        if (result == null) return null;
+        if (result instanceof ChunkAccess ca) return ca;
+        // ChunkResult<ChunkAccess> (1.20.5+): orElse(null).
+        try {
+            java.lang.reflect.Method orElse = result.getClass().getMethod("orElse", Object.class);
+            Object v = orElse.invoke(result, (Object) null);
+            if (v instanceof ChunkAccess ca) return ca;
+        } catch (Throwable ignored) {
+            // fall through to the Either shape
+        }
+        // Either<ChunkAccess,...> (<=1.20.4): left().orElse(null).
+        try {
+            java.lang.reflect.Method left = result.getClass().getMethod("left");
+            Object opt = left.invoke(result);
+            if (opt != null) {
+                java.lang.reflect.Method orElse = opt.getClass().getMethod("orElse", Object.class);
+                Object v = orElse.invoke(opt, (Object) null);
+                if (v instanceof ChunkAccess ca) return ca;
+            }
+        } catch (Throwable ignored) {
+            // no recognised shape
+        }
+        return null;
     }
 
     /**

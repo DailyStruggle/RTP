@@ -67,9 +67,12 @@ public final class NeoForgeMapCanvas implements MapCanvas {
 
     @Override
     public void drawText(int x, int y, String text, byte paletteIndex) {
-        // Vanilla map text rendering needs a server-side font raster that the
-        // NM-free common module cannot reach; the carrier seam only accepts a
-        // pixel buffer. Chart labels degrade gracefully to "no label".
+        // The NM-free common module cannot reach a server-side font raster and
+        // the carrier seam only accepts a pixel buffer, so we rasterise chart
+        // labels ("MSPT (ms)", "Heap (MB)", region titles) directly into the
+        // ARGB buffer with the maps-api embedded bitmap font. This keeps label
+        // parity with the Bukkit binding (which uses MinecraftFont).
+        io.github.dailystruggle.mapsapi.render.PixelFont.draw(this, x, y, text, paletteIndex);
     }
 
     @Override

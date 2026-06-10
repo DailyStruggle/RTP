@@ -45,14 +45,16 @@ import java.util.logging.Level;
  * version-robust so the same code absorbs the post-1.21.5 ticket refactors that
  * are baked into the 26.1 runtime.</p>
  *
- * <p><b>EARLY/EXPERIMENTAL.</b> 26.1 is a moving target (authored against
- * MC 26.1.2 / NeoForge 26.1.2.65-beta). This carrier has NOT been compiled
- * against the real NeoForge 26.1 userdev artifacts (network-gated): the
- * direct typed calls below (notably {@link TicketType#create}, the chunk-source
- * accessors, and the maps / written-book component APIs) are a faithful port of
- * the 1.21.1 carrier and assume the Mojmap surface is unchanged. The maintainer
- * must verify on a network-capable JDK-25 host and re-pin the versions here and
- * in {@code RTPNeoForgeMod#installVersionAdapter} when 26.1 settles.</p>
+ * <p><b>Compiled against the real runtime.</b> This carrier is built and
+ * linked against the real NeoForge 26.1.2 userdev artifacts (neoforgeVersion
+ * {@code 26.1.2.71}, JDK 25) and loads cleanly at runtime (confirmed by the
+ * {@code Active version adapter: 26.1.2} boot line on a dev server), so the
+ * direct typed calls below (the {@code TicketType} ticket pair, the chunk-source
+ * ticket/chunk-future accessors, and the maps / written-book component APIs)
+ * match the shipped Mojmap surface. 26.1 remains a moving target: re-run
+ * {@code .\gradlew :rtp-neoforge:rtp-neoforge-v26_1_R1:build} on a JDK-25 host
+ * and re-pin the versions here and in
+ * {@code RTPNeoForgeMod#installVersionAdapter} after any 26.1/26.2 bump.</p>
  */
 public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdapter {
 
@@ -137,18 +139,53 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         synchronized (V26_1_R1NeoForgeVersionAdapter.class) {
             cached = GET_CHUNK_FUTURE_METHOD;
             if (cached != null) return cached;
+            // The 4-arg (int,int,ChunkStatus,boolean)->CompletableFuture signature
+            // is NOT unique on ServerChunkCache: vanilla declares BOTH the public
+            // entry point getChunkFuture(...) AND the private
+            // getChunkFutureMainThread(...). On 26.1.2 only getChunkFuture exists
+            // with this signature; getChunkFutureMainThread is absent. We prefer
+            // getChunkFuture (the public entry point) and pair it with an explicit
+            // temporary load-ticket (addTicketWithRadius, applied just before the
+            // call in requestFullChunkAsync) so the chunk holder reaches FULL
+            // status. Without the ticket, getChunkFuture(create=true) resolves
+            // immediately to ChunkResult.error("Unloaded chunk") on the 26.1
+            // NeoForge chunk system - the L1 kept cache stays at 0 and /rtp never
+            // lands. Fall back to a structural scan for runtimes where the public
+            // method was renamed.
             Method found = null;
-            for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
-                for (Method m : c.getDeclaredMethods()) {
-                    if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
-                    Class<?>[] p = m.getParameterTypes();
-                    if (p.length != 4) continue;
-                    if (p[0] != int.class || p[1] != int.class) continue;
-                    if (p[2] != ChunkStatus.class) continue;
-                    if (p[3] != boolean.class) continue;
-                    m.setAccessible(true);
-                    found = m;
-                    break;
+            String[] preferredNames = { "getChunkFuture" };
+            for (String name : preferredNames) {
+                for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
+                    for (Method m : c.getDeclaredMethods()) {
+                        if (!name.equals(m.getName())) continue;
+                        if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
+                        Class<?>[] p = m.getParameterTypes();
+                        if (p.length != 4) continue;
+                        if (p[0] != int.class || p[1] != int.class) continue;
+                        if (p[2] != ChunkStatus.class) continue;
+                        if (p[3] != boolean.class) continue;
+                        m.setAccessible(true);
+                        found = m;
+                        break;
+                    }
+                }
+                if (found != null) break;
+            }
+            if (found == null) {
+                // Fallback: structural scan (any name) for runtimes where the
+                // public method was renamed.
+                for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
+                    for (Method m : c.getDeclaredMethods()) {
+                        if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
+                        Class<?>[] p = m.getParameterTypes();
+                        if (p.length != 4) continue;
+                        if (p[0] != int.class || p[1] != int.class) continue;
+                        if (p[2] != ChunkStatus.class) continue;
+                        if (p[3] != boolean.class) continue;
+                        m.setAccessible(true);
+                        found = m;
+                        break;
+                    }
                 }
             }
             if (found == null) {
@@ -156,6 +193,12 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
                         "ServerChunkCache#getChunkFuture(int,int,ChunkStatus,boolean) not found on "
                                 + cache.getClass().getName());
             }
+            RTP.log(Level.INFO,
+                    "[RTP][NeoForge 26.1] resolved chunk-future method '" + found.getName()
+                            + "' on " + found.getDeclaringClass().getName()
+                            + " (preferring the public getChunkFuture entry point so create=true"
+                            + " self-issues the generation ticket; a temporary load-ticket is"
+                            + " applied before the call so the holder reaches FULL status).");
             GET_CHUNK_FUTURE_METHOD = found;
             return found;
         }
@@ -170,45 +213,82 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             ServerChunkCache cache = level.getChunkSource();
             Method getter = resolveGetChunkFutureMethod(cache);
 
-            // Temporary load-ticket so the chunk holder reaches FULL-status
-            // generation (without it the future resolves to a loading failure
-            // -> null). Mirrors the Fabric carrier.
-            ChunkPos cp = new ChunkPos(cx, cz);
-            boolean ticketAdded = false;
-            try {
-                cache.addTicketWithRadius(RTP_TICKET_TYPE, cp, RTP_TICKET_DISTANCE);
-                ticketAdded = true;
-            } catch (Throwable t) {
-                RTP.log(Level.WARNING,
-                        "[RTP][NeoForge 26.1] temp load-ticket apply failed for chunk=("
-                                + cx + "," + cz + "): " + t.getClass().getSimpleName() + ": " + t.getMessage());
-            }
-            final boolean addedTicket = ticketAdded;
-
+            // No temporary load-ticket here. create=true makes vanilla
+            // self-issue the transient generation ticket that drives the holder
+            // to FULL status, exactly as the proven Fabric 26.1 carrier
+            // (V26_1_R1FabricRTPWorld#requestChunkFuture) does. The earlier
+            // explicit addTicketWithRadius(...)/removeTicketWithRadius(...) wrapper
+            // pinned the holder but left generation never settling: the FULL
+            // future hung indefinitely, so the L2->L1 in-flight counter
+            // saturated at the deficit cap ("gets all the way to 10 in flight")
+            // and the kept cache never filled - loads only ever cleared on the
+            // 30s deadline. The persistent kept-cache ticket is still applied
+            // separately via applyTicket(...) after cold->hot promotion, so the
+            // promoted chunk stays pinned (S-002 unaffected).
+            RTP.log(Level.INFO,
+                    "[RTP][NeoForge 26.1][CHUNKLOAD_DIAG] invoking getChunkFuture('" + getter.getName()
+                            + "', cx=" + cx + ", cz=" + cz + ", FULL, create=true) on "
+                            + cache.getClass().getSimpleName() + " (tickThread=" + level.getServer().isSameThread() + ")");
             Object raw = getter.invoke(cache, cx, cz, ChunkStatus.FULL, /*create=*/ true);
             if (!(raw instanceof CompletableFuture<?> cf)) {
-                if (addedTicket) tryRemoveLoadTicket(cache, cp);
+                RTP.log(Level.WARNING,
+                        "[RTP][NeoForge 26.1][CHUNKLOAD_DIAG] getChunkFuture returned non-CompletableFuture: "
+                                + (raw == null ? "null" : raw.getClass()) + " for chunk=(" + cx + "," + cz + ")");
                 return CompletableFuture.failedFuture(new IllegalStateException(
                         "getChunkFuture returned non-CompletableFuture: " + (raw == null ? "null" : raw.getClass())));
             }
+            RTP.log(Level.INFO,
+                    "[RTP][NeoForge 26.1][CHUNKLOAD_DIAG] getChunkFuture returned future id@"
+                            + System.identityHashCode(cf) + " done=" + cf.isDone()
+                            + " for chunk=(" + cx + "," + cz + ")");
             return cf.thenApply(either -> {
-                if (either == null) return null;
-                return unwrapEitherLeft(either);
-            }).whenComplete((handle, ex) -> {
-                if (addedTicket) tryRemoveLoadTicket(cache, cp);
+                ChunkAccess unwrapped = (either == null) ? null : unwrapEitherLeft(either);
+                if (unwrapped != null) return unwrapped;
+
+                // The generation future resolved with no ChunkAccess. We do NOT
+                // fall back to a blocking ServerChunkCache#getChunk(...) here: this
+                // callback runs inside the MinecraftServer#execute task that
+                // dispatched the request (on the tick thread), so a blocking
+                // getChunk would re-drive the main-thread task queue from inside
+                // one of its own tasks and deadlock the chunk-generation
+                // dependency graph - the exact failure mode documented in
+                // rtp-fabric-ADR-008. Emit the S-004 diagnostic instead so a
+                // genuine failure is never silently discarded; log the concrete
+                // result shape + (for a ChunkResult) its error text so a
+                // generation refusal ("Unloaded chunk ...") is distinguishable
+                // from an unrecognised unwrap shape.
+                if (either == null) {
+                    RTP.log(Level.INFO,
+                            "[RTP][NeoForge 26.1] requestFullChunkAsync: chunk-future (create=true) future "
+                                    + "completed with a NULL result for chunk=(" + cx + "," + cz + ").");
+                    return null;
+                }
+                String detail;
+                try {
+                    detail = either.getClass().getName() + " -> " + String.valueOf(either);
+                } catch (Throwable t) {
+                    detail = either.getClass().getName() + " (toString threw "
+                            + t.getClass().getSimpleName() + ")";
+                }
+                String errText = null;
+                try {
+                    Method errM = either.getClass().getMethod("getError");
+                    Object err = errM.invoke(either);
+                    if (err != null) errText = String.valueOf(err);
+                } catch (Throwable ignored) {
+                    // no getError(); not a ChunkResult error-bearing shape
+                }
+                RTP.log(Level.INFO,
+                        "[RTP][NeoForge 26.1] requestFullChunkAsync: chunk-future (create=true) resolved "
+                                + "but no ChunkAccess could be unwrapped for chunk=(" + cx + "," + cz
+                                + "). result=" + detail
+                                + (errText != null ? " chunkResultError=" + errText : "")
+                                + " (a non-null error here means vanilla refused to generate/load the chunk;"
+                                + " an unrecognised result class means the unwrap shape needs updating).");
+                return null;
             });
         } catch (Throwable t) {
             return CompletableFuture.failedFuture(t);
-        }
-    }
-
-    private static void tryRemoveLoadTicket(ServerChunkCache cache, ChunkPos cp) {
-        try {
-            cache.removeTicketWithRadius(RTP_TICKET_TYPE, cp, RTP_TICKET_DISTANCE);
-        } catch (Throwable t) {
-            RTP.log(Level.WARNING,
-                    "[RTP][NeoForge 26.1] temp load-ticket release failed for chunk=("
-                            + cp + "): " + t.getClass().getSimpleName() + ": " + t.getMessage());
         }
     }
 

@@ -24,14 +24,17 @@
 // Java 25 server loads the Java 21 bytecode from rtp-neoforge-common in the
 // same unified jar - bytecode compatibility is forward-only.
 //
-// WARNING: 26.1 is a moving target (latest stable build at authoring time:
-// MC 26.1.2 / NeoForge 26.1.2.65-beta). The pinned minecraftVersion /
+// WARNING: 26.1 is a moving target. The pinned minecraftVersion /
 // neoforgeVersion below, plus the version matcher in
 // RTPNeoForgeMod#installVersionAdapter, must be re-verified when 26.1 settles
-// and again for 26.2. This carrier has NOT been compiled against the real
-// NeoForge 26.1 userdev artifacts (network-gated); the maintainer must run
-// `.\gradlew :rtp-neoforge:rtp-neoforge-v26_1_R1:build` on a network-capable
-// JDK-25 host to verify the Mojmap API surface still matches.
+// and again for 26.2. This carrier HAS been compiled and linked against the
+// real NeoForge 26.1.2 userdev artifacts (neoforgeVersion 26.1.2.71, JDK 25):
+// the adapter loads and links cleanly at runtime (confirmed via the dev server
+// `Active version adapter: 26.1.2` boot line). The Mojmap API surface used by
+// the carrier (TicketType, ServerChunkCache ticket/chunk-future accessors, the
+// maps / written-book component APIs) therefore matches the shipped runtime.
+// Re-run `.\gradlew :rtp-neoforge:rtp-neoforge-v26_1_R1:build` on a JDK-25 host
+// after any version bump to re-confirm the surface still matches.
 
 plugins {
     // ModDevGradle is pinned centrally to 2.0.141 in settings.gradle
@@ -45,7 +48,7 @@ plugins {
 
 ext {
     minecraftVersion = '26.1.2'
-    neoforgeVersion  = '26.1.2.65-beta'
+    neoforgeVersion  = '26.1.2.71'
 }
 
 java {

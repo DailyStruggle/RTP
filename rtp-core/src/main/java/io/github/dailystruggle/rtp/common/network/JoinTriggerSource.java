@@ -235,7 +235,15 @@ public final class JoinTriggerSource {
         }
     }
 
-    private void dispatchRtp(UUID id) {
+    private void dispatchRtp(UUID id, Optional<String> regionKey) {
+        // Re-attach the cross-server region intent (carried on the reservation
+        // token from the player's `/rtp region=<server>:<region>` command) so
+        // the local pipeline teleports into the requested region rather than
+        // the backend default. Regionless requests dispatch a bare `rtp`.
+        final String command = (regionKey != null && regionKey.isPresent()
+                && !regionKey.get().isEmpty())
+                ? "rtp region=" + regionKey.get()
+                : "rtp";
         // Hop to the player's owning thread: Bukkit.dispatchCommand must run
         // on the tick thread that owns the player's entity. On Folia that
         // is the player's *entity scheduler*, NOT the global region scheduler
@@ -260,9 +268,10 @@ public final class JoinTriggerSource {
                 return; // disconnected between join and hop
             }
             RTP.log(Level.FINE,
-                    "[NETWORK][trace] JoinTriggerSource.dispatchRtp: invoking performCommand(player, \"rtp\") for " + id);
+                    "[NETWORK][trace] JoinTriggerSource.dispatchRtp: invoking performCommand(player, \""
+                            + command + "\") for " + id);
             try {
-                player.performCommand(player, "rtp");
+                player.performCommand(player, command);
                 RTP.log(Level.FINE,
                         "[NETWORK][trace] JoinTriggerSource.dispatchRtp: performCommand dispatched"
                                 + " for " + id);
@@ -390,8 +399,10 @@ public final class JoinTriggerSource {
         // Whether or not the coord was pinned, the local /rtp dispatch is
         // the L2 baseline behaviour and must always run on a REDEEMED outcome.
         RTP.log(Level.FINE,
-                "[NETWORK][trace] JoinTriggerSource.onRedeemed: dispatching /rtp for " + id);
-        dispatchRtp(id);
+                "[NETWORK][trace] JoinTriggerSource.onRedeemed: dispatching /rtp for " + id
+                        + (token.regionKey().isPresent()
+                                ? " region=" + token.regionKey().get() : ""));
+        dispatchRtp(id, token.regionKey());
     }
 
     /**

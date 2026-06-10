@@ -134,9 +134,16 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         synchronized (V1_21_R1NeoForgeVersionAdapter.class) {
             cached = GET_CHUNK_FUTURE_METHOD;
             if (cached != null) return cached;
+            // The 4-arg (int,int,ChunkStatus,boolean)->CompletableFuture signature
+            // is not unique on ServerChunkCache (public getChunkFuture plus the
+            // private getChunkFutureMainThread, and any NeoForge-patched overload),
+            // so prefer the public entry point by name to avoid selecting a variant
+            // that returns ChunkResult.error("Unloaded chunk") without adding the
+            // create=true generation ticket. Fall back to the structural scan.
             Method found = null;
             for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
                 for (Method m : c.getDeclaredMethods()) {
+                    if (!"getChunkFuture".equals(m.getName())) continue;
                     if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
                     Class<?>[] p = m.getParameterTypes();
                     if (p.length != 4) continue;
@@ -146,6 +153,21 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
                     m.setAccessible(true);
                     found = m;
                     break;
+                }
+            }
+            if (found == null) {
+                for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
+                    for (Method m : c.getDeclaredMethods()) {
+                        if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
+                        Class<?>[] p = m.getParameterTypes();
+                        if (p.length != 4) continue;
+                        if (p[0] != int.class || p[1] != int.class) continue;
+                        if (p[2] != ChunkStatus.class) continue;
+                        if (p[3] != boolean.class) continue;
+                        m.setAccessible(true);
+                        found = m;
+                        break;
+                    }
                 }
             }
             if (found == null) {
@@ -173,9 +195,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             ChunkPos cp = new ChunkPos(cx, cz);
             boolean ticketAdded = false;
             try {
-                resolveTicketMethodsOnce(cache);
-                Object dm = distanceManager(cache);
-                ADD_TICKET_METHOD.invoke(dm, ticketType(), cp, RTP_TICKET_DISTANCE, cp);
+                addRtpTicket(cache, cp);
                 ticketAdded = true;
             } catch (Throwable t) {
                 RTP.log(Level.WARNING,
@@ -203,8 +223,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
 
     private static void tryRemoveLoadTicket(ServerChunkCache cache, ChunkPos cp) {
         try {
-            Object dm = distanceManager(cache);
-            REMOVE_TICKET_METHOD.invoke(dm, ticketType(), cp, RTP_TICKET_DISTANCE, cp);
+            removeRtpTicket(cache, cp);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP][NeoForge 1.21.1] temp load-ticket release failed for chunk=("
@@ -253,6 +272,21 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
     private static volatile Method GET_DISTANCE_MANAGER_METHOD;
     private static volatile Field GET_DISTANCE_MANAGER_FIELD;
 
+    // 1.21.5+ chunk-ticket API: Mojang removed the 4-arg
+    // DistanceManager#addRegionTicket(TicketType, ChunkPos, int, T) pair in
+    // 1.21.5 in favour of ServerChunkCache#addTicketWithRadius(TicketType,
+    // ChunkPos, int radius) backed by the new TicketStorage. This carrier ships
+    // in the unified jar and is selected for the whole 1.21.x line, so it must
+    // absorb that refactor at runtime: prefer the legacy pair (<= 1.21.4) and
+    // fall back to the modern radius API (1.21.5-1.21.11) when it is absent.
+    private static final int TICKET_MODE_UNRESOLVED = 0;
+    private static final int TICKET_MODE_LEGACY = 1;   // DistanceManager 4-arg pair (<= 1.21.4)
+    private static final int TICKET_MODE_MODERN = 2;   // ServerChunkCache#addTicketWithRadius (1.21.5+)
+    private static volatile int TICKET_MODE = TICKET_MODE_UNRESOLVED;
+    private static volatile Method SCC_ADD_TICKET_RADIUS;
+    private static volatile Method SCC_REMOVE_TICKET_RADIUS;
+    private static volatile Object MODERN_TICKET_TYPE;
+
     private static final int RTP_TICKET_DISTANCE = 1;
 
     private static TicketType<ChunkPos> ticketType() {
@@ -291,50 +325,261 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
                 "No no-arg method or field of type DistanceManager found on " + cache.getClass().getName());
     }
 
-    private static void resolveTicketMethodsOnce(ServerChunkCache cache) throws ReflectiveOperationException {
-        if (ADD_TICKET_METHOD != null && REMOVE_TICKET_METHOD != null
-                && (GET_DISTANCE_MANAGER_METHOD != null || GET_DISTANCE_MANAGER_FIELD != null)) return;
+    /**
+     * Resolve the chunk-ticket strategy exactly once. Prefers the legacy
+     * {@code DistanceManager#addRegionTicket}/{@code #removeRegionTicket} 4-arg
+     * pair (1.21.0-1.21.4); when that is absent (1.21.5+ removed it) falls back
+     * to {@code ServerChunkCache#addTicketWithRadius}/{@code #removeTicketWithRadius}.
+     */
+    private static void ensureTicketStrategy(ServerChunkCache cache) throws ReflectiveOperationException {
+        if (TICKET_MODE != TICKET_MODE_UNRESOLVED) return;
         synchronized (V1_21_R1NeoForgeVersionAdapter.class) {
-            if (ADD_TICKET_METHOD != null && REMOVE_TICKET_METHOD != null
-                    && (GET_DISTANCE_MANAGER_METHOD != null || GET_DISTANCE_MANAGER_FIELD != null)) return;
-            Method getter = resolveDistanceManagerGetter(cache);
-            Object dm = (getter != null) ? getter.invoke(cache) : GET_DISTANCE_MANAGER_FIELD.get(cache);
-            if (dm == null) {
-                throw new IllegalStateException(
-                        "ServerChunkCache distance-manager getter returned null on " + cache.getClass().getName());
+            if (TICKET_MODE != TICKET_MODE_UNRESOLVED) return;
+            try {
+                resolveLegacyTicketMethods(cache);
+                TICKET_MODE = TICKET_MODE_LEGACY;
+                return;
+            } catch (ReflectiveOperationException | IllegalStateException legacyMiss) {
+                // 1.21.5+ dropped the 4-arg DistanceManager pair; use the modern API.
+                resolveModernTicketMethods(cache);
+                TICKET_MODE = TICKET_MODE_MODERN;
+                RTP.log(Level.INFO,
+                        "[RTP][NeoForge] chunk-ticket strategy: modern ServerChunkCache#addTicketWithRadius"
+                                + " (MC 1.21.5+); legacy DistanceManager#addRegionTicket absent ("
+                                + legacyMiss.getClass().getSimpleName() + ").");
             }
-            Class<?> dmClass = dm.getClass();
-            Method add = null;
-            Method remove = null;
-            for (Class<?> c = dmClass; c != null && (add == null || remove == null); c = c.getSuperclass()) {
-                for (Method m : c.getDeclaredMethods()) {
-                    if (m.getReturnType() != void.class) continue;
-                    Class<?>[] p = m.getParameterTypes();
-                    if (p.length != 4) continue;
-                    if (p[0] != TicketType.class) continue;
-                    if (p[1] != ChunkPos.class) continue;
-                    if (p[2] != int.class) continue;
-                    if (p[3].isPrimitive()) continue;
-                    String n = m.getName();
-                    boolean isAdd = n.toLowerCase().contains("add");
-                    boolean isRemove = n.toLowerCase().contains("remove");
-                    if (add == null && isAdd && !isRemove) {
-                        m.setAccessible(true);
-                        add = m;
-                    } else if (remove == null && isRemove && !isAdd) {
-                        m.setAccessible(true);
-                        remove = m;
-                    }
+        }
+    }
+
+    private static void resolveLegacyTicketMethods(ServerChunkCache cache) throws ReflectiveOperationException {
+        Method getter = resolveDistanceManagerGetter(cache);
+        Object dm = (getter != null) ? getter.invoke(cache) : GET_DISTANCE_MANAGER_FIELD.get(cache);
+        if (dm == null) {
+            throw new IllegalStateException(
+                    "ServerChunkCache distance-manager getter returned null on " + cache.getClass().getName());
+        }
+        Class<?> dmClass = dm.getClass();
+        Method add = null;
+        Method remove = null;
+        for (Class<?> c = dmClass; c != null && (add == null || remove == null); c = c.getSuperclass()) {
+            for (Method m : c.getDeclaredMethods()) {
+                if (m.getReturnType() != void.class) continue;
+                Class<?>[] p = m.getParameterTypes();
+                if (p.length != 4) continue;
+                if (p[0] != TicketType.class) continue;
+                if (p[1] != ChunkPos.class) continue;
+                if (p[2] != int.class) continue;
+                if (p[3].isPrimitive()) continue;
+                String n = m.getName();
+                boolean isAdd = n.toLowerCase().contains("add");
+                boolean isRemove = n.toLowerCase().contains("remove");
+                if (add == null && isAdd && !isRemove) {
+                    m.setAccessible(true);
+                    add = m;
+                } else if (remove == null && isRemove && !isAdd) {
+                    m.setAccessible(true);
+                    remove = m;
                 }
             }
-            if (add == null || remove == null) {
-                throw new NoSuchMethodException(
-                        "DistanceManager#addRegionTicket / #removeRegionTicket not found on "
-                                + dmClass.getName() + " (or any superclass).");
+        }
+        if (add == null || remove == null) {
+            throw new NoSuchMethodException(
+                    "DistanceManager#addRegionTicket / #removeRegionTicket not found on "
+                            + dmClass.getName() + " (or any superclass).");
+        }
+        if (getter != null) GET_DISTANCE_MANAGER_METHOD = getter;
+        ADD_TICKET_METHOD = add;
+        REMOVE_TICKET_METHOD = remove;
+    }
+
+    /**
+     * Resolve the 1.21.5+ {@code ServerChunkCache#addTicketWithRadius(TicketType,
+     * ChunkPos, int)} / {@code #removeTicketWithRadius(...)} pair structurally
+     * (by signature, mapping-name agnostic) and build a non-persistent ticket
+     * type for it.
+     */
+    private static void resolveModernTicketMethods(ServerChunkCache cache) throws ReflectiveOperationException {
+        Method add = null;
+        Method remove = null;
+        for (Class<?> c = cache.getClass(); c != null && (add == null || remove == null); c = c.getSuperclass()) {
+            for (Method m : c.getDeclaredMethods()) {
+                if (m.getReturnType() != void.class) continue;
+                Class<?>[] p = m.getParameterTypes();
+                if (p.length != 3) continue;
+                if (p[0] != TicketType.class) continue;
+                if (p[1] != ChunkPos.class) continue;
+                if (p[2] != int.class) continue;
+                String n = m.getName().toLowerCase();
+                if (!n.contains("ticket")) continue;
+                boolean isAdd = n.contains("add");
+                boolean isRemove = n.contains("remove");
+                if (add == null && isAdd && !isRemove) {
+                    m.setAccessible(true);
+                    add = m;
+                } else if (remove == null && isRemove && !isAdd) {
+                    m.setAccessible(true);
+                    remove = m;
+                }
             }
-            if (getter != null) GET_DISTANCE_MANAGER_METHOD = getter;
-            ADD_TICKET_METHOD = add;
-            REMOVE_TICKET_METHOD = remove;
+        }
+        if (add == null || remove == null) {
+            throw new NoSuchMethodException(
+                    "ServerChunkCache#addTicketWithRadius / #removeTicketWithRadius (TicketType, ChunkPos, int)"
+                            + " not found on " + cache.getClass().getName() + " (or any superclass).");
+        }
+        SCC_ADD_TICKET_RADIUS = add;
+        SCC_REMOVE_TICKET_RADIUS = remove;
+        MODERN_TICKET_TYPE = buildModernTicketType();
+    }
+
+    /**
+     * Build a non-persistent, non-expiring {@code TicketType} for the 1.21.5+
+     * runtime. Three shapes are handled, in order:
+     * <ol>
+     *   <li>1.21.5-1.21.8 record {@code TicketType(long timeout, boolean persist,
+     *       TicketType.TicketUse use)} (timeout 0 = no timeout, persist false for
+     *       S-002, loading+simulation use);</li>
+     *   <li>1.21.9+ record {@code TicketType(long timeout, int flags)} where
+     *       {@code flags} is a bitfield over {@code FLAG_PERSIST | FLAG_LOADING |
+     *       FLAG_SIMULATION | ...}. The {@code FLAG_PERSIST} bit is deliberately
+     *       omitted for S-002 (non-persistent: never written to level.dat).</li>
+     *   <li>fallback constructor scan and, as a last resort, reuse of a
+     *       registered static {@code TicketType} field.</li>
+     * </ol>
+     *
+     * <p>The flags shape is critical on 1.21.9-1.21.11: passing {@code flags=0}
+     * yields a ticket that performs neither loading nor simulation, so the chunk
+     * never reaches FULL and every {@code getChunkFuture} resolves to
+     * {@code null} (the {@code nullChunk/asyncLoadNull} failure class).</p>
+     */
+    private static Object buildModernTicketType() throws ReflectiveOperationException {
+        // 1.21.5-1.21.8 record shape (long timeout, boolean persist, TicketUse use).
+        try {
+            Class<?> useClass = Class.forName("net.minecraft.server.level.TicketType$TicketUse");
+            Object use = pickTicketUse(useClass);
+            java.lang.reflect.Constructor<?> ctor =
+                    TicketType.class.getDeclaredConstructor(long.class, boolean.class, useClass);
+            ctor.setAccessible(true);
+            return ctor.newInstance(0L, false, use);
+        } catch (Throwable primaryMiss) {
+            // fall through to the flags shape / generic scan
+        }
+        // 1.21.9+ record shape (long timeout, int flags) — supply LOADING|SIMULATION,
+        // omit PERSIST (S-002). flags=0 would pin nothing -> asyncLoadNull.
+        int flags = modernTicketFlags();
+        try {
+            java.lang.reflect.Constructor<?> ctor =
+                    TicketType.class.getDeclaredConstructor(long.class, int.class);
+            ctor.setAccessible(true);
+            return ctor.newInstance(0L, flags);
+        } catch (Throwable flagsMiss) {
+            // fall through to the generic constructor scan
+        }
+        // Constructor-shape drift: scan constructors, using the computed flags for
+        // any int parameter (a 0 there disables loading/simulation on 1.21.9+).
+        for (java.lang.reflect.Constructor<?> ctor : TicketType.class.getDeclaredConstructors()) {
+            Class<?>[] p = ctor.getParameterTypes();
+            Object[] args = new Object[p.length];
+            boolean ok = true;
+            for (int i = 0; i < p.length; i++) {
+                if (p[i] == long.class) args[i] = 0L;
+                else if (p[i] == int.class) args[i] = flags;
+                else if (p[i] == boolean.class) args[i] = Boolean.FALSE;
+                else if (p[i].isEnum()) args[i] = pickTicketUse(p[i]);
+                else { ok = false; break; }
+            }
+            if (!ok) continue;
+            try {
+                ctor.setAccessible(true);
+                return ctor.newInstance(args);
+            } catch (Throwable ignored) {
+                // try the next constructor
+            }
+        }
+        // Last resort: reuse a registered static TicketType field.
+        for (Field f : TicketType.class.getDeclaredFields()) {
+            if (!java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+            if (!TicketType.class.isAssignableFrom(f.getType())) continue;
+            f.setAccessible(true);
+            Object v = f.get(null);
+            if (v != null) return v;
+        }
+        throw new NoSuchMethodException(
+                "Could not construct or locate a usable TicketType on "
+                        + TicketType.class.getName());
+    }
+
+    /**
+     * Compute the 1.21.9+ {@code TicketType} flags bitfield: {@code FLAG_LOADING
+     * | FLAG_SIMULATION}, omitting {@code FLAG_PERSIST} for S-002. Reads the
+     * static {@code int} flag constants reflectively (they do not exist on the
+     * 1.21.1 carrier-compile mappings). Falls back to {@code 0b11} (the
+     * conventional low two bits = loading|simulation) if the named fields are
+     * absent, which still enables both behaviours on the observed layout.
+     */
+    private static int modernTicketFlags() {
+        int loading = readStaticIntField("FLAG_LOADING", -1);
+        int simulation = readStaticIntField("FLAG_SIMULATION", -1);
+        if (loading >= 0 && simulation >= 0) {
+            return loading | simulation;
+        }
+        // Conventional layout: bit0=persist, bit1=loading, bit2=simulation OR
+        // bit0=loading, bit1=simulation. Enabling the low loading/simulation bits
+        // without the persist bit is the safe non-persistent loading shape.
+        int persist = readStaticIntField("FLAG_PERSIST", -1);
+        if (persist >= 0) {
+            // everything except persist, within a small bit window
+            return (~persist) & 0b1110;
+        }
+        return 0b110; // loading|simulation assuming persist is bit0
+    }
+
+    private static int readStaticIntField(String name, int dflt) {
+        for (Field f : TicketType.class.getDeclaredFields()) {
+            if (!java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+            if (f.getType() != int.class) continue;
+            if (!f.getName().equals(name)) continue;
+            try {
+                f.setAccessible(true);
+                return f.getInt(null);
+            } catch (Throwable ignored) {
+                return dflt;
+            }
+        }
+        return dflt;
+    }
+
+    private static Object pickTicketUse(Class<?> enumClass) {
+        Object[] consts = enumClass.getEnumConstants();
+        if (consts == null || consts.length == 0) return null;
+        for (Object o : consts) {
+            if (o.toString().equalsIgnoreCase("LOADING_AND_SIMULATION")) return o;
+        }
+        for (Object o : consts) {
+            if (o.toString().toUpperCase().contains("LOADING")) return o;
+        }
+        return consts[0];
+    }
+
+    /** Add the RTP load ticket for {@code cp}, dispatching on the resolved strategy. */
+    private static void addRtpTicket(ServerChunkCache cache, ChunkPos cp) throws ReflectiveOperationException {
+        ensureTicketStrategy(cache);
+        if (TICKET_MODE == TICKET_MODE_MODERN) {
+            SCC_ADD_TICKET_RADIUS.invoke(cache, MODERN_TICKET_TYPE, cp, RTP_TICKET_DISTANCE);
+        } else {
+            Object dm = distanceManager(cache);
+            ADD_TICKET_METHOD.invoke(dm, ticketType(), cp, RTP_TICKET_DISTANCE, cp);
+        }
+    }
+
+    /** Remove the RTP load ticket for {@code cp}, dispatching on the resolved strategy. */
+    private static void removeRtpTicket(ServerChunkCache cache, ChunkPos cp) throws ReflectiveOperationException {
+        ensureTicketStrategy(cache);
+        if (TICKET_MODE == TICKET_MODE_MODERN) {
+            SCC_REMOVE_TICKET_RADIUS.invoke(cache, MODERN_TICKET_TYPE, cp, RTP_TICKET_DISTANCE);
+        } else {
+            Object dm = distanceManager(cache);
+            REMOVE_TICKET_METHOD.invoke(dm, ticketType(), cp, RTP_TICKET_DISTANCE, cp);
         }
     }
 
@@ -358,9 +603,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         }
         try {
             ServerChunkCache cache = level.getChunkSource();
-            resolveTicketMethodsOnce(cache);
-            Object dm = distanceManager(cache);
-            ADD_TICKET_METHOD.invoke(dm, ticketType(), new ChunkPos(cx, cz), RTP_TICKET_DISTANCE, new ChunkPos(cx, cz));
+            addRtpTicket(cache, new ChunkPos(cx, cz));
             return CompletableFuture.completedFuture(null);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
@@ -377,9 +620,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         }
         try {
             ServerChunkCache cache = level.getChunkSource();
-            resolveTicketMethodsOnce(cache);
-            Object dm = distanceManager(cache);
-            REMOVE_TICKET_METHOD.invoke(dm, ticketType(), new ChunkPos(cx, cz), RTP_TICKET_DISTANCE, new ChunkPos(cx, cz));
+            removeRtpTicket(cache, new ChunkPos(cx, cz));
             return CompletableFuture.completedFuture(null);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
@@ -479,7 +720,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
                     new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WRITTEN_BOOK);
             book.set(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT, content);
 
-            int hotbar = sp.getInventory().selected;
+            int hotbar = resolveSelectedHotbarSlot(sp.getInventory());
             int slotId = 36 + hotbar;
             net.minecraft.world.item.ItemStack real = sp.getInventory().getItem(hotbar);
             int containerId = sp.inventoryMenu.containerId;
@@ -495,6 +736,62 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
                     + t.getClass().getSimpleName() + ": " + t.getMessage());
             return false;
         }
+    }
+
+    /** Cached resolver for the player's selected hotbar slot (method or field). */
+    private static volatile Method SELECTED_SLOT_METHOD;
+    private static volatile Field SELECTED_SLOT_FIELD;
+    private static volatile boolean SELECTED_SLOT_RESOLVED;
+
+    /**
+     * Resolve the currently-selected hotbar slot index from {@link net.minecraft.world.entity.player.Inventory}
+     * across the 1.21.x line. Mojang made the legacy {@code selected} field private in
+     * later 1.21.x patches (1.21.11) and exposed a public {@code getSelectedSlot()} getter,
+     * so reading the field directly throws {@link IllegalAccessError} at runtime. Prefer the
+     * public getter, fall back to a {@code setAccessible} read of the {@code selected} field.
+     */
+    private static int resolveSelectedHotbarSlot(net.minecraft.world.entity.player.Inventory inv) {
+        if (!SELECTED_SLOT_RESOLVED) {
+            synchronized (V1_21_R1NeoForgeVersionAdapter.class) {
+                if (!SELECTED_SLOT_RESOLVED) {
+                    Class<?> invClass = net.minecraft.world.entity.player.Inventory.class;
+                    for (String name : new String[]{"getSelectedSlot", "getSelected"}) {
+                        try {
+                            Method m = invClass.getMethod(name);
+                            if (m.getReturnType() == int.class) {
+                                m.setAccessible(true);
+                                SELECTED_SLOT_METHOD = m;
+                                break;
+                            }
+                        } catch (NoSuchMethodException ignored) {
+                            // try next candidate
+                        }
+                    }
+                    if (SELECTED_SLOT_METHOD == null) {
+                        try {
+                            Field f = invClass.getDeclaredField("selected");
+                            f.setAccessible(true);
+                            SELECTED_SLOT_FIELD = f;
+                        } catch (NoSuchFieldException ignored) {
+                            // leave both null; resolve below returns 0
+                        }
+                    }
+                    SELECTED_SLOT_RESOLVED = true;
+                }
+            }
+        }
+        try {
+            if (SELECTED_SLOT_METHOD != null) {
+                return (int) SELECTED_SLOT_METHOD.invoke(inv);
+            }
+            if (SELECTED_SLOT_FIELD != null) {
+                return SELECTED_SLOT_FIELD.getInt(inv);
+            }
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING, "[RTP][NeoForge 1.21.1] resolveSelectedHotbarSlot failed: "
+                    + t.getClass().getSimpleName() + ": " + t.getMessage());
+        }
+        return 0;
     }
 
     // -------------------------------------------------------------------------

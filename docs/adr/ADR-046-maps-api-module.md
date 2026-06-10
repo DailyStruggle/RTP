@@ -1,6 +1,6 @@
 # ADR-046 — `maps-api` Module for Runtime Cartography Chart Generation
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-06-04 - REQ-RTP-MAP-004 Lite posture reversed; see *Amendments*)
 **Date:** 2026-05-15
 
 ## Context
@@ -66,7 +66,9 @@ subsystem. It is structured in three layers:
    Implementations:
    - `NoopMapBinding` in `maps-api/src/main/java/...noop/` — default; throws
      `IllegalStateException` on use to satisfy *Require-by-contract* (mirrors
-     S-006). Lite assembly ships only this.
+     S-006). Installed as the fallback when no platform binding is present.
+     (Amended 2026-06-04: the Lite assembly now ships the platform-backed
+     binding, not only this Noop. See *Amendments*.)
    - `InMemoryMapBinding` in `maps-api/src/test/java/...` — test double that
      writes into a `byte[128*128]` buffer for renderer assertions.
    - `BukkitMapBinding` in `maps-api/.../mapsapi/bukkit/` — uses
@@ -110,7 +112,7 @@ at [`docs/dev/scratch/CHECKLIST-maps-api.md`](../dev/scratch/CHECKLIST-maps-api.
 | `REQ-RTP-MAP-001` | A `MapBinding` implementation shall throw `IllegalStateException` when invoked before RTP core is loaded. |
 | `REQ-RTP-MAP-002` | A `ChartRenderer` shall not perform chunk I/O nor block on `CompletableFuture.get()` / `.join()`. |
 | `REQ-RTP-MAP-003` | A live binding shall release every `MemoryTracker` allocation it acquired on cancel, viewer disconnect, and plugin disable. |
-| `REQ-RTP-MAP-004` | The Lite assembly variant shall ship `NoopMapBinding` only. |
+| `REQ-RTP-MAP-004` | The Lite assembly variant shall ship the same platform-backed `MapBinding` as the full assembly; `NoopMapBinding` is the fallback only. *(Original target wording was "ship `NoopMapBinding` only"; reversed by the 2026-06-04 amendment - see below.)* |
 | `REQ-RTP-MAP-005` | A `MermaidRenderer` shall accept the documented Mermaid subset (flowchart `LR`/`TD`, rectangular/rounded/diamond nodes, labelled directed edges) and rasterize to the active `MapCanvas` palette without invoking any external process or scripting engine. |
 
 ### Mermaid output
@@ -218,8 +220,42 @@ during Stage 2.
 - [`docs/dev/EXTERNAL_HOOKS.md`](../dev/EXTERNAL_HOOKS.md) — `MapBinding` `RTPHooks` slot (Stage 2).
 - [ADR-001](ADR-001-archimedean-spiral-1d-mapping.md) — spiral model consumed by `RegionCoverageRenderer`.
 - [ADR-016](ADR-016-anvil-subsystem.md) — biome raster source for `Heatmap2D`.
-- [ADR-024](ADR-024-rtp-lite-assembly-variant.md) — Lite-only `NoopMapBinding` posture (REQ-RTP-MAP-004).
+- [ADR-024](ADR-024-rtp-lite-assembly-variant.md) — Lite-assembly trim posture; per the 2026-06-04 amendment the Lite jar does **not** exclude `mapsapi/**`, so map rendering ships in Lite (REQ-RTP-MAP-004).
 - [ADR-026](ADR-026-external-hook-api-surface.md) — `RTPHooks` registry pattern.
 - [commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md) — Brigadier bridge for `/rtp map`.
 - [effects-api-ADR-006](../../effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md) — obf/unobf split precedent.
 - [rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md) — Fabric carrier dispatch precedent.
+
+## Amendments
+
+### 2026-06-04 - Map rendering ships in the Lite assembly (REQ-RTP-MAP-004 reversed)
+
+The original decision gated the concrete `MapBinding` implementations behind
+the full (Pro) assembly: REQ-RTP-MAP-004 read "the Lite assembly variant
+shall ship `NoopMapBinding` only", and this ADR planned a `liteJarStructureCheck`
+clause excluding `mapsapi/bukkit/**`, `mapsapi/fabric/**`, and the renderer
+packages from the Lite jar.
+
+That trim was never an intentional monetization boundary (mirroring the
+Vault/economy reversal in [ADR-024](ADR-024-rtp-lite-assembly-variant.md),
+2026-06-01). The Lite jar ships the full `mapsapi/**` tree, and the Lite
+bootstraps install the real platform-backed bindings: `RTPBukkitLitePlugin#onEnable`
+installs `BukkitMapBinding` (and `BukkitBiomeColorSource`) unconditionally,
+`RTPFabricMod` installs `FabricMapBinding`, and `RTPNeoForgeMod` installs
+`NeoForgeMapBinding`. So `/rtp visualization ...` renders the heatmap onto a
+real cartography map item on the free build across every supported platform.
+
+Revised contract:
+
+- REQ-RTP-MAP-004 now requires the Lite assembly to ship the same
+  platform-backed `MapBinding` as the full assembly.
+- `NoopMapBinding` remains the require-by-contract default (REQ-RTP-MAP-001)
+  and the fallback installed only when no platform binding is available; it is
+  no longer the *sole* binding on Lite.
+- The `liteJarStructureCheck` audit's forbidden-entry list carries **no**
+  `mapsapi/**` clause, so the maps packages are retained in the Lite jar
+  (rather than excluding the concrete bindings as originally planned).
+
+This amendment is documentation-only at the ADR level; the code already
+behaves as described. `maps-api-ADR-001` §3 (Lite-assembly inclusion /
+exclusion) is amended in lockstep.

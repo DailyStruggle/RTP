@@ -157,7 +157,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         // ops.json is a stable on-disk JSON array of {uuid,name,level}.
         boolean opFallback = false;
         try {
-            ServerLevel lvl = p.serverLevel();
+            ServerLevel lvl = resolveServerLevel(p);
             net.minecraft.server.MinecraftServer srv = lvl == null ? null : lvl.getServer();
             if (srv != null) {
                 java.io.File opsFile = srv.getPlayerList().getOps().getFile();
@@ -264,7 +264,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
     public void performCommand(@Nullable RTPPlayer player, String command) {
         ServerPlayer p = handle;
         if (p == null || command == null) return;
-        ServerLevel lvl = p.serverLevel();
+        ServerLevel lvl = resolveServerLevel(p);
         net.minecraft.server.MinecraftServer srv = lvl == null ? null : lvl.getServer();
         if (srv == null) return;
         net.minecraft.commands.CommandSourceStack source = buildCommandSource(p, lvl, srv);
@@ -358,7 +358,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         ServerLevel target = nw.level();
         net.minecraft.server.MinecraftServer srv = target.getServer();
         if (srv == null) {
-            ServerLevel here = p.serverLevel();
+            ServerLevel here = resolveServerLevel(p);
             srv = here == null ? null : here.getServer();
         }
         if (srv == null) {
@@ -396,7 +396,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         }
 
         try {
-            if (cur.serverLevel() == target) {
+            if (resolveServerLevel(cur) == target) {
                 cur.connection.teleport(x, y, z, yaw, pitch);
                 cur.setYRot(yaw);
                 cur.setXRot(pitch);
@@ -411,7 +411,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
             cur.setPos(x, y, z);
             cur.setYRot(yaw);
             cur.setXRot(pitch);
-            if (cur.serverLevel() == target) {
+            if (resolveServerLevel(cur) == target) {
                 cur.connection.teleport(x, y, z, yaw, pitch);
                 return true;
             }
@@ -427,16 +427,125 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         }
     }
 
+    /**
+     * Resolve a player's {@link ServerLevel} in a way that survives the 1.21.x
+     * mapping drift. {@code ServerPlayer.serverLevel()} exists through MC 1.21.8
+     * but was removed/renamed in the 1.21.11 mappings; fall back to the inherited
+     * {@code Entity.level()} accessor (whose runtime value for an online player
+     * is always a {@link ServerLevel}).
+     */
+    private static volatile java.lang.reflect.Method LEVEL_ACCESSOR;
+    private static volatile java.lang.reflect.Field LEVEL_FIELD;
+    private static volatile boolean LEVEL_RESOLVED;
+
+    @Nullable
+    public static ServerLevel resolveServerLevel(ServerPlayer p) {
+        if (p == null) return null;
+        // Fast path: a previously-resolved accessor (method or field).
+        java.lang.reflect.Method cachedM = LEVEL_ACCESSOR;
+        if (cachedM != null) {
+            try {
+                Object r = cachedM.invoke(p);
+                if (r instanceof ServerLevel sl) return sl;
+            } catch (Throwable ignored) { /* fall through to rescan */ }
+        }
+        java.lang.reflect.Field cachedF = LEVEL_FIELD;
+        if (cachedF != null) {
+            try {
+                Object r = cachedF.get(p);
+                if (r instanceof ServerLevel sl) return sl;
+            } catch (Throwable ignored) { /* fall through to rescan */ }
+        }
+        // Direct compiled accessors (cheapest when the carrier mappings match).
+        try {
+            net.minecraft.world.level.Level lvl = p.level();
+            if (lvl instanceof ServerLevel sl) return sl;
+        } catch (Throwable ignored) {
+            // level() drifted on this mapping; fall through to a structural scan.
+        }
+        return scanForServerLevel(p);
+    }
+
+    /**
+     * Mapping-name-agnostic resolution of an online player's {@link ServerLevel}.
+     * Across the 1.21.x line both {@code ServerPlayer.serverLevel()} and the
+     * inherited {@code Entity.level()} accessor have drifted, so we structurally
+     * scan {@link ServerPlayer} (and its superclasses) for a no-arg method whose
+     * runtime result is a {@link ServerLevel}, then a field of a {@code Level}
+     * type, caching whichever resolves.
+     */
+    @Nullable
+    private static ServerLevel scanForServerLevel(ServerPlayer p) {
+        // Prefer well-known names first to avoid invoking unrelated zero-arg methods.
+        for (String name : new String[]{"serverLevel", "level", "getLevel", "getCommandSenderWorld"}) {
+            try {
+                java.lang.reflect.Method m = findNoArgMethod(p.getClass(), name);
+                if (m == null) continue;
+                Object r = m.invoke(p);
+                if (r instanceof ServerLevel sl) {
+                    LEVEL_ACCESSOR = m;
+                    LEVEL_RESOLVED = true;
+                    return sl;
+                }
+            } catch (Throwable ignored) { /* try next */ }
+        }
+        // Structural method scan: any no-arg method returning a Level subtype.
+        for (Class<?> c = p.getClass(); c != null; c = c.getSuperclass()) {
+            for (java.lang.reflect.Method m : c.getDeclaredMethods()) {
+                if (m.getParameterCount() != 0) continue;
+                if (!net.minecraft.world.level.Level.class.isAssignableFrom(m.getReturnType())) continue;
+                try {
+                    m.setAccessible(true);
+                    Object r = m.invoke(p);
+                    if (r instanceof ServerLevel sl) {
+                        LEVEL_ACCESSOR = m;
+                        LEVEL_RESOLVED = true;
+                        return sl;
+                    }
+                } catch (Throwable ignored) { /* try next */ }
+            }
+        }
+        // Field scan: any field of a Level type holding a ServerLevel.
+        for (Class<?> c = p.getClass(); c != null; c = c.getSuperclass()) {
+            for (java.lang.reflect.Field f : c.getDeclaredFields()) {
+                if (!net.minecraft.world.level.Level.class.isAssignableFrom(f.getType())) continue;
+                try {
+                    f.setAccessible(true);
+                    Object r = f.get(p);
+                    if (r instanceof ServerLevel sl) {
+                        LEVEL_FIELD = f;
+                        LEVEL_RESOLVED = true;
+                        return sl;
+                    }
+                } catch (Throwable ignored) { /* try next */ }
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static java.lang.reflect.Method findNoArgMethod(Class<?> start, String name) {
+        for (Class<?> c = start; c != null; c = c.getSuperclass()) {
+            try {
+                java.lang.reflect.Method m = c.getDeclaredMethod(name);
+                m.setAccessible(true);
+                return m;
+            } catch (NoSuchMethodException ignored) { /* try superclass */ }
+        }
+        return null;
+    }
+
     @Override
     public RTPLocation getLocation() {
         ServerPlayer p = handle;
         if (p == null) return null;
-        ServerLevel level = p.serverLevel();
+        ServerLevel level = resolveServerLevel(p);
+        if (level == null) return null;
         RTPWorld<?> rtpWorld = RTP.serverAccessor == null
                 ? null
                 : RTP.serverAccessor.getRTPWorld(
-                        io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds
-                                .locationString(level.dimension()));
+                        io.github.dailystruggle.rtp.neoforge.world.NeoForgeRTPWorld
+                                .resolveDimensionName(level, false));
         if (rtpWorld == null) return null;
         return new RTPLocation(rtpWorld, p.getBlockX(), p.getBlockY(), p.getBlockZ());
     }

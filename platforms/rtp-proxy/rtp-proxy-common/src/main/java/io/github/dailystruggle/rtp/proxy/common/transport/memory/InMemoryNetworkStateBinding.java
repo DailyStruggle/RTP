@@ -113,15 +113,23 @@ public final class InMemoryNetworkStateBinding implements NetworkTransport {
 
     @Override
     public CompletableFuture<ReservationToken> claim(String serverId, UUID playerId, Duration ttl) {
+        return claim(serverId, playerId, ttl, Optional.empty());
+    }
+
+    @Override
+    public CompletableFuture<ReservationToken> claim(String serverId, UUID playerId,
+                                                     Duration ttl, Optional<String> regionKey) {
         checkOpen();
         Objects.requireNonNull(serverId, "serverId");
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(ttl, "ttl");
+        Objects.requireNonNull(regionKey, "regionKey");
         return CompletableFuture.supplyAsync(() -> {
             long expires = clock.get().toEpochMilli() + ttl.toMillis();
             String tokenId = UUID.randomUUID().toString();
             ReservationToken token = new ReservationToken(
-                    tokenId, serverId, playerId, expires, ReservationToken.State.PENDING);
+                    tokenId, serverId, playerId, expires, ReservationToken.State.PENDING,
+                    regionKey.orElse(null));
             // Per-player idempotency: only one in-flight token per player.
             String prior = activeByPlayer.putIfAbsent(playerId, tokenId);
             if (prior != null) {

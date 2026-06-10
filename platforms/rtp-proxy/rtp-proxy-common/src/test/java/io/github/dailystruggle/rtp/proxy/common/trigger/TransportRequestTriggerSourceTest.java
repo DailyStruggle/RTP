@@ -86,9 +86,12 @@ class TransportRequestTriggerSourceTest {
     /** Minimal dispatcher stub: records every request and completes the future. */
     private static final class RecordingDispatcher implements RtpDispatcher {
         final ConcurrentLinkedQueue<RtpRequest> seen = new ConcurrentLinkedQueue<>();
+        final java.util.concurrent.atomic.AtomicInteger throwCount =
+                new java.util.concurrent.atomic.AtomicInteger();
         volatile RuntimeException throwOn;
         @Override public CompletableFuture<DispatchOutcome> dispatch(RtpRequest r) {
             if (throwOn != null) {
+                throwCount.incrementAndGet();
                 throw throwOn;
             }
             seen.add(r);
@@ -189,9 +192,16 @@ class TransportRequestTriggerSourceTest {
                 q, d, 1, Duration.ofMillis(150), null);
         src.start();
         try {
-            // Give the worker time to pop & try the dispatch (which throws), then
-            // clear the throwOn and offer a second envelope; that one must succeed.
-            Thread.sleep(300L);
+            // Wait until the worker has actually popped p1 and attempted the
+            // dispatch (which throws) before clearing throwOn. Using a fixed
+            // sleep here is racy under heavy parallel test load: if the worker
+            // is slow to start, p1 could be dispatched *after* throwOn is
+            // cleared, leaving seen.size()==2 instead of 1.
+            long boomDeadline = System.currentTimeMillis() + 3_000L;
+            while (d.throwCount.get() == 0 && System.currentTimeMillis() < boomDeadline) {
+                Thread.sleep(20L);
+            }
+            assertTrue(d.throwCount.get() >= 1, "worker must have attempted (and thrown) on the first envelope");
             d.throwOn = null;
             UUID p2 = UUID.randomUUID();
             UUID c2 = UUID.randomUUID();

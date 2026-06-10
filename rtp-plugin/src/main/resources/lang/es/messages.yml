@@ -114,7 +114,7 @@ reanudarEscaneo: "#10A5F5[P0] tarea de escaneo reanudada para las regiones: [sca
 escaneoActivo: "&c[P0] ya hay una tarea de escaneo en curso para las regiones: [scan_regions]"
 escaneoNoActivo: "&c[P0] no hay ninguna tarea de escaneo en curso para las regiones: [scan_regions]"
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-estadoEscaneo: "&a[P0] completados [scan_chunks] / [scan_totalChunks] chunks para las regiones: [scan_regions]. [scan_cps] cps. Porcentaje de tierra: [scan_landPercentage]%. Tiempo restante: [scan_eta]"
+estadoEscaneo: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 tierra &8| &7ETA #7E9CC8[scan_eta]"
 
 # ###############################################################################
 # Sección 7: Comando Info

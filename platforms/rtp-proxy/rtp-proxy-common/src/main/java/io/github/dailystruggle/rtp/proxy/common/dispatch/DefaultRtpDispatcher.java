@@ -364,7 +364,11 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
                             DispatchOutcome.Failed.Reason.NO_BACKEND, MSG_NO_BACKEND.key())));
         }
         String serverId = picked.get();
-        return transport.claim(serverId, request.playerId(), reservationTtl)
+        // Carry the request's region constraint onto the reservation so the
+        // destination backend's JoinTriggerSource can re-attach it as
+        // `rtp region=<regionKey>` on arrival (cross-server
+        // /rtp region=<server>:<region> support).
+        return transport.claim(serverId, request.playerId(), reservationTtl, request.regionKey())
                 .thenApply(token -> {
                     if (token == null) {
                         LOG.log(Level.WARNING,

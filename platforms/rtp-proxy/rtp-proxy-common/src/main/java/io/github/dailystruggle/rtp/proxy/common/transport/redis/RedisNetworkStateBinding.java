@@ -322,11 +322,19 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
 
     @Override
     public CompletableFuture<ReservationToken> claim(String serverId, UUID playerId, Duration ttl) {
+        return claim(serverId, playerId, ttl, Optional.empty());
+    }
+
+    @Override
+    public CompletableFuture<ReservationToken> claim(String serverId, UUID playerId,
+                                                     Duration ttl, Optional<String> regionKey) {
         Objects.requireNonNull(serverId, "serverId");
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(ttl, "ttl");
+        Objects.requireNonNull(regionKey, "regionKey");
         checkOpen();
-        return CompletableFuture.supplyAsync(() -> claimSync(serverId, playerId, ttl), publisherExec);
+        return CompletableFuture.supplyAsync(
+                () -> claimSync(serverId, playerId, ttl, regionKey.orElse(null)), publisherExec);
     }
 
     @Override
@@ -457,7 +465,8 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                             continue;
                         }
                     }
-                    out.add(new ReservationToken(tokenId, rowServerId, playerId, expires, state));
+                    out.add(new ReservationToken(tokenId, rowServerId, playerId, expires, state,
+                            hash.get("regionKey")));
                 }
             } while (!ScanParams.SCAN_POINTER_START.equals(cursor));
         } catch (Exception e) {
@@ -469,7 +478,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         return out;
     }
 
-    private ReservationToken claimSync(String serverId, UUID playerId, Duration ttl) {
+    private ReservationToken claimSync(String serverId, UUID playerId, Duration ttl, String regionKey) {
         // A2 atomic claim via Lua. The script is single-call create-and-lock:
         // race losers see 0 and we mirror SqlNetworkStateBinding.claimSync by
         // throwing IllegalStateException so the dispatcher uniformly retries.
@@ -496,6 +505,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                             Long.toString(expires), Long.toString(now),
                             ReservationToken.State.CLAIMED.name()));
         }
+        String region = (regionKey == null || regionKey.isEmpty()) ? "" : regionKey;
         List<String> args = List.of(
                 tokenId,
                 serverId,
@@ -503,7 +513,8 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 Long.toString(expires),
                 Long.toString(now),
                 Long.toString(ttlSecs),
-                hmacHex);
+                hmacHex,
+                region);
         Object result;
         try (Jedis j = pool.getResource()) {
             result = claimScript.evalsha(j, keys, args);
@@ -515,7 +526,8 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
             throw new IllegalStateException(
                     "claim race lost for player " + playerId + " (Redis claim returned " + rc + ")");
         }
-        return new ReservationToken(tokenId, serverId, playerId, expires, ReservationToken.State.CLAIMED);
+        return new ReservationToken(tokenId, serverId, playerId, expires,
+                ReservationToken.State.CLAIMED, region.isEmpty() ? null : region);
     }
 
     private void releaseSync(String tokenId, ReleaseReason reason) {
@@ -647,7 +659,8 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                     hash.getOrDefault("serverId", ""),
                     playerId,
                     expires,
-                    state));
+                    state,
+                    hash.get("regionKey")));
         } catch (Exception e) {
             throw new RuntimeException("RedisNetworkStateBinding.findReservation failed: " + e.getMessage(), e);
         }
