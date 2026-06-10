@@ -544,10 +544,26 @@ public class Region extends FactoryValue<RegionKeys> {
 
       getWorld().recordChunkLoadOrigin("Region.coldPromote");
       io.github.dailystruggle.rtp.common.tools.CfDiag.regionDeficitDispatch.increment();
+      RTP.log(Level.FINER,
+          "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+              + ") getChunkAtAsync DISPATCHED inFlight=" + inFlightCalculations.get());
       getWorld().getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
+        RTP.log(Level.FINER,
+            "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                + ") thenAccept FIRED chunkSet=" + (chunkSet == null ? "null" : "present")
+                + " complete()=" + (chunkSet == null || chunkSet.complete() == null
+                    ? "null" : "done=" + chunkSet.complete().isDone()));
         chunkSet.complete().whenComplete((success, throwable) -> {
+          RTP.log(Level.FINER,
+              "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                  + ") complete.whenComplete success=" + success
+                  + (throwable == null ? "" : " throwable=" + throwable.getClass().getSimpleName()
+                      + ":" + throwable.getMessage()));
           if (success == null || !success) {
             try {
+              RTP.log(Level.FINER,
+                  "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                      + ") DROPPED success-false; returned to unkept");
               queueManager.unkeptLocations.offer(coldLoc);
             } finally {
               inFlightCalculations.decrementAndGet();
@@ -575,15 +591,25 @@ public class Region extends FactoryValue<RegionKeys> {
           // predicate to keep in sync.
           Runnable verify = () -> {
             try {
+              RTP.log(Level.FINER,
+                  "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                      + ") verify ENTER");
               RTPCoords resolved = null;
               io.github.dailystruggle.rtp.api.world.RTPChunk<?> rtpChunk = null;
               try {
                 long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
                 rtpChunk = getWorld().getCachedChunk(key);
                 VerticalAdjustor<?> v = getVert();
+                RTP.log(Level.FINER,
+                    "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                        + ") verify cachedChunk=" + (rtpChunk == null ? "null" : "present")
+                        + " vert=" + (v == null ? "null" : v.getClass().getSimpleName()));
                 if (rtpChunk != null && v != null) {
                   resolved = v.adjust(rtpChunk);
                 }
+                RTP.log(Level.FINER,
+                    "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                        + ") verify adjust resolved=" + (resolved == null ? "null" : "present"));
               } catch (Throwable verifyEx) {
                 // Fail CLOSED on verification error — never promote an
                 // unverified location (prior fail-open default caused
@@ -617,6 +643,10 @@ public class Region extends FactoryValue<RegionKeys> {
               boolean added = queueManager.keptLocations.offer(
                       new RTPLocation(resolved, coldLoc.attempts(), reservation)
               );
+              RTP.log(Level.FINER,
+                  "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                      + ") keptLocations.offer added=" + added
+                      + " keptSize=" + queueManager.keptLocations.size());
               if (!added) {
                 reservation.close();
                 queueManager.unkeptLocations.offer(coldLoc);
@@ -639,6 +669,11 @@ public class Region extends FactoryValue<RegionKeys> {
           }
         });
       }).exceptionally(throwable -> {
+        RTP.log(Level.FINER,
+            "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                + ") getChunkAtAsync EXCEPTIONALLY "
+                + (throwable == null ? "null" : throwable.getClass().getSimpleName()
+                    + ":" + throwable.getMessage()) + "; returned to unkept");
         inFlightCalculations.decrementAndGet();
         queueManager.unkeptLocations.offer(coldLoc);
         return null;

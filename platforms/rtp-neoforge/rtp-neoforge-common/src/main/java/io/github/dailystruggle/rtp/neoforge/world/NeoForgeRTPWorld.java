@@ -261,33 +261,31 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         final int inFlightNow = liveLoadInFlight.incrementAndGet();
         totalChunkLoads.incrementAndGet();
 
-        // [CHUNKLOAD_DIAG] Trace the live-load dispatch end to end so we can tell
-        // whether the server.execute runnable ever runs on the tick thread, what
-        // the adapter handed back, and whether the chunk future ultimately
-        // resolves. Symptom under investigation: nothing reaches L1 and inFlight
-        // saturates at the deficit cap.
+        // Trace the live-load dispatch end to end at FINER: whether the
+        // server.execute runnable runs on the tick thread, what the adapter
+        // handed back, and whether the chunk future ultimately resolves.
         final long dispatchStartNanos = System.nanoTime();
-        RTP.log(java.util.logging.Level.INFO,
-                "[RTP][NeoForge][CHUNKLOAD_DIAG] dispatch SUBMIT world=" + name
+        RTP.log(java.util.logging.Level.FINER,
+                "[RTP][NeoForge] dispatch SUBMIT world=" + name
                         + " chunk=(" + chunkX + "," + chunkZ + ") inFlight=" + inFlightNow
                         + " serverThread.isSameThread=" + server.isSameThread());
 
         CompletableFuture<CompletableFuture<ChunkAccess>> bridge = new CompletableFuture<>();
         server.execute(() -> {
-            RTP.log(java.util.logging.Level.INFO,
-                    "[RTP][NeoForge][CHUNKLOAD_DIAG] dispatch RUN (on tick thread) world=" + name
+            RTP.log(java.util.logging.Level.FINER,
+                    "[RTP][NeoForge] dispatch RUN (on tick thread) world=" + name
                             + " chunk=(" + chunkX + "," + chunkZ + ") waitedMs="
                             + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L));
             try {
                 CompletableFuture<ChunkAccess> adapterFuture = adapter.requestFullChunkAsync(world, chunkX, chunkZ);
-                RTP.log(java.util.logging.Level.INFO,
-                        "[RTP][NeoForge][CHUNKLOAD_DIAG] adapter.requestFullChunkAsync RETURNED future="
+                RTP.log(java.util.logging.Level.FINER,
+                        "[RTP][NeoForge] adapter.requestFullChunkAsync RETURNED future="
                                 + (adapterFuture == null ? "null" : "id@" + System.identityHashCode(adapterFuture)
                                         + " done=" + adapterFuture.isDone())
                                 + " world=" + name + " chunk=(" + chunkX + "," + chunkZ + ")");
                 if (adapterFuture != null) {
-                    adapterFuture.whenComplete((ca, ex) -> RTP.log(java.util.logging.Level.INFO,
-                            "[RTP][NeoForge][CHUNKLOAD_DIAG] adapter future COMPLETE world=" + name
+                    adapterFuture.whenComplete((ca, ex) -> RTP.log(java.util.logging.Level.FINER,
+                            "[RTP][NeoForge] adapter future COMPLETE world=" + name
                                     + " chunk=(" + chunkX + "," + chunkZ + ") chunk="
                                     + (ca == null ? "null" : ca.getClass().getSimpleName())
                                     + (ex == null ? "" : " ex=" + ex.getClass().getSimpleName() + ":" + ex.getMessage())
@@ -296,7 +294,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                 bridge.complete(adapterFuture);
             } catch (Throwable t) {
                 RTP.log(java.util.logging.Level.WARNING,
-                        "[RTP][NeoForge][CHUNKLOAD_DIAG] adapter.requestFullChunkAsync THREW world=" + name
+                        "[RTP][NeoForge] adapter.requestFullChunkAsync THREW world=" + name
                                 + " chunk=(" + chunkX + "," + chunkZ + "): "
                                 + t.getClass().getSimpleName() + ": " + t.getMessage());
                 bridge.completeExceptionally(t);
@@ -322,8 +320,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
             if (error != null) {
                 Throwable cause = (error instanceof CompletionException && error.getCause() != null)
                         ? error.getCause() : error;
-                RTP.log(java.util.logging.Level.INFO,
-                        "[RTP][NeoForge][CHUNKLOAD_DIAG] dispatch FAILED world=" + name
+                RTP.log(java.util.logging.Level.FINE,
+                        "[RTP][NeoForge] dispatch FAILED world=" + name
                                 + " chunk=(" + chunkX + "," + chunkZ + ") "
                                 + cause.getClass().getSimpleName() + ": " + cause.getMessage()
                                 + " elapsedMs=" + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L));
@@ -331,14 +329,32 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                 return;
             }
             if (chunk != null) {
-                RTP.log(java.util.logging.Level.INFO,
-                        "[RTP][NeoForge][CHUNKLOAD_DIAG] dispatch OK world=" + name
+                RTP.log(java.util.logging.Level.FINER,
+                        "[RTP][NeoForge] dispatch OK world=" + name
                                 + " chunk=(" + chunkX + "," + chunkZ + ") stored="
                                 + chunk.getClass().getSimpleName()
                                 + " elapsedMs=" + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L));
-                chunkCache.put(key, chunk);
-                rtpChunkCache.put(key, new NeoForgeRTPChunk(chunk, world, id));
-                anvilProbeSupport.evict(key);
+                // Guard the cache-store block: a throwable here (e.g. the
+                // NeoForgeRTPChunk wrapper construction or an anvil-probe evict
+                // touching runtime-specific state on 26.x) used to escape into
+                // the discarded whenComplete stage, so result.complete(key) below
+                // was never reached. The L2->L1 promotion's getChunkAtAsync future
+                // then hung forever: the load logged "dispatch OK" but Region's
+                // thenAccept never fired and inFlightCalculations stayed pinned at
+                // the deficit cap, so the kept (L1) cache never filled. Storing
+                // inside a try and always completing result keeps the promotion
+                // chain live and surfaces the real cause (S-004) instead of
+                // silently stalling.
+                try {
+                    chunkCache.put(key, chunk);
+                    rtpChunkCache.put(key, NeoForgeRTPChunk.forLiveChunk(chunk, world, id, chunkX, chunkZ));
+                    anvilProbeSupport.evict(key);
+                } catch (Throwable storeEx) {
+                    RTP.log(java.util.logging.Level.WARNING,
+                            "[RTP][NeoForge] cache-store FAILED world=" + name
+                                    + " chunk=(" + chunkX + "," + chunkZ + "): "
+                                    + storeEx.getClass().getName() + ": " + storeEx.getMessage(), storeEx);
+                }
             } else {
                 // S-004: never silently discard. A null chunk here means the
                 // version adapter's getChunkFuture(create=true) resolved without
@@ -346,7 +362,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                 // ChunkResult shape), which would leave the promotion verify with
                 // no chunk to adjust. Make it visible rather than indistinguishable
                 // from a weak-ref eviction.
-                RTP.log(java.util.logging.Level.INFO,
+                RTP.log(java.util.logging.Level.FINE,
                         "[RTP][NeoForge] loadLiveChunk resolved a NULL ChunkAccess for " + name
                                 + " chunk=(" + ((int) (key & 0xffffffffL)) + ","
                                 + ((int) (key >> 32)) + ") - adapter.requestFullChunkAsync "
@@ -656,7 +672,9 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         }
         ChunkAccess chunk = chunkCache.get(key);
         if (chunk != null) {
-            NeoForgeRTPChunk built = new NeoForgeRTPChunk(chunk, world, id);
+            int builtCx = (int) (key & 0xffffffffL);
+            int builtCz = (int) (key >> 32);
+            NeoForgeRTPChunk built = NeoForgeRTPChunk.forLiveChunk(chunk, world, id, builtCx, builtCz);
             rtpChunkCache.put(key, built);
             anvilProbeSupport.evict(key);
             return built;
