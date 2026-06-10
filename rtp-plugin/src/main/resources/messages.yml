@@ -129,7 +129,7 @@ scanResume: "#10A5F5[P0] scan task resumed for regions: [scan_regions]"
 scanRunning: "&c[P0] scan task already running for regions: [scan_regions]"
 scanNotRunning: "&c[P0] scan task not running for regions: [scan_regions]"
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanStatus: "&a[P0] completed [scan_chunks] / [scan_totalChunks] chunks for regions: [scan_regions]. [scan_cps] cps. Land Percentage: [scan_landPercentage]%. ETA: [scan_eta]"
+scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 land &8| &7ETA #7E9CC8[scan_eta]"
 
 # ###############################################################################
 # Section 7: Info Command

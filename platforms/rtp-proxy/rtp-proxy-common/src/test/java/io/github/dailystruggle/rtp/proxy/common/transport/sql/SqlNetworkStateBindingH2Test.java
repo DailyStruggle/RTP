@@ -249,6 +249,28 @@ class SqlNetworkStateBindingH2Test {
     }
 
     @Test
+    @DisplayName("region_key persists across the claim and is read back cross-instance")
+    void regionKeyPersistsCrossInstance() throws Exception {
+        // Cross-server /rtp region=<server>:<region>: the requested region
+        // must be stored on the reservation row (region_key column) and
+        // observable by a peer instance reading the shared DB.
+        UUID player = UUID.randomUUID();
+        ReservationToken claimed = a
+                .claim("server-rk", player, Duration.ofSeconds(30), java.util.Optional.of("nether"))
+                .get(2, TimeUnit.SECONDS);
+        assertEquals(java.util.Optional.of("nether"), claimed.regionKey());
+
+        java.util.Optional<ReservationToken> seen = b.findReservation(player).get(2, TimeUnit.SECONDS);
+        assertTrue(seen.isPresent(), "peer must observe the region-pinned reservation");
+        assertEquals(java.util.Optional.of("nether"), seen.get().regionKey(),
+                "region_key must survive the DB round-trip");
+
+        assertTrue(b.listActiveForServer("server-rk").get(2, TimeUnit.SECONDS).stream()
+                        .anyMatch(t -> t.regionKey().equals(java.util.Optional.of("nether"))),
+                "listActiveForServer must report the region-pinned token");
+    }
+
+    @Test
     @DisplayName("Close prevents further SPI calls")
     void closeIsTerminal() {
         a.close();

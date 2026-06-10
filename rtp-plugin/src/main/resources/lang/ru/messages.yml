@@ -119,7 +119,7 @@ invalidCommand: "&c[P0] недопустимая команда - [arg]"
 сканированиеАктивно: "&c[P0] задача сканирования уже выполняется для регионов: [scan_regions]"
 сканированиеНеАктивно: "&c[P0] нет выполняющейся задачи сканирования для регионов: [scan_regions]"
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-статусСканирования: "&a[P0] завершено [scan_chunks] / [scan_totalChunks] чанков для регионов: [scan_regions]. [scan_cps] cps. Процент земли: [scan_landPercentage]%. Оставшееся время: [scan_eta]"
+статусСканирования: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 суша &8| &7ETA #7E9CC8[scan_eta]"
 
 # ###############################################################################
 # Section 7: Info Command

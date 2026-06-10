@@ -98,12 +98,13 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * ADR-058 — swappable region-schematic paster, mirroring the Bukkit/Folia
      * {@code setBiomeGetter} idiom (on Fabric the biome getter lives on
      * {@code FabricServerAccessor}; the schematic paster holder lives here for
-     * parity with the other world adapters). Defaults to
-     * {@link io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster}
-     * (never {@code null}, S-006).
+     * parity with the other world adapters). Defaults to the platform-neutral
+     * {@link io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster}
+     * (ADR-058), whose native block writes route back through
+     * {@link #setBlocks(java.util.List)} below; never {@code null} (S-006).
      */
     private static @NotNull io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster =
-            io.github.dailystruggle.rtp.api.schematic.NoOpSchematicPaster.INSTANCE;
+            new io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster();
 
     public static void setSchematicPaster(
             @NotNull io.github.dailystruggle.rtp.api.schematic.SchematicPaster paster) {
@@ -118,6 +119,56 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
     @Override
     public io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster() {
         return schematicPaster;
+    }
+
+    /**
+     * Native bulk block write (ADR-058). Parses each {@link io.github.dailystruggle.rtp.api.platform.BlockDelta}
+     * token through the vanilla {@code BlockStateParser} (the same parser {@code /setblock} uses,
+     * so the in-repo Sponge decoder's canonical {@code namespace:id[props]} tokens are accepted)
+     * and writes the resulting {@code BlockState} via {@link ServerLevel#setBlock}.
+     *
+     * <p>Invoked on the server thread by the caller (the teleport pipeline dispatches the paste
+     * through {@code RTP.scheduler.runTask(location, ...)}). Performs block writes only and never
+     * loads chunks (S-005). A single undecodable token is counted as a skip and audited, never
+     * thrown (S-004).
+     *
+     * @return the number of blocks successfully placed
+     */
+    @Override
+    public int setBlocks(java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+        ServerLevel level = world;
+        if (level == null || blocks == null || blocks.isEmpty()) return 0;
+        net.minecraft.core.HolderLookup<net.minecraft.world.level.block.Block> blockLookup;
+        try {
+            blockLookup = level.registryAccess()
+                    .lookupOrThrow(net.minecraft.core.registries.Registries.BLOCK);
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.WARNING, "[RTP][Fabric] setBlocks could not resolve the block registry "
+                    + "lookup: " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return 0;
+        }
+        int placed = 0;
+        String firstFailedToken = null;
+        for (io.github.dailystruggle.rtp.api.platform.BlockDelta delta : blocks) {
+            try {
+                net.minecraft.world.level.block.state.BlockState state =
+                        net.minecraft.commands.arguments.blocks.BlockStateParser
+                                .parseForBlock(blockLookup, delta.token(), false)
+                                .blockState();
+                // flags=2 (Block.UPDATE_CLIENTS): send to clients without triggering neighbour
+                // physics updates — a bulk world rewrite, not a player edit.
+                level.setBlock(new BlockPos(delta.x(), delta.y(), delta.z()), state, 2);
+                placed++;
+            } catch (Throwable e) {
+                if (firstFailedToken == null) firstFailedToken = delta.token();
+            }
+        }
+        if (firstFailedToken != null) {
+            RTP.log(java.util.logging.Level.WARNING, "[RTP][Fabric] setBlocks placed " + placed + " of "
+                    + blocks.size() + " block(s); at least one block-state token could not be "
+                    + "parsed and was skipped (S-004). First failure: '" + firstFailedToken + "'.");
+        }
+        return placed;
     }
 
     @Override

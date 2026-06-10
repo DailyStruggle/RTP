@@ -102,7 +102,7 @@ These requirements establish the overarching contract for the runtime cartograph
 
 - **REQ-RTP-MAP-003 — Map Binding Lifecycle Accounting:** A live `MapBinding` shall release every `MemoryTracker` allocation it acquired on cancel, on viewer disconnect, and on plugin disable. No allocation tracked through resource bookkeeping shall remain attributable to a cancelled, disconnected, or shut-down binding.
 
-- **REQ-RTP-MAP-004 — Lite Assembly Surface:** The Lite assembly variant shall ship `NoopMapBinding` as the sole `MapBinding` implementation. The Lite variant shall not expose any platform-backed binding nor any renderer that depends on platform-backed pixel delivery.
+- **REQ-RTP-MAP-004 — Lite Assembly Surface:** The Lite assembly variant shall ship the same platform-backed `MapBinding` implementation as the full assembly, so that map chart rendering is available on the Lite build across every supported platform. `NoopMapBinding` shall remain the fallback binding, installed only when no platform-backed binding is available on the active runtime.
 
 - **REQ-RTP-MAP-005 — Mermaid Renderer Subset and Self-Containment:** A `MermaidRenderer` shall accept the documented Mermaid subset (flowchart `LR` / `TD` direction, rectangular / rounded / diamond node shapes, directed labelled edges) and shall rasterize to the active `MapCanvas` palette. The renderer shall not invoke any external process, scripting engine, or third-party graph-layout library at runtime. Mermaid source outside the documented subset shall be rejected at parse time with a message routed through the message-configuration mechanism defined by REQ-RTP-F-013, and the rejection shall be audited under REQ-RTP-S-004.
 

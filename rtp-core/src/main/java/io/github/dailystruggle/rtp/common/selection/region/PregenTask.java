@@ -940,6 +940,34 @@ final class PregenTask implements Runnable {
                     RTP.log(Level.INFO, "#ff8040[RTP] [" + state.region.name + "]   " + outcome);
                 }
             }
+        } else if (i >= state.maxAttempts) {
+            // [PROMOTE_DIAG] Always-on (verbose-independent) compact exhaustion
+            // summary. Without this a non-verbose location generation that fails
+            // every attempt completes null silently, so a /rtp that never finds a
+            // safe spot looks identical to a hang. attemptOutcomes is populated by
+            // recordOutcome regardless of verbose, so aggregate it into a per-cause
+            // tally that proves WHICH stage rejected every candidate.
+            java.util.Map<String, Integer> causeTally = new java.util.LinkedHashMap<>();
+            for (String outcome : state.attemptOutcomes) {
+                // breadcrumb shape: "attempt=<n> outcome=<cause>/<detail>"
+                String cause = outcome;
+                int oc = outcome.indexOf("outcome=");
+                if (oc >= 0) cause = outcome.substring(oc + "outcome=".length());
+                int slash = cause.indexOf('/');
+                int space = cause.indexOf(' ');
+                int cut = cause.length();
+                if (slash >= 0) cut = Math.min(cut, slash);
+                if (space >= 0) cut = Math.min(cut, space);
+                cause = cause.substring(0, cut);
+                causeTally.merge(cause, 1, Integer::sum);
+            }
+            RTP.log(Level.INFO,
+                    "[RTP][PROMOTE_DIAG] [" + state.region.name + "] location generation FAILED after "
+                            + state.maxAttempts + " attempts (every candidate rejected). "
+                            + "Per-cause tally=" + causeTally
+                            + " (enable verbose for per-location detail). A dominant"
+                            + " safety/nullChunk/ungenerated cause here is the same chunk-read"
+                            + " failure that leaves the L1 kept cache empty.");
         }
         result.complete(new GenerationResult(null, reported, null));
     }

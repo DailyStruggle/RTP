@@ -370,8 +370,19 @@ public final class NeoForgeLegacyText {
         } catch (Throwable ignored) { /* not on this runtime */ }
         if (CLICK_CTOR_LEGACY == null) {
             try {
+                // 1.21.5+ refactored ClickEvent into a sealed interface with record
+                // implementations (RunCommand, SuggestCommand, ...). Classify the
+                // nested ctor by the record's simple name rather than calling
+                // getAction(): the carrier compiles against an MC version where
+                // ClickEvent is a class, so an invokevirtual getAction() on the
+                // runtime interface throws IncompatibleClassChangeError and would be
+                // silently swallowed, leaving every click ctor null (clicks dead).
                 for (Class<?> nested : ClickEvent.class.getDeclaredClasses()) {
                     if (!ClickEvent.class.isAssignableFrom(nested)) continue;
+                    String simpleLower = nested.getSimpleName().toLowerCase();
+                    boolean isRun = simpleLower.contains("run");
+                    boolean isSuggest = simpleLower.contains("suggest");
+                    if (!isRun && !isSuggest) continue;
                     java.lang.reflect.Constructor<?> ctor;
                     try {
                         ctor = nested.getDeclaredConstructor(String.class);
@@ -379,15 +390,11 @@ public final class NeoForgeLegacyText {
                         continue;
                     }
                     ctor.setAccessible(true);
-                    try {
-                        Object instance = ctor.newInstance("");
-                        ClickEvent.Action action = ((ClickEvent) instance).getAction();
-                        if (action == ClickEvent.Action.SUGGEST_COMMAND && CLICK_CTOR_SUGGEST == null) {
-                            CLICK_CTOR_SUGGEST = ctor;
-                        } else if (action == ClickEvent.Action.RUN_COMMAND && CLICK_CTOR_RUN == null) {
-                            CLICK_CTOR_RUN = ctor;
-                        }
-                    } catch (Throwable ignored) { /* not this one */ }
+                    if (isRun && CLICK_CTOR_RUN == null) {
+                        CLICK_CTOR_RUN = ctor;
+                    } else if (isSuggest && CLICK_CTOR_SUGGEST == null) {
+                        CLICK_CTOR_SUGGEST = ctor;
+                    }
                     if (CLICK_CTOR_SUGGEST != null && CLICK_CTOR_RUN != null) break;
                 }
             } catch (Throwable ignored) { /* nothing matched */ }
@@ -409,7 +416,7 @@ public final class NeoForgeLegacyText {
                 PROBE_LOGGED = false;
                 return;
             }
-            RTP.log(Level.INFO,
+            RTP.log(Level.FINE,
                     "[RTP] NeoForgeLegacyText probe results: "
                             + "HOVER_CTOR_LEGACY=" + (HOVER_CTOR_LEGACY != null)
                             + ", HOVER_CTOR_SHOWTEXT=" + (HOVER_CTOR_SHOWTEXT != null)

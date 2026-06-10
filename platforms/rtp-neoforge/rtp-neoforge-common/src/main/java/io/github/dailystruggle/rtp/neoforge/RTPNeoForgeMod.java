@@ -302,6 +302,18 @@ public final class RTPNeoForgeMod {
           + t.getClass().getSimpleName() + ": " + t.getMessage());
     }
 
+    // effects-api-ADR-003 / ADR-005 — wire the effect layer to the teleport
+    // pipeline (SOUND/PARTICLE/TITLE/POTION on the rtp.effect.* lifecycle
+    // hooks, driven by effects/<group>.yml + permissions). Reuses the Mojmap
+    // effectsapi.fabric runtime (shared with Fabric; flagged for rename).
+    try {
+      io.github.dailystruggle.rtp.neoforge.effects.NeoForgeEffectsHandler.setupEffects(server);
+      RTP.log(Level.INFO, "[RTP][NeoForge] effects layer installed (NeoForgeEffectsHandler).");
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING, "[RTP][NeoForge] effects layer install failed: "
+          + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
+    }
+
     // ADR-023 — login reserve cache on the default-world region (no-op unless
     // PerformanceKeys.loginCacheEnabled). Runs after setupDatabase so regions
     // have been (re)built.
@@ -403,6 +415,13 @@ public final class RTPNeoForgeMod {
     } catch (Throwable t) {
       RTP.log(Level.WARNING, "[RTP][NeoForge] RTP.stop() raised on shutdown", t);
     } finally {
+      // Drop the effects runtime's server binding so post-stop effect fires
+      // become no-ops instead of dispatching onto a torn-down server.
+      try {
+        io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime.unbindServer();
+      } catch (Throwable ignored) {
+        // effects-api absent or already unbound; nothing to do.
+      }
       if (accessor != null) {
         accessor.unbindServer();
       }

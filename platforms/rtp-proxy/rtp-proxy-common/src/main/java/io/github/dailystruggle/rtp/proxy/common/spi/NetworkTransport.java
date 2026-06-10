@@ -34,6 +34,24 @@ public interface NetworkTransport extends AutoCloseable {
      */
     CompletableFuture<ReservationToken> claim(String serverId, UUID playerId, Duration ttl);
 
+    /**
+     * Region-aware overload of {@link #claim(String, UUID, Duration)}. When
+     * {@code regionKey} is present it is carried verbatim onto the issued
+     * {@link ReservationToken#regionKey()} and persisted with the row, so the
+     * destination backend's {@code JoinTriggerSource} can re-attach it as
+     * {@code rtp region=<regionKey>} on arrival (cross-server
+     * {@code /rtp region=<server>:<region>} support).
+     *
+     * <p>Default implementation delegates to the region-agnostic
+     * {@link #claim(String, UUID, Duration)} so legacy bindings continue to
+     * compile and simply drop the region constraint. Production bindings
+     * (in-memory, Redis, SQL) override this to persist {@code regionKey}.</p>
+     */
+    default CompletableFuture<ReservationToken> claim(String serverId, UUID playerId,
+                                                      Duration ttl, Optional<String> regionKey) {
+        return claim(serverId, playerId, ttl);
+    }
+
     /** Release a previously-issued token; idempotent. */
     CompletableFuture<Void> release(String tokenId, ReleaseReason reason);
 

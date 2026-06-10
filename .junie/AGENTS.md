@@ -431,6 +431,11 @@ Notes:
   - Filter output: append `2>&1 | Select-String "BUILD|PASSED|FAILED|ERROR"`
 - **Preferred runner**: the `run_test` tool is faster than the Gradle CLI for pass/fail checks over a directory of tests.
 - **Search**: use `search_project` with short keywords. Never `grep`/`find`. For file listings: `Get-ChildItem -Recurse <path> -Filter "*.java"`.
+- **Blank-output trap on directory listings (verify before you act, never destroy on an "empty" read)**: a bare `Get-ChildItem ... | Select-Object FullName` (or `-ExpandProperty FullName`) frequently comes back with **no visible output** in this terminal even when the directory is full — the rows are silently dropped on the way to stdout. Treat an empty listing as **"unknown"**, never as **"the directory is empty"**. Real incident: two blank `Get-ChildItem` reads led to the false conclusion that an existing, fully-implemented carrier module was an empty stub, and a follow-up `Copy-Item` then clobbered a real committed source file. Rules:
+  - Force the rows through a real sink before trusting them: `(Get-ChildItem -Recurse <path> -File | Select-Object -ExpandProperty FullName) -join "`n" | Write-Output`. If that *also* prints nothing, the path is genuinely empty/missing.
+  - Cross-check existence another way before any destructive/overwriting action (`Test-Path`, `git status --porcelain <path>`, `git ls-files <path>`, or the `search_project` tool).
+  - **Never overwrite or delete a file based on an apparently-empty directory listing.** `Copy-Item`/`Move-Item`/`Out-File`/`Set-Content` to an existing path silently overwrites; confirm the target does not exist (or is intended to be replaced) first.
+  - If you do clobber a tracked file you created/copied *this session*, restore it with `git checkout HEAD -- <path>` (allowed for your own session change) and re-verify the content + `git status` afterward.
 - **Runtime**: Java 21+ required.
 - **Known-harmless warnings**, **Gradle daemon / JDK mismatch**, **`run_test` stdout suppression**, **`rtp test full` interpretation** — see [`LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md).
 - **Database / shutdown-flush / command-pipeline pitfalls** — see [`LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md).

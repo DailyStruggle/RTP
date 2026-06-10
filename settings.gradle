@@ -251,7 +251,7 @@ if (!excludeJdk25) {
     include 'rtp-fabric:rtp-fabric-v26_1_R1'
 }
 // v26_2_R1 -- EARLY/EXPERIMENTAL, pinned to the MC 26.2 pre-release
-// (26.2-pre-2). Same deobf regime as v26_1_R1 (Loom 1.15, JDK 25, no
+// (26.2-pre-3). Same deobf regime as v26_1_R1 (Loom 1.15, JDK 25, no
 // mappings), cloned from it. See rtp-fabric-ADR-014. Re-pin the MC /
 // loader / fabric-api versions when 26.2 reaches final.
 if (!excludeJdk25) {

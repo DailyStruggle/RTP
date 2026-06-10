@@ -14,12 +14,16 @@ import java.util.function.Supplier;
  * platform binding. Every entry-point throws {@link IllegalStateException}
  * with the same documented prefix per REQ-RTP-MAP-001 (extends REQ-RTP-S-006).
  *
- * <p>Also the binding shipped by the Lite assembly variant
- * (REQ-RTP-MAP-004): the Lite jar excludes the Bukkit / Fabric concrete
- * bindings at shadow-jar time, leaving {@code NoopMapBinding} as the only
- * registered {@code MapBinding}. {@code /rtp map} on Lite therefore surfaces
- * the configurable {@code mapsApiDisabled} message (REQ-RTP-F-013 / S-004)
- * rather than silently no-opping.
+ * <p>This is the fallback binding only. Per REQ-RTP-MAP-004 (amended
+ * 2026-06-04) the Lite assembly ships the same platform-backed
+ * {@code MapBinding} as the full assembly: the Lite jar carries the full
+ * {@code mapsapi/**} tree, and the Lite bootstraps install the real concrete
+ * bindings ({@code BukkitMapBinding} on Bukkit/Paper/Folia, {@code FabricMapBinding}
+ * on Fabric, {@code NeoForgeMapBinding} on NeoForge). {@code NoopMapBinding}
+ * is registered only when no platform binding is available on the active
+ * runtime, in which case {@code /rtp} map commands surface the configurable
+ * {@code mapBindingMissing} message (REQ-RTP-F-013 / S-004) rather than
+ * silently no-opping.
  */
 public final class NoopMapBinding implements MapBinding {
 

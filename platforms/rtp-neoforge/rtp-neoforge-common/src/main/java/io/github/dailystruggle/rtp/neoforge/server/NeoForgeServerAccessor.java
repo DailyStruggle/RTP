@@ -112,8 +112,19 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     }
 
     public void unregisterWorld(ServerLevel level) {
-        String name = io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds
-                .locationString(level.dimension());
+        if (level == null) return;
+        // Resolve via the same helper used at registration so the name matches
+        // exactly (incl. the 1.21.11 parsed-name fallback when the reflective
+        // identifier accessor returns null).
+        String name = NeoForgeRTPWorld.resolveDimensionName(level, false);
+        if (name == null) {
+            // Mapping drift left the dimension id unresolved; fall back to a
+            // by-identity sweep so the ConcurrentHashMap.remove(null) NPE on
+            // shutdown is avoided and the world is still unregistered.
+            worldsByName.values().removeIf(w -> w instanceof NeoForgeRTPWorld nw && nw.level() == level);
+            worldsById.values().removeIf(w -> w instanceof NeoForgeRTPWorld nw && nw.level() == level);
+            return;
+        }
         RTPWorld<?> removed = worldsByName.remove(name);
         if (removed != null) worldsById.remove(removed.id());
     }
@@ -850,8 +861,14 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
             if (p instanceof NeoForgeRTPPlayer np) {
                 ServerPlayer sp = np.handle();
                 if (sp != null) {
-                    return io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds
-                            .locationString(sp.serverLevel().dimension());
+                    // Mojmap drift: ServerPlayer.serverLevel() was removed in the
+                    // 1.21.11 mappings; the inherited Entity.level() is a
+                    // ServerLevel at runtime for an online player.
+                    net.minecraft.world.level.Level lvl = sp.level();
+                    if (lvl instanceof ServerLevel sl) {
+                        return io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds
+                                .locationString(sl.dimension());
+                    }
                 }
             }
         } catch (Throwable t) {

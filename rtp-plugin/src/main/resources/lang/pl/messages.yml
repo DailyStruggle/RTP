@@ -129,7 +129,7 @@ skanWznow: "#10A5F5[P0] zadanie skanowania wznowione dla regionów: [scan_region
 skanDziala: "&c[P0] zadanie skanowania już działa dla regionów: [scan_regions]"
 skanNieDziala: "&c[P0] zadanie skanowania nie działa dla regionów: [scan_regions]"
 # zmienne: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanStatus: "&a[P0] ukończono [scan_chunks] / [scan_totalChunks] chunków dla regionów: [scan_regions]. [scan_cps] cps. Procent lądu: [scan_landPercentage]%. ETA: [scan_eta]"
+scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 ziemia &8| &7ETA #7E9CC8[scan_eta]"
 
 # ###############################################################################
 # Sekcja 7: Komenda info
