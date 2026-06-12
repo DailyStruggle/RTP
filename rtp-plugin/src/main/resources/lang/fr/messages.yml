@@ -26,9 +26,9 @@ alreadyTeleporting: "&7[P0] ⚡ vous êtes déjà en téléportation !"
 
 # si le plugin est en cours de rechargement
 teleportDeniedReloading: "&7[P0] les téléportations sont temporairement désactivées pendant le rechargement du plugin. Réessayez bientôt."
-delayMessage: "&7[P0] ⚡ Teleporting in [delay]. Don't move"
+delayMessage: "&7[P0] ⚡ Téléportation dans [delay]. Ne bougez pas."
 chunkLoading: "&7[P0] ⚙ Chargement des chunks ! veuillez patienter..."
-teleportMessage: "&7[P0] ⚡ Teleported in [attempts] attempts, in [processingTime]"
+teleportMessage: "&7[P0] ⚡ Téléporté en [attempts] tentatives, en [processingTime]"
 
 # if teleport is cancelled
 teleportCancel: "&7[P0] ⚡ Téléportation annulée !"
