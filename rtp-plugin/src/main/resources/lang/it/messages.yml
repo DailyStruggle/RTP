@@ -278,6 +278,7 @@ menuFrontPageSectionTeleport: "&8--- &7teletrasporto &8---"
 # Righe della pagina iniziale. Nessun segnaposto.
 menuFrontPageRowTeleport: "&a▶ /rtp &7- teletrasportati in una posizione casuale"
 menuFrontPageRowRegion: "&a▶ /rtp region:&7... &7- scegli una regione"
+menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- pick a world"
 menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- scegli un bioma"
 menuFrontPageRowHelp: "&a▶ /rtp help &7- elenca i comandi"
 # Front-page admin entry row: the only inline

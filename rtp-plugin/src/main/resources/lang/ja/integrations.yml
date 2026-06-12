@@ -1,34 +1,44 @@
 # --- RTP 連携設定 ---
-# true の場合、該当プラグインの claim/region 内に着地したときに RTP は位置を引き直します。
+# 各トグルは、指定したプラグインのクレーム/領域内に着地した場合に転送先を再抽選します（そのプラグインが導入されている場合のみ有効）。
+# Factions のクレーム内に着地した場合に位置を再抽選します。
+# @type: boolean
+# @default: false
 rerollFactions: false
-# Reroll the location if it lands inside a GriefDefender claim.
+
+# GriefDefender のクレーム内に着地した場合に位置を再抽選します。
 # @type: boolean
 # @default: false
 rerollGriefDefender: false
-# Reroll the location if it lands inside a GriefPrevention claim.
+
+# GriefPrevention のクレーム内に着地した場合に位置を再抽選します。
 # @type: boolean
 # @default: false
 rerollGriefPrevention: false
-# Reroll the location if it lands inside a HuskTowns claim.
+
+# HuskTowns のクレーム内に着地した場合に位置を再抽選します。
 # @type: boolean
 # @default: false
 rerollHuskTowns: false
-# Reroll the location if it lands inside a Lands claim.
+
+# Lands のクレーム内に着地した場合に位置を再抽選します。
 # @type: boolean
 # @default: false
 rerollLands: false
-# Reroll the location if it lands inside a RedProtect region.
+
+# RedProtect の領域内に着地した場合に位置を再抽選します。
 # @type: boolean
 # @default: false
 rerollRedProtect: false
-# Reroll the location if it lands inside a Towny Advanced claim.
+
+# Towny Advanced のクレーム内に着地した場合に位置を再抽選します。
 # @type: boolean
 # @default: false
 rerollTownyAdvanced: false
-# Reroll the location if it lands inside a WorldGuard region.
+
+# WorldGuard の領域内に着地した場合に位置を再抽選します。
 # @type: boolean
 # @default: false
 rerollWorldGuard: false
 
-# DO NOT TOUCH VERSION NUMBER
+# バージョン番号は変更しないでください
 version: 1.0

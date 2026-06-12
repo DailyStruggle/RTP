@@ -18,8 +18,8 @@ tentativasMaximas: 10
 # @default: 0
 distanciaVisaoSelecao: 0
 
-# Chunk radius loaded around the final location immediately before
-# teleport. 0 loads only the destination chunk.
+# Raio de chunks carregado ao redor da localização final logo antes do
+# teleporte. 0 carrega apenas o chunk de destino.
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
@@ -46,7 +46,7 @@ periodo: 20
 # @default: 50
 tempoAlocadoSincrono: 50
 
-# Maximum milliseconds per tick spent in asynchronous tasks.
+# Milissegundos máximos por tick gastos em tarefas assíncronas.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
@@ -83,7 +83,7 @@ carregamentoSincrono: false
 # @default: false
 analiseAoEvento: false
 
-# Parse effect permission nodes at startup.
+# Analisar os nós de permissão de efeitos na inicialização.
 # @type: boolean
 # @default: true
 analiseEfeitos: true
@@ -96,17 +96,16 @@ analiseEfeitos: true
 # @default: true
 lembrancaBioma: true
 
-# When set, only serve biome-filtered requests from cache (never
-# generate new biome searches). Requires biomeRecall.
+# Quando ativado, atende pedidos filtrados por bioma apenas a partir do cache
+# (nunca gera novas buscas de bioma). Requer biomeRecall.
 # @type: boolean
 # @default: false
 lembrancaBiomaForcada: false
 
-# Bias biome-filtered selection so each requested biome is steered toward
-# with equal probability, instead of in proportion to how much of the
-# region it covers. Counteracts common biomes drowning out rare ones when
-# several biomes are requested. Requires biomeRecall; no effect on
-# unfiltered (default-biome) teleports.
+# Enviesa a seleção filtrada por bioma para que cada bioma solicitado seja
+# escolhido com igual probabilidade, em vez de proporcional ao quanto da região
+# ele cobre. Evita que biomas comuns abafem os raros quando vários são solicitados.
+# Requer biomeRecall; sem efeito em teleportes sem filtro (bioma padrão).
 # @type: boolean
 # @default: false
 biomeWeighted: false
@@ -122,10 +121,78 @@ biomeWeighted: false
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
 biomeWeights:
+  # Peso relativo de seleção para este bioma (1.0 = sem viés).
   # @type: number
   # @range: [0.0, null]
   # @default: 1.0
   plains: 1.0
+  sunflower_plains: 1.0
+  snowy_plains: 1.0
+  ice_spikes: 1.0
+  desert: 1.0
+  swamp: 1.0
+  mangrove_swamp: 1.0
+  forest: 1.0
+  flower_forest: 1.0
+  birch_forest: 1.0
+  dark_forest: 1.0
+  old_growth_birch_forest: 1.0
+  old_growth_pine_taiga: 1.0
+  old_growth_spruce_taiga: 1.0
+  taiga: 1.0
+  snowy_taiga: 1.0
+  savanna: 1.0
+  savanna_plateau: 1.0
+  windswept_hills: 1.0
+  windswept_gravelly_hills: 1.0
+  windswept_forest: 1.0
+  windswept_savanna: 1.0
+  jungle: 1.0
+  sparse_jungle: 1.0
+  bamboo_jungle: 1.0
+  badlands: 1.0
+  eroded_badlands: 1.0
+  wooded_badlands: 1.0
+  meadow: 1.0
+  cherry_grove: 1.0
+  pale_garden: 1.0
+  grove: 1.0
+  snowy_slopes: 1.0
+  frozen_peaks: 1.0
+  jagged_peaks: 1.0
+  stony_peaks: 1.0
+  river: 1.0
+  frozen_river: 1.0
+  beach: 1.0
+  snowy_beach: 1.0
+  stony_shore: 1.0
+  warm_ocean: 1.0
+  lukewarm_ocean: 1.0
+  deep_lukewarm_ocean: 1.0
+  ocean: 1.0
+  deep_ocean: 1.0
+  cold_ocean: 1.0
+  deep_cold_ocean: 1.0
+  frozen_ocean: 1.0
+  deep_frozen_ocean: 1.0
+  mushroom_fields: 1.0
+  dripstone_caves: 1.0
+  lush_caves: 1.0
+  deep_dark: 1.0
+  # --- O Nether ---
+  nether_wastes: 1.0
+  warped_forest: 1.0
+  crimson_forest: 1.0
+  soul_sand_valley: 1.0
+  basalt_deltas: 1.0
+  # --- O End ---
+  the_end: 1.0
+  end_highlands: 1.0
+  end_midlands: 1.0
+  small_end_islands: 1.0
+  end_barrens: 1.0
+  # --- Diversos / técnico ---
+  the_void: 1.0
 
 # Verificação passiva de chunks
 # Busca localizações seguras dentro de todos os chunks carregados no alcance de uma região.
@@ -163,53 +230,55 @@ loginCacheEnabled: false
 # @default: 0
 loginCacheCap: 0
 
-# Probability of rejecting an ungenerated chunk per selection attempt.
-# 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land.
-# Generated chunks always pass.
+# Probabilidade de rejeitar um chunk não gerado por tentativa de seleção.
+# 0.0 = sem viés (padrão), 1.0 = evitar estritamente terreno não gerado.
+# Chunks gerados sempre passam.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.0
 pregeneratedPreference: 0.0
 
-# Fraction of L3 backlog capacity at which refill resumes (hysteresis).
-# 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill
-# continuously. Higher values group .mca-bin checks for better
-# CPU/memory efficiency.
+# Fração da capacidade do backlog L3 na qual o reabastecimento é retomado
+# (histerese). 0.5 = reabastecer só quando o L3 cair para 50% (padrão).
+# 1.0 = reabastecer continuamente. Valores maiores agrupam as verificações
+# de bins .mca para melhor eficiência de CPU/memória.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
 backlogRefillThreshold: 0.5
 
-# Latency threshold (ms) above which an immediately-served (unqueued) teleport
-# is audited: a WARN is logged and the cumulative slowPipelineCount counter
-# (surfaced by /rtp info) is incremented. Only immediate/unqueued teleports are
-# audited; queued at-rate teleports are excluded because their measured time
-# includes queue-wait. 0 or below disables the audit. See ADR-053.
+# Limite de latência (ms) acima do qual um teleporte atendido imediatamente
+# (sem fila) é auditado: um WARN é registrado e o contador cumulativo
+# slowPipelineCount (exibido por /rtp info) é incrementado. Apenas teleportes
+# imediatos/sem fila são auditados; os enfileirados são excluídos porque seu
+# tempo medido inclui a espera na fila. 0 ou menos desativa a auditoria. Veja ADR-053.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
 slowPipelineThresholdMs: 5000
 
-# Public teleport-queue depth (players waiting) at or above which queue
-# backpressure is audited: an edge-triggered WARN is logged and the cumulative
-# queueGrowthWarnCount counter (surfaced by /rtp info) is incremented once per
-# crossing. 0 or below disables the audit (opt-in). See ADR-053.
+# Profundidade da fila pública de teleporte (jogadores aguardando) a partir da qual
+# a contrapressão da fila é auditada: um WARN acionado por borda é registrado e o
+# contador cumulativo queueGrowthWarnCount (exibido por /rtp info) é incrementado
+# uma vez por cruzamento. 0 ou menos desativa a auditoria (opcional). Veja ADR-053.
 # @type: integer
 # @range: [0, null]
 # @unit: players
 # @default: 0
 queueGrowthWarnThreshold: 0
-# Settings for /rtp admin prefab. The `apply` -> `confirm` flow writes
-# each touched config file with a sibling backup named
-# <file>.yml.bak.<epochMillis>; `bakRetention` caps how many such
-# backups are kept per file, oldest pruned first. Set to 1 to keep only
-# the most recent backup; values below 1 are clamped to 1. /rtp admin
-# prefab rollback walks backups newest-first across multiple invocations.
+
+# Configurações de /rtp admin prefab. O fluxo apply -> confirm grava cada arquivo de
+# configuração alterado com um backup chamado <file>.yml.bak.<epochMillis>;
+# bakRetention limita quantos desses backups são mantidos por arquivo, removendo
+# primeiro os mais antigos. Defina 1 para manter apenas o mais recente; valores abaixo
+# de 1 são ajustados para 1. /rtp admin prefab rollback percorre os backups do mais
+# novo ao mais antigo ao longo de várias invocações.
 prefab:
+  # Número de backups com carimbo de data/hora mantidos por arquivo.
   # @type: integer
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
-# DO NOT TOUCH VERSION NUMBER
+# NÃO ALTERE O NÚMERO DA VERSÃO
 version: 1.0

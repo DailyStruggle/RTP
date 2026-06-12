@@ -18,8 +18,8 @@ maximaalPogingen: 10
 # @default: 0
 zichtafstandSelectie: 0
 
-# Chunk radius loaded around the final location immediately before
-# teleport. 0 loads only the destination chunk.
+# Chunkstraal die vlak vóór de teleport rond de eindlocatie wordt geladen.
+# 0 laadt alleen de bestemmingschunk.
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
@@ -46,7 +46,7 @@ periode: 20
 # @default: 50
 synchroonToegewezenTijd: 50
 
-# Maximum milliseconds per tick spent in asynchronous tasks.
+# Maximaal aantal milliseconden per tick besteed aan asynchrone taken.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
@@ -83,7 +83,7 @@ synchroonLaden: false
 # @default: false
 verwerking_bijGebeurtenis: false
 
-# Parse effect permission nodes at startup.
+# Effect-permissienodes bij het opstarten inlezen.
 # @type: boolean
 # @default: true
 effectVerwerking: true
@@ -96,17 +96,17 @@ effectVerwerking: true
 # @default: true
 bioomHerinnering: true
 
-# When set, only serve biome-filtered requests from cache (never
-# generate new biome searches). Requires biomeRecall.
+# Indien ingesteld worden biome-gefilterde verzoeken alleen uit de cache bediend
+# (nooit nieuwe biome-zoekopdrachten). Vereist biomeRecall.
 # @type: boolean
 # @default: false
 bioomHerinnering_geforceerd: false
 
-# Bias biome-filtered selection so each requested biome is steered toward
-# with equal probability, instead of in proportion to how much of the
-# region it covers. Counteracts common biomes drowning out rare ones when
-# several biomes are requested. Requires biomeRecall; no effect on
-# unfiltered (default-biome) teleports.
+# Beïnvloedt de biome-gefilterde selectie zo dat elk gevraagd biome met gelijke
+# kans wordt aangestuurd, in plaats van naar rato van hoeveel van de regio het
+# beslaat. Voorkomt dat veelvoorkomende biomes zeldzame verdringen wanneer er
+# meerdere worden gevraagd. Vereist biomeRecall; geen effect op ongefilterde
+# (standaardbiome-)teleports.
 # @type: boolean
 # @default: false
 biomeWeighted: false
@@ -122,10 +122,78 @@ biomeWeighted: false
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
 biomeWeights:
+  # Relatieve selectieweging voor dit biome (1.0 = geen bias).
   # @type: number
   # @range: [0.0, null]
   # @default: 1.0
   plains: 1.0
+  sunflower_plains: 1.0
+  snowy_plains: 1.0
+  ice_spikes: 1.0
+  desert: 1.0
+  swamp: 1.0
+  mangrove_swamp: 1.0
+  forest: 1.0
+  flower_forest: 1.0
+  birch_forest: 1.0
+  dark_forest: 1.0
+  old_growth_birch_forest: 1.0
+  old_growth_pine_taiga: 1.0
+  old_growth_spruce_taiga: 1.0
+  taiga: 1.0
+  snowy_taiga: 1.0
+  savanna: 1.0
+  savanna_plateau: 1.0
+  windswept_hills: 1.0
+  windswept_gravelly_hills: 1.0
+  windswept_forest: 1.0
+  windswept_savanna: 1.0
+  jungle: 1.0
+  sparse_jungle: 1.0
+  bamboo_jungle: 1.0
+  badlands: 1.0
+  eroded_badlands: 1.0
+  wooded_badlands: 1.0
+  meadow: 1.0
+  cherry_grove: 1.0
+  pale_garden: 1.0
+  grove: 1.0
+  snowy_slopes: 1.0
+  frozen_peaks: 1.0
+  jagged_peaks: 1.0
+  stony_peaks: 1.0
+  river: 1.0
+  frozen_river: 1.0
+  beach: 1.0
+  snowy_beach: 1.0
+  stony_shore: 1.0
+  warm_ocean: 1.0
+  lukewarm_ocean: 1.0
+  deep_lukewarm_ocean: 1.0
+  ocean: 1.0
+  deep_ocean: 1.0
+  cold_ocean: 1.0
+  deep_cold_ocean: 1.0
+  frozen_ocean: 1.0
+  deep_frozen_ocean: 1.0
+  mushroom_fields: 1.0
+  dripstone_caves: 1.0
+  lush_caves: 1.0
+  deep_dark: 1.0
+  # --- De Nether ---
+  nether_wastes: 1.0
+  warped_forest: 1.0
+  crimson_forest: 1.0
+  soul_sand_valley: 1.0
+  basalt_deltas: 1.0
+  # --- The End ---
+  the_end: 1.0
+  end_highlands: 1.0
+  end_midlands: 1.0
+  small_end_islands: 1.0
+  end_barrens: 1.0
+  # --- Overig / technisch ---
+  the_void: 1.0
 
 # Passieve chunkcontrole
 # Zoekt naar veilige locaties in alle geladen chunks binnen het bereik van een regio.
@@ -175,36 +243,38 @@ pregeneratedPreference: 0.0
 # @default: 0.5
 backlogRefillThreshold: 0.5
 
-# Latency threshold (ms) above which an immediately-served (unqueued) teleport
-# is audited: a WARN is logged and the cumulative slowPipelineCount counter
-# (surfaced by /rtp info) is incremented. Only immediate/unqueued teleports are
-# audited; queued at-rate teleports are excluded because their measured time
-# includes queue-wait. 0 or below disables the audit. See ADR-053.
+# Latentiedrempel (ms) waarboven een direct bediende (niet-gewachtrijde) teleport
+# wordt gecontroleerd: er wordt een WARN gelogd en de cumulatieve teller
+# slowPipelineCount (getoond door /rtp info) verhoogd. Alleen directe/niet-gewachtrijde
+# teleports worden gecontroleerd; gewachtrijde worden uitgesloten omdat hun gemeten
+# tijd de wachtrijtijd bevat. 0 of lager schakelt de controle uit. Zie ADR-053.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
 slowPipelineThresholdMs: 5000
 
-# Public teleport-queue depth (players waiting) at or above which queue
-# backpressure is audited: an edge-triggered WARN is logged and the cumulative
-# queueGrowthWarnCount counter (surfaced by /rtp info) is incremented once per
-# crossing. 0 or below disables the audit (opt-in). See ADR-053.
+# Diepte van de publieke teleportwachtrij (wachtende spelers) waarop of waarboven
+# de wachtrij-tegendruk wordt gecontroleerd: er wordt een flankgetriggerde WARN
+# gelogd en de cumulatieve teller queueGrowthWarnCount (getoond door /rtp info) wordt
+# eenmaal per overschrijding verhoogd. 0 of lager schakelt de controle uit (opt-in). Zie ADR-053.
 # @type: integer
 # @range: [0, null]
 # @unit: players
 # @default: 0
 queueGrowthWarnThreshold: 0
-# Settings for /rtp admin prefab. The `apply` -> `confirm` flow writes
-# each touched config file with a sibling backup named
-# <file>.yml.bak.<epochMillis>; `bakRetention` caps how many such
-# backups are kept per file, oldest pruned first. Set to 1 to keep only
-# the most recent backup; values below 1 are clamped to 1. /rtp admin
-# prefab rollback walks backups newest-first across multiple invocations.
+
+# Instellingen voor /rtp admin prefab. De apply -> confirm-stroom schrijft elk gewijzigd
+# configuratiebestand met een back-up genaamd <file>.yml.bak.<epochMillis>;
+# bakRetention beperkt hoeveel van zulke back-ups per bestand worden bewaard, oudste
+# eerst verwijderd. Zet op 1 om alleen de nieuwste te bewaren; waarden onder 1 worden
+# naar 1 bijgesteld. /rtp admin prefab rollback doorloopt back-ups nieuwste-eerst over
+# meerdere aanroepen.
 prefab:
+  # Aantal van een tijdstempel voorziene configback-ups dat per bestand wordt bewaard.
   # @type: integer
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
-# DO NOT TOUCH VERSION NUMBER
+# RAAK HET VERSIENUMMER NIET AAN
 version: 1.0

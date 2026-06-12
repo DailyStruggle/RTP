@@ -10,22 +10,22 @@ foliaIncludeRegions: true
 
 # Aggregationsstrategie, um Pro-Region-Stichproben in die skalaren
 # tps{1,5,15}m-Felder von MetricsSnapshot auf Folia zusammenzufassen.
-# Zulässige Werte: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
 # Aggregationsstrategie, um Pro-Region-Stichproben in das skalare
 # mspt-Feld von MetricsSnapshot auf Folia zusammenzufassen.
-# Zulässige Werte: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
 # Aggregationsstrategie, um Pro-Region-Stichproben in das skalare
 # tickBudgetUtilisation-Feld von MetricsSnapshot auf Folia zusammenzufassen.
-# Zulässige Werte: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationTickBudget: "max"
 

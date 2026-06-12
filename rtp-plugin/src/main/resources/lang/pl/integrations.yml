@@ -1,34 +1,44 @@
 # --- Ustawienia integracji RTP ---
-# Jeśli true, RTP wylosuje lokalizację ponownie, gdy znajdzie się w obrębie claim/region danej wtyczki.
+# Każdy przełącznik losuje cel ponownie, jeśli wypadnie wewnątrz claimu/regionu wskazanej wtyczki (działa tylko, gdy ta wtyczka jest zainstalowana).
+# Losuje lokalizację ponownie, jeśli wypadnie wewnątrz claimu wtyczki Factions.
+# @type: boolean
+# @default: false
 rerollFactions: false
-# Reroll the location if it lands inside a GriefDefender claim.
+
+# Losuje lokalizację ponownie, jeśli wypadnie wewnątrz claimu wtyczki GriefDefender.
 # @type: boolean
 # @default: false
 rerollGriefDefender: false
-# Reroll the location if it lands inside a GriefPrevention claim.
+
+# Losuje lokalizację ponownie, jeśli wypadnie wewnątrz claimu wtyczki GriefPrevention.
 # @type: boolean
 # @default: false
 rerollGriefPrevention: false
-# Reroll the location if it lands inside a HuskTowns claim.
+
+# Losuje lokalizację ponownie, jeśli wypadnie wewnątrz claimu wtyczki HuskTowns.
 # @type: boolean
 # @default: false
 rerollHuskTowns: false
-# Reroll the location if it lands inside a Lands claim.
+
+# Losuje lokalizację ponownie, jeśli wypadnie wewnątrz claimu wtyczki Lands.
 # @type: boolean
 # @default: false
 rerollLands: false
-# Reroll the location if it lands inside a RedProtect region.
+
+# Losuje lokalizację ponownie, jeśli wypadnie wewnątrz regionu wtyczki RedProtect.
 # @type: boolean
 # @default: false
 rerollRedProtect: false
-# Reroll the location if it lands inside a Towny Advanced claim.
+
+# Losuje lokalizację ponownie, jeśli wypadnie wewnątrz claimu wtyczki Towny Advanced.
 # @type: boolean
 # @default: false
 rerollTownyAdvanced: false
-# Reroll the location if it lands inside a WorldGuard region.
+
+# Losuje lokalizację ponownie, jeśli wypadnie wewnątrz regionu wtyczki WorldGuard.
 # @type: boolean
 # @default: false
 rerollWorldGuard: false
 
-# DO NOT TOUCH VERSION NUMBER
+# NIE ZMIENIAJ NUMERU WERSJI
 version: 1.0

@@ -1,34 +1,44 @@
 # --- Настройки интеграций RTP ---
-# Если true, RTP перевыбирает локацию, если она оказалась внутри клейма/региона соответствующего плагина.
+# Каждый переключатель заново выбирает точку назначения, если она оказывается внутри клейма/региона указанного плагина (действует только если этот плагин установлен).
+# Заново выбирает местоположение, если оно оказывается внутри клейма плагина Factions.
+# @type: boolean
+# @default: false
 rerollFactions: false
-# Reroll the location if it lands inside a GriefDefender claim.
+
+# Заново выбирает местоположение, если оно оказывается внутри клейма плагина GriefDefender.
 # @type: boolean
 # @default: false
 rerollGriefDefender: false
-# Reroll the location if it lands inside a GriefPrevention claim.
+
+# Заново выбирает местоположение, если оно оказывается внутри клейма плагина GriefPrevention.
 # @type: boolean
 # @default: false
 rerollGriefPrevention: false
-# Reroll the location if it lands inside a HuskTowns claim.
+
+# Заново выбирает местоположение, если оно оказывается внутри клейма плагина HuskTowns.
 # @type: boolean
 # @default: false
 rerollHuskTowns: false
-# Reroll the location if it lands inside a Lands claim.
+
+# Заново выбирает местоположение, если оно оказывается внутри клейма плагина Lands.
 # @type: boolean
 # @default: false
 rerollLands: false
-# Reroll the location if it lands inside a RedProtect region.
+
+# Заново выбирает местоположение, если оно оказывается внутри региона плагина RedProtect.
 # @type: boolean
 # @default: false
 rerollRedProtect: false
-# Reroll the location if it lands inside a Towny Advanced claim.
+
+# Заново выбирает местоположение, если оно оказывается внутри клейма плагина Towny Advanced.
 # @type: boolean
 # @default: false
 rerollTownyAdvanced: false
-# Reroll the location if it lands inside a WorldGuard region.
+
+# Заново выбирает местоположение, если оно оказывается внутри региона плагина WorldGuard.
 # @type: boolean
 # @default: false
 rerollWorldGuard: false
 
-# DO NOT TOUCH VERSION NUMBER
+# НЕ ТРОГАЙТЕ НОМЕР ВЕРСИИ
 version: 1.0

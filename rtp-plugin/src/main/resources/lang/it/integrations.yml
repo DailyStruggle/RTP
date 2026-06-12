@@ -1,34 +1,44 @@
 # --- Impostazioni di integrazione di RTP ---
-# Se true, RTP rilancerà la posizione se ricade all'interno di un claim/regione del rispettivo plugin.
+# Ogni opzione riestrae la destinazione se cade all'interno di un claim/una regione del plugin indicato (attiva solo se quel plugin è installato).
+# Riestrae la posizione se cade all'interno di un claim di Factions.
+# @type: boolean
+# @default: false
 rerollFactions: false
-# Reroll the location if it lands inside a GriefDefender claim.
+
+# Riestrae la posizione se cade all'interno di un claim di GriefDefender.
 # @type: boolean
 # @default: false
 rerollGriefDefender: false
-# Reroll the location if it lands inside a GriefPrevention claim.
+
+# Riestrae la posizione se cade all'interno di un claim di GriefPrevention.
 # @type: boolean
 # @default: false
 rerollGriefPrevention: false
-# Reroll the location if it lands inside a HuskTowns claim.
+
+# Riestrae la posizione se cade all'interno di un claim di HuskTowns.
 # @type: boolean
 # @default: false
 rerollHuskTowns: false
-# Reroll the location if it lands inside a Lands claim.
+
+# Riestrae la posizione se cade all'interno di un claim di Lands.
 # @type: boolean
 # @default: false
 rerollLands: false
-# Reroll the location if it lands inside a RedProtect region.
+
+# Riestrae la posizione se cade all'interno di una regione di RedProtect.
 # @type: boolean
 # @default: false
 rerollRedProtect: false
-# Reroll the location if it lands inside a Towny Advanced claim.
+
+# Riestrae la posizione se cade all'interno di un claim di Towny Advanced.
 # @type: boolean
 # @default: false
 rerollTownyAdvanced: false
-# Reroll the location if it lands inside a WorldGuard region.
+
+# Riestrae la posizione se cade all'interno di una regione di WorldGuard.
 # @type: boolean
 # @default: false
 rerollWorldGuard: false
 
-# DO NOT TOUCH VERSION NUMBER
+# NON TOCCARE IL NUMERO DI VERSIONE
 version: 1.0

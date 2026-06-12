@@ -20,11 +20,22 @@
 #   - String scalars are double-quoted; ints/floats/bools/null are bare.
 #   - "__MAP_OR_LIST_PARENT__" sentinel emits "<key>:" with no value.
 #   - UTF-8 no BOM, LF endings.
+#
+# Options:
+#   -Only <patterns>  Regenerate only files whose relpath / leaf name /
+#                     baseline-equivalent relpath matches one of the wildcard
+#                     patterns (e.g. -Only "integrations.yml" or
+#                     -Only "lang/de/*"). Keeps a scoped change from flushing
+#                     the whole locale tree. Untouched files are left as-is.
+#   -Verify           Scan every regenerated file for AI mojibake markers
+#                     (see .junie/AGENTS.md) and U+FFFD; throw if any are found.
 
 [CmdletBinding()]
 param(
-    [string] $ResourcesRoot,
-    [string] $InputDir
+    [string]   $ResourcesRoot,
+    [string]   $InputDir,
+    [string[]] $Only,
+    [switch]   $Verify
 )
 
 $ErrorActionPreference = 'Stop'
@@ -45,6 +56,32 @@ if (-not $ResourcesRoot) {
 if (-not $InputDir) {
     $InputDir = Join-Path $scriptDir 'out'
 }
+
+# Optional mojibake scan helper (shared with the changeset scripts).
+$commonScript = Join-Path $scriptDir 'locale-changeset-common.ps1'
+if ($Verify -and (Test-Path -LiteralPath $commonScript)) {
+    . $commonScript
+}
+
+# Decide whether a given baseline relpath is in scope for -Only. Locale copies
+# (lang/<loc>/<file>) and synthesized <file>.lang.yml are matched against the
+# same patterns by their leaf filename / baseline-equivalent relpath.
+function Test-InScope([string]$relpath) {
+    if (-not $Only) { return $true }
+    $leaf = Split-Path -Leaf $relpath
+    $baseRel = $relpath
+    if ($relpath -match '^lang/[a-z]{2,3}/(shape|vert)/(.+)$') {
+        $baseRel = "lang/$($matches[1])/$($matches[2])"
+    } elseif ($relpath -match '^lang/[a-z]{2,3}/(.+)$') {
+        $baseRel = $matches[1]
+    }
+    foreach ($p in $Only) {
+        if ($relpath -like $p -or $leaf -like $p -or $baseRel -like $p) { return $true }
+    }
+    return $false
+}
+
+$mojibakeHits = New-Object System.Collections.Generic.List[string]
 
 function Test-IsBareScalar([string]$v) {
     if ($null -eq $v) { return $false }
@@ -169,6 +206,7 @@ foreach ($relpath in $grouped.Keys) {
 }
 
 foreach ($relpath in $grouped.Keys) {
+    if (-not (Test-InScope $relpath)) { continue }
     $fileRows = $grouped[$relpath]
     $sb = New-Object System.Text.StringBuilder
     $firstRow = $true
@@ -220,7 +258,14 @@ foreach ($relpath in $grouped.Keys) {
     if (-not (Test-Path -LiteralPath $outDir)) {
         New-Item -ItemType Directory -Force -Path $outDir | Out-Null
     }
-    [System.IO.File]::WriteAllBytes($outFull, $utf8NoBom.GetBytes($sb.ToString()))
+    $content = $sb.ToString()
+    if ($Verify) {
+        $hits = Find-Mojibake $content
+        if ($hits.Count -gt 0) {
+            $mojibakeHits.Add(("{0}: {1}" -f $relpath, ($hits -join ', '))) | Out-Null
+        }
+    }
+    [System.IO.File]::WriteAllBytes($outFull, $utf8NoBom.GetBytes($content))
     $writtenCount++
 }
 
@@ -244,6 +289,7 @@ foreach ($relpath in $grouped.Keys) {
     if (-not ($name -like '*.yml')) { continue }
     $stem = [System.IO.Path]::GetFileNameWithoutExtension($name)
     if ($langMapStems -notcontains $stem) { continue }
+    if (-not (Test-InScope $relpath)) { continue }
     $dir  = Split-Path -Parent $relpath
     # Baseline root files (e.g. `messages.yml`) map their `.lang.yml` into
     # `lang/<stem>.lang.yml`, matching the on-disk layout. Locale files map
@@ -280,8 +326,28 @@ foreach ($relpath in $grouped.Keys) {
     if (-not (Test-Path -LiteralPath $outDir)) {
         New-Item -ItemType Directory -Force -Path $outDir | Out-Null
     }
-    [System.IO.File]::WriteAllBytes($outFull, $utf8NoBom.GetBytes($lsb.ToString()))
+    $langContent = $lsb.ToString()
+    if ($Verify) {
+        $hits = Find-Mojibake $langContent
+        if ($hits.Count -gt 0) {
+            $mojibakeHits.Add(("{0}: {1}" -f $langRel, ($hits -join ', '))) | Out-Null
+        }
+    }
+    [System.IO.File]::WriteAllBytes($outFull, $utf8NoBom.GetBytes($langContent))
     $langSynthCount++
 }
 
 Write-Host ("Wrote {0} files from {1} CSV input(s) under {2} (+ {3} synthesized .lang.yml)" -f $writtenCount, $csvFiles.Count, $InputDir, $langSynthCount)
+if ($Only) {
+    Write-Host ("  (scoped by -Only: {0})" -f ($Only -join ', '))
+}
+if ($Verify) {
+    if ($mojibakeHits.Count -gt 0) {
+        Write-Host ""
+        Write-Host "Mojibake detected in regenerated output:"
+        foreach ($h in $mojibakeHits) { Write-Host ("  {0}" -f $h) }
+        throw ("Mojibake found in {0} file(s); fix the offending TSV cell(s) and regenerate." -f $mojibakeHits.Count)
+    } else {
+        Write-Host "Verify: no mojibake markers found in regenerated output."
+    }
+}

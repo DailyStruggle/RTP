@@ -10,24 +10,24 @@ foliaIncludeRegions: true
 
 # Estrategia de agregación para combinar muestras por región en los campos
 # escalares tps{1,5,15}m de MetricsSnapshot en Folia.
-# Valores aceptados: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
 # Estrategia de agregación para combinar muestras por región en el campo
 # escalar mspt de MetricsSnapshot en Folia.
-# Valores aceptados: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
 # Estrategia de agregación para combinar muestras por región en el campo
 # escalar tickBudgetUtilisation de MetricsSnapshot en Folia.
-# Valores aceptados: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationTickBudget: "max"
 
-# DO NOT TOUCH VERSION NUMBER
+# NO TOQUES EL NÚMERO DE VERSIÓN
 version: 1.0

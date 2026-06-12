@@ -1,34 +1,44 @@
-# --- RTP Integration Settings ---
-# If true, RTP will reroll the location if it lands within a claim/region from the respective plugin.
+# --- RTP Fur-iend Plugin Settings ---
+# Each toggle does a re-pounce to a new warm-spot if you land inside another kitty's claimed territory from the named plugin (only purrs to life when that plugin is around).
+# Re-pounce to a new warm-spot if you land inside a Factions territory.
+# @type: boolean
+# @default: false
 rerollFactions: false
-# Reroll the location if it lands inside a GriefDefender claim.
+
+# Re-pounce to a new warm-spot if you land inside a GriefDefender territory.
 # @type: boolean
 # @default: false
 rerollGriefDefender: false
-# Reroll the location if it lands inside a GriefPrevention claim.
+
+# Re-pounce to a new warm-spot if you land inside a GriefPrevention territory.
 # @type: boolean
 # @default: false
 rerollGriefPrevention: false
-# Reroll the location if it lands inside a HuskTowns claim.
+
+# Re-pounce to a new warm-spot if you land inside a HuskTowns territory.
 # @type: boolean
 # @default: false
 rerollHuskTowns: false
-# Reroll the location if it lands inside a Lands claim.
+
+# Re-pounce to a new warm-spot if you land inside a Lands territory.
 # @type: boolean
 # @default: false
 rerollLands: false
-# Reroll the location if it lands inside a RedProtect region.
+
+# Re-pounce to a new warm-spot if you land inside a RedProtect territory.
 # @type: boolean
 # @default: false
 rerollRedProtect: false
-# Reroll the location if it lands inside a Towny Advanced claim.
+
+# Re-pounce to a new warm-spot if you land inside a Towny Advanced territory.
 # @type: boolean
 # @default: false
 rerollTownyAdvanced: false
-# Reroll the location if it lands inside a WorldGuard region.
+
+# Re-pounce to a new warm-spot if you land inside a WorldGuard territory.
 # @type: boolean
 # @default: false
 rerollWorldGuard: false
 
-# DO NOT TOUCH VERSION NUMBER
+# DO NOT TOUCH VERSION NUMBER (no scritchies here)
 version: 1.0

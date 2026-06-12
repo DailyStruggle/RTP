@@ -1,34 +1,44 @@
 # --- RTP-integratie-instellingen ---
-# Indien true, kiest RTP een nieuwe locatie als de huidige binnen een claim/regio van de betreffende plugin valt.
+# Elke schakelaar loot de bestemming opnieuw als die binnen een claim/gebied van de genoemde plugin valt (alleen actief als die plugin is geïnstalleerd).
+# Loot de locatie opnieuw als die binnen een Factions-claim valt.
+# @type: boolean
+# @default: false
 rerollFactions: false
-# Reroll the location if it lands inside a GriefDefender claim.
+
+# Loot de locatie opnieuw als die binnen een GriefDefender-claim valt.
 # @type: boolean
 # @default: false
 rerollGriefDefender: false
-# Reroll the location if it lands inside a GriefPrevention claim.
+
+# Loot de locatie opnieuw als die binnen een GriefPrevention-claim valt.
 # @type: boolean
 # @default: false
 rerollGriefPrevention: false
-# Reroll the location if it lands inside a HuskTowns claim.
+
+# Loot de locatie opnieuw als die binnen een HuskTowns-claim valt.
 # @type: boolean
 # @default: false
 rerollHuskTowns: false
-# Reroll the location if it lands inside a Lands claim.
+
+# Loot de locatie opnieuw als die binnen een Lands-claim valt.
 # @type: boolean
 # @default: false
 rerollLands: false
-# Reroll the location if it lands inside a RedProtect region.
+
+# Loot de locatie opnieuw als die binnen een RedProtect-gebied valt.
 # @type: boolean
 # @default: false
 rerollRedProtect: false
-# Reroll the location if it lands inside a Towny Advanced claim.
+
+# Loot de locatie opnieuw als die binnen een Towny Advanced-claim valt.
 # @type: boolean
 # @default: false
 rerollTownyAdvanced: false
-# Reroll the location if it lands inside a WorldGuard region.
+
+# Loot de locatie opnieuw als die binnen een WorldGuard-gebied valt.
 # @type: boolean
 # @default: false
 rerollWorldGuard: false
 
-# DO NOT TOUCH VERSION NUMBER
+# RAAK HET VERSIENUMMER NIET AAN
 version: 1.0

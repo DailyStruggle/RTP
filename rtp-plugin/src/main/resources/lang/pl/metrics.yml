@@ -10,24 +10,24 @@ foliaIncludeRegions: true
 
 # Strategia agregacji służąca do złożenia próbek z poszczególnych regionów
 # w skalarne pola tps{1,5,15}m obiektu MetricsSnapshot w Folii.
-# Dopuszczalne wartości: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
 # Strategia agregacji służąca do złożenia próbek z poszczególnych regionów
 # w skalarne pole mspt obiektu MetricsSnapshot w Folii.
-# Dopuszczalne wartości: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
 # Strategia agregacji służąca do złożenia próbek z poszczególnych regionów
 # w skalarne pole tickBudgetUtilisation obiektu MetricsSnapshot w Folii.
-# Dopuszczalne wartości: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationTickBudget: "max"
 
-# DO NOT TOUCH VERSION NUMBER
+# NIE ZMIENIAJ NUMERU WERSJI
 version: 1.0

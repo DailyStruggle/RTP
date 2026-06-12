@@ -3,43 +3,75 @@
 # Подробные системные логи
 # detailed_reload: логировать все перезагруженные файлы/секции
 # detailed_region_init: логировать инициализацию каждого региона
+# @type: boolean
+# @default: false
 подробная_перезагрузка: false
-# Log region initialization details
+
+# Логировать сведения об инициализации региона
+# @type: boolean
+# @default: false
 подробная_инициализация_региона: false
 
 # Логи базовой активности
 # command: логировать команды RTP, выполняемые игроками
 # teleport: логировать фактические события телепорта
+# @type: boolean
+# @default: false
 команда: false
-# Log successful teleport events
+
+# Логировать успешные телепортации
+# @type: boolean
+# @default: true
 телепорт: true
 
 # Когда игрок меняет мир
+# @type: boolean
+# @default: true
 событие_сменаМира: true
+
 # Когда игрок входит на сервер
+# @type: boolean
+# @default: true
 событие_вход: true
+
 # Когда игрок возрождается
+# @type: boolean
+# @default: true
 событие_возрождение: true
+
 # Когда игрок двигается (если RTP по движению включён)
+# @type: boolean
+# @default: true
 событие_движение: true
+
 # Когда игрок телепортируется (если RTP по телепорту включён)
+# @type: boolean
+# @default: true
 событие_телепорт: true
 
 # Отладка ошибок выбора
 # Логирует подробную информацию, когда выбор безопасной локации не удаётся,
 # включая частоты сбоев и параметры поиска.
+# @type: boolean
+# @default: true
 ошибка_выбора: true
 
 # Системные логи
 # Связано с фоновыми задачами и операциями базы данных.
+# @type: boolean
+# @default: false
 система_отслеживаниеПамяти: false
-# Debug logs for database activity
+
+# Отладочные логи активности базы данных
+# @type: boolean
+# @default: false
 система_базаДанных: false
 
-# Минимальный уровень логирования плагина. Эффективный фильтр - самый
-# строгий из этого и логгера Bukkit. Допускаются: SEVERE, WARNING, INFO,
-# CONFIG, FINE, FINER, FINEST, ALL, OFF. Значение по умолчанию ALL
-# сохраняет поведение, идентичное логгеру Bukkit.
+# Минимальный уровень логирования плагина. Эффективный фильтр - более
+# подробный из этого и логгера Bukkit. ALL сохраняет поведение логгера Bukkit.
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
 мин_уровень: "INFO"
 
 # НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ

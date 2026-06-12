@@ -1,34 +1,44 @@
-# --- RTP 통합 설정 ---
-# true 인 경우 해당 플러그인의 claim/region 안에 떨어지면 RTP 가 위치를 다시 추첨합니다.
+# --- RTP 연동 설정 ---
+# 각 토글은 지정된 플러그인의 클레임/영역 안에 도착하면 목적지를 다시 추첨합니다(해당 플러그인이 설치된 경우에만 작동).
+# Factions 클레임 안에 도착하면 위치를 다시 추첨합니다.
+# @type: boolean
+# @default: false
 rerollFactions: false
-# Reroll the location if it lands inside a GriefDefender claim.
+
+# GriefDefender 클레임 안에 도착하면 위치를 다시 추첨합니다.
 # @type: boolean
 # @default: false
 rerollGriefDefender: false
-# Reroll the location if it lands inside a GriefPrevention claim.
+
+# GriefPrevention 클레임 안에 도착하면 위치를 다시 추첨합니다.
 # @type: boolean
 # @default: false
 rerollGriefPrevention: false
-# Reroll the location if it lands inside a HuskTowns claim.
+
+# HuskTowns 클레임 안에 도착하면 위치를 다시 추첨합니다.
 # @type: boolean
 # @default: false
 rerollHuskTowns: false
-# Reroll the location if it lands inside a Lands claim.
+
+# Lands 클레임 안에 도착하면 위치를 다시 추첨합니다.
 # @type: boolean
 # @default: false
 rerollLands: false
-# Reroll the location if it lands inside a RedProtect region.
+
+# RedProtect 영역 안에 도착하면 위치를 다시 추첨합니다.
 # @type: boolean
 # @default: false
 rerollRedProtect: false
-# Reroll the location if it lands inside a Towny Advanced claim.
+
+# Towny Advanced 클레임 안에 도착하면 위치를 다시 추첨합니다.
 # @type: boolean
 # @default: false
 rerollTownyAdvanced: false
-# Reroll the location if it lands inside a WorldGuard region.
+
+# WorldGuard 영역 안에 도착하면 위치를 다시 추첨합니다.
 # @type: boolean
 # @default: false
 rerollWorldGuard: false
 
-# DO NOT TOUCH VERSION NUMBER
+# 버전 번호를 건드리지 마세요
 version: 1.0

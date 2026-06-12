@@ -384,6 +384,8 @@ Hard rules:
 
 The per-locale YAML tree under `rtp-plugin/src/main/resources/` is **derived output**. The editable source of truth for locale maintenance is a set of tab-separated files under `scripts/out/` (one `baseline.tsv` + one `locale-<lang>.tsv` per shipped locale). Each `locale-<lang>.tsv` is the **single source of truth** for that locale's translated keys, values, **and** comments — there is no separate overlay file. Whenever you add, rename, or remove a user-facing config key (or touch a baseline value or comment), the workflow is:
 
+> **Intent (read first): the TSV is a consolidation surface, not an auto-translator.** Its purpose is to gather a whole set of locale changes into one file per locale (`scripts/out/locale-<lang>.tsv`) so the translation work happens in a single place, instead of hopping across dozens of scattered `lang/<locale>/<file>.yml` files. The scripts only move text and enforce structural parity; **the agent is still the translator.** `reconcile-locale-csvs.ps1` seeds new or changed rows with the *English* baseline text as a placeholder - those English cells are a to-do list to translate inside the TSV (step 4), not a finished result. Skipping step 4 and regenerating ships English under every locale's translated key.
+
 1. **Edit the baseline only.** Add or update the key in `rtp-plugin/src/main/resources/<file>.yml` with its English value and leading comment block. Do not hand-edit any `lang/<locale>/*.yml` or `lang/<locale>/*.lang.yml` file — they will be regenerated.
 2. **Export the tree to TSV.**
    ```powershell
@@ -419,6 +421,37 @@ Notes:
 - The `shape/<x>.lang.yml` and `vert/<x>.lang.yml` rename-map files have no sibling value file and are **not** synthesized — their rows live in each locale TSV directly.
 - **Adding a new locale**: do not copy an existing `lang/<other-locale>/` directory as a seed — that carries the other locale's translated keys/values/comments into the new TSV and forces a double-translation. Instead, add an empty `lang/<new-locale>/` directory (or just add the locale name to `reconcile-locale-csvs.ps1`'s known list if it iterates a fixed list), run the pipeline once so `reconcile` seeds every row from English baseline, then translate the resulting `scripts/out/locale-<new>.tsv` directly.
 - Skipping step 4 (translation) is the documented anti-pattern: it ships English values under every locale's translated key name. That passes `LocaleParityTest` but degrades the user experience and is not the intended endpoint of a config change.
+
+### Secondary "changeset" workflow (translate a finite set of changes across every locale)
+
+The full per-locale TSV above is the right surface when you want to translate or re-review one whole language. It is the wrong surface for the **other** common case: you added one option to the English baseline, or reworded a description, and now the **same finite set of keys** needs translating across **every** language. Editing a dozen `locale-<lang>.tsv` files by hand for two changed keys is tedious and error-prone.
+
+For that case use the changeset scripts (a secondary component layered on top of the same TSVs):
+
+1. **Edit the English baseline** under `rtp-plugin/src/main/resources/<file>.yml` (add/reword keys), then run the primary pipeline through reconcile so each locale TSV has a seeded row:
+   ```powershell
+   .\scripts\locale-files-to-csv.ps1
+   .\scripts\reconcile-locale-csvs.ps1
+   ```
+2. **Export a changeset** - a single, wide, spreadsheet-friendly **comma-separated** `scripts/out/changeset.csv` with one row per changed key and one column per language:
+   ```powershell
+   # only the keys you changed:
+   .\scripts\locale-changeset-to-csv.ps1 -Keys "messages.yml:alreadyTeleporting","messages.yml:teleportSuccess"
+   # or a whole file, or (default) every row still untranslated in some locale:
+   .\scripts\locale-changeset-to-csv.ps1 -Keys "messages.yml"
+   .\scripts\locale-changeset-to-csv.ps1          # -UntranslatedOnly (default)
+   .\scripts\locale-changeset-to-csv.ps1 -All     # every translatable value row
+   ```
+   Columns: `relpath, parent_path, base_key, index, english, <loc1>, <loc2>, ...`. Each locale cell is prefilled with that locale's current value (often the English placeholder) for context. Unlike the internal `.tsv`, this is a real RFC-4180 `.csv` (UTF-8 no BOM) so it opens cleanly in a spreadsheet.
+3. **Translate the per-language columns** for just those rows (same masking rules as step 4 above: preserve `[placeholders]`, `&a`/`#hex`, doc-tags). Leaving a cell empty or equal to `english` means "not translated yet".
+4. **Import** the filled changeset back into every `locale-<lang>.tsv` (matched by the same langmap logic reconcile uses, so translated key names resolve correctly):
+   ```powershell
+   .\scripts\locale-changeset-from-csv.ps1
+   ```
+   Only cells that differ from `english` (or all, with `-IncludeEnglish`) overwrite the locale TSV value; absent rows are reported so you can re-run reconcile to seed them.
+5. **Regenerate and verify** exactly as the primary pipeline (`locale-files-from-csv.ps1`, then `LocaleParityTest` + full build).
+
+The changeset never bypasses the TSVs - it is a focused editing surface that reads and writes them. `scripts/locale-changeset-common.ps1` holds the shared TSV/CSV/langmap helpers for both changeset scripts.
 
 ---
 

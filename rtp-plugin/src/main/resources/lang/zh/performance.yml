@@ -18,8 +18,8 @@
 # @default: 0
 视距_选择: 0
 
-# Chunk radius loaded around the final location immediately before
-# teleport. 0 loads only the destination chunk.
+# 传送前在最终位置周围加载的区块半径。
+# 0 仅加载目标区块。
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
@@ -46,7 +46,7 @@
 # @default: 50
 分配时间_同步: 50
 
-# Maximum milliseconds per tick spent in asynchronous tasks.
+# 每刻用于异步任务的最大毫秒数。
 # @type: integer
 # @range: [1, null]
 # @unit: ms
@@ -83,7 +83,7 @@
 # @default: false
 事件时解析: false
 
-# Parse effect permission nodes at startup.
+# 在启动时解析效果权限节点。
 # @type: boolean
 # @default: true
 效果解析: true
@@ -96,17 +96,15 @@
 # @default: true
 生物群系记忆: true
 
-# When set, only serve biome-filtered requests from cache (never
-# generate new biome searches). Requires biomeRecall.
+# 启用后，仅从缓存中处理按生物群系筛选的请求（绝不发起新的生物群系搜索）。
+# 需要 biomeRecall。
 # @type: boolean
 # @default: false
 生物群系记忆_强制: false
 
-# Bias biome-filtered selection so each requested biome is steered toward
-# with equal probability, instead of in proportion to how much of the
-# region it covers. Counteracts common biomes drowning out rare ones when
-# several biomes are requested. Requires biomeRecall; no effect on
-# unfiltered (default-biome) teleports.
+# 对按生物群系筛选的选择进行加权，使每个请求的生物群系以相同概率被选中，
+# 而不是按其在区域中所占比例选中。当请求多个生物群系时，可防止常见生物群系
+# 淹没稀有生物群系。需要 biomeRecall；对未筛选（默认生物群系）的传送无效。
 # @type: boolean
 # @default: false
 biomeWeighted: false
@@ -122,10 +120,78 @@ biomeWeighted: false
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
 biomeWeights:
+  # 该生物群系的相对选择权重（1.0 = 无偏向）。
   # @type: number
   # @range: [0.0, null]
   # @default: 1.0
   plains: 1.0
+  sunflower_plains: 1.0
+  snowy_plains: 1.0
+  ice_spikes: 1.0
+  desert: 1.0
+  swamp: 1.0
+  mangrove_swamp: 1.0
+  forest: 1.0
+  flower_forest: 1.0
+  birch_forest: 1.0
+  dark_forest: 1.0
+  old_growth_birch_forest: 1.0
+  old_growth_pine_taiga: 1.0
+  old_growth_spruce_taiga: 1.0
+  taiga: 1.0
+  snowy_taiga: 1.0
+  savanna: 1.0
+  savanna_plateau: 1.0
+  windswept_hills: 1.0
+  windswept_gravelly_hills: 1.0
+  windswept_forest: 1.0
+  windswept_savanna: 1.0
+  jungle: 1.0
+  sparse_jungle: 1.0
+  bamboo_jungle: 1.0
+  badlands: 1.0
+  eroded_badlands: 1.0
+  wooded_badlands: 1.0
+  meadow: 1.0
+  cherry_grove: 1.0
+  pale_garden: 1.0
+  grove: 1.0
+  snowy_slopes: 1.0
+  frozen_peaks: 1.0
+  jagged_peaks: 1.0
+  stony_peaks: 1.0
+  river: 1.0
+  frozen_river: 1.0
+  beach: 1.0
+  snowy_beach: 1.0
+  stony_shore: 1.0
+  warm_ocean: 1.0
+  lukewarm_ocean: 1.0
+  deep_lukewarm_ocean: 1.0
+  ocean: 1.0
+  deep_ocean: 1.0
+  cold_ocean: 1.0
+  deep_cold_ocean: 1.0
+  frozen_ocean: 1.0
+  deep_frozen_ocean: 1.0
+  mushroom_fields: 1.0
+  dripstone_caves: 1.0
+  lush_caves: 1.0
+  deep_dark: 1.0
+  # --- 下界 ---
+  nether_wastes: 1.0
+  warped_forest: 1.0
+  crimson_forest: 1.0
+  soul_sand_valley: 1.0
+  basalt_deltas: 1.0
+  # --- 末地 ---
+  the_end: 1.0
+  end_highlands: 1.0
+  end_midlands: 1.0
+  small_end_islands: 1.0
+  end_barrens: 1.0
+  # --- 杂项 / 技术 ---
+  the_void: 1.0
 
 # 区块加载时被动检查
 # 在区域范围内的所有已加载区块中查找安全位置。
@@ -160,53 +226,51 @@ loginCacheEnabled: false
 # @default: 0
 loginCacheCap: 0
 
-# Probability of rejecting an ungenerated chunk per selection attempt.
-# 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land.
-# Generated chunks always pass.
+# 每次选择尝试拒绝未生成区块的概率。
+# 0.0 = 无偏向（默认），1.0 = 严格避开未生成的地块。
+# 已生成的区块始终通过。
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.0
 pregeneratedPreference: 0.0
 
-# Fraction of L3 backlog capacity at which refill resumes (hysteresis).
-# 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill
-# continuously. Higher values group .mca-bin checks for better
-# CPU/memory efficiency.
+# 恢复补充时 L3 积压容量所占的比例（迟滞）。
+# 0.5 = 仅在 L3 降至 50% 后才补充（默认）。1.0 = 持续补充。
+# 数值越大，越会合并 .mca 分箱检查，以提升 CPU/内存效率。
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
 backlogRefillThreshold: 0.5
 
-# Latency threshold (ms) above which an immediately-served (unqueued) teleport
-# is audited: a WARN is logged and the cumulative slowPipelineCount counter
-# (surfaced by /rtp info) is incremented. Only immediate/unqueued teleports are
-# audited; queued at-rate teleports are excluded because their measured time
-# includes queue-wait. 0 or below disables the audit. See ADR-053.
+# 延迟阈值（毫秒），超过该值的即时处理（未排队）传送将被审计：
+# 记录一条 WARN 并递增累计计数器 slowPipelineCount（由 /rtp info 显示）。
+# 仅审计即时/未排队的传送；排队的限速传送会被排除，因为其测得时间
+# 包含排队等待。设为 0 或更小可禁用审计。参见 ADR-053。
 # @type: integer
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
 slowPipelineThresholdMs: 5000
 
-# Public teleport-queue depth (players waiting) at or above which queue
-# backpressure is audited: an edge-triggered WARN is logged and the cumulative
-# queueGrowthWarnCount counter (surfaced by /rtp info) is incremented once per
-# crossing. 0 or below disables the audit (opt-in). See ADR-053.
+# 公共传送队列深度（等待的玩家数）达到或超过该值时，将审计队列背压：
+# 记录一条边沿触发的 WARN，并在每次越过阈值时将累计计数器
+# queueGrowthWarnCount（由 /rtp info 显示）递增一次。
+# 设为 0 或更小可禁用审计（需手动开启）。参见 ADR-053。
 # @type: integer
 # @range: [0, null]
 # @unit: players
 # @default: 0
 queueGrowthWarnThreshold: 0
-# Settings for /rtp admin prefab. The `apply` -> `confirm` flow writes
-# each touched config file with a sibling backup named
-# <file>.yml.bak.<epochMillis>; `bakRetention` caps how many such
-# backups are kept per file, oldest pruned first. Set to 1 to keep only
-# the most recent backup; values below 1 are clamped to 1. /rtp admin
-# prefab rollback walks backups newest-first across multiple invocations.
+
+# /rtp admin prefab 的设置。apply -> confirm 流程会为每个改动的配置文件写入一个
+# 名为 <file>.yml.bak.<epochMillis> 的备份；bakRetention 限制每个文件保留的此类
+# 备份数量，最旧的先被清除。设为 1 仅保留最新备份；小于 1 的值会被钳制为 1。
+# /rtp admin prefab rollback 会在多次调用中按从新到旧的顺序遍历备份。
 prefab:
+  # 每个文件保留的带时间戳的配置备份数量。
   # @type: integer
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
-# DO NOT TOUCH VERSION NUMBER
+# 请勿修改版本号
 version: 1.0

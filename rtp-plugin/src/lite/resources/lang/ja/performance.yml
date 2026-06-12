@@ -18,8 +18,8 @@
 # @default: 0
 視距離_選択: 0
 
-# Chunk radius loaded around the final location immediately before
-# teleport. 0 loads only the destination chunk.
+# テレポート直前に最終地点の周囲で読み込むチャンク半径。
+# 0 は目的地のチャンクのみを読み込みます。
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
@@ -46,7 +46,7 @@
 # @default: 50
 割当時間_同期: 50
 
-# Maximum milliseconds per tick spent in asynchronous tasks.
+# 1 ティックあたりに非同期タスクへ費やす最大ミリ秒数。
 # @type: integer
 # @range: [1, null]
 # @unit: ms
@@ -83,7 +83,7 @@
 # @default: false
 イベント時解析: false
 
-# Parse effect permission nodes at startup.
+# 起動時にエフェクトの権限ノードを解析します。
 # @type: boolean
 # @default: true
 エフェクト解析: true
@@ -96,17 +96,16 @@
 # @default: true
 バイオーム記憶: true
 
-# When set, only serve biome-filtered requests from cache (never
-# generate new biome searches). Requires biomeRecall.
+# 設定すると、バイオーム絞り込み要求をキャッシュからのみ提供します（新たな
+# バイオーム検索は行いません）。biomeRecall が必要です。
 # @type: boolean
 # @default: false
 バイオーム記憶_強制: false
 
-# Bias biome-filtered selection so each requested biome is steered toward
-# with equal probability, instead of in proportion to how much of the
-# region it covers. Counteracts common biomes drowning out rare ones when
-# several biomes are requested. Requires biomeRecall; no effect on
-# unfiltered (default-biome) teleports.
+# バイオームで絞り込んだ選択に偏りを与え、要求された各バイオームが領域内で
+# 占める広さに比例するのではなく、等しい確率で選ばれるようにします。複数の
+# バイオームを要求したとき、よくあるバイオームが希少なものを押しのけるのを防ぎます。
+# biomeRecall が必要です。絞り込みなし（既定バイオーム）のテレポートには影響しません。
 # @type: boolean
 # @default: false
 biomeWeighted: false
@@ -122,10 +121,78 @@ biomeWeighted: false
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
 biomeWeights:
+  # このバイオームの相対的な選択ウェイト（1.0 = 偏りなし）。
   # @type: number
   # @range: [0.0, null]
   # @default: 1.0
   plains: 1.0
+  sunflower_plains: 1.0
+  snowy_plains: 1.0
+  ice_spikes: 1.0
+  desert: 1.0
+  swamp: 1.0
+  mangrove_swamp: 1.0
+  forest: 1.0
+  flower_forest: 1.0
+  birch_forest: 1.0
+  dark_forest: 1.0
+  old_growth_birch_forest: 1.0
+  old_growth_pine_taiga: 1.0
+  old_growth_spruce_taiga: 1.0
+  taiga: 1.0
+  snowy_taiga: 1.0
+  savanna: 1.0
+  savanna_plateau: 1.0
+  windswept_hills: 1.0
+  windswept_gravelly_hills: 1.0
+  windswept_forest: 1.0
+  windswept_savanna: 1.0
+  jungle: 1.0
+  sparse_jungle: 1.0
+  bamboo_jungle: 1.0
+  badlands: 1.0
+  eroded_badlands: 1.0
+  wooded_badlands: 1.0
+  meadow: 1.0
+  cherry_grove: 1.0
+  pale_garden: 1.0
+  grove: 1.0
+  snowy_slopes: 1.0
+  frozen_peaks: 1.0
+  jagged_peaks: 1.0
+  stony_peaks: 1.0
+  river: 1.0
+  frozen_river: 1.0
+  beach: 1.0
+  snowy_beach: 1.0
+  stony_shore: 1.0
+  warm_ocean: 1.0
+  lukewarm_ocean: 1.0
+  deep_lukewarm_ocean: 1.0
+  ocean: 1.0
+  deep_ocean: 1.0
+  cold_ocean: 1.0
+  deep_cold_ocean: 1.0
+  frozen_ocean: 1.0
+  deep_frozen_ocean: 1.0
+  mushroom_fields: 1.0
+  dripstone_caves: 1.0
+  lush_caves: 1.0
+  deep_dark: 1.0
+  # --- ネザー ---
+  nether_wastes: 1.0
+  warped_forest: 1.0
+  crimson_forest: 1.0
+  soul_sand_valley: 1.0
+  basalt_deltas: 1.0
+  # --- ジ・エンド ---
+  the_end: 1.0
+  end_highlands: 1.0
+  end_midlands: 1.0
+  small_end_islands: 1.0
+  end_barrens: 1.0
+  # --- その他 / 技術的 ---
+  the_void: 1.0
 
 # チャンクロード時のパッシブチェック
 # リージョン範囲内でロードされたすべてのチャンクから安全な位置を探します。
@@ -134,5 +201,5 @@ biomeWeights:
 # @default: false
 チャンクロード時チェック: false
 
-# DO NOT TOUCH VERSION NUMBER
+# バージョン番号は変更しないでください
 version: 1.0
