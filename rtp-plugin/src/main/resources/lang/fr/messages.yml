@@ -22,16 +22,16 @@ placeholders:
 # Section 2: Teleportation
 # ###############################################################################
 # when teleporting, say this
-alreadyTeleporting: "&7[P0] you're already teleporting!"
+alreadyTeleporting: "&7[P0] vous êtes déjà en téléportation !"
 
 # si le plugin est en cours de rechargement
-teleportDeniedReloading: "&7[P0] teleports are temporarily disabled while the plugin reloads. Please try again shortly."
+teleportDeniedReloading: "&7[P0] les téléportations sont temporairement désactivées pendant le rechargement du plugin. Réessayez bientôt."
 delayMessage: "&7[P0] Teleporting in [delay]. Don't move"
-chunkLoading: "&7[P0] Loading chunks! please wait..."
+chunkLoading: "&7[P0] Chargement des chunks ! veuillez patienter..."
 teleportMessage: "&7[P0] Teleported in [attempts] attempts, in [processingTime]"
 
 # if teleport is cancelled
-teleportCancel: "&7[P0] Teleport cancelled!"
+teleportCancel: "&7[P0] Téléportation annulée !"
 
 # s'il n'y a pas d'endroits sûrs après le nombre maximum de tentatives
 # espace réservé : [attempts] - le nombre maximum de tentatives
@@ -39,18 +39,18 @@ unsafe: "&7[P0] impossible de trouver un emplacement sûr en [attempts] tentativ
 
 # lorsque le joueur est en temps de recharge
 # espace réservé : [remainingCooldown] - le temps restant
-cooldownMessage: "&7[P0] You can't teleport again for [remainingCooldown]"
+cooldownMessage: "&7[P0] Vous ne pouvez pas vous téléporter avant [remainingCooldown]"
 
 # si la région n'a aucun emplacement en file et que le joueur n'a pas la permission rtp.unqueued
-noLocationsQueued: "#f5eb73[P0] no locations ready at this time"
+noLocationsQueued: "#f5eb73[P0] aucun emplacement prêt pour le moment"
 
 # lorsque la file d'attente avance
 # espace réservé : [spot] - la position actuelle dans la file
-queueUpdate: "#2636ef[P0] your spot in line: [spot]"
+queueUpdate: "#2636ef[P0] votre place dans la file : [spot]"
 
 # si le joueur n'a pas assez d'argent pour se téléporter dans la région
 # espace réservé : [money] - combien d'argent la commande requiert
-notEnoughMoney: "&7[P0] you need at least $[money] for that."
+notEnoughMoney: "&7[P0] il vous faut au moins $[money] pour cela."
 
 # ###############################################################################
 # Section 3: Time Formatting
@@ -75,7 +75,7 @@ newWorld: "&b[P0] detected a new world '[world]'"
 
 # le monde n'existe pas dans bukkit
 # espace réservé : [world] - le nom du monde
-invalidWorld: "&7[P0] could not find world '[world]'"
+invalidWorld: "&7[P0] impossible de trouver le monde '[world]'"
 
 # texte de rechargement / mise à jour du plugin
 # espace réservé : [filename] - nom du fichier
@@ -86,23 +86,23 @@ updated: "&a[P0] successfully updated [filename]."
 
 # le plugin n'a pas la commande demandée par l'utilisateur
 # espace réservé : [arg] - l'argument tenté
-badArg: "&c[P0] invalid command argument [arg]"
+badArg: "&c[P0] argument de commande invalide [arg]"
 
 # lorsque la console tente d'exécuter une commande réservée aux joueurs
-consoleCmdNotAllowed: "&c[P0] You must be an in-game player to execute this command."
+consoleCmdNotAllowed: "&c[P0] Vous devez être un joueur en jeu pour exécuter cette commande."
 
 # plugin is busy reloading
 busy: "&c[P0] occupé"
 
 # Sent when the optional PvP combat check refuses /rtp because the player is in combat
-pvpInCombat: "&c[P0] You cannot random-teleport while in combat."
+pvpInCombat: "&c[P0] Vous ne pouvez pas vous téléporter aléatoirement en combat."
 
 # plugin doesn't have the subcommand or parameter the user requested
 # placeholder: [arg] - the argument attempted
 invalidCommand: "&c[P0] commande invalide - [arg]"
 
 # l'utilisateur n'a pas la permission pour la commande demandée
-noPerms: "&7I'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
+noPerms: "&7Désolé, mais vous n'avez pas la permission d'exécuter cette commande. Veuillez contacter les administrateurs du serveur si vous pensez qu'il s'agit d'une erreur."
 
 # ###############################################################################
 # Section 5: Administrative Logs
@@ -458,43 +458,43 @@ menuInfoBadPointsLabel: "#9D7CD8&l# bad-points map"
 # and is awaiting a backend claim. Placeholder: [position] - 0-indexed
 # position from `pollStatus`; may be empty if the transport returns no
 # position.
-networkQueued: "&7[P0] queued for a cross-server destination (position [position])..."
+networkQueued: "&7[P0] en file pour une destination inter-serveurs (position [position])..."
 # Sent when a player runs /rtp* while they already hold a non-terminal
 # cross-server enrolment (ADR-015 / REQ-RTP-NET-015 command-lock). Placeholder:
 # [position] - FIFO position when known; empty when the proxy has not yet
 # assigned one.
-alreadyQueued: "&cYou are already waiting in the cross-server queue (position [position]). Please wait."
+alreadyQueued: "&cVous attendez déjà dans la file inter-serveurs (position [position]). Veuillez patienter."
 # Sent when a cross-server waitlist entry is reaped after exceeding its
 # configured TTL (ADR-015). No placeholders.
-networkTimedOut: "&c[P0] cross-server teleport timed out while waiting for a backend."
+networkTimedOut: "&c[P0] la téléportation inter-serveurs a expiré en attendant un serveur."
 # Sent when a cross-server waitlist enrolment is rejected because the shared
 # waitlist has reached its configured maximum size (ADR-015 REJECTED_FULL).
 # No placeholders.
-waitlistFull: "&c[P0] cross-server queue is full; please try again shortly."
+waitlistFull: "&c[P0] la file inter-serveurs est pleine ; réessayez bientôt."
 # Sent when the queue has handed the request off to the proxy router and
 # a backend selection is in progress.
-networkRouting: "&7[P0] routing to a backend..."
+networkRouting: "&7[P0] routage vers un serveur..."
 # Sent when a backend has reserved a coordinate for this player and the
 # proxy is about to initiate the cross-server hop. Placeholder: [server]
 # - the destination backend's serverId.
-networkReserved: "&a[P0] coordinate reserved on [server]. Transferring..."
+networkReserved: "&a[P0] coordonnée réservée sur [server]. Transfert..."
 # Sent when the proxy is mid-hop. Placeholder: [server] - destination.
-networkTransferring: "&a[P0] transferring to [server]..."
+networkTransferring: "&a[P0] transfert vers [server]..."
 # Sent when the cross-server path gave up and the request fell back to
 # the local backend. Placeholder: [reason] - one of the
 # `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
-networkFallback: "&e[P0] cross-server unavailable ([reason]); falling back to local."
+networkFallback: "&e[P0] inter-serveurs indisponible ([reason]) ; retour au serveur local."
 # Sent when the cross-server request failed terminally (no fallback was
 # possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
-networkFailed: "&c[P0] cross-server teleport failed: [reason]."
+networkFailed: "&c[P0] la téléportation inter-serveurs a échoué : [reason]."
 # Sent when the player asked for a specific region (`/rtp <region>`) but
 # no backend in the network is currently serving it. Placeholder:
 # [region] - the requested region name.
-networkRegionUnavailable: "&c[P0] no backend is currently serving region '[region]'."
+networkRegionUnavailable: "&c[P0] aucun serveur ne dessert actuellement la région '[region]'."
 # Sent when the requested region name resolves to two or more backends and
 # the operator-configured policy cannot pick one (only fires
 # under stronger policies than the default `warn`). Placeholder: [region].
-networkRegionAmbiguous: "&c[P0] region '[region]' is ambiguous across backends; please pin a server."
+networkRegionAmbiguous: "&c[P0] la région '[region]' est ambiguë entre serveurs ; veuillez fixer un serveur."
 
 # --- MultiConfig submenu ---
 # Header row fallback used when no per-kind header key is registered.
@@ -545,11 +545,11 @@ multiconfigResultNameTaken: "&can entry named '[name]' already exists."
 # Section 9: PlaceholderAPI Support
 # ###############################################################################
 # status placeholders for players
-PLAYER_AVAILABLE: "&aAVAILABLE"
+PLAYER_AVAILABLE: "&aDISPONIBLE"
 PLAYER_COOLDOWN: "&7ON COOLDOWN"
-PLAYER_SETUP: "&bPICKING A LOCATION"
-PLAYER_LOADING: "&bLOADING CHUNKS"
-PLAYER_TELEPORTING: "&bTELEPORTING"
+PLAYER_SETUP: "&bCHOIX D'UN EMPLACEMENT"
+PLAYER_LOADING: "&bCHARGEMENT DES CHUNKS"
+PLAYER_TELEPORTING: "&bTÉLÉPORTATION"
 
 # ###############################################################################
 # Section 10: Visuals

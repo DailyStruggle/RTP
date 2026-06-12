@@ -97,7 +97,7 @@ tall_human_forbidden: "&c[P0] only an in-game kitty can do that, tall human."
 busy: "&c[P0] busy grooming"
 
 # Sent when the optional PvP combat check refuses /rtp because the player is in combat
-pvpInCombat: "&c[P0] You cannot random-teleport while in combat."
+pvpInCombat: "&c[P0] no pouncing away while you're scrapping, kitty."
 
 # unknown subcommand
 # placeholder: [arg] - the argument attempted
@@ -259,7 +259,7 @@ pick_a_flavour: "&7pick a flavour for [param] (will pounce: /rtp [command] [para
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list.
-menuTypeValue: "&7âœŽ type a custom flavour..."
+menuTypeValue: "&7✎ type a custom flavour..."
 # Non-clickable header row at the top of every non-root menu page (Stage A.4).
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
@@ -270,11 +270,11 @@ menuRootTitle: "#5FB3B3&lâš¡ RTP meow menu"
 # Non-clickable subtitle/hint row prepended to the root /rtp menu page below
 # menuRootTitle (Stage A.5). Short orientation text for first-time users.
 paw_an_option: "&7paw an option below to begin"
-# Navigation rows appended to paginated menu pages (Stage A.6) â€” clicking
+# Navigation rows appended to paginated menu pages (Stage A.6) - clicking
 # them moves to the previous/next page of the same model. Placeholder:
 # [page] - the 1-based human-readable target page number.
-menuPagePrev: "&7Â« previous page ([page])"
-menuPageNext: "&7next page ([page]) Â»"
+menuPagePrev: "&7« previous page ([page])"
+menuPageNext: "&7next page ([page]) »"
 # Section divider on the front page above teleport rows (player view).
 menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
 # Front-page rows. No placeholders.
@@ -329,7 +329,7 @@ menuAdminPanelHoverVisualizations: "&7open maps and other operator-facing visual
 # Section divider above the Visualizations block on the admin panel.
 menuAdminPanelSectionVisualizations: "&8Â» &7visualizations"
 # Non-clickable title row at the top of the Visualizations submenu.
-menuVisualizationsTitle: "#9D7CD8&lâŒ– visualizations"
+menuVisualizationsTitle: "#9D7CD8&l⌖ visualizations"
 # Non-clickable hint row below the title.
 menuVisualizationsHint: "&7pick a region to view its bad-locations map"
 # Visualizations row template; [region] - region name.
@@ -578,5 +578,5 @@ meowsion: 1.0
 # ###############################################################################
 # Section 12: Developer Options
 # ###############################################################################
-# set to true to append a kitten tag (e.g. Â§8(RTP:ClassName)) to every message
+# set to true to append a kitten tag (e.g. §8(RTP:ClassName)) to every message
 show_kitten_tag: false

@@ -87,7 +87,7 @@
 busy: "&c[P0] 처리 중"
 
 # Sent when the optional PvP combat check refuses /rtp because the player is in combat
-pvpInCombat: "&c[P0] You cannot random-teleport while in combat."
+pvpInCombat: "&c[P0] 전투 중에는 무작위 텔레포트를 할 수 없습니다."
 
 # plugin doesn't have the subcommand or parameter the user requested
 # placeholder: [arg] - the argument attempted
@@ -444,43 +444,43 @@ menuInfoBadPointsLabel: "#9D7CD8&l# bad-points map"
 # and is awaiting a backend claim. Placeholder: [position] - 0-indexed
 # position from `pollStatus`; may be empty if the transport returns no
 # position.
-networkQueued: "&7[P0] queued for a cross-server destination (position [position])..."
+networkQueued: "&7[P0] 서버 간 목적지를 위해 대기 중입니다 (순번 [position])..."
 # Sent when a player runs /rtp* while they already hold a non-terminal
 # cross-server enrolment (ADR-015 / REQ-RTP-NET-015 command-lock). Placeholder:
 # [position] - FIFO position when known; empty when the proxy has not yet
 # assigned one.
-alreadyQueued: "&cYou are already waiting in the cross-server queue (position [position]). Please wait."
+alreadyQueued: "&c이미 서버 간 대기열에서 기다리고 있습니다 (순번 [position]). 잠시 기다려 주세요."
 # Sent when a cross-server waitlist entry is reaped after exceeding its
 # configured TTL (ADR-015). No placeholders.
-networkTimedOut: "&c[P0] cross-server teleport timed out while waiting for a backend."
+networkTimedOut: "&c[P0] 백엔드를 기다리는 동안 서버 간 텔레포트가 시간 초과되었습니다."
 # Sent when a cross-server waitlist enrolment is rejected because the shared
 # waitlist has reached its configured maximum size (ADR-015 REJECTED_FULL).
 # No placeholders.
-waitlistFull: "&c[P0] cross-server queue is full; please try again shortly."
+waitlistFull: "&c[P0] 서버 간 대기열이 가득 찼습니다. 잠시 후 다시 시도해 주세요."
 # Sent when the queue has handed the request off to the proxy router and
 # a backend selection is in progress.
-networkRouting: "&7[P0] routing to a backend..."
+networkRouting: "&7[P0] 백엔드로 라우팅 중..."
 # Sent when a backend has reserved a coordinate for this player and the
 # proxy is about to initiate the cross-server hop. Placeholder: [server]
 # - the destination backend's serverId.
-networkReserved: "&a[P0] coordinate reserved on [server]. Transferring..."
+networkReserved: "&a[P0] [server]에 좌표를 예약했습니다. 전송 중..."
 # Sent when the proxy is mid-hop. Placeholder: [server] - destination.
-networkTransferring: "&a[P0] transferring to [server]..."
+networkTransferring: "&a[P0] [server](으)로 전송 중..."
 # Sent when the cross-server path gave up and the request fell back to
 # the local backend. Placeholder: [reason] - one of the
 # `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
-networkFallback: "&e[P0] cross-server unavailable ([reason]); falling back to local."
+networkFallback: "&e[P0] 서버 간 연결을 사용할 수 없습니다 ([reason]). 로컬로 전환합니다."
 # Sent when the cross-server request failed terminally (no fallback was
 # possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
-networkFailed: "&c[P0] cross-server teleport failed: [reason]."
+networkFailed: "&c[P0] 서버 간 텔레포트에 실패했습니다: [reason]."
 # Sent when the player asked for a specific region (`/rtp <region>`) but
 # no backend in the network is currently serving it. Placeholder:
 # [region] - the requested region name.
-networkRegionUnavailable: "&c[P0] no backend is currently serving region '[region]'."
+networkRegionUnavailable: "&c[P0] 현재 '[region]' 지역을 제공하는 백엔드가 없습니다."
 # Sent when the requested region name resolves to two or more backends and
 # the operator-configured policy cannot pick one (only fires
 # under stronger policies than the default `warn`). Placeholder: [region].
-networkRegionAmbiguous: "&c[P0] region '[region]' is ambiguous across backends; please pin a server."
+networkRegionAmbiguous: "&c[P0] '[region]' 지역이 여러 백엔드에서 모호합니다. 서버를 지정해 주세요."
 
 # --- MultiConfig submenu ---
 # Header row fallback used when no per-kind header key is registered.
