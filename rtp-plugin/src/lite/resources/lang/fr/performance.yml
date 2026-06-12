@@ -4,73 +4,73 @@
 # @type: integer
 # @range: [1, null]
 # @default: 32
-maxAttempts: 32
+tentativesMax: 32
 
 # Chunk radius to load during selection
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
-viewDistanceSelect: 0
+distanceVueSelection: 0
 
 # Chunk radius to load before teleport
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
-viewDistanceTeleport: 0
+distanceVueTeleport: 0
 
 # Ticks between background cache cycles
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
-period: 20
+periode: 20
 
 # Max ms per tick for sync tasks
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
-syncAllottedTime: 50
+tempsAlloueSync: 50
 
 # Max ms per tick for async tasks
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
-asyncAllottedTime: 50
+tempsAlloueAsync: 50
 
 # Min TPS to continue background queueing
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
-minTPS: 19.0
+tpsMin: 19.0
 
 # Refill cache immediately after teleport
 # @type: boolean
 # @default: false
-postTeleportQueueing: false
+miseEnFilePostTeleport: false
 
 # Use sync chunk loading (NOT RECOMMENDED)
 # @type: boolean
 # @default: false
-syncLoading: false
+chargementSync: false
 
 # Parse effect permissions on startup
 # @type: boolean
 # @default: true
-effectParsing: true
+analyseEffets: true
 
 # Reuse found biome locations
 # @type: boolean
 # @default: true
-biomeRecall: true
+rappelBiome: true
 
 # Only use biomes already in cache
 # @type: boolean
 # @default: false
-biomeRecallForced: false
+rappelBiomeForce: false
 
 # Biaise la sélection filtrée par biome pour que chaque biome demandé soit ciblé
 # avec une probabilité égale, au lieu d'être proportionnel à la part de la région
@@ -79,7 +79,7 @@ biomeRecallForced: false
 # non filtrées (biome par défaut).
 # @type: boolean
 # @default: false
-biomeWeighted: false
+biomePondere: false
 
 # Per-biome relative selection weights for biome-filtered teleports.
 # Only consulted when biomeWeighted is true. Biomes not listed here use
@@ -91,7 +91,7 @@ biomeWeighted: false
 # (default-biome) teleports. The shipped plains entry is a weight-1.0
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
-biomeWeights:
+poidsBiome:
   # Poids de sélection relatif pour ce biome (1.0 = aucun biais).
   # @type: number
   # @range: [0.0, null]
@@ -168,7 +168,7 @@ biomeWeights:
 # Check for safe spots in all loaded chunks
 # @type: boolean
 # @default: false
-checkOnChunkLoads: false
+verifierAuChargementChunk: false
 
 # NE PAS MODIFIER LE NUMÉRO DE VERSION
 version: 1.0

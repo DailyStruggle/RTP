@@ -4,78 +4,78 @@
 # @type: integer
 # @range: [1, null]
 # @default: 32
-maxAttempts: 32
+tentativesMax: 32
 
 # Chunk radius to load during selection
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
-viewDistanceSelect: 0
+distanceVueSelection: 0
 
 # Chunk radius to load before teleport
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
-viewDistanceTeleport: 0
+distanceVueTeleport: 0
 
 # Ticks between background cache cycles
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
-period: 20
+periode: 20
 
 # Max ms per tick for sync tasks
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
-syncAllottedTime: 50
+tempsAlloueSync: 50
 
 # Max ms per tick for async tasks
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
-asyncAllottedTime: 50
+tempsAlloueAsync: 50
 
 # Min TPS to continue background queueing
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
-minTPS: 19.0
+tpsMin: 19.0
 
 # Refill cache immediately after teleport
 # @type: boolean
 # @default: false
-postTeleportQueueing: false
+miseEnFilePostTeleport: false
 
 # Use sync chunk loading (NOT RECOMMENDED)
 # @type: boolean
 # @default: false
-syncLoading: false
+chargementSync: false
 
 # Parse permissions on every event
 # @type: boolean
 # @default: false
-onEventParsing: false
+analyseSurEvenement: false
 
 # Parse effect permissions on startup
 # @type: boolean
 # @default: true
-effectParsing: true
+analyseEffets: true
 
 # Reuse found biome locations
 # @type: boolean
 # @default: true
-biomeRecall: true
+rappelBiome: true
 
 # Only use biomes already in cache
 # @type: boolean
 # @default: false
-biomeRecallForced: false
+rappelBiomeForce: false
 
 # Biaise la sélection filtrée par biome pour que chaque biome demandé soit ciblé
 # avec une probabilité égale, au lieu d'être proportionnel à la part de la région
@@ -84,7 +84,7 @@ biomeRecallForced: false
 # non filtrées (biome par défaut).
 # @type: boolean
 # @default: false
-biomeWeighted: false
+biomePondere: false
 
 # Per-biome relative selection weights for biome-filtered teleports.
 # Only consulted when biomeWeighted is true. Biomes not listed here use
@@ -96,7 +96,7 @@ biomeWeighted: false
 # (default-biome) teleports. The shipped plains entry is a weight-1.0
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
-biomeWeights:
+poidsBiome:
   # Poids de sélection relatif pour ce biome (1.0 = aucun biais).
   # @type: number
   # @range: [0.0, null]
@@ -173,35 +173,35 @@ biomeWeights:
 # Check for safe spots in all loaded chunks
 # @type: boolean
 # @default: false
-checkOnChunkLoads: false
+verifierAuChargementChunk: false
 
 # Enable background data gathering
 # @type: boolean
 # @default: false
-visitorEnabled: true
+visiteurActive: true
 
 # Conserver un cache réservé pour les téléportations à la connexion (rtp.onevent.firstjoin / rtp.onevent.join). Dimensionné par les slots libres restants. Voir
 # @type: boolean
 # @default: false
-loginCacheEnabled: false
+cacheConnexionActive: false
 
 # Plafond strict du cache de connexion. 0 = automatique (max-players du serveur au démarrage).
 # @type: integer
 # @range: [0, null]
 # @default: 0
-loginCacheCap: 0
+limiteCacheConnexion: 0
 
 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.0
-pregeneratedPreference: 0.0
+preferencePregenere: 0.0
 
 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
-backlogRefillThreshold: 0.5
+seuilRemplissageBacklog: 0.5
 
 # Seuil de latence (ms) au-delà duquel une téléportation servie immédiatement
 # (non mise en file) est auditée : un WARN est journalisé et le compteur cumulé
@@ -212,7 +212,7 @@ backlogRefillThreshold: 0.5
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
-slowPipelineThresholdMs: 5000
+seuilPipelineLenteMs: 5000
 
 # Profondeur de la file publique de téléportation (joueurs en attente) à partir de
 # laquelle la contre-pression est auditée : un WARN déclenché sur front est journalisé
@@ -222,7 +222,7 @@ slowPipelineThresholdMs: 5000
 # @range: [0, null]
 # @unit: players
 # @default: 0
-queueGrowthWarnThreshold: 0
+seuilAlerteCroissanceFile: 0
 
 # Réglages de /rtp admin prefab. Le flux apply -> confirm écrit chaque fichier de
 # configuration modifié avec une sauvegarde nommée <file>.yml.bak.<epochMillis>;
@@ -230,11 +230,11 @@ queueGrowthWarnThreshold: 0
 # plus anciennes étant supprimées d'abord. Mettez 1 pour ne garder que la plus
 # récente ; les valeurs inférieures à 1 sont ramenées à 1. /rtp admin prefab rollback
 # parcourt les sauvegardes de la plus récente à la plus ancienne sur plusieurs appels.
-prefab:
+prefabrique:
   # Nombre de sauvegardes horodatées conservées par fichier avant suppression.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  bakRetention: 3
+  retentionBak: 3
 # NE PAS MODIFIER LE NUMÉRO DE VERSION
 version: 1.0

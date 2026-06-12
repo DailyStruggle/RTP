@@ -3,7 +3,7 @@
 # logging.yml (right). Generated from the per-locale TSV; edit the TSV's
 # base_key/key columns and regenerate, do not hand-edit this file.
 command: "befehl"
-teleport: "teleport"
+teleport: "teleportierung"
 event_changeworld: "ereignisWeltwechsel"
 event_join: "ereignisBeitritt"
 event_respawn: "ereignisRespawn"

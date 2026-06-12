@@ -108,7 +108,7 @@
 # 않은(기본 바이옴) 텔레포트에는 영향이 없습니다.
 # @type: boolean
 # @default: false
-biomeWeighted: false
+바이옴가중치: false
 
 # Per-biome relative selection weights for biome-filtered teleports.
 # Only consulted when biomeWeighted is true. Biomes not listed here use
@@ -120,7 +120,7 @@ biomeWeighted: false
 # (default-biome) teleports. The shipped plains entry is a weight-1.0
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
-biomeWeights:
+바이옴가중치맵:
   # 이 바이옴의 상대 선택 가중치 (1.0 = 편향 없음).
   # @type: number
   # @range: [0.0, null]
@@ -201,5 +201,80 @@ biomeWeights:
 # @default: false
 청크로드시검사: false
 
+# 관찰 모드 캐시 보충 (Region Data Visitor)
+# 사전 생성된 캐시가 가득 찬 경우, 동일한 `period` 주기로 각 리전에
+# 관찰 모드 RegionCacheTask 를 스케줄링합니다.
+# 일반 캐시 보충과 동일한 LocationGenerator 파이프라인을 재사용하지만,
+# 안전 후보를 큐에 넣지 않고 폐기하므로 부수 효과(불량 위치 기록, 관찰된
+# 바이옴 수집 등)는 백그라운드에서 누적되지만 큐가 한계를 초과하지는
+# 않습니다.
+# 월드 생성을 결코 유발하지 않습니다: 디스크에 기록되지 않은 청크는
+# 의 Anvil 사전 필터에 의해 UNKNOWN 으로 건너뜁니다.
+# visitorEnabled: 메인 스위치 (true 로 관찰 모드 활성화).
+# 빈도는 위의 `period` 설정을 따릅니다. 전용 속도 매개변수는 없습니다.
+# 영향: 낮음 — 기존 `period` 에 의해 율속되며, 기본 보충 모드에서 캐시에
+# 여유가 있을 때만 추가 작업이 수행됩니다.
+# @type: boolean
+# @default: false
+방문자활성화: true
+
+# 접속 텔레포트 (rtp.onevent.firstjoin / rtp.onevent.join) 용 예약 캐시를 유지합니다. 남은 빈 슬롯 수로 크기가 결정됩니다. 참고.
+# @type: boolean
+# @default: false
+로그인캐시활성화: false
+
+# 접속 캐시 상한. 0 = 자동 (시작 시 서버 max-players).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+로그인캐시상한: 0
+
+# 선택 시도마다 미생성 청크를 거부할 확률.
+# 0.0 = 편향 없음(기본값), 1.0 = 미생성 지형을 엄격히 회피.
+# 생성된 청크는 항상 통과합니다.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+사전생성선호도: 0.0
+
+# 보충을 재개하는 L3 백로그 용량의 비율(히스테리시스).
+# 0.5 = L3 가 50%까지 줄어든 후에만 보충(기본값). 1.0 = 지속적으로 보충.
+# 값이 클수록 .mca 빈 검사를 묶어 CPU/메모리 효율이 좋아집니다.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+백로그보충임계값: 0.5
+
+# 이 지연 임계값(ms)을 초과하면 즉시 제공된(큐 미경유) 텔레포트가 감사됩니다.
+# WARN 이 기록되고 누적 카운터 slowPipelineCount(/rtp info 에 표시)가 증가합니다.
+# 즉시/큐 미경유 텔레포트만 감사하며, 큐를 거친 정속 텔레포트는 측정 시간에
+# 큐 대기 시간이 포함되어 제외됩니다. 0 이하이면 감사를 비활성화합니다. ADR-053 참조.
+# @type: integer
+# @range: [0, null]
+# @unit: ms
+# @default: 5000
+느린파이프라인임계값Ms: 5000
+
+# 공개 텔레포트 큐 깊이(대기 중인 플레이어)가 이 값 이상이면 큐 배압이
+# 감사됩니다. 에지 트리거 WARN 이 기록되고 누적 카운터 queueGrowthWarnCount
+# (/rtp info 에 표시)가 경계를 넘을 때마다 한 번 증가합니다.
+# 0 이하이면 감사를 비활성화합니다(옵트인). ADR-053 참조.
+# @type: integer
+# @range: [0, null]
+# @unit: players
+# @default: 0
+대기열증가경고임계값: 0
+
+# /rtp admin prefab 설정. apply -> confirm 흐름은 변경된 각 설정 파일을
+# <file>.yml.bak.<epochMillis> 라는 백업과 함께 기록합니다.
+# bakRetention 은 파일당 보관하는 백업 개수의 상한이며 오래된 것부터 제거합니다.
+# 1 로 설정하면 가장 최근 백업만 보관하고, 1 미만 값은 1 로 보정됩니다.
+# /rtp admin prefab rollback 은 여러 번 호출에 걸쳐 백업을 최신 순으로 진행합니다.
+프리셋:
+  # 파일당 보관되는 타임스탬프 설정 백업의 개수.
+  # @type: integer
+  # @range: [1, null]
+  # @default: 3
+  bak보관수: 3
 # 버전 번호를 건드리지 마세요
 version: 1.0

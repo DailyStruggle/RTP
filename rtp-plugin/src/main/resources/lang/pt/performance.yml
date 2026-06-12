@@ -108,7 +108,7 @@ lembrancaBiomaForcada: false
 # Requer biomeRecall; sem efeito em teleportes sem filtro (bioma padrão).
 # @type: boolean
 # @default: false
-biomeWeighted: false
+biomaPonderado: false
 
 # Per-biome relative selection weights for biome-filtered teleports.
 # Only consulted when biomeWeighted is true. Biomes not listed here use
@@ -120,7 +120,7 @@ biomeWeighted: false
 # (default-biome) teleports. The shipped plains entry is a weight-1.0
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
-biomeWeights:
+pesosBioma:
   # Peso relativo de seleção para este bioma (1.0 = sem viés).
   # @type: number
   # @range: [0.0, null]
@@ -217,18 +217,18 @@ verificarNoCarregamentoChunk: false
 # cache não tem margem para preenchimentos no modo padrão.
 # @type: boolean
 # @default: false
-visitorEnabled: true
+visitanteAtivado: true
 
 # Manter cache reservado para teletransportes ao entrar (rtp.onevent.firstjoin / rtp.onevent.join). Dimensionado pelos slots vazios restantes. Ver
 # @type: boolean
 # @default: false
-loginCacheEnabled: false
+cacheLoginAtivado: false
 
 # Limite rígido do cache de entrada. 0 = automático (max-players do servidor na inicialização).
 # @type: integer
 # @range: [0, null]
 # @default: 0
-loginCacheCap: 0
+limiteCacheLogin: 0
 
 # Probabilidade de rejeitar um chunk não gerado por tentativa de seleção.
 # 0.0 = sem viés (padrão), 1.0 = evitar estritamente terreno não gerado.
@@ -236,7 +236,7 @@ loginCacheCap: 0
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.0
-pregeneratedPreference: 0.0
+preferenciaPregerado: 0.0
 
 # Fração da capacidade do backlog L3 na qual o reabastecimento é retomado
 # (histerese). 0.5 = reabastecer só quando o L3 cair para 50% (padrão).
@@ -245,7 +245,7 @@ pregeneratedPreference: 0.0
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
-backlogRefillThreshold: 0.5
+limiteReabastecimentoBacklog: 0.5
 
 # Limite de latência (ms) acima do qual um teleporte atendido imediatamente
 # (sem fila) é auditado: um WARN é registrado e o contador cumulativo
@@ -256,7 +256,7 @@ backlogRefillThreshold: 0.5
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
-slowPipelineThresholdMs: 5000
+limitePipelineLentaMs: 5000
 
 # Profundidade da fila pública de teleporte (jogadores aguardando) a partir da qual
 # a contrapressão da fila é auditada: um WARN acionado por borda é registrado e o
@@ -266,7 +266,7 @@ slowPipelineThresholdMs: 5000
 # @range: [0, null]
 # @unit: players
 # @default: 0
-queueGrowthWarnThreshold: 0
+limiteAvisoCrescimentoFila: 0
 
 # Configurações de /rtp admin prefab. O fluxo apply -> confirm grava cada arquivo de
 # configuração alterado com um backup chamado <file>.yml.bak.<epochMillis>;
@@ -274,11 +274,11 @@ queueGrowthWarnThreshold: 0
 # primeiro os mais antigos. Defina 1 para manter apenas o mais recente; valores abaixo
 # de 1 são ajustados para 1. /rtp admin prefab rollback percorre os backups do mais
 # novo ao mais antigo ao longo de várias invocações.
-prefab:
+prefabricado:
   # Número de backups com carimbo de data/hora mantidos por arquivo.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  bakRetention: 3
+  retencaoBak: 3
 # NÃO ALTERE O NÚMERO DA VERSÃO
 version: 1.0

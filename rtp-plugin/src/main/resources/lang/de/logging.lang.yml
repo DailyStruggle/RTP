@@ -5,7 +5,7 @@
 detailed_reload: "detailliertesNeuladen"
 detailed_region_init: "detaillierteRegionsInitialisierung"
 command: "befehl"
-teleport: "teleport"
+teleport: "teleportierung"
 event_changeworld: "ereignisWeltwechsel"
 event_join: "ereignisBeitritt"
 event_respawn: "ereignisRespawn"

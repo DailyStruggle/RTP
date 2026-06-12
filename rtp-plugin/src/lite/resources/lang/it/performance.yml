@@ -83,7 +83,7 @@ richiamoBiomaForzato: false
 # Richiede biomeRecall; nessun effetto sui teletrasporti non filtrati (bioma predefinito).
 # @type: boolean
 # @default: false
-biomeWeighted: false
+biomaPesato: false
 
 # Per-biome relative selection weights for biome-filtered teleports.
 # Only consulted when biomeWeighted is true. Biomes not listed here use
@@ -95,7 +95,7 @@ biomeWeighted: false
 # (default-biome) teleports. The shipped plains entry is a weight-1.0
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
-biomeWeights:
+pesiBioma:
   # Peso di selezione relativo per questo bioma (1.0 = nessun bias).
   # @type: number
   # @range: [0.0, null]

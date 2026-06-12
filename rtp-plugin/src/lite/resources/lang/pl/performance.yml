@@ -4,7 +4,7 @@
 # @type: integer
 # @range: [1, null]
 # @default: 32
-maxAttempts: 32
+maksProby: 32
 
 # Promień chunków ładowanych wokół kandydującej lokalizacji podczas wyboru.
 # 0 ładuje tylko chunk kandydata.
@@ -12,7 +12,7 @@ maxAttempts: 32
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
-viewDistanceSelect: 0
+zasiegWidokuWybor: 0
 
 # Promień chunków ładowanych wokół końcowej lokalizacji tuż przed teleportacją.
 # 0 ładuje tylko chunk docelowy.
@@ -20,28 +20,28 @@ viewDistanceSelect: 0
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
-viewDistanceTeleport: 0
+zasiegWidokuTeleport: 0
 
 # Ticki między cyklami pamięci podręcznej w tle (wstępne wypełnianie regionu, uzupełnianie kolejki).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
-period: 20
+okres: 20
 
 # Maksymalna liczba milisekund na tick poświęcana zadaniom synchronicznym.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
-syncAllottedTime: 50
+przydzielonyCzasSync: 50
 
 # Maksymalna liczba milisekund na tick poświęcana zadaniom asynchronicznym.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
-asyncAllottedTime: 50
+przydzielonyCzasAsync: 50
 
 # Minimalny TPS serwera wymagany do kontynuowania kolejkowania w tle.
 # Praca w tle wstrzymuje się, gdy TPS spadnie poniżej tego progu.
@@ -53,29 +53,29 @@ minTPS: 19.0
 # Uzupełnij pamięć podręczną regionu natychmiast po udanej teleportacji.
 # @type: boolean
 # @default: false
-postTeleportQueueing: false
+kolejkowaniePoTeleporcie: false
 
 # Użyj synchronicznego ładowania chunków. NIEZALECANE. Narusza ducha S-005
 # na Folii i zablokuje główny wątek na Paper/Spigot.
 # @type: boolean
 # @default: false
-syncLoading: false
+ladowanieSync: false
 
 # Parsuj węzły uprawnień efektów przy starcie.
 # @type: boolean
 # @default: true
-effectParsing: true
+analizaEfektow: true
 
 # Ponownie wykorzystuj z pamięci podręcznej wcześniej znalezione lokalizacje dopasowane do biomu.
 # @type: boolean
 # @default: true
-biomeRecall: true
+pamiecBiomu: true
 
 # Gdy włączone, żądania filtrowane po biomie obsługiwane są tylko z pamięci
 # podręcznej (bez nowych wyszukiwań biomów). Wymaga biomeRecall.
 # @type: boolean
 # @default: false
-biomeRecallForced: false
+pamiecBiomuWymuszona: false
 
 # Modyfikuje wybór filtrowany po biomie tak, by każdy żądany biom był wybierany
 # z równym prawdopodobieństwem, a nie proporcjonalnie do tego, jaką część regionu
@@ -84,7 +84,7 @@ biomeRecallForced: false
 # (domyślny biom).
 # @type: boolean
 # @default: false
-biomeWeighted: false
+biomWazony: false
 
 # Per-biome relative selection weights for biome-filtered teleports.
 # Only consulted when biomeWeighted is true. Biomes not listed here use
@@ -96,7 +96,7 @@ biomeWeighted: false
 # (default-biome) teleports. The shipped plains entry is a weight-1.0
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
-biomeWeights:
+wagiBiomu:
   # Względna waga wyboru dla tego biomu (1.0 = brak preferencji).
   # @type: number
   # @range: [0.0, null]
@@ -174,7 +174,7 @@ biomeWeights:
 # chunkach (oportunistyczne wstępne wypełnianie).
 # @type: boolean
 # @default: false
-checkOnChunkLoads: false
+sprawdzPrzyZaladowaniuChunka: false
 
 # NIE ZMIENIAJ NUMERU WERSJI
 version: 1.0

@@ -109,7 +109,7 @@
 # (биом по умолчанию).
 # @type: boolean
 # @default: false
-biomeWeighted: false
+взвешиваниеБиома: false
 
 # Per-biome relative selection weights for biome-filtered teleports.
 # Only consulted when biomeWeighted is true. Biomes not listed here use
@@ -121,7 +121,7 @@ biomeWeighted: false
 # (default-biome) teleports. The shipped plains entry is a weight-1.0
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
-biomeWeights:
+весаБиома:
   # Относительный вес выбора для этого биома (1.0 = без смещения).
   # @type: number
   # @range: [0.0, null]
@@ -219,18 +219,18 @@ biomeWeights:
 # когда у кэша нет места для заполнений в режиме по умолчанию.
 # @type: boolean
 # @default: false
-visitorEnabled: true
+посетительВключен: true
 
 # Поддерживать зарезервированный кэш для телепортов при входе (rtp.onevent.firstjoin / rtp.onevent.join). Размер по числу свободных слотов. См.
 # @type: boolean
 # @default: false
-loginCacheEnabled: false
+кэшВходаВключен: false
 
 # Жёсткий предел кэша входа. 0 = авто (max-players сервера при запуске).
 # @type: integer
 # @range: [0, null]
 # @default: 0
-loginCacheCap: 0
+пределКэшаВхода: 0
 
 # Вероятность отклонить несгенерированный чанк за попытку выбора.
 # 0.0 = без смещения (по умолчанию), 1.0 = строго избегать несгенерированной земли.
@@ -238,7 +238,7 @@ loginCacheCap: 0
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.0
-pregeneratedPreference: 0.0
+предпочтениеПредген: 0.0
 
 # Доля ёмкости L3-очереди, при которой возобновляется пополнение
 # (гистерезис). 0.5 = пополнять только после опустошения L3 до 50% (по умолчанию).
@@ -247,7 +247,7 @@ pregeneratedPreference: 0.0
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
-backlogRefillThreshold: 0.5
+порогПополненияBacklog: 0.5
 
 # Порог задержки (мс), выше которого немедленно обслуженная (без очереди)
 # телепортация проверяется: записывается WARN и увеличивается накопительный
@@ -258,7 +258,7 @@ backlogRefillThreshold: 0.5
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
-slowPipelineThresholdMs: 5000
+порогМедленногоPipelineMs: 5000
 
 # Глубина публичной очереди телепортации (ожидающие игроки), при достижении
 # которой проверяется обратное давление очереди: по фронту записывается WARN
@@ -268,18 +268,18 @@ slowPipelineThresholdMs: 5000
 # @range: [0, null]
 # @unit: players
 # @default: 0
-queueGrowthWarnThreshold: 0
+порогПредупрежденияРостаОчереди: 0
 
 # Настройки /rtp admin prefab. Поток apply -> confirm записывает каждый изменённый
 # файл конфигурации с резервной копией с именем <file>.yml.bak.<epochMillis>;
 # bakRetention ограничивает число таких копий на файл, старые удаляются первыми.
 # Установите 1, чтобы хранить только последнюю; значения ниже 1 повышаются до 1.
 # /rtp admin prefab rollback проходит копии от новых к старым за несколько вызовов.
-prefab:
+шаблон:
   # Количество резервных копий с отметкой времени, хранящихся для каждого файла.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  bakRetention: 3
+  хранениеBak: 3
 # НЕ ТРОГАЙТЕ НОМЕР ВЕРСИИ
 version: 1.0
