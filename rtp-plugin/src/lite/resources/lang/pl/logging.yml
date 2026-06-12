@@ -1,28 +1,54 @@
-# Log player-executed RTP commands
+# Loguj komendy RTP wykonane przez graczy
+# @type: boolean
+# @default: false
 command: false
-# Log successful teleport events
+
+# Loguj udane zdarzenia teleportacji
+# @type: boolean
+# @default: true
 teleport: true
 
-# Log RTP triggered by world changes
+# Loguj RTP wywołane zmianą świata
+# @type: boolean
+# @default: true
 event_changeworld: true
-# Log RTP triggered on join
+
+# Loguj RTP wywołane przy dołączeniu
+# @type: boolean
+# @default: true
 event_join: true
-# Log RTP triggered on respawn
+
+# Loguj RTP wywołane przy odrodzeniu
+# @type: boolean
+# @default: true
 event_respawn: true
-# Log move event processing
+
+# Loguj przetwarzanie zdarzeń ruchu
+# @type: boolean
+# @default: true
 event_move: true
-# Log teleport event processing
+
+# Loguj przetwarzanie zdarzeń teleportacji
+# @type: boolean
+# @default: true
 event_teleport: true
 
-# Log info when location selection fails
+# Loguj informacje, gdy wybór lokalizacji się nie powiedzie
+# @type: boolean
+# @default: true
 selection_failure: true
 
-# Debug logs for memory activity
+# Logi debugowania aktywności pamięci
+# @type: boolean
+# @default: false
 system_memory_tracker: false
-# Plugin-scoped minimum log level. Effective filter is the finer of this and the
-# Bukkit logger's own level. Accepts: SEVERE, WARNING, INFO, CONFIG, FINE, FINER,
-# FINEST, ALL, OFF. Default ALL keeps behavior identical to the Bukkit logger.
+
+# Minimalny poziom logowania pluginu. Efektywny filtr to bardziej szczegółowy
+# z tego i loggera Bukkit. ALL zachowuje zachowanie identyczne z loggerem Bukkit.
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
 min_level: "INFO"
 
-# DO NOT TOUCH VERSION NUMBER
+# NIE ZMIENIAJ NUMERU WERSJI
 version: 1.0

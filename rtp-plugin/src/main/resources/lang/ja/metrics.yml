@@ -10,24 +10,24 @@ foliaIncludeRegions: true
 
 # Folia 上で MetricsSnapshot のスカラー tps{1,5,15}m フィールドに
 # リージョン別サンプルを集約する方式。
-# 受け付ける値: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
 # Folia 上で MetricsSnapshot のスカラー mspt フィールドにリージョン別
 # サンプルを集約する方式。
-# 受け付ける値: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
 # Folia 上で MetricsSnapshot のスカラー tickBudgetUtilisation
 # フィールドにリージョン別サンプルを集約する方式。
-# 受け付ける値: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationTickBudget: "max"
 
-# DO NOT TOUCH VERSION NUMBER
+# バージョン番号は変更しないでください
 version: 1.0

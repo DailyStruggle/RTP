@@ -1,31 +1,41 @@
 # --- RTP-Integrationseinstellungen ---
-# Wenn true, würfelt RTP den Standort neu, wenn er innerhalb eines Claims/Bereichs des jeweiligen Plugins landet.
+# Jeder Schalter würfelt das Ziel neu aus, wenn es innerhalb eines Claims/Bereichs des genannten Plugins landet (nur aktiv, wenn dieses Plugin installiert ist).
+# Würfelt den Standort neu aus, wenn er innerhalb eines Factions-Claims landet.
+# @type: boolean
+# @default: false
 rerollFactions: false
-# Reroll the location if it lands inside a GriefDefender claim.
+
+# Würfelt den Standort neu aus, wenn er innerhalb eines GriefDefender-Claims landet.
 # @type: boolean
 # @default: false
 rerollGriefDefender: false
-# Reroll the location if it lands inside a GriefPrevention claim.
+
+# Würfelt den Standort neu aus, wenn er innerhalb eines GriefPrevention-Claims landet.
 # @type: boolean
 # @default: false
 rerollGriefPrevention: false
-# Reroll the location if it lands inside a HuskTowns claim.
+
+# Würfelt den Standort neu aus, wenn er innerhalb eines HuskTowns-Claims landet.
 # @type: boolean
 # @default: false
 rerollHuskTowns: false
-# Reroll the location if it lands inside a Lands claim.
+
+# Würfelt den Standort neu aus, wenn er innerhalb eines Lands-Claims landet.
 # @type: boolean
 # @default: false
 rerollLands: false
-# Reroll the location if it lands inside a RedProtect region.
+
+# Würfelt den Standort neu aus, wenn er innerhalb einer RedProtect-Region landet.
 # @type: boolean
 # @default: false
 rerollRedProtect: false
-# Reroll the location if it lands inside a Towny Advanced claim.
+
+# Würfelt den Standort neu aus, wenn er innerhalb eines Towny Advanced-Claims landet.
 # @type: boolean
 # @default: false
 rerollTownyAdvanced: false
-# Reroll the location if it lands inside a WorldGuard region.
+
+# Würfelt den Standort neu aus, wenn er innerhalb einer WorldGuard-Region landet.
 # @type: boolean
 # @default: false
 rerollWorldGuard: false

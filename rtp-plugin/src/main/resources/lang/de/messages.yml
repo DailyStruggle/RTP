@@ -277,6 +277,7 @@ menueStartseiteAbschnittTeleport: "&8--- &7teleport &8---"
 # Startseitenzeilen. Keine Platzhalter.
 menueStartseiteZeileTeleport: "&a▶ /rtp &7- zu einem zufälligen Ort teleportieren"
 menueStartseiteZeileRegion: "&a▶ /rtp region:&7... &7- eine Region wählen"
+menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- pick a world"
 menueStartseiteZeileBiom: "&a▶ /rtp biome:&7... &7- ein Biom wählen"
 menueStartseiteZeileHilfe: "&a▶ /rtp help &7- Befehle auflisten"
 # Admin-Einstiegszeile der Startseite: die einzige inline

@@ -1,34 +1,44 @@
 # --- Configuración de integración de RTP ---
-# Si es true, RTP volverá a elegir la ubicación si cae dentro de un claim/región del plugin correspondiente.
+# Cada opción vuelve a elegir el destino si cae dentro de un claim/región del plugin indicado (solo activa si ese plugin está instalado).
+# Vuelve a elegir la ubicación si cae dentro de un claim de Factions.
+# @type: boolean
+# @default: false
 rerollFactions: false
-# Reroll the location if it lands inside a GriefDefender claim.
+
+# Vuelve a elegir la ubicación si cae dentro de un claim de GriefDefender.
 # @type: boolean
 # @default: false
 rerollGriefDefender: false
-# Reroll the location if it lands inside a GriefPrevention claim.
+
+# Vuelve a elegir la ubicación si cae dentro de un claim de GriefPrevention.
 # @type: boolean
 # @default: false
 rerollGriefPrevention: false
-# Reroll the location if it lands inside a HuskTowns claim.
+
+# Vuelve a elegir la ubicación si cae dentro de un claim de HuskTowns.
 # @type: boolean
 # @default: false
 rerollHuskTowns: false
-# Reroll the location if it lands inside a Lands claim.
+
+# Vuelve a elegir la ubicación si cae dentro de un claim de Lands.
 # @type: boolean
 # @default: false
 rerollLands: false
-# Reroll the location if it lands inside a RedProtect region.
+
+# Vuelve a elegir la ubicación si cae dentro de una región de RedProtect.
 # @type: boolean
 # @default: false
 rerollRedProtect: false
-# Reroll the location if it lands inside a Towny Advanced claim.
+
+# Vuelve a elegir la ubicación si cae dentro de un claim de Towny Advanced.
 # @type: boolean
 # @default: false
 rerollTownyAdvanced: false
-# Reroll the location if it lands inside a WorldGuard region.
+
+# Vuelve a elegir la ubicación si cae dentro de una región de WorldGuard.
 # @type: boolean
 # @default: false
 rerollWorldGuard: false
 
-# DO NOT TOUCH VERSION NUMBER
+# NO TOQUES EL NÚMERO DE VERSIÓN
 version: 1.0

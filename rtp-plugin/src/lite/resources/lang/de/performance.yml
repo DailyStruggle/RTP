@@ -77,11 +77,11 @@ biomWiederverwendung: true
 # @default: false
 biomWiederverwendungErzwungen: false
 
-# Bias biome-filtered selection so each requested biome is steered toward
-# with equal probability, instead of in proportion to how much of the
-# region it covers. Counteracts common biomes drowning out rare ones when
-# several biomes are requested. Requires biomeRecall; no effect on
-# unfiltered (default-biome) teleports.
+# Verzerrt die biomgefilterte Auswahl so, dass jedes angeforderte Biom mit
+# gleicher Wahrscheinlichkeit angesteuert wird, statt anteilig zu seiner Fläche
+# in der Region. Verhindert, dass häufige Biome seltene verdrängen, wenn mehrere
+# Biome angefordert werden. Erfordert biomeRecall; keine Wirkung auf
+# ungefilterte (Standardbiom-)Teleports.
 # @type: boolean
 # @default: false
 biomeWeighted: false
@@ -97,10 +97,78 @@ biomeWeighted: false
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
 biomeWeights:
+  # Relative Auswahlgewichtung für dieses Biom (1.0 = keine Gewichtung).
   # @type: number
   # @range: [0.0, null]
   # @default: 1.0
   plains: 1.0
+  sunflower_plains: 1.0
+  snowy_plains: 1.0
+  ice_spikes: 1.0
+  desert: 1.0
+  swamp: 1.0
+  mangrove_swamp: 1.0
+  forest: 1.0
+  flower_forest: 1.0
+  birch_forest: 1.0
+  dark_forest: 1.0
+  old_growth_birch_forest: 1.0
+  old_growth_pine_taiga: 1.0
+  old_growth_spruce_taiga: 1.0
+  taiga: 1.0
+  snowy_taiga: 1.0
+  savanna: 1.0
+  savanna_plateau: 1.0
+  windswept_hills: 1.0
+  windswept_gravelly_hills: 1.0
+  windswept_forest: 1.0
+  windswept_savanna: 1.0
+  jungle: 1.0
+  sparse_jungle: 1.0
+  bamboo_jungle: 1.0
+  badlands: 1.0
+  eroded_badlands: 1.0
+  wooded_badlands: 1.0
+  meadow: 1.0
+  cherry_grove: 1.0
+  pale_garden: 1.0
+  grove: 1.0
+  snowy_slopes: 1.0
+  frozen_peaks: 1.0
+  jagged_peaks: 1.0
+  stony_peaks: 1.0
+  river: 1.0
+  frozen_river: 1.0
+  beach: 1.0
+  snowy_beach: 1.0
+  stony_shore: 1.0
+  warm_ocean: 1.0
+  lukewarm_ocean: 1.0
+  deep_lukewarm_ocean: 1.0
+  ocean: 1.0
+  deep_ocean: 1.0
+  cold_ocean: 1.0
+  deep_cold_ocean: 1.0
+  frozen_ocean: 1.0
+  deep_frozen_ocean: 1.0
+  mushroom_fields: 1.0
+  dripstone_caves: 1.0
+  lush_caves: 1.0
+  deep_dark: 1.0
+  # --- Der Nether ---
+  nether_wastes: 1.0
+  warped_forest: 1.0
+  crimson_forest: 1.0
+  soul_sand_valley: 1.0
+  basalt_deltas: 1.0
+  # --- Das End ---
+  the_end: 1.0
+  end_highlands: 1.0
+  end_midlands: 1.0
+  small_end_islands: 1.0
+  end_barrens: 1.0
+  # --- Sonstiges / technisch ---
+  the_void: 1.0
 
 # In allen geladenen Chunks nach sicheren Landeplätzen suchen (opportunistische
 # Vorbefüllung).

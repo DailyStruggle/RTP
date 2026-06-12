@@ -1,92 +1,92 @@
-# --- RTP Performance Settings ---
+# --- Ustawienia wydajności RTP ---
 # Documentation: plugins/RTP/docs/admin/PERFORMANCE.md
-# Maximum search attempts per /rtp invocation before giving up.
+# Maksymalna liczba prób wyszukiwania na wywołanie /rtp przed rezygnacją.
 # @type: integer
 # @range: [1, null]
 # @default: 32
 maxAttempts: 32
 
-# Chunk radius loaded around a candidate location during selection.
-# 0 loads only the candidate chunk.
+# Promień chunków ładowanych wokół kandydującej lokalizacji podczas wyboru.
+# 0 ładuje tylko chunk kandydata.
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
 viewDistanceSelect: 0
 
-# Chunk radius loaded around the final location immediately before
-# teleport. 0 loads only the destination chunk.
+# Promień chunków ładowanych wokół końcowej lokalizacji tuż przed teleportacją.
+# 0 ładuje tylko chunk docelowy.
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
 viewDistanceTeleport: 0
 
-# Ticks between background cache cycles (region pre-fill, queue refill).
+# Ticki między cyklami pamięci podręcznej w tle (wstępne wypełnianie regionu, uzupełnianie kolejki).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
 period: 20
 
-# Maximum milliseconds per tick spent in synchronous tasks.
+# Maksymalna liczba milisekund na tick poświęcana zadaniom synchronicznym.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
 syncAllottedTime: 50
 
-# Maximum milliseconds per tick spent in asynchronous tasks.
+# Maksymalna liczba milisekund na tick poświęcana zadaniom asynchronicznym.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
 asyncAllottedTime: 50
 
-# Minimum server TPS required to continue background queueing.
-# Background work pauses when TPS drops below this threshold.
+# Minimalny TPS serwera wymagany do kontynuowania kolejkowania w tle.
+# Praca w tle wstrzymuje się, gdy TPS spadnie poniżej tego progu.
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
 minTPS: 19.0
 
-# Refill the region cache immediately after a successful teleport.
+# Uzupełnij pamięć podręczną regionu natychmiast po udanej teleportacji.
 # @type: boolean
 # @default: false
 postTeleportQueueing: false
 
-# Use synchronous chunk loading. NOT RECOMMENDED. Violates S-005 spirit
-# on Folia and will block the main thread on Paper/Spigot.
+# Użyj synchronicznego ładowania chunków. NIEZALECANE. Narusza ducha S-005
+# na Folii i zablokuje główny wątek na Paper/Spigot.
 # @type: boolean
 # @default: false
 syncLoading: false
 
-# Re-parse permission nodes on every event instead of caching.
+# Ponownie parsuj węzły uprawnień przy każdym zdarzeniu zamiast buforowania.
 # @type: boolean
 # @default: false
 onEventParsing: false
 
-# Parse effect permission nodes at startup.
+# Parsuj węzły uprawnień efektów przy starcie.
 # @type: boolean
 # @default: true
 effectParsing: true
 
-# Reuse previously-found biome-matched locations from cache.
+# Ponownie wykorzystuj z pamięci podręcznej wcześniej znalezione lokalizacje dopasowane do biomu.
 # @type: boolean
 # @default: true
 biomeRecall: true
 
-# When set, only serve biome-filtered requests from cache (never
-# generate new biome searches). Requires biomeRecall.
+# Gdy włączone, żądania filtrowane po biomie obsługiwane są tylko z pamięci
+# podręcznej (bez nowych wyszukiwań biomów). Wymaga biomeRecall.
 # @type: boolean
 # @default: false
 biomeRecallForced: false
 
-# Bias biome-filtered selection so each requested biome is steered toward
-# with equal probability, instead of in proportion to how much of the
-# region it covers. Counteracts common biomes drowning out rare ones when
-# several biomes are requested. Requires biomeRecall; no effect on
-# unfiltered (default-biome) teleports.
+# Modyfikuje wybór filtrowany po biomie tak, by każdy żądany biom był wybierany
+# z równym prawdopodobieństwem, a nie proporcjonalnie do tego, jaką część regionu
+# zajmuje. Zapobiega zagłuszaniu rzadkich biomów przez pospolite, gdy żądanych
+# jest kilka biomów. Wymaga biomeRecall; bez wpływu na teleportacje bez filtra
+# (domyślny biom).
 # @type: boolean
 # @default: false
 biomeWeighted: false
@@ -102,18 +102,86 @@ biomeWeighted: false
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
 biomeWeights:
+  # Względna waga wyboru dla tego biomu (1.0 = brak preferencji).
   # @type: number
   # @range: [0.0, null]
   # @default: 1.0
   plains: 1.0
+  sunflower_plains: 1.0
+  snowy_plains: 1.0
+  ice_spikes: 1.0
+  desert: 1.0
+  swamp: 1.0
+  mangrove_swamp: 1.0
+  forest: 1.0
+  flower_forest: 1.0
+  birch_forest: 1.0
+  dark_forest: 1.0
+  old_growth_birch_forest: 1.0
+  old_growth_pine_taiga: 1.0
+  old_growth_spruce_taiga: 1.0
+  taiga: 1.0
+  snowy_taiga: 1.0
+  savanna: 1.0
+  savanna_plateau: 1.0
+  windswept_hills: 1.0
+  windswept_gravelly_hills: 1.0
+  windswept_forest: 1.0
+  windswept_savanna: 1.0
+  jungle: 1.0
+  sparse_jungle: 1.0
+  bamboo_jungle: 1.0
+  badlands: 1.0
+  eroded_badlands: 1.0
+  wooded_badlands: 1.0
+  meadow: 1.0
+  cherry_grove: 1.0
+  pale_garden: 1.0
+  grove: 1.0
+  snowy_slopes: 1.0
+  frozen_peaks: 1.0
+  jagged_peaks: 1.0
+  stony_peaks: 1.0
+  river: 1.0
+  frozen_river: 1.0
+  beach: 1.0
+  snowy_beach: 1.0
+  stony_shore: 1.0
+  warm_ocean: 1.0
+  lukewarm_ocean: 1.0
+  deep_lukewarm_ocean: 1.0
+  ocean: 1.0
+  deep_ocean: 1.0
+  cold_ocean: 1.0
+  deep_cold_ocean: 1.0
+  frozen_ocean: 1.0
+  deep_frozen_ocean: 1.0
+  mushroom_fields: 1.0
+  dripstone_caves: 1.0
+  lush_caves: 1.0
+  deep_dark: 1.0
+  # --- Nether ---
+  nether_wastes: 1.0
+  warped_forest: 1.0
+  crimson_forest: 1.0
+  soul_sand_valley: 1.0
+  basalt_deltas: 1.0
+  # --- The End ---
+  the_end: 1.0
+  end_highlands: 1.0
+  end_midlands: 1.0
+  small_end_islands: 1.0
+  end_barrens: 1.0
+  # --- Różne / techniczne ---
+  the_void: 1.0
 
-# Scan for safe landing spots in all loaded chunks (opportunistic
-# pre-fill).
+# Skanuj w poszukiwaniu bezpiecznych miejsc lądowania we wszystkich załadowanych
+# chunkach (oportunistyczne wstępne wypełnianie).
 # @type: boolean
 # @default: false
 checkOnChunkLoads: false
 
-# Enable background data gathering for visitor analytics.
+# Włącz gromadzenie danych w tle na potrzeby analityki odwiedzających.
 # @type: boolean
 # @default: false
 visitorEnabled: false
@@ -129,53 +197,54 @@ loginCacheEnabled: false
 # @default: 0
 loginCacheCap: 0
 
-# Probability of rejecting an ungenerated chunk per selection attempt.
-# 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land.
-# Generated chunks always pass.
+# Szansa odrzucenia niewygenerowanego chunku na każdą próbę wyboru.
+# 0.0 = brak preferencji (domyślnie), 1.0 = ściśle unikaj niewygenerowanego terenu.
+# Wygenerowane chunki zawsze przechodzą.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.0
 pregeneratedPreference: 0.0
 
-# Fraction of L3 backlog capacity at which refill resumes (hysteresis).
-# 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill
-# continuously. Higher values group .mca-bin checks for better
-# CPU/memory efficiency.
+# Ułamek pojemności zaległości L3, przy którym wznawia się uzupełnianie
+# (histereza). 0.5 = uzupełniaj dopiero, gdy L3 spadnie do 50% (domyślnie).
+# 1.0 = uzupełniaj ciągle. Wyższe wartości grupują sprawdzenia binów .mca
+# dla lepszej wydajności CPU/pamięci.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
 backlogRefillThreshold: 0.5
 
-# Latency threshold (ms) above which an immediately-served (unqueued) teleport
-# is audited: a WARN is logged and the cumulative slowPipelineCount counter
-# (surfaced by /rtp info) is incremented. Only immediate/unqueued teleports are
-# audited; queued at-rate teleports are excluded because their measured time
-# includes queue-wait. 0 or below disables the audit. See ADR-053.
+# Próg opóźnienia (ms), powyżej którego natychmiast obsłużona (bez kolejki)
+# teleportacja jest audytowana: zapisywane jest WARN, a skumulowany licznik
+# slowPipelineCount (pokazywany przez /rtp info) jest zwiększany. Audytowane są
+# tylko teleportacje natychmiastowe/bez kolejki; te z kolejki są wyłączone, bo ich
+# zmierzony czas obejmuje oczekiwanie w kolejce. 0 lub mniej wyłącza audyt. Zob. ADR-053.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
 slowPipelineThresholdMs: 5000
 
-# Public teleport-queue depth (players waiting) at or above which queue
-# backpressure is audited: an edge-triggered WARN is logged and the cumulative
-# queueGrowthWarnCount counter (surfaced by /rtp info) is incremented once per
-# crossing. 0 or below disables the audit (opt-in). See ADR-053.
+# Głębokość publicznej kolejki teleportacji (oczekujący gracze), przy której
+# audytowane jest spiętrzenie kolejki: zapisywane jest WARN wyzwalane zboczem,
+# a skumulowany licznik queueGrowthWarnCount (pokazywany przez /rtp info) jest
+# zwiększany raz na przekroczenie. 0 lub mniej wyłącza audyt (opcjonalny). Zob. ADR-053.
 # @type: integer
 # @range: [0, null]
 # @unit: players
 # @default: 0
 queueGrowthWarnThreshold: 0
-# Settings for /rtp admin prefab. The `apply` -> `confirm` flow writes
-# each touched config file with a sibling backup named
-# <file>.yml.bak.<epochMillis>; `bakRetention` caps how many such
-# backups are kept per file, oldest pruned first. Set to 1 to keep only
-# the most recent backup; values below 1 are clamped to 1. /rtp admin
-# prefab rollback walks backups newest-first across multiple invocations.
+
+# Ustawienia /rtp admin prefab. Przepływ apply -> confirm zapisuje każdy zmieniony plik
+# konfiguracji z kopią zapasową o nazwie <file>.yml.bak.<epochMillis>;
+# bakRetention ogranicza liczbę takich kopii przechowywanych na plik, usuwając najpierw
+# najstarsze. Ustaw 1, aby zachować tylko najnowszą; wartości poniżej 1 są podnoszone do 1.
+# /rtp admin prefab rollback przechodzi kopie od najnowszej w wielu wywołaniach.
 prefab:
+  # Liczba opatrzonych znacznikiem czasu kopii zapasowych zachowywanych na plik.
   # @type: integer
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
-# DO NOT TOUCH VERSION NUMBER
+# NIE ZMIENIAJ NUMERU WERSJI
 version: 1.0

@@ -1,34 +1,44 @@
-# --- Paramètres d'intégration RTP ---
-# Si true, RTP relance le tirage de l'emplacement s'il tombe dans un claim/une région du plugin concerné.
+# --- Paramètres d'intégration de RTP ---
+# Chaque option relance le tirage de la destination si elle tombe dans un claim/une région du plugin indiqué (actif uniquement si ce plugin est installé).
+# Relance le tirage si la position tombe dans un claim Factions.
+# @type: boolean
+# @default: false
 rerollFactions: false
-# Reroll the location if it lands inside a GriefDefender claim.
+
+# Relance le tirage si la position tombe dans un claim GriefDefender.
 # @type: boolean
 # @default: false
 rerollGriefDefender: false
-# Reroll the location if it lands inside a GriefPrevention claim.
+
+# Relance le tirage si la position tombe dans un claim GriefPrevention.
 # @type: boolean
 # @default: false
 rerollGriefPrevention: false
-# Reroll the location if it lands inside a HuskTowns claim.
+
+# Relance le tirage si la position tombe dans un claim HuskTowns.
 # @type: boolean
 # @default: false
 rerollHuskTowns: false
-# Reroll the location if it lands inside a Lands claim.
+
+# Relance le tirage si la position tombe dans un claim Lands.
 # @type: boolean
 # @default: false
 rerollLands: false
-# Reroll the location if it lands inside a RedProtect region.
+
+# Relance le tirage si la position tombe dans une région RedProtect.
 # @type: boolean
 # @default: false
 rerollRedProtect: false
-# Reroll the location if it lands inside a Towny Advanced claim.
+
+# Relance le tirage si la position tombe dans un claim Towny Advanced.
 # @type: boolean
 # @default: false
 rerollTownyAdvanced: false
-# Reroll the location if it lands inside a WorldGuard region.
+
+# Relance le tirage si la position tombe dans une région WorldGuard.
 # @type: boolean
 # @default: false
 rerollWorldGuard: false
 
-# DO NOT TOUCH VERSION NUMBER
+# NE PAS MODIFIER LE NUMÉRO DE VERSION
 version: 1.0

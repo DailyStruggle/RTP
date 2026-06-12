@@ -77,11 +77,11 @@ biomeRecall: true
 # @default: false
 biomeRecallForced: false
 
-# Bias biome-filtered selection so each requested biome is steered toward
-# with equal probability, instead of in proportion to how much of the
-# region it covers. Counteracts common biomes drowning out rare ones when
-# several biomes are requested. Requires biomeRecall; no effect on
-# unfiltered (default-biome) teleports.
+# Biaise la sélection filtrée par biome pour que chaque biome demandé soit ciblé
+# avec une probabilité égale, au lieu d'être proportionnel à la part de la région
+# qu'il couvre. Évite que les biomes courants n'éclipsent les rares quand plusieurs
+# biomes sont demandés. Nécessite biomeRecall ; sans effet sur les téléportations
+# non filtrées (biome par défaut).
 # @type: boolean
 # @default: false
 biomeWeighted: false
@@ -97,10 +97,78 @@ biomeWeighted: false
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
 biomeWeights:
+  # Poids de sélection relatif pour ce biome (1.0 = aucun biais).
   # @type: number
   # @range: [0.0, null]
   # @default: 1.0
   plains: 1.0
+  sunflower_plains: 1.0
+  snowy_plains: 1.0
+  ice_spikes: 1.0
+  desert: 1.0
+  swamp: 1.0
+  mangrove_swamp: 1.0
+  forest: 1.0
+  flower_forest: 1.0
+  birch_forest: 1.0
+  dark_forest: 1.0
+  old_growth_birch_forest: 1.0
+  old_growth_pine_taiga: 1.0
+  old_growth_spruce_taiga: 1.0
+  taiga: 1.0
+  snowy_taiga: 1.0
+  savanna: 1.0
+  savanna_plateau: 1.0
+  windswept_hills: 1.0
+  windswept_gravelly_hills: 1.0
+  windswept_forest: 1.0
+  windswept_savanna: 1.0
+  jungle: 1.0
+  sparse_jungle: 1.0
+  bamboo_jungle: 1.0
+  badlands: 1.0
+  eroded_badlands: 1.0
+  wooded_badlands: 1.0
+  meadow: 1.0
+  cherry_grove: 1.0
+  pale_garden: 1.0
+  grove: 1.0
+  snowy_slopes: 1.0
+  frozen_peaks: 1.0
+  jagged_peaks: 1.0
+  stony_peaks: 1.0
+  river: 1.0
+  frozen_river: 1.0
+  beach: 1.0
+  snowy_beach: 1.0
+  stony_shore: 1.0
+  warm_ocean: 1.0
+  lukewarm_ocean: 1.0
+  deep_lukewarm_ocean: 1.0
+  ocean: 1.0
+  deep_ocean: 1.0
+  cold_ocean: 1.0
+  deep_cold_ocean: 1.0
+  frozen_ocean: 1.0
+  deep_frozen_ocean: 1.0
+  mushroom_fields: 1.0
+  dripstone_caves: 1.0
+  lush_caves: 1.0
+  deep_dark: 1.0
+  # --- Le Nether ---
+  nether_wastes: 1.0
+  warped_forest: 1.0
+  crimson_forest: 1.0
+  soul_sand_valley: 1.0
+  basalt_deltas: 1.0
+  # --- L'End ---
+  the_end: 1.0
+  end_highlands: 1.0
+  end_midlands: 1.0
+  small_end_islands: 1.0
+  end_barrens: 1.0
+  # --- Divers / technique ---
+  the_void: 1.0
 
 # Check for safe spots in all loaded chunks
 # @type: boolean
@@ -135,36 +203,38 @@ pregeneratedPreference: 0.0
 # @default: 0.5
 backlogRefillThreshold: 0.5
 
-# Latency threshold (ms) above which an immediately-served (unqueued) teleport
-# is audited: a WARN is logged and the cumulative slowPipelineCount counter
-# (surfaced by /rtp info) is incremented. Only immediate/unqueued teleports are
-# audited; queued at-rate teleports are excluded because their measured time
-# includes queue-wait. 0 or below disables the audit. See ADR-053.
+# Seuil de latence (ms) au-delà duquel une téléportation servie immédiatement
+# (non mise en file) est auditée : un WARN est journalisé et le compteur cumulé
+# slowPipelineCount (affiché par /rtp info) est incrémenté. Seules les
+# téléportations immédiates/non mises en file sont auditées ; celles en file
+# sont exclues car leur temps mesuré inclut l'attente. 0 ou moins désactive l'audit. Voir ADR-053.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
 slowPipelineThresholdMs: 5000
 
-# Public teleport-queue depth (players waiting) at or above which queue
-# backpressure is audited: an edge-triggered WARN is logged and the cumulative
-# queueGrowthWarnCount counter (surfaced by /rtp info) is incremented once per
-# crossing. 0 or below disables the audit (opt-in). See ADR-053.
+# Profondeur de la file publique de téléportation (joueurs en attente) à partir de
+# laquelle la contre-pression est auditée : un WARN déclenché sur front est journalisé
+# et le compteur cumulé queueGrowthWarnCount (affiché par /rtp info) est incrémenté
+# une fois par franchissement. 0 ou moins désactive l'audit (optionnel). Voir ADR-053.
 # @type: integer
 # @range: [0, null]
 # @unit: players
 # @default: 0
 queueGrowthWarnThreshold: 0
-# Settings for /rtp admin prefab. The `apply` -> `confirm` flow writes
-# each touched config file with a sibling backup named
-# <file>.yml.bak.<epochMillis>; `bakRetention` caps how many such
-# backups are kept per file, oldest pruned first. Set to 1 to keep only
-# the most recent backup; values below 1 are clamped to 1. /rtp admin
-# prefab rollback walks backups newest-first across multiple invocations.
+
+# Réglages de /rtp admin prefab. Le flux apply -> confirm écrit chaque fichier de
+# configuration modifié avec une sauvegarde nommée <file>.yml.bak.<epochMillis>;
+# bakRetention limite le nombre de telles sauvegardes conservées par fichier, les
+# plus anciennes étant supprimées d'abord. Mettez 1 pour ne garder que la plus
+# récente ; les valeurs inférieures à 1 sont ramenées à 1. /rtp admin prefab rollback
+# parcourt les sauvegardes de la plus récente à la plus ancienne sur plusieurs appels.
 prefab:
+  # Nombre de sauvegardes horodatées conservées par fichier avant suppression.
   # @type: integer
   # @range: [1, null]
   # @default: 3
   bakRetention: 3
-# DO NOT TOUCH VERSION NUMBER
+# NE PAS MODIFIER LE NUMÉRO DE VERSION
 version: 1.0

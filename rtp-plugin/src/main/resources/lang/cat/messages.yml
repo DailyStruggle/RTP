@@ -280,6 +280,7 @@ menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&aâ–¶ /rtp &7- pounce to a random warm spot"
 menuFrontPageRowRegion: "&aâ–¶ /rtp region:&7... &7- sniff a territory"
+menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- pick a world"
 menuFrontPageRowBiome: "&aâ–¶ /rtp biome:&7... &7- sniff a flavour of land"
 menuFrontPageRowHelp: "&aâ–¶ /rtp help &7- list meows"
 # Front-page admin entry row: the only inline

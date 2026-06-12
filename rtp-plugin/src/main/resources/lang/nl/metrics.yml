@@ -10,24 +10,24 @@ foliaIncludeRegions: true
 
 # Aggregatiestrategie om per-regio-samples samen te voegen in de
 # scalaire tps{1,5,15}m-velden van MetricsSnapshot op Folia.
-# Toegestane waarden: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
 # Aggregatiestrategie om per-regio-samples samen te voegen in het
 # scalaire mspt-veld van MetricsSnapshot op Folia.
-# Toegestane waarden: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
 # Aggregatiestrategie om per-regio-samples samen te voegen in het
 # scalaire tickBudgetUtilisation-veld van MetricsSnapshot op Folia.
-# Toegestane waarden: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationTickBudget: "max"
 
-# DO NOT TOUCH VERSION NUMBER
+# RAAK HET VERSIENUMMER NIET AAN
 version: 1.0

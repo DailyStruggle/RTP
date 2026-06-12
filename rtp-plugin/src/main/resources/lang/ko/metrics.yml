@@ -10,24 +10,24 @@ foliaIncludeRegions: true
 
 # Folia 에서 MetricsSnapshot 의 스칼라 tps{1,5,15}m 필드로
 # 리전별 샘플을 집계하는 방식.
-# 허용 값: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
 # Folia 에서 MetricsSnapshot 의 스칼라 mspt 필드로 리전별 샘플을
 # 집계하는 방식.
-# 허용 값: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
 # Folia 에서 MetricsSnapshot 의 스칼라 tickBudgetUtilisation
 # 필드로 리전별 샘플을 집계하는 방식.
-# 허용 값: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationTickBudget: "max"
 
-# DO NOT TOUCH VERSION NUMBER
+# 버전 번호를 건드리지 마세요
 version: 1.0

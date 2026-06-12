@@ -35,7 +35,7 @@ teleportCancel: "&7[P0] Teleport cancelled!"
 
 # s'il n'y a pas d'endroits sûrs après le nombre maximum de tentatives
 # espace réservé : [attempts] - le nombre maximum de tentatives
-unsafe: "&7[P0] could not find a safe location within [attempts] attempts"
+unsafe: "&7[P0] impossible de trouver un emplacement sûr en [attempts] tentatives"
 
 # lorsque le joueur est en temps de recharge
 # espace réservé : [remainingCooldown] - le temps restant
@@ -277,6 +277,7 @@ menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&a▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&a▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- pick a world"
 menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- pick a biome"
 menuFrontPageRowHelp: "&a▶ /rtp help &7- list commands"
 # Front-page admin entry row: the only inline

@@ -10,24 +10,24 @@ foliaIncludeRegions: true
 
 # Strategia di aggregazione usata per ridurre i campioni per-regione nei campi
 # scalari tps{1,5,15}m di MetricsSnapshot su Folia.
-# Valori accettati: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
 # Strategia di aggregazione usata per ridurre i campioni per-regione nel campo
 # scalare mspt di MetricsSnapshot su Folia.
-# Valori accettati: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
 # Strategia di aggregazione usata per ridurre i campioni per-regione nel campo
 # scalare tickBudgetUtilisation di MetricsSnapshot su Folia.
-# Valori accettati: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationTickBudget: "max"
 
-# DO NOT TOUCH VERSION NUMBER
+# NON TOCCARE IL NUMERO DI VERSIONE
 version: 1.0

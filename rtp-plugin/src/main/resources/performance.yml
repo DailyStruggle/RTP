@@ -108,6 +108,7 @@ biomeWeighted: false
 # current. Biomes left at 1.0 behave exactly as if absent from the map.
 # @type: map<string, number>
 biomeWeights:
+  # Relative selection weight for this biome (1.0 = no bias).
   # @type: number
   # @range: [0.0, null]
   # @default: 1.0
@@ -243,6 +244,7 @@ slowPipelineThresholdMs: 5000
 # @unit: players
 # @default: 0
 queueGrowthWarnThreshold: 0
+
 # Settings for /rtp admin prefab. The `apply` -> `confirm` flow writes
 # each touched config file with a sibling backup named
 # <file>.yml.bak.<epochMillis>; `bakRetention` caps how many such
@@ -250,6 +252,7 @@ queueGrowthWarnThreshold: 0
 # the most recent backup; values below 1 are clamped to 1. /rtp admin
 # prefab rollback walks backups newest-first across multiple invocations.
 prefab:
+  # Number of timestamped config backups kept per file before pruning.
   # @type: integer
   # @range: [1, null]
   # @default: 3

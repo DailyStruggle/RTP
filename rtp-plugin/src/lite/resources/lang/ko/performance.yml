@@ -18,8 +18,8 @@
 # @default: 0
 시야거리_선택: 0
 
-# Chunk radius loaded around the final location immediately before
-# teleport. 0 loads only the destination chunk.
+# 텔레포트 직전에 최종 위치 주변에서 불러올 청크 반경.
+# 0 은 목적지 청크만 불러옵니다.
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
@@ -46,7 +46,7 @@
 # @default: 50
 할당시간_동기: 50
 
-# Maximum milliseconds per tick spent in asynchronous tasks.
+# 틱당 비동기 작업에 사용하는 최대 밀리초.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
@@ -83,7 +83,7 @@
 # @default: false
 이벤트시파싱: false
 
-# Parse effect permission nodes at startup.
+# 시작 시 효과 권한 노드를 구문 분석합니다.
 # @type: boolean
 # @default: true
 이펙트파싱: true
@@ -96,17 +96,16 @@
 # @default: true
 바이옴기억: true
 
-# When set, only serve biome-filtered requests from cache (never
-# generate new biome searches). Requires biomeRecall.
+# 설정하면 바이옴 필터 요청을 캐시에서만 제공합니다(새 바이옴 검색을 시작하지
+# 않음). biomeRecall 이 필요합니다.
 # @type: boolean
 # @default: false
 바이옴기억_강제: false
 
-# Bias biome-filtered selection so each requested biome is steered toward
-# with equal probability, instead of in proportion to how much of the
-# region it covers. Counteracts common biomes drowning out rare ones when
-# several biomes are requested. Requires biomeRecall; no effect on
-# unfiltered (default-biome) teleports.
+# 바이옴 필터 선택에 가중치를 주어, 요청된 각 바이옴이 영역에서 차지하는 비율이
+# 아니라 동일한 확률로 선택되도록 합니다. 여러 바이옴을 요청할 때 흔한 바이옴이
+# 희귀한 바이옴을 밀어내는 것을 막습니다. biomeRecall 이 필요하며, 필터링되지
+# 않은(기본 바이옴) 텔레포트에는 영향이 없습니다.
 # @type: boolean
 # @default: false
 biomeWeighted: false
@@ -122,10 +121,78 @@ biomeWeighted: false
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
 biomeWeights:
+  # 이 바이옴의 상대 선택 가중치 (1.0 = 편향 없음).
   # @type: number
   # @range: [0.0, null]
   # @default: 1.0
   plains: 1.0
+  sunflower_plains: 1.0
+  snowy_plains: 1.0
+  ice_spikes: 1.0
+  desert: 1.0
+  swamp: 1.0
+  mangrove_swamp: 1.0
+  forest: 1.0
+  flower_forest: 1.0
+  birch_forest: 1.0
+  dark_forest: 1.0
+  old_growth_birch_forest: 1.0
+  old_growth_pine_taiga: 1.0
+  old_growth_spruce_taiga: 1.0
+  taiga: 1.0
+  snowy_taiga: 1.0
+  savanna: 1.0
+  savanna_plateau: 1.0
+  windswept_hills: 1.0
+  windswept_gravelly_hills: 1.0
+  windswept_forest: 1.0
+  windswept_savanna: 1.0
+  jungle: 1.0
+  sparse_jungle: 1.0
+  bamboo_jungle: 1.0
+  badlands: 1.0
+  eroded_badlands: 1.0
+  wooded_badlands: 1.0
+  meadow: 1.0
+  cherry_grove: 1.0
+  pale_garden: 1.0
+  grove: 1.0
+  snowy_slopes: 1.0
+  frozen_peaks: 1.0
+  jagged_peaks: 1.0
+  stony_peaks: 1.0
+  river: 1.0
+  frozen_river: 1.0
+  beach: 1.0
+  snowy_beach: 1.0
+  stony_shore: 1.0
+  warm_ocean: 1.0
+  lukewarm_ocean: 1.0
+  deep_lukewarm_ocean: 1.0
+  ocean: 1.0
+  deep_ocean: 1.0
+  cold_ocean: 1.0
+  deep_cold_ocean: 1.0
+  frozen_ocean: 1.0
+  deep_frozen_ocean: 1.0
+  mushroom_fields: 1.0
+  dripstone_caves: 1.0
+  lush_caves: 1.0
+  deep_dark: 1.0
+  # --- 네더 ---
+  nether_wastes: 1.0
+  warped_forest: 1.0
+  crimson_forest: 1.0
+  soul_sand_valley: 1.0
+  basalt_deltas: 1.0
+  # --- 디 엔드 ---
+  the_end: 1.0
+  end_highlands: 1.0
+  end_midlands: 1.0
+  small_end_islands: 1.0
+  end_barrens: 1.0
+  # --- 기타 / 기술적 ---
+  the_void: 1.0
 
 # 청크 로드 시 패시브 검사
 # 리전 범위 내에서 로드된 모든 청크에서 안전한 위치를 찾습니다.
@@ -134,5 +201,5 @@ biomeWeights:
 # @default: false
 청크로드시검사: false
 
-# DO NOT TOUCH VERSION NUMBER
+# 버전 번호를 건드리지 마세요
 version: 1.0

@@ -10,24 +10,24 @@ foliaIncludeRegions: true
 
 # 在 Folia 上将每个区域的采样合并为 MetricsSnapshot 标量
 # tps{1,5,15}m 字段的聚合策略。
-# 可选值: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
 # 在 Folia 上将每个区域的采样合并为 MetricsSnapshot 标量 mspt
 # 字段的聚合策略。
-# 可选值: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
 # 在 Folia 上将每个区域的采样合并为 MetricsSnapshot 标量
 # tickBudgetUtilisation 字段的聚合策略。
-# 可选值: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationTickBudget: "max"
 
-# DO NOT TOUCH VERSION NUMBER
+# 请勿修改版本号
 version: 1.0

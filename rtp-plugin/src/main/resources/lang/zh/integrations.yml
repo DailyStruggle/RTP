@@ -1,34 +1,44 @@
 # --- RTP 集成设置 ---
-# 若为 true，当位置落在对应插件的圈地/区域内时，RTP 将重新选择位置。
+# 如果传送点落在指定插件的领地/区域内，每个开关都会重新随机选择目的地（仅当安装了该插件时生效）。
+# 如果落点位于 Factions 领地内，则重新随机选择位置。
+# @type: boolean
+# @default: false
 rerollFactions: false
-# Reroll the location if it lands inside a GriefDefender claim.
+
+# 如果落点位于 GriefDefender 领地内，则重新随机选择位置。
 # @type: boolean
 # @default: false
 rerollGriefDefender: false
-# Reroll the location if it lands inside a GriefPrevention claim.
+
+# 如果落点位于 GriefPrevention 领地内，则重新随机选择位置。
 # @type: boolean
 # @default: false
 rerollGriefPrevention: false
-# Reroll the location if it lands inside a HuskTowns claim.
+
+# 如果落点位于 HuskTowns 领地内，则重新随机选择位置。
 # @type: boolean
 # @default: false
 rerollHuskTowns: false
-# Reroll the location if it lands inside a Lands claim.
+
+# 如果落点位于 Lands 领地内，则重新随机选择位置。
 # @type: boolean
 # @default: false
 rerollLands: false
-# Reroll the location if it lands inside a RedProtect region.
+
+# 如果落点位于 RedProtect 区域内，则重新随机选择位置。
 # @type: boolean
 # @default: false
 rerollRedProtect: false
-# Reroll the location if it lands inside a Towny Advanced claim.
+
+# 如果落点位于 Towny Advanced 领地内，则重新随机选择位置。
 # @type: boolean
 # @default: false
 rerollTownyAdvanced: false
-# Reroll the location if it lands inside a WorldGuard region.
+
+# 如果落点位于 WorldGuard 区域内，则重新随机选择位置。
 # @type: boolean
 # @default: false
 rerollWorldGuard: false
 
-# DO NOT TOUCH VERSION NUMBER
+# 请勿修改版本号
 version: 1.0

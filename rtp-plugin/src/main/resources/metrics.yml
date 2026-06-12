@@ -10,22 +10,22 @@ foliaIncludeRegions: true
 
 # Aggregation strategy used to fold per-region samples into the scalar
 # tps{1,5,15}m fields of MetricsSnapshot on Folia.
-# Accepted values: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
 # Aggregation strategy used to fold per-region samples into the scalar
 # mspt field of MetricsSnapshot on Folia.
-# Accepted values: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
 # Aggregation strategy used to fold per-region samples into the scalar
 # tickBudgetUtilisation field of MetricsSnapshot on Folia.
-# Accepted values: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationTickBudget: "max"
 

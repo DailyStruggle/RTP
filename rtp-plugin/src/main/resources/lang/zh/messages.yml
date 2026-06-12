@@ -263,6 +263,7 @@ rtp_说明: "传送到一个随机位置"
 # Front-page rows. No placeholders.
 菜单_首页_传送行: "&a▶ /rtp &7- teleport to a random location"
 菜单_首页_区域行: "&a▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- pick a world"
 菜单_首页_生物群系行: "&a▶ /rtp biome:&7... &7- pick a biome"
 菜单_首页_帮助行: "&a▶ /rtp help &7- list commands"
 # Front-page admin entry row: the only inline

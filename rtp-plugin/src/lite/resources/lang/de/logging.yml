@@ -1,27 +1,53 @@
 # Von Spielern ausgeführte RTP-Befehle protokollieren
+# @type: boolean
+# @default: false
 befehl: false
+
 # Erfolgreiche Teleport-Ereignisse protokollieren
+# @type: boolean
+# @default: true
 teleport: true
 
 # RTP ausgelöst durch Weltenwechsel protokollieren
+# @type: boolean
+# @default: true
 ereignisWeltwechsel: true
+
 # RTP ausgelöst beim Beitritt protokollieren
+# @type: boolean
+# @default: true
 ereignisBeitritt: true
+
 # RTP ausgelöst beim Respawn protokollieren
+# @type: boolean
+# @default: true
 ereignisRespawn: true
+
 # Verarbeitung von Bewegungsereignissen protokollieren
+# @type: boolean
+# @default: true
 ereignisBewegung: true
+
 # Verarbeitung von Teleport-Ereignissen protokollieren
+# @type: boolean
+# @default: true
 ereignisTeleport: true
 
 # Informationen protokollieren, wenn die Standortauswahl fehlschlägt
+# @type: boolean
+# @default: true
 auswahlFehlschlag: true
 
 # Debug-Protokolle für Speicheraktivität
+# @type: boolean
+# @default: false
 systemSpeicherTracker: false
+
 # Plugin-spezifisches Mindest-Log-Level. Wirksam ist der feinere der beiden
-# Filter (dieser und der Bukkit-Logger). Erlaubt: SEVERE, WARNING, INFO, CONFIG,
-# FINE, FINER, FINEST, ALL, OFF. Standard ALL ist identisch zum Bukkit-Logger.
+# Filter (dieser und der Bukkit-Logger). ALL ist identisch zum Bukkit-Logger.
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
 minLevel: "INFO"
 
 # ÄNDERE NICHT DIE VERSIONSNUMMER

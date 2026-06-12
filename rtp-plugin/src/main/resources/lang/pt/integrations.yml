@@ -1,34 +1,44 @@
 # --- Configurações de integração do RTP ---
-# Se true, o RTP sorteia a localização novamente se ela cair dentro de um claim/região do respectivo plugin.
+# Cada opção sorteia o destino novamente se ele cair dentro de um claim/região do plugin indicado (ativa apenas se esse plugin estiver instalado).
+# Sorteia a localização novamente se ela cair dentro de um claim do Factions.
+# @type: boolean
+# @default: false
 rerollFactions: false
-# Reroll the location if it lands inside a GriefDefender claim.
+
+# Sorteia a localização novamente se ela cair dentro de um claim do GriefDefender.
 # @type: boolean
 # @default: false
 rerollGriefDefender: false
-# Reroll the location if it lands inside a GriefPrevention claim.
+
+# Sorteia a localização novamente se ela cair dentro de um claim do GriefPrevention.
 # @type: boolean
 # @default: false
 rerollGriefPrevention: false
-# Reroll the location if it lands inside a HuskTowns claim.
+
+# Sorteia a localização novamente se ela cair dentro de um claim do HuskTowns.
 # @type: boolean
 # @default: false
 rerollHuskTowns: false
-# Reroll the location if it lands inside a Lands claim.
+
+# Sorteia a localização novamente se ela cair dentro de um claim do Lands.
 # @type: boolean
 # @default: false
 rerollLands: false
-# Reroll the location if it lands inside a RedProtect region.
+
+# Sorteia a localização novamente se ela cair dentro de uma região do RedProtect.
 # @type: boolean
 # @default: false
 rerollRedProtect: false
-# Reroll the location if it lands inside a Towny Advanced claim.
+
+# Sorteia a localização novamente se ela cair dentro de um claim do Towny Advanced.
 # @type: boolean
 # @default: false
 rerollTownyAdvanced: false
-# Reroll the location if it lands inside a WorldGuard region.
+
+# Sorteia a localização novamente se ela cair dentro de uma região do WorldGuard.
 # @type: boolean
 # @default: false
 rerollWorldGuard: false
 
-# DO NOT TOUCH VERSION NUMBER
+# NÃO ALTERE O NÚMERO DA VERSÃO
 version: 1.0

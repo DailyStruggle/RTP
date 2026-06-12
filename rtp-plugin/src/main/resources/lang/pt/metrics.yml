@@ -10,24 +10,24 @@ foliaIncludeRegions: true
 
 # Estratégia de agregação usada para combinar amostras por região nos
 # campos escalares tps{1,5,15}m de MetricsSnapshot no Folia.
-# Valores aceitos: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
 # Estratégia de agregação usada para combinar amostras por região no
 # campo escalar mspt de MetricsSnapshot no Folia.
-# Valores aceitos: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
 # Estratégia de agregação usada para combinar amostras por região no campo
 # escalar tickBudgetUtilisation de MetricsSnapshot no Folia.
-# Valores aceitos: mean | max
 # @type: enum
+# @options: [mean, max]
 # @default: max
 foliaAggregationTickBudget: "max"
 
-# DO NOT TOUCH VERSION NUMBER
+# NÃO ALTERE O NÚMERO DA VERSÃO
 version: 1.0

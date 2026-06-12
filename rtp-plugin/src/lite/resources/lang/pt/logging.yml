@@ -1,33 +1,58 @@
 # Registros de atividade básica
 # command: registrar os comandos do RTP executados pelos jogadores
 # teleport: registrar os eventos reais de teletransporte
+# @type: boolean
+# @default: false
 comando: false
-# Log successful teleport events
+
+# Registrar eventos de teleporte bem-sucedidos
+# @type: boolean
+# @default: true
 teletransporte: true
 
 # Quando o jogador muda de mundo
+# @type: boolean
+# @default: true
 evento_mudancaMundo: true
+
 # Quando o jogador entra no servidor
+# @type: boolean
+# @default: true
 evento_entrada: true
+
 # Quando o jogador renasce
+# @type: boolean
+# @default: true
 evento_renascimento: true
+
 # Quando o jogador se move (se o RTP por movimento estiver ativo)
+# @type: boolean
+# @default: true
 evento_movimento: true
+
 # Quando o jogador teletransporta (se o RTP por teletransporte estiver ativo)
+# @type: boolean
+# @default: true
 evento_teletransporte: true
 
 # Depuração de falhas de seleção
 # Registra informações detalhadas quando a seleção de uma localização segura
 # falha, incluindo taxas de falha e parâmetros de busca.
+# @type: boolean
+# @default: true
 falha_selecao: true
 
 # Registros do sistema
 # Relacionados a tarefas em segundo plano e operações de banco de dados.
+# @type: boolean
+# @default: false
 sistema_rastreioMemoria: false
+
 # Nível mínimo de registro do plugin. O filtro efetivo é o mais restritivo
-# entre este e o do logger do Bukkit. Aceita: SEVERE, WARNING, INFO, CONFIG,
-# FINE, FINER, FINEST, ALL, OFF. O valor padrão ALL mantém o comportamento
-# idêntico ao do logger do Bukkit.
+# entre este e o do logger do Bukkit. ALL mantém o comportamento idêntico.
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
 nivel_minimo: "INFO"
 
 # NAO MODIFIQUE O NUMERO DE VERSAO
