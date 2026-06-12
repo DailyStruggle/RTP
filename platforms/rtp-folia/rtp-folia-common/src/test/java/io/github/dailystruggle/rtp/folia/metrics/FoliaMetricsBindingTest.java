@@ -64,6 +64,37 @@ final class FoliaMetricsBindingTest {
     }
 
     /**
+     * Decoupling regression: the steady global heartbeat sampler (driven in
+     * production from the global region scheduler, here via the test seam)
+     * keeps the scalar TPS / MSPT sampled even when NO per-region sampler has
+     * data - i.e. with zero RTP traffic and therefore no
+     * {@code FoliaRegionProcessor} pulses. {@code foliaRegions()} stays empty
+     * because the global sampler is not a real region.
+     */
+    @Test
+    void global_heartbeat_keeps_scalars_sampled_with_no_region_traffic() {
+        SteppingClock clk = new SteppingClock(0L, 50_000_000L); // ~20 TPS
+        FoliaMetricsBinding b = new FoliaMetricsBinding(clk::peek, () -> 0, () -> 0);
+
+        clk.advance();
+        b.tickGlobalSamplerForTest();  // seed
+        assertEquals(MetricsSnapshot.UNSAMPLED, b.tps1m(), 1e-9);
+
+        clk.advance();
+        b.tickGlobalSamplerForTest();  // first real sample
+
+        double tps = b.tps1m();
+        assertNotEquals(MetricsSnapshot.UNSAMPLED, tps);
+        assertTrue(tps > 19.0 && tps <= 20.0, "expected ~20 TPS, got " + tps);
+        assertNotEquals(MetricsSnapshot.UNSAMPLED, b.mspt());
+
+        // No real per-region sampler was recorded, so the per-region list and
+        // registry stay empty even though the scalars are sampled.
+        assertEquals(0, b.registrySize());
+        assertTrue(b.foliaRegions().isEmpty());
+    }
+
+    /**
      * First tick for a new key seeds a sampler (no EMA yet); second tick
      * produces a valid EMA. {@code regionId} is stable across reads.
      */

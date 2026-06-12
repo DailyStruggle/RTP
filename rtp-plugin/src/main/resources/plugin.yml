@@ -21,7 +21,10 @@ description: 'a fast and flexible random teleportation plugin'
 # on Paper/Folia a plugin may only resolve another plugin's classes when it
 # declares a dependency on it, otherwise the CombatLogX/PvPManager adapters hit a
 # NoClassDefFoundError at query time and silently report "not in combat".
-softdepend: [ WorldGuard, WorldEdit, PlaceholderAPI, Vault, Chunky, ChunkyBorder, GriefDefender, GriefPrevention, Towny, HuskTowns, Factions, Lands, RedProtect, CombatLogX, PvPManager, SimpleCombatLog ]
+# spark is listed for load-order only: when present it loads before RTP so the
+# spark API is ready when the metrics binding queries it (richer TPS/MSPT than
+# the native server calls). Never required - absence degrades to the native binding.
+softdepend: [ WorldGuard, WorldEdit, PlaceholderAPI, Vault, Chunky, ChunkyBorder, GriefDefender, GriefPrevention, Towny, HuskTowns, Factions, Lands, RedProtect, CombatLogX, PvPManager, SimpleCombatLog, spark ]
 folia-supported: true
 
 # --- Commands ---

@@ -66,6 +66,43 @@ public class PlaceholderProvider {
     }
 
     /**
+     * {@code true} when the active binding has sampled a live server TPS (i.e. the
+     * snapshot's {@code tps1m} is not the {@link MetricsSnapshot#UNSAMPLED} sentinel).
+     * Used by {@code /rtp info} to suppress the {@code n/a} TPS row when no live
+     * metrics binding is installed.
+     */
+    public static boolean hasLiveTps() {
+        return !Double.isNaN(currentSnapshot().tps1m);
+    }
+
+    /**
+     * {@code true} when the active binding has sampled a live server MSPT. Used by
+     * {@code /rtp info} to suppress the {@code n/a} MSPT rows when no live metrics
+     * binding is installed.
+     */
+    public static boolean hasLiveMspt() {
+        return !Double.isNaN(currentSnapshot().mspt);
+    }
+
+    /**
+     * {@code true} when a database round-trip latency has been recorded (the RTP
+     * extension reports a non-negative value). Used by {@code /rtp info} to suppress
+     * the {@code n/a} database-latency row before any query has run.
+     */
+    public static boolean hasDatabaseLatency() {
+        return currentRtpExt().databaseLatencyMs >= 0;
+    }
+
+    /**
+     * Number of pipeline-latency samples currently in the ring (0 when no teleport
+     * has completed yet). Used by {@code /rtp info} to suppress the {@code n/a}
+     * average-latency and percentile rows before any sample exists.
+     */
+    public static int pipelineSampleCount() {
+        return currentPercentiles().sampleCount;
+    }
+
+    /**
      * Return the RTP-specific extension on the current snapshot, or a zeroed
      * fallback if absent (e.g. NOOP binding). Never returns {@code null}.
      */
