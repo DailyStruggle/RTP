@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'io.github.dailystruggle'
-version = '3.1.2'
+version = '3.1.3'
 
 spotless {
     java {
@@ -19,13 +19,13 @@ spotless {
 
 allprojects {
     group = 'io.github.dailystruggle'
-    version = '3.1.2'
+    version = '3.1.3'
 
     // RTP-lite ships a separate version line from Pro. Pro tracks the
-    // root `version` above (currently 3.1.2); lite is pinned via
+    // root `version` above (currently 3.1.3); lite is pinned via
     // `ext.liteVersion` and applied to the lite shadow/remap tasks and
     // `processLiteResources` token expansion in `rtp-plugin/build.gradle`.
-    ext.liteVersion = '3.1.1'
+    ext.liteVersion = '3.1.2'
 
     repositories {
         mavenCentral()

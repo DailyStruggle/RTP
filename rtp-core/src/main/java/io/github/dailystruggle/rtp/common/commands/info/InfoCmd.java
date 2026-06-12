@@ -228,9 +228,17 @@ public class InfoCmd extends BaseRTPCmdImpl {
       String infoDisclaimerHeader = lang.getConfigValue(MessagesKeys.infoDisclaimerHeader, "").toString();
       String infoDisclaimer = lang.getConfigValue(MessagesKeys.infoDisclaimer, "").toString();
 
+      // Live-metric rows render the documented "n/a" sentinel when no metrics
+      // binding has sampled yet. Suppress those rows entirely (rather than print a
+      // wall of "n/a") so /rtp info stays compact on servers without a live binding.
+      boolean hasLiveTps = PlaceholderProvider.hasLiveTps();
+      boolean hasLiveMspt = PlaceholderProvider.hasLiveMspt();
+      boolean hasPipelineSamples = PlaceholderProvider.pipelineSampleCount() > 0;
+      boolean hasDatabaseLatency = PlaceholderProvider.hasDatabaseLatency();
+
       if (!infoTickets.isEmpty()) emit(callerId, infoTickets);
       if (!infoTeleports.isEmpty()) emit(callerId, infoTeleports);
-      if (!infoMSPT.isEmpty()) emit(callerId, infoMSPT);
+      if (!infoMSPT.isEmpty() && hasLiveMspt) emit(callerId, infoMSPT);
       if (!infoTotalLoads.isEmpty()) emit(callerId, infoTotalLoads);
       if (!infoLoadsByOrigin.isEmpty()) emit(callerId, infoLoadsByOrigin);
       if (!infoLeakRate.isEmpty()) emit(callerId, infoLeakRate);
@@ -238,18 +246,18 @@ public class InfoCmd extends BaseRTPCmdImpl {
       // is rendered ahead of the metrics group so operators can visually anchor it.
       if (!infoHealthPipelineHeader.isEmpty())
         emit(callerId, infoHealthPipelineHeader);
-      if (!infoTps.isEmpty()) emit(callerId, infoTps);
-      if (!infoMSPTLive.isEmpty()) emit(callerId, infoMSPTLive);
+      if (!infoTps.isEmpty() && hasLiveTps) emit(callerId, infoTps);
+      if (!infoMSPTLive.isEmpty() && hasLiveMspt) emit(callerId, infoMSPTLive);
       if (!infoSoftCap.isEmpty()) emit(callerId, infoSoftCap);
       if (!infoQueueDepth.isEmpty()) emit(callerId, infoQueueDepth);
       if (!infoPendingTeleports.isEmpty()) emit(callerId, infoPendingTeleports);
-      if (!infoAvgPipelineMs.isEmpty()) emit(callerId, infoAvgPipelineMs);
+      if (!infoAvgPipelineMs.isEmpty() && hasPipelineSamples) emit(callerId, infoAvgPipelineMs);
       // ADR-053: pipeline-latency percentiles + slow-teleport / queue-growth audit counters.
-      if (!infoPipelinePercentiles.isEmpty()) emit(callerId, infoPipelinePercentiles);
+      if (!infoPipelinePercentiles.isEmpty() && hasPipelineSamples) emit(callerId, infoPipelinePercentiles);
       if (!infoSlowPipeline.isEmpty()) emit(callerId, infoSlowPipeline);
       if (!infoQueueGrowth.isEmpty()) emit(callerId, infoQueueGrowth);
       if (!infoHeap.isEmpty()) emit(callerId, infoHeap);
-      if (!infoDatabaseLatencyMs.isEmpty()) emit(callerId, infoDatabaseLatencyMs);
+      if (!infoDatabaseLatencyMs.isEmpty() && hasDatabaseLatency) emit(callerId, infoDatabaseLatencyMs);
       // ADR-052: generation outcome metrics. Empty templates skip silently so locales
       // without the new keys keep working unchanged.
       if (!infoFailureRate.isEmpty()) emit(callerId, infoFailureRate);
@@ -306,14 +314,17 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
     if (sender.hasPermission("rtp.admin") || sender.hasPermission("rtp.support")) {
-      emit(callerId, "&7--- DRM Information ---");
-      emit(callerId, "&7Source: &f" + DownloadInfo.source());
-      emit(callerId, "&7Downloader ID: &f" + DownloadInfo.userId());
-      emit(callerId, "&7Download Nonce: &f" + DownloadInfo.nonce());
+      // DRM block: deliberately hardcoded (never sourced from the player-editable
+      // messages.yml) and condensed to a single line to keep /rtp info compact.
+      StringBuilder drm = new StringBuilder("&7DRM: &f")
+          .append(DownloadInfo.source())
+          .append(" &7id=&f").append(DownloadInfo.userId())
+          .append(" &7nonce=&f").append(DownloadInfo.nonce());
       if (DownloadInfo.source() == DownloadInfo.Source.BUILTBYBIT) {
-        emit(callerId, "&7BBB Resource: &f" + DownloadInfo.resourceId());
-        emit(callerId, "&7BBB Timestamp: &f" + DownloadInfo.timestamp());
+        drm.append(" &7bbb=&f").append(DownloadInfo.resourceId())
+           .append("@").append(DownloadInfo.timestamp());
       }
+      emit(callerId, drm.toString());
     }
 
     return true;

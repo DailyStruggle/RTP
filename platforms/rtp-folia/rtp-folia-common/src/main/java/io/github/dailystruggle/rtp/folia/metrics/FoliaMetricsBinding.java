@@ -70,6 +70,21 @@ public final class FoliaMetricsBinding implements MetricsBinding {
     private final ConcurrentHashMap<RegionKey, Integer> regionQueueDepths = new ConcurrentHashMap<>();
     private final AtomicInteger regionIdSeq = new AtomicInteger(0);
 
+    /**
+     * Steady, RTP-traffic-independent heartbeat sampler. Ticked once per
+     * server tick from the Folia global region scheduler (see
+     * {@link #scheduleGlobalSampler()}), so the scalar TPS / MSPT aggregation
+     * stays sampled even when no {@code /rtp} is in flight and therefore no
+     * {@code FoliaRegionProcessor} is running. Decouples the binding's clock
+     * from {@code FoliaRegionProcessor}, which only fires while a region has
+     * queued RTP tasks; without this, an idle server reported UNSAMPLED after
+     * the 60s idle-eviction window and bStats / {@code /rtp info} had no data.
+     */
+    private final FoliaRegionTpsSampler globalSampler;
+    private volatile boolean globalSampled = false;
+    /** Handle of the steady sampler task; cancelled when the binding is replaced. */
+    private volatile Object globalTaskHandle = null;
+
     private final LongSupplier nanoClock;
     private final IntSupplier playerCount;
     private final IntSupplier softCap;
@@ -79,6 +94,7 @@ public final class FoliaMetricsBinding implements MetricsBinding {
         this(System::nanoTime,
                 FoliaMetricsBinding::safePlayerCount,
                 FoliaMetricsBinding::safeMaxPlayers);
+        scheduleGlobalSampler();
     }
 
     /** Test seam. */
@@ -86,6 +102,57 @@ public final class FoliaMetricsBinding implements MetricsBinding {
         this.nanoClock = nanoClock;
         this.playerCount = playerCount;
         this.softCap = softCap;
+        this.globalSampler = new FoliaRegionTpsSampler(nanoClock);
+    }
+
+    /**
+     * Schedule the steady global heartbeat sampler on the Folia global region
+     * scheduler (1-tick period). Best-effort: if {@link RTP#scheduler} is not
+     * yet installed, the binding silently degrades to the legacy
+     * {@code FoliaRegionProcessor}-driven per-region sampling (scalars may then
+     * report UNSAMPLED on an idle server, as before).
+     */
+    private void scheduleGlobalSampler() {
+        try {
+            if (RTP.scheduler == null) return;
+            globalTaskHandle = RTP.scheduler.runTaskTimer(this::globalTick, 1L, 1L);
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.FINER,
+                    "FoliaMetricsBinding global sampler schedule failed: "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+        }
+    }
+
+    /**
+     * One steady heartbeat tick. Self-terminates (cancels its own task) once
+     * this binding is no longer the active binding, so a hot reload / uninstall
+     * does not leak the task.
+     */
+    private void globalTick() {
+        try {
+            if (RTP.metrics == null || RTP.metrics.getBinding() != this) {
+                cancelGlobalSampler();
+                return;
+            }
+            globalSampler.tick();
+            globalSampled = true;
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.FINER,
+                    "FoliaMetricsBinding global tick failed: "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+        }
+    }
+
+    private void cancelGlobalSampler() {
+        Object handle = globalTaskHandle;
+        globalTaskHandle = null;
+        if (handle == null) return;
+        try {
+            handle.getClass().getMethod("cancel").invoke(handle);
+        } catch (Throwable ignored) {
+            // Best-effort; the self-terminating guard in globalTick() prevents
+            // any further work even if the explicit cancel fails.
+        }
     }
 
     /**
@@ -172,7 +239,6 @@ public final class FoliaMetricsBinding implements MetricsBinding {
 
     private double aggregate(SamplerView view, String mode) {
         evictIdle();
-        if (samplers.isEmpty()) return MetricsSnapshot.UNSAMPLED;
         double sum = 0.0;
         double max = Double.NEGATIVE_INFINITY;
         int n = 0;
@@ -182,6 +248,17 @@ public final class FoliaMetricsBinding implements MetricsBinding {
             sum += v;
             if (v > max) max = v;
             n++;
+        }
+        // Fold in the steady global heartbeat sampler so the scalar TPS / MSPT
+        // stays sampled even when no per-region sampler has data (zero RTP
+        // traffic). The global sampler is not surfaced in foliaRegions().
+        if (globalSampled) {
+            double v = read(globalSampler, view);
+            if (!Double.isNaN(v) && v != MetricsSnapshot.UNSAMPLED) {
+                sum += v;
+                if (v > max) max = v;
+                n++;
+            }
         }
         if (n == 0) return MetricsSnapshot.UNSAMPLED;
         return AGG_MAX.equalsIgnoreCase(mode) ? max : (sum / n);
@@ -269,4 +346,14 @@ public final class FoliaMetricsBinding implements MetricsBinding {
 
     /** Visible for tests. */
     int registrySize() { return samplers.size(); }
+
+    /**
+     * Test seam: drive the steady global heartbeat sampler one tick, as the
+     * scheduled {@link #globalTick()} would in production. Used to exercise the
+     * traffic-independent scalar sampling without a live {@code RTP.scheduler}.
+     */
+    void tickGlobalSamplerForTest() {
+        globalSampler.tick();
+        globalSampled = true;
+    }
 }

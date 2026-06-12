@@ -59,6 +59,11 @@ public final class MetricsBindingDispatcher {
     /** Resolved by FQN — see class-level rationale. */
     private static final String SPIGOT_SAMPLER_FQN =
             "io.github.dailystruggle.rtp.bukkitplatform.metrics.BukkitTpsSampler";
+    /** Resolved by FQN — see class-level rationale. */
+    private static final String SPARK_BINDING_FQN =
+            "io.github.dailystruggle.rtp.bukkitplatform.metrics.SparkMetricsBinding";
+    /** spark public-API probe class; presence implies the spark plugin is loaded. */
+    private static final String SPARK_API_PROBE_FQN = "me.lucko.spark.api.SparkProvider";
 
     private static volatile boolean installed = false;
     /** Non-null only on the Spigot path; cancelled in {@link #uninstall()}. */
@@ -80,25 +85,40 @@ public final class MetricsBindingDispatcher {
             return;
         }
         try {
-            if (isFoliaRuntime()) {
-                MetricsBinding folia = (MetricsBinding) Class.forName(FOLIA_BINDING_FQN)
-                        .getDeclaredConstructor()
-                        .newInstance();
-                RTP.metrics.setBinding(folia);
+            // Folia and Paper bindings are resolved by FQN and may be absent from
+            // trimmed assemblies (e.g. the rtp-lite jar excludes
+            // io/github/dailystruggle/rtp/folia/**). When the preferred binding is
+            // not on the classpath, fall through to the next applicable path
+            // rather than aborting with a WARNING + stack trace.
+            if (isFoliaRuntime() && tryInstallBinding(
+                    FOLIA_BINDING_FQN, "FoliaMetricsBinding (threaded-regions detected)")) {
                 // No external sampler task: FoliaRegionProcessor drives
                 // FoliaMetricsBinding#recordRegionTick from each region's
                 // own thread (C1.2b).
-                RTP.log(Level.INFO, LOG_TAG + " installed FoliaMetricsBinding (threaded-regions detected)");
-            } else if (isPaperRuntime()) {
-                MetricsBinding paper = (MetricsBinding) Class.forName(PAPER_BINDING_FQN)
-                        .getDeclaredConstructor()
-                        .newInstance();
-                RTP.metrics.setBinding(paper);
-                RTP.log(Level.INFO, LOG_TAG + " installed PaperMetricsBinding (Bukkit#getTPS detected)");
-            } else {
+                installed = true;
+                return;
+            }
+            if (isPaperRuntime()) {
+                MetricsBinding paper = instantiateBinding(
+                        PAPER_BINDING_FQN, "PaperMetricsBinding (Bukkit#getTPS detected)");
+                if (paper != null) {
+                    RTP.log(Level.INFO, LOG_TAG
+                            + " installed PaperMetricsBinding (Bukkit#getTPS detected)");
+                    // Per-field merge: prefer spark's TPS/MSPT over the native
+                    // Paper values when spark is present (Folia is handled above
+                    // and intentionally stays on its native per-region binding).
+                    RTP.metrics.setBinding(wrapWithSparkIfPresent(paper));
+                    installed = true;
+                    return;
+                }
+            }
+            {
                 Class<?> samplerClass = Class.forName(SPIGOT_SAMPLER_FQN);
                 Object sampler = samplerClass.getDeclaredConstructor().newInstance();
-                RTP.metrics.setBinding((MetricsBinding) sampler);
+                // Merge spark TPS/MSPT over the raw-Spigot sampler when present;
+                // the sampler is still driven below so its values back the
+                // merge's fallback and supply playerCount / softCap.
+                RTP.metrics.setBinding(wrapWithSparkIfPresent((MetricsBinding) sampler));
                 spigotSamplerInstance = sampler;
                 // Drive sampler.tick() once per server tick. The sampler is
                 // documented as single-tick-thread-only, which matches
@@ -157,6 +177,94 @@ public final class MetricsBindingDispatcher {
         }
         installed = false;
         RTP.log(Level.FINE, LOG_TAG + " uninstalled MetricsBinding");
+    }
+
+    /**
+     * Attempt to instantiate and install the {@link MetricsBinding} named by
+     * {@code bindingFqn}. Returns {@code true} on success. Returns
+     * {@code false} (without throwing) if the binding class is absent from the
+     * runtime classpath — this is expected on trimmed assemblies such as the
+     * rtp-lite jar, which excludes the platform metrics bindings. In that case
+     * the caller falls through to the next applicable binding (or the raw
+     * Spigot sampler), so {@code /rtp info} still reports sampled data instead
+     * of logging a WARNING + stack trace.
+     */
+    private static boolean tryInstallBinding(String bindingFqn, String description) {
+        try {
+            MetricsBinding binding = (MetricsBinding) Class.forName(bindingFqn)
+                    .getDeclaredConstructor()
+                    .newInstance();
+            RTP.metrics.setBinding(binding);
+            RTP.log(Level.INFO, LOG_TAG + " installed " + description);
+            return true;
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            RTP.log(Level.FINE, LOG_TAG + " binding " + bindingFqn
+                    + " not present (trimmed assembly?); falling back to next path");
+            return false;
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING, LOG_TAG + " failed to install " + description
+                    + "; falling back to next path", t);
+            return false;
+        }
+    }
+
+    /**
+     * Instantiate the {@link MetricsBinding} named by {@code bindingFqn} without
+     * installing it. Returns {@code null} (without throwing) when the class is
+     * absent from the runtime classpath (trimmed assembly) or instantiation
+     * fails — the caller then falls through to the next path.
+     */
+    private static MetricsBinding instantiateBinding(String bindingFqn, String description) {
+        try {
+            return (MetricsBinding) Class.forName(bindingFqn)
+                    .getDeclaredConstructor()
+                    .newInstance();
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            RTP.log(Level.FINE, LOG_TAG + " binding " + bindingFqn
+                    + " not present (trimmed assembly?); falling back to next path");
+            return null;
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING, LOG_TAG + " failed to instantiate " + description
+                    + "; falling back to next path", t);
+            return null;
+        }
+    }
+
+    /**
+     * Wrap {@code delegate} in {@code SparkMetricsBinding} when the spark plugin
+     * (and its public API) is present, so spark's richer TPS/MSPT values are
+     * merged over the native binding. Returns {@code delegate} unchanged when
+     * spark is absent or the wrap fails — spark is a pure soft-dependency.
+     *
+     * <p>The {@code SparkMetricsBinding} itself self-disables (delegating every
+     * field) if the spark API cannot be linked, so the up-front probe here is
+     * an optimisation that avoids an unnecessary wrapper, not a correctness
+     * requirement.
+     */
+    private static MetricsBinding wrapWithSparkIfPresent(MetricsBinding delegate) {
+        try {
+            Class.forName(SPARK_API_PROBE_FQN);
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            return delegate; // spark not installed — keep native binding
+        } catch (Throwable t) {
+            return delegate;
+        }
+        try {
+            MetricsBinding wrapped = (MetricsBinding) Class.forName(SPARK_BINDING_FQN)
+                    .getConstructor(MetricsBinding.class)
+                    .newInstance(delegate);
+            RTP.log(Level.INFO, LOG_TAG
+                    + " spark detected; merging spark TPS/MSPT over native binding");
+            return wrapped;
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            // SparkMetricsBinding absent (trimmed assembly) — keep native binding.
+            RTP.log(Level.FINE, LOG_TAG + " SparkMetricsBinding not present; using native binding");
+            return delegate;
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING, LOG_TAG
+                    + " spark present but SparkMetricsBinding wrap failed; using native binding", t);
+            return delegate;
+        }
     }
 
     /** Visible for tests. */
