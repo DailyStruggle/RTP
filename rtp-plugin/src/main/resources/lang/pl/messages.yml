@@ -98,7 +98,7 @@ komendaKonsoliNiedozwolona: "&c[P0] Musisz być graczem w grze, aby wykonać to 
 zajety: "&c[P0] zajęty"
 
 # Sent when the optional PvP combat check refuses /rtp because the player is in combat
-pvpInCombat: "&c[P0] You cannot random-teleport while in combat."
+pvpInCombat: "&c[P0] Nie możesz losowo się teleportować podczas walki."
 
 # wtyczka nie ma podkomendy lub parametru zadanego przez uzytkownika
 # zmienna: [arg] - sprobowany argument
