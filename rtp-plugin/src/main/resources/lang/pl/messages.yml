@@ -25,27 +25,27 @@ symboleZastepcze:
 # Sekcja 2: Teleportacja
 # ###############################################################################
 # podczas teleportacji wyswietl to
-juzTeleportowany: "&7[P0] już jesteś teleportowany!"
+juzTeleportowany: "&7[P0] ⚡ już jesteś teleportowany!"
 
 # gdy wtyczka jest aktualnie przeładowywana
 teleportOdmowaPrzeladowanie: "&7[P0] teleportacje są tymczasowo wyłączone, gdy plugin się przeładowuje. Spróbuj ponownie za chwilę."
-wiadomoscOpoznienia: "&7[P0] Teleporting in [delay]. Don't move"
-ladowanieChunkow: "&7[P0] Wczytywanie chunków! proszę czekać..."
-wiadomoscTeleportu: "&7[P0] Teleported in [attempts] attempts, in [processingTime]"
+wiadomoscOpoznienia: "&7[P0] ⚡ Teleporting in [delay]. Don't move"
+ladowanieChunkow: "&7[P0] ⚙ Wczytywanie chunków! proszę czekać..."
+wiadomoscTeleportu: "&7[P0] ⚡ Teleported in [attempts] attempts, in [processingTime]"
 
 # jesli teleportacja zostanie anulowana
-teleportAnulowano: "&7[P0] Teleportacja anulowana!"
+teleportAnulowano: "&7[P0] ⚡ Teleportacja anulowana!"
 
 # brak bezpiecznych miejsc po wyczerpaniu maksymalnej liczby prób
 # zmienna: [attempts] - maksymalna liczba prób
-niebezpieczny: "&7[P0] nie udało się znaleźć bezpiecznego miejsca w ciągu [attempts] prób"
+niebezpieczny: "&7[P0] ⌖ nie udało się znaleźć bezpiecznego miejsca w ciągu [attempts] prób"
 
 # gdy gracz jest na odnowieniu
 # zmienna: [remainingCooldown] - pozostały czas
-wiadomoscOdnowienia: "&7[P0] Nie możesz teleportować się ponownie przez [remainingCooldown]"
+wiadomoscOdnowienia: "&7[P0] ⚡ Nie możesz teleportować się ponownie przez [remainingCooldown]"
 
 # gdy region nie ma żadnych lokalizacji w kolejce, a gracz nie posiada uprawnienia rtp.unqueued
-brakLokalizacjiWKolejce: "#f5eb73[P0] brak gotowych lokalizacji w tej chwili"
+brakLokalizacjiWKolejce: "#f5eb73[P0] ⌖ brak gotowych lokalizacji w tej chwili"
 
 # gdy kolejka się przesuwa
 # zmienna: [spot] - bieżąca pozycja w kolejce

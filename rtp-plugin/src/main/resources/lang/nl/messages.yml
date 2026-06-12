@@ -17,27 +17,27 @@ plaatshouders:
 # ###############################################################################
 # Sectie 2: Teletransport
 # ###############################################################################
-alTeletransporteert: "&7[P0] je wordt al geteletransporteerd!"
+alTeletransporteert: "&7[P0] ⚡ je wordt al geteletransporteerd!"
 
 # als de plugin momenteel wordt herladen
 teletransportGeweigerdHerladen: "&7[P0] teletransports zijn tijdelijk uitgeschakeld terwijl de plugin herlaadt. Probeer het over een ogenblik opnieuw."
-vertragingsBericht: "&7[P0] Teletransporteren over [delay]. Beweeg niet."
-chunkLaden: "&7[P0] Chunks laden, even geduld..."
-teletransportBericht: "&7[P0] Geteletransporteerd in [attempts] pogingen, in [processingTime]"
+vertragingsBericht: "&7[P0] ⚡ Teletransporteren over [delay]. Beweeg niet."
+chunkLaden: "&7[P0] ⚙ Chunks laden, even geduld..."
+teletransportBericht: "&7[P0] ⚡ Geteletransporteerd in [attempts] pogingen, in [processingTime]"
 
 # if teleport is cancelled
-teletransportAnnuleren: "&7[P0] Teletransport geannuleerd!"
+teletransportAnnuleren: "&7[P0] ⚡ Teletransport geannuleerd!"
 
 # als er na het maximum aantal pogingen geen veilige plek is
 # placeholder: [attempts] - het maximum aantal pogingen
-onveilig: "&7[P0] geen veilige locatie gevonden in [attempts] pogingen"
+onveilig: "&7[P0] ⌖ geen veilige locatie gevonden in [attempts] pogingen"
 
 # wanneer de speler in cooldown is
 # placeholder: [remainingCooldown] - de resterende tijd
-wachttijdBericht: "&7[P0] Je kunt pas weer teletransporteren over [remainingCooldown]"
+wachttijdBericht: "&7[P0] ⚡ Je kunt pas weer teletransporteren over [remainingCooldown]"
 
 # als de regio geen locaties in de wachtrij heeft en de speler geen rtp.unqueued-permissie heeft
-geenLocatiesInWachtrij: "#f5eb73[P0] er zijn momenteel geen locaties beschikbaar"
+geenLocatiesInWachtrij: "#f5eb73[P0] ⌖ er zijn momenteel geen locaties beschikbaar"
 
 # wanneer de wachtrij opschuift
 # placeholder: [spot] - de huidige positie in de rij

@@ -22,27 +22,27 @@ platzhalter:
 # Abschnitt 2: Teleportation
 # ###############################################################################
 # beim Teleportieren dies anzeigen
-wirdBereitsTeleportiert: "&7[P0] du wirst bereits teleportiert!"
+wirdBereitsTeleportiert: "&7[P0] ⚡ du wirst bereits teleportiert!"
 
 # wenn das Plugin gerade neu lädt
 teleportVerweigertNeuladen: "&7[P0] Teleports sind vorübergehend deaktiviert, während das Plugin neu lädt. Bitte versuche es gleich erneut."
-verzoegerungsNachricht: "&7[P0] Teleportiere in [delay]. Nicht bewegen"
-chunksLaden: "&7[P0] Lade Chunks! bitte warten..."
-teleportNachricht: "&7[P0] Teleportiert in [attempts] Versuchen, in [processingTime]"
+verzoegerungsNachricht: "&7[P0] ⚡ Teleportiere in [delay]. Nicht bewegen"
+chunksLaden: "&7[P0] ⚙ Lade Chunks! bitte warten..."
+teleportNachricht: "&7[P0] ⚡ Teleportiert in [attempts] Versuchen, in [processingTime]"
 
 # wenn der Teleport abgebrochen wird
-teleportAbbruch: "&7[P0] Teleport abgebrochen!"
+teleportAbbruch: "&7[P0] ⚡ Teleport abgebrochen!"
 
 # wenn nach Erreichen der maximalen Versuche keine sicheren Orte gefunden wurden
 # Platzhalter: [attempts] - die maximale Anzahl Versuche
-unsicher: "&7[P0] konnte innerhalb von [attempts] Versuchen keinen sicheren Ort finden"
+unsicher: "&7[P0] ⌖ konnte innerhalb von [attempts] Versuchen keinen sicheren Ort finden"
 
 # wenn der Spieler eine Abklingzeit hat
 # Platzhalter: [remainingCooldown] - die verbleibende Zeit
-abklingzeitNachricht: "&7[P0] Du kannst erst in [remainingCooldown] wieder teleportieren"
+abklingzeitNachricht: "&7[P0] ⚡ Du kannst erst in [remainingCooldown] wieder teleportieren"
 
 # wenn die Region keine Standorte in der Warteschlange hat und der Spieler keine rtp.unqueued-Berechtigung besitzt
-keineOrteInWarteschlange: "#f5eb73[P0] derzeit keine Orte bereit"
+keineOrteInWarteschlange: "#f5eb73[P0] ⌖ derzeit keine Orte bereit"
 
 # wenn sich die Warteschlange verschiebt
 # Platzhalter: [spot] - die aktuelle Position in der Warteschlange
