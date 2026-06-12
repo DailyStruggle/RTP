@@ -54,6 +54,35 @@ final class PregenState {
      * a finite, pre-mapped, Anvil-sourced set; no unbounded reroll).
      */
     final boolean biomeWeighted;
+    /**
+     * ADR-062 Phase 2 per-biome selection weights. Maps an upper-cased biome
+     * name to a non-negative relative weight; biomes absent from the map use a
+     * weight of {@code 1.0}. Consulted only when {@link #biomeWeighted} is
+     * {@code true} and at least one entry is present: the weighted recall draw
+     * then picks a target biome in proportion to these weights rather than with
+     * equal probability (the all-equal degenerate case is Phase 1). Empty when
+     * unconfigured, which reproduces the Phase 1 equal-probability draw.
+     */
+    final Map<String, Double> biomeWeights;
+    /**
+     * ADR-062 Phase 3 - the world's full biome registry (upper-cased names plus
+     * their {@code minecraft:<lower>} namespaced forms), resolved once per
+     * invocation via {@link RTPServerAccessor#getBiomes(RTPWorld)}. A requested
+     * biome present in this registry but absent from recall memory is treated as
+     * reachable "gray space" (steerable via bounded spiral exploration) rather
+     * than implicitly weight {@code 0}; a requested biome absent from the
+     * registry is a true {@code 0} (the world genuinely cannot produce it).
+     * Empty when the platform reports no registry, in which case gray-space
+     * gating treats every requested biome as registered (no pruning).
+     */
+    final Set<String> worldBiomeRegistry;
+    /**
+     * ADR-062 Phase 3 - per-world classification of how cheaply the platform can
+     * sample the biome at an arbitrary coordinate. Resolved once per invocation;
+     * consulted by the gray-space steering decision and reserved for the future
+     * noise-sample pre-filter (Future Work in ADR-062).
+     */
+    final io.github.dailystruggle.rtp.api.world.BiomeSampleCapability biomeSampleCapability;
     final long resolution;
     final long maxAttemptsBase;
     final ConfigParser<PerformanceKeys> performance;
@@ -108,6 +137,9 @@ final class PregenState {
             boolean biomeRecall,
             boolean biomeRecallForced,
             boolean biomeWeighted,
+            Map<String, Double> biomeWeights,
+            Set<String> worldBiomeRegistry,
+            io.github.dailystruggle.rtp.api.world.BiomeSampleCapability biomeSampleCapability,
             long resolution,
             ConfigParser<PerformanceKeys> performance) {
         this.region = region;
@@ -127,6 +159,9 @@ final class PregenState {
         this.biomeRecall = biomeRecall;
         this.biomeRecallForced = biomeRecallForced;
         this.biomeWeighted = biomeWeighted;
+        this.biomeWeights = biomeWeights;
+        this.worldBiomeRegistry = worldBiomeRegistry;
+        this.biomeSampleCapability = biomeSampleCapability;
         this.resolution = resolution;
         this.performance = performance;
 
@@ -227,6 +262,36 @@ final class PregenState {
                 performance.getConfigValue(PerformanceKeys.biomeRecallForced, false).toString());
         boolean biomeWeighted = Boolean.parseBoolean(
                 performance.getConfigValue(PerformanceKeys.biomeWeighted, false).toString());
+        Map<String, Double> biomeWeights = parseBiomeWeights(performance);
+
+        // ADR-062 Phase 3: resolve the world's biome registry and sampling
+        // capability once per invocation (like the weights above). Both feed the
+        // gray-space steering decision in PregenTask; the registry lets a
+        // registered-but-unrecorded requested biome stay reachable instead of
+        // being implicitly weight 0.
+        RTPWorld<?> world = region.getWorld();
+        Set<String> worldBiomeRegistry = new HashSet<>();
+        io.github.dailystruggle.rtp.api.world.BiomeSampleCapability biomeSampleCapability =
+                io.github.dailystruggle.rtp.api.world.BiomeSampleCapability.GENERATE_REQUIRED;
+        if (accessor != null && world != null) {
+            try {
+                Set<String> registry = accessor.getBiomes(world);
+                if (registry != null) {
+                    for (String b : registry) {
+                        if (b != null) worldBiomeRegistry.add(b.toUpperCase(Locale.ROOT));
+                    }
+                }
+            } catch (RuntimeException re) {
+                RTP.log(Level.WARNING, "[RTP] biome registry lookup failed: " + re);
+            }
+            try {
+                io.github.dailystruggle.rtp.api.world.BiomeSampleCapability cap =
+                        accessor.biomeSampleCapability(world);
+                if (cap != null) biomeSampleCapability = cap;
+            } catch (RuntimeException re) {
+                RTP.log(Level.WARNING, "[RTP] biome-sample capability lookup failed: " + re);
+            }
+        }
 
         return new PregenState(
                 region,
@@ -245,7 +310,42 @@ final class PregenState {
                 biomeRecall,
                 biomeRecallForced,
                 biomeWeighted,
+                biomeWeights,
+                worldBiomeRegistry,
+                biomeSampleCapability,
                 resolution,
                 performance);
+    }
+
+    /**
+     * Parse the {@code performance.yml#biomeWeights} map into an upper-cased,
+     * non-negative weight table (ADR-062 Phase 2). Non-numeric or negative
+     * values are dropped (negative weights are meaningless for a probability
+     * draw); a malformed or absent map yields an empty table, which the draw
+     * treats as "all biomes equal" (Phase 1 behavior).
+     */
+    private static Map<String, Double> parseBiomeWeights(ConfigParser<PerformanceKeys> performance) {
+        Map<String, Double> result = new HashMap<>();
+        Map<String, Object> raw;
+        try {
+            raw = performance.getMap(PerformanceKeys.biomeWeights);
+        } catch (RuntimeException re) {
+            return result;
+        }
+        if (raw == null || raw.isEmpty()) return result;
+        for (Map.Entry<String, Object> e : raw.entrySet()) {
+            if (e.getKey() == null || e.getValue() == null) continue;
+            double w;
+            try {
+                w = (e.getValue() instanceof Number n)
+                        ? n.doubleValue()
+                        : Double.parseDouble(e.getValue().toString().trim());
+            } catch (NumberFormatException nfe) {
+                continue;
+            }
+            if (Double.isNaN(w) || w < 0.0d) continue;
+            result.put(e.getKey().toUpperCase(Locale.ROOT), w);
+        }
+        return result;
     }
 }

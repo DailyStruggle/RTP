@@ -120,9 +120,9 @@ Each capability below is paired with the part of that architecture that makes it
 [TH][B]LeafRTP-Pro[/B][/TH]
 [/TR]
 [TR]
-[TD][B]Folia[/B] (Region Scheduler + off-tick pre-filter, no 1-tick stalls)[/TD]
-[TD]No[/TD]
-[TD][B]Yes[/B][/TD]
+[TD][B]Folia[/B] (tuned Region Scheduler + off-tick pre-filter, no 1-tick stalls)[/TD]
+[TD]Basic[/TD]
+[TD][B]Tuned[/B][/TD]
 [/TR]
 [TR]
 [TD][B]Multi-server / proxy[/B] (Velocity)[/TD]
@@ -150,7 +150,7 @@ Each capability below is paired with the part of that architecture that makes it
 [TD][B]Yes[/B][/TD]
 [/TR]
 [TR]
-[TD]Earliest release on each MC version + priority support[/TD]
+[TD]Earliest release on each MC version + first access to new platforms/features + priority support[/TD]
 [TD]No[/TD]
 [TD][B]Yes[/B][/TD]
 [/TR]
@@ -171,7 +171,7 @@ Each capability below is paired with the part of that architecture that makes it
 [/TR]
 [/TABLE]
 
-Same configuration, same data files, same commands as the free build - [B]upgrade is drop-in.[/B]
+Pro is the early-access tier: the tuned, throughput-optimized versions of new platforms and scaling backends land here first, because each one carries a real hands-on support burden that is only guaranteed on the paid tier. The free build still [I]runs[/I] on Folia (basic regionized scheduling + async teleport); Pro's tuned Folia adapter is what graduates to the free build once stabilized. Same configuration, same data files, same commands as the free build - [B]upgrade is drop-in.[/B]
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
@@ -735,7 +735,7 @@ A: Pre-warmed queue. In most cases a verified destination is ready before you ty
 A: See the admin guide. Resolution order: player's current world (or [I]world:[/I] param) -> world's target region -> region's target world.
 
 [B]Q: Does LeafRTP work on Folia?[/B]
-A: Yes - LeafRTP-Pro runs on the Region Scheduler with an off-tick pre-filter so no region stalls. Per-teleport work stays comfortably under one region tick; the 9.87 TP/s @ 99.97 % success we measured was limited by Region-Scheduler hops in the test harness, not by the engine's computation, so treat it as a harness-imposed floor rather than a performance ceiling.
+A: Yes, on both editions. The free build runs on Folia out of the box with a basic regionized scheduler (correctness-first: global/region/entity scheduling + async teleport). LeafRTP-Pro adds the tuned Folia adapter - the Region Scheduler with an off-tick pre-filter so no region stalls. Per-teleport work stays comfortably under one region tick; the 9.87 TP/s @ 99.97 % success we measured was limited by Region-Scheduler hops in the test harness, not by the engine's computation, so treat it as a harness-imposed floor rather than a performance ceiling.
 
 [B]Q: Do you support triangle / diamond region shapes?[/B]
 A: Use the [I]Polygon[/I] shape. A triangle is a 3-vertex polygon and a diamond is a rotated square, so both are already expressible without a dedicated shape type - define the vertices you want and the bounded spiral fills it.
@@ -756,7 +756,7 @@ A: Plain-material entries keep working unchanged; the new grammar is strictly ad
 A: Paper, with memory to spare for the location cache. LeafRTP works particularly well on pre-generated worlds.
 
 [B]Q: Can I downgrade to the free LeafRTP build?[/B]
-A: Yes - same configuration, same data files, same commands. You lose Folia, proxy, SQL/Redis, Vault, multilingual, and the tag/state-predicate grammar.
+A: Yes - same configuration, same data files, same commands. The free build still runs on Folia (basic regionized scheduling); what you give up is the [I]tuned[/I] Folia adapter, plus proxy, SQL/Redis, Vault, multilingual, and the tag/state-predicate grammar.
 [/SPOILER]
 
 

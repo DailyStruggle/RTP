@@ -211,9 +211,11 @@ public final class BrigadierCommandAdapter {
      * lets multi-parameter input like {@code /rtp player=leaf26 region=<TAB>}
      * tab-complete cleanly.
      *
-     * <p>Suggestions are intentionally unfiltered by permission, mirroring the
-     * historic Bukkit {@code TabCompleter} contract; permission filtering happens
-     * server-side at execution time.
+     * <p>Stage-1 suggestions (subcommand names and {@code paramName=} keys) are
+     * filtered by the caller's permission via {@link BrigadierBridgeContext#permissionCheck()},
+     * mirroring the Bukkit {@link TreeCommand#onTabComplete} contract so that
+     * Fabric/NeoForge callers are not shown subcommands or parameters they lack
+     * permission to use. A null/empty permission is treated as open.
      */
     private static <S> @NotNull SuggestionProvider<S> argsSuggestionsFor(@NotNull CommandsAPICommand node,
                                                                          @NotNull BrigadierBridgeContext<S> ctx) {
@@ -223,6 +225,25 @@ public final class BrigadierCommandAdapter {
             // the player sees an empty list with no log. Catch, log, return what
             // we already built.
             try {
+                final S source = brigadierCtx.getSource();
+                // Permission gate mirroring the Bukkit TreeCommand.onTabComplete
+                // contract: a null/empty permission is open, otherwise the
+                // suggestion is surfaced only when the caller holds it. A
+                // throwing predicate denies the suggestion (and logs), matching
+                // applyRequires' "deny on throw" semantics so we never leak a
+                // node the caller cannot use.
+                Predicate<String> allows = permission -> {
+                    if (permission == null || permission.isEmpty()) return true;
+                    try {
+                        return ctx.permissionCheck().test(source, permission);
+                    } catch (Throwable t) {
+                        java.util.logging.Logger.getLogger("RTP").log(java.util.logging.Level.WARNING,
+                                "[RTP] Brigadier suggestion permission predicate threw for permission='"
+                                        + permission + "'; denying. cause="
+                                        + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
+                        return false;
+                    }
+                };
                 String remainingRaw = builder.getRemaining();
                 // Locate the start of the LAST whitespace-separated token in the
                 // greedy capture; everything before it ("prior" tokens) has
@@ -256,6 +277,7 @@ public final class BrigadierCommandAdapter {
                                 if (sub == null) continue;
                                 String name = sub.name();
                                 if (name == null || name.isEmpty()) continue;
+                                if (!allows.test(sub.permission())) continue;
                                 if (name.toLowerCase(Locale.ROOT).startsWith(tokenLc)) {
                                     tokenBuilder.suggest(name);
                                 }
@@ -264,8 +286,11 @@ public final class BrigadierCommandAdapter {
                     }
                     Map<String, CommandParameter> params = tree.getParameterLookup();
                     if (params != null) {
-                        for (String paramName : params.keySet()) {
+                        for (Map.Entry<String, CommandParameter> paramEntry : params.entrySet()) {
+                            String paramName = paramEntry.getKey();
                             if (paramName == null || paramName.isEmpty()) continue;
+                            CommandParameter param = paramEntry.getValue();
+                            if (param != null && !allows.test(param.permission())) continue;
                             String suggestion = paramName + delim;
                             String suggestionLc = suggestion.toLowerCase(Locale.ROOT);
                             if (suggestionLc.startsWith(tokenLc)

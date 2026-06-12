@@ -56,6 +56,9 @@ An ADR captures a significant architectural decision: the context that forced it
 | [ADR-060](ADR-060-emergency-platform-block-restoration-timeout.md) | Emergency-Platform Block-Restoration Timeout (`safety.yml` `platformRestoreSeconds`, -1 disables; per-coordinate diff capture; DB-persisted, chunk-loaded countdown reaper; row removed on completion) | Accepted |
 | [ADR-061](ADR-061-open-core-dual-licensing.md) | Open-Core Dual Licensing (MIT for `rtp-api`, `rtp-core`, and the RTP lite binary; PolyForm Noncommercial for Pro-only source) | Accepted |
 | [ADR-062](ADR-062-biome-probability-weighting.md) | Biome-Probability Weighting for Location Selection (Anvil-sourced per-region biome occupancy map + bounded weighted draw; steering distinct from existing bad-sector avoidance) | Accepted |
+| [ADR-063](ADR-063-biome-first-menu-and-auto-region-by-biome.md) | Biome-First Menu with Auto-Region Selection by Biome Availability (observed-biome list from `MemoryShape.getObservedBiomes()`, `BiomeColorSource` row coloring, shared `/rtp biome:<x>` auto-region for CLI/menu parity, no player-controlled disk writes) | Accepted |
+| [ADR-064](ADR-064-config-comment-format-summary-line-as-menu-hover.md) | Config-Comment Format: Summary Line as Menu Hover Text (fixed two-part template — standalone first-line summary + prose + `@type`/`@options`/`@range`/`@unit`/`@default`/`@source` directives; canonical style guide `docs/dev/CONFIG_COMMENT_STYLE.md`) | Accepted |
+| [ADR-065](ADR-065-world-override-region-and-world-menu.md) | World-Override Regions and the `/rtp` World Menu (shared `world:<x>` override builds a cached `<region>_<world>` region so `rtp world:nether` and `rtp region:r world:nether` actually land in the target world; adds the front-page world picker row) | Accepted |
 
 ## Subproject ADRs
 

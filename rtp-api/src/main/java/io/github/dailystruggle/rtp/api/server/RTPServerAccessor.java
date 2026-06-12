@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
+import io.github.dailystruggle.rtp.api.world.BiomeSampleCapability;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.io.File;
@@ -382,6 +383,51 @@ public interface RTPServerAccessor {
    * @return set of all known biome name strings; never {@code null}
    */
   Set<String> getBiomes();
+
+  /**
+   * ADR-062 Phase 3 - classifies how cheaply the platform can answer "what
+   * biome is at (x, z)?" for an arbitrary, not-yet-recorded coordinate in the
+   * given world. See {@link BiomeSampleCapability}.
+   *
+   * <p>The default implementation returns {@link BiomeSampleCapability#GENERATE_REQUIRED},
+   * the conservative worst case: it assumes nothing about the world's biome
+   * source, so {@code rtp-core} treats unrecorded area as reachable only via
+   * bounded chunk-generating exploration. Platform adapters that can detect a
+   * deterministic noise biome source (vanilla and equivalents) override this to
+   * return {@link BiomeSampleCapability#NOISE_SAMPLABLE}, and adapters that can
+   * read already-generated chunks but not noise-sample return
+   * {@link BiomeSampleCapability#ANVIL_ONLY}.
+   *
+   * @param rtpWorld the world to classify; must not be {@code null}
+   * @return the sampling capability for {@code rtpWorld}; never {@code null}
+   */
+  default BiomeSampleCapability biomeSampleCapability(RTPWorld<?> rtpWorld) {
+    return BiomeSampleCapability.GENERATE_REQUIRED;
+  }
+
+  /**
+   * ADR-062 Phase 3 - best-effort biome name at a coordinate, used by
+   * registry-aware gray-space steering to confirm an exploratory candidate's
+   * biome without committing a teleport. Only the cheap, non-blocking tiers are
+   * expected to answer here: an adapter that classifies the world as
+   * {@link BiomeSampleCapability#NOISE_SAMPLABLE} may return a deterministic
+   * noise-source sample; all other capabilities, and any case that would
+   * require a synchronous chunk load (S-005), shall return {@code null} so the
+   * caller falls back to the downstream pipeline biome verification.
+   *
+   * <p>The default implementation returns {@code null} (no cheap sample
+   * available).
+   *
+   * @param rtpWorld the world to sample; must not be {@code null}
+   * @param x block x
+   * @param y block y
+   * @param z block z
+   * @return the upper-cased biome name at the coordinate, or {@code null} if no
+   *     cheap, non-blocking sample is available
+   */
+  default @Nullable String sampleBiome(RTPWorld<?> rtpWorld, int x, int y, int z) {
+    return null;
+  }
 
   /**
    * Returns whether the calling thread is the main server tick thread.

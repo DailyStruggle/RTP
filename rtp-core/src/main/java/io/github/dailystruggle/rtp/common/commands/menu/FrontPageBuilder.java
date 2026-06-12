@@ -161,6 +161,16 @@ public final class FrontPageBuilder {
                     null,
                     new MenuAction.OpenParamPicker(new String[0], "region"));
         }
+        CommandParameter worldParam = findParameter(rtpRoot, "world");
+        if (worldParam != null
+                && parameterPermissionOk(worldParam, permission)
+                && parameterHasSuggestions(worldParam, viewer)) {
+            addRow(
+                    lines,
+                    lookupMsg(MessagesKeys.menuFrontPageRowWorld, "🌐 Pick a world"),
+                    null,
+                    new MenuAction.OpenParamPicker(new String[0], "world"));
+        }
         CommandParameter biomeParam = findParameter(rtpRoot, "biome");
         if (biomeParam != null
                 && parameterPermissionOk(biomeParam, permission)

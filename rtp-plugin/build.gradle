@@ -320,18 +320,25 @@ tasks.register('copyDocs', Copy) {
     // `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `FOR_CONTRIBUTORS.md`,
     // SpigotMC `*.bbcode` listing sources, `DOCS_OPTIMIZATION_PLAN.md`, ...)
     // is intentionally NOT bundled — it remains available in the public
-    // repository. The `docs/admin/**` and `docs/architecture/**` trees stay
-    // in the jar so admins who unzip the release can read Quick Start,
-    // Configuration, the runtime/architecture diagrams, etc., without
-    // needing GitHub access. See CHANGELOG `[3.0.0-beta.2]`.
+    // repository. The `docs/admin/**` tree stays in the jar so admins who
+    // unzip the release can read Quick Start, Configuration, etc., without
+    // needing GitHub access. The `docs/architecture/**` tree is contributor-
+    // facing internals and is NOT bundled (see the `from` block below).
+    // See CHANGELOG `[3.0.0-beta.2]`.
     from(rootProject.file('docs')) {
         // Top-level audience landing pages (the ones that actually live under docs/).
         include 'MAP.md'
         include 'FOR_SERVER_ADMINS.md'
         include 'FOR_ADDON_DEVELOPERS.md'
-        // Audience-A: server-admin docs and runtime/architecture diagrams.
+        // Audience-A: operator-facing server-admin docs only.
         include 'admin/**'
-        include 'architecture/**'
+        // The `architecture/**` tree (per-attempt pipeline internals, chunk-
+        // ticket lifecycle, active-GC sweep, network model, etc.) is
+        // developer/contributor material, not operator runbook content. It is
+        // intentionally NOT bundled in the released jar (size: ~78KB) -- it
+        // stays available in the public repository for contributors. Admins
+        // who unzip the release still get the full `admin/**` operational set
+        // (Quick Start, Configuration, Commands, Hazards, Runbook, proxies...).
     }
     from(rootProject.projectDir) {
         include 'LICENSE'
@@ -417,6 +424,22 @@ shadowJar {
     exclude 'macos/**'
     exclude 'META-INF/jars/**'
 
+    // Size trim: compile-only IntelliJ annotations (@Nullable/@NotNull etc.)
+    // leak in transitively from several deps. They have CLASS retention and no
+    // runtime purpose for RTP or for addons -- drop them and their orphan
+    // maven metadata. (~30KB compressed.)
+    exclude 'org/jetbrains/annotations/**'
+    exclude 'org/intellij/lang/annotations/**'
+    // Orphan maven pom/properties metadata for every shaded artifact -- never
+    // read at runtime.
+    exclude 'META-INF/maven/**'
+    // Contributor-facing architecture internals are no longer bundled (see
+    // copyDocs). Belt-and-braces exclude here too: copyDocs is a Copy task and
+    // does not prune previously-copied files from its output dir on an
+    // incremental build, so a stale docs/architecture/** tree could otherwise
+    // survive into the packaged jar.
+    exclude 'docs/architecture/**'
+
     relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
     relocate 'io.github.dailystruggle.commandsapi', 'io.github.dailystruggle.rtp.commandsapi'
     relocate 'io.github.dailystruggle.effectsapi', 'io.github.dailystruggle.rtp.effectsapi'
@@ -441,6 +464,18 @@ shadowJar {
     //
     // Solution: merge v26_1_R1 bytecode AFTER remapJar via the `mergeV26`
     // task below, so its classes survive intact.
+    //
+    // NOTE: shadowJar's `minimize()` is deliberately NOT used here. The heavy
+    // shaded libs are either reflectively driven (Jedis pub/sub, lz4 Safe/
+    // Unsafe variant selection) or relocated into our own namespace (Hikari,
+    // bstats), and every published RTP module exposes an addon-facing API plus
+    // descriptor-loaded platform entry points (RTPFabricMod, the Velocity main,
+    // plugin.yml main) that static reachability analysis cannot see. Under
+    // those constraints minimize() would trim only a few KB of genuinely-unused
+    // transitive code while risking silent NoClassDefFoundError on the public
+    // API or a platform bootstrap -- a bad trade. Size is instead reduced via
+    // the deterministic excludes above (annotations, maven metadata) and the
+    // narrowed copyDocs payload.
 }
 
 // Loom's remapJar reads from `jar` by default and produces an intermediary-
@@ -1042,10 +1077,11 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     exclude 'org/slf4j/**'
     // Annotation-processor service descriptors leaked from compileOnly deps.
     exclude 'META-INF/services/javax.annotation.processing.Processor'
-    // Orphan maven metadata for stripped libraries.
-    exclude 'META-INF/maven/org.slf4j/**'
-    exclude 'META-INF/maven/org.apache.commons/**'
-    exclude 'META-INF/maven/com.zaxxer/**'
+    // Compile-only IntelliJ annotations (CLASS retention, no runtime use) and
+    // all orphan maven pom/properties metadata for shaded artifacts.
+    exclude 'org/jetbrains/annotations/**'
+    exclude 'org/intellij/lang/annotations/**'
+    exclude 'META-INF/maven/**'
     exclude 'io/github/dailystruggle/rtp/common/database/options/H2*.class'
     exclude 'io/github/dailystruggle/rtp/common/database/options/SQLite*.class'
     exclude 'io/github/dailystruggle/rtp/common/database/options/MySQL*.class'

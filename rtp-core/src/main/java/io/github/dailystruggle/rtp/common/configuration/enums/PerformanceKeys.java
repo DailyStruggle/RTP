@@ -16,6 +16,7 @@ public enum PerformanceKeys {
   biomeRecall,
   biomeRecallForced,
   biomeWeighted,
+  biomeWeights,
   visitorEnabled,
   loginCacheEnabled,
   loginCacheCap,

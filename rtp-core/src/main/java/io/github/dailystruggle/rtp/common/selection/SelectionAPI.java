@@ -33,7 +33,18 @@ public class SelectionAPI {
   public final ConcurrentLinkedQueue<Runnable> selectionPipelineUrgent =
       new ConcurrentLinkedQueue<>();
 
-  /** A cache for temporary, on-the-fly regions, keyed by UUID. */
+  /**
+   * A cache for temporary, on-the-fly regions, keyed by UUID.
+   *
+   * <p>Two distinct key spaces share this map: shape/vert parameter overrides
+   * are keyed by the requesting <em>sender</em> UUID (one-shot, per-command),
+   * while world-override regions (ADR-065) are keyed by the target
+   * <em>world</em> UUID ({@code RTPWorld.id()}) so a {@code "<region>_<world>"}
+   * region is created once per world and reused across requests. Storing them
+   * here reuses the existing shutdown/flush/clear lifecycle (reload + server
+   * stop) and DB dump without a separate map. The two UUID spaces do not
+   * collide in practice (player ids vs world ids).
+   */
   public final ConcurrentHashMap<UUID, Region> tempRegions = new ConcurrentHashMap<>();
 
   /** A lookup map for all permanently configured regions, keyed by name. */
@@ -218,6 +229,70 @@ public class SelectionAPI {
     );
 
     return new Region("temp", newSettings);
+  }
+
+  /**
+   * Returns a world-override region (ADR-065): a region with {@code baseRegionName}'s
+   * settings but rebound to the world {@code worldName} (and that world's shape).
+   * Used so {@code /rtp world:<w>} and {@code /rtp region:<r> world:<w>} land in
+   * world {@code w} rather than following the base region's configured world.
+   *
+   * <p>The result is cached in {@link #tempRegions} keyed by the target world's
+   * UUID ({@code RTPWorld.id()}), and named {@code "<baseRegion>_<world>"} (e.g.
+   * {@code default_nether}), so repeated requests reuse the same region and it
+   * is cleaned up by the existing temp-region lifecycle. When the base region
+   * already targets {@code worldName}, the base region is returned unchanged
+   * (no synthetic region is created).
+   *
+   * @param baseRegionName the base region to clone settings from; falls back to
+   *                       {@code "default"} when null/empty/unknown.
+   * @param worldName      the target world name (as returned by {@code RTPWorld.name()}).
+   * @return the world-override region, the base region when it already targets the
+   *         world, or {@code null} when the world is unknown or no base region exists.
+   */
+  @Nullable
+  public Region worldRegion(@Nullable String baseRegionName, @Nullable String worldName) {
+    if (worldName == null || worldName.isEmpty()) return null;
+    if (baseRegionName == null
+        || baseRegionName.isEmpty()
+        || !permRegionLookup.containsKey(baseRegionName)) baseRegionName = "default";
+    Region baseRegion = permRegionLookup.get(baseRegionName);
+    if (baseRegion == null) return null;
+
+    // Already the right world? Don't synthesize a region.
+    RTPWorld<?> baseWorld = baseRegion.getWorld();
+    if (baseWorld != null && worldName.equals(baseWorld.name())) return baseRegion;
+
+    RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(worldName);
+    if (world == null) return null;
+    UUID worldId = world.id();
+    if (worldId == null) return null;
+
+    String name = baseRegionName + "_" + worldName;
+    final Region baseRegionFinal = baseRegion;
+    final RTPWorld<?> worldFinal = world;
+    return tempRegions.computeIfAbsent(worldId, k -> {
+      RegionSettings base = baseRegionFinal.getSettings();
+      Shape<?> shape;
+      Object resolvedShape = RTP.serverAccessor.getShape(worldName);
+      shape = (resolvedShape instanceof Shape<?>) ? (Shape<?>) resolvedShape : base.shape();
+      RegionSettings newSettings = new RegionSettings(
+          name,
+          worldFinal,
+          shape,
+          base.vert(),
+          base.worldBorderOverride(),
+          base.requirePermission(),
+          base.cacheCap(),
+          base.backlogCacheCap(),
+          base.networkReserveSize(),
+          base.activeChunkCap(),
+          base.price(),
+          base.spatialResolution(),
+          base.override(),
+          base.detailedRegionInit());
+      return new Region(name, newSettings);
+    });
   }
 
   /**

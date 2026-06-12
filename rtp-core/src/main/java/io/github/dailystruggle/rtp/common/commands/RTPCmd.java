@@ -550,6 +550,28 @@ public interface RTPCmd extends BaseRTPCmd {
         }
 
         regionName = worldParser.getConfigValue(WorldKeys.region, "default").toString();
+
+        // ADR-063: auto-region by biome availability. When a biome is requested
+        // without an explicit region, keep the world-default region only if it
+        // has itself observed the biome; otherwise pick the accessible region
+        // that best offers it. Falls back to the world-default name when no
+        // region has observed the biome (cold-data graceful degradation). This
+        // shared resolution keeps CLI and menu in parity: the menu emits the
+        // plain /rtp biome:<x> command and gets the same region choice.
+        if (biomeList != null && !biomeList.isEmpty()) {
+          String requestedBiome = biomeList.get(0);
+          String resolved =
+              io.github.dailystruggle.rtp.common.commands.menu.BiomeMenuSource.bestRegionForBiome(
+                  senderId, requestedBiome, regionName);
+          if (resolved != null) {
+            if (!resolved.equals(regionName)) {
+              RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute auto-region by biome senderId="
+                  + senderId + " biome=" + requestedBiome + " worldDefaultRegion=" + regionName
+                  + " -> resolvedRegion=" + resolved);
+            }
+            regionName = resolved;
+          }
+        }
       }
 
       SelectionAPI selectionAPI = RTP.selectionAPI;
@@ -569,6 +591,26 @@ public interface RTPCmd extends BaseRTPCmd {
         RTP.getInstance().processingPlayers.remove(senderId);
         RTP.getInstance().latestTeleportData.remove(senderId);
         return true;
+      }
+
+      // ADR-065: world-override region. When a world:<w> argument is present
+      // (top-level `rtp world:<w>` or the region sub-parameter
+      // `rtp region:<r> world:<w>`), rebind the resolved base region to the
+      // requested world so the teleport actually lands there instead of
+      // following the base region's configured world (e.g. world:nether would
+      // otherwise resolve back to the overworld via WorldKeys.region). CLI and
+      // menu share this path, so the menu emits the plain /rtp world:<w>.
+      if (rtpArgs.containsKey("world")) {
+        String worldOverride = pickOne(rtpArgs.get("world"), null);
+        if (worldOverride != null && !worldOverride.isEmpty()) {
+          Region worldRegion = selectionAPI.worldRegion(region.name, worldOverride);
+          if (worldRegion != null && worldRegion != region) {
+            RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute world-override senderId=" + senderId
+                + " baseRegion=" + region.name + " world=" + worldOverride
+                + " -> region=" + worldRegion.name);
+            region = worldRegion;
+          }
+        }
       }
 
       RTPWorld rtpWorld = region.getWorld();

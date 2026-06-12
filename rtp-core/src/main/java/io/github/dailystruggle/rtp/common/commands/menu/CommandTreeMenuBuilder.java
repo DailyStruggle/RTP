@@ -512,8 +512,21 @@ public final class CommandTreeMenuBuilder {
                     // Book parchment contrast: clickable value rows default to
                     // vanilla book yellow on Paper Books; prefix &2 (dark
                     // green) so the row reads cleanly against parchment. Per
-                    // .junie/AGENTS.md 'Book Menu Color Contrast'.
-                    valueLines.add(MenuLine.of(new MenuFragment("&2" + value, null,
+                    // .junie/AGENTS.md 'Book Menu Color Contrast'. ADR-063:
+                    // biome rows are tinted by their map color (parchment-safe
+                    // dark legacy code) so each biome is visually distinct;
+                    // world rows are tinted by the average of the biome map
+                    // colors observed in that world, again clamped for the
+                    // parchment background.
+                    String colorPrefix;
+                    if ("biome".equalsIgnoreCase(paramName)) {
+                        colorPrefix = MenuColor.biomeColorPrefix(value);
+                    } else if ("world".equalsIgnoreCase(paramName)) {
+                        colorPrefix = MenuColor.worldColorPrefix(value);
+                    } else {
+                        colorPrefix = "&2";
+                    }
+                    valueLines.add(MenuLine.of(new MenuFragment(colorPrefix + value, null,
                             new MenuAction.OpenMenu(openArgs))));
                 }
             }

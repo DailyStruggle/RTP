@@ -1,7 +1,46 @@
 # ADR-024 — RTP-lite Assembly Variant
 
-**Status:** Accepted (amended 2026-06-01 — Vault economy in scope for lite)
+**Status:** Accepted (amended 2026-06-10 — basic Folia support in scope for lite)
 **Date:** 2026-04-30
+
+## 2026-06-10 amendment — basic Folia support in scope for lite
+
+The original decision below, and the 2026-05-07 Fabric amendment, scoped Folia as
+**full/Pro-only**: the lite `plugin.yml` declared `folia-supported: false`, and on a
+Folia host the lite jar failed to wire (it resolves `folia_v*` adapter classes that
+are excluded from the lite jar). That left the free build unable to even start on
+Folia — a harder wall than the competition, which runs on Folia for free. As of
+2026-06-10 that scope is widened: **the free build runs on Folia with a basic,
+correctness-first regionized path; the tuned `rtp-folia` adapter stays Pro.**
+
+Concretely:
+
+- A new `FoliaAwareScheduler` (`io.github.dailystruggle.rtp.paper.scheduling`, in the
+  lite-bundled `rtp-paper-common` module) implements `RTPScheduler` against paper-api's
+  regionized scheduler statics (`getGlobalRegionScheduler` / `getRegionScheduler` /
+  `getAsyncScheduler`) and the per-entity scheduler for player work. It is
+  correctness-first: it always hops to the correct region/global thread (no
+  `isGlobalTickThread` inline-run optimization, which paper-api does not expose).
+- `BukkitRTPPlayer.setLocation` (Spigot-classpath `rtp-bukkit-common`) detects Folia by
+  class-probe and routes the teleport through `Entity#teleportAsync` reflectively (the
+  Spigot API has no `teleportAsync`); a cross-region sync `teleport()` would throw on
+  Folia. Failures are logged, never swallowed (REQ-RTP-S-004).
+- `BukkitServerProvider.resolveServerModel` prefers the tuned `folia_v*` adapter when it
+  is on the classpath (Pro) and falls back to the Paper accessor + `FoliaAwareScheduler`
+  when it is not (lite).
+- The lite `plugin.yml` sets `folia-supported: true`.
+- Because the new class lives in the `io.github.dailystruggle.rtp.paper.*` package, the
+  existing `io/.../folia/**` + `folia_*` lite excludes and the `liteJarStructureCheck`
+  audit are unchanged — the tuned `rtp-folia` adapter remains excluded from the lite jar,
+  so no PolyForm-licensed Pro source leaks into the MIT lite binary (ADR-061).
+
+This keeps the Pro value on Folia (the tuned, throughput-optimized adapter ships first in
+Pro, per the early-access framing) while removing the "won't run on Folia at all" wall
+from the free build. Bullets below referring to "Folia drop" / "no Folia" as a lite
+packaging drop are superseded by this amendment for the **scheduler/teleport** path; the
+tuned `rtp-folia` adapter classes remain a lite drop.
+
+---
 
 ## 2026-06-01 amendment — Vault economy in scope for lite
 
