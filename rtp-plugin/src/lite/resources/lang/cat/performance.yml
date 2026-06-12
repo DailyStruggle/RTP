@@ -78,7 +78,7 @@ forced_smell_memory: false
 # Needs biomeRecall; no effect on unfiltered (default-biome) pounces.
 # @type: boolean
 # @default: false
-biomeWeighted: false
+biome_favoritism: false
 
 # Per-biome relative selection weights for biome-filtered teleports.
 # Only consulted when biomeWeighted is true. Biomes not listed here use
@@ -90,7 +90,7 @@ biomeWeighted: false
 # (default-biome) teleports. The shipped plains entry is a weight-1.0
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
-biomeWeights:
+biome_favor_amounts:
   # How strongly this biome gets pounced toward (1.0 = no favoritism).
   # @type: number
   # @range: [0.0, null]

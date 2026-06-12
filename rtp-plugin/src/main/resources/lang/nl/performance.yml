@@ -109,7 +109,7 @@ bioomHerinnering_geforceerd: false
 # (standaardbiome-)teleports.
 # @type: boolean
 # @default: false
-biomeWeighted: false
+bioomGewogen: false
 
 # Per-biome relative selection weights for biome-filtered teleports.
 # Only consulted when biomeWeighted is true. Biomes not listed here use
@@ -121,7 +121,7 @@ biomeWeighted: false
 # (default-biome) teleports. The shipped plains entry is a weight-1.0
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
-biomeWeights:
+bioomGewichten:
   # Relatieve selectieweging voor dit biome (1.0 = geen bias).
   # @type: number
   # @range: [0.0, null]
@@ -222,26 +222,26 @@ bezoeker_ingeschakeld: true
 # Houd een gereserveerde cache voor join-teleports (rtp.onevent.firstjoin / rtp.onevent.join). Grootte volgens de resterende vrije spelersslots. Zie
 # @type: boolean
 # @default: false
-loginCacheEnabled: false
+loginCacheIngeschakeld: false
 
 # Harde bovengrens voor de join-cache. 0 = automatisch (server max-players bij opstart).
 # @type: integer
 # @range: [0, null]
 # @default: 0
-loginCacheCap: 0
+loginCacheLimiet: 0
 
 # WIJZIG HET VERSIENUMMER NIET
 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.0
-pregeneratedPreference: 0.0
+voorgegenereerdVoorkeur: 0.0
 
 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
-backlogRefillThreshold: 0.5
+backlogBijvulDrempel: 0.5
 
 # Latentiedrempel (ms) waarboven een direct bediende (niet-gewachtrijde) teleport
 # wordt gecontroleerd: er wordt een WARN gelogd en de cumulatieve teller
@@ -252,7 +252,7 @@ backlogRefillThreshold: 0.5
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
-slowPipelineThresholdMs: 5000
+traagPipelineDrempelMs: 5000
 
 # Diepte van de publieke teleportwachtrij (wachtende spelers) waarop of waarboven
 # de wachtrij-tegendruk wordt gecontroleerd: er wordt een flankgetriggerde WARN
@@ -262,7 +262,7 @@ slowPipelineThresholdMs: 5000
 # @range: [0, null]
 # @unit: players
 # @default: 0
-queueGrowthWarnThreshold: 0
+wachtrijGroeiWaarschuwDrempel: 0
 
 # Instellingen voor /rtp admin prefab. De apply -> confirm-stroom schrijft elk gewijzigd
 # configuratiebestand met een back-up genaamd <file>.yml.bak.<epochMillis>;
@@ -270,11 +270,11 @@ queueGrowthWarnThreshold: 0
 # eerst verwijderd. Zet op 1 om alleen de nieuwste te bewaren; waarden onder 1 worden
 # naar 1 bijgesteld. /rtp admin prefab rollback doorloopt back-ups nieuwste-eerst over
 # meerdere aanroepen.
-prefab:
+voorgevormd:
   # Aantal van een tijdstempel voorziene configback-ups dat per bestand wordt bewaard.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  bakRetention: 3
+  bakBehoud: 3
 # RAAK HET VERSIENUMMER NIET AAN
 version: 1.0

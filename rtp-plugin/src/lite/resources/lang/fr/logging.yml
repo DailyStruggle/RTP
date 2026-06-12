@@ -6,7 +6,7 @@ commande: false
 # Journaliser les événements de téléportation réussis
 # @type: boolean
 # @default: true
-teleport: true
+teleportation: true
 
 # Journaliser le RTP déclenché par des changements de monde
 # @type: boolean

@@ -48,7 +48,7 @@ asyncZugeteilteZeit: 50
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
-minTPS: 19.0
+minimaleTPS: 19.0
 
 # Den Regions-Cache unmittelbar nach einem erfolgreichen Teleport auffüllen.
 # @type: boolean
@@ -84,7 +84,7 @@ biomWiederverwendungErzwungen: false
 # ungefilterte (Standardbiom-)Teleports.
 # @type: boolean
 # @default: false
-biomeWeighted: false
+biomGewichtet: false
 
 # Per-biome relative selection weights for biome-filtered teleports.
 # Only consulted when biomeWeighted is true. Biomes not listed here use
@@ -96,7 +96,7 @@ biomeWeighted: false
 # (default-biome) teleports. The shipped plains entry is a weight-1.0
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
-biomeWeights:
+biomGewichte:
   # Relative Auswahlgewichtung für dieses Biom (1.0 = keine Gewichtung).
   # @type: number
   # @range: [0.0, null]

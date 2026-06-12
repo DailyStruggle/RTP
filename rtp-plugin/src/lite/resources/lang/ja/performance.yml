@@ -108,7 +108,7 @@
 # biomeRecall が必要です。絞り込みなし（既定バイオーム）のテレポートには影響しません。
 # @type: boolean
 # @default: false
-biomeWeighted: false
+バイオーム重み付け: false
 
 # Per-biome relative selection weights for biome-filtered teleports.
 # Only consulted when biomeWeighted is true. Biomes not listed here use
@@ -120,7 +120,7 @@ biomeWeighted: false
 # (default-biome) teleports. The shipped plains entry is a weight-1.0
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
-biomeWeights:
+バイオーム重み:
   # このバイオームの相対的な選択ウェイト（1.0 = 偏りなし）。
   # @type: number
   # @range: [0.0, null]
@@ -201,5 +201,81 @@ biomeWeights:
 # @default: false
 チャンクロード時チェック: false
 
+# 観察モードキャッシュ補充 (Region Data Visitor)
+# プリジェネレーション済みキャッシュが満杯の場合、同じ `period` 周期で
+# 各リージョンに観察モードの RegionCacheTask をスケジュールします。
+# 通常のキャッシュ補充と同じ LocationGenerator パイプラインを再利用しますが、
+# 安全候補をキューに入れずに破棄するため、副作用（不良位置の記録、観測済み
+# バイオームの収集など）はバックグラウンドで蓄積される一方、キューが上限を
+# 超えることはありません。
+# ワールド生成は決して引き起こしません: ディスクに書き込まれていないチャンクは
+# の Anvil プリフィルタにより UNKNOWN としてスキップされます。
+# visitorEnabled: メインスイッチ (true で観察モードを有効化)。
+# 頻度は上の `period` 設定に従います。専用のレートパラメータはありません。
+# 影響: 低 — 既存の `period` で律速されており、デフォルト補充モードでキャッシュに
+# 余裕があるときにのみ追加作業が行われます。
+# @type: boolean
+# @default: false
+ビジター有効: true
+
+# 参加時テレポート (rtp.onevent.firstjoin / rtp.onevent.join) 用に予約位置キャッシュを維持します。残りの空きスロット数でサイズが決まります。 参照。
+# @type: boolean
+# @default: false
+ログインキャッシュ有効: false
+
+# 参加キャッシュの上限。0 = 自動 (起動時のサーバー max-players)。
+# @type: integer
+# @range: [0, null]
+# @default: 0
+ログインキャッシュ上限: 0
+
+# 選択試行ごとに未生成チャンクを拒否する確率。
+# 0.0 = 偏りなし（既定）、1.0 = 未生成の土地を厳密に避ける。
+# 生成済みチャンクは常に通過します。
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+事前生成優先度: 0.0
+
+# L3 バックログ容量のどの割合で補充を再開するか（ヒステリシス）。
+# 0.5 = L3 が 50% まで減ってから補充（既定）。1.0 = 継続的に補充。
+# 値を大きくすると .mca ビンの確認がまとめられ、CPU/メモリ効率が向上します。
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+バックログ補充しきい値: 0.5
+
+# この遅延しきい値（ミリ秒）を超えると、即時提供（キュー未経由）のテレポートが
+# 監査されます。WARN が記録され、累積カウンタ slowPipelineCount（/rtp info で表示）
+# が増加します。監査対象は即時/キュー未経由のテレポートのみで、キュー経由の
+# 一定レートのテレポートは測定時間にキュー待ちを含むため除外されます。
+# 0 以下で監査を無効化します。ADR-053 を参照。
+# @type: integer
+# @range: [0, null]
+# @unit: ms
+# @default: 5000
+低速パイプラインしきい値Ms: 5000
+
+# 公開テレポートキューの深さ（待機中のプレイヤー数）がこの値以上になると、
+# キューの背圧が監査されます。エッジトリガーで WARN が記録され、累積カウンタ
+# queueGrowthWarnCount（/rtp info で表示）が境界の通過ごとに 1 回増加します。
+# 0 以下で監査を無効化します（オプトイン）。ADR-053 を参照。
+# @type: integer
+# @range: [0, null]
+# @unit: players
+# @default: 0
+キュー増加警告しきい値: 0
+
+# /rtp admin prefab の設定。apply -> confirm の流れで、変更した各設定ファイルを
+# <file>.yml.bak.<epochMillis> という名前のバックアップとともに書き込みます。
+# bakRetention はファイルごとに保持するバックアップ数の上限で、古いものから削除します。
+# 1 にすると最新のバックアップのみ保持。1 未満の値は 1 に切り上げられます。
+# /rtp admin prefab rollback は複数回の呼び出しでバックアップを新しい順にたどります。
+プリセット:
+  # ファイルごとに保持されるタイムスタンプ付き設定バックアップの数。
+  # @type: integer
+  # @range: [1, null]
+  # @default: 3
+  bak保持数: 3
 # バージョン番号は変更しないでください
 version: 1.0

@@ -18,7 +18,7 @@ befehl: false
 # Erfolgreiche Teleport-Ereignisse protokollieren
 # @type: boolean
 # @default: true
-teleport: true
+teleportierung: true
 
 # RTP ausgelöst durch Weltenwechsel protokollieren
 # @type: boolean

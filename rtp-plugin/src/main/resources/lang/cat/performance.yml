@@ -83,7 +83,7 @@ forced_smell_memory: false
 # Needs biomeRecall; no effect on unfiltered (default-biome) pounces.
 # @type: boolean
 # @default: false
-biomeWeighted: false
+biome_favoritism: false
 
 # Per-biome relative selection weights for biome-filtered teleports.
 # Only consulted when biomeWeighted is true. Biomes not listed here use
@@ -95,7 +95,7 @@ biomeWeighted: false
 # (default-biome) teleports. The shipped plains entry is a weight-1.0
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
-biomeWeights:
+biome_favor_amounts:
   # How strongly this biome gets pounced toward (1.0 = no favoritism).
   # @type: number
   # @range: [0.0, null]
@@ -177,18 +177,18 @@ check_when_kibble_arrives: false
 # Enable background data gathering by visiting kitties
 # @type: boolean
 # @default: false
-visitorEnabled: false
+visitor_kitty_enabled: false
 
 # Keep a reserved warm-spot pile for join-time pounces (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty kitty slots.
 # @type: boolean
 # @default: false
-loginCacheEnabled: false
+login_warmspot_enabled: false
 
 # Hard lid for the join warm-spot pile. 0 = auto (server max-kitties at startup).
 # @type: integer
 # @range: [0, null]
 # @default: 0
-loginCacheCap: 0
+login_warmspot_cap: 0
 
 # Chance of rejecting an ungenerated chunk per pounce attempt.
 # 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land.
@@ -196,7 +196,7 @@ loginCacheCap: 0
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.0
-pregeneratedPreference: 0.0
+prefers_explored_land: 0.0
 
 # Fraction of L3 backlog capacity at which top-up resumes (hysteresis).
 # 0.5 = top-up only after L3 drains to 50% (default). 1.0 = top-up
@@ -205,7 +205,7 @@ pregeneratedPreference: 0.0
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
-backlogRefillThreshold: 0.5
+backlog_refill_threshold: 0.5
 
 # Latency threshold (ms) above which an immediately-served (unqueued) pounce
 # is audited: a WARN is logged and the cumulative slowPipelineCount counter
@@ -216,7 +216,7 @@ backlogRefillThreshold: 0.5
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
-slowPipelineThresholdMs: 5000
+slow_pounce_threshold_ms: 5000
 
 # Public pounce-queue depth (cats waiting) at or above which queue backpressure
 # is audited: an edge-triggered WARN is logged and the cumulative
@@ -226,18 +226,18 @@ slowPipelineThresholdMs: 5000
 # @range: [0, null]
 # @unit: players
 # @default: 0
-queueGrowthWarnThreshold: 0
+queue_growth_warn_threshold: 0
 
 # Settings for /rtp admin prefab. The apply -> confirm flow writes each touched
 # config file with a sibling backup named <file>.yml.bak.<epochMillis>;
 # bakRetention caps how many such backups are kept per file, oldest pruned first.
 # Set to 1 to keep only the most recent backup; values below 1 are clamped to 1.
 # /rtp admin prefab rollback walks backups newest-first across multiple invocations.
-prefab:
+prefab_blanket:
   # How many time-stamped backup copies of each settings file are kept before the oldest is swatted away.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  bakRetention: 3
+  kept_backup_naps: 3
 # Do not bite the version number, sacred catnip
 meowsion: 1.0

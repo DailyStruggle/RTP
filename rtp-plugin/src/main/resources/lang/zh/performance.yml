@@ -107,7 +107,7 @@
 # 淹没稀有生物群系。需要 biomeRecall；对未筛选（默认生物群系）的传送无效。
 # @type: boolean
 # @default: false
-biomeWeighted: false
+生物群系加权: false
 
 # Per-biome relative selection weights for biome-filtered teleports.
 # Only consulted when biomeWeighted is true. Biomes not listed here use
@@ -119,7 +119,7 @@ biomeWeighted: false
 # (default-biome) teleports. The shipped plains entry is a weight-1.0
 # no-op example - replace or extend it with the biomes you want to bias.
 # @type: map<string, number>
-biomeWeights:
+生物群系权重:
   # 该生物群系的相对选择权重（1.0 = 无偏向）。
   # @type: number
   # @range: [0.0, null]
@@ -213,18 +213,18 @@ biomeWeights:
 # 会执行额外工作。
 # @type: boolean
 # @default: false
-visitorEnabled: true
+访客启用: true
 
 # 为加入时传送 (rtp.onevent.firstjoin / rtp.onevent.join) 保留缓存。容量由剩余空闲槽位决定。参见。
 # @type: boolean
 # @default: false
-loginCacheEnabled: false
+登录缓存启用: false
 
 # 加入缓存的硬上限。0 = 自动 (服务器启动时的 max-players)。
 # @type: integer
 # @range: [0, null]
 # @default: 0
-loginCacheCap: 0
+登录缓存上限: 0
 
 # 每次选择尝试拒绝未生成区块的概率。
 # 0.0 = 无偏向（默认），1.0 = 严格避开未生成的地块。
@@ -232,7 +232,7 @@ loginCacheCap: 0
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.0
-pregeneratedPreference: 0.0
+预生成偏好: 0.0
 
 # 恢复补充时 L3 积压容量所占的比例（迟滞）。
 # 0.5 = 仅在 L3 降至 50% 后才补充（默认）。1.0 = 持续补充。
@@ -240,7 +240,7 @@ pregeneratedPreference: 0.0
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
-backlogRefillThreshold: 0.5
+积压补充阈值: 0.5
 
 # 延迟阈值（毫秒），超过该值的即时处理（未排队）传送将被审计：
 # 记录一条 WARN 并递增累计计数器 slowPipelineCount（由 /rtp info 显示）。
@@ -250,7 +250,7 @@ backlogRefillThreshold: 0.5
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
-slowPipelineThresholdMs: 5000
+慢管线阈值Ms: 5000
 
 # 公共传送队列深度（等待的玩家数）达到或超过该值时，将审计队列背压：
 # 记录一条边沿触发的 WARN，并在每次越过阈值时将累计计数器
@@ -260,17 +260,17 @@ slowPipelineThresholdMs: 5000
 # @range: [0, null]
 # @unit: players
 # @default: 0
-queueGrowthWarnThreshold: 0
+队列增长警告阈值: 0
 
 # /rtp admin prefab 的设置。apply -> confirm 流程会为每个改动的配置文件写入一个
 # 名为 <file>.yml.bak.<epochMillis> 的备份；bakRetention 限制每个文件保留的此类
 # 备份数量，最旧的先被清除。设为 1 仅保留最新备份；小于 1 的值会被钳制为 1。
 # /rtp admin prefab rollback 会在多次调用中按从新到旧的顺序遍历备份。
-prefab:
+预设:
   # 每个文件保留的带时间戳的配置备份数量。
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  bakRetention: 3
+  bak保留数: 3
 # 请勿修改版本号
 version: 1.0
