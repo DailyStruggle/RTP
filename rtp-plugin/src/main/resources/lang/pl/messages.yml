@@ -29,9 +29,9 @@ juzTeleportowany: "&7[P0] ⚡ już jesteś teleportowany!"
 
 # gdy wtyczka jest aktualnie przeładowywana
 teleportOdmowaPrzeladowanie: "&7[P0] teleportacje są tymczasowo wyłączone, gdy plugin się przeładowuje. Spróbuj ponownie za chwilę."
-wiadomoscOpoznienia: "&7[P0] ⚡ Teleporting in [delay]. Don't move"
-ladowanieChunkow: "&7[P0] ⚙ Wczytywanie chunków! proszę czekać..."
-wiadomoscTeleportu: "&7[P0] ⚡ Teleported in [attempts] attempts, in [processingTime]"
+wiadomoscOpoznienia: "&7[P0] ⚡ Teleportacja za [delay]. Nie ruszaj sie."
+ladowanieChunkow: "&7[P0] ⚙ Wczytywanie chunkow! prosze czekac..."
+wiadomoscTeleportu: "&7[P0] ⚡ Przeteleportowano w [attempts] probach, w [processingTime]"
 
 # jesli teleportacja zostanie anulowana
 teleportAnulowano: "&7[P0] ⚡ Teleportacja anulowana!"

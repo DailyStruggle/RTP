@@ -22,7 +22,7 @@ jaTeletransportando: "&7[P0] ⚡ você já está se teletransportando!"
 
 # se o plugin está sendo recarregado no momento
 teletransporteNegadoRecarregando: "&7[P0] os teletransportes estão temporariamente desativados enquanto o plugin recarrega. Tente novamente em alguns instantes."
-mensagemAtraso: "&7[P0] ⚡ Teletransportando em [delay]. Não se mova."
+mensagemAtraso: "&7[P0] ⚡ Teletransportando em [delay]. Nao se mova."
 carregamentoChunk: "&7[P0] ⚙ Carregando chunks, por favor aguarde..."
 mensagemTeletransporte: "&7[P0] ⚡ Teletransportado em [attempts] tentativas, em [processingTime]"
 
