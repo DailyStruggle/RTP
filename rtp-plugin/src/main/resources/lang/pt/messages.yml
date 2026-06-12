@@ -18,27 +18,27 @@ marcadores:
 # ###############################################################################
 # Seção 2: Teletransporte
 # ###############################################################################
-jaTeletransportando: "&7[P0] você já está se teletransportando!"
+jaTeletransportando: "&7[P0] ⚡ você já está se teletransportando!"
 
 # se o plugin está sendo recarregado no momento
 teletransporteNegadoRecarregando: "&7[P0] os teletransportes estão temporariamente desativados enquanto o plugin recarrega. Tente novamente em alguns instantes."
-mensagemAtraso: "&7[P0] Teletransportando em [delay]. Não se mova."
-carregamentoChunk: "&7[P0] Carregando chunks, por favor aguarde..."
-mensagemTeletransporte: "&7[P0] Teletransportado em [attempts] tentativas, em [processingTime]"
+mensagemAtraso: "&7[P0] ⚡ Teletransportando em [delay]. Não se mova."
+carregamentoChunk: "&7[P0] ⚙ Carregando chunks, por favor aguarde..."
+mensagemTeletransporte: "&7[P0] ⚡ Teletransportado em [attempts] tentativas, em [processingTime]"
 
 # if teleport is cancelled
-cancelarTeletransporte: "&7[P0] Teletransporte cancelado!"
+cancelarTeletransporte: "&7[P0] ⚡ Teletransporte cancelado!"
 
 # se não houver lugares seguros após atingir o máximo de tentativas
 # espaço reservado: [attempts] - o número máximo de tentativas
-inseguro: "&7[P0] nenhuma localização segura encontrada em [attempts] tentativas"
+inseguro: "&7[P0] ⌖ nenhuma localização segura encontrada em [attempts] tentativas"
 
 # quando o jogador está em tempo de recarga
 # espaço reservado: [remainingCooldown] - o tempo restante
-mensagemEspera: "&7[P0] Você não pode teletransportar-se novamente por [remainingCooldown]"
+mensagemEspera: "&7[P0] ⚡ Você não pode teletransportar-se novamente por [remainingCooldown]"
 
 # se a região não tem locais na fila e o jogador não tem a permissão rtp.unqueued
-semLocalizacoesNaFila: "#f5eb73[P0] não há localizações prontas no momento"
+semLocalizacoesNaFila: "#f5eb73[P0] ⌖ não há localizações prontas no momento"
 
 # quando a fila de espera avança
 # espaço reservado: [spot] - a posição atual na fila

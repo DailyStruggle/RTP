@@ -25,27 +25,27 @@ placeholders:
 # Section 2: Teleportation
 # ###############################################################################
 # when teleporting, say this
-alreadyTeleporting: "&7[P0] you're already teleporting!"
+alreadyTeleporting: "&7[P0] ⚡ you're already teleporting!"
 
 # if the plugin is currently reloading
 teleportDeniedReloading: "&7[P0] teleports are temporarily disabled while the plugin reloads. Please try again shortly."
-delayMessage: "#9D7CD8[P0] Teleporting in [delay]. Don't move"
-chunkLoading: "&7[P0] Loading chunks! please wait..."
-teleportMessage: "#5FB3B3[P0] Teleported in [attempts] attempts, in [processingTime]"
+delayMessage: "#9D7CD8[P0] ⚡ Teleporting in [delay]. Don't move"
+chunkLoading: "&7[P0] ⚙ Loading chunks! please wait..."
+teleportMessage: "#5FB3B3[P0] ⚡ Teleported in [attempts] attempts, in [processingTime]"
 
 # if teleport is cancelled
-teleportCancel: "&7[P0] Teleport cancelled!"
+teleportCancel: "&7[P0] ⚡ Teleport cancelled!"
 
 # if no safe places after reaching max attempts
 # placeholder: [attempts] - the maximum number of attempts
-unsafe: "&7[P0] could not find a safe location within [attempts] attempts"
+unsafe: "&7[P0] ⌖ could not find a safe location within [attempts] attempts"
 
 # when the player is on cooldown
 # placeholder: [remainingCooldown] - the remaining time
-cooldownMessage: "&7[P0] You can't teleport again for [remainingCooldown]"
+cooldownMessage: "&7[P0] ⚡ You can't teleport again for [remainingCooldown]"
 
 # if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
-noLocationsQueued: "#f5eb73[P0] no locations ready at this time"
+noLocationsQueued: "#f5eb73[P0] ⌖ no locations ready at this time"
 
 # when the queue line shifts
 # placeholder: [spot] - the current position in line

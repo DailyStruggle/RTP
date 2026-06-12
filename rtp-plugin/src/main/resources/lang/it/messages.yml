@@ -22,27 +22,27 @@ segnaposto:
 # Sezione 2: Teletrasporto
 # ###############################################################################
 # durante il teletrasporto, mostra questo
-giàTeletrasporto: "&7[P0] ti stai già teletrasportando!"
+giàTeletrasporto: "&7[P0] ⚡ ti stai già teletrasportando!"
 
 # se il plugin si sta attualmente ricaricando
 teletrasportoNegatoRicaricamento: "&7[P0] i teletrasporti sono temporaneamente disattivati mentre il plugin si ricarica. Riprova tra poco."
-messaggioRitardo: "&7[P0] Teletrasporto in [delay]. Non muoverti"
-caricamentoChunk: "&7[P0] Caricamento dei chunk! attendere..."
-messaggioTeletrasporto: "&7[P0] Teletrasportato in [attempts] tentativi, in [processingTime]"
+messaggioRitardo: "&7[P0] ⚡ Teletrasporto in [delay]. Non muoverti"
+caricamentoChunk: "&7[P0] ⚙ Caricamento dei chunk! attendere..."
+messaggioTeletrasporto: "&7[P0] ⚡ Teletrasportato in [attempts] tentativi, in [processingTime]"
 
 # se il teletrasporto viene annullato
-teletrasportoAnnullato: "&7[P0] Teletrasporto annullato!"
+teletrasportoAnnullato: "&7[P0] ⚡ Teletrasporto annullato!"
 
 # se non ci sono posizioni sicure dopo aver raggiunto il numero massimo di tentativi
 # segnaposto: [attempts] - il numero massimo di tentativi
-nonSicuro: "&7[P0] impossibile trovare una posizione sicura entro [attempts] tentativi"
+nonSicuro: "&7[P0] ⌖ impossibile trovare una posizione sicura entro [attempts] tentativi"
 
 # quando il giocatore è in cooldown
 # segnaposto: [remainingCooldown] - il tempo rimanente
-messaggioRaffreddamento: "&7[P0] Non puoi teletrasportarti di nuovo per [remainingCooldown]"
+messaggioRaffreddamento: "&7[P0] ⚡ Non puoi teletrasportarti di nuovo per [remainingCooldown]"
 
 # se la regione non ha posizioni in coda e il giocatore non ha il permesso rtp.unqueued
-nessunaPosizioneInCoda: "#f5eb73[P0] nessuna posizione pronta in questo momento"
+nessunaPosizioneInCoda: "#f5eb73[P0] ⌖ nessuna posizione pronta in questo momento"
 
 # quando la fila in coda si sposta
 # segnaposto: [spot] - la posizione attuale in coda

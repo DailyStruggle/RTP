@@ -22,27 +22,27 @@ placeholders:
 # Section 2: Teleportation
 # ###############################################################################
 # when teleporting, say this
-alreadyTeleporting: "&7[P0] vous êtes déjà en téléportation !"
+alreadyTeleporting: "&7[P0] ⚡ vous êtes déjà en téléportation !"
 
 # si le plugin est en cours de rechargement
 teleportDeniedReloading: "&7[P0] les téléportations sont temporairement désactivées pendant le rechargement du plugin. Réessayez bientôt."
-delayMessage: "&7[P0] Teleporting in [delay]. Don't move"
-chunkLoading: "&7[P0] Chargement des chunks ! veuillez patienter..."
-teleportMessage: "&7[P0] Teleported in [attempts] attempts, in [processingTime]"
+delayMessage: "&7[P0] ⚡ Teleporting in [delay]. Don't move"
+chunkLoading: "&7[P0] ⚙ Chargement des chunks ! veuillez patienter..."
+teleportMessage: "&7[P0] ⚡ Teleported in [attempts] attempts, in [processingTime]"
 
 # if teleport is cancelled
-teleportCancel: "&7[P0] Téléportation annulée !"
+teleportCancel: "&7[P0] ⚡ Téléportation annulée !"
 
 # s'il n'y a pas d'endroits sûrs après le nombre maximum de tentatives
 # espace réservé : [attempts] - le nombre maximum de tentatives
-unsafe: "&7[P0] impossible de trouver un emplacement sûr en [attempts] tentatives"
+unsafe: "&7[P0] ⌖ impossible de trouver un emplacement sûr en [attempts] tentatives"
 
 # lorsque le joueur est en temps de recharge
 # espace réservé : [remainingCooldown] - le temps restant
-cooldownMessage: "&7[P0] Vous ne pouvez pas vous téléporter avant [remainingCooldown]"
+cooldownMessage: "&7[P0] ⚡ Vous ne pouvez pas vous téléporter avant [remainingCooldown]"
 
 # si la région n'a aucun emplacement en file et que le joueur n'a pas la permission rtp.unqueued
-noLocationsQueued: "#f5eb73[P0] aucun emplacement prêt pour le moment"
+noLocationsQueued: "#f5eb73[P0] ⌖ aucun emplacement prêt pour le moment"
 
 # lorsque la file d'attente avance
 # espace réservé : [spot] - la position actuelle dans la file

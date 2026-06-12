@@ -18,27 +18,27 @@ marcadores:
 # ###############################################################################
 # Sección 2: Teletransporte
 # ###############################################################################
-yaTeletransportando: "&7[P0] ¡ya te estás teletransportando!"
+yaTeletransportando: "&7[P0] ⚡ ¡ya te estás teletransportando!"
 
 # si el plugin se está recargando actualmente
 teletransporteDenegadoRecargando: "&7[P0] los teletransportes están desactivados temporalmente mientras el plugin se recarga. Inténtalo de nuevo en unos instantes."
-mensajeRetraso: "&7[P0] Teletransportando en [delay]. No te muevas."
-cargaDeChunk: "&7[P0] Cargando chunks, por favor espera..."
-mensajeTeletransporte: "&7[P0] Teletransportado en [attempts] intentos, en [processingTime]"
+mensajeRetraso: "&7[P0] ⚡ Teletransportando en [delay]. No te muevas."
+cargaDeChunk: "&7[P0] ⚙ Cargando chunks, por favor espera..."
+mensajeTeletransporte: "&7[P0] ⚡ Teletransportado en [attempts] intentos, en [processingTime]"
 
 # if teleport is cancelled
-cancelarTeletransporte: "&7[P0] ¡Teletransporte cancelado!"
+cancelarTeletransporte: "&7[P0] ⚡ ¡Teletransporte cancelado!"
 
 # si no hay lugares seguros tras alcanzar el máximo de intentos
 # marcador: [attempts] - el número máximo de intentos
-inseguro: "&7[P0] no se encontró una ubicación segura en [attempts] intentos"
+inseguro: "&7[P0] ⌖ no se encontró una ubicación segura en [attempts] intentos"
 
 # cuando el jugador está en tiempo de reutilización
 # marcador: [remainingCooldown] - el tiempo restante
-mensajeEnfriamiento: "&7[P0] No puedes teletransportarte otra vez hasta dentro de [remainingCooldown]"
+mensajeEnfriamiento: "&7[P0] ⚡ No puedes teletransportarte otra vez hasta dentro de [remainingCooldown]"
 
 # si la región no tiene ubicaciones en cola y el jugador no tiene el permiso rtp.unqueued
-sinUbicacionesEnCola: "#f5eb73[P0] no hay ubicaciones listas en este momento"
+sinUbicacionesEnCola: "#f5eb73[P0] ⌖ no hay ubicaciones listas en este momento"
 
 # cuando la fila de espera avanza
 # marcador: [spot] - la posición actual en la fila

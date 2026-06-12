@@ -24,27 +24,27 @@ empty_bowls:
 # Section 2: Pouncing
 # ###############################################################################
 # already mid-pounce
-already_pouncing: "&7[P0] mrrp! you're already pouncing!"
+already_pouncing: "&7[P0] ⚡ mrrp! you're already pouncing!"
 
 # plugin is grooming itself
 pounce_denied_grooming: "&7[P0] pounces are paused while the kitty grooms. try again after a few licks."
-hold_paw_message: "&7[P0] Pouncing in [delay]. Don't twitch your tail"
-kibble_loading: "&7[P0] Loading kibble! please wait..."
-pounce_message: "&7[P0] Pounced in [attempts] attempts, in [processingTime]"
+hold_paw_message: "&7[P0] ⚡ Pouncing in [delay]. Don't twitch your tail"
+kibble_loading: "&7[P0] ⚙ Loading kibble! please wait..."
+pounce_message: "&7[P0] ⚡ Pounced in [attempts] attempts, in [processingTime]"
 
 # pounce cancelled
-pounce_cancelled: "&7[P0] Pounce cancelled! mrow."
+pounce_cancelled: "&7[P0] ⚡ Pounce cancelled! mrow."
 
 # no safe spots after max attempts
 # placeholder: [attempts] - the maximum number of attempts
-spooky: "&7[P0] could not find a safe paw-spot within [attempts] attempts"
+spooky: "&7[P0] ⌖ could not find a safe paw-spot within [attempts] attempts"
 
 # the kitty is on cooldown nap
 # placeholder: [remainingCooldown] - the remaining time
-nap_message: "&7[P0] you can't pounce again for [remainingCooldown]. nap first."
+nap_message: "&7[P0] ⚡ you can't pounce again for [remainingCooldown]. nap first."
 
 # no warm spots ready
-no_warm_spots_left: "#f5eb73[P0] no warm spots ready at this time"
+no_warm_spots_left: "#f5eb73[P0] ⌖ no warm spots ready at this time"
 
 # the line of waiting kitties shifted
 # placeholder: [spot] - the current position in line
