@@ -79,18 +79,18 @@ Each capability below is paired with the part of that architecture that makes it
 
 |                                                                                                                  | Free LeafRTP | **LeafRTP-Pro** |
 |------------------------------------------------------------------------------------------------------------------|----------|-------------|
-| **Folia** (Region Scheduler + off-tick pre-filter, no 1-tick stalls)                                             | No       | **Yes**     |
+| **Folia** (tuned Region Scheduler + off-tick pre-filter, no 1-tick stalls)                                       | Basic    | **Tuned**   |
 | **Multi-server / proxy** (Velocity)                                                                              | No       | **Yes**     |
 | **SQL / Redis** shared-state backends (H2, SQLite, MySQL, PostgreSQL, Jedis)                                     | No       | **Yes**     |
 | **Vault** economy (charge for `/rtp`)                                                                            | No       | **Yes**     |
 | Multilingual `lang/**`, login-reserve cache, visitor mode                                                        | No       | **Yes**     |
 | **`safety.yml` token grammar** - vanilla block tags, state predicates, wildcards                                 | No       | **Yes**     |
-| Earliest release on each MC version + priority support                                                           | No       | **Yes**     |
+| Earliest release on each MC version + first access to new platforms/features + priority support                  | No       | **Yes**     |
 | *Spigot + Paper engine, queues, spiral, Anvil pre-filter*                                                        | *Yes*    | *Yes*       |
 | *8 claim plugins bundled (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect)* | *Yes*    | *Yes*       |
 | *`effects-api`, `rtp-api`, PlaceholderAPI, ProtocolLib*                                                          | *Yes*    | *Yes*       |
 
-Same configuration, same data files, same commands as the free build - **upgrade is drop-in.**
+Pro is the early-access tier: the tuned, throughput-optimized versions of new platforms and scaling backends land here first, because each one carries a real hands-on support burden that is only guaranteed on the paid tier. The free build still *runs* on Folia (basic regionized scheduling + async teleport); Pro's tuned Folia adapter is what graduates to the free build once stabilized. Same configuration, same data files, same commands as the free build - **upgrade is drop-in.**
 
 ---
 
@@ -374,7 +374,7 @@ A: Pre-warmed queue. In most cases a verified destination is ready before you ty
 A: See the admin guide. Resolution order: player's current world (or `world:` param) -> world's target region -> region's target world.
 
 **Q: Does LeafRTP work on Folia?**
-A: Yes - LeafRTP-Pro runs on the Region Scheduler with an off-tick pre-filter so no region stalls. Per-teleport work stays comfortably under one region tick; the 9.87 TP/s @ 99.97% success we measured was limited by Region-Scheduler hops in the test harness, not by the engine's computation, so treat it as a harness-imposed floor rather than a performance ceiling.
+A: Yes, on both editions. The free build runs on Folia out of the box with a basic regionized scheduler (correctness-first: global/region/entity scheduling + async teleport). LeafRTP-Pro adds the tuned Folia adapter - the Region Scheduler with an off-tick pre-filter so no region stalls. Per-teleport work stays comfortably under one region tick; the 9.87 TP/s @ 99.97% success we measured was limited by Region-Scheduler hops in the test harness, not by the engine's computation, so treat it as a harness-imposed floor rather than a performance ceiling.
 
 **Q: Do you support triangle / diamond region shapes?**
 A: Use the `Polygon` shape. A triangle is a 3-vertex polygon and a diamond is a rotated square, so both are already expressible without a dedicated shape type - define the vertices you want and the bounded spiral fills it.
@@ -395,7 +395,7 @@ A: Plain-material entries keep working unchanged; the new grammar is strictly ad
 A: Paper, with memory to spare for the location cache. LeafRTP works particularly well on pre-generated worlds.
 
 **Q: Can I downgrade to the free LeafRTP build?**
-A: Yes - same configuration, same data files, same commands. You lose Folia, proxy, SQL/Redis, Vault, multilingual, and the tag/state-predicate grammar.
+A: Yes - same configuration, same data files, same commands. The free build still runs on Folia (basic regionized scheduling); what you give up is the *tuned* Folia adapter, plus proxy, SQL/Redis, Vault, multilingual, and the tag/state-predicate grammar.
 
 </details>
 

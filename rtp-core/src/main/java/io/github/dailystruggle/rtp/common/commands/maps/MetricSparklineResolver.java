@@ -16,10 +16,12 @@ import java.util.logging.Level;
  * {@code RTP.start}:
  *
  * <ul>
- *   <li><strong>Series A: MSPT (ms).</strong> Aggregated across Folia
- *       regions as {@code max} (worst-region wins). Y-scale autoscales
- *       to {@code [0, max(observed, 50 ms)]} so an idle server doesn't
- *       zoom into noise but a spike clearly stands above the 50 ms
+ *   <li><strong>Series A: MSPT (ms).</strong> On Folia, aggregated across
+ *       regions by the platform binding per the configurable
+ *       {@code foliaAggregationMspt} mode ({@code max} default, or
+ *       {@code mean}); the ring records that host scalar directly. Y-scale
+ *       autoscales to {@code [0, max(observed, 50 ms)]} so an idle server
+ *       doesn't zoom into noise but a spike clearly stands above the 50 ms
  *       budget line.</li>
  *   <li><strong>Series B: heap used (MB).</strong> Per-JVM scalar; no
  *       Folia aggregation. Y-scale autoscales to

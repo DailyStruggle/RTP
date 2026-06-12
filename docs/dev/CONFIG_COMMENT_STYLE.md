@@ -8,6 +8,13 @@ Conventions for comments that document options in shipped YAML config files
 These rules apply to admin-facing config resources only. Internal Java/Kotlin
 code comments and KDoc are unaffected.
 
+The governing decision is recorded in
+[ADR-064](../adr/ADR-064-config-comment-format-summary-line-as-menu-hover.md);
+this document is its canonical, example-rich style guide. The key architectural
+constraint: the **first comment line** of each option doubles as the option's
+**hover tooltip** in the config menu (ADR-035 / ADR-044), so it must read as a
+standalone summary.
+
 ## Rule (the pattern)
 
 Every documented option **shall** be preceded by a comment block with two
@@ -277,7 +284,9 @@ comment is the canonical form; do not reword it.
   introducing a new option, or the existing comment is actively misleading.
 - Bulk reformat passes across a whole config file should be a dedicated
   change, not bundled with a behavior change. See *Stay-On-Task Policy* in
-  `.junie/AGENTS.md`.
+  `.junie/AGENTS.md`. For the priority order in which files should be brought
+  into this format with minimal translation cost, see
+  [`CONFIG_COMMENT_MINIMIZATION.md`](CONFIG_COMMENT_MINIMIZATION.md).
 - When in doubt about valid options, link to the relevant admin doc
   (`docs/admin/CORE_CONFIG.md`, `docs/admin/SAFETY.md`, etc.) rather than
   duplicating an enumeration that will drift.

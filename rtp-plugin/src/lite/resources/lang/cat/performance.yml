@@ -72,6 +72,31 @@ smell_memory: true
 # @default: false
 forced_smell_memory: false
 
+# Bias biome-filtered selection so each requested biome is steered toward
+# with equal probability, instead of in proportion to how much of the
+# region it covers. Counteracts common biomes drowning out rare ones when
+# several biomes are requested. Requires biomeRecall; no effect on
+# unfiltered (default-biome) teleports.
+# @type: boolean
+# @default: false
+biomeWeighted: false
+
+# Per-biome relative selection weights for biome-filtered teleports.
+# Only consulted when biomeWeighted is true. Biomes not listed here use
+# weight 1.0, so an empty/all-equal map reproduces the equal-probability
+# behavior of biomeWeighted on its own. A biome given weight 2.0 is
+# steered toward roughly twice as often as a weight-1.0 biome among the
+# requested set (when both are present in biome-recall memory); 0.0
+# suppresses a biome. Requires biomeRecall; no effect on unfiltered
+# (default-biome) teleports. The shipped plains entry is a weight-1.0
+# no-op example - replace or extend it with the biomes you want to bias.
+# @type: map<string, number>
+biomeWeights:
+  # @type: number
+  # @range: [0.0, null]
+  # @default: 1.0
+  plains: 1.0
+
 # Check for warm-spots in every loaded kibble (chunk)
 # @type: boolean
 # @default: false

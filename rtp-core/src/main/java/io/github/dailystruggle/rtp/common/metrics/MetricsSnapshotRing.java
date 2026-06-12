@@ -31,10 +31,16 @@ import java.util.concurrent.atomic.AtomicLongArray;
  *
  * <p>Heap encoding: stored as raw bytes ({@code long}).
  *
- * <p>Aggregation: when {@code MetricsSnapshot#foliaRegions} is non-empty, the
- * MSPT recorded is the {@code max} across regions (worst-region wins, that
- * is the region bottlenecking the user experience). Heap is a per-JVM
- * scalar, no aggregation needed. See {@link #recordFromSnapshot}.
+ * <p>Aggregation: the MSPT recorded is {@code snapshot.mspt}, which the
+ * platform binding has already aggregated across Folia regions per the
+ * admin-configurable {@code foliaAggregationMspt} mode ({@code max} default,
+ * or {@code mean}). This keeps the sparkline consistent with the scalar MSPT
+ * surfaced by {@code /rtp info} and the telemetry publishers. Only when the
+ * binding leaves {@code snapshot.mspt} unsampled (e.g. per-region detail is
+ * enabled but no host-scalar was produced) does the ring fall back to the
+ * {@code max} across {@code MetricsSnapshot#foliaRegions} so a worst-region
+ * spike still renders. Heap is a per-JVM scalar, no aggregation needed.
+ * See {@link #recordFromSnapshot}.
  *
  * <p>No tick-thread blocking. No locking.
  */
@@ -47,9 +53,12 @@ public final class MetricsSnapshotRing {
     private final AtomicLong writeIndex = new AtomicLong(0L);
 
     /**
-     * Records one sample from {@code snapshot}. MSPT is aggregated as
-     * {@code max} across Folia regions when present, falling back to
-     * {@code snapshot.mspt} on single-region runtimes. Heap is taken from
+     * Records one sample from {@code snapshot}. MSPT is taken from
+     * {@code snapshot.mspt} (already aggregated per the configurable
+     * {@code foliaAggregationMspt} mode by the platform binding on Folia,
+     * and the single-thread value on every other runtime), falling back to
+     * the {@code max} across {@code snapshot.foliaRegions} only when the
+     * host scalar is unsampled. Heap is taken from
      * {@code snapshot.heapUsedBytes} directly.
      */
     public void recordFromSnapshot(MetricsSnapshot snapshot) {
@@ -63,6 +72,17 @@ public final class MetricsSnapshotRing {
     }
 
     private static double aggregateMspt(MetricsSnapshot snapshot) {
+        // Prefer the host scalar: on Folia the binding has already aggregated
+        // per-region MSPT per the configurable foliaAggregationMspt mode
+        // (max|mean), so honouring it here keeps the sparkline consistent with
+        // every other MSPT surface. On single-region runtimes this is simply
+        // the single-thread value.
+        if (!Double.isNaN(snapshot.mspt)) {
+            return snapshot.mspt;
+        }
+        // Fallback: the host scalar was unsampled but per-region detail may
+        // still carry data (e.g. foliaIncludeRegions=true while the scalar
+        // path lagged). Surface the worst region so a spike still renders.
         List<FoliaRegionSample> regions = snapshot.foliaRegions;
         if (regions == null || regions.isEmpty()) {
             return snapshot.mspt;
@@ -76,8 +96,7 @@ public final class MetricsSnapshotRing {
                 max = m;
             }
         }
-        // Fall back to host scalar if no per-region MSPT was sampled.
-        return Double.isNaN(max) ? snapshot.mspt : max;
+        return max;
     }
 
     /** Number of distinct samples observed (capped at {@link #CAPACITY}). */

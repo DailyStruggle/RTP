@@ -1,12 +1,33 @@
 # --- RTP Integration Settings ---
 # If true, RTP will reroll the location if it lands within a claim/region from the respective plugin.
 rerollFactions: false
+# Reroll the location if it lands inside a GriefDefender claim.
+# @type: boolean
+# @default: false
 rerollGriefDefender: false
+# Reroll the location if it lands inside a GriefPrevention claim.
+# @type: boolean
+# @default: false
 rerollGriefPrevention: false
+# Reroll the location if it lands inside a HuskTowns claim.
+# @type: boolean
+# @default: false
 rerollHuskTowns: false
+# Reroll the location if it lands inside a Lands claim.
+# @type: boolean
+# @default: false
 rerollLands: false
+# Reroll the location if it lands inside a RedProtect region.
+# @type: boolean
+# @default: false
 rerollRedProtect: false
+# Reroll the location if it lands inside a Towny Advanced claim.
+# @type: boolean
+# @default: false
 rerollTownyAdvanced: false
+# Reroll the location if it lands inside a WorldGuard region.
+# @type: boolean
+# @default: false
 rerollWorldGuard: false
 
 # DO NOT TOUCH VERSION NUMBER

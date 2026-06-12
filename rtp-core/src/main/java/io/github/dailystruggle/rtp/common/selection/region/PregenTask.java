@@ -141,6 +141,147 @@ final class PregenTask implements Runnable {
         if (reservation != null) reservation.close();
     }
 
+    /**
+     * ADR-062 bounded biome-probability weighted draw. Given the per-biome run
+     * tables ({@code perBiome} entries are {@code {keys, widths}} parallel arrays,
+     * already filtered to non-empty biomes), selects a target biome with equal
+     * probability among those present in spatial memory, then a run within that
+     * biome weighted by run width (so placement stays spatially uniform inside the
+     * chosen biome), then a uniform offset within the run.
+     *
+     * <p>This counteracts the run-count dominance of the legacy uniform-over-runs
+     * draw: a common biome occupying thousands of runs no longer drowns out a rare
+     * requested biome occupying a handful. The draw is bounded - a finite weighted
+     * pick over the pre-mapped, Anvil-sourced occupancy map with no reroll loop and
+     * no chunk I/O.
+     *
+     * @param perBiome non-empty list of {@code {keys, widths}} parallel-array pairs,
+     *     one per biome that has at least one recorded run.
+     * @return the drawn 1D location index.
+     */
+    static long drawWeightedBiome(List<long[][]> perBiome) {
+        return drawWeightedBiome(perBiome, null);
+    }
+
+    /**
+     * ADR-062 Phase 2 weighted-biome overload. Behaves like
+     * {@link #drawWeightedBiome(List)} but selects the target biome in
+     * proportion to {@code biomeWeights} (parallel to {@code perBiome}) instead
+     * of with equal probability. Passing {@code null} - or a weight array that
+     * sums to a non-positive total - falls back to the equal-probability pick,
+     * so the Phase 1 (all-equal) behavior is the degenerate case of this draw.
+     * A biome's weight is its relative selection share among the requested
+     * biomes present in memory; within the chosen biome, the run/offset pick is
+     * unchanged (width-weighted, spatially uniform). Stays bounded - a finite
+     * weighted pick with no reroll loop and no chunk I/O.
+     *
+     * @param perBiome non-empty list of {@code {keys, widths}} parallel-array
+     *     pairs, one per biome that has at least one recorded run.
+     * @param biomeWeights optional per-biome relative weights, parallel to
+     *     {@code perBiome}; {@code null} for an equal-probability pick.
+     * @return the drawn 1D location index.
+     */
+    static long drawWeightedBiome(List<long[][]> perBiome, double @org.jetbrains.annotations.Nullable [] biomeWeights) {
+        int chosenIdx;
+        if (biomeWeights == null || biomeWeights.length != perBiome.size()) {
+            chosenIdx = LocationGenerator.rng().nextInt(perBiome.size());
+        } else {
+            double totalW = 0.0d;
+            for (double w : biomeWeights) totalW += Math.max(0.0d, w);
+            if (totalW <= 0.0d) {
+                chosenIdx = LocationGenerator.rng().nextInt(perBiome.size());
+            } else {
+                double pick = LocationGenerator.rng().nextDouble() * totalW;
+                double acc = 0.0d;
+                chosenIdx = perBiome.size() - 1;
+                for (int idx = 0; idx < biomeWeights.length; idx++) {
+                    acc += Math.max(0.0d, biomeWeights[idx]);
+                    if (pick < acc) {
+                        chosenIdx = idx;
+                        break;
+                    }
+                }
+            }
+        }
+        long[][] chosen = perBiome.get(chosenIdx);
+        long[] keys = chosen[0];
+        long[] widths = chosen[1];
+
+        long total = 0L;
+        for (long w : widths) total += Math.max(0L, w);
+
+        int k;
+        if (total <= 0L) {
+            // Degenerate: all runs are zero-width. Fall back to a uniform run pick.
+            k = LocationGenerator.rng().nextInt(keys.length);
+        } else {
+            long pick = (long) (LocationGenerator.rng().nextDouble() * total);
+            long acc = 0L;
+            k = keys.length - 1;
+            for (int idx = 0; idx < widths.length; idx++) {
+                acc += Math.max(0L, widths[idx]);
+                if (pick < acc) {
+                    k = idx;
+                    break;
+                }
+            }
+        }
+
+        long key = keys[k];
+        long width = widths[k];
+        return key + (width > 0L ? (long) (LocationGenerator.rng().nextDouble() * width) : 0L);
+    }
+
+    /**
+     * ADR-062 Phase 3 minimum-diversity threshold: the number of distinct
+     * recorded runs at or above which a requested biome is treated as
+     * "well-recorded" and steered purely from recall memory. Below it, a
+     * proportional share of the biome's selection weight is deferred to
+     * gray-space exploration so a thinly-recorded biome (in the limit, a single
+     * recorded run) cannot funnel every weighted teleport onto the same
+     * coordinate.
+     */
+    static final long GRAY_SPACE_MIN_RUNS = 8L;
+
+    /**
+     * ADR-062 Phase 3 - the fraction of a requested biome's selection weight that
+     * should be deferred to gray-space exploration given how thinly it is recorded.
+     * A biome with {@code runs >= minRuns} is fully recall-steered (returns
+     * {@code 0.0}); an unrecorded biome ({@code runs <= 0}) is fully gray
+     * (returns {@code 1.0}); in between, the fraction ramps linearly so a
+     * single-run biome defers most of its weight to exploration.
+     *
+     * @param runs the number of distinct recorded runs for the biome.
+     * @param minRuns the well-recorded threshold ({@code <= 0} disables the ramp).
+     * @return the gray-space deferral fraction in {@code [0.0, 1.0]}.
+     */
+    static double grayFraction(long runs, long minRuns) {
+        if (minRuns <= 0L) return 0.0d;
+        if (runs >= minRuns) return 0.0d;
+        if (runs <= 0L) return 1.0d;
+        return (double) (minRuns - runs) / (double) minRuns;
+    }
+
+    /**
+     * ADR-062 Phase 3 - probability that a weighted draw should explore gray
+     * space (a fresh bounded-spiral position whose biome is confirmed downstream)
+     * instead of drawing from recall memory. This is the gray-space share of the
+     * total selection weight: registered-but-unrecorded requested biomes plus the
+     * deferred share of thinly-recorded ones. A higher configured weight on an
+     * under-recorded biome therefore defers <em>more</em> to exploration, so a
+     * weight can never amplify single-run clustering.
+     *
+     * @param recordedWeight summed (run-adjusted) weight steered from recall.
+     * @param grayWeight summed weight deferred to gray-space exploration.
+     * @return the exploration probability in {@code [0.0, 1.0]}.
+     */
+    static double graySpaceProbability(double recordedWeight, double grayWeight) {
+        if (grayWeight <= 0.0d) return 0.0d;
+        double total = recordedWeight + grayWeight;
+        if (total <= 0.0d) return 0.0d;
+        return grayWeight / total;
+    }
+
     /** Continue the current attempt inline (no scheduler hop). */
     private void continueInline(Runnable r) {
         try {
@@ -186,21 +327,97 @@ final class PregenTask implements Runnable {
         if (state.shape instanceof MemoryShape<?> memoryShape) {
             memoryShape.flushAndRebuild(state.resolution);
             if (state.biomeRecall && !state.defaultBiomes) {
+                // Flattened run list (all runs across requested biomes) and a
+                // per-biome grouping. The flattened list drives the legacy
+                // uniform-over-runs draw; the grouping drives the ADR-062
+                // equal-probability-per-biome weighted draw.
                 List<Map.Entry<Long, Long>> biomes = new ArrayList<>();
+                List<long[][]> perBiome = new ArrayList<>();
+                // ADR-062 Phase 2: relative selection weight per perBiome entry,
+                // looked up by biome name (biomes not configured default to 1.0).
+                List<Double> perBiomeWeights = new ArrayList<>();
+                // ADR-062 Phase 3: distinct recorded-run count per perBiome entry
+                // (drives the gray-space deferral ramp) and the set of recorded
+                // requested biome names (so the unrecorded-but-registered set can
+                // be derived below).
+                List<Long> perBiomeRuns = new ArrayList<>();
+                Set<String> recordedNames = new HashSet<>();
                 for (String biomeName : state.biomeNames) {
                     long[] keys = memoryShape.getBiomeKeys(biomeName);
                     long[] sums = memoryShape.getBiomePrefixSums(biomeName);
-                    if (keys != null && sums != null) {
+                    if (keys != null && sums != null && keys.length > 0) {
+                        long[] widths = new long[keys.length];
                         for (int k = 0; k < keys.length; k++) {
                             long prevSum = (k > 0) ? sums[k - 1] : 0L;
-                            biomes.add(new AbstractMap.SimpleEntry<>(keys[k], sums[k] - prevSum));
+                            widths[k] = sums[k] - prevSum;
+                            biomes.add(new AbstractMap.SimpleEntry<>(keys[k], widths[k]));
                         }
+                        perBiome.add(new long[][] {keys, widths});
+                        perBiomeWeights.add(state.biomeWeights.getOrDefault(
+                                biomeName.toUpperCase(java.util.Locale.ROOT), 1.0d));
+                        perBiomeRuns.add((long) keys.length);
+                        recordedNames.add(biomeName.toUpperCase(java.util.Locale.ROOT));
                     }
                 }
                 if (!biomes.isEmpty()) {
-                    int nextInt = LocationGenerator.rng().nextInt(biomes.size());
-                    Map.Entry<Long, Long> entry = biomes.get(nextInt);
-                    l = entry.getKey() + (long) (LocationGenerator.rng().nextDouble() * entry.getValue());
+                    if (state.biomeWeighted) {
+                        // ADR-062: pick a biome among those present in spatial
+                        // memory, then a run within it weighted by width. Steers
+                        // toward rare requested biomes instead of letting a common
+                        // biome's many runs dominate the uniform draw. Phase 1
+                        // (no biomeWeights configured) picks the biome with equal
+                        // probability; Phase 2 picks it in proportion to the
+                        // configured per-biome weights.
+                        //
+                        // ADR-062 Phase 3: registry-aware gray-space steering.
+                        // Each recorded biome defers a share of its weight
+                        // (grayFraction, by run count) to bounded-spiral
+                        // exploration, and each requested biome that the world's
+                        // registry can produce but that has not been recorded yet
+                        // contributes its full weight to gray space instead of
+                        // being an implicit weight 0. With probability equal to the
+                        // gray-space share of total weight we explore a fresh
+                        // spiral position (biome confirmed downstream), which
+                        // dissolves single-run clustering and keeps unrecorded
+                        // registered biomes reachable. Forced recall opts out
+                        // (it must draw from memory). The recall draw itself uses
+                        // run-adjusted weights so a thin biome is also less likely
+                        // to be over-picked within recall.
+                        double recordedWeight = 0.0d;
+                        double grayWeight = 0.0d;
+                        double[] weights = new double[perBiome.size()];
+                        for (int wi = 0; wi < weights.length; wi++) {
+                            double cfg = perBiomeWeights.get(wi);
+                            double gf = grayFraction(perBiomeRuns.get(wi), GRAY_SPACE_MIN_RUNS);
+                            weights[wi] = cfg * (1.0d - gf);
+                            recordedWeight += weights[wi];
+                            grayWeight += cfg * gf;
+                        }
+                        for (String biomeName : state.biomeNames) {
+                            String up = biomeName.toUpperCase(java.util.Locale.ROOT);
+                            if (recordedNames.contains(up)) continue;
+                            boolean registered = state.worldBiomeRegistry.isEmpty()
+                                    || state.worldBiomeRegistry.contains(up)
+                                    || state.worldBiomeRegistry.contains(
+                                            "MINECRAFT:" + up);
+                            if (!registered) continue; // true 0: world cannot produce it
+                            double cfg = state.biomeWeights.getOrDefault(up, 1.0d);
+                            if (cfg <= 0.0d) continue; // explicitly suppressed
+                            grayWeight += cfg;
+                        }
+                        double pGray = graySpaceProbability(recordedWeight, grayWeight);
+                        if (!state.biomeRecallForced
+                                && pGray > 0.0d
+                                && LocationGenerator.rng().nextDouble() < pGray) {
+                            l = memoryShape.rand();
+                        } else {
+                            l = drawWeightedBiome(perBiome, weights);
+                        }
+                    } else {
+                        int nextInt = LocationGenerator.rng().nextInt(biomes.size());
+                        Map.Entry<Long, Long> entry = biomes.get(nextInt);
+                        l = entry.getKey() + (long) (LocationGenerator.rng().nextDouble() * entry.getValue());
+                    }
                 } else if (state.biomeRecallForced) {
                     RTP.log(Level.WARNING,
                             "[RTP] invalid state, biome recall enabled but biomes are not in memory - "

@@ -413,6 +413,8 @@ public enum MessagesKeys {
   menuFrontPageRowTeleport,
   /** Front-page row: open the region parameter-value picker. No placeholders. */
   menuFrontPageRowRegion,
+  /** Front-page row: open the world parameter-value picker (ADR-065). No placeholders. */
+  menuFrontPageRowWorld,
   /** Front-page row: open the biome parameter-value picker. No placeholders. */
   menuFrontPageRowBiome,
   /** Front-page row: show help. No placeholders. */

@@ -10,6 +10,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
@@ -80,6 +81,24 @@ public final class BukkitRTPPlayer implements RTPPlayer {
     return new BukkitRTPPlayer(player);
   }
 
+  /**
+   * Class-probe for Folia. Cached: the runtime platform never changes mid-process. Lives here
+   * (not in the rtp-plugin {@code BukkitServerProvider}) because this Spigot-classpath module
+   * cannot reference it, and the basic Folia path in the free build needs an async teleport.
+   */
+  private static final boolean IS_FOLIA;
+
+  static {
+    boolean folia;
+    try {
+      Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+      folia = true;
+    } catch (ClassNotFoundException e) {
+      folia = false;
+    }
+    IS_FOLIA = folia;
+  }
+
   @Override
   public CompletableFuture<Boolean> setLocation(RTPLocation to) {
     World world = ((BukkitRTPWorld) to.world()).world();
@@ -88,11 +107,41 @@ public final class BukkitRTPPlayer implements RTPPlayer {
     double z = to.z() + 0.5;
     Location location = new Location(world, x, y, z);
 
-    // Graceful fallback for pure Spigot servers running 1.18.2 or older
     CompletableFuture<Boolean> future = new CompletableFuture<>();
-    Runnable tpTask = () -> future.complete(player.teleport(location));
 
-    // Legacy Spigot mandates that entity teleportation occurs on the main thread
+    // Basic Folia path (free build, ADR-024 / ADR-061): a synchronous player.teleport() throws
+    // on Folia because the RTP destination is almost always in a region other than the one this
+    // thread owns. paper-api's Entity#teleportAsync is callable from any thread and performs the
+    // cross-region hop itself, so route through it reflectively (this module compiles against the
+    // Spigot API, which lacks teleportAsync). The tuned rtp-folia adapter (Pro) uses the
+    // first-class FoliaRTPPlayer teleport path instead.
+    if (IS_FOLIA) {
+      try {
+        Object result =
+            player.getClass().getMethod("teleportAsync", Location.class).invoke(player, location);
+        if (result instanceof CompletableFuture) {
+          @SuppressWarnings("unchecked")
+          CompletableFuture<Boolean> async = (CompletableFuture<Boolean>) result;
+          async.whenComplete(
+              (success, throwable) -> {
+                if (throwable != null) {
+                  RTP.log(Level.WARNING, "[FOLIA] teleportAsync failed", throwable);
+                  future.complete(false);
+                } else {
+                  future.complete(Boolean.TRUE.equals(success));
+                }
+              });
+          return future;
+        }
+      } catch (ReflectiveOperationException | RuntimeException e) {
+        // teleportAsync unavailable/failed unexpectedly; fall through to the sync path below so
+        // the teleport failure is never silently swallowed (REQ-RTP-S-004).
+        RTP.log(Level.WARNING, "[FOLIA] teleportAsync unavailable, falling back to sync teleport", e);
+      }
+    }
+
+    // Default path: legacy Spigot mandates that entity teleportation occurs on the main thread.
+    Runnable tpTask = () -> future.complete(player.teleport(location));
     RTP.scheduler.runTask(tpTask);
     return future;
   }
