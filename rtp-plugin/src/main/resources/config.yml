@@ -10,8 +10,7 @@
 # @default: 2
 teleportDelay: 2
 
-# Maximum distance a player may move during teleportDelay before the
-# queued teleport is cancelled.
+# Maximum distance a player may move during teleportDelay before the queued teleport is cancelled.
 # @type: integer
 # @range: [0, null]
 # @unit: blocks

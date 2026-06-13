@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.api.hooks;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -33,6 +35,7 @@ import java.util.function.Consumer;
  * treated as "not handled", so a bare {@code /rtp} falls back to the classic
  * teleport; the error is never silently swallowed (REQ-RTP-S-004).
  */
+@PublicApi
 public interface RootActionRegistry {
 
   /** Functional interface for the bare-{@code /rtp} action binding. */

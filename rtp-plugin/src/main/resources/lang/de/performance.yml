@@ -242,10 +242,10 @@ warteschlangenWachstumWarnSchwelle: 0
 # das neueste Backup zu behalten; Werte unter 1 werden auf 1 angehoben. /rtp admin
 # prefab rollback geht Backups über mehrere Aufrufe vom neuesten zum ältesten durch.
 vorlage:
-  # Anzahl der mit Zeitstempel versehenen Konfigurations-Backups, die pro Datei aufbewahrt werden.
+  # Number of timestamped config backups kept per file before pruning.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  bakAufbewahrung: 3
+  bakRetention: 3
 # ÄNDERE NICHT DIE VERSIONSNUMMER
 version: 1.0

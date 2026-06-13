@@ -275,10 +275,10 @@ limiteAvisoCrescimentoFila: 0
 # de 1 são ajustados para 1. /rtp admin prefab rollback percorre os backups do mais
 # novo ao mais antigo ao longo de várias invocações.
 prefabricado:
-  # Número de backups com carimbo de data/hora mantidos por arquivo.
+  # Number of timestamped config backups kept per file before pruning.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  retencaoBak: 3
+  bakRetention: 3
 # NÃO ALTERE O NÚMERO DA VERSÃO
 version: 1.0

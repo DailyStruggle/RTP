@@ -1,0 +1,20 @@
+# Devstack backend-a network.yml (LITE variant).
+# Tier-1 plugin-message transport: no Redis/SQL required (ADR-024 amendment,
+# rtp-proxy-ADR-016). Selected by `run-acceptance.ps1 -Lite` via the
+# docker-compose.lite.yml seed-remount override.
+#
+# transport.type: proxy-direct - the player-INDEPENDENT backend->proxy socket
+# (rtp-proxy-ADR-017). This backend dials each proxy companion's TCP listener at
+# startup and publishes its REAL region list with NO player online, then reads
+# the merged network snapshot back. This is what makes cross-server /rtp
+# region= tab-completion converge with zero players anywhere and no per-server
+# operator config. The `proxies` list is mirrorable: paste the SAME list on
+# every backend. No driver, no DB.
+network:
+  enabled: true
+  serverId: "backend-a"
+transport:
+  type: "proxy-direct"
+  proxies:
+    - "proxy-a:25599"
+    - "proxy-b:25599"

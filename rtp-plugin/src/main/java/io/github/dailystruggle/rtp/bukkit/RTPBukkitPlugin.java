@@ -275,6 +275,75 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     } else {
       RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable Folia detected -- skipping ChunkUnloadProcessor");
     }
+
+    // Biome-occupancy sampler (feeds /rtp info biomes). Periodically snapshots
+    // which biomes online players are standing in. Biome reads are location-
+    // bound, so the design splits by platform (the timer primitive itself has no
+    // region/location context):
+    //
+    //  - Folia: an ASYNC timer pulse (runTaskTimerAsynchronously) only enumerates
+    //    the online players and hands them to BiomeActivityTracker.sample, which
+    //    dispatches each per-player biome read onto that player's OWNING region
+    //    thread via RTP.scheduler.runTaskForPlayer. No world/entity state is
+    //    touched on the async pulse thread itself.
+    //
+    //  - Non-Folia: a MAIN-thread timer pulse (runTaskTimer) does the data
+    //    collection inline - the main thread owns every world, so reading each
+    //    online player's biome there is correct and cheap - then hands the
+    //    (trivial) accumulation off to an async task so nothing but the reads
+    //    stays on the main thread.
+    {
+      final long biomeSamplePeriodTicks = 600L; // ~30s at 20 TPS
+      RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable starting biome occupancy sampler timer");
+      if (isFolia()) {
+        RTP.scheduler.runTaskTimerAsynchronously(
+            () -> {
+              try {
+                java.util.List<io.github.dailystruggle.rtp.api.entity.RTPPlayer> players =
+                    new java.util.ArrayList<>();
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                  io.github.dailystruggle.rtp.api.entity.RTPPlayer rp =
+                      RTP.serverAccessor.getPlayer(p.getUniqueId());
+                  if (rp != null) players.add(rp);
+                }
+                if (!players.isEmpty()) RTP.biomeActivity.sample(players);
+              } catch (Throwable t) {
+                RTP.log(java.util.logging.Level.FINE,
+                    "[RTP] biome occupancy sampler pulse failed", t);
+              }
+            },
+            biomeSamplePeriodTicks,
+            biomeSamplePeriodTicks);
+      } else {
+        RTP.scheduler.runTaskTimer(
+            () -> {
+              try {
+                // Main thread owns every world: read each online player's biome
+                // directly, here and now.
+                java.util.List<String> biomes = new java.util.ArrayList<>();
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                  io.github.dailystruggle.rtp.api.entity.RTPPlayer rp =
+                      RTP.serverAccessor.getPlayer(p.getUniqueId());
+                  if (rp == null || !rp.isOnline()) continue;
+                  io.github.dailystruggle.rtp.api.world.RTPLocation loc = rp.getLocation();
+                  if (loc == null || loc.world() == null) continue;
+                  String biome = loc.world().getBiome(loc.x(), loc.y(), loc.z());
+                  if (biome != null) biomes.add(biome);
+                }
+                // Hand the accumulation off the main thread.
+                if (!biomes.isEmpty()) {
+                  RTP.scheduler.runTaskAsynchronously(
+                      () -> biomes.forEach(RTP.biomeActivity::record));
+                }
+              } catch (Throwable t) {
+                RTP.log(java.util.logging.Level.FINE,
+                    "[RTP] biome occupancy sampler pulse failed", t);
+              }
+            },
+            biomeSamplePeriodTicks,
+            biomeSamplePeriodTicks);
+      }
+    }
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable DatabaseProcessing.start");
     DatabaseProcessing.start();
 

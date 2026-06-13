@@ -271,10 +271,10 @@
 # 1 로 설정하면 가장 최근 백업만 보관하고, 1 미만 값은 1 로 보정됩니다.
 # /rtp admin prefab rollback 은 여러 번 호출에 걸쳐 백업을 최신 순으로 진행합니다.
 프리셋:
-  # 파일당 보관되는 타임스탬프 설정 백업의 개수.
+  # Number of timestamped config backups kept per file before pruning.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  bak보관수: 3
+  bakRetention: 3
 # 버전 번호를 건드리지 마세요
 version: 1.0

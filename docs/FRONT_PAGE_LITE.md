@@ -27,6 +27,8 @@ No menu, however polished, can make `/rtp` fast - only the engine behind it can.
 
 **100% Free.** Same engine as the paid [**LeafRTP-Pro**](https://builtbybit.com/resources/rtp-pro.105418) build. No paywalled `/rtp` or nag screens, and no ads - just anonymous [bStats](https://bstats.org/) usage stats (server-admin opt-out via `plugins/bStats/config.yml`).
 
+**Trusted since 2021: 4.6 stars over 30+ reviews, 430k+ downloads.**
+
 </div>
 
 ---
@@ -41,7 +43,7 @@ No menu, however polished, can make `/rtp` fast - only the engine behind it can.
 
 **If `/rtp` is the top entry in your timings report, this is the fix.** LeafRTP is the fastest free Random Teleport plugin for Bukkit-native Minecraft servers (Paper, Bukkit, Arclight, Mohist, and other Bukkit-family forks), with Fabric supported as a first-class platform:
 
-- **No lag spikes when players spam `/rtp`.** Worst-case main-thread tick stays at 4 ms (vs. 70-771 ms for the next plugins) - your TPS holds at 20.00 during a teleport burst.
+- **No lag spikes when players spam `/rtp`.** Worst-case main-thread tick stays at 4 ms (vs. 70-852 ms for the next plugins) - your TPS holds at 20.00 during a teleport burst.
 - **Instant teleports, no "Finding a safe location..." wait.** Pre-verified location queue serves `/rtp` in one tick instead of loading chunks on demand.
 - **Works on plain Bukkit servers at Paper-class speed.** Off-tick `.mca` Anvil pre-filter, worst tick stays at 3 ms while competitors spike past 3 seconds.
 - **Clickable `/rtp menu` GUI world & region selection** - players pick worlds and regions from an interactive book menu (Paper / Folia; chat-paginated elsewhere), no commands to memorize.
@@ -55,8 +57,8 @@ On **Paper 1.21**, measured on the in-repo benchmark harness, two clients spammi
 |------------------|----------|-----------------------|------------------|
 | **LeafRTP**          | **19.8** | **4 ms**              | **16.9 ms**      |
 | JakesRTP         | 20.0     | 70 ms                 | 26.0 ms          |
-| BetterRTP        | 7.1      | 771 ms                | 53.6 ms          |
-| HuskHomes RTP    | 6.2      | 335 ms                | 52.2 ms          |
+| BetterRTP        | 7.3      | 852 ms                | 53.6 ms          |
+| HuskHomes RTP    | 6.2      | 372 ms                | 52.2 ms          |
 
 *Methodology: Paper 1.21, 2 OPed clients spamming `/rtp` continuously, in-repo harness linked below. Spigot and Folia results in the full benchmark section.*
 
@@ -126,7 +128,7 @@ This is the part competitors describe as "enterprise-grade" in their listing cop
 A few hard requirements. If any are a **no**, EssentialsX `/rtp` or HuskHomes are fine free alternatives.
 
 - ✅ **Java 21+** on your host (REQ-RTP-SYS-001, non-negotiable).
-- ✅ **Paper, Spigot, or a Bukkit-family fork** (Arclight / Mohist supported for Forge bridges). Fabric and NeoForge (1.21.x / 26.1.x) are supported and regularly tested, with their featureset lagging the Bukkit family by a release or two.
+- ✅ **Paper, Spigot, or a Bukkit-family fork** (Arclight / Mohist supported for Forge bridges). Fabric and NeoForge (1.21.x / 26.1.x) are supported and regularly tested, at feature parity with the Bukkit family in the latest builds.
 - ✅ **In-game editing or YAML, your call.** Browse and tune config from the clickable `/rtp menu` (book on Paper / Folia, chat-paginated elsewhere), or edit the plain YAML files directly and version-control them.
 - ✅ **Runs on Folia** out of the box (basic regionized scheduling + async teleport). The tuned, throughput-optimized Folia adapter ships first in **LeafRTP-Pro**, along with proxy/cross-server and SQL/Redis. (Vault economy works in the free build.)
 
@@ -194,7 +196,7 @@ A lot of what people install companion plugins for is already in the free engine
 | **Arclight / Mohist** (Forge bridges)                        | ✅ Officially supported | Use the Spigot/Paper jar. Recommended way to run on Forge.                                  |
 | **Folia**                                                   | ✅ Basic support       | Runs on Folia via regionized scheduling + async teleport. The tuned, throughput-optimized adapter ships first in **LeafRTP-Pro**. |
 | **Multi-server / proxy** (Velocity)                         | ❌ Not in this build    | Cross-server queue ships in **LeafRTP-Pro**.                                                    |
-| **Fabric**                                                  | ✅ Supported            | First-class, stable, in-scope platform; tested regularly, at feature parity with the Bukkit family. |
+| **Fabric**                                                  | ✅ Supported            | First-class, stable, in-scope platform; tested regularly, at feature parity with the Bukkit family in the latest builds. |
 | **Native NeoForge**                                         | ✅ Supported            | First-class adapter on Minecraft 1.21.x / 26.1.x.                                           |
 | **Native Forge**                                            | 🔁 Use Arclight / Mohist | No native adapter planned.                                                                  |
 
@@ -340,22 +342,6 @@ Support for the free build is **community-tier and best-effort** - a solo mainta
 - Emergency landing platform default is now `platformRadius: -1` (disabled). Set to `0` or higher to restore legacy 2.x behavior.
 
 Live list: [CHANGELOG](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md#known-issues).
-
-</details>
-
-
-<details>
-<summary><b>TODO list</b></summary>
-
-- more book menus
-- more charts
-- better polygon shape setup
-- finish translating
-- verify against modded data
-- drop 1.20.1 due to performance issues, favor 1.21-26.2 when it comes out
-- create support mechanisms for transferring from other plugins
-- steady-state and burst usage statistics for admins
-- biome and player analytics for world builders
 
 </details>
 

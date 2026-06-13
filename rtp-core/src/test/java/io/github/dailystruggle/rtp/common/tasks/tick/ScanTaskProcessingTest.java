@@ -101,7 +101,7 @@ class ScanTaskProcessingTest {
 
     @Test
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
-    void run_with_empty_fillTasks_does_not_throw() {
+    void run_with_empty_scanTasks_does_not_throw() {
         assertDoesNotThrow(() -> new ScanTaskProcessing().run());
     }
 

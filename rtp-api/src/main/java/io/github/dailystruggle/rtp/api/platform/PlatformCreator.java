@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.api.platform;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 
 import java.util.concurrent.CompletableFuture;
@@ -26,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
  * (file or network I/O) runs off the region/tick thread (S-005); only block writes run on
  * the region-owning thread.
  */
+@PublicApi
 public interface PlatformCreator {
 
   /**

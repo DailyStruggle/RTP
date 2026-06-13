@@ -1,7 +1,45 @@
 # ADR-024 — RTP-lite Assembly Variant
 
-**Status:** Accepted (amended 2026-06-10 — basic Folia support in scope for lite)
+**Status:** Accepted (amended 2026-06-12 — plugin-message network transport in scope for lite)
 **Date:** 2026-04-30
+
+## 2026-06-12 amendment — plugin-message cross-server RTP in scope for lite
+
+The original decision below dropped all network/proxy coordination from lite: SQL/Redis
+persistence and their drivers are excluded (still are), and cross-server RTP was treated
+as a Pro-only, database-backed feature. That left the free build with no cross-server
+story at all, a visible gap against competitors (EzRTP) that ship a DB-free proxy
+selector for free. As of 2026-06-12, ratified by repo owner leaf from the approved
+D-005 proposal `docs/dev/scratch/PROPOSAL-plugin-message-network-default.md` (and the
+ADR-036 *Amendment: Plugin-Message Promoted to Tier-1 Default*): **the tier-1,
+non-durable plugin-message network transport ships in lite.**
+
+Concretely:
+
+- The `plugin-message` `NetworkTransport` binding (and the `transport.type: auto`
+  proxy auto-detect resolver) ships in lite. It adds **no JDBC/Redis driver** — it
+  rides the proxy's built-in plugin-messaging vocabulary (`Connect` for the move,
+  `Forward` for `BackendHeartbeat` region-availability gossip) over an online player's
+  connection, so lite's "no SQL / no Redis" stance is unchanged.
+- The durable Pro tiers (`SqlNetworkStateBinding`, `RedisNetworkStateBinding`) and their
+  drivers stay **excluded** from lite, exactly as the SQL/Redis drops below specify.
+  Durable reservation tokens, atomic claims, multi-proxy fan-out, and load-balanced
+  selection at scale remain Pro.
+- A trimmed `network.yml` (transport + optional per-server policy overlay; no hand-typed
+  server list, no `host`/`port`) ships in lite.
+- `liteJarStructureCheck` is extended only to **assert no Redis/SQL transport class
+  leaks** (`RedisNetworkStateBinding`, `SqlNetworkStateBinding`, JDBC/Jedis drivers)
+  while **permitting** the plugin-message binding and the `auto` resolver.
+- S-00x unchanged: the destination always runs the normal local pipeline (spiral ->
+  chunk -> safety); lite transports *intent*, not a coordinate. Move failures are
+  logged, never swallowed (S-004); busy/invalid messages are configurable (S-007).
+
+Contract detail: subproject ADR
+`platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-016-plugin-message-default-transport.md`.
+Bullets below that imply *all* network/proxy support is a lite drop are superseded for
+the **plugin-message tier only**; the SQL/Redis persistence drops still apply in full.
+
+---
 
 ## 2026-06-10 amendment — basic Folia support in scope for lite
 

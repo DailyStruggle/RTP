@@ -83,3 +83,9 @@ lobby-b/rtp-config/**
 !backend-b/rtp-config/network.yml
 !lobby-a/rtp-config/network.yml
 !lobby-b/rtp-config/network.yml
+# Lite (plugin-message transport) seed variants, selected by run-acceptance.ps1
+# -Lite via docker-compose.lite.yml. Per-instance source like network.yml.
+!backend-a/rtp-config/network-lite.yml
+!backend-b/rtp-config/network-lite.yml
+!lobby-a/rtp-config/network-lite.yml
+!lobby-b/rtp-config/network-lite.yml

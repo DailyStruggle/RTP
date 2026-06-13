@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.api.hooks;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 
 /**
@@ -17,6 +19,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
  * (off the main thread on Folia) and from per-attempt verification. Implementations
  * shall be thread-safe.
  */
+@PublicApi
 public interface AnvilPrefilterRegistry {
 
   /** Functional interface for the anvil pre-filter binding. */

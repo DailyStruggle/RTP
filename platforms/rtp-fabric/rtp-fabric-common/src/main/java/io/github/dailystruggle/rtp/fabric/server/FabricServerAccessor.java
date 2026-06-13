@@ -1841,6 +1841,29 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   }
 
   /**
+   * Typed fast-path for {@link #defaultBiomesFor}: enumerate the bound server's
+   * biome registry through direct, Loom-remapped 1.21.x descriptors. This works
+   * on the intermediary production runtime (where the reflective Mojang-named
+   * lookups in {@code defaultBiomesFor} cannot resolve the obfuscated runtime
+   * method names) and throws on the deobf MC 26.x runtime (the intermediary
+   * descriptors are absent there), where the caller falls back to reflection.
+   */
+  private Set<String> defaultBiomesForTyped(MinecraftServer s) {
+    net.minecraft.core.Registry<?> biomeReg =
+        s.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+    Set<String> out = new HashSet<>();
+    for (Object rawKey : biomeReg.keySet()) {
+      if (rawKey == null) continue;
+      String raw = rawKey.toString();
+      String n = io.github.dailystruggle.rtp.api.configuration
+          .PaletteIdentifierNormalizer.normalize(raw);
+      if (n != null && !n.isEmpty()) out.add(n);
+      if (raw != null && !raw.isEmpty()) out.add(raw);
+    }
+    return out;
+  }
+
+  /**
    * Return every biome key present in the bound server's biome registry. Falls
    * back to an empty set when the server is not yet bound (e.g. before
    * SERVER_STARTED) so callers get a deterministic empty result rather than
@@ -1851,6 +1874,19 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   private Set<String> defaultBiomesFor(@Nullable RTPWorld<?> rtpWorld) {
     MinecraftServer s = server;
     if (s == null) return Collections.emptySet();
+    // Typed fast-path: on the intermediary production runtime (1.21.x) the
+    // reflective Mojang-named lookups below resolve nothing because the live
+    // runtime methods are obfuscated (e.g. method_30611), so the registry
+    // resolution fails and the biome allow-list comes back empty. Call the
+    // Loom-remapped descriptors directly first. On the deobf MC 26.x runtime
+    // those intermediary descriptors are absent, so this throws and we fall
+    // through to the reflective resolver that targets the deobf names.
+    try {
+      Set<String> typed = defaultBiomesForTyped(s);
+      if (!typed.isEmpty()) return typed;
+    } catch (Throwable typedFail) {
+      // deobf 26.x runtime — fall through to the reflective path below.
+    }
     // Both MinecraftServer.registryAccess() and Registry.registryOrThrow are
     // baked as Yarn-intermediary descriptors (method_30611, method_29107) in
     // common-module bytecode by Loom + officialMojangMappings. Those aliases

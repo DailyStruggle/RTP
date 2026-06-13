@@ -109,6 +109,17 @@ public final class NetworkModeBootstrap {
     // Platform-scheduler task handle for the periodic snapshot refresh.
     // Stored so shutdown() can cancel via RTP.scheduler.cancelTask.
     private Object snapshotRefreshTask;
+    // Slice D item 19: when transport.type=auto resolves to the plugin-message
+    // tier, the auto-detect state machine is stored here so boot() can pump it
+    // (tick + carrier-availability re-probe) on RTP.scheduler and shutdown()
+    // can cancel the pump. Null for every other transport.type.
+    private io.github.dailystruggle.rtp.common.network.pluginmessage.ProxyAutoDetector autoDetector;
+    // The bridge shared by the auto-detector and the plugin-message binding;
+    // retained so the pump can check carrier availability without building a
+    // second bridge (which would re-register the channel/listener).
+    private io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge autoDetectorBridge;
+    // Platform-scheduler task handle for the periodic auto-detector pump.
+    private Object autoDetectorTask;
 
     /**
      * Run boot logic. Idempotent for the disabled-mode path; calling
@@ -162,6 +173,13 @@ public final class NetworkModeBootstrap {
         RtpYamlSection heartbeat = cfg.getConfigurationSection("heartbeat");
         long intervalMs = heartbeat == null ? 1000L : heartbeat.getLong("intervalMs", 1000L);
         if (intervalMs <= 0) intervalMs = 1000L;
+        // The plugin-message tier ages a cached peer heartbeat out of its
+        // snapshot after this window (its "stale" timeout). This reuses the
+        // pre-existing heartbeat.staleAfterMs knob that the SQL poll loop
+        // already honours - there is no separate transport.pluginMessage
+        // staleness key - so one value drives staleness across all tiers.
+        long staleAfterMs = heartbeat == null ? 5000L : heartbeat.getLong("staleAfterMs", 5000L);
+        if (staleAfterMs <= 0) staleAfterMs = 5000L;
 
         // Reservation-token TTL reaper cadence (REQ-RTP-NET-011). Mirrors
         // NetworkConfig.reservationReapIntervalMs() default + clamping.
@@ -192,7 +210,7 @@ public final class NetworkModeBootstrap {
 
         NetworkTransport selected;
         try {
-            selected = openTransport(transportType, intervalMs, transportSec, verifier, schemaVersion);
+            selected = openTransport(transportType, intervalMs, staleAfterMs, transportSec, verifier, schemaVersion);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[NETWORK] Failed to open transport.type=" + transportType
@@ -274,6 +292,44 @@ public final class NetworkModeBootstrap {
         this.snapshotRefreshTask =
                 RTP.scheduler.runTaskTimerAsynchronously(refresh, refreshTicks, refreshTicks);
 
+        // Slice D item 19: pump the auto-detect state machine for
+        // transport.type=auto on the plugin-message tier. The detector is
+        // platform-neutral and starts no threads itself (guideline Scheduler
+        // Usage); we drive it from RTP.scheduler. Each pulse:
+        //   - drives onCarrierAvailable() once a carrier player exists (this
+        //     fires the active GetServer/GetServers handshake from ARMED, and
+        //     re-probes from DISABLED so a server later attached to a proxy
+        //     picks the network up without a restart - decision §9.5), and
+        //   - calls tick() to time out an over-due handshake back to standalone.
+        // The plugin-message binding gossips only when a carrier is online
+        // regardless of detector state, so this pump adds topology discovery
+        // and the re-probe lifecycle on top of an already-functional tier.
+        final io.github.dailystruggle.rtp.common.network.pluginmessage.ProxyAutoDetector detector =
+                this.autoDetector;
+        final io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge probeBridge =
+                this.autoDetectorBridge;
+        if (detector != null) {
+            Runnable pump = () -> {
+                try {
+                    if (detector.state()
+                            != io.github.dailystruggle.rtp.common.network.pluginmessage
+                                    .ProxyAutoDetector.State.ENABLED) {
+                        // Only spend a handshake when a carrier player can
+                        // actually carry the plugin message.
+                        if (probeBridge == null
+                                || probeBridge.anyOnlinePlayer().isPresent()) {
+                            detector.onCarrierAvailable();
+                        }
+                    }
+                    detector.tick();
+                } catch (Throwable ignored) {
+                    // Defensive: a flaky bridge must not crash the pump.
+                }
+            };
+            this.autoDetectorTask =
+                    RTP.scheduler.runTaskTimerAsynchronously(pump, refreshTicks, refreshTicks);
+        }
+
         // Reservation-token TTL reaper (REQ-RTP-NET-011). On backends in proxy-
         // aware mode the reaper sweeps tokens this backend (or any peer) issued,
         // dispatching release(TTL_EXPIRED) so the originating backend's buffer
@@ -287,6 +343,10 @@ public final class NetworkModeBootstrap {
         // L2: prepare the join-time redeem listener. Actual Bukkit listener
         // registration is deferred to registerJoinTriggerSource(Plugin) so
         // RTPBukkitPlugin can register us alongside its other listeners.
+        // proxy-direct is now a remote view of the proxy store (PROPOSAL-
+        // proxy-direct-as-remote-store): the standard JoinTriggerSource reads
+        // the reservation via findReservation/redeem RPC, so no dedicated
+        // proxy-direct arrival listener is needed.
         this.joinTriggerSource = new JoinTriggerSource(selected, serverId);
 
         // L6 Slice C: wire router + enrolment buffer + status cache.
@@ -327,6 +387,20 @@ public final class NetworkModeBootstrap {
                         "[NETWORK] NetworkRequestQueue open failed for transport=" + transportType
                                 + ": " + t.getMessage() + " - cross-server enrolment stays disabled.", t);
                 rq = null;
+            }
+            // proxy-direct (PROPOSAL-proxy-direct-as-remote-store): the
+            // backend's request queue is a thin RPC client of the proxy's
+            // in-memory queue, riding the same outbound socket as the
+            // transport. openRequestQueue returns null for this tier, so build
+            // the remote client here from the already-open
+            // ProxyDirectNetworkBinding. The standard qref!=null flush/poll
+            // wiring below then lights up unchanged.
+            if (rq == null
+                    && this.transport instanceof io.github.dailystruggle.rtp.common.network.direct.ProxyDirectNetworkBinding pdb) {
+                rq = new io.github.dailystruggle.rtp.common.network.direct.ProxyDirectNetworkRequestQueue(pdb);
+                RTP.log(Level.INFO,
+                        "[NETWORK] proxy-direct: request queue is a remote view of the proxy store "
+                                + "(enrolment + status ride the proxy-direct socket).");
             }
             this.requestQueue = rq;
 
@@ -551,6 +625,20 @@ public final class NetworkModeBootstrap {
                     () -> this.cachedSnapshot,
                     serverId,
                     loadBalancerConfig);
+            // Option 1 (plugin-message tier): seed cross-server destinations
+            // from the proxy's GetServers topology that the `auto` resolver
+            // discovers. On the DB-free transport a single player cannot carry
+            // heartbeat gossip off a player-empty backend, so the snapshot is
+            // often empty even though the proxy knows every backend; feeding
+            // the discovered server list lets /rtp suggest and accept
+            // `server:region` destinations (availability UNKNOWN -> the
+            // destination decides on arrival). Durable Redis/SQL tiers leave
+            // the detector null and rely purely on heartbeats.
+            this.peerRegionRegistry.setTopologyPeerSupplier(() -> {
+                io.github.dailystruggle.rtp.common.network.pluginmessage.ProxyAutoDetector d =
+                        this.autoDetector;
+                return d == null ? java.util.Set.of() : d.peerServerIds();
+            });
             // L6 Slice I: pass lobbyMode through so a no-arg /rtp on a
             // lobby backend auto-routes to the "most kept" remote region.
             // Slice I follow-up: pass the backend state publisher so
@@ -779,6 +867,14 @@ public final class NetworkModeBootstrap {
             catch (Throwable ignored) { /* best-effort */ }
             snapshotRefreshTask = null;
         }
+        // Slice D item 19: stop pumping the auto-detect state machine.
+        if (autoDetectorTask != null) {
+            try { RTP.scheduler.cancelTask(autoDetectorTask); }
+            catch (Throwable ignored) { /* best-effort */ }
+            autoDetectorTask = null;
+        }
+        autoDetector = null;
+        autoDetectorBridge = null;
         cachedSnapshot = null;
         if (publisher != null) {
             try { publisher.stop(); } catch (Throwable ignored) { /* best-effort */ }
@@ -867,6 +963,20 @@ public final class NetworkModeBootstrap {
                 return new io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisNetworkRequestQueue(
                         host, port, password, 0);
             }
+            case "proxy-direct":
+            case "proxydirect":
+            case "proxy-cache":
+            case "plugin-message":
+            case "pluginmessage":
+            case "auto":
+                // DB-free, player-INDEPENDENT discovery-only tiers
+                // (rtp-proxy-ADR-017 proxy-direct, the plugin-message /
+                // proxy-cache tiers, and auto). These converge cross-server
+                // region NAMES only and have no shared mutable request store,
+                // so there is no cross-server enrolment queue to open. Return
+                // null (not an error): the router short-circuits to local
+                // fallback and /rtp keeps serving locally.
+                return null;
             default:
                 throw new IllegalArgumentException(
                         "NetworkModeBootstrap.openRequestQueue: unrecognised transport.type '"
@@ -996,13 +1106,17 @@ public final class NetworkModeBootstrap {
         }
     }
 
+    /** Default TCP port for the {@code proxy-direct} transport (rtp-proxy-ADR-017). */
+    private static final int PROXY_DIRECT_DEFAULT_PORT = 25599;
+
     /**
      * Open the transport binding matching {@code type}. Phase 2e supports
      * {@code in-memory} (dev/test) and {@code sql} (real cross-process).
      * {@code redis} surfaces a clear "not yet" message rather than failing
      * silently.
      */
-    private NetworkTransport openTransport(String type, long intervalMs, RtpYamlSection transportSec,
+    private NetworkTransport openTransport(String type, long intervalMs, long staleAfterMs,
+                                           RtpYamlSection transportSec,
                                            io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier verifier,
                                            int schemaVersion) {
         String t = type == null ? "in-memory" : type.toLowerCase(java.util.Locale.ROOT);
@@ -1010,6 +1124,111 @@ public final class NetworkModeBootstrap {
             case "in-memory":
             case "memory":
                 return new InMemoryNetworkStateBinding();
+            case "plugin-message":
+            case "pluginmessage": {
+                // Tier-1, DB-free default (rtp-proxy-ADR-016). Requires a
+                // platform-installed NetworkBridge; absence is a clear error
+                // (the operator explicitly asked for plugin-message).
+                io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge bridge =
+                        openNetworkBridgeOrNull();
+                if (bridge == null) {
+                    throw new IllegalStateException(
+                            "transport.type=plugin-message requires a platform NetworkBridge; "
+                                    + "this platform did not install one (RTP.networkBridgeFactory is null).");
+                }
+                return new io.github.dailystruggle.rtp.common.network.pluginmessage
+                        .PluginMessageNetworkBinding(bridge, staleAfterMs, System::currentTimeMillis);
+            }
+            case "proxy-cache":
+            case "proxycache": {
+                // Tier-1, DB-free "proxy is the database" transport
+                // (PROPOSAL-proxy-as-availability-store). Backends push their
+                // heartbeat to the proxy companion's in-memory cache and pull
+                // the cached snapshot back; converges without player presence
+                // on the peer side (unlike backend-to-backend gossip).
+                io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge bridge =
+                        openNetworkBridgeOrNull();
+                if (bridge == null) {
+                    throw new IllegalStateException(
+                            "transport.type=proxy-cache requires a platform NetworkBridge; "
+                                    + "this platform did not install one (RTP.networkBridgeFactory is null).");
+                }
+                return new io.github.dailystruggle.rtp.common.network.pluginmessage
+                        .ProxyCacheNetworkBinding(bridge, staleAfterMs, System::currentTimeMillis);
+            }
+            case "auto": {
+                // Proxy auto-detect (Slice D item 19): build the detector and
+                // run its cheap passive evaluation. When the bridge is absent
+                // or the passive proxy-forwarding probe is disarmed we resolve
+                // silently to disabled (return null -> boot() short-circuits)
+                // so a standalone server prints no warning spam
+                // (rtp-proxy-ADR-016 open item 3). When the probe is armed we
+                // open the plugin-message tier and retain the detector so
+                // boot() can pump it (active GetServer/GetServers handshake +
+                // re-probe on carrier availability) via RTP.scheduler.
+                io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge bridge =
+                        openNetworkBridgeOrNull();
+                if (bridge == null || !bridge.isAvailable()) {
+                    RTP.log(Level.FINE,
+                            "[NETWORK] transport.type=auto resolved to disabled "
+                                    + "(no proxy bridge installed) - staying standalone.");
+                    return null;
+                }
+                io.github.dailystruggle.rtp.common.network.pluginmessage.ProxyAutoDetector detector =
+                        new io.github.dailystruggle.rtp.common.network.pluginmessage
+                                .ProxyAutoDetector(bridge);
+                detector.evaluatePassive();
+                if (detector.state()
+                        == io.github.dailystruggle.rtp.common.network.pluginmessage
+                                .ProxyAutoDetector.State.DISABLED) {
+                    RTP.log(Level.FINE,
+                            "[NETWORK] transport.type=auto resolved to disabled "
+                                    + "(passive proxy probe disarmed) - staying standalone.");
+                    return null;
+                }
+                this.autoDetector = detector;
+                this.autoDetectorBridge = bridge;
+                // Prefer the proxy-cache tier under auto: it reuses the proxy
+                // companion as the availability store and converges without
+                // peer-side player presence (the backend-to-backend gossip tier
+                // could not). When no companion answers, snapshots stay empty
+                // and the topology seeding (Option 1) still routes default
+                // regions, so this is strictly >= the gossip tier
+                // (PROPOSAL-proxy-as-availability-store Q2: prefer when armed).
+                return new io.github.dailystruggle.rtp.common.network.pluginmessage
+                        .ProxyCacheNetworkBinding(bridge, staleAfterMs, System::currentTimeMillis);
+            }
+            case "proxy-direct":
+            case "proxydirect": {
+                // Tier-1, DB-free player-INDEPENDENT transport (rtp-proxy-ADR-017).
+                // The backend dials the proxy companion's TCP listener directly
+                // (configured proxy address list), publishing its real region
+                // list at startup with NO player and reading the merged snapshot
+                // back. This is the only DB-free channel that converges
+                // cross-server region names with zero players AND zero per-server
+                // operator config (plugin messaging cannot, because it is gated on
+                // a player connection).
+                java.util.List<String> proxyAddrs =
+                        transportSec == null ? java.util.List.of()
+                                : transportSec.getStringList("proxies");
+                int defaultPort = transportSec == null ? PROXY_DIRECT_DEFAULT_PORT
+                        : transportSec.getInt("port", PROXY_DIRECT_DEFAULT_PORT);
+                java.util.List<java.net.InetSocketAddress> parsed =
+                        io.github.dailystruggle.rtp.common.network.direct
+                                .ProxyDirectNetworkBinding.parseProxies(proxyAddrs, defaultPort);
+                if (parsed.isEmpty()) {
+                    throw new IllegalStateException(
+                            "transport.type=proxy-direct requires a non-empty transport.proxies "
+                                    + "list (host:port of each proxy companion).");
+                }
+                int connectTimeoutMs = transportSec == null ? 1000
+                        : transportSec.getInt("connectTimeoutMs", 1000);
+                int readTimeoutMs = transportSec == null ? 2000
+                        : transportSec.getInt("readTimeoutMs", 2000);
+                return new io.github.dailystruggle.rtp.common.network.direct
+                        .ProxyDirectNetworkBinding(parsed, verifier, schemaVersion,
+                        staleAfterMs, connectTimeoutMs, readTimeoutMs, System::currentTimeMillis);
+            }
             case "sql": {
                 // Reuse the existing AbstractSQLDatabaseAccessor pool via asDataSource()
                 // - REQ-RTP-PROXY-COMMON-010 / ADR-011 §HikariCP Pool Sharing (Q2).
@@ -1042,6 +1261,26 @@ public final class NetworkModeBootstrap {
             }
             default:
                 throw new IllegalArgumentException("Unrecognised transport.type='" + type + "'");
+        }
+    }
+
+    /**
+     * Resolve the platform-installed plugin-message {@link io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge}
+     * via {@link RTP#networkBridgeFactory}, or {@code null} when no platform
+     * installed one (single-server / unsupported platform). Defensive: a
+     * throwing factory degrades to {@code null} rather than aborting boot.
+     */
+    private static io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge openNetworkBridgeOrNull() {
+        try {
+            java.util.function.Supplier<
+                    io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge> factory =
+                    RTP.networkBridgeFactory;
+            return factory == null ? null : factory.get();
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[NETWORK] networkBridgeFactory threw while building a NetworkBridge: "
+                            + t.getMessage() + " - plugin-message tier unavailable.", t);
+            return null;
         }
     }
 

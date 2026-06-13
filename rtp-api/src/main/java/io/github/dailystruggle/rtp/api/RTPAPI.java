@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.api;
 
 import io.github.dailystruggle.metrics.api.FoliaRegionSample;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
 import io.github.dailystruggle.rtp.api.hooks.RTPHooks;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -46,6 +47,7 @@ import java.util.function.ToIntFunction;
  * production code; it enforces the write-once contract and prevents a buggy
  * addon from silently replacing the accessor with an incompatible implementation.
  */
+@PublicApi
 public class RTPAPI {
   /** The platform-specific server accessor. Volatile for cross-thread visibility. */
   public static volatile RTPServerAccessor serverAccessor;
@@ -142,6 +144,7 @@ public class RTPAPI {
    * @throws IllegalArgumentException if {@code accessor} is {@code null}
    * @throws IllegalStateException    if a different accessor has already been registered
    */
+  @PublicApi
   public static synchronized void setServerAccessor(RTPServerAccessor accessor) {
     if (accessor == null) {
       throw new IllegalArgumentException("[RTP API] serverAccessor must not be null");
@@ -160,6 +163,7 @@ public class RTPAPI {
    * provider has not been registered yet (callers MUST null-check). Thread-safe once
    * {@code rtp-core} is loaded.
    */
+  @PublicApi
   public static Set<String> getBiomes(RTPWorld world) {
     if (biomeProvider != null) {
       return biomeProvider.apply(world);
@@ -182,6 +186,7 @@ public class RTPAPI {
    * @throws IllegalStateException if called before core delegates are registered
    *     (REQ-RTP-S-006)
    */
+  @PublicApi
   public static RTPHooks hooks() {
     RTPHooks h = hooks;
     if (h == null) {
@@ -213,6 +218,7 @@ public class RTPAPI {
    *     (REQ-RTP-S-006)
    * @throws IllegalArgumentException if {@code player} or {@code target} is {@code null}
    */
+  @PublicApi
   public static CompletableFuture<RTPResult> teleport(UUID player, RtpTarget target) {
     if (player == null) throw new IllegalArgumentException("[RTP API] player must not be null");
     if (target == null) throw new IllegalArgumentException("[RTP API] target must not be null");
@@ -234,6 +240,7 @@ public class RTPAPI {
    *     (REQ-RTP-S-006)
    * @throws IllegalArgumentException if {@code player} is {@code null}
    */
+  @PublicApi
   public static boolean cancel(UUID player) {
     if (player == null) throw new IllegalArgumentException("[RTP API] player must not be null");
     Predicate<UUID> d = cancelDelegate;
@@ -254,6 +261,7 @@ public class RTPAPI {
    *     (REQ-RTP-S-006)
    * @throws IllegalArgumentException if {@code world} is {@code null}
    */
+  @PublicApi
   public static int queueDepth(RTPWorld<?> world) {
     if (world == null) throw new IllegalArgumentException("[RTP API] world must not be null");
     ToIntFunction<RTPWorld<?>> d = queueDepthDelegate;
@@ -274,6 +282,7 @@ public class RTPAPI {
    *     (REQ-RTP-S-006)
    * @throws IllegalArgumentException if {@code player} is {@code null}
    */
+  @PublicApi
   public static boolean isWarmingUp(UUID player) {
     if (player == null) throw new IllegalArgumentException("[RTP API] player must not be null");
     Predicate<UUID> d = warmupDelegate;
@@ -305,6 +314,7 @@ public class RTPAPI {
    *     (REQ-RTP-S-006)
    * @throws IllegalArgumentException if {@code player} is {@code null}
    */
+  @PublicApi
   public static List<RtpTarget> getAllowedTargets(UUID player) {
     if (player == null) throw new IllegalArgumentException("[RTP API] player must not be null");
     Function<UUID, List<RtpTarget>> d = allowedTargetsDelegate;
@@ -335,6 +345,7 @@ public class RTPAPI {
    *     (REQ-RTP-S-006)
    * @throws IllegalArgumentException if {@code player} or {@code target} is {@code null}
    */
+  @PublicApi
   public static RtpTargetStatus getTargetStatus(UUID player, RtpTarget target) {
     if (player == null) throw new IllegalArgumentException("[RTP API] player must not be null");
     if (target == null) throw new IllegalArgumentException("[RTP API] target must not be null");
@@ -362,6 +373,7 @@ public class RTPAPI {
    * @throws IllegalStateException if {@code rtp-core} has not loaded yet
    *     (REQ-RTP-S-006)
    */
+  @PublicApi
   public static MetricsSnapshot getMetricsSnapshot() {
     Supplier<MetricsSnapshot> d = metricsSnapshotDelegate;
     if (d == null) {
@@ -383,6 +395,7 @@ public class RTPAPI {
    * @throws IllegalStateException if {@code rtp-core} has not loaded yet
    *     (REQ-RTP-S-006)
    */
+  @PublicApi
   public static List<FoliaRegionSample> getRegionSamples() {
     MetricsSnapshot snapshot = getMetricsSnapshot();
     if (snapshot == null || snapshot.foliaRegions == null) {

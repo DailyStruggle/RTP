@@ -307,6 +307,42 @@ reproducible by readers".
   KingdomsX, hClaims, UltimateClaims, Pueblos, SaberFactions, HuskClaims, FactionsBridge, CrashClaim,
   Residence. Folds into the existing "Claim-plugin integration audit" item above — same workstream,
   this just sharpens the target list.
+- [ ] **Foreign config importer (`rtp config import <plugin>`, one-shot migration aid).** Design
+  settled in [ADR-066](../adr/ADR-066-foreign-config-importer.md) (Proposed, D-005). Lower the
+  switching cost for operators moving off a competitor by translating its on-disk config into RTP's
+  config tree. This is a *migration aid*, not the live API shim above: it reads the competitor's YAML
+  once, writes our files, and then RTP owns the config. A generic `ConfigImporter` seam (in `rtp-core`,
+  since file-only reading via the in-house `RtpYamlConfig` parser is platform-neutral) with BetterRTP
+  as the first source and EzRTP / JakesRTP to follow; `rtp config import` with no argument auto-detects
+  when exactly one source's files are present. Design constraints:
+  - **Explicit, non-destructive, dry-run-first.** Trigger via an explicit `rtp config import <plugin>`
+    (never silent auto-overwrite on startup); `rtp config import` with no argument auto-detects when
+    exactly one source is present, else lists candidates. Default to a preview that lists every mapped
+    key, every approximation, every deferred mapping, and every dropped key; only write on a `confirm`
+    second phase (parallel to `rtp prefab` `apply`/`confirm`). Back up any RTP file we touch (reuse the
+    `prefab` `<file>.yml.bak.<epochMillis>` mechanism). Refuse to clobber a customized RTP config
+    without confirmation.
+  - **No hard dependency.** Parse the competitor's YAML straight off disk via the in-house
+    `RtpYamlConfig` parser; do not link competitor classes or soft-depend on the plugin being
+    installed. Because file-only reading is platform-neutral, the `ConfigImporter` seam lives in
+    `rtp-core`. Target each competitor's latest config schema.
+  - **Honest, lossy translation.** Competitors and RTP model regions differently; classify each key
+    `MAPPED` / `APPROXIMATED` / `DEFERRED` / `DROPPED` and log every approximation rather than implying
+    parity. Known **clean** (`MAPPED`) mappings: BetterRTP `Shape: square` → RTP `SQUARE` shape (RTP
+    ships both square and circle); arbitrary outlines → `Polygon` (ADR-034) vertices (`APPROXIMATED`);
+    `CenterX`/`CenterZ`, `MaxRadius`/`MinRadius` → region center + radius/minRadius; `Cooldown`/`Delay`
+    → `teleportCooldown`/`teleportDelay` (seconds, 1:1); `MaxAttempts` → `performance.yml#maxAttempts`
+    (1:1, same default 32); `PreloadRadius` → `performance.yml#viewDistanceSelect`/`viewDistanceTeleport`;
+    per-world enable list → worlds/regions; `Price`/economy → `economy.yml`; biome/block blocklists →
+    `safety.yml` filters.
+  - **Parity-dependent keys (`DEFERRED`, not dropped).** `SetAsRespawn` (persistent spawn anchor) and
+    `LockAfter` (cooldown usage cap) map onto RTP parity features that are planned but not yet landed
+    (their own ROADMAP items above). Until each target ships, the importer reports the key as
+    `DEFERRED` ("recognized, target not yet available"); when the parity feature lands, flip its row
+    from `DEFERRED` to `MAPPED` in the same change.
+  - **D-005 + ADR.** Design settled in
+    [ADR-066](../adr/ADR-066-foreign-config-importer.md) (Proposed): generic `ConfigImporter` seam
+    with BetterRTP first, EzRTP / JakesRTP to follow.
 
 ---
 

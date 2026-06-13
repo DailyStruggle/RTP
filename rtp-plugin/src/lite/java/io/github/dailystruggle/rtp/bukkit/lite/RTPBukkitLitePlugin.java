@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnPlayerQuit;
 import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnEventTeleports;
 import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnWorldLoadUnload;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
 import io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor;
 import io.github.dailystruggle.rtp.bukkitplatform.server.AsyncTeleportProcessing;
 import io.github.dailystruggle.rtp.common.server.DatabaseProcessing;
@@ -59,6 +60,14 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
 
   private static RTPBukkitLitePlugin instance = null;
   private static Metrics metrics;
+
+  /**
+   * Network-mode bootstrap (ADR-036). Lite ships only the DB-free tiers
+   * (plugin-message / proxy-cache, ADR-024 amendment); the durable SQL/Redis
+   * transports are excluded from the lite jar. Without this the entire
+   * cross-server transport machinery is inert under the lite assembly.
+   */
+  private final NetworkModeBootstrap networkBootstrap = new NetworkModeBootstrap();
 
   /** @return the single plugin instance initialized at bukkit startup */
   public static RTPBukkitLitePlugin getInstance() {
@@ -111,6 +120,30 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       // now ships lang/** plus language.yml so the locale resource lookups succeed.
       RTP rtp = new RTP();
 
+      // Read routing.lobbyMode from network.yml BEFORE regions are loaded
+      // (reloadRegions below constructs Region instances). On a lobby this
+      // skips the local region processing (ScanTask pre-fill, DB hydrate,
+      // Region.execute pulse) so the lobby does not initialise default
+      // regions. The full bootstrap performs this same early-read; omitting
+      // it on lite was the cause of lite lobbies hydrating regions.
+      // Defensive: any failure resolves to lobbyMode=false.
+      try {
+        java.io.File earlyNetworkYml = NetworkModeBootstrap.ensureNetworkYml(
+            getDataFolder(), RTPBukkitLitePlugin.class);
+        RTP.lobbyMode = NetworkModeBootstrap.readLobbyModeEarly(earlyNetworkYml);
+        if (RTP.lobbyMode) {
+          RTP.log(Level.INFO,
+              "[LIFECYCLE-LITE] onEnable routing.lobbyMode=true -- local region"
+                  + " processing skipped; this backend acts as a pure cross-server"
+                  + " dispatcher.");
+        }
+      } catch (Throwable t) {
+        RTP.lobbyMode = false;
+        RTP.log(Level.FINE,
+            "[LIFECYCLE-LITE] onEnable lobbyMode early-read failed; defaulting to false: "
+                + t.getMessage());
+      }
+
       // Yaml-only persistence wiring (ADR-024). Mirrors the minimum subset of
       // BukkitDatabaseHandler.setupDatabase that lite still needs:
       //   1. Ensure the database/ directory exists (YamlFileDatabase reads/writes there).
@@ -137,6 +170,20 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
         RTP.log(Level.WARNING,
             "[LIFECYCLE-LITE] yaml-only persistence wiring failed", e);
       }
+
+      // Boot backend-side network mode (ADR-036). No-op when network.yml is
+      // absent or network.enabled=false. Lite resolves to the DB-free transport
+      // tiers only (plugin-message / proxy-cache); failure is logged but never
+      // aborts plugin enable (network mode is strictly optional).
+      try {
+        java.io.File networkYml = NetworkModeBootstrap.ensureNetworkYml(
+            getDataFolder(), RTPBukkitLitePlugin.class);
+        networkBootstrap.boot(networkYml);
+      } catch (Throwable t) {
+        RTP.log(Level.WARNING,
+            "[LIFECYCLE-LITE] onEnable network-mode boot failed; continuing without it: "
+                + t.getMessage(), t);
+      }
     }
 
     // Step 3: command registration. Shared with the full bootstrap (ADR-024 helper).
@@ -159,6 +206,35 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     Bukkit.getPluginManager().registerEvents(new OnWorldLoadUnload(), this);
     Bukkit.getPluginManager().registerEvents(new OnEventTeleports(), this);
     OnWorldLoadUnload.rebindFallbackRegionsForAllLoadedWorlds();
+
+    // Cross-server arrival wiring (ADR-036). Registers the network-mode
+    // JoinTriggerSource and the cross-server waitlist quit listener so a
+    // proxied player arriving on this backend redeems their pending RTP.
+    // All no-ops when network mode is disabled (boot() left them null).
+    try {
+      networkBootstrap.registerJoinTriggerSource();
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[LIFECYCLE-LITE] JoinTriggerSource registration failed; continuing: "
+              + t.getMessage(), t);
+    }
+    try {
+      networkBootstrap.registerWaitlistQuitListener();
+      java.util.function.Predicate<io.github.dailystruggle.rtp.api.entity.RTPCommandSender> guard =
+          networkBootstrap.waitlistCommandGuard();
+      if (guard != null
+          && RTP.baseCommand instanceof io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit cmd) {
+        cmd.addSenderCheck(s -> {
+          if (!(s instanceof org.bukkit.entity.Player p)) return true;
+          io.github.dailystruggle.rtp.api.entity.RTPCommandSender rs =
+              RTP.serverAccessor.getSender(p.getUniqueId());
+          return rs == null || guard.test(rs);
+        });
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[LIFECYCLE-LITE] waitlist wiring failed; continuing: " + t.getMessage(), t);
+    }
 
     // Step 6: chunk-unload processor (Spigot/Paper only -- safe in lite, no Folia branch).
     RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1);
@@ -335,6 +411,16 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
   @Override
   public void onDisable() {
     RTP.log(Level.FINE, "[LIFECYCLE-LITE] onDisable ENTER");
+    // Stop the backend heartbeat publisher + close the network transport
+    // first (reverse-order teardown). Idempotent; safe if network mode was
+    // never enabled this lifecycle.
+    try {
+      networkBootstrap.shutdown();
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[LIFECYCLE-LITE] onDisable network-mode shutdown failed (continuing): "
+              + t.getMessage(), t);
+    }
     // CHECKLIST-metrics-and-multiserver.md row B9: mirror the full bootstrap
     // teardown so a /reload cycle reinstalls the binding cleanly. Idempotent.
     try {

@@ -1,0 +1,14 @@
+# Devstack backend-b network.yml (LITE variant). Folia 1.21.11.
+# Tier-1 plugin-message transport: no Redis/SQL required (ADR-024 amendment,
+# rtp-proxy-ADR-016). Selected by `run-acceptance.ps1 -Lite` via the
+# docker-compose.lite.yml seed-remount override.
+network:
+  enabled: true
+  serverId: "backend-b"
+transport:
+  # proxy-direct: player-independent backend->proxy socket (rtp-proxy-ADR-017).
+  # Mirrorable proxies list (identical on every backend).
+  type: "proxy-direct"
+  proxies:
+    - "proxy-a:25599"
+    - "proxy-b:25599"

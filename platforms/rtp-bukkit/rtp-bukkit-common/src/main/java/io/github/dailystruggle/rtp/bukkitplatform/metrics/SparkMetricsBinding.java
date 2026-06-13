@@ -37,10 +37,12 @@ import java.util.List;
  * spark-side failure degrades to the delegate / sentinel rather than
  * propagating.
  *
- * <p><b>Folia.</b> This binding is intentionally <em>not</em> applied on Folia
- * by {@code MetricsBindingDispatcher}; Folia keeps its native
- * {@code FoliaMetricsBinding} so per-region samples ({@link #foliaRegions()})
- * are preserved.
+ * <p><b>Folia.</b> This binding <em>is</em> applied on Folia, wrapping the
+ * native {@code FoliaMetricsBinding} delegate. spark supplies the scalar
+ * TPS/MSPT (Folia's native per-region sampler can only derive MSPT from the
+ * inter-tick interval, not real per-tick processing time), while
+ * {@link #foliaRegions()} delegates to the Folia binding so per-region
+ * samples are preserved.
  *
  * <p>Testable without spark on the classpath via the package-private
  * {@link #SparkMetricsBinding(MetricsBinding, SparkStats)} constructor.

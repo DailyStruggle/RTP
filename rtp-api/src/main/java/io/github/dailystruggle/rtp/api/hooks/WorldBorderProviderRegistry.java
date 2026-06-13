@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.api.hooks;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 
 /**
@@ -15,6 +17,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
  * invoked from the async generation pipeline; implementations shall be thread-safe
  * and shall not perform blocking I/O.
  */
+@PublicApi
 public interface WorldBorderProviderRegistry {
 
   /** Functional interface for world-border membership tests. */

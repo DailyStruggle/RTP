@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.api;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
 import java.util.Objects;
 
 /**
@@ -19,6 +20,7 @@ import java.util.Objects;
  * {@link RTPAPI#teleport(java.util.UUID, RtpTarget)}, which re-enforces every
  * safety and permission check regardless of what this status reported.
  */
+@PublicApi
 public final class RtpTargetStatus {
 
   /**

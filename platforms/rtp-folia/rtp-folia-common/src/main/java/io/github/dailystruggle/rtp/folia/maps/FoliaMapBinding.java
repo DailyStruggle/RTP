@@ -1,13 +1,6 @@
 package io.github.dailystruggle.rtp.folia.maps;
 
-import io.github.dailystruggle.mapsapi.MapHandle;
 import io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
-
-import java.util.Objects;
-import java.util.UUID;
 
 /**
  * Folia-specific {@code MapBinding} override. Thin subclass of
@@ -47,61 +40,10 @@ import java.util.UUID;
  */
 public class FoliaMapBinding extends BukkitMapBinding {
 
-    /**
-     * Best-effort hop to a viewer's {@code EntityScheduler} for any
-     * follow-up work a caller wants to attach to the viewer's region.
-     * Currently unused by the ephemeral path (Stage 3 hook); exposed for
-     * the future {@code bindLive} implementation.
-     *
-     * @param viewer player UUID; must not be {@code null}
-     * @param work   runnable to dispatch on the viewer's region
-     * @return {@code true} if the viewer was online and the task was
-     *         scheduled, {@code false} otherwise
-     */
-    public boolean dispatchToViewerRegion(UUID viewer, Runnable work) {
-        Objects.requireNonNull(viewer, "viewer");
-        Objects.requireNonNull(work, "work");
-        Player player;
-        try {
-            player = Bukkit.getPlayer(viewer);
-        } catch (Throwable t) {
-            // No server is running (e.g. unit-test context); treat as offline.
-            return false;
-        }
-        if (player == null) return false;
-        try {
-            Plugin[] plugins = Bukkit.getPluginManager().getPlugins();
-            if (plugins.length == 0) return false;
-            player.getScheduler().run(plugins[0], scheduledTask -> work.run(), null);
-            return true;
-        } catch (Throwable t) {
-            // Folia not present, or scheduler refused; caller treats this as
-            // "no region hop available" and falls back to the global path.
-            return false;
-        }
-    }
-
-    /**
-     * Folia override: hop to the viewer's {@code EntityScheduler} before
-     * dropping the {@code FILLED_MAP} item entity, because mutating world
-     * state at a player's location from a foreign region thread throws
-     * {@code ThreadAccessException} on Folia. Delegates to the superclass
-     * implementation once on the correct thread. If the viewer cannot be
-     * reached (offline, no Folia scheduler present), falls back to the
-     * superclass path (which itself throws an {@code IllegalStateException}
-     * the dispatcher then surfaces to the player via {@code mapUnavailable}).
-     */
-    @Override
-    public void deliverTo(MapHandle handle, UUID viewer) {
-        Objects.requireNonNull(handle, "handle");
-        Objects.requireNonNull(viewer, "viewer");
-        boolean hopped = dispatchToViewerRegion(viewer, () -> super.deliverTo(handle, viewer));
-        if (!hopped) {
-            // Viewer offline / Folia scheduler unavailable; superclass will
-            // throw IllegalStateException, which is the S-004 contract.
-            super.deliverTo(handle, viewer);
-        }
-    }
+    // deliverTo is inherited from BukkitMapBinding: the FILLED_MAP drop is
+    // dispatched onto the viewer's region thread by the caller (MapDispatch)
+    // via RTP.scheduler.runTask(location, ...), so no per-binding
+    // EntityScheduler hop is needed here.
 
     // bindLive is inherited from BukkitMapBinding: CraftMapView.render is
     // dispatched per-viewer by the platform's own scheduling, on Folia just

@@ -6,7 +6,9 @@ import io.github.dailystruggle.mapsapi.MapBindingLifecycle;
 import io.github.dailystruggle.mapsapi.MapHandle;
 import io.github.dailystruggle.mapsapi.noop.NoopMapBinding;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 
@@ -356,22 +358,50 @@ public final class MapDispatch {
 
     // Delivery: a freshly-rendered MapView is invisible to the client unless
     // a FILLED_MAP item referencing its id reaches the viewer. The binding
-    // owns the platform-specific delivery (Bukkit-family: drop a
-    // FILLED_MAP item entity at the viewer's feet; Folia: same, hopped via
-    // the viewer's EntityScheduler). S-004: delivery faults exit through
-    // the same WARNING + mapUnavailable message path as renderEphemeral.
-    try {
-      RTP.log(Level.FINE,
-          "[viz/bad-locations] binding.deliverTo invoking for viewer=" + viewer);
-      binding.deliverTo(handle, viewer);
-      RTP.log(Level.FINE,
-          "[viz/bad-locations] binding.deliverTo OK for viewer=" + viewer);
-    } catch (RuntimeException e) {
-      RTP.log(Level.WARNING,
-          "ChartSpec " + spec.kind() + " for viewer " + viewer
-              + " deliverTo failed: " + e.getMessage(), e);
-      sendMessage(viewer, MessagesKeys.mapUnavailable);
-      return false;
+    // drops a FILLED_MAP item entity at the viewer's feet, which mutates
+    // world state and must therefore run on the thread that owns the
+    // viewer's location. We hop there via RTP.scheduler.runTask(location,..)
+    // rather than letting each platform binding reimplement the hop: on
+    // Paper/Spigot the scheduler runs the task inline (main thread); on
+    // Folia it dispatches onto the region thread that owns the viewer's
+    // chunk (a foreign region thread would otherwise throw, surfacing as an
+    // NPE in ServerLevel.getCurrentWorldData()). S-004: delivery faults exit
+    // through the same WARNING + mapUnavailable message path as
+    // renderEphemeral, evaluated inside the scheduled runnable since the
+    // hop may run after this method returns.
+    final MapBinding deliverBinding = binding;
+    final MapHandle deliverHandle = handle;
+    Runnable deliver = () -> {
+      try {
+        RTP.log(Level.FINE,
+            "[viz/bad-locations] binding.deliverTo invoking for viewer=" + viewer);
+        deliverBinding.deliverTo(deliverHandle, viewer);
+        RTP.log(Level.FINE,
+            "[viz/bad-locations] binding.deliverTo OK for viewer=" + viewer);
+      } catch (RuntimeException e) {
+        RTP.log(Level.WARNING,
+            "ChartSpec " + spec.kind() + " for viewer " + viewer
+                + " deliverTo failed: " + e.getMessage(), e);
+        sendMessage(viewer, MessagesKeys.mapUnavailable);
+      }
+    };
+
+    RTPLocation viewerLocation = null;
+    if (RTP.serverAccessor != null) {
+      try {
+        RTPPlayer p = RTP.serverAccessor.getPlayer(viewer);
+        if (p != null) viewerLocation = p.getLocation();
+      } catch (RuntimeException e) {
+        // Resolver fault: fall through to inline delivery below.
+        viewerLocation = null;
+      }
+    }
+    if (RTP.scheduler != null && viewerLocation != null) {
+      RTP.scheduler.runTask(viewerLocation, deliver);
+    } else {
+      // Test context / pre-init / unresolvable viewer location: run inline,
+      // preserving the pre-hop behaviour on non-Folia and unit-test paths.
+      deliver.run();
     }
     return true;
   }

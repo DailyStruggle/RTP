@@ -2,9 +2,7 @@
 # Schema: rtp-proxy-ADR-002.
 network:
   enabled: true
-  schemaVersion: 1
   proxyId: "proxy-a"
-  role: proxy
   secretEnv: RTP_NET_SECRET
   # Short TTL so the L3 kill-mid-flight scenario reaps within the harness window.
   # PRODUCTION DEFAULT IS 300000ms - do not ship this value.

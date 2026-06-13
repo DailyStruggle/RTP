@@ -1,0 +1,45 @@
+# Lite overlay for the rtp-proxy devstack.
+#
+# Layered on top of docker-compose.yml by `run-acceptance.ps1 -Lite` via the
+# COMPOSE_FILE env var (same mechanism as docker-compose.lobby-world.yml). It
+# swaps each instance's seeded network.yml for its `network-lite.yml` sibling,
+# which selects the tier-1 plugin-message transport (`transport.type: auto`)
+# instead of Redis. This exercises the DB-free cross-server path that ships in
+# the lite edition (ADR-024 2026-06-12 amendment, rtp-proxy-ADR-016): backends
+# self-advertise over the proxy's built-in bungeecord:main vocabulary, so no
+# Redis/SQL binding is required.
+#
+# The volume entries below replace ONLY the `/seed/network.yml` mount (compose
+# keys volume merges by container target path); every other mount, env var, and
+# the entrypoint shim from the base file is inherited unchanged. The Redis
+# service stays defined/running (the lite plugin simply never connects to it),
+# so no service removal is needed -- keeping the override minimal and reversible.
+services:
+  # Proxies: the lite uber-jar fanned into proxy-{a,b}/plugins ships the Velocity
+  # entrypoint but EXCLUDES the durable redis/sql transport bindings (ADR-024). A
+  # proxy network.yml that still selects transport.type=redis would otherwise hit
+  # NoClassDefFoundError on boot, so overlay a lite seed that selects
+  # transport.type=auto (degrades to the in-memory binding on the proxy). The
+  # proxy/plugins dir is bind-mounted whole by the base file; this file-over-dir
+  # mount replaces only network.yml.
+  proxy-a:
+    volumes:
+      - ./proxy-a/plugins/rtp/network-lite.yml:/server/plugins/rtp/network.yml
+  proxy-b:
+    volumes:
+      - ./proxy-b/plugins/rtp/network-lite.yml:/server/plugins/rtp/network.yml
+  backend-a:
+    volumes:
+      - ./backend-a/rtp-config/network-lite.yml:/seed/network.yml:ro
+  backend-b:
+    volumes:
+      - ./backend-b/rtp-config/network-lite.yml:/seed/network.yml:ro
+  backend-c:
+    volumes:
+      - ./backend-c/rtp-config/network-lite.yml:/seed/network.yml:ro
+  lobby-a:
+    volumes:
+      - ./lobby-a/rtp-config/network-lite.yml:/seed/network.yml:ro
+  lobby-b:
+    volumes:
+      - ./lobby-b/rtp-config/network-lite.yml:/seed/network.yml:ro

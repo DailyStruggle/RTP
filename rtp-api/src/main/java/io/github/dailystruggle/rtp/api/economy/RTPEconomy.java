@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.api.economy;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+
 import java.util.UUID;
 
 /**
@@ -15,6 +17,7 @@ import java.util.UUID;
  * pipeline; implementations must be safe to invoke off the main server thread
  * (REQ-API-ARCH-001).
  */
+@PublicApi
 public interface RTPEconomy {
   /**
    * Credits {@code money} to the player's account (e.g. for a refund on

@@ -326,6 +326,40 @@ class SqlNetworkStateBindingH2Test {
     }
 
     @Test
+    @DisplayName("L6 heartbeat fields (regions Set + per-region kept counts) survive the signed DB round-trip")
+    void l6FieldsSurviveSignedRoundtrip() throws Exception {
+        // Regression guard: the shared codec signs over the L6 fields, so the
+        // read-side reconstruction must persist + restore them or the HMAC
+        // recomputed from the columns would mismatch and drop the row.
+        byte[] secret = new byte[32];
+        for (int i = 0; i < 32; i++) secret[i] = (byte) i;
+        io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier v =
+                io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier.forTesting(secret, 1, 1);
+
+        a.close(); b.close();
+        a = new SqlNetworkStateBinding(dataSource, 200L, v, 1);
+        b = new SqlNetworkStateBinding(dataSource, 200L, v, 1);
+
+        BackendHeartbeat rich = new BackendHeartbeat(
+                "server-l6", 3, PluginState.READY, true, 12345L,
+                18.0, 0, 20, 1L, 2L, 0,
+                List.of("default", "nether"), List.of("world"),
+                false,
+                /*keptCount*/ 42, /*networkReservedCount*/ 5,
+                java.util.Set.of("default", "nether", "the_end"),
+                java.util.Map.of("default", 10, "nether", 0, "the_end", 7));
+        a.publishBackendHeartbeat(rich).get(2, TimeUnit.SECONDS);
+
+        NetworkSnapshot snap = b.readSnapshot().get(2, TimeUnit.SECONDS);
+        BackendHeartbeat out = snap.backend("server-l6").orElseThrow();
+        assertEquals(42, out.keptCount(), "keptCount must survive (and HMAC must verify)");
+        assertEquals(5, out.networkReservedCount());
+        assertEquals(rich.regions(), out.regions(), "regions Set must survive the DB round-trip");
+        assertEquals(rich.regionKeptCounts(), out.regionKeptCounts(),
+                "per-region kept counts must survive the DB round-trip");
+    }
+
+    @Test
     @DisplayName("A3 HMAC: legacy NULL-hmac row is dropped when verifier is enabled")
     void hmacEnvelopeLegacyNullDrop() throws Exception {
         // Unsigned binding writes a row (hmac column NULL).

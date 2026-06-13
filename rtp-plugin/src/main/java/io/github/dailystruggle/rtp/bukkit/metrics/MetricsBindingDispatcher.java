@@ -90,13 +90,29 @@ public final class MetricsBindingDispatcher {
             // io/github/dailystruggle/rtp/folia/**). When the preferred binding is
             // not on the classpath, fall through to the next applicable path
             // rather than aborting with a WARNING + stack trace.
-            if (isFoliaRuntime() && tryInstallBinding(
-                    FOLIA_BINDING_FQN, "FoliaMetricsBinding (threaded-regions detected)")) {
-                // No external sampler task: FoliaRegionProcessor drives
-                // FoliaMetricsBinding#recordRegionTick from each region's
-                // own thread (C1.2b).
-                installed = true;
-                return;
+            if (isFoliaRuntime()) {
+                MetricsBinding folia = instantiateBinding(
+                        FOLIA_BINDING_FQN, "FoliaMetricsBinding (threaded-regions detected)");
+                if (folia != null) {
+                    // No external sampler task: FoliaRegionProcessor drives
+                    // FoliaMetricsBinding#recordRegionTick from each region's
+                    // own thread (C1.2b).
+                    //
+                    // Per-field merge: prefer spark's TPS/MSPT over the native
+                    // Folia values when spark is present. Folia's native
+                    // FoliaRegionTpsSampler derives MSPT from the inter-tick
+                    // interval (~50 ms on a healthy server), not the real
+                    // per-tick processing time, so /rtp info and the map
+                    // visualizer showed a flat/incorrect MSPT. spark exposes a
+                    // true MSPT statistic that is consistent on Folia. The
+                    // SparkMetricsBinding delegates foliaRegions() to the Folia
+                    // binding, so per-region samples are preserved.
+                    RTP.log(Level.INFO, LOG_TAG
+                            + " installed FoliaMetricsBinding (threaded-regions detected)");
+                    RTP.metrics.setBinding(wrapWithSparkIfPresent(folia));
+                    installed = true;
+                    return;
+                }
             }
             if (isPaperRuntime()) {
                 MetricsBinding paper = instantiateBinding(

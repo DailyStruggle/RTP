@@ -20,19 +20,19 @@ Maintain a standing pre-generation queue (`RegionQueueManager`) replenished by a
 
 The replenishment task is scheduled on a fixed cadence rather than triggered reactively. This distributes validation work evenly across server ticks, giving the server predictable recovery periods between replenishment cycles — analogous to real-time scheduling, where a bounded time slice is granted periodically and work does not accumulate into uncontrolled bursts.
 
-Pre-filling the queue via `/rtp fill` further guards against runtime chunk-loading costs: when a region has been pre-filled into the spatial memory database (`MemoryShape`), background replenishment can skip the most expensive step (loading and ticking unknown chunks) entirely, because safe sectors are already known.
+Pre-filling the queue via `/rtp scan` further guards against runtime chunk-loading costs: when a region has been pre-filled into the spatial memory database (`MemoryShape`), background replenishment can skip the most expensive step (loading and ticking unknown chunks) entirely, because safe sectors are already known.
 
 ## Consequences
 
 - **Positive:**
   - Teleport execution is O(1) (queue dequeue) from the player's perspective — no blocking on the main thread.
   - Server CPU load from location validation is spread evenly over time with deterministic per-cycle cost, analogous to real-time scheduling.
-  - Pre-filling via `/rtp fill` eliminates runtime chunk-loading costs, making replenishment nearly free for well-seeded regions.
+  - Pre-filling via `/rtp scan` eliminates runtime chunk-loading costs, making replenishment nearly free for well-seeded regions.
   - The queue depth and replenishment rate are configurable, allowing operators to tune memory usage against responsiveness.
 
 - **Negative / Trade-offs:**
   - The standing queue consumes memory proportional to its configured depth and the number of active regions.
-  - There is a brief cold-start period after server startup (or after `/rtp fill reset`) during which the queue may be empty and teleports shall wait.
+  - There is a brief cold-start period after server startup (or after `/rtp scan reset`) during which the queue may be empty and teleports shall wait.
   - Over-provisioning the queue depth wastes chunk ticket allocations; operators shall tune depth to their expected concurrent player count.
 
 ## References

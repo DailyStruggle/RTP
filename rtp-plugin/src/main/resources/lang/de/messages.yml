@@ -194,6 +194,14 @@ infoWelt: "  #21ADA8[world]"
 infoRegionKopf: "#63C5DARegionen:"
 infoKonsoleRegionKopf: "&7--- Regionen ---"
 infoRegion: "  #52B2BF[region]"
+# Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
+# players spend their time in, sampled over the server's uptime.
+# Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
+infoBiomeActivityHeader: "&8--- &3Biome occupancy &8(&3[biomeTotalSamples]&8 samples, &3[biomeDistinctCount]&8 biomes) ---"
+# Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
+infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
+# Shown when no occupancy has been sampled yet.
+infoBiomeActivityEmpty: "&8--- &7no biome occupancy sampled yet &8---"
 
 # Unter-Info-Auflistungen
 # Platzhalter: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
@@ -277,7 +285,7 @@ menueStartseiteAbschnittTeleport: "&8--- &7teleport &8---"
 # Startseitenzeilen. Keine Platzhalter.
 menueStartseiteZeileTeleport: "&a▶ /rtp &7- zu einem zufälligen Ort teleportieren"
 menueStartseiteZeileRegion: "&a▶ /rtp region:&7... &7- eine Region wählen"
-menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- pick a world"
+menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- eine Welt wählen"
 menueStartseiteZeileBiom: "&a▶ /rtp biome:&7... &7- ein Biom wählen"
 menueStartseiteZeileHilfe: "&a▶ /rtp help &7- Befehle auflisten"
 # Admin-Einstiegszeile der Startseite: die einzige inline

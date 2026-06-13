@@ -63,11 +63,14 @@ class RtpVelocityPluginPhase2bTest {
         assertNotNull(plugin.accessor(), "accessor must be registered even when network is absent");
         assertEquals(Role.PROXY_VELOCITY, plugin.accessor().role());
         assertTrue(RtpProxy.isRegistered(), "RtpProxy.proxyAccessor slot must be set BEFORE config load");
-        // With no network.yml on disk, fromMap() sees an empty document and fails fast
-        // on the (missing) proxyId for the PROXY_VELOCITY role. The plugin must catch
-        // the NetworkConfigException and degrade to disabled - config stays null,
+        // With no network.yml on disk, fromMap() sees an empty document. proxyId is
+        // optional for a proxy role (defaults to the local hostname), so parsing
+        // succeeds and config is non-null, but the empty document leaves
+        // network.enabled=false. The plugin must therefore degrade to disabled:
         // accessor stays registered, no transport / publisher.
-        assertNull(plugin.config(), "absent network.yml degrades to disabled; config left null");
+        assertNotNull(plugin.config(), "absent network.yml parses to a disabled config");
+        org.junit.jupiter.api.Assertions.assertFalse(plugin.config().enabled(),
+                "absent network.yml leaves network disabled");
         assertNull(plugin.publisher(), "publisher must not be wired when network is disabled");
         assertNull(plugin.transport(), "transport must not be opened when network is disabled");
 
@@ -152,10 +155,13 @@ class RtpVelocityPluginPhase2bTest {
         RtpVelocityPlugin plugin = new RtpVelocityPlugin(
                 fakeServer, LoggerFactory.getLogger("test"), data);
         plugin.onProxyInitialize(new ProxyInitializeEvent());
-        // Empty proxyId fails fast in NetworkConfig; plugin should have caught and
-        // logged. Config slot stays null but accessor is registered.
+        // Empty proxyId is no longer fatal: a proxy role defaults proxyId to the
+        // local hostname, so the config parses successfully. With enabled:false it
+        // still degrades to a disabled no-op (no publisher / transport).
         assertNotNull(plugin.accessor());
-        assertNull(plugin.config(), "config must be null after fail-fast validation");
+        assertNotNull(plugin.config(), "empty proxyId defaults to hostname; config parses");
+        org.junit.jupiter.api.Assertions.assertFalse(plugin.config().enabled(),
+                "enabled:false leaves network disabled");
         assertNull(plugin.publisher());
         assertNull(plugin.transport());
 

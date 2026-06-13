@@ -16,6 +16,10 @@ No menu, however polished, can make [I]/rtp[/I] fast - only the engine behind it
 
 [SIZE=4][COLOR=#27AE60][B]100% Free.[/B][/COLOR] Same engine as the paid [URL='https://builtbybit.com/resources/rtp-pro.105418'][B]LeafRTP-Pro[/B][/URL] build. No paywalled [I]/rtp[/I] or nag screens, and no ads - just anonymous [URL='https://bstats.org/']bStats[/URL] usage stats (server-admin opt-out via [I]plugins/bStats/config.yml[/I]).[/SIZE]
 
+[SIZE=4][B][COLOR=#16A085]Trusted since 2021: 4.6 stars over 30+ reviews, 430k+ downloads.[/COLOR][/B][/SIZE]
+
+[SIZE=4][B]Latest builds, Folia-tagged releases, and beta channels also live on [URL='https://modrinth.com/plugin/leafrtp']Modrinth[/URL][/B] - auto-updater and Pterodactyl friendly.[/SIZE]
+
 [/CENTER]
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
@@ -25,7 +29,7 @@ No menu, however polished, can make [I]/rtp[/I] fast - only the engine behind it
 [B]If [I]/rtp[/I] is the top entry in your timings report, this is the fix.[/B] LeafRTP is the fastest free Random Teleport plugin for Bukkit-native Minecraft servers (Paper, Bukkit, Arclight, Mohist, and other Bukkit-family forks), with Fabric supported as a first-class platform:
 
 [LIST]
-[*][B]No lag spikes when players spam [I]/rtp[/I].[/B] Worst-case main-thread tick stays at 4 ms (vs. 70-771 ms for the next plugins) - your TPS holds at 20.00 during a teleport burst.
+[*][B]No lag spikes when players spam [I]/rtp[/I].[/B] Worst-case main-thread tick stays at 4 ms (vs. 70-852 ms for the next plugins) - your TPS holds at 20.00 during a teleport burst.
 [*][B]Instant teleports, no "Finding a safe location..." wait.[/B] Pre-verified location queue serves [I]/rtp[/I] in one tick instead of loading chunks on demand.
 [*][B]Works on plain Bukkit servers at Paper-class speed.[/B] Off-tick [I].mca[/I] Anvil pre-filter, worst tick stays at 3 ms while competitors spike past 3 seconds.
 [*][B]Clickable [I]/rtp menu[/I] GUI world & region selection[/B] - players pick worlds and regions from an interactive book menu (Paper / Folia; chat-paginated elsewhere), no commands to memorize.
@@ -41,8 +45,8 @@ On [B]Paper 1.21[/B], measured on the in-repo benchmark harness, two clients spa
 [TR][TH]Plugin[/TH][TH]TP/s[/TH][TH]Worst tick (MSPT p99)[/TH][TH]CPU per teleport[/TH][/TR]
 [TR][TD][B]🧪 LeafRTP[/B][/TD][TD][B]19.8[/B][/TD][TD][B]4 ms[/B][/TD][TD][B]16.9 ms[/B][/TD][/TR]
 [TR][TD][COLOR=#888888]🧪 JakesRTP[/COLOR][/TD][TD][COLOR=#888888]20.0[/COLOR][/TD][TD][COLOR=#888888]70 ms[/COLOR][/TD][TD][COLOR=#888888]26.0 ms[/COLOR][/TD][/TR]
-[TR][TD][COLOR=#888888]🧪 BetterRTP[/COLOR][/TD][TD][COLOR=#888888]7.1[/COLOR][/TD][TD][COLOR=#888888]771 ms[/COLOR][/TD][TD][COLOR=#888888]53.6 ms[/COLOR][/TD][/TR]
-[TR][TD][COLOR=#888888]🧪 HuskHomes RTP[/COLOR][/TD][TD][COLOR=#888888]6.2[/COLOR][/TD][TD][COLOR=#888888]335 ms[/COLOR][/TD][TD][COLOR=#888888]52.2 ms[/COLOR][/TD][/TR]
+[TR][TD][COLOR=#888888]🧪 BetterRTP[/COLOR][/TD][TD][COLOR=#888888]7.3[/COLOR][/TD][TD][COLOR=#888888]852 ms[/COLOR][/TD][TD][COLOR=#888888]53.6 ms[/COLOR][/TD][/TR]
+[TR][TD][COLOR=#888888]🧪 HuskHomes RTP[/COLOR][/TD][TD][COLOR=#888888]6.2[/COLOR][/TD][TD][COLOR=#888888]372 ms[/COLOR][/TD][TD][COLOR=#888888]52.2 ms[/COLOR][/TD][/TR]
 [/TABLE]
 
 [I]Methodology: Paper 1.21, 2 OPed clients spamming [I]/rtp[/I] continuously, in-repo harness linked below. Spigot and Folia results in the full benchmark section.[/I]
@@ -140,7 +144,7 @@ A few hard requirements. If any are a [B]no[/B], EssentialsX [I]/rtp[/I] or Husk
 
 [LIST]
 [*]✅ [B]Java 21+[/B] on your host (REQ-RTP-SYS-001, non-negotiable).
-[*]✅ [B]Paper, Spigot, or a Bukkit-family fork[/B] (Arclight / Mohist supported for Forge bridges). Fabric and NeoForge (1.21.x / 26.1.x) are supported and regularly tested, with their featureset lagging the Bukkit family by a release or two.
+[*]✅ [B]Paper, Spigot, or a Bukkit-family fork[/B] (Arclight / Mohist supported for Forge bridges). Fabric and NeoForge (1.21.x / 26.1.x) are supported and regularly tested, at feature parity with the Bukkit family in the latest builds.
 [*]✅ [B]In-game editing or YAML, your call.[/B] Browse and tune config from the clickable [I]/rtp menu[/I] (book on Paper / Folia, chat-paginated elsewhere), or edit the plain YAML files directly and version-control them.
 [*]✅ [B]Runs on Folia[/B] out of the box (basic regionized scheduling + async teleport). The tuned, throughput-optimized Folia adapter ships first in [B]LeafRTP-Pro[/B], along with proxy/cross-server and SQL/Redis. (Vault economy works in the free build.)
 [/LIST]
@@ -192,7 +196,7 @@ Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/I] later - 
 [TR][TD][B]Arclight / Mohist[/B] (Forge bridges)[/TD][TD]✅ Officially supported[/TD][TD]Use the Spigot/Paper jar. Recommended way to run on Forge.[/TD][/TR]
 [TR][TD][B]Folia[/B][/TD][TD]✅ Basic support[/TD][TD]Runs on Folia via regionized scheduling + async teleport. The tuned, throughput-optimized adapter ships first in [B]LeafRTP-Pro[/B].[/TD][/TR]
 [TR][TD][B]Multi-server / proxy[/B] (Velocity)[/TD][TD]❌ Not in this build[/TD][TD]Cross-server queue ships in [B]LeafRTP-Pro[/B].[/TD][/TR]
-[TR][TD][B]Fabric[/B][/TD][TD]✅ Supported[/TD][TD]First-class, stable, in-scope platform; tested regularly, at feature parity with the Bukkit family.[/TD][/TR]
+[TR][TD][B]Fabric[/B][/TD][TD]✅ Supported[/TD][TD]First-class, stable, in-scope platform; tested regularly, at feature parity with the Bukkit family in the latest builds.[/TD][/TR]
 [TR][TD][B]Native NeoForge[/B][/TD][TD]✅ Supported[/TD][TD]First-class adapter on Minecraft 1.21.x / 26.1.x.[/TD][/TR]
 [TR][TD][B]Native Forge[/B][/TD][TD]🔁 Use Arclight / Mohist[/TD][TD]No native adapter planned.[/TD][/TR]
 [/TABLE]
@@ -520,19 +524,6 @@ Support for the free build is [B]community-tier and best-effort[/B] — a solo m
 Live list: [URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md#known-issues']CHANGELOG[/URL].
 [/SPOILER]
 
-[SPOILER='TODO list']
-[LIST]
-[*]more book menus
-[*]more charts
-[*]better polygon shape setup
-[*]finish translating
-[*]verify against modded data
-[*]drop 1.20.1 due to performance issues, favor 1.21-26.2 when it comes out
-[*]create support mechanisms for transferring from other plugins
-[*]steady-state and burst usage statistics for admins
-[*]biome and player analytics for world builders
-[/LIST]
-[/SPOILER]
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
@@ -554,6 +545,7 @@ Live list: [URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md#known
 [*][URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md'][B]LeafRTP admin & configuration guide[/B][/URL] - install, configure, command reference
 [*][URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md'][B]LeafRTP addon / API developer guide[/B][/URL] - [I]rtp-api[/I] and examples
 [*][URL='https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md'][B]LeafRTP changelog & roadmap[/B][/URL]
+[*][URL='https://modrinth.com/plugin/leafrtp'][B]LeafRTP on Modrinth[/B][/URL] - latest builds, Folia-tagged releases, and beta channels (auto-updater friendly)
 [*][URL='https://github.com/dailystruggle/RTP'][B]LeafRTP source on GitHub[/B][/URL] - star, watch, contribute, file issues
 [*][URL='https://builtbybit.com/resources/rtp-pro.105418'][B]LeafRTP-Pro (Folia, proxy, SQL/Redis)[/B][/URL] - the high-performance paid build of this random teleport engine
 [/LIST]

@@ -267,10 +267,10 @@
 # 备份数量，最旧的先被清除。设为 1 仅保留最新备份；小于 1 的值会被钳制为 1。
 # /rtp admin prefab rollback 会在多次调用中按从新到旧的顺序遍历备份。
 预设:
-  # 每个文件保留的带时间戳的配置备份数量。
+  # Number of timestamped config backups kept per file before pruning.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  bak保留数: 3
+  bakRetention: 3
 # 请勿修改版本号
 version: 1.0

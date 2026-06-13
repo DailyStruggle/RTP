@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.api.hooks;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+
 /**
  * Facade aggregating every <i>behavior-modification</i> extension point that RTP
  * exposes to third-party plugins and addons.
@@ -33,29 +35,38 @@ package io.github.dailystruggle.rtp.api.hooks;
  * its {@code onEnable}. Calling any registry method before core has loaded throws
  * {@link IllegalStateException} (REQ-RTP-S-006).
  */
+@PublicApi
 public interface RTPHooks {
 
   /** @return the region-verifier registry; never {@code null}. */
+  @PublicApi
   RegionVerifierRegistry verifiers();
 
   /** @return the economy provider registry; never {@code null}. */
+  @PublicApi
   EconomyProviderRegistry economy();
 
   /** @return the placeholder provider registry; never {@code null}. */
+  @PublicApi
   PlaceholderProviderRegistry placeholders();
 
   /** @return the world-border provider registry; never {@code null}. */
+  @PublicApi
   WorldBorderProviderRegistry worldBorder();
 
   /** @return the anvil pre-filter registry; never {@code null}. */
+  @PublicApi
   AnvilPrefilterRegistry anvilPrefilter();
 
   /** @return the PvP combat-state registry; never {@code null}. */
+  @PublicApi
   PvPCombatStateRegistry pvpCombatState();
 
   /** @return the bare-{@code /rtp} root-action registry; never {@code null}. */
+  @PublicApi
   RootActionRegistry rootAction();
 
   /** @return the arrival platform-creator registry; never {@code null}. */
+  @PublicApi
   PlatformCreatorRegistry platformCreator();
 }

@@ -7,8 +7,10 @@ import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.RtpRequest;
 import io.github.dailystruggle.rtp.proxy.common.spi.TriggerType;
+import io.github.dailystruggle.rtp.common.RTP;
 
 import java.util.HashSet;
+import java.util.logging.Level;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -77,6 +79,34 @@ public final class PeerRegionRegistry {
             new ConcurrentHashMap<>();
 
     /**
+     * Topology-seeded peer source (Option 1, plugin-message tier). On the
+     * DB-free plugin-message transport a single test player cannot carry
+     * heartbeat gossip from a player-empty backend, so the heartbeat-fed
+     * {@link NetworkSnapshot} is frequently empty even though the proxy
+     * knows every backend. The {@code auto} resolver learns the full server
+     * list from the proxy's {@code GetServers} reply (which only needs the
+     * local server's own player connection), and that list is supplied here
+     * so {@link #peerEntries()} can surface, and {@link #isReachableHardPin}
+     * can accept, {@code server:region} destinations the snapshot has not
+     * yet observed. Availability for these is UNKNOWN, and the "unknown ->
+     * accept" rule lets the destination backend decide on arrival.
+     *
+     * <p>Defaults to an empty supplier (durable Redis/SQL tiers leave it
+     * unset and rely purely on heartbeats, which they can publish even when
+     * a backend is player-empty).</p>
+     */
+    private volatile Supplier<Set<String>> topologyPeerSupplier = Set::of;
+
+    /**
+     * Region names assumed for a topology-seeded peer whose real region set
+     * has not been observed via a heartbeat. Defaults to {@code {"default"}}
+     * - the conventional region name. Used only to materialise concrete
+     * {@code server:region} tab-completion entries; validation accepts any
+     * region for a topology-known server (the destination decides).
+     */
+    private volatile Supplier<Set<String>> assumedRegionSupplier = () -> Set.of("default");
+
+    /**
      * Back-compat constructor: builds a registry with the bundled
      * {@link LoadBalancerConfig#defaults()} so {@link #pickMostKept()}
      * reproduces the legacy "most-kept" pick byte-identically (default
@@ -98,6 +128,40 @@ public final class PeerRegionRegistry {
         this.localServerId = localServerId; // null-tolerated; matches nothing
         Objects.requireNonNull(loadBalancerConfig, "loadBalancerConfig");
         this.selector = new RegionAwareSelector(loadBalancerConfig);
+    }
+
+    /**
+     * Install the topology-peer supplier (Option 1, plugin-message tier).
+     * The supplier returns the set of backend server IDs the proxy has
+     * advertised via {@code GetServers} (typically
+     * {@code ProxyAutoDetector#peerServerIds()}). A {@code null} argument
+     * resets to the empty default. The supplier is read on every
+     * {@link #peerEntries()} / {@link #isReachableHardPin} call so it always
+     * reflects the latest handshake result.
+     */
+    public void setTopologyPeerSupplier(Supplier<Set<String>> supplier) {
+        this.topologyPeerSupplier = supplier == null ? Set::of : supplier;
+    }
+
+    /**
+     * Override the region names assumed for topology-seeded peers (defaults
+     * to {@code {"default"}}). A {@code null} argument resets to the default.
+     */
+    public void setAssumedRegionSupplier(Supplier<Set<String>> supplier) {
+        this.assumedRegionSupplier = supplier == null ? () -> Set.of("default") : supplier;
+    }
+
+    /**
+     * Defensive read of the topology-peer set: never {@code null}, never
+     * throws (a flaky supplier yields the empty set).
+     */
+    private Set<String> topologyPeers() {
+        try {
+            Set<String> peers = topologyPeerSupplier.get();
+            return peers == null ? Set.of() : peers;
+        } catch (Throwable ignored) {
+            return Set.of();
+        }
     }
 
     /**
@@ -186,32 +250,75 @@ public final class PeerRegionRegistry {
             snap = snapshotSupplier.get();
         } catch (Throwable ignored) {
             // Defensive: a flaky transport must not crash autocomplete.
-            return Set.of();
+            snap = null;
         }
-        if (snap == null) return Set.of();
         Set<String> out = new HashSet<>();
-        for (BackendHeartbeat hb : snap.all()) {
-            if (hb == null) continue;
-            if (hb.killSwitch()) continue;
-            if (hb.serverId() == null || hb.serverId().isEmpty()) continue;
-            // Self is intentionally NOT excluded: surfacing
-            // {@code <self>:default} alongside the unqualified {@code default}
-            // lets operators hard-pin to this backend (skip load balancing).
-            // Prefer the L6 typed regions Set; fall back to legacy list.
-            Set<String> regions = hb.regions();
-            if (regions != null && !regions.isEmpty()) {
-                for (String r : regions) {
-                    if (r != null && !r.isEmpty()) out.add(hb.serverId() + ":" + r);
+        // Track which servers a heartbeat already described so the
+        // topology-seeded fallback below does not duplicate (or override
+        // with a coarser assumed-region set) a server we have real data for.
+        Set<String> heartbeatServers = new HashSet<>();
+        if (snap != null) {
+            for (BackendHeartbeat hb : snap.all()) {
+                if (hb == null) continue;
+                if (hb.killSwitch()) continue;
+                if (hb.serverId() == null || hb.serverId().isEmpty()) continue;
+                // Self is intentionally NOT excluded: surfacing
+                // {@code <self>:default} alongside the unqualified {@code default}
+                // lets operators hard-pin to this backend (skip load balancing).
+                // Prefer the L6 typed regions Set; fall back to legacy list.
+                Set<String> regions = hb.regions();
+                if (regions != null && !regions.isEmpty()) {
+                    heartbeatServers.add(hb.serverId());
+                    for (String r : regions) {
+                        if (r != null && !r.isEmpty()) out.add(hb.serverId() + ":" + r);
+                    }
+                    continue;
                 }
-                continue;
-            }
-            if (hb.regionsAvailable() != null) {
-                for (String r : hb.regionsAvailable()) {
-                    if (r != null && !r.isEmpty()) out.add(hb.serverId() + ":" + r);
+                if (hb.regionsAvailable() != null && !hb.regionsAvailable().isEmpty()) {
+                    heartbeatServers.add(hb.serverId());
+                    for (String r : hb.regionsAvailable()) {
+                        if (r != null && !r.isEmpty()) out.add(hb.serverId() + ":" + r);
+                    }
                 }
             }
         }
+        // Topology-seeded fallback (Option 1): for every server the proxy
+        // advertised that we have NOT yet observed a heartbeat from, surface
+        // assumed {@code server:region} entries (default region) so the
+        // command layer can suggest and accept cross-server destinations on
+        // the plugin-message tier where heartbeat gossip cannot reach a
+        // player-empty backend. Availability is UNKNOWN; the destination
+        // backend decides on arrival.
+        Set<String> assumed = assumedRegions();
+        Set<String> topology = topologyPeers();
+        for (String peer : topology) {
+            if (peer == null || peer.isEmpty()) continue;
+            if (heartbeatServers.contains(peer)) continue;
+            for (String r : assumed) {
+                if (r != null && !r.isEmpty()) out.add(peer + ":" + r);
+            }
+        }
+        RTP.log(Level.FINE, "[NETWORK] peerEntries: snapshot="
+                + (snap == null ? "null" : snap.all().size() + " backend(s)")
+                + ", heartbeatServers=" + heartbeatServers
+                + ", topologyPeers=" + topology
+                + ", assumedRegions=" + assumed
+                + " -> " + out.size() + " entry(ies): " + out);
         return out;
+    }
+
+    /**
+     * Defensive read of the assumed-region set: never {@code null}/empty,
+     * never throws (falls back to {@code {"default"}}).
+     */
+    private Set<String> assumedRegions() {
+        try {
+            Set<String> r = assumedRegionSupplier.get();
+            if (r == null || r.isEmpty()) return Set.of("default");
+            return r;
+        } catch (Throwable ignored) {
+            return Set.of("default");
+        }
     }
 
     /**
@@ -284,30 +391,52 @@ public final class PeerRegionRegistry {
     }
 
     /**
-     * Hard-pin reachability check: does {@code serverId} currently
-     * advertise {@code regionKey} in a non-{@code killSwitch} heartbeat?
-     * Used by the {@code RTPCmdBukkit} validator so a player typing
-     * {@code rtp region=backend-a:default} passes commands-api's
-     * isRelevant gate only when the registry confirms backend-a is alive
-     * and hosts {@code default}.
+     * Hard-pin reachability check: may a player hard-pin
+     * {@code serverId:regionKey}?
+     *
+     * <p>Resolution order (KNOWN beats topology; "unknown -> accept"):</p>
+     * <ul>
+     *   <li>A {@code killSwitch} heartbeat from {@code serverId} -> reject
+     *       (operator-asserted unavailable).</li>
+     *   <li>A heartbeat that lists {@code regionKey} -> accept.</li>
+     *   <li>A heartbeat whose concrete region set does NOT contain
+     *       {@code regionKey} -> reject (KNOWN region set, region absent).</li>
+     *   <li>No heartbeat observed but the proxy advertised {@code serverId}
+     *       via {@code GetServers} (topology) -> accept. Availability is
+     *       UNKNOWN on the plugin-message tier (a player-empty backend cannot
+     *       gossip), so we let the destination backend decide on arrival
+     *       rather than falsely rejecting a valid destination.</li>
+     *   <li>Otherwise -> reject.</li>
+     * </ul>
+     *
+     * <p>Self is intentionally reachable as a hard-pin: typing
+     * {@code /rtp region=<self>:default} on a backend pins the request to
+     * this backend and bypasses the lobby/network load balancer.</p>
      */
     public boolean isReachableHardPin(String serverId, String regionKey) {
         if (serverId == null || serverId.isEmpty()) return false;
         if (regionKey == null || regionKey.isEmpty()) return false;
-        // Self is intentionally reachable as a hard-pin: typing
-        // {@code /rtp region=<self>:default} on a backend pins the request
-        // to this backend and bypasses the lobby/network load balancer.
         NetworkSnapshot snap;
         try {
             snap = snapshotSupplier.get();
         } catch (Throwable ignored) {
-            return false;
+            snap = null;
         }
-        if (snap == null) return false;
-        BackendHeartbeat hb = snap.backend(serverId).orElse(null);
-        if (hb == null || hb.killSwitch()) return false;
-        if (hb.regions() != null && hb.regions().contains(regionKey)) return true;
-        if (hb.regionsAvailable() != null && hb.regionsAvailable().contains(regionKey)) return true;
-        return false;
+        BackendHeartbeat hb = snap == null ? null : snap.backend(serverId).orElse(null);
+        if (hb != null) {
+            if (hb.killSwitch()) return false;
+            if (hb.regions() != null && hb.regions().contains(regionKey)) return true;
+            if (hb.regionsAvailable() != null && hb.regionsAvailable().contains(regionKey)) return true;
+            // Heartbeat present with a concrete region set that does not
+            // include regionKey: this is KNOWN_UNAVAILABLE, not unknown.
+            boolean hasConcreteRegions =
+                    (hb.regions() != null && !hb.regions().isEmpty())
+                            || (hb.regionsAvailable() != null && !hb.regionsAvailable().isEmpty());
+            if (hasConcreteRegions) return false;
+            // Heartbeat with no region info: treat as unknown -> fall through
+            // to the topology acceptance below.
+        }
+        // No (useful) heartbeat: accept if the proxy knows this server.
+        return topologyPeers().contains(serverId);
     }
 }

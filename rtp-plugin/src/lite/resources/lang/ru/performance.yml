@@ -276,10 +276,10 @@
 # Установите 1, чтобы хранить только последнюю; значения ниже 1 повышаются до 1.
 # /rtp admin prefab rollback проходит копии от новых к старым за несколько вызовов.
 шаблон:
-  # Количество резервных копий с отметкой времени, хранящихся для каждого файла.
+  # Number of timestamped config backups kept per file before pruning.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  хранениеBak: 3
+  bakRetention: 3
 # НЕ ТРОГАЙТЕ НОМЕР ВЕРСИИ
 version: 1.0

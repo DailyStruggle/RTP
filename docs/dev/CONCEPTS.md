@@ -48,7 +48,7 @@ RTP solves this by doing all the slow work *before* anyone asks for it:
 - When a player runs `/rtp`, the plugin pops the next ready location off the queue — instant.
 - The background task then refills the queue asynchronously.
 
-This is why the first teleport after a cold server start might take a moment (the queue is empty), but subsequent teleports are instant. Running `/rtp fill` manually pre-warms the queue.
+This is why the first teleport after a cold server start might take a moment (the queue is empty), but subsequent teleports are instant. Running `/rtp scan` manually pre-warms the queue.
 
 ---
 
@@ -113,7 +113,7 @@ Player runs /rtp
        │
    ┌───┴────────────────────────────────────────────────┐
    │ Queue has a ready location                         │ Queue is empty
-   │ (normal case — instant)                            │ (cold start / fill not run)
+   │ (normal case — instant)                            │ (cold start / scan not run)
    ▼                                                    ▼
  Teleport player immediately            Generate location on-demand (may take
        │                                1–2 ticks while chunk loads)

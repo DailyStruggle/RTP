@@ -36,8 +36,11 @@ The following ADR numbers are reserved by ADR-036's *Phased Subproject ADR Plan*
 | `rtp-proxy-ADR-011` | `sql-network-state-binding` | Phase 2b/2e | Accepted (2026-05-18) | DB-as-bus default for Phase 2e; folds ADR-007 + ADR-009 sketches; Redis (ADR-005) becomes opt-in latency upsell |
 | `rtp-proxy-ADR-012` | `proxy-role-participant-default` | Phase 2b | Proposed | Participant-vs-router toggle; participant default; implicit-via-wiring (no new config knob) |
 | `rtp-proxy-ADR-013` | `proxy-accessor-registration` | Phase 2b | Proposed | `RTPProxyAccessor` + `RtpProxy.proxyAccessor` slot (mirrors `RTP.serverAccessor`); replaces ADR-002's `Class.forName` probe |
+| `rtp-proxy-ADR-014` | `backend-owned-rtp-with-network-queue` | L6 | Accepted (2026-05-21) | Backend-owned `/rtp` + network wait-queue; proxy reduced to dispatch + reservation lifecycle |
+| `rtp-proxy-ADR-015` | `shared-network-waitlist-and-dynamic-batched-dispatch` | L6 | Accepted (2026-05-21) | Shared network waitlist + dynamic batched dispatch (refines ADR-014) |
+| `rtp-proxy-ADR-016` | `plugin-message-default-transport` | (amends ADR-036) | Accepted (2026-06-12) | Tier-1 non-durable `PluginMessageNetworkBinding` + `transport.type: auto`; DB-free cross-server RTP, ships in lite |
 
-Additional ADRs may be inserted at the tail of the series (`-ADR-014`, `-015`, …) as needs arise. **Do not** renumber existing ADRs.
+Additional ADRs may be inserted at the tail of the series (`-ADR-017`, `-018`, …) as needs arise. **Do not** renumber existing ADRs.
 
 ## References
 

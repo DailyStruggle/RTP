@@ -215,12 +215,14 @@ public final class NetworkConfig {
             }
         }
 
-        // Fail-fast: proxyId required when role resolves to proxy (ADR-002 §Validation Rules Q3).
+        // proxyId is optional: when role resolves to a proxy and no proxyId is
+        // configured, default to the local hostname. A Velocity/BungeeCord proxy
+        // has no intrinsic self-name, so an operator running a single proxy need
+        // not invent one; multi-proxy deployments should still set proxyId
+        // explicitly so each proxy has a stable, human-readable identity.
         if (declared == Role.PROXY_VELOCITY || declared == Role.PROXY_BUNGEE) {
             if (b.proxyId == null || b.proxyId.isEmpty()) {
-                throw new NetworkConfigException(
-                        "network.proxyId is required when network.role resolves to a proxy role ("
-                                + declared + "); empty or missing values refuse to enable network mode.");
+                b.proxyId = defaultProxyId();
             }
         }
 
@@ -279,6 +281,24 @@ public final class NetworkConfig {
         if (v == null) return def;
         try { return Long.parseLong(String.valueOf(v)); }
         catch (NumberFormatException e) { throw new NetworkConfigException(key + ": expected long, got '" + v + "'"); }
+    }
+
+    /**
+     * Best-effort stable identity for a proxy that did not configure
+     * {@code network.proxyId}. Uses the local hostname; falls back to
+     * {@code "proxy"} if the hostname cannot be resolved. Never returns null
+     * or empty so the proxy-role contract (non-empty proxyId) still holds.
+     */
+    private static String defaultProxyId() {
+        try {
+            String host = java.net.InetAddress.getLocalHost().getHostName();
+            if (host != null && !host.isEmpty()) {
+                return host;
+            }
+        } catch (java.net.UnknownHostException | RuntimeException ignored) {
+            // fall through to the static default
+        }
+        return "proxy";
     }
 
     /** Mutable builder used internally by {@link #fromMap}. */

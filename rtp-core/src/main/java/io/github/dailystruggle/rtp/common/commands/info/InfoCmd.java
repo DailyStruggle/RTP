@@ -28,6 +28,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
         "region",
         new RegionParameter(
             "rtp.info", "check on a region's state and configuration", (uuid, s) -> true));
+    // /rtp info biomes - biome-occupancy leaderboard (where players spend time).
+    addSubCommand(new BiomeActivityCmd(this));
   }
 
   @Override

@@ -151,7 +151,7 @@ These packages have tests but still have meaningful uncovered branches worth clo
 |---|---|
 | `ChunkyChecker` / `ChunkyRTPShape` | Requires Chunky plugin at runtime |
 | `RedisManager` | Requires live Redis server (`RedisManagerTest` should be `@Disabled`) |
-| `FillCmd` family | Deeply server-coupled (currently 83% — don't regress) |
+| `ScanCmd` family | Deeply server-coupled (currently 83% — don't regress) |
 | MySQL / PostgreSQL accessors | Require running DB server — use inline H2/SQLite instead |
 
 ---

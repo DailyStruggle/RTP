@@ -83,7 +83,11 @@ public final class SqlNetworkStateSchema {
                 worlds_loaded        VARCHAR(4000) NOT NULL,
                 kill_switch          BOOLEAN       NOT NULL DEFAULT FALSE,
                 updated_at_ms        BIGINT        NOT NULL,
-                hmac                 VARCHAR(128)
+                hmac                 VARCHAR(128),
+                kept_count             INT           NOT NULL DEFAULT 0,
+                network_reserved_count INT           NOT NULL DEFAULT 0,
+                regions                VARCHAR(4000) NOT NULL DEFAULT '',
+                region_kept_counts     VARCHAR(4000) NOT NULL DEFAULT ''
             )
             """;
 
@@ -95,6 +99,30 @@ public final class SqlNetworkStateSchema {
     private static final String DDL_BACKENDS_IDX =
             "CREATE INDEX IF NOT EXISTS idx_rtp_network_backends_last_seen "
                     + "ON rtp_network_backends(last_seen_ms)";
+
+    /**
+     * L6 cross-server fields (rtp-proxy region-aware selection): add the
+     * {@code kept_count}, {@code network_reserved_count}, {@code regions}, and
+     * {@code region_kept_counts} columns to pre-existing deployments so the
+     * durable SQL tier carries the same heartbeat field set the shared
+     * {@link io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeatCodec}
+     * signs over (otherwise the read-side HMAC, recomputed from the persisted
+     * columns, would mismatch and drop every signed row). Idempotent and
+     * dialect-tolerant, like the {@code hmac} migration above. Defaults keep
+     * legacy rows valid (zero / empty).
+     */
+    private static final String[] DDL_BACKENDS_ADD_L6 = {
+            "ALTER TABLE rtp_network_backends ADD COLUMN IF NOT EXISTS kept_count INT NOT NULL DEFAULT 0",
+            "ALTER TABLE rtp_network_backends ADD COLUMN IF NOT EXISTS network_reserved_count INT NOT NULL DEFAULT 0",
+            "ALTER TABLE rtp_network_backends ADD COLUMN IF NOT EXISTS regions VARCHAR(4000) NOT NULL DEFAULT ''",
+            "ALTER TABLE rtp_network_backends ADD COLUMN IF NOT EXISTS region_kept_counts VARCHAR(4000) NOT NULL DEFAULT ''"
+    };
+    private static final String[] DDL_BACKENDS_ADD_L6_MYSQL = {
+            "ALTER TABLE rtp_network_backends ADD COLUMN kept_count INT NOT NULL DEFAULT 0",
+            "ALTER TABLE rtp_network_backends ADD COLUMN network_reserved_count INT NOT NULL DEFAULT 0",
+            "ALTER TABLE rtp_network_backends ADD COLUMN regions VARCHAR(4000) NOT NULL DEFAULT ''",
+            "ALTER TABLE rtp_network_backends ADD COLUMN region_kept_counts VARCHAR(4000) NOT NULL DEFAULT ''"
+    };
 
     private static final String DDL_TOKENS = """
             CREATE TABLE IF NOT EXISTS rtp_network_tokens (
@@ -207,6 +235,9 @@ public final class SqlNetworkStateSchema {
         // is wired in (REQ-RTP-S-004, rtp-proxy-ADR-010).
         addColumnIgnoringMissing(conn, DDL_PROXIES_ADD_HMAC, DDL_PROXIES_ADD_HMAC_MYSQL);
         addColumnIgnoringMissing(conn, DDL_BACKENDS_ADD_HMAC, DDL_BACKENDS_ADD_HMAC_MYSQL);
+        for (int i = 0; i < DDL_BACKENDS_ADD_L6.length; i++) {
+            addColumnIgnoringMissing(conn, DDL_BACKENDS_ADD_L6[i], DDL_BACKENDS_ADD_L6_MYSQL[i]);
+        }
         addColumnIgnoringMissing(conn, DDL_TOKENS_ADD_HMAC, DDL_TOKENS_ADD_HMAC_MYSQL);
         addColumnIgnoringMissing(conn, DDL_TOKENS_ADD_REGION, DDL_TOKENS_ADD_REGION_MYSQL);
         // Slice D row D5: wait-queue tables. Independent of the heartbeat /

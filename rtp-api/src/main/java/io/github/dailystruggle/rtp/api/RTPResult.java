@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.api;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 
 /**
@@ -22,6 +23,7 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
  *       });
  * }</pre>
  */
+@PublicApi
 public final class RTPResult {
 
   /** Classifies why a teleport request did not succeed. */
