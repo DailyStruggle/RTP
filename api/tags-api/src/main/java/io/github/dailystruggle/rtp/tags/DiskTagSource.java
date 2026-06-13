@@ -16,7 +16,7 @@ import java.util.stream.Stream;
  * <p>The data root contains namespace subdirectories, structured as in data packs:
  * {@code <dataRoot>/<namespace>/tags/{block,blocks}/...json}.
  *
- * <p>Probes both {@code tags/block} (>= 1.21) and {@code tags/blocks} (<= 1.20) for compatibility.
+ * <p>Probes both {@code tags/block} (&gt;= 1.21) and {@code tags/blocks} (&lt;= 1.20) for compatibility.
  * Failures are reported via the provided {@code rejectionSink} (consistent with REQ-RTP-S-004).
  *
  * <p>Immutable and thread-safe.

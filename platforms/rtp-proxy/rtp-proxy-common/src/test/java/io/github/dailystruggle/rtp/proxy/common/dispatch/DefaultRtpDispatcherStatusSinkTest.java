@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Slice D row D6 + REQ-RTP-S-004 guard for the {@link StatusSink} integration
+ * REQ-RTP-S-004 guard for the {@link StatusSink} integration
  * in {@link DefaultRtpDispatcher}. Verifies that every terminal outcome path
  * fires exactly one {@code StatusSink.emit(...)} with the matching
  * {@link QueueState} so the cross-server queue can push the player's queue
@@ -224,7 +224,7 @@ final class DefaultRtpDispatcherStatusSinkTest {
     void default_constructors_use_NO_OP_sink_and_stay_backward_compatible() throws Exception {
         UUID p = UUID.randomUUID();
         // 4-arg constructor must not throw and must dispatch normally without
-        // any caller-supplied sink (pre-L6 compat).
+        // any caller-supplied sink (backward compat).
         DispatchOutcome outcome4 = new DefaultRtpDispatcher(
                 (req, snap) -> Optional.of("b1"),
                 new FakeTransport(List.of(backend("b1"))),

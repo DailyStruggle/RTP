@@ -5,8 +5,8 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Cross-proxy single-leader lease guarding the shared
- * {@link NetworkWaitlist} drainer. Slice 2 of `CHECKLIST-network-waitlist.md`;
- * design in `rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md`.
+ * {@link NetworkWaitlist} drainer.
+ * Design in `rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md`.
  *
  * <p>When two or more proxies share one Redis (or SQL) waitlist, only one
  * proxy at a time may pop envelopes off it - otherwise the same envelope
@@ -23,7 +23,7 @@ import java.util.concurrent.CompletableFuture;
  * <p>In-memory and single-proxy deployments use
  * {@link io.github.dailystruggle.rtp.proxy.common.transport.memory.AlwaysLeaderLease}
  * which always returns {@code true}. The Redis-backed lease using
- * {@code SET NX PX} is deferred to Slice 3.
+ * {@code SET NX PX} is not yet implemented in the Redis binding.
  *
  * <p><strong>S-004 contract.</strong> Every failure path resolves with a
  * meaningful future. Transport errors complete exceptionally; "lost the

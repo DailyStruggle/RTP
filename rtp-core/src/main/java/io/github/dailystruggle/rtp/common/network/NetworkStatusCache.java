@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 import java.util.logging.Level;
 
 /**
- * Read-side cache for per-player cross-server queue status. Slice C row C6.
+ * Read-side cache for per-player cross-server queue status.
  *
  * <p>A single async timer polls the injected {@code statusSupplier} on a
  * fixed interval (default {@code network.queuePollIntervalMs = 1000ms}) and
@@ -21,7 +21,7 @@ import java.util.logging.Level;
  * the transport. Message emission per {@code REQ-RTP-F-013} is the caller's
  * responsibility - this cache is data only.</p>
  *
- * <p>The {@link QueueStatus} record is the slice-C-local shape; Slice D's
+ * <p>The {@link QueueStatus} record is the local shape; the
  * {@code NetworkRequestQueue.pollStatus} returns the same fields and a
  * thin adapter feeds them in here.</p>
  */
@@ -48,7 +48,7 @@ public final class NetworkStatusCache {
         public enum State {
             QUEUED,
             /**
-             * Slice 4 (Slice 1+2 SPI, ADR-015 / REQ-RTP-NET-015): the request
+             * ADR-015 / REQ-RTP-NET-015: the request
              * is parked on the shared cross-proxy {@code NetworkWaitlist}
              * because no backend qualified at enrolment time. The player has
              * not been routed; they are awaiting the {@code NetworkWaitlistDrainer}.
@@ -63,7 +63,7 @@ public final class NetworkStatusCache {
          * @return {@code true} when this state is non-terminal (the player
          *     still has an active cross-server enrolment and a new
          *     {@code /rtp} should be rejected with {@code msgAlreadyQueued}).
-         *     {@code WAITLISTED} is included here per Slice 4 / REQ-RTP-NET-015.
+         *     {@code WAITLISTED} is included here per REQ-RTP-NET-015.
          */
         public boolean nonTerminal() {
             return state == State.QUEUED

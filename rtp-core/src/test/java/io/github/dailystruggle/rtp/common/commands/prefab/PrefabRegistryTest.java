@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Session 1 (Admin-panel prefabs) contract test for {@link PrefabRegistry}.
+ * Contract test for {@link PrefabRegistry}.
  *
  * <p>Guards:
  * <ul>

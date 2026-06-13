@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Slice C row C8 / C9: pure-function audit of region-name overlap across
+ * Pure-function audit of region-name overlap across
  * backends. The side-effecting {@code auditAndWarn} variant is exercised
  * for the null-snapshot / no-collision branches; log assertions are out of
  * scope for unit-level coverage (covered by {@code rtp test full}).
@@ -91,7 +91,7 @@ class NetworkRouterRegionCollisionTest {
 
     @Test
     void policy_parse_is_forwards_compatible() {
-        // L6 ships WARN only; unknown values fall back to WARN rather than throwing.
+        // Only WARN is supported; unknown values fall back to WARN rather than throwing.
         assertEquals(NetworkRegionCollisionWarner.Policy.WARN,
                 NetworkRegionCollisionWarner.Policy.parse(null));
         assertEquals(NetworkRegionCollisionWarner.Policy.WARN,

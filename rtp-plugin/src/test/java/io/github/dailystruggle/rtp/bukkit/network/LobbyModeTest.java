@@ -148,7 +148,7 @@ class LobbyModeTest {
 
     @Test
     void pickMostKept_legacy_peer_with_regionsAvailable_falls_through() {
-        // Pre-L6 peer: regions Set empty, regionsAvailable list populated,
+        // Older peer: regions Set empty, regionsAvailable list populated,
         // regionKeptCounts empty. Should still be considered (count=0).
         BackendHeartbeat legacy = new BackendHeartbeat(
                 "legacy-1", 1, BackendHeartbeat.PluginState.READY, true,
@@ -287,7 +287,7 @@ class LobbyModeTest {
         assertSame(false, s.isLobbyMode());
     }
 
-    // ----- Slice I follow-up: acceptingRequests filter -----------------
+    // ----- acceptingRequests filter -----------------
 
     /**
      * Build a heartbeat with explicit {@code acceptingRequests} and an
@@ -348,7 +348,7 @@ class LobbyModeTest {
         assertEquals("backend-b", pick.get().serverId());
     }
 
-    // ----- Slice I follow-up: on-send local decrement ------------------
+    // ----- on-send local decrement ------------------
 
     @Test
     void pickMostKept_applies_local_decrement_after_recordDispatch() {

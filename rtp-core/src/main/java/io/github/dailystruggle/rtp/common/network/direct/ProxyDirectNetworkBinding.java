@@ -259,7 +259,7 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
 
     /**
      * Regions a peer actually advertised, for logging and change detection.
-     * Prefers the L6 typed {@code regions()} Set when present, else the legacy
+     * Prefers the typed {@code regions()} Set when present, else the legacy
      * {@code regionsAvailable()} list - matching what {@code PeerRegionRegistry}
      * surfaces for tab-completion. The {@code BackendHeartbeatCodec} now carries
      * both, so {@code regions()} survives a wire round-trip; the list remains a

@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Parsed, validated view of {@code network.yml}. Phase 2b subset: only the
+ * Parsed, validated view of {@code network.yml}. Only the
  * keys the adapter shell + heartbeat publisher need today. The full closed
  * schema lives in rtp-proxy-ADR-002; additional sections land as the
  * features that consume them ship (transport binding, load balancer,
@@ -109,7 +109,7 @@ public final class NetworkConfig {
     /** Drainer pulse cadence in millis; should track {@link #heartbeatIntervalMs()}. */
     public long waitlistDrainIntervalMs() { return waitlistDrainIntervalMs; }
 
-    /** Drainer backoff window after a total-failure pulse (ADR-015 Slice 2.4a). */
+    /** Drainer backoff window after a total-failure pulse (ADR-015). */
     public long waitlistDrainPauseMs() { return waitlistDrainPauseMs; }
 
     /** Leader-lease TTL in millis; lease is re-extended on every successful pulse. */
@@ -133,7 +133,7 @@ public final class NetworkConfig {
      *       names an unset environment variable, fail.</li>
      * </ul>
      * Other validation (closed-schema rejection of unknown keys, weight
-     * ranges, schemaVersion negotiation) deferred to later phases.</p>
+     * ranges, schemaVersion negotiation) deferred to later phases.
      */
     public static NetworkConfig fromMap(Map<String, Object> root, RTPProxyAccessor accessor) {
         Objects.requireNonNull(root, "root");
@@ -206,7 +206,7 @@ public final class NetworkConfig {
         long reapMaxMs = asLong(waitlist, "reapMaxAgeMs", 60_000L);
         b.waitlistReapMaxAgeMs = reapMaxMs > 0 ? reapMaxMs : 60_000L;
 
-        // Fail-fast: redis transport requires a host (Phase 2e-Redis A1).
+        // Fail-fast: redis transport requires a host.
         if (b.enabled && "redis".equalsIgnoreCase(b.transportType)) {
             if (b.redisHost == null || b.redisHost.isEmpty()) {
                 throw new NetworkConfigException(

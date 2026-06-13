@@ -245,7 +245,7 @@ public class JumpAdjustorProbeTest {
    * {@code airBlocks.contains("POPPY")} was always {@code false} — every flower-topped
    * chunk paid the full-load penalty, which is what the {@code adjustNull ≈ 0.39 ×
    * activeChecks} ratio in the scan logs was showing. See
-   * {@code docs/dev/SAFETY_TAGS_AND_STATES_PLAN.md} Slice 3.
+   * {@code docs/dev/SAFETY_TAGS_AND_STATES_PLAN.md}.
    */
   @SuppressWarnings("unchecked")
   @Test

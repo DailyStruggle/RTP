@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Validates {@link NetworkConfig#fromMap} against ADR-002 §Validation Rules
- * (Phase 2b subset): role-auto resolution via {@link RTPProxyAccessor},
+ * Role-auto resolution via {@link RTPProxyAccessor},
  * proxyId fail-fast when role resolves to a proxy, secretEnv check only when
  * enabled, defaults preserved.
  */

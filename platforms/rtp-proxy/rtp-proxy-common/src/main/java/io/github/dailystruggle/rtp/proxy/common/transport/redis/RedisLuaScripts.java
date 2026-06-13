@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Loader, SHA1-verifier, and EVALSHA dispatcher for the Phase 2e-Redis A2
+ * Loader, SHA1-verifier, and EVALSHA dispatcher for the
  * atomic-claim/release Lua scripts.
  *
  * <p>Refines rtp-proxy-ADR-005 §"Lua script SHA1 verify-on-load" (Amendment

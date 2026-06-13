@@ -39,8 +39,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Redis-backed {@link NetworkTransport} implementation - Phase 2e-Redis A1 slice
- * per {@code MULTI_SERVER_PLAN.md}.
+ * Redis-backed {@link NetworkTransport} implementation.
  *
  * <p><strong>A1 + A2 scope (this class):</strong> heartbeats (publish + read snapshot
  * via {@code SCAN}), subscriber fan-out via Redis pub/sub on the
@@ -136,7 +135,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
      * Legacy constructor; HMAC envelope disabled. Retained for tests and in-memory
      * fallback paths. Production wiring through {@code NetworkBindings.open} uses
      * the {@link #RedisNetworkStateBinding(String,int,String,long,HmacVerifier,int)}
-     * overload below per rtp-proxy-ADR-010 (Phase 2e-Redis A3 slice).
+     * overload below per rtp-proxy-ADR-010.
      */
     public RedisNetworkStateBinding(String host, int port, String password, long heartbeatIntervalMs) {
         this(host, port, password, heartbeatIntervalMs, null, 1);
@@ -405,7 +404,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
 
     /**
      * One-shot SCAN+HGETALL filter over {@code rtp:net:tok:*}. Used by a
-     * backend's boot-time reconcile (L6/F1) so the cost is borne once per
+     * backend's boot-time reconcile so the cost is borne once per
      * backend lifecycle, not every tick. Corrupt rows (missing state, bad
      * timestamps, HMAC mismatch) are filtered with WARNING and never raised
      * to the caller, mirroring {@link #findReservationSync(UUID)}.

@@ -52,7 +52,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Velocity proxy adapter entry-point - Phase 2b participant skeleton.
+ * Velocity proxy adapter entry-point.
  *
  * <p>Bootstrap order (rtp-proxy-ADR-006, rtp-proxy-ADR-013):
  * <ol>
@@ -61,21 +61,19 @@ import java.util.concurrent.TimeUnit;
  *   <li>Read {@code network.yml} (absent file = disabled defaults).</li>
  *   <li>If {@code enabled:false}: log banner, register nothing further.
  *       REQ-RTP-NET-002 byte-identical no-op.</li>
- *   <li>If {@code enabled:true}: open the configured transport (Phase 2b
- *       ships {@code in-memory} only; Redis/SQL are Phase 2e), start the
+ *   <li>If {@code enabled:true}: open the configured transport, start the
  *       heartbeat publisher.</li>
  * </ol>
  *
- * <p>Phase 2b deliberately omits Brigadier {@code /rtp} (Phase 2d) and
- * {@code ServerPreConnectEvent} interception (Phase 2c). The participant
+ * <p>The participant
  * skeleton wires the publisher so peers see this proxy on the heartbeat
- * fan-out; the dispatcher half lands in Phase 2e.</p>
+ * fan-out.</p>
  */
 @Plugin(
         id = "rtp",
         name = "RTP",
         version = "3.0.0-beta.2",
-        description = "Random Teleport - Velocity proxy adapter (Phase 2b participant skeleton).",
+        description = "Random Teleport - Velocity proxy adapter.",
         authors = {"dailystruggle"}
 )
 public final class RtpVelocityPlugin {
@@ -149,7 +147,7 @@ public final class RtpVelocityPlugin {
             // operator can see why the file wasn't created.
             saveDefaultNetworkYaml();
 
-            // Phase 2b step 1: register accessor BEFORE any rtp-proxy-common entry point.
+            // Step 1: register accessor BEFORE any rtp-proxy-common entry point.
             // proxyId is read from network.yml, but the accessor needs a value at
             // construction. Read just the proxyId first (or fall back to a placeholder
             // when the file is absent; disabled config does not require a real id).
@@ -157,7 +155,7 @@ public final class RtpVelocityPlugin {
             this.accessor = new VelocityProxyAccessor(proxyServer, preliminaryProxyId);
             RtpProxy.setProxyAccessor(accessor);
 
-            // Phase 2b step 2: parse network.yml (defaults when absent).
+            // Step 2: parse network.yml (defaults when absent).
             Map<String, Object> raw = readNetworkYaml();
             try {
                 this.config = NetworkConfig.fromMap(raw, accessor);
@@ -171,14 +169,13 @@ public final class RtpVelocityPlugin {
                 return;
             }
 
-            // Phase 2b step 3: open transport + start publisher (participant default).
-            // Phase 2e-SQL update: route through NetworkBindings factory. The proxy
-            // currently has no JDBC DataSource (proxies don't own a SQL DB by
-            // default); transport.type=sql therefore fails fast on the proxy until
-            // Phase 2e-SQL-Proxy adds a proxy-side JDBC config block. Operators
-            // who want cross-process state today should pick transport.type=sql
-            // on the BACKENDS and run the proxy with transport.type=in-memory or
-            // leave it disabled; backends fan out via the shared DB.
+            // Step 3: open transport + start publisher.
+            // Route through NetworkBindings factory. The proxy currently has no
+            // JDBC DataSource (proxies don't own a SQL DB by default);
+            // transport.type=sql therefore fails fast on the proxy. Operators
+            // who want cross-process state should pick transport.type=sql on the
+            // backends and run the proxy with transport.type=in-memory or leave
+            // it disabled; backends fan out via the shared DB.
             try {
                 this.transport = NetworkBindings.open(config, /* dataSource */ null);
             } catch (RuntimeException | LinkageError ex) {
@@ -215,10 +212,8 @@ public final class RtpVelocityPlugin {
                     transport, Duration.ofMillis(config.reservationReapIntervalMs()));
             this.reservationReaper.start();
 
-            // Slice E (CHECKLIST-cross-server-rtp-L6.md row E2): selector + dispatcher
-            // + transport-driven request trigger source. The proxy no longer hosts a
-            // Brigadier /rtp command (deleted in Slice E1); instead, backends enrol
-            // locally and ship batches into the shared NetworkRequestQueue, and the
+            // Selector + dispatcher + transport-driven request trigger source.
+            // Backends enrol locally and ship batches into the shared NetworkRequestQueue, and the
             // TransportRequestTriggerSource pops envelopes off the queue and feeds
             // them to the dispatcher. The existing ServerPreConnectEvent listener
             // still redeems the resulting ReservationToken at the connect boundary.
@@ -251,8 +246,8 @@ public final class RtpVelocityPlugin {
             this.sender = new VelocityProxySender(proxyServer, logger);
             // Dispatcher is constructed below, after the waitlist + status sink are
             // resolved so it can park no-backend envelopes onto the shared waitlist
-            // (ADR-015 Slice 2). Was: `new DefaultRtpDispatcher(selector, transport,
-            // sender, scheduler)` (pre-Slice-2 4-arg ctor with null waitlist).
+            // (ADR-015). Was: `new DefaultRtpDispatcher(selector, transport,
+            // sender, scheduler)` (4-arg ctor with null waitlist).
 
             // Open the cross-server request queue alongside the transport. Failure
             // here logs a WARNING and leaves the trigger source unstarted: the proxy
@@ -270,7 +265,7 @@ public final class RtpVelocityPlugin {
 
             // ADR-015 / REQ-RTP-NET-015: open the shared cross-proxy waitlist + leader
             // lease. Both are null when network.waitlist.enabled=false; the dispatcher
-            // then resolves no-backend as terminal FAILED (legacy pre-Slice-2 path).
+            // then resolves no-backend as terminal FAILED.
             // Both open paths degrade-to-in-memory on transport failure per the
             // NetworkBindings factories; we never propagate the exception so the
             // proxy stays up for heartbeats / reservation redeem on a partial outage.
@@ -295,10 +290,10 @@ public final class RtpVelocityPlugin {
                     ? new RequestQueueStatusSink(requestQueue)
                     : StatusSink.NO_OP;
 
-            // Slice E (CHECKLIST-cross-server-rtp-L6.md row E2) + ADR-015 Slice 2:
+            // ADR-015:
             // construct the dispatcher with the full 8-arg ctor so the no-backend
             // branch can park onto the shared waitlist. When waitlist is null the
-            // ctor still accepts the null and the dispatcher behaves pre-Slice-2.
+            // ctor still accepts the null and the dispatcher behaves without a waitlist.
             this.dispatcher = new DefaultRtpDispatcher(
                     selector, transport, sender, scheduler,
                     Duration.ofSeconds(30),
@@ -371,7 +366,7 @@ public final class RtpVelocityPlugin {
                 }
             }
 
-            // ADR-015 Slice 2 drainer + reaper: pulse cadence tracks heartbeat
+            // ADR-015 drainer + reaper: pulse cadence tracks heartbeat
             // interval (the BackendHeartbeat.regionKeptCounts feed is what bounds
             // the per-backend cap map). scheduleWithFixedDelay (not fixedRate) so a
             // slow pulse never queues up successors behind itself during a transport
@@ -590,7 +585,7 @@ public final class RtpVelocityPlugin {
     }
 
     /**
-     * Phase 2c: redeem a pre-allocated {@link ReservationToken} at the
+     * Redeem a pre-allocated {@link ReservationToken} at the
      * connect boundary. When a player connects (initial join or
      * cross-backend hop) and the active {@link NetworkTransport} reports an
      * active reservation for them, rewrite the connect target to the
@@ -713,7 +708,7 @@ public final class RtpVelocityPlugin {
         boolean cleanShutdown = true;
         try {
             step = 1;
-            // ADR-015 Slice 2 teardown: cancel drainer + reaper BEFORE stopping
+            // ADR-015 teardown: cancel drainer + reaper BEFORE stopping
             // the request trigger source so a final in-flight pulse cannot try to
             // dispatch into a half-torn-down pipeline. Future.cancel(false) lets
             // an in-flight pulse run to completion; the scheduler shutdown below
@@ -1001,7 +996,7 @@ public final class RtpVelocityPlugin {
     /** @return active dispatcher when network enabled, else {@code null}. */
     RtpDispatcher dispatcher() { return dispatcher; }
 
-    // ---- Slice E (CHECKLIST-cross-server-rtp-L6.md): network.queue.* config readers ----
+    // ---- network.queue.* config readers ----
 
     /**
      * Read {@code network.queue.workerThreads} from the parsed yaml map.

@@ -1,5 +1,4 @@
--- rtp-proxy-common L6 Slice D3 cross-server network wait queue: dequeue head.
--- Refines PROPOSAL-cross-server-rtp-L6 Section 4.4 (proxy worker hot path).
+-- rtp-proxy-common cross-server network wait queue: dequeue head.
 -- Atomic LPOP of the head correlationId off the ready FIFO, paired with an
 -- HGETALL of its envelope HASH and a one-shot transition of the player's
 -- status row to ROUTING. The envelope HASH is preserved for the dispatch

@@ -1,5 +1,4 @@
--- rtp-proxy-common L6 Slice D3 cross-server network wait queue: poll status.
--- Refines PROPOSAL-cross-server-rtp-L6 Section 4.3 (read-side wholesale-replace).
+-- rtp-proxy-common cross-server network wait queue: poll status.
 -- One-shot pipelined read of per-player status: for each requested playerId
 -- in ARGV, returns either the flat HASH contents (as a Lua array of
 -- alternating field/value strings, prefixed by the playerId) or a single

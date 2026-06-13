@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Session 2 contract test for {@link PrefabApplier}.
+ * Contract test for {@link PrefabApplier}.
  *
  * <p>Guards the pure merge contract from {@code PROPOSAL-admin-panel-prefabs.md}
  * §3.1: sparse merge, nested-map recursion, list-wholesale replacement,

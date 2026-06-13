@@ -229,7 +229,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
      * {@code ConfigParser&lt;PerformanceKeys&gt;}) because the knob is
      * namespaced under a {@code prefab:} sub-map that does not yet appear in
      * {@code PerformanceKeys}; introducing the enum constant requires a
-     * locale TSV pipeline pass which is Session 6.
+     * locale TSV pipeline pass.
      *
      * <p>Falls back to {@link PrefabDiskIO#DEFAULT_BAK_RETENTION} on any
      * failure (no server accessor, file absent, key absent, non-numeric).

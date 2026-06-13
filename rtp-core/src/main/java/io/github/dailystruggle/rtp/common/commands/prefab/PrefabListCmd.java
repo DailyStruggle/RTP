@@ -16,7 +16,7 @@ import org.jetbrains.annotations.Nullable;
  * description, and a usage hint. Permission-gated via the shared
  * {@link PrefabCommand#PERMISSION}.
  *
- * <p>Output is plain text (no localised keys yet - Session 6 wires
+ * <p>Output is plain text (no localised keys yet -
  * the {@code MessagesKeys} entries through the locale TSV pipeline). The
  * English description on each row is the {@link Prefab#description()} carried
  * directly by the in-code registry, so this verb stays useful pre-locale.

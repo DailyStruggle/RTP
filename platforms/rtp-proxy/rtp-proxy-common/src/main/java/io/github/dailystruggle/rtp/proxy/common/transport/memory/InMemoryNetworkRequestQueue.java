@@ -22,12 +22,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Reference {@link NetworkRequestQueue} implementation backed by in-process
- * concurrent collections. Slice D row D2 of `CHECKLIST-cross-server-rtp-L6.md`.
+ * concurrent collections.
  *
  * <p><strong>Production use is unsupported.</strong> State lives in this JVM
- * only. Intended for: unit tests of the dispatcher / status sink, the
- * Slice C buffer/cache adapter wiring, and the no-op fallback path of
- * {@code NetworkBindings} when {@code transport.kind = memory}.</p>
+ * only. Intended for: unit tests of the dispatcher / status sink, and the
+ * no-op fallback path of {@code NetworkBindings} when
+ * {@code transport.kind = memory}.</p>
  *
  * <p>Async semantics mirror {@link InMemoryNetworkStateBinding}: every SPI
  * call hops off the caller's thread onto an internal single-thread pool, so

@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
- * L6 Slice H2: hard-pin semantics on the 3-arg
+ * Hard-pin semantics on the 3-arg
  * {@link NetworkRouter#route(UUID, String, String)}. The named
  * {@code serverHint} must exist, be alive, be non-killSwitch, and advertise
  * the requested region; any failure returns

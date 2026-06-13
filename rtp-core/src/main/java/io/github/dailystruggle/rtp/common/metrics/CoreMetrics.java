@@ -11,18 +11,18 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 /**
- * Default {@link Metrics} implementation that combines a platform-supplied
- * {@link MetricsBinding} with core-readable fields (queue depth, memory tracker,
+ * Default {@link io.github.dailystruggle.metrics.api.Metrics} implementation that combines a platform-supplied
+ * {@link io.github.dailystruggle.metrics.api.MetricsBinding} with core-readable fields (queue depth, memory tracker,
  * heap, pipeline histogram).
  *
  * <p>This class is intentionally platform-agnostic &mdash; the only platform-specific
- * fields go through the injected {@link MetricsBinding}. No {@code org.bukkit.*} or
+ * fields go through the injected {@link io.github.dailystruggle.metrics.api.MetricsBinding}. No {@code org.bukkit.*} or
  * other platform imports may appear here (S-005 spirit; ArchUnit core-package guard).
  *
  * <p>Lifecycle: a single {@link CoreMetrics} instance is owned by the {@code RTP}
- * facade. Platform adapters install their {@link MetricsBinding} via
- * {@link #setBinding(MetricsBinding)} during plugin/mod startup; the default is
- * {@link MetricsBinding#NOOP}.
+ * facade. Platform adapters install their {@link io.github.dailystruggle.metrics.api.MetricsBinding} via
+ * {@link #setBinding(io.github.dailystruggle.metrics.api.MetricsBinding)} during plugin/mod startup; the default is
+ * {@link io.github.dailystruggle.metrics.api.MetricsBinding#NOOP}.
  *
  * <p>Per {@code METRICS_PLAN.md > Goals}: snapshot-not-stream, no tick-thread blocking.
  * All reads here are O(R) where R is the count of configured regions.

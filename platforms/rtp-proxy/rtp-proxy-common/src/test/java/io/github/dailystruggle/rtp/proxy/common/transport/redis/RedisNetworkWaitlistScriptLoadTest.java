@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * test here means an editor that converted CRLF on a Windows checkout
  * has not silently invalidated the sidecar.</p>
  *
- * <p>Slice 3b regression guard for
+ * <p>Regression guard for
  * {@code rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md}.</p>
  */
 class RedisNetworkWaitlistScriptLoadTest {

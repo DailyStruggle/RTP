@@ -8,9 +8,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Write-batched cross-server `/rtp` wait queue SPI. Slice D row D1 of
- * `CHECKLIST-cross-server-rtp-L6.md`; design in
- * `PROPOSAL-cross-server-rtp-L6.md` Sections 4 and 7.
+ * Write-batched cross-server `/rtp` wait queue SPI.
  *
  * <p>Per-request hot path (per proposal Section 2):
  * <ul>
@@ -30,7 +28,7 @@ import java.util.concurrent.CompletableFuture;
  * future carrying a typed outcome or a failed future with a meaningful
  * {@link Throwable}. Implementations must never silently swallow.</p>
  *
- * @see InMemoryNetworkRequestQueue
+ * @see NetworkTransport
  */
 public interface NetworkRequestQueue {
 
@@ -72,7 +70,7 @@ public interface NetworkRequestQueue {
 
     /**
      * What the backend buffers locally and ships to the queue. Mirrors the
-     * Slice C {@code NetworkEnrolmentBuffer.EnrolmentRecord} shape so the
+     * {@code NetworkEnrolmentBuffer.EnrolmentRecord} shape so the
      * existing dirty-write buffer can adapt-in with a thin wrapper.
      */
     record EnrolmentEnvelope(
@@ -92,7 +90,7 @@ public interface NetworkRequestQueue {
 
     /**
      * Per-player snapshot returned by {@link #pollStatus(List)}. Mirrors
-     * the Slice C {@code NetworkStatusCache.QueueStatus} shape.
+     * the {@code NetworkStatusCache.QueueStatus} shape.
      */
     record QueueStatus(
             UUID playerId,

@@ -16,7 +16,7 @@ import java.util.function.Supplier;
  * across the network. Pure-function entry: {@link #route(UUID, String)} reads
  * injected suppliers and produces a {@link RoutingDecision}; the caller acts.
  *
- * <p>L6 of {@code CHECKLIST-cross-server-rtp.md}, Slice C row C1-C4.
+ * <p>Cross-server routing logic (rtp-proxy-ADR-014).
  * Decision matrix (PROPOSAL §3, locked D2/D6):</p>
  *
  * <ol>
@@ -108,7 +108,7 @@ public final class NetworkRouter {
 
     /**
      * Decide routing with an optional hard-pin to a specific peer
-     * {@code serverHint}. L6 Slice H2: when the player typed
+     * {@code serverHint}. When the player typed
      * {@code rtp region=<server>:<region>}, the {@code serverHint} is the
      * parsed server id and the semantics are <strong>hard-pin</strong> -
      * if the named server is missing from the snapshot, {@code killSwitch},
@@ -205,7 +205,7 @@ public final class NetworkRouter {
                 for (BackendHeartbeat hb : snap.all()) {
                     if (hb == null || hb.killSwitch()) continue;
                     if (hb.regions() != null && hb.regions().contains(regionKey)) { advertised = true; break; }
-                    // Pre-L6 peer back-compat: legacy regionsAvailable list.
+                    // Older peer back-compat: legacy regionsAvailable list.
                     if (hb.regionsAvailable() != null && hb.regionsAvailable().contains(regionKey)) {
                         advertised = true; break;
                     }
@@ -248,7 +248,7 @@ public final class NetworkRouter {
 
     /**
      * Parsed region argument carrying an optional {@code serverHint} and a
-     * {@code regionKey}. L6 Slice H2 syntax:
+     * {@code regionKey}. Syntax:
      *
      * <ul>
      *   <li>{@code default} -&gt; {@code (serverHint=null, regionKey="default")}</li>
@@ -286,7 +286,7 @@ public final class NetworkRouter {
 
     /**
      * Parse an optionally-qualified region argument. Returns {@code null}
-     * when {@code arg} is null or whitespace-only. L6 Slice H2.
+     * when {@code arg} is null or whitespace-only.
      *
      * @throws IllegalArgumentException when {@code arg} contains the
      *         reserved {@code =} character (D7) or more than one colon

@@ -115,8 +115,7 @@ public final class FabricLegacyText {
         // mid-loop. We therefore wrap the styling in a best-effort try/catch
         // and degrade gracefully to the un-decorated component rather than
         // aborting the whole command. The drift itself should be repaired in
-        // the per-version adapter (rtp-fabric-v1_21_R5 / R11) - tracked under
-        // Step F follow-ups.
+        // the per-version adapter (rtp-fabric-v1_21_R5 / R11).
         try {
             MutableComponent mut = base.copy();
             Style style = mut.getStyle();

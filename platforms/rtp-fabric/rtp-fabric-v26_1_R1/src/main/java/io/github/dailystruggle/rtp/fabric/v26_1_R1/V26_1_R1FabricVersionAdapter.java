@@ -345,7 +345,7 @@ public final class V26_1_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     // -------------------------------------------------------------------------
-    // Maps-api parity — rtp-fabric-ADR-014 / MULTI_PLATFORM_PLAN Step K.
+    // Maps-api parity — rtp-fabric-ADR-014.
     // Vanilla filled-map rendering for the deobf MC 26.1.x runtime. Mirrors the
     // v26_2_R1 carrier (compile mappings == runtime mappings on the deobf line,
     // so the typed binding links directly).

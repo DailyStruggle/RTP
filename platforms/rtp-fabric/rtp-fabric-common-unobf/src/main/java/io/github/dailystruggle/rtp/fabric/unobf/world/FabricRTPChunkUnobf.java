@@ -386,8 +386,8 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
      * Fabric for now — see class-level note. Hot-path fast exits mirror the
      * Bukkit implementation: empty compiled set short-circuits to safe with
      * zero allocations. Anvil-backed instances also delegate to the plain
-     * bucket via {@link #isSafe(int, int, int, Set)}, matching Spigot's Slice 2
-     * behaviour (state predicates against Anvil palette data are deferred).
+     * bucket via {@link #isSafe(int, int, int, Set)}
+     * (state predicates against Anvil palette data are not yet supported).
      */
     @Override
     public boolean isSafe(int x, int y, int z, CompiledUnsafeSet unsafeBlocks) {

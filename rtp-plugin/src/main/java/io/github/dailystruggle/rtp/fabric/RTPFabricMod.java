@@ -50,7 +50,7 @@ public final class RTPFabricMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        // Phase 2 Step E2 + Step G G1 wiring. Body kept minimal per
+        // Event bridge + command wiring. Body kept minimal per
         // REQ-RTP-NF-003 (applied per-entry-point under rtp-fabric-ADR-002 §2). Heavy
         // lifting is in FabricServerAccessor / FabricEventBridge / the
         // commands-api Brigadier adapter.
@@ -114,7 +114,7 @@ public final class RTPFabricMod implements ModInitializer {
             RTP.backendStateSamplerFactory =
                     io.github.dailystruggle.rtp.fabric.network.FabricBackendStateSampler::new;
 
-            // L6 Slice J: read routing.lobbyMode from network.yml early (before
+            // Read routing.lobbyMode from network.yml early (before
             // the startupTasks drain constructs Region instances) so a pure
             // cross-server lobby skips local region prefill. Defensive: any
             // failure resolves to lobbyMode=false, preserving non-lobby
@@ -136,7 +136,7 @@ public final class RTPFabricMod implements ModInitializer {
                                 + t.getMessage());
             }
 
-            // Step D wiring — Configuration & Database setup. Mirrors
+            // Configuration & Database setup. Mirrors
             // BukkitDatabaseHandler.setupDatabase invoked from
             // RTPBukkitPlugin.onEnable. Selects the DatabaseAccessor from
             // configs (sqlite default, h2/mysql/postgresql/yaml supported)
@@ -616,8 +616,8 @@ public final class RTPFabricMod implements ModInitializer {
             // ----------------------------------------------------------------
 
             // ----------------------------------------------------------------
-            // Step G G1 — Brigadier registration of the bare /rtp root.
-            // Permissions deferred to Step F (always-true predicate here so
+            // Brigadier registration of the /rtp root.
+            // Permissions use fabric-permissions-api when available (always-true predicate here so
             // any player can invoke /rtp during initial smoke testing).
             // Full subcommand/parameter parity is Step G2 follow-up — see
             // RTPCmdFabricRoot Javadoc for the parity TODO checklist.

@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Slice C row C8 / C9: behaviour of {@link NetworkEnrolmentBuffer} when
+ * Behaviour of {@link NetworkEnrolmentBuffer} when
  * exercised via {@link NetworkEnrolmentBuffer#flushOnce()} (no scheduler
  * dependency in tests).
  */

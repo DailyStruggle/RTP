@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * L6 Slice H2: {@link BukkitNetworkCommandHook} translates the
+ * {@link BukkitNetworkCommandHook} translates the
  * {@link NetworkRouter}'s {@link RoutingDecision} into the rtp-api
  * {@link NetworkCommandHook.RoutingResult} SPI shapes. Covers the
  * `server:region` parse path, hard-pin reject, silent fallback for

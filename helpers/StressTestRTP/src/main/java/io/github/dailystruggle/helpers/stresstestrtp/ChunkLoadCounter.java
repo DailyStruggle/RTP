@@ -39,7 +39,7 @@ import java.util.logging.Level;
  * disabled per-plugin pre-queueing where possible (so loads are caused by the
  * pipeline that fires on dispatch, not by a background pre-warmer).
  *
- * <h3>Attribution chain</h3>
+ * <p><b>Attribution chain</b>
  *
  * <ol>
  *   <li><b>Plugin tickets (Paper).</b> If the loaded {@link Chunk} exposes a

@@ -53,7 +53,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
         sender -> msg -> io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(sender, msg);
 
     // region name parameter
-    // filter by region exists and sender permission. L6 Slice H2: validator
+    // filter by region exists and sender permission. Validator
     // also accepts qualified `server:region` syntax when the named peer is
     // reachable per the live PeerRegionRegistry (looked up dynamically via
     // NetworkModeBootstrap.LIVE so this code path works whether network
@@ -186,7 +186,8 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
             (sender, s) -> {
               if (!sender.hasPermission("rtp.other")) return false;
               Player player = Bukkit.getPlayer(s);
-              return player != null && player.getName().equalsIgnoreCase(s) && !player.hasPermission("rtp.notme");
+              return player != null && player.getName().equalsIgnoreCase(s)
+                  && (!(sender instanceof Player) || !player.hasPermission("rtp.notme"));
             }));
 
     // world name parameter

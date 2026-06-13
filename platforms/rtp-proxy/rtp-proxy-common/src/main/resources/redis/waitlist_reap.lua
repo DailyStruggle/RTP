@@ -1,7 +1,6 @@
 -- waitlist_reap.lua
 -- Remove every waitlist entry whose enrolledAtMs is older than
--- (nowMs - maxAgeMs). Per the user-approved Slice 3b discussion, this is a
--- safety-net for stuck states only; the drainer's refreshAllTtl path keeps
+-- (nowMs - maxAgeMs). Safety-net for stuck states only; the drainer's refreshAllTtl path keeps
 -- live entries from ageing out under transient total-failure. Bounded by
 -- waitlist size (default cap 1024); the scan walks the whole LIST once.
 --

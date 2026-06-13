@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Tests for {@link PrefabConfirmationMenuBuilder} (Session 5).
+ * Tests for {@link PrefabConfirmationMenuBuilder}.
  *
  * <p>Covers:
  * <ul>

@@ -10,9 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Lifecycle + construction guards for {@link RedisNetworkRequestQueue}
- * (L6 Slice D row D4). Live-Redis behaviour (script atomicity, terminal
+ * Live-Redis behaviour (script atomicity, terminal
  * env cleanup, LPOS positioning) is exercised end-to-end by the opt-in
- * {@code RedisNetworkRequestQueueIT} that ships with Slice D row D9.
+ * {@code RedisNetworkRequestQueueIT}.
  *
  * <p>This suite is intentionally narrow: it exercises the constructor's
  * connectivity validation, the {@code ttlSeconds} input guard, and the

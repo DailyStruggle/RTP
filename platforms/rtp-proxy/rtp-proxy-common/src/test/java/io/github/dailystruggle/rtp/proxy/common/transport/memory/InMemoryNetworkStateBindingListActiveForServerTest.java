@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * L6 Slice F row F1: exercises {@code listActiveForServer(serverId)} on the
+ * Exercises {@code listActiveForServer(serverId)} on the
  * in-memory binding. The boot-time reconcile in {@code NetworkModeBootstrap}
  * relies on this method to return only PENDING/CLAIMED tokens whose
  * {@code serverId} matches and whose {@code expiresAtMs > now}.

@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Session 2 drift guard: {@code SurvivalDefault} is documented as the
+ * Drift guard: {@code SurvivalDefault} is documented as the
  * identity overlay ("reset to shipped defaults"). If a future commit adds
  * a key to {@link SurvivalDefault#INSTANCE}'s overlay maps - whether by
  * mistake or to "document" a default - the prefab stops being an identity

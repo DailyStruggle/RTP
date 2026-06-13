@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Slice 1 of `CHECKLIST-network-waitlist.md` - lifecycle, idempotency,
+ * Unit tests for {@link InMemoryNetworkWaitlist} - lifecycle, idempotency,
  * FIFO discipline, point-removal, position lookup, TTL reap, and
  * per-backend dynamic batch sizing for the reference
  * {@link InMemoryNetworkWaitlist}.

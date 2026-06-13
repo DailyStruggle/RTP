@@ -10,8 +10,8 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Shared cross-proxy waitlist for cross-server {@code /rtp} enrolments that
- * cannot be dispatched immediately. Slice 1 of `CHECKLIST-network-waitlist.md`;
- * design in `rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md`.
+ * cannot be dispatched immediately.
+ * Design in `rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md`.
  *
  * <p><strong>Why this is a sibling SPI to {@link NetworkRequestQueue}.</strong>
  * {@code NetworkRequestQueue} is a strict FIFO whose hot path is BLPOP-style

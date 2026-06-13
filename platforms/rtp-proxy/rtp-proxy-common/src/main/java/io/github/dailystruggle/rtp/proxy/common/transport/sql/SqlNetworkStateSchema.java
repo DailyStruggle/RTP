@@ -29,7 +29,7 @@ import java.sql.Statement;
  *       {@code MERGE INTO ... USING ... WHEN MATCHED} pattern for H2 /
  *       {@code INSERT ... ON CONFLICT} for PostgreSQL / SQLite /
  *       {@code INSERT ... ON DUPLICATE KEY UPDATE} for MySQL. See
- *       {@link SqlNetworkStateBinding#dialect(java.sql.Connection)}.</li>
+ *       {@link SqlNetworkStateBinding#dialectOf(java.sql.Connection)}.</li>
  * </ul>
  *
  * <p>All collection columns ({@code regions_available}, {@code worlds_loaded})
@@ -55,7 +55,7 @@ public final class SqlNetworkStateSchema {
             """;
 
     /**
-     * Phase 2e-SQL A3 envelope (rtp-proxy-ADR-010): add the {@code hmac}
+     * HMAC envelope (rtp-proxy-ADR-010): add the {@code hmac}
      * column to pre-A3 deployments. Idempotent and dialect-tolerant: H2 /
      * Postgres / SQLite honour {@code ADD COLUMN IF NOT EXISTS}; MySQL/MariaDB
      * raises a duplicate-column SQLException (SQLSTATE 42S21 / errno 1060)
@@ -101,7 +101,7 @@ public final class SqlNetworkStateSchema {
                     + "ON rtp_network_backends(last_seen_ms)";
 
     /**
-     * L6 cross-server fields (rtp-proxy region-aware selection): add the
+     * Cross-server fields (rtp-proxy region-aware selection): add the
      * {@code kept_count}, {@code network_reserved_count}, {@code regions}, and
      * {@code region_kept_counts} columns to pre-existing deployments so the
      * durable SQL tier carries the same heartbeat field set the shared
@@ -111,7 +111,7 @@ public final class SqlNetworkStateSchema {
      * dialect-tolerant, like the {@code hmac} migration above. Defaults keep
      * legacy rows valid (zero / empty).
      */
-    private static final String[] DDL_BACKENDS_ADD_L6 = {
+    private static final String[] DDL_BACKENDS_ADD_CROSS_SERVER = {
             "ALTER TABLE rtp_network_backends ADD COLUMN IF NOT EXISTS kept_count INT NOT NULL DEFAULT 0",
             "ALTER TABLE rtp_network_backends ADD COLUMN IF NOT EXISTS network_reserved_count INT NOT NULL DEFAULT 0",
             "ALTER TABLE rtp_network_backends ADD COLUMN IF NOT EXISTS regions VARCHAR(4000) NOT NULL DEFAULT ''",
@@ -167,7 +167,7 @@ public final class SqlNetworkStateSchema {
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_rtp_network_tokens_active_player "
                     + "ON rtp_network_tokens(player_id)";
 
-    // --- Slice D row D5: cross-server wait-queue tables ---------------------
+    // --- Cross-server wait-queue tables ---------------------
     //
     // {@code rtp_net_wq_ready} holds the FIFO of envelopes awaiting proxy
     // dequeue. Order is established by {@code (enqueued_at_ms, correlation_id)}.
@@ -235,12 +235,12 @@ public final class SqlNetworkStateSchema {
         // is wired in (REQ-RTP-S-004, rtp-proxy-ADR-010).
         addColumnIgnoringMissing(conn, DDL_PROXIES_ADD_HMAC, DDL_PROXIES_ADD_HMAC_MYSQL);
         addColumnIgnoringMissing(conn, DDL_BACKENDS_ADD_HMAC, DDL_BACKENDS_ADD_HMAC_MYSQL);
-        for (int i = 0; i < DDL_BACKENDS_ADD_L6.length; i++) {
-            addColumnIgnoringMissing(conn, DDL_BACKENDS_ADD_L6[i], DDL_BACKENDS_ADD_L6_MYSQL[i]);
+        for (int i = 0; i < DDL_BACKENDS_ADD_CROSS_SERVER.length; i++) {
+            addColumnIgnoringMissing(conn, DDL_BACKENDS_ADD_CROSS_SERVER[i], DDL_BACKENDS_ADD_L6_MYSQL[i]);
         }
         addColumnIgnoringMissing(conn, DDL_TOKENS_ADD_HMAC, DDL_TOKENS_ADD_HMAC_MYSQL);
         addColumnIgnoringMissing(conn, DDL_TOKENS_ADD_REGION, DDL_TOKENS_ADD_REGION_MYSQL);
-        // Slice D row D5: wait-queue tables. Independent of the heartbeat /
+        // Wait-queue tables. Independent of the heartbeat /
         // reservation-token tables above; safe to bootstrap on every open
         // because the create statements are IF NOT EXISTS.
         execIgnoringDuplicate(conn, DDL_WQ_READY);

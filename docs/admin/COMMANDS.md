@@ -371,7 +371,7 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 | `rtp.noDelay.chunks` | op | Bypass chunk-load delay |
 | `rtp.noCancel` | op | Prevent teleport from being cancelled |
 | `rtp.other` | op | Teleport another player with `player:<name>` |
-| `rtp.notme` | op | Exclude yourself when others teleport players (`priceOther` exemption) |
+| `rtp.notme` | op | Make yourself untargetable by other players' `/rtp player:<name>` - prevents forced RTP by other ops. Console is exempt and can always target any player. |
 | `rtp.reload` | op | Use `/rtp reload` |
 | `rtp.config` | op | Legacy alias — grants `rtp.config.view` + `rtp.config.set`. Retained for back-compat; new deployments should grant the more specific nodes below. |
 | `rtp.config.view` | op | Use `/rtp config <file> view` (read-only inspection). |

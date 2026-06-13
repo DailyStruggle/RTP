@@ -34,7 +34,7 @@ network:
   # deployments with `transport.type: redis` only one proxy drains at a
   # time via a Redis-backed leader lease (RedisLeaderLease, SET NX PX).
   waitlist:
-    # Master switch. Set to false to keep the legacy pre-Slice-2 path where
+    # Master switch. Set to false to use the path where
     # no-backend resolves as terminal FAILED.
     enabled: true
     # Hard cap on the shared waitlist. Over-cap enrolments reject as

@@ -15,19 +15,19 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Phase 2a smoke test for REQ-RTP-PROXY-VELOCITY-001 (Velocity Runtime).
+ * Smoke test for REQ-RTP-PROXY-VELOCITY-001 (Velocity Runtime).
  *
  * <p>Validates the no-op shell wiring without spinning up a Velocity host:
  * <ul>
  *   <li>{@link RtpVelocityPlugin} carries {@link Plugin} with {@code id="rtp"}.</li>
  *   <li>Lifecycle handlers for {@link ProxyInitializeEvent} and {@link ProxyShutdownEvent}
  *       exist and are annotated {@link Subscribe}.</li>
- *   <li>No other {@code @Subscribe} method is present — Phase 2a is strictly no-op
+ *   <li>No other {@code @Subscribe} method is present beyond the core lifecycle
  *       (no {@code ServerPreConnectEvent}, no Brigadier registration, no heartbeat task).
  *       This guards REQ-RTP-NET-002 parity by structural means.</li>
  * </ul>
  */
-@DisplayName("REQ-RTP-PROXY-VELOCITY-001 — Velocity adapter Phase 2a no-op shell smoke test")
+@DisplayName("REQ-RTP-PROXY-VELOCITY-001 — Velocity adapter smoke test")
 class ReqRtpProxyVelocity001SmokeTest {
 
     @Test
@@ -55,7 +55,7 @@ class ReqRtpProxyVelocity001SmokeTest {
     }
 
     @Test
-    @DisplayName("ServerPreConnectEvent handler present and @Subscribe-annotated (Phase 2c-α)")
+    @DisplayName("ServerPreConnectEvent handler present and @Subscribe-annotated")
     void serverPreConnectHandlerIsSubscribed() throws NoSuchMethodException {
         Method m = RtpVelocityPlugin.class.getDeclaredMethod("onServerPreConnect", ServerPreConnectEvent.class);
         assertNotNull(m.getAnnotation(Subscribe.class),
@@ -63,14 +63,14 @@ class ReqRtpProxyVelocity001SmokeTest {
     }
 
     @Test
-    @DisplayName("Phase 2c-α: exactly init + shutdown + serverPreConnect @Subscribe methods exist")
+    @DisplayName("Exactly init + shutdown + serverPreConnect @Subscribe methods exist")
     void subscribeSurfaceMatchesPhase2cAlpha() {
         long subscribed = java.util.Arrays.stream(RtpVelocityPlugin.class.getDeclaredMethods())
                 .filter(m -> m.getAnnotation(Subscribe.class) != null)
                 .count();
         assertEquals(3, subscribed,
-                "Phase 2c-α surface: ProxyInitializeEvent + ProxyShutdownEvent + ServerPreConnectEvent only. "
-                        + "Further additions (Brigadier-related @Subscribe handlers in Phase 2d, etc.) require the plan + REQ row to advance first.");
+                "Surface: ProxyInitializeEvent + ProxyShutdownEvent + ServerPreConnectEvent only. "
+                        + "Further additions require a plan + REQ row.");
     }
 
     @Test

@@ -72,7 +72,7 @@ class BackendHeartbeatCodecRoundTripTest {
     }
 
     @Test
-    @DisplayName("L6 fields (regions Set, kept counts, region kept-count map) survive the round-trip")
+    @DisplayName("Cross-server fields (regions Set, kept counts, region kept-count map) survive the round-trip")
     void l6FieldsRoundTrip() {
         BackendHeartbeat in = new BackendHeartbeat(
                 "backend-a", 3, PluginState.READY, true,
@@ -91,15 +91,15 @@ class BackendHeartbeatCodecRoundTripTest {
     }
 
     @Test
-    @DisplayName("a pre-L6 row (no L6 fields) decodes to zero/empty L6 defaults")
+    @DisplayName("a legacy row (no cross-server fields) decodes to zero/empty defaults")
     void preL6RowDecodesToDefaults() {
-        // Encode a legacy heartbeat that predates the L6 field set; the canonical
-        // prefix is unchanged so an old row simply lacks the trailing L6 lines.
-        BackendHeartbeat legacy = sample();
-        String enc = BackendHeartbeatCodec.encode(legacy);
-        // Strip the L6 trailing lines to simulate an older producer.
-        String preL6 = enc.substring(0, enc.indexOf("\nkeptCount="));
-        BackendHeartbeat out = BackendHeartbeatCodec.decode(preL6);
+        // Encode a legacy heartbeat that predates the cross-server field set; the canonical
+        // prefix is unchanged so an old row simply lacks the trailing lines.
+        BackendHeartbeat legacyHb = sample();
+        String enc = BackendHeartbeatCodec.encode(legacyHb);
+        // Strip the trailing cross-server lines to simulate an older producer.
+        String legacyEnc = enc.substring(0, enc.indexOf("\nkeptCount="));
+        BackendHeartbeat out = BackendHeartbeatCodec.decode(legacyEnc);
         assertEquals(0, out.keptCount());
         assertEquals(0, out.networkReservedCount());
         assertTrue(out.regions().isEmpty());

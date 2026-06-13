@@ -19,12 +19,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Slice B (L6) row B4: verifies the {@code serverIdFilter} parameter added to
+ * Verifies the {@code serverIdFilter} parameter added to
  * {@link io.github.dailystruggle.rtp.proxy.common.spi.BackendSelector#choose(RtpRequest, NetworkSnapshot, Optional)}.
  *
  * <p>This parameter is plumbing for the deferred D6/D7 (B)
  * {@code <server>=<region>} qualified-region rollout and is never set by any
- * L6 caller; the tests pin its contract so the downstream rollout does not
+ * caller; the tests pin its contract so the downstream rollout does not
  * need to retest the selector itself.</p>
  */
 class BackendSelectorServerIdFilterTest {

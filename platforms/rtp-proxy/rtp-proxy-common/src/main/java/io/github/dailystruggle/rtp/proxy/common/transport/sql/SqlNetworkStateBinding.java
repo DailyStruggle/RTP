@@ -327,7 +327,7 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
 
     /**
      * One-shot listing of PENDING / CLAIMED tokens owned by {@code serverId}
-     * whose {@code expires_at_ms > now}. Used by a backend's L6/F1 boot-time
+     * whose {@code expires_at_ms > now}. Used by a backend's boot-time
      * reconcile so the cost is borne once per backend lifecycle. Corrupt
      * rows (unknown state, HMAC mismatch) are filtered with WARNING and
      * never raised to the caller, mirroring {@link #findReservationSync(UUID)}.
@@ -559,7 +559,7 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
             } else {
                 ps.setString(16, hmac);
             }
-            // L6 cross-server fields. Persisted so the read-side reconstruction
+            // Cross-server fields. Persisted so the read-side reconstruction
             // carries the same data the codec signs over (HMAC stays valid) and
             // the proxy selector keeps its region-aware signal.
             ps.setInt(17, row.keptCount());
@@ -636,7 +636,7 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
     }
 
     private ReservationToken claimSync(String serverId, UUID playerId, Duration ttl, String regionKey) {
-        // Phase 2e-SQL first cut: atomic claim via INSERT on the unique
+        // Atomic claim via INSERT on the unique
         // (player_id) index. Race losers see SQLSTATE 23xxx and are translated
         // into IllegalStateException to match the in-memory binding's contract.
         String tokenId = UUID.randomUUID().toString();

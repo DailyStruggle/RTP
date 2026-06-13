@@ -13,17 +13,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Slice B (L6) row B4: shape contract for the four L6 fields added to
+ * Shape contract for the four cross-server fields added to
  * {@link BackendHeartbeat} - {@code keptCount}, {@code networkReservedCount},
  * {@code regions}, {@code regionKeptCounts}. Verifies field round-trip,
- * immutability, null-rejection, and that both pre-L6 compatibility
+ * immutability, null-rejection, and that both backward-compatibility
  * constructors default the new fields to zero / empty.
  */
 class BackendHeartbeatKeptCountTest {
 
     private static final long NOW = 1_700_000_000_000L;
 
-    private static BackendHeartbeat fullL6(int keptCount,
+    private static BackendHeartbeat fullHeartbeat(int keptCount,
                                            int networkReservedCount,
                                            Set<String> regions,
                                            Map<String, Integer> regionKeptCounts) {
@@ -35,9 +35,9 @@ class BackendHeartbeatKeptCountTest {
     }
 
     @Test
-    @DisplayName("All four L6 fields round-trip via the full constructor")
+    @DisplayName("All four cross-server fields round-trip via the full constructor")
     void fullCtorRoundTrip() {
-        BackendHeartbeat hb = fullL6(7, 3,
+        BackendHeartbeat hb = fullHeartbeat(7, 3,
                 Set.of("default", "nether"),
                 Map.of("default", 5, "nether", 2));
         assertEquals(7, hb.keptCount());
@@ -47,7 +47,7 @@ class BackendHeartbeatKeptCountTest {
     }
 
     @Test
-    @DisplayName("13-arg compat ctor defaults L6 fields to zero / empty")
+    @DisplayName("13-arg compat ctor defaults cross-server fields to zero / empty")
     void compatCtor13Defaults() {
         BackendHeartbeat hb = new BackendHeartbeat(
                 "a", 1, BackendHeartbeat.PluginState.READY, true, NOW,
@@ -62,7 +62,7 @@ class BackendHeartbeatKeptCountTest {
     }
 
     @Test
-    @DisplayName("14-arg killSwitch compat ctor defaults L6 fields to zero / empty")
+    @DisplayName("14-arg killSwitch compat ctor defaults cross-server fields to zero / empty")
     void compatCtor14Defaults() {
         BackendHeartbeat hb = new BackendHeartbeat(
                 "a", 1, BackendHeartbeat.PluginState.READY, true, NOW,
@@ -83,7 +83,7 @@ class BackendHeartbeatKeptCountTest {
         java.util.HashMap<String, Integer> mutableCounts = new java.util.HashMap<>();
         mutableCounts.put("default", 5);
 
-        BackendHeartbeat hb = fullL6(5, 0, mutableRegions, mutableCounts);
+        BackendHeartbeat hb = fullHeartbeat(5, 0, mutableRegions, mutableCounts);
 
         mutableRegions.add("nether");
         mutableCounts.put("nether", 99);
@@ -102,15 +102,15 @@ class BackendHeartbeatKeptCountTest {
     @DisplayName("null regions and regionKeptCounts are rejected")
     void nullRejection() {
         assertThrows(NullPointerException.class,
-                () -> fullL6(0, 0, null, Map.of()));
+                () -> fullHeartbeat(0, 0, null, Map.of()));
         assertThrows(NullPointerException.class,
-                () -> fullL6(0, 0, Set.of(), null));
+                () -> fullHeartbeat(0, 0, Set.of(), null));
     }
 
     @Test
     @DisplayName("Empty regions / regionKeptCounts are accepted and non-null")
     void emptyAccepted() {
-        BackendHeartbeat hb = fullL6(0, 0, Set.of(), Map.of());
+        BackendHeartbeat hb = fullHeartbeat(0, 0, Set.of(), Map.of());
         assertNotNull(hb.regions());
         assertNotNull(hb.regionKeptCounts());
         assertTrue(hb.regions().isEmpty());

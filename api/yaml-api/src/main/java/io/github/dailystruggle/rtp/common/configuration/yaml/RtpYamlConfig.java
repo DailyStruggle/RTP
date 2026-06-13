@@ -126,7 +126,7 @@ public final class RtpYamlConfig extends RtpYamlSection {
     /** Returns the file binding, or {@code null} if this is an unbound document. */
     public File file() { return file; }
 
-    /* ---------- simpleyaml API-compat surface (Session 1 parity layer) ---------- */
+    /* ---------- simpleyaml API-compat surface ---------- */
 
     /**
      * Mirrors {@code simpleyaml}'s {@code YamlFile.getConfigurationFile()}.
@@ -186,7 +186,7 @@ public final class RtpYamlConfig extends RtpYamlSection {
      * {@code YamlFile}. Inherited from {@link RtpYamlSection}.
      */
 
-    /* ---------- file-handle parity (Session 2 surface) ---------- */
+    /* ---------- file-handle parity ---------- */
 
     /** Path-and-file constructor mirroring {@code simpleyaml}'s {@code new YamlFile(File)}. */
     public RtpYamlConfig(File file) {

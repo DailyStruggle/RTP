@@ -9,7 +9,7 @@ import java.util.List;
  * {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#openBookMenu
  * openBookMenu} carrier method, which binds the spec to that MC version's
  * {@code WrittenBookContent} / {@code ClientboundOpenBookPacket} types
- * (rtp-fabric-ADR-012 §4 un-defer, MULTI_PLATFORM_PLAN Step I Session 3).
+ * (rtp-fabric-ADR-012 §4).
  *
  * <p>All text is already run through
  * {@code RTPServerAccessor.format(uuid, raw)} (placeholders + legacy

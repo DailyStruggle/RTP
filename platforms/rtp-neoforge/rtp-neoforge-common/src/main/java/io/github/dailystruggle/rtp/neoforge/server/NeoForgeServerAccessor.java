@@ -43,7 +43,7 @@ import java.util.function.Function;
 import java.util.logging.Level;
 
 /**
- * NeoForge platform implementation of {@link RTPServerAccessor} (Phase N2.1),
+ * NeoForge platform implementation of {@link RTPServerAccessor},
  * the NeoForge analogue of {@code FabricServerAccessor}.
  *
  * <p><b>Mojmap-at-runtime simplification.</b> NeoForge ships Mojang-mapped names
@@ -51,10 +51,7 @@ import java.util.logging.Level;
  * constructs {@link NeoForgeRTPWorld} / {@link NeoForgeRTPPlayer} directly —
  * none of Fabric's reflective obf/deobf carrier dispatch is needed.</p>
  *
- * <p><b>Deferred to later N2 sub-phases:</b> the event-bridge wiring (N2.3) that
- * populates the player/world maps, the player lifecycle hook (a
- * {@code NoopPlayerLifecycleHook} placeholder is used until N2.3), and the
- * permission/menu sinks (N2.5/N2.6). No {@code org.bukkit.*} imports.</p>
+ * <p>No {@code org.bukkit.*} imports.</p>
  */
 public final class NeoForgeServerAccessor implements RTPServerAccessor {
 

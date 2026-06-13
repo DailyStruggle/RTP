@@ -13,9 +13,9 @@ import java.util.UUID;
  * <p>NeoForge analogue of {@code FabricPlayerLifecycleHook}. Unlike the Fabric
  * shim, this class is free of reflective UUID extraction: NeoForge ships
  * Mojang-mapped names at runtime, so the join / quit bridge
- * ({@link NeoForgeEventBridge}) hands a typed {@link ServerPlayer} straight
+ * ({@code NeoForgeEventBridge}) hands a typed {@link ServerPlayer} straight
  * through and {@link ServerPlayer#getUUID()} links directly. The
- * {@link NeoForgeEventBridge} invokes {@link #fireJoinFromPlayer(ServerPlayer)}
+ * {@code NeoForgeEventBridge} invokes {@link #fireJoinFromPlayer(ServerPlayer)}
  * / {@link #fireQuitFromPlayer(ServerPlayer)} after its register / unregister
  * calls so platform-agnostic subscribers (e.g. the network-mode
  * reservation-redeem path, ADR-049) receive the UUID event.

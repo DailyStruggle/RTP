@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Offline guard for the Phase 2e-Redis A2 Lua script loader.
+ * Offline guard for the Lua script loader.
  *
  * <p>Verifies that the SHA1 sidecars under
  * {@code rtp-proxy-common/src/main/resources/redis/} agree with the LF-normalized

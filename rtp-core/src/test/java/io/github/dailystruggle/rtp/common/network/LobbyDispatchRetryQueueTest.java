@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Post-Slice-4 lobby auto-retry queue: verifies the four advance paths
+ * Lobby auto-retry queue: verifies the four advance paths
  * (transient -> stay parked, transient cleared -> enrol + drop,
  * REGION_UNAVAILABLE -> terminate, TTL exhausted -> terminate).
  *

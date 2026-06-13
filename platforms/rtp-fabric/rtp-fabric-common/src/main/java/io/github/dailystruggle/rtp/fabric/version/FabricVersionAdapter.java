@@ -517,7 +517,7 @@ public interface FabricVersionAdapter {
 
     /**
      * Open an interactive written-book menu modal for the given player
-     * (rtp-fabric-ADR-012 §4 un-defer, MULTI_PLATFORM_PLAN Step I Session 3).
+     * (rtp-fabric-ADR-012 §4).
      * The {@code serverPlayer} argument is the raw NM {@code ServerPlayer}
      * object; {@code spec} is the fully-formatted, NM-free page model produced
      * by {@code FabricBookMenuRenderer}.
@@ -546,7 +546,7 @@ public interface FabricVersionAdapter {
     }
 
     // -------------------------------------------------------------------------
-    // Maps-api parity (MULTI_PLATFORM_PLAN Step K, rtp-fabric-ADR-014).
+    // Maps-api parity (rtp-fabric-ADR-014).
     //
     // The platform-neutral FabricMapBinding (rtp-fabric-common) renders an
     // RTP ChartModel into a 128x128 ARGB pixel buffer using the maps-api

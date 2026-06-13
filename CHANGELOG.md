@@ -23,7 +23,7 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 ---
 
-## [3.1.3] - unreleased
+## [3.1.2-Lite] - 2026-06-13
 
 ### Added
 
@@ -451,8 +451,8 @@ Earlier versions introduced the multi-module split (`rtp-api` / `rtp-core` / pla
 
 ---
 
-[3.1.3]: https://github.com/DailyStruggle/RTP/compare/v3.1.2...HEAD
-[3.1.2]: https://github.com/DailyStruggle/RTP/compare/v3.1.0...v3.1.2
+[3.1.2-Lite]: https://github.com/DailyStruggle/RTP/compare/v3.1.2...v3.1.2-Lite
+[3.1.2]: https://github.com/DailyStruggle/RTP/compare/v3.1.1...v3.1.2
 [3.1.0]: https://github.com/DailyStruggle/RTP/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/DailyStruggle/RTP/compare/v3.0.0-beta.4...v3.0.0
 [3.0.0-beta.4]: https://github.com/DailyStruggle/RTP/compare/v3.0.0-beta.3...v3.0.0-beta.4

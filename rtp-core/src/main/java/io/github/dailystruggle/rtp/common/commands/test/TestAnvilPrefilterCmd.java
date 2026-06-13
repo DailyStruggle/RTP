@@ -12,7 +12,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * {@code rtp test anvil-prefilter} &mdash; read-only diagnostic that reports
- * the current {@link AnvilPrefilterMetrics} counters (ACCEPT / REJECT /
+ * the current {@code AnvilPrefilterMetrics} counters (ACCEPT / REJECT /
  * UNKNOWN) plus the derived hit rate.
  *
  * <p>Surfaces the Phase&nbsp;4 telemetry introduced in ADR-016 so operators

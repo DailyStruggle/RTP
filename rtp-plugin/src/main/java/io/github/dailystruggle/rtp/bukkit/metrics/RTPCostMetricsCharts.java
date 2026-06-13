@@ -33,7 +33,7 @@ import java.util.logging.Level;
  * <p>Per {@code docs/dev/METRICS_PLAN.md > bStats Integration}:
  * <ul>
  *   <li>All lambdas read pre-cached values from
- *       {@link io.github.dailystruggle.rtp.common.metrics.Metrics#snapshot()};
+ *       {@link io.github.dailystruggle.rtp.common.metrics.CoreMetrics#snapshot()};
  *       no parallel sampling, no platform calls inline.</li>
  *   <li>Numeric values are bucketised once per snapshot, never as raw
  *       potentially-fingerprinting scalars.</li>

@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Covers Slice D row D7: the {@link ReservationTokenReaper}'s in-process
+ * Covers the {@link ReservationTokenReaper}'s in-process
  * {@link ReleaseSink} hook fires once per reaped token with reason
  * {@link ReleaseReason#TTL_EXPIRED}, even when the sink itself throws, and
  * defaults to {@link ReleaseSink#NO_OP} when callers use the legacy ctors.

@@ -70,7 +70,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
   /**
    * Adapter view of this accessor as a JDBC {@link javax.sql.DataSource}.
    *
-   * <p>Phase 2e-SQL (rtp-proxy-ADR-011 §Backend Wiring): the
+   * <p>rtp-proxy-ADR-011 §Backend Wiring: the
    * {@code SqlNetworkStateBinding} consumes a {@code DataSource}, but
    * {@link #getConnection()} is the only contract this accessor publishes.
    * Wrap each call into a fresh {@code DataSource.getConnection()} so callers

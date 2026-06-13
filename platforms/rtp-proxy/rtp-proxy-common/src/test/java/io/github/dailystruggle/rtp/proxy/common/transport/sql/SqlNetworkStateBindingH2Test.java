@@ -326,9 +326,9 @@ class SqlNetworkStateBindingH2Test {
     }
 
     @Test
-    @DisplayName("L6 heartbeat fields (regions Set + per-region kept counts) survive the signed DB round-trip")
+    @DisplayName("Cross-server heartbeat fields (regions Set + per-region kept counts) survive the signed DB round-trip")
     void l6FieldsSurviveSignedRoundtrip() throws Exception {
-        // Regression guard: the shared codec signs over the L6 fields, so the
+        // Regression guard: the shared codec signs over the cross-server fields, so the
         // read-side reconstruction must persist + restore them or the HMAC
         // recomputed from the columns would mismatch and drop the row.
         byte[] secret = new byte[32];

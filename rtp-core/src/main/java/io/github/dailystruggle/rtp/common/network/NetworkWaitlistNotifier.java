@@ -11,7 +11,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * Slice 4 (ADR-015 / REQ-RTP-NET-015): periodic player-facing notifier for
+ * ADR-015 / REQ-RTP-NET-015: periodic player-facing notifier for
  * the cross-server waitlist.
  *
  * <p>On every pulse the notifier walks {@link NetworkStatusCache#snapshot()},
@@ -25,7 +25,7 @@ import java.util.logging.Level;
  *   <li>the notify interval has elapsed.</li>
  * </ol>
  * Players who fall out of the cache (terminal state reached, evicted) are
- * removed from the dedup table.</p>
+ * removed from the dedup table.
  *
  * <p>Scheduling: owned by {@code RTP.scheduler.runTaskTimerAsynchronously}.
  * No raw executor (per AGENTS.md "Scheduler Usage"). Idempotent

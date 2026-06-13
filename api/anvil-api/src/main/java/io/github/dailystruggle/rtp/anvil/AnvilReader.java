@@ -18,9 +18,9 @@ import net.jpountz.lz4.LZ4FrameInputStream;
  * <p><b>Scope.</b> This class is deliberately narrow: it opens an {@code r.X.Z.mca} byte
  * buffer, locates the chunk entry at region-local coordinates {@code (cx, cz)}, decompresses
  * it, and hands the decoded root {@code TAG_Compound} back to the caller. It never imports
- * {@link org.bukkit.Chunk} (the whole point of the pre-filter is operating on unloaded chunks)
+ * {@code org.bukkit.Chunk} (the whole point of the pre-filter is operating on unloaded chunks)
  * and it performs no block-state or biome interpretation beyond what the structural NBT walk
- * provides — those higher-level views are the job of later phases.
+ * provides - those higher-level views are the job of later phases.
  *
  * <p><b>Compression support.</b> Per observed fixtures across 1.20.4 / 1.21.5 / 26.1 (data
  * versions 3465 / 4671 / 4788), vanilla servers ship Anvil chunks as Minecraft compression

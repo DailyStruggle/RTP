@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Slice A row A6 - CHECKLIST-cross-server-rtp-L6.md. Draining
+ * Draining
  * {@code keptLocations} (local hot queue) must not deplete
  * {@code networkKeptLocations} (cross-server sibling pool), and vice versa.
  * Also verifies that disabling the network split ({@code networkReserveSize=0})

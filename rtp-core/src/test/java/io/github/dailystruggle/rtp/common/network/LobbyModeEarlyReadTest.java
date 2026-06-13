@@ -12,7 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * L6 Slice J: verifies {@link NetworkModeBootstrap#readLobbyModeEarly(File)}
+ * Verifies {@link NetworkModeBootstrap#readLobbyModeEarly(File)}
  * resolves {@code routing.lobbyMode} from {@code network.yml} BEFORE the rest
  * of the bootstrap runs, and defensively returns {@code false} on every
  * failure path (missing file, network disabled, missing routing section,

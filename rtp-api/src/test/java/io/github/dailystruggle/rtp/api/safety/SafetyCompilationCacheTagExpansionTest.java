@@ -13,7 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Covers Slice 3a compile-time tag expansion (ADR-017).
+ * Covers compile-time tag expansion (ADR-017).
  *
  * <p>Verifies that {@link SafetyCompilationCache#getOrCompile(java.util.Collection,
  * Map, java.util.function.Consumer)} produces a tag-free

@@ -1,4 +1,4 @@
-# Multi-Server (Proxy) Support Roadmap
+﻿# Multi-Server (Proxy) Support Roadmap
 
 This document outlines the plan for RTP's multi-server (proxy / network) expansion. It is **distinct from** [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md): that plan covers running on additional Minecraft server flavours (Spigot/Paper/Folia/Fabric); *this* plan covers coordinating RTP across **multiple concurrent backend servers** â€” and, as of 2026-05-07, **multiple concurrent proxy instances** â€” sitting in front of those backends (Velocity, BungeeCord, Waterfall).
 
@@ -733,6 +733,7 @@ etwork.secretEnv). Guarded by two new cases in SqlNetworkStateBindingH2Test (10/
 - [ ] Postgres `LISTEN/NOTIFY` push + `SKIP LOCKED` claim optimization (latency win over polling). Postgres is already supported end-to-end via `SqlNetworkStateBinding`'s `POSTGRES` dialect (UPSERT + portable polling per ADR-011); this remaining box is scoped to the push-channel / lock-hint optimization originally specified by [rtp-proxy-ADR-007](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-007-postgres-binding.md). The portable polling path stays as the cross-dialect baseline.
 - [ ] `JoinTriggerSource` wired on proxy-side per D1.
 - [ ] `rtp-proxy-bungee` adapter (BungeeCord + Waterfall).
+- [ ] Proxy-shared cooldown/limit store - backends delegate per-player cooldown and usage-limit state to the proxy's network-state member so a multi-server deployment shares one authoritative view without a separate MySQL connection.
 - [ ] **Acceptance**: same scenarios green on BungeeCord + Postgres.
 
 ### Phase 4 â€” Generic SQL + Hardening + Release
@@ -824,6 +825,7 @@ This plan has been reviewed for implementer-sufficiency against `AGENTS.md`, `RU
 ## Open Items / Follow-Ups
 
 - **D4 â€” HMAC key distribution beyond env var** â€” v1 ships env-var (`RTP_NET_SECRET`). Research alternatives (config file with restrictive perms, per-backend keypair, OS keyring) before public release; not a Phase 2 blocker.
+- **Proxy-shared cooldown/limit store** - single-server deployments keep limits local (YAML); multi-server deployments using proxy-direct or SQL/Redis transports shall optionally delegate cooldown and usage-limit state to the proxy's network-state member so backends share a single authoritative view without requiring a separate MySQL connection. v1 ships local-only; proxy-shared limits land as a Phase 3 hardening item alongside the BungeeCord adapter.
 - **Shared `recentPicks` across proxies** â€” v1 keeps `recentPicks` per-proxy and relies on backend telemetry to dampen inter-heartbeat stampedes (see *Hot-Spot Avoidance Across Proxies*). A v2 opt-in mode that writes `recentPicks` bumps to the network-state member would close the intra-heartbeat window at the cost of one round-trip per pick. Revisit only if Phase 2+ devstack data shows multi-proxy stampedes that telemetry feedback fails to absorb.
 - **Runtime-mutable proxy trigger/load-balancer config replication** â€” v1 is file-and-restart on every proxy. A Phase 3 hardening item is to read the optional `ConfigVersionTable` row on each `/rtp` request so a single edit propagates across the proxy fleet without a restart sweep.
 - **Proxy telemetry table (`proxy_state`)** â€” sketched under *Multi-Proxy Deployment* but not yet table-level specified the way `backend_state` is. Concrete column list lands in ADR-036 alongside the backend table; expected fields: `proxyId`, `schemaVersion`, `rtpVersion`, `proxyPlatform` (`velocity` | `bungee` | `waterfall`), `proxyState`, `connectedPlayers`, `lastSeenEpochMs`. No performance fields â€” proxies are not selection candidates.

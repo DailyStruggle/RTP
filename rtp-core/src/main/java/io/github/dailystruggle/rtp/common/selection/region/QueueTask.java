@@ -163,7 +163,7 @@ final class QueueTask {
         }
 
         // BIOME_LOOKUP_PERF_PLAN.md Stage 1 — probe-first gate (QUEUETASK_PROBE_FIRST_PLAN.md
-        // Slice 1). Mirrors PregenTask.tryProbeFirst / ScanTask.tryProbeFirstScan: try to
+        // Mirrors PregenTask.tryProbeFirst / ScanTask.tryProbeFirstScan: try to
         // reject the candidate from a lean column probe before paying for the full
         // getOrLoadChunk decode. On probe-accept / probe-UNKNOWN / probe-exception we
         // fall through to the original load path unchanged; the post-load evaluateSafety

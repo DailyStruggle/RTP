@@ -19,8 +19,8 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * Written-book renderer for {@link MenuModel} on Fabric (rtp-fabric-ADR-012 §4
- * un-defer, MULTI_PLATFORM_PLAN Step I Session 3). It opens an interactive
+ * Written-book renderer for {@link MenuModel} on Fabric (rtp-fabric-ADR-012 §4).
+ * It opens an interactive
  * multi-page written book modal - the same UX Paper gets from
  * {@code BookMenuRenderer} - instead of the chat-stream rendering of
  * {@code ChatMenuRenderer}.

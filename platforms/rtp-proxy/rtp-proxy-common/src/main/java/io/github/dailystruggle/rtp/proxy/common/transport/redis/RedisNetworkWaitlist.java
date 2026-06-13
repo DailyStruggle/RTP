@@ -30,7 +30,7 @@ import java.util.logging.Logger;
 /**
  * Redis-backed {@link NetworkWaitlist} for cross-proxy shared parking of
  * cross-server {@code /rtp} enrolments that could not be dispatched
- * immediately. Slice 3b of {@code CHECKLIST-network-waitlist.md}; design in
+ * immediately. Design in
  * {@code rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md}.
  *
  * <p>Mirrors {@link RedisNetworkRequestQueue}'s shape: a {@link JedisPool}

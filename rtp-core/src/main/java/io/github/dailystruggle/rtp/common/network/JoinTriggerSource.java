@@ -89,7 +89,7 @@ public final class JoinTriggerSource {
     /**
      * Tracks tokens this backend has redeemed but not yet released, keyed by
      * playerId. Populated in {@link #handleRedeem} on a REDEEMED outcome so the
-     * {@link #onQuit(UUID)} handler (Slice F row F3) can drive
+     * {@link #onQuit(UUID)} handler can drive
      * {@code RegionQueueManager.releaseToNetworkKept(...)} if the player
      * disconnects before consuming the local /rtp dispatch. Cleared on quit.
      * Visible-for-tests via {@link #activeReservationsForTesting()}.
@@ -317,7 +317,7 @@ public final class JoinTriggerSource {
     }
 
     /**
-     * Slice F row F2: the proxy chose this backend and earmarked a coord
+     * The proxy chose this backend and earmarked a coord
      * via {@link io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager#reserveFromNetworkKept}.
      * Try {@code redeemReserved} on every region. First non-null hit:
      * (a) record the playerId-&gt;tokenId mapping so {@link #onQuit(UUID)}
@@ -406,7 +406,7 @@ public final class JoinTriggerSource {
     }
 
     /**
-     * Slice F row F3: on disconnect, if a cross-server reservation is still
+     * On disconnect, if a cross-server reservation is still
      * bound for this player (the /rtp dispatch hadn't drained the personal
      * queue yet), call {@code releaseToNetworkKept} so the earmarked coord
      * returns to the network sibling pool and CAS-transition the proxy-side
@@ -503,10 +503,10 @@ public final class JoinTriggerSource {
      * locate by map presence, so we accept the first region whose
      * {@code networkReservedCount() > 0} as a best-effort heuristic.
      *
-     * <p>In the single-region L6 scope all backends bind to one region per
+     * <p>In the current scope all backends bind to one region per
      * world; for multi-region deployments the proxy-issued token id would
      * need to carry the region key (a follow-up SPI extension). Documented
-     * in {@code CHECKLIST-cross-server-rtp-L6.md} F1 notes.</p>
+     * in the F1 boot-reconcile notes.</p>
      */
     private static Region findRegionForReservation(UUID networkTokenId) {
         try {

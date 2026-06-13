@@ -67,7 +67,7 @@ public final class BackendHeartbeatCodec {
         m.put("regionsAvailable", joinList(r.regionsAvailable()));
         m.put("worldsLoaded", joinList(r.worldsLoaded()));
         m.put("killSwitch", Boolean.toString(r.killSwitch()));
-        // L6 fields, appended after killSwitch to preserve the pre-L6 canonical
+        // Extended fields, appended after killSwitch to preserve the canonical
         // byte prefix (older rows simply omit them and decode to zero/empty).
         m.put("keptCount", Integer.toString(r.keptCount()));
         m.put("networkReservedCount", Integer.toString(r.networkReservedCount()));

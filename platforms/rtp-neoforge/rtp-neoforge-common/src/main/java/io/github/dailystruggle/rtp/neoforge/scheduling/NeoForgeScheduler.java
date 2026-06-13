@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.server.MinecraftServer;
 
 /**
- * NeoForge {@link RTPScheduler} (Phase N1).
+ * NeoForge {@link RTPScheduler}.
  *
  * <p>Structurally identical to {@code FabricScheduler}: NeoForge servers are
  * single-main-thread (no Folia regions), so the threading model is the same as

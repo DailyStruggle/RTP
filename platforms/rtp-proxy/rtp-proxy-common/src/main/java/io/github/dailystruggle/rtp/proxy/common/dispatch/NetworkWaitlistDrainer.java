@@ -24,9 +24,8 @@ import java.util.logging.Logger;
 
 /**
  * Proxy-side daemon body that drains the shared cross-proxy
- * {@link NetworkWaitlist} into the configured {@link RtpDispatcher}. Slice 2
- * of `CHECKLIST-network-waitlist.md`; design in
- * `rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md`.
+ * {@link NetworkWaitlist} into the configured {@link RtpDispatcher}.
+ * Design in `rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md`.
  *
  * <p><strong>Pure pulse logic.</strong> This class does <em>not</em> own a
  * scheduler. The proxy adapter (Velocity, BungeeCord, future) owns the

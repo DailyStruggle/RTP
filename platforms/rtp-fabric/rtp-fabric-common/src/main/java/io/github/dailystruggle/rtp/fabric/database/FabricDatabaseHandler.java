@@ -19,11 +19,7 @@ import java.util.logging.Level;
  * <p>Locates the per-mod config dir via {@link FabricLoader#getConfigDir()} (typically
  * {@code <server>/config/rtp/}) and delegates accessor selection to {@code rtp-core}'s
  * platform-agnostic {@code DatabaseHandler} primitives. No {@code org.bukkit.*} imports
- * (ADR-022 §4 invariant). No new {@code rtp-api} abstraction (ADR-022 §5 / Step D).
- *
- * <p>Phase 2 Step D — minimal slice: handler factory + config-dir resolution. Lifecycle
- * wiring (start at {@code SERVER_STARTED}, flush+close at {@code SERVER_STOPPING}) lands
- * in Step E with the rest of the event bridge.
+ * (ADR-022 §4 invariant). No new {@code rtp-api} abstraction (ADR-022 §5).
  *
  * <p>REQ-RTP-S-006 — fail-loud if invoked before {@code rtp-core} is ready.
  */

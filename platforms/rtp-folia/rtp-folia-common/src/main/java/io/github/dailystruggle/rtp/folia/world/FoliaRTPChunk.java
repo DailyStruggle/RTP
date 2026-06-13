@@ -326,9 +326,9 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
   /**
    * Compiled-form safety check (ADR-017). Mirror of {@code BukkitRTPChunk} override —
    * see that class's Javadoc for the evaluation contract, hot-path fast exits, and
-   * Slice 2 boundary caveats (tag membership stubbed to empty collection; Anvil-backed
-   * snapshots evaluate only the plain-material bucket, deferring state / tag predicates
-   * to Slice 3).
+   * boundary caveats (tag membership stubbed to empty collection; Anvil-backed
+   * snapshots evaluate only the plain-material bucket; state / tag predicates
+   * are not yet supported).
    *
    * <p>Runs under {@link RegionThread} because the live-backed path reads from the
    * chunk and the caller already holds region-thread context in {@code LocationGenerator};

@@ -142,7 +142,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
     if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = settings.spatialResolution();
 
-    // L6 Slice J: lobby backends never serve teleports to local coords -
+    // Lobby backends never serve teleports to local coords -
     // peers see regions=[] / acceptingRequests=false (BukkitBackendStateSampler)
     // and the no-arg /rtp path is intercepted by BukkitNetworkCommandHook to
     // dispatch to a peer. Skip the per-region ScanTask pre-fill crawler and
@@ -240,7 +240,7 @@ public class Region extends FactoryValue<RegionKeys> {
     this.worldFallbackBound = false;
     this.configuredWorldName = null;
 
-    // L6 Slice J: lobby backends skip local region processing - no scan-task
+    // Lobby backends skip local region processing - no scan-task
     // bootstrap, no DB hydrate. Same rationale as the constructor gate above.
     if (RTP.lobbyMode) {
       return;
@@ -480,7 +480,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
   public void execute(long availableTime) {
     io.github.dailystruggle.rtp.common.tools.CfDiag.regionExecute.increment();
-    // L6 Slice J: lobby backends advertise regions=[]/acceptingRequests=false
+    // Lobby backends advertise regions=[]/acceptingRequests=false
     // and route every /rtp to a peer (BukkitNetworkCommandHook). The local
     // pulse - cold->hot promotion, backlog drain, ticket validation, chunk
     // I/O - is pure waste on a lobby. Region objects are still constructed so

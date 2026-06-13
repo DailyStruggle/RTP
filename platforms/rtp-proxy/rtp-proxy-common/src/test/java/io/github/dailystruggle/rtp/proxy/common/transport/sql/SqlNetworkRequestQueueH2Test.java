@@ -28,8 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * H2-backed unit tests for {@link SqlNetworkRequestQueue}. Slice D row D5
- * of `CHECKLIST-cross-server-rtp-L6.md`; mirrors the
+ * H2-backed unit tests for {@link SqlNetworkRequestQueue}. Mirrors the
  * {@link SqlNetworkStateBindingH2Test} pattern (in-memory H2, shared via a
  * named URL with {@code DB_CLOSE_DELAY=-1}).
  *

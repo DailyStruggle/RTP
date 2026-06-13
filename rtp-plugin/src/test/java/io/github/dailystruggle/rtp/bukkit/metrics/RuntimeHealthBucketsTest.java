@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Bucket-boundary tests for the Phase M2 *Runtime health* chart helpers in
+ * Bucket-boundary tests for the *Runtime health* chart helpers in
  * {@link RTPCostMetricsCharts} (CHECKLIST-metrics-and-multiserver.md row C4).
  *
  * <p>Each helper is pure (no {@code RTP} singleton dependency) so the suite

@@ -1,5 +1,4 @@
--- rtp-proxy-common L6 Slice D3 cross-server network wait queue: state transition.
--- Refines PROPOSAL-cross-server-rtp-L6 Section 4.4 (single-writer transitions).
+-- rtp-proxy-common cross-server network wait queue: state transition.
 -- Atomically writes the next QueueState into the player's status HASH. On a
 -- terminal state (COMPLETED / FAILED / CANCELLED) the per-correlationId env
 -- HASH is deleted and the seen-correlation entry is scrubbed so a fresh

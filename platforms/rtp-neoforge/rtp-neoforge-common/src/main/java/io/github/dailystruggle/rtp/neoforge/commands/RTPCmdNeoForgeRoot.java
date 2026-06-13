@@ -30,7 +30,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * NeoForge root {@code /rtp} command (Phase N2.4 — Step NG).
+ * NeoForge root {@code /rtp} command.
  *
  * <p>Near-verbatim port of {@code RTPCmdFabricRoot}: the {@code commands-api}
  * tree is platform-neutral, so only the {@code values()} player-listing source
@@ -43,12 +43,11 @@ import java.util.logging.Level;
  * {@code RTP.serverAccessor.*} (never {@code net.minecraft.*} server globals)
  * and permission checks through {@code RTP.serverAccessor.getSender(uuid)
  * .hasPermission(...)}, so permission gating works for free once the NeoForge
- * permission chain (Step NF / N2.5) lands.</p>
+ * permission chain lands.</p>
  *
  * <p>The {@code /rtp menu} wiring (Fabric's {@code MenuWiringSupport.attachTo}
- * block) is intentionally omitted here: the NeoForge menu renderer is N2.6
- * (Step NI). The teleport command and all other subcommands are fully
- * functional without it.</p>
+ * block) is intentionally omitted here. The teleport command and all other
+ * subcommands are fully functional without it.</p>
  */
 public final class RTPCmdNeoForgeRoot extends BaseRTPCmdImpl implements RTPCmd {
 
@@ -140,7 +139,8 @@ public final class RTPCmdNeoForgeRoot extends BaseRTPCmdImpl implements RTPCmd {
                     RTPPlayer target = RTP.serverAccessor.getPlayer(s);
                     if (target == null || !target.name().equalsIgnoreCase(s)) return false;
                     RTPCommandSender targetSender = RTP.serverAccessor.getSender(target.uuid());
-                    return targetSender == null || !targetSender.hasPermission("rtp.notme");
+                    // Console (non-player sender) is exempt from rtp.notme - parity with RTPCmdBukkit.
+                    return targetSender == null || !(sender instanceof RTPPlayer) || !targetSender.hasPermission("rtp.notme");
                 }) {
                 @Override
                 public Set<String> values() {

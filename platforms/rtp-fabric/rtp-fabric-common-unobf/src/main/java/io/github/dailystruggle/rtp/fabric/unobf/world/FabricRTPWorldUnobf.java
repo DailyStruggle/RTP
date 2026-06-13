@@ -43,8 +43,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * vanilla {@code setChunkForced} to avoid persisting RTP-owned chunks to
  * {@code level.dat} (S-002).
  *
- * <p>End-to-end verification is deferred to Phase 2 Step H per
- * {@code MULTI_PLATFORM_PLAN.md}.
  */
 public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
 
@@ -116,7 +114,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     }
 
     // ---------------------------------------------------------------------------
-    // Step A — async chunk load (S-005)
+    // Async chunk load (S-005)
     // ---------------------------------------------------------------------------
 
     /**
@@ -809,7 +807,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      * On a closed gate or any decode failure the future resolves to {@code null}
      * (UNKNOWN) and {@code ScanTask} / {@code QueueTask} / {@code PregenTask}
      * fall back to the live-load path — preserving the
-     * {@code .mca}-as-advisory invariant of ADR-016.</p>
+     * {@code .mca}-as-advisory invariant of ADR-016.
      *
      * <p>S-005: file I/O is dispatched onto
      * {@link io.github.dailystruggle.rtp.anvil.AnvilIoPool} (the same dedicated
@@ -1144,7 +1142,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     }
 
     // ---------------------------------------------------------------------------
-    // Step C — chunk-ticket lifecycle
+    // Chunk-ticket lifecycle
     // ---------------------------------------------------------------------------
 
     /**
@@ -1332,7 +1330,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     }
 
     // ---------------------------------------------------------------------------
-    // Step E — read-only world data
+    // Read-only world data
     // ---------------------------------------------------------------------------
 
     /**
@@ -1404,7 +1402,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     public void platform(RTPLocation location) {
         // Fabric platform-block writes require a server-thread hop and a
         // BlockState lookup that depends on Material → Block parity work
-        // scheduled for Step E follow-ups (no MaterialRegistry on Fabric —
+        // (no MaterialRegistry on Fabric —
         // we'd need to parse the configured platform-material identifier
         // through BuiltInRegistries.BLOCK directly). Until then, the
         // platform sub-feature is a no-op: the safety pipeline's primary

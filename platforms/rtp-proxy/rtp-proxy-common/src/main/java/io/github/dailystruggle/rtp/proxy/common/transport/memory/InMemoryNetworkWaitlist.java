@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Reference {@link NetworkWaitlist} implementation backed by in-process
- * concurrent collections. Slice 1 of `CHECKLIST-network-waitlist.md`.
+ * concurrent collections.
  *
  * <p><strong>Production use is unsupported.</strong> State lives in this JVM
  * only; a multi-proxy deployment would diverge immediately. Intended for:
@@ -132,7 +132,7 @@ public final class InMemoryNetworkWaitlist implements NetworkWaitlist {
                 while (it.hasNext() && taken < globalCap) {
                     WaitEnvelope env = it.next().getValue();
                     // Round-robin-ish: take any backend that still has cap.
-                    // Region-aware selection is a caller concern (Slice 2);
+                    // Region-aware selection is a caller concern;
                     // here we simply pick the first remaining backend with
                     // capacity, preserving FIFO order across the waitlist.
                     String chosen = pickBackend(remaining);

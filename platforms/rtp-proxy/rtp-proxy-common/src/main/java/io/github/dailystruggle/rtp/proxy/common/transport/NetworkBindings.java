@@ -40,7 +40,7 @@ import java.util.logging.Logger;
  * here.</p>
  *
  * <p>{@code redis} is recognised but currently throws
- * {@link UnsupportedOperationException}; it ships in Phase 2e-Redis.</p>
+ * {@link UnsupportedOperationException}; the Redis binding is not yet complete.</p>
  */
 public final class NetworkBindings {
 
@@ -88,7 +88,7 @@ public final class NetworkBindings {
                             "NetworkBindings.open: transport.type=sql requires a non-null DataSource "
                                     + "(typically the host's AbstractSQLDatabaseAccessor pool).");
                 }
-                // Phase 2e-SQL A3: load the HMAC envelope verifier the same
+                // Load the HMAC envelope verifier the same
                 // way as the Redis branch. Loader failure degrades-to-disabled
                 // (InMemory fallback) per MULTI_SERVER_PLAN.md §Failure-Mode
                 // Policy (network-mode bootstrap).
@@ -107,7 +107,7 @@ public final class NetworkBindings {
                         dataSource, cfg.heartbeatIntervalMs(),
                         sqlVerifier, cfg.schemaVersion());
             case "redis":
-                // Phase 2e-Redis A3: heartbeats + snapshot + pub/sub fan-out +
+                // Redis: heartbeats + snapshot + pub/sub fan-out +
                 // atomic claim + HMAC envelope. Verifier is constructed from
                 // network.secretEnv (REQ-RTP-PROXY-007); loader failure is the
                 // single fail-fast on the security path per
@@ -147,7 +147,7 @@ public final class NetworkBindings {
 
     /**
      * Construct a {@link NetworkRequestQueue} matching {@code cfg.transportType()}.
-     * Slice D rows D2/D4/D5 of {@code CHECKLIST-cross-server-rtp-L6.md}.
+     * Wires the network request queue, status sink, and release sink.
      *
      * <p>The {@code in-memory} kind returns {@link InMemoryNetworkRequestQueue}.
      * The {@code sql} kind constructs {@link SqlNetworkRequestQueue} against
@@ -196,7 +196,7 @@ public final class NetworkBindings {
                     return new InMemoryNetworkRequestQueue();
                 }
             case "redis":
-                // Slice D row D4: terminal transitions in the D3 scripts
+                // Terminal transitions in the Lua scripts
                 // already delete per-envelope and per-status HASHes; passing
                 // ttlSeconds = 0 disables EXPIRE so entries persist until
                 // their terminal COMPLETED/FAILED/CANCELLED transition.

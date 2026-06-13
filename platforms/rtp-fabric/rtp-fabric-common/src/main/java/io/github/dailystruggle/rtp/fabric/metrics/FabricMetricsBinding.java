@@ -8,8 +8,7 @@ import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
 
 /**
- * Fabric-flavoured {@link MetricsBinding} (Phase M2, Section C, C2 of the
- * metrics + multi-server checklist).
+ * Fabric-flavoured {@link MetricsBinding}.
  *
  * <p>Unlike Folia, Fabric (vanilla server architecture) runs a single
  * server tick loop, so there is no per-region partitioning. This binding

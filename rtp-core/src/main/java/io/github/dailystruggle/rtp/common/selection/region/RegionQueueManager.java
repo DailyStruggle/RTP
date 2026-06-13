@@ -31,15 +31,15 @@ public class RegionQueueManager {
     public final LockFreeLocationBuffer unkeptLocations;
 
     /**
-     * Cross-server sibling of {@link #keptLocations} for L6 (PROPOSAL
-     * §12.2, CHECKLIST Slice A). Identical lifecycle (kept-with-ticket
+     * Cross-server sibling of {@link #keptLocations} (PROPOSAL
+     * §12.2). Identical lifecycle (kept-with-ticket
      * semantics, fed by the scan/verify pipeline, drained by the network
      * reservation pulse) but isolated from local {@code /rtp} consumption so
      * local players draining {@code keptLocations} cannot starve cross-server
      * requests and vice versa.
      *
      * <p>Allocated only when {@code settings.networkReserveSize() > 0};
-     * {@code null} otherwise (the L6 D2 default = local routing means most
+     * {@code null} otherwise (local routing means most
      * deployments will leave this off until they opt in). Capacity is
      * clamped to {@code min(networkReserveSize, cacheCap)}.
      */
@@ -47,15 +47,15 @@ public class RegionQueueManager {
     public final LockFreeLocationBuffer networkKeptLocations;
 
     /**
-     * In-flight pinned reservations for cross-server transfers (L6
-     * PROPOSAL §12, CHECKLIST Slice A row A3). Keyed by the proxy-issued
+     * In-flight pinned reservations for cross-server transfers
+     * (PROPOSAL §12). Keyed by the proxy-issued
      * {@code networkTokenId} (see {@code ReservationToken} in
      * {@code rtp-proxy-common}). An entry exists between
      * {@link #reserveFromNetworkKept(UUID, String)} (called by the backend
-     * reservation pulse, Slice F row F1) and
+     * reservation pulse) and
      * {@link #redeemReserved(UUID)} (called by {@code JoinTriggerSource}
-     * post-transfer, Slice F row F2) or {@link #releaseToNetworkKept(UUID)}
-     * (TTL reaper / disconnect, Slice F row F3 + Slice D row D7).
+     * post-transfer) or {@link #releaseToNetworkKept(UUID)}
+     * (TTL reaper / disconnect).
      *
      * <p>Never {@code null}; empty when no reservations are outstanding.
      */
@@ -153,7 +153,7 @@ public class RegionQueueManager {
             this.backlogLocations = (backlogCap > 0)
                     ? new BacklogLocationBuffer((int) Math.min(backlogCap, Integer.MAX_VALUE))
                     : null;
-            // L6 PROPOSAL §12.2: networkKeptLocations is a sibling pool capped
+            // PROPOSAL §12.2: networkKeptLocations is a sibling pool capped
             // by min(networkReserveSize, cacheCap). 0 disables the network split
             // for this region (no allocation; regionKeptCounts heartbeat field omitted).
             long networkReserve = settings.networkReserveSize();
@@ -210,7 +210,7 @@ public class RegionQueueManager {
     }
 
     // -------------------------------------------------------------------------
-    // L6 network reservation API (CHECKLIST Slice A row A4).
+    // Network reservation API.
     //
     // Reserve a coordinate from networkKeptLocations under a proxy-issued
     // networkTokenId. Returns the reserved RTPLocation on success, null when
@@ -219,7 +219,7 @@ public class RegionQueueManager {
     // until redeemReserved/releaseToNetworkKept is called.
     //
     // regionKey is accepted for API symmetry with the cross-server selector
-    // predicate (Slice B); current single-region scope ignores it but
+    // predicate; current single-region scope ignores it but
     // implementers MUST keep the parameter so future per-region routing does
     // not require an API churn.
     //
@@ -259,7 +259,7 @@ public class RegionQueueManager {
     /**
      * Redeem a previously reserved coordinate. Removes the entry from
      * {@link #networkReservedLocations} and returns the bound location.
-     * The caller is expected to consume it (e.g. teleport on join, Slice F row F2).
+     * The caller is expected to consume it (e.g. teleport on join).
      * Subsequent calls with the same token return {@code null}.
      *
      * @param networkTokenId proxy-issued token id
@@ -272,8 +272,8 @@ public class RegionQueueManager {
 
     /**
      * Release a previously reserved coordinate back to {@link #networkKeptLocations}.
-     * Used by the TTL reaper (Slice D row D7), disconnect listener (Slice F
-     * row F3), and any failed-transfer cleanup path. Idempotent: a second call
+     * Used by the TTL reaper, disconnect listener, and any failed-transfer
+     * cleanup path. Idempotent: a second call
      * with the same token id is a no-op.
      *
      * @param networkTokenId proxy-issued token id
@@ -300,7 +300,7 @@ public class RegionQueueManager {
      * Pin a previously-redeemed cross-server reservation coordinate into
      * {@code playerId}'s personal queue so the immediately-following local
      * {@code /rtp} dispatch preferentially polls that coord. Used by the
-     * backend-side {@code JoinTriggerSource} on REDEEMED hit (Slice F row F2):
+     * backend-side {@code JoinTriggerSource} on REDEEMED hit:
      * the proxy already chose this backend at /rtp time and the coord was
      * earmarked via {@link #reserveFromNetworkKept(UUID, String)}; on join
      * the redeemed coord must reach the player without re-running the

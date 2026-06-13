@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Opt-in live-Redis integration test for {@link RedisNetworkRequestQueue}
- * (L6 Slice D row D9). Exercises end-to-end script atomicity, correlationId
+ * Exercises end-to-end script atomicity, correlationId
  * idempotency, LPOS-derived position, and terminal-state cleanup that the
  * no-Redis {@code RedisNetworkRequestQueueTest} cannot reach.
  *

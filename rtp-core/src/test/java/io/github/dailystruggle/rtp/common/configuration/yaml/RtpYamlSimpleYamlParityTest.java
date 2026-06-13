@@ -16,7 +16,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Focused parity-surface tests for Session 1 of the simpleyaml → in-house
+ * Focused parity-surface tests for the simpleyaml → in-house
  * YAML substrate migration (see {@code docs/dev/scratch/CHECKLIST-simpleyaml-migration.md}
  * and ADR-025).
  *

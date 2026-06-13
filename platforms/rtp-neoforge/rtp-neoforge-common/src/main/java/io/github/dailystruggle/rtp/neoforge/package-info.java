@@ -1,5 +1,5 @@
 /**
- * NeoForge platform adapter for RTP (Phase N1 skeleton).
+ * NeoForge platform adapter for RTP.
  *
  * <p>In-scope per {@code ADR-033} (NeoForge platform in-scope) and the
  * subproject ADR {@code rtp-neoforge-ADR-001-platform-in-scope}. This package
@@ -21,14 +21,10 @@
  *       (not null / no-op) when called before core load (S-006).</li>
  * </ul>
  *
- * <h2>Phase N1 status</h2>
- * <p>This is the bring-up skeleton: the {@code @Mod} entry point
+ * <h2>Status</h2>
+ * <p>The {@code @Mod} entry point
  * ({@link io.github.dailystruggle.rtp.neoforge.RTPNeoForgeMod}) wires the
  * lifecycle and a server-thread {@link io.github.dailystruggle.rtp.neoforge.scheduling.NeoForgeScheduler}.
- * The {@code RTPServerAccessor} implementation, command Brigadier bridge wiring,
- * event bridge, database handler, anvil/ticket parity, and the S-005/S-006
- * REQ-traceable guards are filled in by the platform maintainer in subsequent
- * Phase N1/N2 sessions (see {@code platforms/rtp-neoforge/REQUIREMENTS.md} and
- * {@code docs/dev/scratch/PROPOSAL-neoforge-bringup.md}).</p>
+ * See {@code platforms/rtp-neoforge/REQUIREMENTS.md} for the full requirements.</p>
  */
 package io.github.dailystruggle.rtp.neoforge;

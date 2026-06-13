@@ -19,12 +19,10 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Fabric implementation of {@link RTPPlayer}. Step E2 scope: real identity,
- * location, online status, and teleport. Permissions are op-level only — full
- * {@code fabric-permissions-api} integration lands in Step F.
+ * Fabric implementation of {@link RTPPlayer}.
  *
  * <p><b>Design note.</b> Holds a strong reference to the {@link ServerPlayer}
- * that was current at construction. Step E's event bridge drops the wrapper
+ * that was current at construction. The event bridge drops the wrapper
  * from the accessor map on disconnect (REQ-RTP-S-004 — MemoryTracker release
  * on all exit paths), so the strong-ref window is bounded by player session.
  *
@@ -96,7 +94,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
 
     @Override
     public boolean hasPermission(String permission) {
-        // Step F: route through fabric-permissions-api (me.lucko:fabric-permissions-api)
+        // Route through fabric-permissions-api (me.lucko:fabric-permissions-api)
         // when an implementer (LuckPerms-Fabric, Cyan, Ledger, ...) is present.
         // Permissions.check(player, node, defaultRequiredLevel) returns the
         // implementer's verdict if any handler is registered, otherwise falls
@@ -344,7 +342,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
 
     @Override
     public long cooldown() {
-        // Step F (perms-driven cooldown groups). 0 means "use default" upstream.
+        // Perms-driven cooldown groups not yet implemented. 0 means "use default" upstream.
         return 0L;
     }
 

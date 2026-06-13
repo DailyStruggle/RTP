@@ -1189,7 +1189,7 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     inputFile.set(tasks.named('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar).flatMap { it.archiveFile })
     archiveBaseName.set('LeafRTP')
     archiveClassifier.set('')
-    archiveVersion.set(project.ext.liteVersion.toString())
+    archiveVersion.set(providers.gradleProperty('liteVersion').getOrElse('3.1.2'))
 
     // Resolve carrier jars and capture the merge closure at configuration time
     // so doLast does not reach Task.project at execution time
