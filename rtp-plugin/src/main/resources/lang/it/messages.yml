@@ -185,7 +185,7 @@ infoSogliaEtaReteGialla: 5.0
 infoIntestazioneRegioniFolia: "&7--- Regioni Folia ---"
 # Modello di riga per una singola regione Folia. Segnaposto: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
-infoRegioneFolia: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 giocatori=#7E9CC8[playerCount]&7 coda=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
+infoRegioneFolia: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 giocatori=#7E9CC8[playerCount]&7 coda=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 infoIntestazioneDisclaimer: "&7--- Disclaimer diagnostico ---"
 infoDisclaimer: "&7Nota diagnostica: se il conteggio totale dei chunk orfani del server supera i caricamenti totali di questo plugin ([loads]), questo plugin non è l'unica fonte del leak di memoria."
 infoIntestazioneMondo: "#008080Mondi:"
@@ -194,6 +194,14 @@ infoMondo: "  #21ADA8[world]"
 infoIntestazioneRegione: "#63C5DARegioni:"
 infoIntestazioneRegioneConsole: "&7--- Regioni ---"
 infoRegione: "  #52B2BF[region]"
+# Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
+# players spend their time in, sampled over the server's uptime.
+# Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
+infoBiomeActivityHeader: "&8--- &3Biome occupancy &8(&3[biomeTotalSamples]&8 samples, &3[biomeDistinctCount]&8 biomes) ---"
+# Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
+infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
+# Shown when no occupancy has been sampled yet.
+infoBiomeActivityEmpty: "&8--- &7no biome occupancy sampled yet &8---"
 
 # sotto-elenchi di info
 # segnaposto: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
@@ -278,7 +286,7 @@ menuFrontPageSectionTeleport: "&8--- &7teletrasporto &8---"
 # Righe della pagina iniziale. Nessun segnaposto.
 menuFrontPageRowTeleport: "&a▶ /rtp &7- teletrasportati in una posizione casuale"
 menuFrontPageRowRegion: "&a▶ /rtp region:&7... &7- scegli una regione"
-menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- pick a world"
+menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- scegli un mondo"
 menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- scegli un bioma"
 menuFrontPageRowHelp: "&a▶ /rtp help &7- elenca i comandi"
 # Front-page admin entry row: the only inline
@@ -302,7 +310,7 @@ menuAdminPanelRowConfig: "&b▶ config editor"
 menuAdminPanelHoverConfig: "&7open the curated config selector"
 menuAdminPanelRowRegions: "#5FB3B3▶ regions"
 menuAdminPanelHoverRegions: "&7add, remove, or edit per-region configs"
-menuAdminPanelRowWorlds: "#5FB3B3▶ worlds"
+menuAdminPanelRowWorlds: "#5FB3B3▶ mondi"
 menuAdminPanelHoverWorlds: "&7add, remove, or edit per-world configs"
 menuAdminPanelRowEffects: "#5FB3B3▶ effects"
 menuAdminPanelHoverEffects: "&7add, remove, or edit per-group teleport effects"

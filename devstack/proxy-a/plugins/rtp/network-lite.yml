@@ -1,0 +1,26 @@
+# Devstack proxy-a network.yml - LITE edition (docker-compose.lite.yml seed override).
+# Schema: rtp-proxy-ADR-002.
+#
+# The lite assembly (ADR-024) ships the Velocity entrypoint but EXCLUDES the
+# durable redis/sql transport bindings, so the proxy must not select them.
+# transport.type: auto resolves to the in-memory binding on the proxy (the
+# proxy has no plugin-message bridge of its own); cross-server moves still work
+# via Velocity's built-in bungeecord:main vocabulary that the backends speak.
+# No Redis, no DB.
+network:
+  enabled: true
+  proxyId: "proxy-a"
+  secretEnv: RTP_NET_SECRET
+transport:
+  type: auto
+  # Player-independent proxy-direct TCP listener (rtp-proxy-ADR-017). Backends
+  # dial proxy-a:25599 to publish their real region list with NO player online
+  # and to read the merged snapshot back. This is what fills cross-server /rtp
+  # region= tab-completion with zero players and no per-server operator config.
+  direct:
+    enabled: true
+    port: 25599
+    bindHost: "0.0.0.0"
+heartbeat:
+  intervalMs: 1000
+  staleAfterMs: 5000

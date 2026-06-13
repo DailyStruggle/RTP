@@ -673,15 +673,16 @@ public class ScanTask extends RTPRunnable {
         String fullLoadSuffix = readFullLoadStatsAndReset();
         String probeOutcomeSuffix = readProbeOutcomeStatsAndReset();
         String phaseLabelStr = phaseLabel(scanPhase.get());
-        // Promoted from FINER to INFO (2026-05-19) so that the per-batch
-        // diagnostic split (probeNull / adjustNull / cacheHitLoad / genscan*)
-        // is visible during a scan without raising the global log level. This
-        // is the single line that explains *why* PRESCAN falls back to
-        // runFullLoadPath: e.g. genscanGenerated >> genscanUngenerated on a
-        // freshly-spawned world means the platform isChunkGenerated is
-        // disagreeing with the on-disk .mca data, and probeNull dominating
-        // PRESCAN means the anvil probe found no region file to read.
-        RTP.log(Level.INFO, "[TRACE] ScanTask diag region=" + region.name
+        // Per-batch scan diagnostic split (probeNull / adjustNull /
+        // cacheHitLoad / genscan*). Logged at FINE so it is available when a
+        // server raises the log level to debug a scan but does not spam the
+        // default INFO console. This is the single line that explains *why*
+        // PRESCAN falls back to runFullLoadPath: e.g. genscanGenerated >>
+        // genscanUngenerated on a freshly-spawned world means the platform
+        // isChunkGenerated is disagreeing with the on-disk .mca data, and
+        // probeNull dominating PRESCAN means the anvil probe found no region
+        // file to read.
+        RTP.log(Level.FINE, "[TRACE] ScanTask diag region=" + region.name
             + " phase=" + phaseLabelStr
             + " cps=" + cps_local + " activeChecks=" + activeChecks + " peakInFlight=" + peak
             + " currentInFlight=" + inFlight.get() + " cap=" + MAX_PENDING_CHUNKS

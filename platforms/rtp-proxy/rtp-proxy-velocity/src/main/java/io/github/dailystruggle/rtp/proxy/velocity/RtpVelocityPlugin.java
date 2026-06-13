@@ -7,6 +7,7 @@ import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
+import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
@@ -44,6 +45,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -111,6 +113,20 @@ public final class RtpVelocityPlugin {
     private VelocityPlayerOwnershipListener ownershipListener;
     /** ADR-016 periodic tag-refresh pulse; cancelled on shutdown. */
     private ScheduledFuture<?> ownershipRefreshTask;
+    /**
+     * Proxy-cache companion (PROPOSAL-proxy-as-availability-store): caches
+     * backend heartbeats + serves the operator-configured server-&gt;regions
+     * snapshot to lobbies over the {@code rtp:net} channel. Null when network
+     * is disabled.
+     */
+    private VelocityProxyCacheListener proxyCacheListener;
+    /**
+     * Proxy-direct TCP listener (rtp-proxy-ADR-017): backends dial this socket
+     * directly (no player connection) to publish their real region list and
+     * read the merged snapshot. Null when not enabled. Shares the same
+     * {@link VelocityProxyAvailabilityCache} as {@link #proxyCacheListener}.
+     */
+    private ProxyDirectListener proxyDirectListener;
     /** Idempotence guard for {@link #onProxyShutdown} (checklist row 7f). */
     private volatile boolean shutdownStarted;
 
@@ -165,11 +181,21 @@ public final class RtpVelocityPlugin {
             // leave it disabled; backends fan out via the shared DB.
             try {
                 this.transport = NetworkBindings.open(config, /* dataSource */ null);
-            } catch (RuntimeException ex) {
+            } catch (RuntimeException | LinkageError ex) {
+                // LinkageError (incl. NoClassDefFoundError) is caught alongside
+                // RuntimeException because the lite assembly (ADR-024) ships the
+                // Velocity entrypoint but EXCLUDES the durable redis/sql transport
+                // bindings. A lite proxy whose network.yml still selects
+                // transport.type=redis/sql therefore hits a NoClassDefFoundError
+                // when NetworkBindings.open instantiates the absent binding; that
+                // must degrade to the in-memory binding (cross-server moves still
+                // work via Velocity's built-in plugin-messaging vocabulary), not
+                // crash network init.
                 logger.warn("RTP transport.type='{}' could not be opened on the proxy ({}); "
                         + "falling back to in-memory binding for this session. "
-                        + "Phase 2e-SQL-Proxy adds proxy-side JDBC support.",
-                        config.transportType(), ex.getMessage());
+                        + "Durable redis/sql transports are not bundled in the lite "
+                        + "edition; use the full edition for proxy-side durable state.",
+                        config.transportType(), ex.toString());
                 this.transport = new InMemoryNetworkStateBinding();
             }
             this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -236,9 +262,10 @@ public final class RtpVelocityPlugin {
             Duration pollTimeout = readQueuePollTimeout(raw);
             try {
                 this.requestQueue = NetworkBindings.openRequestQueue(config, /* dataSource */ null);
-            } catch (RuntimeException ex) {
+            } catch (RuntimeException | LinkageError ex) {
+                // LinkageError: lite assembly excludes the durable redis/sql queue.
                 logger.warn("RTP request queue open failed ({}); proxy will not drain "
-                        + "cross-server /rtp requests this session.", ex.getMessage());
+                        + "cross-server /rtp requests this session.", ex.toString());
             }
 
             // ADR-015 / REQ-RTP-NET-015: open the shared cross-proxy waitlist + leader
@@ -250,9 +277,10 @@ public final class RtpVelocityPlugin {
             try {
                 this.waitlist = NetworkBindings.openWaitlist(config, /* dataSource */ null);
                 this.leaderLease = NetworkBindings.openLeaderLease(config, /* dataSource */ null);
-            } catch (RuntimeException ex) {
+            } catch (RuntimeException | LinkageError ex) {
+                // LinkageError: lite assembly excludes the durable redis/sql waitlist/lease.
                 logger.warn("RTP waitlist/lease open failed ({}); no-backend dispatch will fall "
-                        + "back to terminal FAILED this session.", ex.getMessage());
+                        + "back to terminal FAILED this session.", ex.toString());
                 this.waitlist = null;
                 this.leaderLease = null;
             }
@@ -287,9 +315,10 @@ public final class RtpVelocityPlugin {
             String thisProxyId = config.proxyId() == null ? "" : config.proxyId();
             try {
                 this.ownershipTracker = NetworkBindings.openOwnershipTracker(config);
-            } catch (RuntimeException ex) {
+            } catch (RuntimeException | LinkageError ex) {
+                // LinkageError: lite assembly excludes the durable redis/sql ownership tracker.
                 logger.warn("RTP ownership tracker open failed ({}); cross-proxy ownership "
-                        + "filtering disabled this session.", ex.getMessage());
+                        + "filtering disabled this session.", ex.toString());
                 this.ownershipTracker = PlayerOwnershipTracker.NO_OP;
             }
 
@@ -382,11 +411,181 @@ public final class RtpVelocityPlugin {
                 proxyServer.getEventManager().register(this, waitlistQuitListener);
             }
 
+            // Proxy availability store: the proxy is the always-present process,
+            // so it holds the merged cross-server region snapshot a lobby reads
+            // to populate `/rtp region=` tab-completion. Row sources, ascending
+            // precedence: operator-configured `servers.<id>.regions` (optional)
+            // < live backend pushes. NO assumed-`default` topology seeding: a
+            // server that has not actually reported is NOT fabricated with a
+            // guessed region (a backend that is offline is not a valid RTP
+            // target). Real region names arrive player-independently via the
+            // proxy-direct listener below (rtp-proxy-ADR-017) - a backend dials
+            // us at startup and publishes its real regions with no player.
+            //
+            // The SAME cache instance is shared by two front-ends:
+            //   - VelocityProxyCacheListener: the rtp:net plugin-message channel
+            //     (player-gated; serves lobbies that have a player online).
+            //   - ProxyDirectListener: the player-independent TCP socket
+            //     (rtp-proxy-ADR-017) that both ingests backend pushes and
+            //     answers snapshot reads.
+            // Failure here is non-fatal: the proxy stays up without the cache.
+            try {
+                Map<String, java.util.List<String>> serverRegions = parseServerRegions(raw);
+                VelocityProxyAvailabilityCache cache = new VelocityProxyAvailabilityCache(
+                        serverRegions, config.heartbeatStaleAfterMs(), System::currentTimeMillis);
+                this.proxyCacheListener = new VelocityProxyCacheListener(proxyServer, cache, logger);
+                this.proxyCacheListener.register();
+                proxyServer.getEventManager().register(this, proxyCacheListener);
+                logger.info("RTP proxy-cache companion active: {} operator-configured server(s) {} on the rtp:net channel.",
+                        serverRegions.size(), serverRegions);
+
+                // Player-independent proxy-direct TCP listener, sharing the cache.
+                startProxyDirectListener(raw, cache);
+            } catch (RuntimeException ex) {
+                logger.warn("RTP proxy-cache companion init failed ({}); cross-server region "
+                        + "tab-completion will rely on live heartbeats only.", ex.toString());
+                this.proxyCacheListener = null;
+            }
+
             logger.info("RTP Velocity adapter active as participant: proxyId='{}', transport='{}', heartbeat={}ms, queueWorkers={}, waitlist={}.",
                     config.proxyId(), config.transportType(), config.heartbeatIntervalMs(),
                     workerThreads, waitlist != null ? "enabled" : "disabled");
         } catch (RuntimeException ex) {
             logger.warn("RTP Velocity adapter init failed; running disabled.", ex);
+        }
+    }
+
+    /**
+     * Parse the optional {@code servers:} block of {@code network.yml} into an
+     * operator-declared {@code serverId -> regions} map (direction B). Supported
+     * shapes (per entry):
+     * <pre>
+     * servers:
+     *   backend-a:
+     *     regions: [default, nether]   # list
+     *   backend-b:
+     *     regions: "default,arena"     # comma string
+     *   backend-c: [default]           # bare list shorthand
+     * </pre>
+     * Never throws on a malformed entry: a bad row is skipped with a WARNING so
+     * a config typo cannot break proxy boot. Returns an empty (mutable) map when
+     * the block is absent.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, java.util.List<String>> parseServerRegions(Map<String, Object> raw) {
+        Map<String, java.util.List<String>> out = new java.util.LinkedHashMap<>();
+        if (raw == null) return out;
+        Object node = raw.get("servers");
+        if (!(node instanceof Map<?, ?> servers)) return out;
+        for (Map.Entry<?, ?> e : servers.entrySet()) {
+            String serverId = String.valueOf(e.getKey());
+            if (serverId.isEmpty()) continue;
+            try {
+                Object value = e.getValue();
+                Object regionsNode = value;
+                if (value instanceof Map<?, ?> entryMap) {
+                    regionsNode = entryMap.get("regions");
+                }
+                java.util.List<String> regions = new java.util.ArrayList<>();
+                if (regionsNode instanceof java.util.List<?> list) {
+                    for (Object r : list) {
+                        if (r != null && !String.valueOf(r).isEmpty()) regions.add(String.valueOf(r));
+                    }
+                } else if (regionsNode instanceof String s) {
+                    for (String tok : s.split(",")) {
+                        String trimmed = tok.trim();
+                        if (!trimmed.isEmpty()) regions.add(trimmed);
+                    }
+                }
+                out.put(serverId, regions);
+            } catch (RuntimeException ex) {
+                logger.warn("RTP proxy-cache: skipping malformed servers.{} entry ({}).",
+                        serverId, ex.getMessage());
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Start the player-independent {@code proxy-direct} TCP listener
+     * (rtp-proxy-ADR-017) when enabled. Enabled iff {@code transport.type} is
+     * {@code proxy-direct} OR {@code transport.direct.enabled: true}. Reads
+     * {@code transport.direct.port} (default 25599) and
+     * {@code transport.direct.bindHost} (default {@code 0.0.0.0}). Builds an
+     * {@link io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier}
+     * from {@code network.secretEnv} when a secret is present; otherwise runs
+     * unsigned (matching the backend binding's fallback). Never throws: a bind
+     * failure logs a WARNING and leaves the listener null.
+     */
+    @SuppressWarnings("unchecked")
+    private void startProxyDirectListener(Map<String, Object> raw, VelocityProxyAvailabilityCache cache) {
+        Map<String, Object> transport = raw.get("transport") instanceof Map<?, ?> m
+                ? (Map<String, Object>) m : java.util.Map.of();
+        String type = String.valueOf(transport.getOrDefault("type", ""))
+                .toLowerCase(java.util.Locale.ROOT);
+        Map<String, Object> direct = transport.get("direct") instanceof Map<?, ?> d
+                ? (Map<String, Object>) d : java.util.Map.of();
+        boolean enabled = type.equals("proxy-direct") || type.equals("proxydirect")
+                || Boolean.parseBoolean(String.valueOf(direct.getOrDefault("enabled", "false")));
+        if (!enabled) {
+            return;
+        }
+        int port = parseIntOrDefault(direct.get("port"), 25599);
+        String bindHost = String.valueOf(direct.getOrDefault("bindHost", "0.0.0.0"));
+        int schema = 1;
+        if (raw.get("network") instanceof Map<?, ?> net) {
+            schema = parseIntOrDefault(((Map<String, Object>) net).get("schemaVersion"), 1);
+        }
+        final int schemaVersion = Math.max(1, schema);
+        io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier verifier = null;
+        try {
+            verifier = io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier
+                    .loadFromEnv(config.secretEnv(), 1, schemaVersion);
+        } catch (RuntimeException ex) {
+            logger.warn("RTP proxy-direct: HMAC secret unavailable ({}); running UNSIGNED this session.",
+                    ex.getMessage());
+        }
+        try {
+            ProxyDirectListener listener = new ProxyDirectListener(
+                    bindHost, port, verifier, schemaVersion,
+                    payload -> cache.onPush(
+                            io.github.dailystruggle.rtp.proxy.common.transport.codec
+                                    .BackendHeartbeatCodec.decode(payload)),
+                    () -> {
+                        java.util.List<String> rows = new java.util.ArrayList<>();
+                        for (io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat hb
+                                : cache.snapshot()) {
+                            rows.add(io.github.dailystruggle.rtp.proxy.common.transport.codec
+                                    .BackendHeartbeatCodec.encode(hb));
+                        }
+                        return rows;
+                    },
+                    // proxy-direct = remote view of the proxy store: dispatch
+                    // NetworkTransport + NetworkRequestQueue RPCs onto the
+                    // proxy's own instances (PROPOSAL-proxy-direct-as-remote-store).
+                    // NB: the local `transport` here is the YAML section, so we
+                    // pass the plugin fields explicitly.
+                    this.transport,
+                    this.requestQueue,
+                    logger);
+            listener.start();
+            this.proxyDirectListener = listener;
+        } catch (Exception ex) {
+            logger.warn("RTP proxy-direct listener failed to bind {}:{} ({}); player-independent "
+                    + "backend publishing disabled this session.", bindHost, port, ex.toString());
+            this.proxyDirectListener = null;
+        }
+    }
+
+
+    /** Lenient int parse for raw YAML values; returns {@code def} on null / non-numeric. */
+    private static int parseIntOrDefault(Object value, int def) {
+        if (value == null) return def;
+        if (value instanceof Number n) return n.intValue();
+        try {
+            return Integer.parseInt(String.valueOf(value).trim());
+        } catch (NumberFormatException e) {
+            return def;
         }
     }
 
@@ -576,6 +775,22 @@ public final class RtpVelocityPlugin {
                 try { ownershipTracker.close(); }
                 catch (RuntimeException ex) {
                     logger.warn("RTP shutdown step {} (close ownership tracker) threw: {}", step, ex.getMessage());
+                }
+            }
+            // Proxy-cache companion: deregister the rtp:net channel so a
+            // subsequent reload re-registers cleanly.
+            if (proxyCacheListener != null) {
+                try { proxyCacheListener.unregister(); }
+                catch (RuntimeException ex) {
+                    logger.warn("RTP shutdown step {} (unregister proxy-cache channel) threw: {}", step, ex.getMessage());
+                }
+            }
+            // Proxy-direct listener: stop accepting + close the TCP socket and
+            // its worker pool so a reload re-binds cleanly (rtp-proxy-ADR-017).
+            if (proxyDirectListener != null) {
+                try { proxyDirectListener.stop(); }
+                catch (RuntimeException ex) {
+                    logger.warn("RTP shutdown step {} (stop proxy-direct listener) threw: {}", step, ex.getMessage());
                 }
             }
             step = 3;

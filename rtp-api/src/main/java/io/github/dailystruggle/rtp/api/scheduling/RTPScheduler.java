@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.api.scheduling;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -16,6 +17,7 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
  * <p>Implementations are provided by the platform adapter (e.g., {@code rtp-bukkit},
  * {@code rtp-folia}).
  */
+@PublicApi
 public interface RTPScheduler {
   /**
    * Executes a task in an asynchronous thread.

@@ -1,4 +1,5 @@
 package io.github.dailystruggle.rtp.api.selection;
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
@@ -15,6 +16,7 @@ import java.util.concurrent.CompletableFuture;
  * @see GenerationContext
  * @see GenerationResult
  */
+@PublicApi
 public interface ILocationGenerator {
 
     /**

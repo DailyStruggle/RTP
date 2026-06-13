@@ -123,6 +123,77 @@ cannot synthesize without re-implementing the protocol. The harness drives
 every other scenario via Redis introspection and `docker exec` Bukkit-console
 commands.
 
+## Lite edition (plugin-message transport, no Redis)
+
+By default the harness builds and stages the **Pro** jar and seeds each
+backend/lobby with a Redis `network.yml`. Pass `-Lite` to instead exercise the
+free/lite edition's DB-free, tier-1 plugin-message transport (ADR-024
+2026-06-12 amendment, `rtp-proxy-ADR-016`):
+
+```powershell
+.\run-acceptance.ps1 -Lite                 # boot + roundtrip against the lite jar
+.\run-acceptance.ps1 -Lite -Scenario boot   # single scenario
+```
+
+`-Lite` changes three things:
+
+1. **Jar** - builds `:rtp-plugin:remapLiteJar` and stages the unclassified
+   `LeafRTP-<ver>.jar` (no Redis/SQL `NetworkTransport` bindings) instead of
+   `LeafRTP-Pro-<ver>.jar`.
+2. **Seeds** - layers `docker-compose.lite.yml` (via the same `COMPOSE_FILE`
+   chain the lobby-world overlay uses), which remounts each instance's
+   `network-lite.yml` (`transport.type: auto`, `pluginMessage` block) over the
+   Redis `network.yml`. Backends self-advertise region availability over the
+   proxy's built-in `bungeecord:main` vocabulary; no Redis/SQL is required.
+3. **Scenario plan** - under `-Scenario all`, only `boot` + the manual
+   `roundtrip` run. The `heartbeat`, `killmidflight`, and `killswitch`
+   scenarios introspect/drive Redis keys and do not apply to the lite tier.
+
+The Redis container still boots (the base compose file defines it) but the lite
+plugin never connects to it. Auto-detection completes on the first player join
+(plugin messages ride a player connection), so the lite roundtrip is the
+client-driven verification of the DB-free path. Mixing `-Lite` with the
+lobby-world overlay is supported (both overlays compose cleanly).
+
+### Testing a cross-server teleport on the lite stack
+
+`docker-compose.lite.yml` is an **overlay**, not a standalone stack: it layers
+on top of `docker-compose.yml`, which still defines the two Velocity proxies
+(`proxy-a`, `proxy-b`). The proxy is still what performs the player move
+(`Connect`) and relays backend->backend availability gossip (`Forward`); `-Lite`
+only swaps the coordination *transport* underneath from Redis to the DB-free
+plugin-message tier. So the cross-server `/rtp` path is exercised exactly as on
+Pro - there is no proxy-less teleport (only a proxy can move a player between
+backends).
+
+Steps (a live 1.21.x Minecraft client is required - plugin messages ride a
+real player connection and cannot be synthesized headlessly):
+
+```powershell
+cd devstack
+.\run-acceptance.ps1 -Lite -Scenario roundtrip
+```
+
+1. Connect a client to `localhost:25577` (proxy-a). You land on `backend-a`.
+2. Run `/server backend-b` then `/server backend-c` once each. This matters on
+   the lite tier specifically: a backend can only emit its heartbeat / complete
+   auto-detection once a player connection exists on it (plugin messages cannot
+   flow on a player-empty backend), so visiting each backend seeds availability
+   gossip. A freshly-idled Fabric/NeoForge backend self-pauses after ~60 s with
+   no players, so its availability reverts to unknown until someone hops back.
+3. From the client, run `/rtp` (or the cross-server region form) and observe the
+   player being moved to another backend and teleported there.
+4. Confirm in the destination backend's log window that it ran its local
+   teleport pipeline on arrival.
+
+**Evidence under lite differs from Pro.** The `roundtrip` scenario's automated
+capture was written for the Redis tier: it samples reservation-token keys via
+`redis-cli`, which are empty under lite (the plugin-message binding's `claim` is
+best-effort/no-op by design - "no token" is expected, not a failure). On the
+lite stack, verification is **visual + log-based**: confirm the teleport
+in-client and grep the destination backend log for the arrival/teleport line
+rather than looking for a reservation token.
+
 ## Lobby world (optional)
 
 By default both lobbies generate a vanilla flat-ish Paper world on first boot.

@@ -271,10 +271,10 @@ wachtrijGroeiWaarschuwDrempel: 0
 # naar 1 bijgesteld. /rtp admin prefab rollback doorloopt back-ups nieuwste-eerst over
 # meerdere aanroepen.
 voorgevormd:
-  # Aantal van een tijdstempel voorziene configback-ups dat per bestand wordt bewaard.
+  # Number of timestamped config backups kept per file before pruning.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  bakBehoud: 3
+  bakRetention: 3
 # RAAK HET VERSIENUMMER NIET AAN
 version: 1.0

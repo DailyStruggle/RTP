@@ -253,14 +253,23 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
     // future; this is the tell-tale S-005 violation we care about.
     r.alreadyDoneOnReturn = future.isDone();
 
-    future.whenComplete(
-        (key, err) -> {
-          completingThread.set(Thread.currentThread().getName());
-          if (err != null) completionError.set(err);
-        });
+    // Block on the future returned by whenComplete (not on `future`
+    // itself): that returned stage only completes AFTER our callback has
+    // run, so by the time get() returns the completingThread reference is
+    // guaranteed to be set. Blocking directly on `future` is racy because
+    // the completing thread pops the blocking waiter (Signaller) and our
+    // whenComplete dependent off the same stack in an indeterminate
+    // order, so get() could return before the callback recorded the
+    // completing thread (intermittent null completingThread).
+    CompletableFuture<Long> observed =
+        future.whenComplete(
+            (key, err) -> {
+              completingThread.set(Thread.currentThread().getName());
+              if (err != null) completionError.set(err);
+            });
 
     try {
-      Long key = future.get(timeoutMs, TimeUnit.MILLISECONDS);
+      Long key = observed.get(timeoutMs, TimeUnit.MILLISECONDS);
       r.chunkKey = key;
     } catch (TimeoutException te) {
       r.notes = "timeout after " + timeoutMs + "ms";

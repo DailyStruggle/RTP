@@ -62,23 +62,23 @@ class NetworkConfigTest {
     }
 
     @Test
-    void emptyProxyIdFailsFastWhenResolvedToProxy() {
+    void emptyProxyIdDefaultsToNonEmptyWhenResolvedToProxy() {
+        // proxyId is optional: an empty value on a proxy role defaults to the
+        // local hostname (never empty / null) rather than failing fast.
         Map<String, Object> root = minimalDisabled();
         ((Map<String, Object>) root.get("network")).put("proxyId", "");
-        NetworkConfigException ex = assertThrows(NetworkConfigException.class,
-                () -> NetworkConfig.fromMap(root, velocityAccessor("p1")));
-        assertNotNull(ex.getMessage());
-        org.junit.jupiter.api.Assertions.assertTrue(
-                ex.getMessage().contains("proxyId"),
-                "message must name proxyId: " + ex.getMessage());
+        NetworkConfig cfg = NetworkConfig.fromMap(root, velocityAccessor("p1"));
+        assertNotNull(cfg.proxyId());
+        assertFalse(cfg.proxyId().isEmpty(), "proxyId must default to a non-empty value");
     }
 
     @Test
-    void missingProxyIdFailsFastWhenResolvedToProxy() {
+    void missingProxyIdDefaultsToNonEmptyWhenResolvedToProxy() {
         Map<String, Object> root = minimalDisabled();
         ((Map<String, Object>) root.get("network")).remove("proxyId");
-        assertThrows(NetworkConfigException.class,
-                () -> NetworkConfig.fromMap(root, velocityAccessor("p1")));
+        NetworkConfig cfg = NetworkConfig.fromMap(root, velocityAccessor("p1"));
+        assertNotNull(cfg.proxyId());
+        assertFalse(cfg.proxyId().isEmpty(), "proxyId must default to a non-empty value");
     }
 
     @Test

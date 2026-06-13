@@ -275,10 +275,10 @@ umbralAvisoCrecimientoCola: 0
 # ajustan a 1. /rtp admin prefab rollback recorre las copias de la más nueva a la más
 # antigua a lo largo de varias invocaciones.
 prefabricado:
-  # Número de copias de seguridad con marca de tiempo que se conservan por archivo.
+  # Number of timestamped config backups kept per file before pruning.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  retencionBak: 3
+  bakRetention: 3
 # NO TOQUES EL NÚMERO DE VERSIÓN
 version: 1.0

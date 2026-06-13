@@ -1,9 +1,7 @@
 # Devstack backend-c network.yml. Fabric 1.21.11.
 network:
   enabled: true
-  schemaVersion: 1
   serverId: "backend-c"
-  role: backend
   secretEnv: RTP_NET_SECRET
 transport:
   type: redis

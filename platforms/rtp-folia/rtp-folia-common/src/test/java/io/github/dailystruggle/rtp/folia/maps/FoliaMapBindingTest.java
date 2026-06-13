@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -21,14 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <ul>
  *   <li>FoliaMapBinding is a subtype of {@link BukkitMapBinding} and the
  *       {@link MapBinding} / {@link MapBindingLifecycle} contracts.</li>
- *   <li>{@code bindLive} throws a Folia-specific
- *       {@link UnsupportedOperationException} message (so log readers can
- *       tell which platform path is unwired).</li>
- *   <li>{@code dispatchToViewerRegion} returns {@code false} for an offline
- *       viewer rather than throwing -- the contract documented on the
- *       method, and the safety net the future Stage 3 {@code bindLive}
- *       implementation will rely on.</li>
- *   <li>Null arguments to {@code dispatchToViewerRegion} are rejected.</li>
+ *   <li>{@code deliverTo} is inherited from {@link BukkitMapBinding}: the
+ *       region-thread hop for the {@code FILLED_MAP} drop is performed by
+ *       the caller ({@code MapDispatch}) via {@code RTP.scheduler}, so this
+ *       subclass no longer reimplements an {@code EntityScheduler} hop.</li>
  * </ul>
  */
 class FoliaMapBindingTest {
@@ -55,28 +50,6 @@ class FoliaMapBindingTest {
         // work on Folia via the supplier-driven LiveChartRenderer.
         assertThrows(NullPointerException.class,
                 () -> binding.bindLive(null, null, null));
-    }
-
-    @Test
-    @DisplayName("dispatchToViewerRegion returns false for an offline viewer")
-    void dispatchOffline() {
-        FoliaMapBinding binding = new FoliaMapBinding();
-        // No Bukkit server is running in this test; Bukkit.getPlayer(...)
-        // returns null and the method must return false rather than throw.
-        boolean dispatched = binding.dispatchToViewerRegion(
-                UUID.randomUUID(), () -> { throw new AssertionError("must not run"); });
-        assertFalse(dispatched,
-                "offline viewer must yield a no-op dispatch returning false");
-    }
-
-    @Test
-    @DisplayName("dispatchToViewerRegion rejects null arguments")
-    void dispatchNullArgs() {
-        FoliaMapBinding binding = new FoliaMapBinding();
-        assertThrows(NullPointerException.class,
-                () -> binding.dispatchToViewerRegion(null, () -> {}));
-        assertThrows(NullPointerException.class,
-                () -> binding.dispatchToViewerRegion(UUID.randomUUID(), null));
     }
 
     @Test

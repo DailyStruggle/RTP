@@ -88,6 +88,15 @@ public class RTP {
   public static final io.github.dailystruggle.rtp.common.addon.AddonRegistry addons =
       new io.github.dailystruggle.rtp.common.addon.AddonRegistry();
 
+  /**
+   * Process-wide accumulator of biome <em>occupancy</em> (where online players
+   * spend their time), surfaced by {@code /rtp info biomes}. Populated by the
+   * platform adapter's periodic occupancy sampler; resets on restart/reload.
+   * In-memory only - no persistence, identical in the full and lite editions.
+   */
+  public static final io.github.dailystruggle.rtp.common.tools.activity.BiomeActivityTracker
+      biomeActivity = new io.github.dailystruggle.rtp.common.tools.activity.BiomeActivityTracker();
+
   public static final UUID serverId = RTPAPI.serverId;
 
   public static RTPServerAccessor serverAccessor;
@@ -131,6 +140,27 @@ public class RTP {
   public static volatile java.util.function.Function<Boolean,
       io.github.dailystruggle.rtp.common.network.BackendStateSampler>
       backendStateSamplerFactory;
+
+  /**
+   * Platform-supplied factory for the tier-1 (DB-free) plugin-message
+   * {@link io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge}.
+   * Each backend platform adapter that supports proxy plugin messaging
+   * (Bukkit / Paper / Folia; later Fabric / NeoForge) installs a factory
+   * during startup that wires the {@code bungeecord:main} channel and the
+   * passive proxy-forwarding probe. Consumed by
+   * {@code NetworkModeBootstrap.openTransport} when {@code transport.type} is
+   * {@code plugin-message} or {@code auto}.
+   *
+   * <p>The factory lives on {@code RTP} (rtp-core) rather than
+   * {@code RTPServerAccessor} (rtp-api) because {@code NetworkBridge} feeds a
+   * {@code rtp-proxy-common}-typed transport. Remains {@code null} until a
+   * platform installs one; the bootstrap treats {@code null} as "this platform
+   * has no plugin-message bridge" and keeps the plugin-message / auto tiers
+   * disabled (graceful, no crash). See {@code rtp-proxy-ADR-016}.
+   */
+  public static volatile java.util.function.Supplier<
+      io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge>
+      networkBridgeFactory;
 
   /**
    * L6 Slice J: when {@code true}, this backend is configured as a pure

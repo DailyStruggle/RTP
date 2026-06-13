@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.api.hooks;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+
 import io.github.dailystruggle.rtp.api.platform.PlatformCreator;
 
 /**
@@ -24,6 +26,7 @@ import io.github.dailystruggle.rtp.api.platform.PlatformCreator;
  * thread (S-005); block writes run on the region-owning thread. Implementations shall be
  * thread-safe.
  */
+@PublicApi
 public interface PlatformCreatorRegistry {
 
   /**

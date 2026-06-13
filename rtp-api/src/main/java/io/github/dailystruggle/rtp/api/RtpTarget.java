@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.api;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.util.Objects;
 
@@ -18,6 +19,7 @@ import java.util.Objects;
  * across threads. Use {@link #defaultRegion()} when you just want "an RTP, anywhere
  * sensible".
  */
+@PublicApi
 public final class RtpTarget {
 
   /** Discriminator describing how {@link #name()} should be interpreted. */

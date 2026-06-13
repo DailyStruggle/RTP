@@ -88,10 +88,16 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
               if (!registry.isReachableHardPin(parsed.serverHint(), parsed.regionKey())) {
                 return false;
               }
-              // Permission is keyed on the bare region name, not the
+              // Two independent gates for a qualified `server:region` target:
+              //   - `rtp.servers.<server>` allows/denies the destination
+              //     backend (new; mirrors `rtp.regions.x` but keyed on the
+              //     server hint), and
+              //   - `rtp.regions.<region>` allows/denies the region.
+              // Region permission is keyed on the bare region name, not the
               // qualified form, so an operator's existing
               // `rtp.regions.default` grant covers `backend-a:default`.
-              return sender.hasPermission("rtp.regions." + parsed.regionKey());
+              return sender.hasPermission("rtp.servers." + parsed.serverHint())
+                  && sender.hasPermission("rtp.regions." + parsed.regionKey());
             },
             () -> {
               io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap live =

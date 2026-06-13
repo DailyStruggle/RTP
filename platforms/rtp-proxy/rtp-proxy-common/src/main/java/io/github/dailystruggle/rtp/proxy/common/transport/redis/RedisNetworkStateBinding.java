@@ -1,13 +1,13 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
-import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat.PluginState;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
 import io.github.dailystruggle.rtp.proxy.common.spi.ProxyHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReleaseReason;
 import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
+import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeatCodec;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.spi.Subscription;
 
@@ -683,27 +683,15 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
     // ---- encode / decode -------------------------------------------------
 
     private String encodeBackend(BackendHeartbeat r) {
-        // Build the field map in canonical insertion order. Both encode (sign)
-        // and decode (verify) MUST reconstruct the canonical byte sequence in
+        // Field map / canonical byte sequence are produced by the shared
+        // BackendHeartbeatCodec so Redis, SQL, and the plugin-message tier all
+        // carry an identical field set and ordering. Both encode (sign) and
+        // decode (verify) MUST reconstruct the canonical byte sequence in
         // exactly this order - HSET-read via j.hgetAll() returns a plain
         // HashMap with arbitrary iteration order, so deriving canonical bytes
         // from the parsed map's iteration order would break HMAC verification
         // on every snapshot read (REQ-RTP-S-004, fix 2026-05-21).
-        Map<String, String> m = new LinkedHashMap<>();
-        m.put("serverId", r.serverId());
-        m.put("schemaVersion", Integer.toString(r.schemaVersion()));
-        m.put("pluginState", r.pluginState().name());
-        m.put("acceptingRequests", Boolean.toString(r.acceptingRequests()));
-        m.put("lastSeenEpochMs", Long.toString(r.lastSeenEpochMs()));
-        m.put("mspt", Double.toString(r.mspt()));
-        m.put("queueDepth", Integer.toString(r.queueDepth()));
-        m.put("softCap", Integer.toString(r.softCap()));
-        m.put("heapUsedBytes", Long.toString(r.heapUsedBytes()));
-        m.put("heapMaxBytes", Long.toString(r.heapMaxBytes()));
-        m.put("playerCount", Integer.toString(r.playerCount()));
-        m.put("regionsAvailable", joinList(r.regionsAvailable()));
-        m.put("worldsLoaded", joinList(r.worldsLoaded()));
-        m.put("killSwitch", Boolean.toString(r.killSwitch()));
+        Map<String, String> m = BackendHeartbeatCodec.toFieldMap(r);
         String canonical = canonicalBackend(m);
         StringBuilder sb = new StringBuilder(256).append(canonical);
         if (verifier != null) {
@@ -725,27 +713,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
      * the line count fixed; the surrounding decoder rejects malformed rows.
      */
     static String canonicalBackend(Map<String, String> m) {
-        StringBuilder sb = new StringBuilder(256);
-        appendField(sb, m, "serverId", true);
-        appendField(sb, m, "schemaVersion", false);
-        appendField(sb, m, "pluginState", false);
-        appendField(sb, m, "acceptingRequests", false);
-        appendField(sb, m, "lastSeenEpochMs", false);
-        appendField(sb, m, "mspt", false);
-        appendField(sb, m, "queueDepth", false);
-        appendField(sb, m, "softCap", false);
-        appendField(sb, m, "heapUsedBytes", false);
-        appendField(sb, m, "heapMaxBytes", false);
-        appendField(sb, m, "playerCount", false);
-        appendField(sb, m, "regionsAvailable", false);
-        appendField(sb, m, "worldsLoaded", false);
-        appendField(sb, m, "killSwitch", false);
-        return sb.toString();
-    }
-
-    private static void appendField(StringBuilder sb, Map<String, String> m, String key, boolean first) {
-        if (!first) sb.append('\n');
-        sb.append(key).append('=').append(m.getOrDefault(key, ""));
+        return BackendHeartbeatCodec.canonical(m);
     }
 
     private BackendHeartbeat decodeBackend(String payload) {
@@ -768,27 +736,11 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 return null;
             }
         }
-        try {
-            return new BackendHeartbeat(
-                    requireKey(m, "serverId"),
-                    Integer.parseInt(m.getOrDefault("schemaVersion", "1")),
-                    PluginState.valueOf(m.getOrDefault("pluginState", "READY")),
-                    Boolean.parseBoolean(m.getOrDefault("acceptingRequests", "true")),
-                    Long.parseLong(m.getOrDefault("lastSeenEpochMs", "0")),
-                    Double.parseDouble(m.getOrDefault("mspt", "0")),
-                    Integer.parseInt(m.getOrDefault("queueDepth", "0")),
-                    Integer.parseInt(m.getOrDefault("softCap", "0")),
-                    Long.parseLong(m.getOrDefault("heapUsedBytes", "0")),
-                    Long.parseLong(m.getOrDefault("heapMaxBytes", "0")),
-                    Integer.parseInt(m.getOrDefault("playerCount", "0")),
-                    splitList(m.getOrDefault("regionsAvailable", "")),
-                    splitList(m.getOrDefault("worldsLoaded", "")),
-                    Boolean.parseBoolean(m.getOrDefault("killSwitch", "false"))
-            );
-        } catch (Exception e) {
-            LOG.log(Level.WARNING, "decodeBackend: malformed payload (" + e.getMessage() + ")");
-            return null;
+        BackendHeartbeat hb = BackendHeartbeatCodec.fromFieldMap(m);
+        if (hb == null) {
+            LOG.log(Level.WARNING, "decodeBackend: malformed payload");
         }
+        return hb;
     }
 
     private Map<String, String> encodeProxy(ProxyHeartbeat r) {
@@ -849,30 +801,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         return sb.toString();
     }
 
-    private static String requireKey(Map<String, String> m, String key) {
-        String v = m.get(key);
-        if (v == null) throw new IllegalArgumentException("missing required key: " + key);
-        return v;
-    }
 
-    private static String joinList(List<String> xs) {
-        if (xs == null || xs.isEmpty()) return "";
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < xs.size(); i++) {
-            if (i > 0) sb.append(',');
-            sb.append(xs.get(i).replace(',', '_').replace('\n', '_'));
-        }
-        return sb.toString();
-    }
-
-    private static List<String> splitList(String s) {
-        if (s == null || s.isEmpty()) return List.of();
-        List<String> out = new ArrayList<>();
-        for (String tok : s.split(",")) {
-            if (!tok.isEmpty()) out.add(tok);
-        }
-        return out;
-    }
 
     private final class Sub implements Subscription {
         final Consumer<BackendHeartbeat> sink;

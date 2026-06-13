@@ -197,6 +197,14 @@ infoSwiat: "  #21ADA8[world]"
 infoRegionNaglowek: "#63C5DARegiony:"
 infoKonsolaRegionNaglowek: "&7--- Regiony ---"
 infoRegion: "  #52B2BF[region]"
+# Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
+# players spend their time in, sampled over the server's uptime.
+# Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
+infoBiomeActivityHeader: "&8--- &3Biome occupancy &8(&3[biomeTotalSamples]&8 samples, &3[biomeDistinctCount]&8 biomes) ---"
+# Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
+infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
+# Shown when no occupancy has been sampled yet.
+infoBiomeActivityEmpty: "&8--- &7no biome occupancy sampled yet &8---"
 
 # pod-listy info
 # zmienne: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
@@ -283,8 +291,8 @@ menuStronaGlownaSekcjaTeleport: "&8--- &7teleport &8---"
 # Front-page rows. No placeholders.
 menuStronaGlownaWierszTeleport: "&a▶ /rtp &7- teleport to a random location"
 menuStronaGlownaWierszRegion: "&a▶ /rtp region:&7... &7- pick a region"
-menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- pick a world"
-menuStronaGlownaWierszBiom: "&a▶ /rtp biome:&7... &7- pick a biome"
+menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- wybierz świat"
+menuStronaGlownaWierszBiom: "&a▶ /rtp biome:&7... &7- wybierz biom"
 menuStronaGlownaWierszPomoc: "&a▶ /rtp help &7- list commands"
 # Front-page admin entry row: the only inline
 # admin-visible row on the front page; click descends into the curated admin
@@ -307,7 +315,7 @@ menuPanelAdminaWierszKonfig: "&b▶ config editor"
 menuPanelAdminaHoverKonfig: "&7otwórz wyselekcjonowany selektor konfiguracji"
 menuPanelAdminaWierszRegiony: "#5FB3B3▶ regions"
 menuPanelAdminaHoverRegiony: "&7dodaj, usuń lub edytuj konfiguracje poszczególnych regionów"
-menuPanelAdminaWierszSwiaty: "#5FB3B3▶ worlds"
+menuPanelAdminaWierszSwiaty: "#5FB3B3▶ światy"
 menuPanelAdminaHoverSwiaty: "&7dodaj, usuń lub edytuj konfiguracje poszczególnych światów"
 menuPanelAdminaWierszEfekty: "#5FB3B3▶ effects"
 menuPanelAdminaHoverEfekty: "&7dodaj, usuń lub edytuj efekty teleportacji dla grup"

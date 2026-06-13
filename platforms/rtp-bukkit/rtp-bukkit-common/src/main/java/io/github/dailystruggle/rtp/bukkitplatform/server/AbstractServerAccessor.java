@@ -566,6 +566,12 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     // without importing this Bukkit-family class. Idempotent across reloads.
     RTP.backendStateSamplerFactory = lobbyMode ->
         new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler(lobbyMode);
+    // rtp-proxy-ADR-016: install the tier-1 (DB-free) plugin-message bridge
+    // factory so NetworkModeBootstrap can open the plugin-message / auto
+    // transports without importing this Bukkit-family class. Idempotent across
+    // reloads; a fresh bridge per call re-registers the channel cleanly.
+    RTP.networkBridgeFactory = () ->
+        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitNetworkBridge(bukkitPlugin);
   }
 
   @Override

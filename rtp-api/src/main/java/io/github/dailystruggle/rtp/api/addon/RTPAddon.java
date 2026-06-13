@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.api.addon;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+
 /**
  * Platform-agnostic lifecycle contract for RTP addons.
  *
@@ -25,18 +27,21 @@ package io.github.dailystruggle.rtp.api.addon;
  * not block, must not perform synchronous chunk I/O on the main thread (S-005), and
  * must not silently swallow teleport failures from any callback it registers (S-004).
  */
+@PublicApi
 public interface RTPAddon {
 
   /**
    * Called once after {@code rtp-core} initialisation completes. The {@code RTPAPI}
    * delegates are guaranteed non-null when this is invoked.
    */
+  @PublicApi
   void onLoad();
 
   /**
    * Called once on shutdown. Release tickets, cancel scheduled tasks, and flush any
    * state allocated in {@link #onLoad()}. The default implementation does nothing.
    */
+  @PublicApi
   default void onUnload() {}
 
   /**
@@ -44,6 +49,7 @@ public interface RTPAddon {
    *
    * @return a non-null display name
    */
+  @PublicApi
   default String name() {
     return getClass().getSimpleName();
   }

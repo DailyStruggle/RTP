@@ -187,7 +187,7 @@ infoThresholdNetworkAgeYellow: 5.0
 folia_dens_header: "&7--- Folia dens ---"
 # Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
-folia_den_row: "  #7E9CC8[regionId]&7: flicks=#7E9CC8[tps1m]&7 purr=#7E9CC8[mspt]&7 kitties=#7E9CC8[playerCount]&7 line=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
+folia_den_row: "#7E9CC8[regionId]&7: flicks=#7E9CC8[tps1m]&7 purr=#7E9CC8[mspt]&7 kitties=#7E9CC8[playerCount]&7 line=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 hairball_warning_header: "&7--- Hairball disclaimer ---"
 hairball_warning: "&7Hairball note: if the server's total orphaned-kibble count exceeds this kitty's lifetime loads ([loads]), this kitty is not the only droolster."
 box_header: "#008080Boxes:"
@@ -196,6 +196,14 @@ box_info_meow: "  #21ADA8[world]"
 territory_header: "#63C5DATerritories:"
 tall_human_territory_header: "&7--- Territories ---"
 territory_meow: "  #52B2BF[region]"
+# Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
+# players spend their time in, sampled over the server's uptime.
+# Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
+infoBiomeActivityHeader: "&8--- &3Biome occupancy &8(&3[biomeTotalSamples]&8 samples, &3[biomeDistinctCount]&8 biomes) ---"
+# Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
+infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
+# Shown when no occupancy has been sampled yet.
+infoBiomeActivityEmpty: "&8--- &7no biome occupancy sampled yet &8---"
 
 # sub-info listings
 # placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
@@ -280,8 +288,8 @@ menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&aâ–¶ /rtp &7- pounce to a random warm spot"
 menuFrontPageRowRegion: "&aâ–¶ /rtp region:&7... &7- sniff a territory"
-menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- pick a world"
-menuFrontPageRowBiome: "&aâ–¶ /rtp biome:&7... &7- sniff a flavour of land"
+menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- sniff a box"
+menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- sniff a flavour of land"
 menuFrontPageRowHelp: "&aâ–¶ /rtp help &7- list meows"
 # Front-page admin entry row: the only inline
 # admin-visible row on the front page; click descends into the curated admin
@@ -304,7 +312,7 @@ menuAdminPanelRowConfig: "&bâ–¶ setup editor"
 menuAdminPanelHoverConfig: "&7open the curated setup picker"
 menuAdminPanelRowRegions: "#5FB3B3â–¶ territories"
 menuAdminPanelHoverRegions: "&7add, remove, or groom per-territory setups"
-menuAdminPanelRowWorlds: "#5FB3B3â–¶ boxes"
+menuAdminPanelRowWorlds: "#5FB3B3▶ boxes"
 menuAdminPanelHoverWorlds: "&7add, remove, or groom per-box setups"
 menuAdminPanelRowEffects: "#5FB3B3â–¶ effects"
 menuAdminPanelHoverEffects: "&7add, remove, or edit per-group teleport effects"

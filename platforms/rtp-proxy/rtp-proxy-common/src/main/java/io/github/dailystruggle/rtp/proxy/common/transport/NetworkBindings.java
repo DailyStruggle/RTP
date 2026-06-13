@@ -64,6 +64,24 @@ public final class NetworkBindings {
             case "in-memory":
             case "memory":
                 return new InMemoryNetworkStateBinding();
+            case "plugin-message":
+            case "pluginmessage":
+            case "auto":
+                // rtp-proxy-ADR-016: the plugin-message tier (and the `auto`
+                // resolver that selects it) is a BACKEND-only transport - a
+                // backend speaks the proxy's built-in plugin-messaging
+                // vocabulary over an online player's connection. The proxy IS
+                // the proxy and has no plugin-message bridge to open, so we
+                // degrade to the in-memory binding here with a clear note
+                // rather than the cryptic "unrecognised type" error. A proxy
+                // that needs cross-process durable state must use `sql` or
+                // `redis`.
+                LOG.log(Level.INFO,
+                        "NetworkBindings.open: transport.type='" + cfg.transportType()
+                                + "' is a backend-only plugin-message tier and is not applicable "
+                                + "on the proxy; using the in-memory binding. Set transport.type "
+                                + "to 'sql' or 'redis' for durable proxy-side network state.");
+                return new InMemoryNetworkStateBinding();
             case "sql":
                 if (dataSource == null) {
                     throw new IllegalArgumentException(
@@ -152,6 +170,14 @@ public final class NetworkBindings {
         switch (t) {
             case "in-memory":
             case "memory":
+            case "plugin-message":
+            case "pluginmessage":
+            case "auto":
+                // rtp-proxy-ADR-016: the plugin-message tier (and the `auto`
+                // resolver that selects it) is a backend-only transport; the
+                // proxy has no plugin-message bridge to open, so degrade to the
+                // in-memory queue rather than throwing. A proxy that needs
+                // cross-process durable state must use `sql` or `redis`.
                 return new InMemoryNetworkRequestQueue();
             case "sql":
                 if (dataSource == null) {
@@ -218,6 +244,11 @@ public final class NetworkBindings {
         switch (t) {
             case "in-memory":
             case "memory":
+            case "plugin-message":
+            case "pluginmessage":
+            case "auto":
+                // rtp-proxy-ADR-016: plugin-message/auto is a backend-only tier
+                // and not applicable on the proxy; degrade to in-memory.
                 return new InMemoryNetworkWaitlist(cfg.waitlistMaxSize());
             case "sql":
                 LOG.log(Level.WARNING,
@@ -263,6 +294,11 @@ public final class NetworkBindings {
         switch (t) {
             case "in-memory":
             case "memory":
+            case "plugin-message":
+            case "pluginmessage":
+            case "auto":
+                // rtp-proxy-ADR-016: plugin-message/auto is a backend-only tier
+                // and not applicable on the proxy; degrade to AlwaysLeaderLease.
                 return new AlwaysLeaderLease();
             case "sql":
                 LOG.log(Level.WARNING,
@@ -299,7 +335,12 @@ public final class NetworkBindings {
         switch (t) {
             case "in-memory":
             case "memory":
+            case "plugin-message":
+            case "pluginmessage":
+            case "auto":
             case "sql":
+                // rtp-proxy-ADR-016: plugin-message/auto is a backend-only tier
+                // and not applicable on the proxy; ownership is implicit (NO_OP).
                 return PlayerOwnershipTracker.NO_OP;
             case "redis":
                 try {

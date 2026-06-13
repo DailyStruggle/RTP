@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.api.hooks;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+
 import java.util.UUID;
 import java.util.function.BiFunction;
 
@@ -18,6 +20,7 @@ import java.util.function.BiFunction;
  * promise main-thread invocation). Implementations shall not call blocking server
  * APIs.
  */
+@PublicApi
 public interface PlaceholderProviderRegistry {
 
   /**

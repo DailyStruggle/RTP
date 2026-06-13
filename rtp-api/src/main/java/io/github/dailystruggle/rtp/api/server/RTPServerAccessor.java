@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.api.server;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
@@ -37,6 +38,7 @@ import java.util.logging.Level;
  * <p><b>Thread safety:</b> All methods are safe to call from any thread unless
  * otherwise noted in the method Javadoc.
  */
+@PublicApi
 public interface RTPServerAccessor {
   ConcurrentHashMap<String, TrackedRTPTask> activeTasks = new ConcurrentHashMap<>();
 

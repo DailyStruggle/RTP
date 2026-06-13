@@ -261,6 +261,25 @@ public enum MessagesKeys {
   infoConsoleRegionHeader,
   /** Template for a single region entry line in {@code /rtp info} (player view). */
   infoRegion,
+  /**
+   * Header line introducing the biome-occupancy leaderboard shown by
+   * {@code /rtp info biomes}. Supports the {@code [biomeTotalSamples]} and
+   * {@code [biomeDistinctCount]} tokens. Empty template skips silently.
+   */
+  infoBiomeActivityHeader,
+  /**
+   * Per-row template for a single biome in the {@code /rtp info biomes}
+   * occupancy leaderboard. Supports the row-local tokens {@code [biomeRank]},
+   * {@code [biomeName]}, {@code [biomeSamples]}, {@code [biomePercent]}, and
+   * {@code [biomeBar]} (a textual share bar). Empty template skips silently.
+   */
+  infoBiomeActivityRow,
+  /**
+   * Line shown by {@code /rtp info biomes} when no occupancy has been sampled
+   * yet (no players online long enough, or the sampler has not run). Empty
+   * template skips silently.
+   */
+  infoBiomeActivityEmpty,
   /** Detailed world information block shown by {@code /rtp info <world>}. */
   worldInfo,
   /** Detailed region information block shown by {@code /rtp info <world> <region>}. */

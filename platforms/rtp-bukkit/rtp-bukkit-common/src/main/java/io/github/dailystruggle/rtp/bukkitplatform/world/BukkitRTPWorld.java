@@ -631,6 +631,15 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       loadChunkTask.run();
       return;
     }
+    // Folia note: Bukkit.getScheduler().runTask(...) throws UnsupportedOperationException
+    // on Folia, so route the synchronous load through RTP.scheduler (region-aware on
+    // Folia, main-thread on Bukkit/Paper).
+    io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler =
+        RTP.serverAccessor == null ? null : RTP.serverAccessor.getScheduler();
+    if (scheduler != null) {
+      scheduler.runTask(this, cx, cz, loadChunkTask);
+      return;
+    }
     org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
     if (plugin != null) {
       org.bukkit.Bukkit.getScheduler().runTask(plugin, loadChunkTask);
@@ -684,13 +693,19 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       return java.util.concurrent.CompletableFuture.completedFuture(null);
     }
     // ADR-015 Paper chunk-system-v2 follow-up (ticket-application race):
-    // the raw addPluginChunkTicket call is main-thread-only on Bukkit/Paper.
-    // Off-thread callers schedule the application via runTask and MUST await
-    // the returned future before relying on the chunk being pinned; the
-    // previous void return allowed the location generator to hit the stale-
-    // chunk guard before the scheduled task had actually run.
+    // the raw addPluginChunkTicket call is main-thread-only on Bukkit/Paper and
+    // region-thread-only on Folia. Off-thread callers schedule the application via
+    // the platform's region-aware scheduler and MUST await the returned future
+    // before relying on the chunk being pinned; the previous void return allowed
+    // the location generator to hit the stale-chunk guard before the scheduled
+    // task had actually run.
+    //
+    // Folia note: Bukkit.getScheduler().runTask(...) throws
+    // UnsupportedOperationException on Folia, so the ticket application is routed
+    // through RTP.scheduler (FoliaAwareScheduler), which hops to the region that
+    // owns (cx, cz) on Folia and to the main thread on Bukkit/Paper.
     java.util.concurrent.CompletableFuture<Void> future = new java.util.concurrent.CompletableFuture<>();
-    org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+    Runnable applyTicket = () -> {
       try {
         if (forceLoad) {
           if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {
@@ -703,7 +718,14 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       } catch (Throwable t) {
         future.completeExceptionally(t);
       }
-    });
+    };
+    io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler =
+        RTP.serverAccessor == null ? null : RTP.serverAccessor.getScheduler();
+    if (scheduler != null) {
+      scheduler.runTask(this, cx, cz, applyTicket);
+    } else {
+      org.bukkit.Bukkit.getScheduler().runTask(plugin, applyTicket);
+    }
     return future;
   }
 

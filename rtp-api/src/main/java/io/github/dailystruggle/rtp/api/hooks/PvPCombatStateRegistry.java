@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.api.hooks;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+
 import java.util.UUID;
 
 /**
@@ -23,6 +25,7 @@ import java.util.UUID;
  * combat" and logged once at WARNING; the gate never silently swallows the error
  * (REQ-RTP-S-004) and the teleport is not blocked by a buggy integration.
  */
+@PublicApi
 public interface PvPCombatStateRegistry {
 
   /** Functional interface for the combat-state binding. */

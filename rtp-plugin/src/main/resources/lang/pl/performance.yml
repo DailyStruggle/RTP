@@ -241,10 +241,10 @@ progOstrzezeniaWzrostuKolejki: 0
 # najstarsze. Ustaw 1, aby zachować tylko najnowszą; wartości poniżej 1 są podnoszone do 1.
 # /rtp admin prefab rollback przechodzi kopie od najnowszej w wielu wywołaniach.
 prefabrykat:
-  # Liczba opatrzonych znacznikiem czasu kopii zapasowych zachowywanych na plik.
+  # Number of timestamped config backups kept per file before pruning.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  przechowywanieBak: 3
+  bakRetention: 3
 # NIE ZMIENIAJ NUMERU WERSJI
 version: 1.0

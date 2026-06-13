@@ -9,15 +9,10 @@
 # sich byte-identisch zu einem Build ohne Netzwerkmodus.
 network:
   enabled: false
-  schemaVersion: 1
   # Stabile Backend-Identität. Erforderlich, wenn `enabled: true`. Kein Standard - der
   # Betreiber MUSS eine angeben; zwei Backends mit derselben serverId überschreiben
   # gegenseitig ihre Heartbeat-Zeile.
   serverId: ""
-  # Backends nehmen niemals eine Proxy-Rolle an. `role: backend` ist der einzige gültige
-  # Wert auf dieser Seite; das Feld existiert nur aus Symmetrie zu Proxy-
-  # Adaptern (die `role: auto | proxy` berücksichtigen).
-  role: "backend"
   # Umgebungsvariable mit dem gemeinsamen HMAC-Secret. Erforderlich, wenn
   # `enabled: true` UND `transport.type: redis`; die SQL-Bindung behandelt
   # die Umgebungsvariable derzeit als optional (DB-Verbindungs-Authentifizierung + TLS bilden die
@@ -35,7 +30,13 @@ transport:
   #   backend-übergreifende Reservierungs-Tokens) steht noch nicht bereit. Projektziel ist
   #   redis-first; stelle `type: redis` um, sobald du eine von allen Backends und Proxys
   #   gemeinsam genutzte Redis-Instanz hast.
-  type: "sql"
+  type: "auto"
+  # Plugin-messaging transport tuning. Used when `type` is `auto` (and a
+  # proxy was detected) or `plugin-message`. Ignored by the other transports.
+  pluginMessage:
+    # Proxy plugin-messaging channel. Leave as the default unless your proxy
+    # is configured to use a non-standard channel name.
+    channel: "bungeecord:main"
   redis:
     # Erforderlich, wenn `type: redis`. Hostname oder IP der Redis-Instanz,
     # die von jedem Backend und Proxy im Netzwerk gemeinsam genutzt wird.
@@ -51,6 +52,12 @@ heartbeat:
   # der von Publishern auf Proxy- und Backend-Seite verwendet wird; die Poll-Schleife
   # des Proxys muss Zeilen innerhalb von `staleAfterMs` sehen, um sie als aktiv zu werten.
   intervalMs: 1000
+  # How long a peer's last-seen state stays trusted before it is treated as
+  # unknown. On the plugin-message tier this is also the snapshot stale
+  # window: a peer that goes unknown is still accepted as a destination (the
+  # destination decides on arrival), it just stops being suggested. Keep it
+  # comfortably above `intervalMs` so one dropped heartbeat does not flap a
+  # peer to unknown.
   staleAfterMs: 5000
 # Router auf Backend-Seite. Wenn `routing.mode`
 # `local` ist (Standard), führt `/rtp` nur die lokale Pipeline aus und der Rest
@@ -170,33 +177,54 @@ regionCollision:
 # regionScarcityWeight ist 0, weil der explizite `region`-Term unten das
 # Kept-Region-Signal besitzt.
 loadBalancer:
+  # Weight of the built-in region-scarcity term. 0 here because the explicit
+  # `region` term below already owns the kept-region signal.
+  # @type: number
+  # @default: 0
   regionScarcityWeight: 0
+  # Scoring terms, one per metric. Each has an `input`, a `weight`, and a
+  # `curve` (type + parameters). Defaults gate overloaded backends.
   terms:
+    # Tick pressure; sigmoid knee at 0.6.
     mspt:
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       input: "mspt"
+      # @type: number
       weight: 1.0
       curve:
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         type: "sigmoid"
+        # @type: number
+        # @range: [0.1, 20]
         k: 8.0
+        # @type: number
+        # @range: [0, 1]
         x0: 0.6
+    # Queue depth; small queues silent, large ones explode.
     queue:
       input: "queueDepth"
       weight: 1.0
       curve:
         type: "exponential"
         k: 3.0
+    # Heap gate; fires at >= 85% used.
     heap:
       input: "heapUsed"
       weight: 5.0
       curve:
         type: "step"
+        # @range: [0, 1]
         threshold: 0.85
+    # Region gate; fires when the kept pool is >= 95% full.
     region:
       input: "keptRegion"
       weight: 5.0
       curve:
         type: "step"
         threshold: 0.95
+    # Gentle tie-breaker on kept count.
     kept:
       input: "keptCount"
       weight: 0.25

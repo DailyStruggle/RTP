@@ -272,10 +272,10 @@
 # 1 にすると最新のバックアップのみ保持。1 未満の値は 1 に切り上げられます。
 # /rtp admin prefab rollback は複数回の呼び出しでバックアップを新しい順にたどります。
 プリセット:
-  # ファイルごとに保持されるタイムスタンプ付き設定バックアップの数。
+  # Number of timestamped config backups kept per file before pruning.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  bak保持数: 3
+  bakRetention: 3
 # バージョン番号は変更しないでください
 version: 1.0

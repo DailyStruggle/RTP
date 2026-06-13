@@ -244,10 +244,10 @@ sogliaAvvisoCrescitaCoda: 0
 # portati a 1. /rtp admin prefab rollback percorre i backup dal più recente al più
 # vecchio su più invocazioni.
 prefabbricato:
-  # Numero di backup con marca temporale conservati per file prima dell'eliminazione.
+  # Number of timestamped config backups kept per file before pruning.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  conservazioneBak: 3
+  bakRetention: 3
 # NON MODIFICARE IL NUMERO DI VERSIONE
 versione: 1.0

@@ -180,6 +180,14 @@ infoFoliaRegion: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]
 정보_리전헤더: "#63C5DA리전:"
 정보_콘솔_리전헤더: "&7--- 리전 ---"
 정보리전: "  #52B2BF[region]"
+# Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
+# players spend their time in, sampled over the server's uptime.
+# Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
+infoBiomeActivityHeader: "&8--- &3Biome occupancy &8(&3[biomeTotalSamples]&8 samples, &3[biomeDistinctCount]&8 biomes) ---"
+# Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
+infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
+# Shown when no occupancy has been sampled yet.
+infoBiomeActivityEmpty: "&8--- &7no biome occupancy sampled yet &8---"
 
 # sub-info listings
 # placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
@@ -263,8 +271,8 @@ menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&a▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&a▶ /rtp region:&7... &7- pick a region"
-menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- pick a world"
-menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- pick a biome"
+menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- 월드 선택"
+menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- 바이오타 선택"
 menuFrontPageRowHelp: "&a▶ /rtp help &7- list commands"
 # Front-page admin entry row: the only inline
 # admin-visible row on the front page; click descends into the curated admin
@@ -287,7 +295,7 @@ menuAdminPanelRowConfig: "&b▶ config editor"
 menuAdminPanelHoverConfig: "&7open the curated config selector"
 menuAdminPanelRowRegions: "#5FB3B3▶ regions"
 menuAdminPanelHoverRegions: "&7add, remove, or edit per-region configs"
-menuAdminPanelRowWorlds: "#5FB3B3▶ worlds"
+menuAdminPanelRowWorlds: "#5FB3B3▶ 월드"
 menuAdminPanelHoverWorlds: "&7add, remove, or edit per-world configs"
 menuAdminPanelRowEffects: "#5FB3B3▶ effects"
 menuAdminPanelHoverEffects: "&7add, remove, or edit per-group teleport effects"

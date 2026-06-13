@@ -9,15 +9,10 @@
 # byte-identically to a build without network mode.
 network:
   enabled: false
-  schemaVersion: 1
   # Stable backend identity. Required when `enabled: true`. No default - the
   # operator MUST supply one; two backends sharing a serverId will overwrite
   # each other's heartbeat row.
   serverId: ""
-  # Backends never assume a proxy role. `role: backend` is the only valid
-  # value on this side; the field exists only for symmetry with proxy
-  # adapters (which honour `role: auto | proxy`).
-  role: "backend"
   # Environment variable holding the shared HMAC secret. Required when
   # `enabled: true` AND `transport.type: redis`; SQL binding currently
   # treats the env var as optional (DB connection auth + TLS is the
@@ -26,16 +21,36 @@ network:
 
 transport:
   # Backing store for cross-process state.
-  # - `in-memory`: development only; nothing leaves the JVM (REQ-RTP-NET-002
-  #   parity-by-construction).
+  # - `auto`: no database required. Detects a BungeeCord/Velocity proxy at
+  #   runtime and, when one is present, gossips region availability over the
+  #   proxy's built-in plugin-messaging channel. Falls back to a local-only
+  #   (disabled network) state when no proxy is detected. This is the
+  #   recommended starting point: drop the plugin on every backend and the
+  #   network assembles itself, no shared store to set up.
+  # - `plugin-message`: force the proxy plugin-messaging transport even
+  #   without auto-detection. No database required. Availability is
+  #   best-effort and only as fresh as the last heartbeat seen over a player
+  #   connection, so a player-empty backend may briefly show as unknown. Not
+  #   intended for very large multi-proxy networks; use `sql` or `redis`
+  #   there for durable, always-fresh availability.
+  # - `in-memory`: development only; nothing leaves the JVM.
   # - `sql`: DB-as-bus. Reuses the existing RTP database
-  #   accessor pool from `database.yml`. Fallback when redis is not available.
+  #   accessor pool from `database.yml`. Durable across restarts.
   # - `redis`: Jedis-backed heartbeats + pub/sub fan-out.
   #   Heartbeats and snapshot work; atomic claim (used for
-  #   cross-backend reservation tokens) is not yet available. Project goal is
-  #   redis-first; flip `type: redis` once you have a Redis instance shared
+  #   cross-backend reservation tokens) is not yet available. Flip
+  #   `type: redis` once you have a Redis instance shared
   #   across every backend and proxy.
-  type: "sql"
+  type: "auto"
+  # Plugin-messaging transport tuning. Used when `type` is `auto` (and a
+  # proxy was detected) or `plugin-message`. Ignored by the other transports.
+  # Gossip cadence and peer-staleness are NOT configured here: they reuse the
+  # shared `heartbeat.intervalMs` / `heartbeat.staleAfterMs` knobs below, so a
+  # single pair of values drives every transport tier.
+  pluginMessage:
+    # Proxy plugin-messaging channel. Leave as the default unless your proxy
+    # is configured to use a non-standard channel name.
+    channel: "bungeecord:main"
   redis:
     # Required when `type: redis`. Hostname or IP of the Redis instance
     # shared by every backend and proxy in the network.
@@ -50,7 +65,15 @@ heartbeat:
   # How often this backend publishes its state row. 1000ms is the default
   # used by both proxy-side and backend-side publishers; the proxy's
   # poll loop must observe rows within `staleAfterMs` to consider them live.
+  # On the plugin-message tier this same value sets the region-availability
+  # gossip cadence.
   intervalMs: 1000
+  # How long a peer's last-seen state stays trusted before it is treated as
+  # unknown. On the plugin-message tier this is also the snapshot stale
+  # window: a peer that goes unknown is still accepted as a destination (the
+  # destination decides on arrival), it just stops being suggested. Keep it
+  # comfortably above `intervalMs` so one dropped heartbeat does not flap a
+  # peer to unknown.
   staleAfterMs: 5000
 # Backend-side router. When `routing.mode` is
 # `local` (the default), `/rtp` runs the local pipeline only and the rest
@@ -117,86 +140,83 @@ reservation:
 # documented follow-ups. Unknown values silently degrade to `warn`.
 regionCollision:
   policy: "warn"
-# Load balancer scoring table.
-# Consumed by `PeerRegionRegistry.pickMostKept()` on lobby/backend JVMs to
-# drive blank-`/rtp` region selection (and, when `routing.mode: auto`, the
-# fallback region pick for cross-server enrolment). The SAME schema is
-# parsed by the Velocity proxy's `network-proxy.yml`, so curves/weights
-# tuned for one side can be copy-pasted to the other.
-#
-# Per-`(serverId, regionKey)` pair score:
-#   score(b, r) = ( Sigma_i  weight_i * curve_i( normalize_i( metric_i(b) ) ) ) / backendWeight(b)
-#               + regionScarcityWeight * exponential_k5( 1 - keptCount(b, r) / refCount )
-# Lowest score wins; ties break by serverId then regionKey ascending. The
-# synthesized region-scarcity term sharply prioritises regions whose kept
-# pool is shallow (a region 90% empty contributes ~0.85, one 50% empty
-# only ~0.07) - this is the curve-driven replacement for the legacy
-# "most-kept wins" v1 policy.
-#
-# Two configuration shapes are accepted; the lobby reads whichever is present.
-#
-# 1) Sub-configuration `terms` block (preferred). Each term is a map keyed
-#    by a free-form label, with `input`, `weight`, and a nested `curve`
-#    sub-map. Supported inputs: mspt, queueDepth, heapUsed, heapFree,
-#    playerCount, keptCount, tps, keptRegion. Supported curves: linear,
-#    exponential (k), logarithmic (k), sigmoid (k, x0), step (threshold),
-#    power (p). Parameter bounds: k in [0.1, 20], p in [0.1, 8],
-#    x0/threshold in [0, 1].
-#
-# 2) Legacy flat weights (msptWeight, queueDepthWeight, heapWeight,
-#    playerCountWeight) are synthesized to linear terms for back-compat.
-#
-# `regionScarcityWeight` (default 1.0) controls the synthesized
-# region-scarcity term. Set to 0 to disable it (e.g. when you add an
-# explicit `keptRegion` input term and want full control). Adding any
-# explicit `keptRegion` term suppresses the synthesized one automatically.
-#
-# The block below ships ACTIVE so operator support is "edit values" not
-# "first uncomment, then edit". The defaults below mirror the prior
-# "most-kept wins" v1 behaviour with a smooth fall-off (synthesized
-# region-scarcity term disabled because the explicit `region` term owns
-# the signal), but with `step` curves on `heapUsed` and `keptRegion` so
-# overloaded backends are silently skipped without operator action.
-#
-# Five terms, one per metric (no doubled constraints). The curve carries
-# the soft-vs-hard expression: `step` near the top of its range acts as a
-# gate that only fires when the metric is critical, but the candidate can
-# still win if every alternative is even worse (graceful degradation).
-#   - mspt:   sigmoid x0=0.6 (production knee; fires when tick is under pressure)
-#   - queue:  exponential (small queues silent, large ones explode)
-#   - heap:   step at heapUsed >= 0.85, weight 5.0 (effective gate)
-#   - region: step at keptRegion >= 0.95, weight 5.0 (effective gate)
-#   - kept:   logarithmic, weight 0.25 (gentle tie-breaker)
-# regionScarcityWeight is 0 because the explicit `region` term below owns
-# the kept-region signal.
+# Optional per-destination policy overlay. Never required: backends announce
+# themselves over the proxy, so the destination list assembles itself. Add an
+# entry (matched by serverId) only to override policy for one destination;
+# anything not listed uses defaults. Leave commented out for the common case.
+#servers:
+#  example-backend:
+#    # Permission required to target this destination (empty = none).
+#    # @type: string
+#    permission: ""
+#    # Label shown in menus / suggestions (default: serverId).
+#    # @type: string
+#    display-name: "Example"
+#    # Hide from tab-completion when it has no servable region.
+#    # @type: boolean
+#    # @default: false
+#    hide-when-unavailable: false
+#    # Allow targeting it even when it reports no servable region.
+#    # @type: boolean
+#    # @default: true
+#    allow-when-unavailable: true
+# Load balancer scoring for blank-`/rtp` region selection. Lower score wins.
+# Each `terms` entry scores a backend by one metric through a curve; scores
+# sum, divide by backendWeight, and ties break by serverId then region.
+# Inputs: mspt, queueDepth, heapUsed, heapFree, playerCount, keptCount, tps,
+# keptRegion. Curves: linear, exponential (k), logarithmic (k),
+# sigmoid (k, x0), step (threshold), power (p); k 0.1-20, p 0.1-8,
+# x0/threshold 0-1. The defaults below mirror "most-kept wins" with smooth
+# fall-off, gating overloaded backends via `step` curves on heap and region.
 loadBalancer:
+  # Weight of the built-in region-scarcity term. 0 here because the explicit
+  # `region` term below already owns the kept-region signal.
+  # @type: number
+  # @default: 0
   regionScarcityWeight: 0
+  # Scoring terms, one per metric. Each has an `input`, a `weight`, and a
+  # `curve` (type + parameters). Defaults gate overloaded backends.
   terms:
+    # Tick pressure; sigmoid knee at 0.6.
     mspt:
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       input: "mspt"
+      # @type: number
       weight: 1.0
       curve:
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         type: "sigmoid"
+        # @type: number
+        # @range: [0.1, 20]
         k: 8.0
+        # @type: number
+        # @range: [0, 1]
         x0: 0.6
+    # Queue depth; small queues silent, large ones explode.
     queue:
       input: "queueDepth"
       weight: 1.0
       curve:
         type: "exponential"
         k: 3.0
+    # Heap gate; fires at >= 85% used.
     heap:
       input: "heapUsed"
       weight: 5.0
       curve:
         type: "step"
+        # @range: [0, 1]
         threshold: 0.85
+    # Region gate; fires when the kept pool is >= 95% full.
     region:
       input: "keptRegion"
       weight: 5.0
       curve:
         type: "step"
         threshold: 0.95
+    # Gentle tie-breaker on kept count.
     kept:
       input: "keptCount"
       weight: 0.25

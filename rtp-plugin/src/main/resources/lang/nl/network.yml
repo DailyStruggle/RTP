@@ -9,15 +9,10 @@
 # byte-identically to a build without network mode.
 network:
   enabled: false
-  schemaVersion: 1
   # Stable backend identity. Required when `enabled: true`. No default - the
   # operator MUST supply one; two backends sharing a serverId will overwrite
   # each other's heartbeat row.
   serverId: ""
-  # Backends never assume a proxy role. `role: backend` is the only valid
-  # value on this side; the field exists only for symmetry with proxy
-  # adapters (which honour `role: auto | proxy`).
-  role: "backend"
   # Environment variable holding the shared HMAC secret. Required when
   # `enabled: true` AND `transport.type: redis`; SQL binding currently
   # treats the env var as optional (DB connection auth + TLS is the
@@ -35,7 +30,13 @@ transport:
   #   cross-backend reservation tokens) is not yet available. Project goal is
   #   redis-first; flip `type: redis` once you have a Redis instance shared
   #   across every backend and proxy.
-  type: "sql"
+  type: "auto"
+  # Plugin-messaging transport tuning. Used when `type` is `auto` (and a
+  # proxy was detected) or `plugin-message`. Ignored by the other transports.
+  pluginMessage:
+    # Proxy plugin-messaging channel. Leave as the default unless your proxy
+    # is configured to use a non-standard channel name.
+    channel: "bungeecord:main"
   redis:
     # Required when `type: redis`. Hostname or IP of the Redis instance
     # shared by every backend and proxy in the network.
@@ -51,6 +52,12 @@ heartbeat:
   # used by both proxy-side and backend-side publishers; the proxy's
   # poll loop must observe rows within `staleAfterMs` to consider them live.
   intervalMs: 1000
+  # How long a peer's last-seen state stays trusted before it is treated as
+  # unknown. On the plugin-message tier this is also the snapshot stale
+  # window: a peer that goes unknown is still accepted as a destination (the
+  # destination decides on arrival), it just stops being suggested. Keep it
+  # comfortably above `intervalMs` so one dropped heartbeat does not flap a
+  # peer to unknown.
   staleAfterMs: 5000
 # Backend-side router. When `routing.mode` is
 # `local` (the default), `/rtp` runs the local pipeline only and the rest
@@ -170,33 +177,54 @@ regionCollision:
 # regionScarcityWeight is 0 because the explicit `region` term below owns
 # the kept-region signal.
 loadBalancer:
+  # Weight of the built-in region-scarcity term. 0 here because the explicit
+  # `region` term below already owns the kept-region signal.
+  # @type: number
+  # @default: 0
   regionScarcityWeight: 0
+  # Scoring terms, one per metric. Each has an `input`, a `weight`, and a
+  # `curve` (type + parameters). Defaults gate overloaded backends.
   terms:
+    # Tick pressure; sigmoid knee at 0.6.
     mspt:
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
       input: "mspt"
+      # @type: number
       weight: 1.0
       curve:
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
         type: "sigmoid"
+        # @type: number
+        # @range: [0.1, 20]
         k: 8.0
+        # @type: number
+        # @range: [0, 1]
         x0: 0.6
+    # Queue depth; small queues silent, large ones explode.
     queue:
       input: "queueDepth"
       weight: 1.0
       curve:
         type: "exponential"
         k: 3.0
+    # Heap gate; fires at >= 85% used.
     heap:
       input: "heapUsed"
       weight: 5.0
       curve:
         type: "step"
+        # @range: [0, 1]
         threshold: 0.85
+    # Region gate; fires when the kept pool is >= 95% full.
     region:
       input: "keptRegion"
       weight: 5.0
       curve:
         type: "step"
         threshold: 0.95
+    # Gentle tie-breaker on kept count.
     kept:
       input: "keptCount"
       weight: 0.25

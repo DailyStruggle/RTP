@@ -1,9 +1,7 @@
 ﻿# Devstack proxy-b network.yml.
 network:
   enabled: true
-  schemaVersion: 1
   proxyId: "proxy-b"
-  role: proxy
   secretEnv: RTP_NET_SECRET
   killSwitch: false
 transport:

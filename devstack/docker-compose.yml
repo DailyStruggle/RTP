@@ -141,7 +141,7 @@ services:
     entrypoint:
       - /bin/bash
       - -c
-      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
     volumes:
       # Plugin jars: bind a PER-BACKEND plugins dir into /data/plugins (writable).
       # We MUST NOT share ./jars/plugin between backend-a and backend-b: Paper writes
@@ -155,6 +155,11 @@ services:
       # container's writable layer and are discarded on `docker compose down`,
       # so the host devstack tree is never mutated by a running container.
       - ./backend-a/rtp-config/network.yml:/seed/network.yml:ro
+      # Seed-only (read-only): copied into /data/plugins/RTP/logging.yml at boot
+      # so the devstack ships min_level: FINE and the cross-server [NETWORK] FINE
+      # logs (BukkitNetworkBridge push/snapshot, PeerRegionRegistry peerEntries)
+      # are visible without an in-container edit.
+      - ./backend-a/rtp-config/logging.yml:/seed/logging.yml:ro
       # PATCH_DEFINITIONS source: a single JSON patch shared across both backends
       # that flips velocity.enabled=true + sets secret-file. mc-image-helper applies
       # it after refreshing the upstream Paper defaults, so the setting is permanent.
@@ -220,11 +225,14 @@ services:
     entrypoint:
       - /bin/bash
       - -c
-      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
     volumes:
       - ./lobby-a/plugins:/data/plugins
       # Seed-only (read-only); copied into /data/plugins/RTP/network.yml at boot.
       - ./lobby-a/rtp-config/network.yml:/seed/network.yml:ro
+      # See backend-a: seed logging.yml (min_level: FINE) so the lobby's
+      # PeerRegionRegistry FINE tab-completion diagnostics are visible.
+      - ./lobby-a/rtp-config/logging.yml:/seed/logging.yml:ro
       - ./shared/paper-patches:/paper-patches:ro
       - ./shared/forwarding.secret:/data/forwarding.secret
       # Expose user-dropped schematics (shared/lobby-world/*.schem) to
@@ -275,11 +283,13 @@ services:
     entrypoint:
       - /bin/bash
       - -c
-      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
     volumes:
       - ./lobby-b/plugins:/data/plugins
       # Seed-only (read-only); copied into /data/plugins/RTP/network.yml at boot.
       - ./lobby-b/rtp-config/network.yml:/seed/network.yml:ro
+      # See backend-a: seed logging.yml (min_level: FINE).
+      - ./lobby-b/rtp-config/logging.yml:/seed/logging.yml:ro
       - ./shared/paper-patches:/paper-patches:ro
       - ./shared/forwarding.secret:/data/forwarding.secret
       # See lobby-a: expose shared/lobby-world/*.schem to FAWE's pickup dir.
@@ -333,13 +343,15 @@ services:
     entrypoint:
       - /bin/bash
       - -c
-      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
     volumes:
       # See backend-a: per-backend plugins dir (shared host bind corrupts the
       # .paper-remapped cache when both backends race on it).
       - ./backend-b/plugins:/data/plugins
       # Seed-only (read-only); copied into /data/plugins/RTP/network.yml at boot.
       - ./backend-b/rtp-config/network.yml:/seed/network.yml:ro
+      # See backend-a: seed logging.yml (min_level: FINE).
+      - ./backend-b/rtp-config/logging.yml:/seed/logging.yml:ro
       - ./shared/paper-patches:/paper-patches:ro
       - ./shared/forwarding.secret:/data/forwarding.secret
       # See backend-a: shared mc-image-helper download cache.

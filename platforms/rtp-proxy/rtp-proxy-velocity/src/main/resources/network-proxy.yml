@@ -86,6 +86,21 @@ heartbeat:
   # observe rows within `staleAfterMs` to consider them live.
   intervalMs: 1000
   staleAfterMs: 5000
+# Proxy-cache availability store (DB-free tier). When a backend selects
+# `transport.type: proxy-cache` (or `auto` with this proxy companion present)
+# this proxy answers each backend's snapshot request with the merged view of:
+#   1) live heartbeats backends pushed while they had a player online, and
+#   2) the operator-declared server -> regions map below.
+# The declared map lets a lobby populate cross-server `/rtp region=`
+# tab-completion as `<server>:<region>` even when a backend is currently
+# player-empty (and therefore not pushing a live heartbeat). A fresh live
+# heartbeat always supersedes the declared entry for the same server.
+# Optional: omit the whole block to rely on live heartbeats only.
+#servers:
+#  backend-a:
+#    regions: [default]
+#  backend-b:
+#    regions: [default, nether]
 # Load balancer scoring table (rtp-proxy-ADR-004). The reference selector
 # (WeightedAverageBackendSelector) scores each candidate backend as
 #   score(b) = ( Sigma_i  weight_i * curve_i( normalize_i( metric_i(b) ) ) ) / backendWeight(b)

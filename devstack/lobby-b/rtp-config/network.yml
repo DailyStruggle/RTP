@@ -1,9 +1,7 @@
 ﻿# Devstack backend-a network.yml.
 network:
   enabled: true
-  schemaVersion: 1
   serverId: "lobby-b"
-  role: backend
   secretEnv: RTP_NET_SECRET
 transport:
   type: redis

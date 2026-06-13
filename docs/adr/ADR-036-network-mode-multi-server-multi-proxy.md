@@ -44,11 +44,11 @@ RTP shall ship an optional **network mode** that coordinates teleport requests a
 ### 3. Locked-In Decisions
 
 - **D1.** Join-trigger region/world mapping lives proxy-side.
-- **D2.** Reservations shall survive proxy restart; durable transport required. `plugin-message` is permitted as a dev-only transport with a startup warning outside developer profile.
+- **D2.** *Durable* reservation tokens (atomic cross-server coordinate claims) shall survive proxy restart and therefore require a durable transport (SQL/Redis). **Amended 2026-06-12** (see *Amendment* below): the `plugin-message` transport is promoted from dev-only to the **tier-1 default, non-durable** transport. It deliberately does not mint durable reservation tokens; it provides connectivity plus region-availability gossip and degrades to a re-issued `/rtp` on a miss. Durable reservation semantics remain exclusive to the SQL/Redis tiers.
 - **D3.** Network state lives as a **member of `AbstractSQLDatabaseAccessor`**, not in a parallel hierarchy. The network-state member exposes `BackendHeartbeatTable`, `ReservationTokenTable`, `NetworkCooldownTable`, `ConfigVersionTable`, and a `ProxyStateTable` for proxy heartbeats.
 - **D4.** HMAC key distribution shall use the environment variable `RTP_NET_SECRET` for v1. Alternative mechanisms (vault, file, k8s secret bridge) are deferred.
 - **Primary proxy:** Velocity. **Secondary proxy:** BungeeCord (with Waterfall covered by the same artifact via runtime detection).
-- **Transport preference order:** Redis (Lettuce; covers RESP-compatible Dragonfly / KeyDB by URL alone) → Postgres (`LISTEN/NOTIFY` + `SELECT … FOR UPDATE SKIP LOCKED`) → generic SQL polling → in-memory (tests / disabled default) → plugin-message (dev only).
+- **Transport tiers (amended 2026-06-12):** `plugin-message` is the **tier-1 non-durable default** (lite + Pro), with `transport.type: auto` resolving to it on proxy auto-detect. Durable Pro tiers, in preference order for large/atomic-claim deployments: Redis (Lettuce; covers RESP-compatible Dragonfly / KeyDB by URL alone) -> Postgres (`LISTEN/NOTIFY` + `SELECT ... FOR UPDATE SKIP LOCKED`) -> generic SQL polling. `in-memory` remains dev/test only.
 - **Commands.** `commands-api` and the Brigadier bridge shall be reused; proxy adapters shall not fork a parallel command surface.
 
 ### 4. Coordinate Resolution Timing
@@ -113,6 +113,17 @@ Phases are inherited from `MULTI_SERVER_PLAN.md`; this ADR ratifies the *order* 
 | **4** | Generic SQL + hardening + release | `rtp-proxy-ADR-009-generic-sql-binding`, `rtp-proxy-ADR-010-security-hardening` |
 
 Subproject ADR numbering restarts at `001` inside `platforms/rtp-proxy/docs/adr/` per the per-directory naming rule in `AGENTS.md > Self-Updating Protocol`. The global `docs/adr/` sequence shall not be used for narrower network-mode concerns once this umbrella ADR is accepted; only umbrella-level reversals or successors (e.g., a future ADR that supersedes this one) shall consume global ADR numbers.
+
+## Amendment (2026-06-12): Plugin-Message Promoted to Tier-1 Default
+
+Ratified by repo owner leaf from the approved D-005 proposal `docs/dev/scratch/PROPOSAL-plugin-message-network-default.md`. This amends D2 and the transport ordering above; the eight ratified components and all safety/non-goal clauses are otherwise unchanged.
+
+- **Default transport.** The `plugin-message` transport is promoted from dev-only to the **tier-1, non-durable default**, shipped in both lite and Pro. It carries the existing `BackendHeartbeat` (region availability, warm-cache counts, load) over the proxy's built-in plugin-messaging vocabulary (`Connect` for the player move, `Forward` for heartbeat gossip), so a database is **not required** for cross-server RTP on most networks. EzRTP parity-and-beyond: it transmits real region availability rather than a bare up/down ping.
+- **Auto-detection (`transport.type: auto`).** A passive `spigot.yml` / `paper-global.yml` probe arms network mode; an active `GetServer` / `GetServers` handshake on first player join confirms the proxy and learns the topology, so no hand-typed `servers:` list is required. Re-probe on first join and on proxy reconnect.
+- **No SPI change.** Tier-1 is a peer implementation of `NetworkTransport`; the dispatcher, `BackendSelector`, reservation, and command/tab-complete layers are unchanged and transport-agnostic. The non-durable `claim`/`redeem`/`release`/`reapExpired` methods are best-effort / no-op in tier-1.
+- **Honest limits (durable-tier upgrade boundary).** Everything rides an online player's connection (a player-empty or idle-self-paused Fabric/NeoForge backend cannot broadcast, so its availability goes stale; treat unknown/stale as accept and let the destination decide); single-proxy `Forward` fan-out only; no durable reservation across a proxy restart. Multi-proxy, always-fresh-availability, and atomic-claim deployments move to the SQL/Redis tiers.
+- **Safety unchanged.** The destination always runs the normal local pipeline (spiral -> chunk -> safety), so S-001/S-004/S-005 hold; tier-1 transports *intent*, not a coordinate. Move failures are logged, never swallowed (S-004); busy/invalid messages are configurable (S-007).
+- **Contract detail:** subproject ADR [`rtp-proxy-ADR-016-plugin-message-default-transport`](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-016-plugin-message-default-transport.md). Lite-assembly impact: [ADR-024](ADR-024-rtp-lite-assembly-variant.md). Plan amendment: `docs/dev/MULTI_SERVER_PLAN.md` *Amendment: Plugin-Message Default Tier*.
 
 ## Alternatives Considered
 

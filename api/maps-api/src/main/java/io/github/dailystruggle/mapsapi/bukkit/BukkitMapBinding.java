@@ -161,9 +161,11 @@ public class BukkitMapBinding implements MapBinding, MapBindingLifecycle {
      * invisible to the player.
      *
      * <p>Threading: this call mutates world state and must run on the
-     * viewer's region thread. The Bukkit-family implementation assumes the
-     * caller already hopped to the main thread; the {@code FoliaMapBinding}
-     * override re-hops via the viewer's {@code EntityScheduler}.
+     * viewer's region thread. The caller ({@code MapDispatch}) is responsible
+     * for dispatching this onto the correct thread via {@code RTP.scheduler}
+     * (on Folia, the region thread owning the viewer's location; on
+     * Paper/Spigot, the main thread). This method therefore drops the item
+     * directly and assumes it is already on the right thread.
      *
      * <p>S-004: failures (viewer offline, world unavailable, item entity
      * spawn refused by the server) throw {@link IllegalStateException}

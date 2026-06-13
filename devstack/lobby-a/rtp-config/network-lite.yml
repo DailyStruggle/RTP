@@ -1,0 +1,20 @@
+# Devstack lobby-a network.yml (LITE variant).
+# Tier-1 plugin-message transport: no Redis/SQL required (ADR-024 amendment,
+# rtp-proxy-ADR-016). Selected by `run-acceptance.ps1 -Lite` via the
+# docker-compose.lite.yml seed-remount override.
+network:
+  enabled: true
+  serverId: "lobby-a"
+transport:
+  # proxy-direct: player-independent backend->proxy socket (rtp-proxy-ADR-017).
+  # The lobby dials the proxies to READ the merged snapshot that populates
+  # cross-server /rtp region= tab-completion. Mirrorable proxies list.
+  type: "proxy-direct"
+  proxies:
+    - "proxy-a:25599"
+    - "proxy-b:25599"
+routing:
+  # Lobby mode: no local region pre-fill/scan/hydrate. A blank /rtp here
+  # dispatches the player to the best peer backend instead of serving a
+  # local region. This is what makes lobby-a a lobby rather than a backend.
+  lobbyMode: true

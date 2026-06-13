@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.api.hooks;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+
 import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 
 /**
@@ -18,6 +20,7 @@ import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
  * <p><b>Threading.</b> Implementations may be invoked from the async generation
  * pipeline; see {@link RTPEconomy} for thread-safety contracts.
  */
+@PublicApi
 public interface EconomyProviderRegistry {
 
   /**

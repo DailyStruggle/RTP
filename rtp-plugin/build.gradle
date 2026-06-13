@@ -1091,6 +1091,19 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // runtime. The concrete H2/SQLite/MySQL/Postgres subclasses remain excluded, so the
     // instanceof check is always false in lite.
     exclude 'io/github/dailystruggle/rtp/common/network/Redis*.class'
+    // ADR-024 2026-06-12 amendment (plugin-message tier-1 default): the durable
+    // Redis/SQL NetworkTransport bindings live in rtp-proxy-common's transport
+    // subpackages and are pulled in transitively via rtp-core. They stay Pro --
+    // drop the whole redis/ and sql/ transport subtrees from lite. The
+    // plugin-message tier (common/network/pluginmessage/**), the shared codec,
+    // the in-memory binding, NetworkBindings, and ReservationTokenReaper are
+    // intentionally KEPT (the plugin-message binding rides them; no driver).
+    // NetworkModeBootstrap (rtp-core) imports RedisNetworkStateBinding directly,
+    // but lite defaults to transport.type=auto/plugin-message so the redis/sql
+    // code paths are never linked at runtime -- same lazy-link pattern as the
+    // excluded H2/SQLite/MySQL/Postgres concrete database options above.
+    exclude 'io/github/dailystruggle/rtp/proxy/common/transport/redis/**'
+    exclude 'io/github/dailystruggle/rtp/proxy/common/transport/sql/**'
     exclude 'io/github/dailystruggle/rtp/common/selection/region/LoginCacheTask.class'
     // HikariCP -- pulled in transitively but only used by SQL accessors which lite drops.
     exclude 'com/zaxxer/hikari/**'
@@ -1220,6 +1233,13 @@ tasks.register('liteJarStructureCheck') {
             ~'^io/github/dailystruggle/rtp/common/database/options/MySQL.*\\.class$',
             ~'^io/github/dailystruggle/rtp/common/database/options/Postgre.*\\.class$',
             ~'^io/github/dailystruggle/rtp/common/network/Redis.*\\.class$',
+            // ADR-024 2026-06-12 amendment: durable Redis/SQL NetworkTransport
+            // bindings stay Pro; assert the whole redis/ and sql/ transport
+            // subtrees are absent from lite. The plugin-message tier, the shared
+            // codec, and the in-memory binding are permitted (asserted present
+            // below).
+            ~'^io/github/dailystruggle/rtp/proxy/common/transport/redis/.*$',
+            ~'^io/github/dailystruggle/rtp/proxy/common/transport/sql/.*$',
             ~'^com/zaxxer/hikari/.*$',
             ~'^io/github/dailystruggle/rtp/hikari/.*$',
             ~'^io/github/dailystruggle/rtp/common/selection/region/LoginCacheTask\\.class$',
@@ -1268,6 +1288,27 @@ tasks.register('liteJarStructureCheck') {
             throw new GradleException(
                 "ADR-024 structure check FAILED. Forbidden entries in lite JAR:\n  " +
                 violations.unique().sort().join('\n  '))
+        }
+
+        // ADR-024 2026-06-12 amendment: lite MUST ship the tier-1 plugin-message
+        // NetworkTransport binding and the `transport.type: auto` resolver (they
+        // add no JDBC/Redis driver). Assert they are present so a future shadow
+        // exclude or package move that accidentally drops them is caught here.
+        def requiredPresent = [
+            'io/github/dailystruggle/rtp/common/network/pluginmessage/PluginMessageNetworkBinding.class',
+            'io/github/dailystruggle/rtp/common/network/pluginmessage/ProxyAutoDetector.class',
+            'io/github/dailystruggle/rtp/common/network/pluginmessage/NetworkBridge.class',
+        ]
+        def presentEntries = [] as Set
+        new java.util.zip.ZipFile(jarFile).withCloseable { zip ->
+            zip.entries().each { entry -> presentEntries << entry.name }
+        }
+        def missingRequired = requiredPresent.findAll { !presentEntries.contains(it) }
+        if (!missingRequired.isEmpty()) {
+            throw new GradleException(
+                "ADR-024 structure check FAILED. Required plugin-message network " +
+                "entries missing from lite JAR (they must NOT be excluded):\n  " +
+                missingRequired.sort().join('\n  '))
         }
 
         // ADR-061: the lite binary is MIT-licensed. Assert the in-jar LICENSE

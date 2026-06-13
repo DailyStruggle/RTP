@@ -140,4 +140,76 @@ class PeerRegionRegistryTest {
         assertThrows(NullPointerException.class,
                 () -> new PeerRegionRegistry(null, "local-1"));
     }
+
+    // --- Option 1: topology-seeded candidates (plugin-message tier) ---
+
+    @Test
+    void peerEntries_seeds_default_region_for_topology_peer_without_heartbeat() {
+        // No snapshot rows, but the proxy advertised backend-a/backend-b via
+        // GetServers. With a single test player these backends are
+        // player-empty and never gossip, so the snapshot stays empty.
+        var registry = new PeerRegionRegistry(() -> snap(), "lobby-a");
+        registry.setTopologyPeerSupplier(() -> Set.of("backend-a", "backend-b"));
+        assertEquals(Set.of("backend-a:default", "backend-b:default"), registry.peerEntries());
+    }
+
+    @Test
+    void peerEntries_prefers_heartbeat_over_topology_seed() {
+        // backend-a has a real heartbeat (two regions); backend-b is only
+        // known via topology -> seeded with the assumed default region.
+        var a = hb("backend-a", Set.of("default", "east"), false);
+        var registry = new PeerRegionRegistry(() -> snap(a), "lobby-a");
+        registry.setTopologyPeerSupplier(() -> Set.of("backend-a", "backend-b"));
+        assertEquals(
+                Set.of("backend-a:default", "backend-a:east", "backend-b:default"),
+                registry.peerEntries());
+    }
+
+    @Test
+    void peerEntries_honours_assumed_region_override() {
+        var registry = new PeerRegionRegistry(() -> snap(), "lobby-a");
+        registry.setTopologyPeerSupplier(() -> Set.of("backend-a"));
+        registry.setAssumedRegionSupplier(() -> Set.of("default", "pvp"));
+        assertEquals(Set.of("backend-a:default", "backend-a:pvp"), registry.peerEntries());
+    }
+
+    @Test
+    void isReachableHardPin_accepts_topology_peer_without_heartbeat() {
+        // The load-bearing fix: a lobby must validate backend-a:default even
+        // when no heartbeat has reached it (unknown -> accept; the
+        // destination decides on arrival).
+        var registry = new PeerRegionRegistry(() -> snap(), "lobby-a");
+        registry.setTopologyPeerSupplier(() -> Set.of("backend-a"));
+        assertTrue(registry.isReachableHardPin("backend-a", "default"));
+        // Any region is accepted for a topology-known server (we do not know
+        // its real region set).
+        assertTrue(registry.isReachableHardPin("backend-a", "anything"));
+    }
+
+    @Test
+    void isReachableHardPin_rejects_server_not_in_topology_and_not_in_snapshot() {
+        var registry = new PeerRegionRegistry(() -> snap(), "lobby-a");
+        registry.setTopologyPeerSupplier(() -> Set.of("backend-a"));
+        assertFalse(registry.isReachableHardPin("backend-z", "default"));
+    }
+
+    @Test
+    void isReachableHardPin_killSwitch_heartbeat_beats_topology_seed() {
+        // A live (kill-switched) heartbeat is authoritative: even though the
+        // proxy still lists the server, the operator asserted it unavailable.
+        var dead = hb("backend-a", Set.of("default"), true);
+        var registry = new PeerRegionRegistry(() -> snap(dead), "lobby-a");
+        registry.setTopologyPeerSupplier(() -> Set.of("backend-a"));
+        assertFalse(registry.isReachableHardPin("backend-a", "default"));
+    }
+
+    @Test
+    void isReachableHardPin_known_region_set_without_region_beats_topology_seed() {
+        // backend-a has a concrete region set that does not include "missing":
+        // KNOWN_UNAVAILABLE wins over the topology accept-all.
+        var peer = hb("backend-a", Set.of("default"), false);
+        var registry = new PeerRegionRegistry(() -> snap(peer), "lobby-a");
+        registry.setTopologyPeerSupplier(() -> Set.of("backend-a"));
+        assertFalse(registry.isReachableHardPin("backend-a", "missing"));
+    }
 }

@@ -66,7 +66,17 @@ param(
   # wipes the bind-mounted worlds and a stale DB pointing at a fresh
   # world is worse than a fresh DB. Use -Purge for a truly
   # fresh-from-scratch reset that also re-downloads the server images.
-  [switch]$Purge
+  [switch]$Purge,
+  # Run the LITE edition instead of Pro. Builds/stages the unclassified
+  # `LeafRTP-<ver>.jar` (`:rtp-plugin:remapLiteJar`) rather than the Pro jar,
+  # and layers `docker-compose.lite.yml` so each backend/lobby seeds its
+  # `network-lite.yml` (tier-1 plugin-message `transport.type: auto`, no
+  # Redis/SQL). This exercises the DB-free cross-server path that ships in the
+  # free/lite edition (ADR-024 2026-06-12 amendment, rtp-proxy-ADR-016).
+  # Because the lite tier never touches Redis, the Redis-backed scenarios
+  # (heartbeat / killmidflight / killswitch) are skipped under `-Scenario all`;
+  # only `boot` + the manual `roundtrip` run (use -Scenario to force one).
+  [switch]$Lite
 )
 
 $ErrorActionPreference = 'Stop'
@@ -246,7 +256,8 @@ function Invoke-GradleBuild {
     Write-Host "[build] WARN - gradlew.bat not found at $gradlew; skipping auto-build" -ForegroundColor Yellow
     return
   }
-  Write-Host '[build] running gradle (clean + rtp-proxy-velocity:jar + rtp-plugin:shadowJar) (typical: cold 1-3 min, incremental 30-60s with clean)...' -ForegroundColor Cyan
+  $pluginTask = if ($Lite) { ':rtp-plugin:remapLiteJar' } else { ':rtp-plugin:remapJar' }
+  Write-Host "[build] running gradle (clean + rtp-proxy-velocity:jar + $pluginTask) [edition: $(if ($Lite) {'LITE'} else {'Pro'})] (typical: cold 1-3 min, incremental 30-60s with clean)..." -ForegroundColor Cyan
   Push-Location $root
   try {
     # rtp-proxy-velocity is a plain java-library (no shadow plugin) - its `jar` task
@@ -272,7 +283,7 @@ function Invoke-GradleBuild {
       ':rtp-proxy:rtp-proxy-velocity:clean' `
       ':rtp-plugin:clean' `
       ':rtp-proxy:rtp-proxy-velocity:jar' `
-      ':rtp-plugin:remapJar' `
+      $pluginTask `
       '--console=plain' }
     Write-Evidence 'build' $out
     if ($LASTEXITCODE -ne 0) {
@@ -343,11 +354,22 @@ function Invoke-GradleBuild {
     $allJars = Get-ChildItem -Path $pluginLibs -Filter 'LeafRTP-*.jar' -File |
       Where-Object { $_.Name -notmatch '-dev\.jar$|-sources\.jar$|-javadoc\.jar$' }
     $proJars = $allJars | Where-Object { $_.Name -match '^LeafRTP-Pro-' }
-    if ($proJars -and $proJars.Count -gt 0) {
+    $liteJars = $allJars | Where-Object { $_.Name -notmatch '^LeafRTP-Pro-' }
+    if ($Lite) {
+      # -Lite: ship the unclassified LeafRTP-<ver>.jar (no Pro/durable transports).
+      if ($liteJars -and $liteJars.Count -gt 0) {
+        $pJars = $liteJars
+        $variant = 'lite'
+      } else {
+        $pJars = $proJars
+        $variant = 'Pro (lite jar not found - falling back)'
+        Write-Host '[build] WARN - LeafRTP-<ver>.jar (lite) not found; falling back to Pro jar. Build lite via :rtp-plugin:remapLiteJar.' -ForegroundColor Yellow
+      }
+    } elseif ($proJars -and $proJars.Count -gt 0) {
       $pJars = $proJars
       $variant = 'Pro'
     } else {
-      $pJars = $allJars | Where-Object { $_.Name -notmatch '^LeafRTP-Pro-' }
+      $pJars = $liteJars
       $variant = 'lite (Pro jar not found - falling back)'
       Write-Host '[build] WARN - LeafRTP-Pro-<ver>.jar not found; falling back to plain LeafRTP jar. Build Pro via the Pro Gradle profile to match the devstack.' -ForegroundColor Yellow
     }
@@ -808,10 +830,15 @@ Initialize-Secrets
 # default world. Implemented via the `COMPOSE_FILE` env var (path-separator
 # delimited) so every existing `docker compose ...` call site in this script
 # picks the override up transparently - no per-call `-f` flag plumbing needed.
+# The override chain is assembled into COMPOSE_FILE (path-separator delimited),
+# base first. Both the lobby-world overlay and the -Lite overlay are optional
+# and compose cleanly (the lite overlay only remaps the /seed/network.yml mount;
+# the lobby overlay only touches lobby world seeding), so they can stack.
+$composeFiles = @((Join-Path $PSScriptRoot 'docker-compose.yml'))
 $LobbyWorldZip = Join-Path $PSScriptRoot 'shared\lobby-world.zip'
 $LobbyOverride = Join-Path $PSScriptRoot 'docker-compose.lobby-world.yml'
 if ((Test-Path $LobbyWorldZip) -and (Test-Path $LobbyOverride)) {
-  $env:COMPOSE_FILE = "$(Join-Path $PSScriptRoot 'docker-compose.yml');$LobbyOverride"
+  $composeFiles += $LobbyOverride
   Write-Host "[init] using baked lobby world: $LobbyWorldZip" -ForegroundColor Cyan
   Write-Evidence 'init' "lobby-world overlay active: $LobbyWorldZip"
 } else {
@@ -827,6 +854,22 @@ if ((Test-Path $LobbyWorldZip) -and (Test-Path $LobbyOverride)) {
   } else {
     Write-Evidence 'init' 'lobby-world overlay skipped: no schematic, no zip'
   }
+}
+# -Lite: layer the plugin-message (DB-free) seed remount overlay.
+if ($Lite) {
+  $LiteOverride = Join-Path $PSScriptRoot 'docker-compose.lite.yml'
+  if (Test-Path $LiteOverride) {
+    $composeFiles += $LiteOverride
+    Write-Host '[init] LITE edition: layering docker-compose.lite.yml (plugin-message transport, no Redis)' -ForegroundColor Cyan
+    Write-Evidence 'init' 'lite overlay active: docker-compose.lite.yml (transport.type=auto/plugin-message)'
+  } else {
+    Write-Host "[init] WARN - -Lite set but $LiteOverride not found; backends will seed the Redis network.yml" -ForegroundColor Yellow
+  }
+}
+# Only pin COMPOSE_FILE when an overlay is present; otherwise leave it unset so
+# compose uses its default docker-compose.yml discovery (unchanged behaviour).
+if ($composeFiles.Count -gt 1) {
+  $env:COMPOSE_FILE = ($composeFiles -join ';')
 }
 
 if ($Scenario -eq 'down') {
@@ -859,7 +902,17 @@ if (-not $NoLogs) {
 
 $results = [ordered]@{}
 $plan = if ($Scenario -eq 'all') {
-  @('boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch')
+  if ($Lite) {
+    # The lite edition uses the plugin-message transport and never touches
+    # Redis, so the Redis-backed scenarios (heartbeat / killmidflight /
+    # killswitch all introspect or drive Redis keys via redis-cli) do not
+    # apply. Run only the transport-agnostic checks under `all`; an operator
+    # can still force a Redis scenario explicitly with -Scenario for a mixed
+    # stack, but it will not pass against lite seeds.
+    @('boot', 'roundtrip')
+  } else {
+    @('boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch')
+  }
 } else {
   @($Scenario)
 }

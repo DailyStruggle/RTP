@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.api.hooks;
 
+import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -26,6 +28,7 @@ import java.util.function.Predicate;
  * returned {@code false} (location rejected); RTP will not silently swallow the
  * failure (REQ-RTP-S-004).
  */
+@PublicApi
 public interface RegionVerifierRegistry {
 
   /**

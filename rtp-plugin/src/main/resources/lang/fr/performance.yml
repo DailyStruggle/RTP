@@ -231,10 +231,10 @@ seuilAlerteCroissanceFile: 0
 # récente ; les valeurs inférieures à 1 sont ramenées à 1. /rtp admin prefab rollback
 # parcourt les sauvegardes de la plus récente à la plus ancienne sur plusieurs appels.
 prefabrique:
-  # Nombre de sauvegardes horodatées conservées par fichier avant suppression.
+  # Number of timestamped config backups kept per file before pruning.
   # @type: integer
   # @range: [1, null]
   # @default: 3
-  retentionBak: 3
+  bakRetention: 3
 # NE PAS MODIFIER LE NUMÉRO DE VERSION
 version: 1.0
