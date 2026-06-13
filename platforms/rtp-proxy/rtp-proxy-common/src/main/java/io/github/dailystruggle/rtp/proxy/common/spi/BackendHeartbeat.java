@@ -39,16 +39,16 @@ import java.util.Set;
  *                           {@code regionKey} is requested. Default {@code 0}.
  * @param networkReservedCount count of in-flight cross-server reservations
  *                           held against {@code networkKeptLocations} on this
- *                           backend (L6 D3; one extra HSET field per
+ *                           backend (one extra HSET field per
  *                           PROPOSAL §12.3). Default {@code 0}.
  * @param regions            region keys this backend hosts as a {@link Set}
- *                           (L6 D4; superset of {@link #regionsAvailable()},
+ *                           (superset of {@link #regionsAvailable()},
  *                           kept distinct so the selector can filter by exact
  *                           region containment without list-order surprises).
  *                           Default empty.
  * @param regionKeptCounts   per-region count of locations in
  *                           {@code networkKeptLocations} (NOT local
- *                           {@code keptLocations}; L6 D4 option (ii)). Used by
+ *                           {@code keptLocations}). Used by
  *                           the selector to filter peers that actually have a
  *                           coordinate ready for cross-server reservation.
  *                           Default empty.
@@ -88,7 +88,7 @@ public record BackendHeartbeat(
 
     /**
      * Convenience constructor for callers that have not opted into the kill
-     * switch field; defaults {@code killSwitch} to {@code false} and all L6
+     * switch field; defaults {@code killSwitch} to {@code false} and all
      * fields to zero / empty. Retained for source compatibility while
      * transport bindings learn the new fields.
      */
@@ -113,7 +113,7 @@ public record BackendHeartbeat(
 
     /**
      * Convenience constructor for callers that have opted into
-     * {@code killSwitch} but not yet into the L6 cross-server fields; defaults
+     * {@code killSwitch} but not yet into the cross-server fields; defaults
      * {@code keptCount}, {@code networkReservedCount}, {@code regions}, and
      * {@code regionKeptCounts} to zero / empty.
      */

@@ -13,7 +13,7 @@ import java.util.function.Predicate;
 import java.util.logging.Level;
 
 /**
- * Slice 4 (Slice 1+2+3 SPI / ADR-015 / REQ-RTP-NET-015): a sender-check
+ * ADR-015 / REQ-RTP-NET-015: a sender-check
  * predicate registered on {@code RTPCmdBukkit} via
  * {@code addSenderCheck(...)} that rejects new {@code /rtp*} invocations
  * while the caller already has a non-terminal cross-server enrolment.

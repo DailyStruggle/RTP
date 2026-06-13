@@ -16,9 +16,9 @@ import org.checkerframework.common.basetype.BaseTypeChecker;
  *
  * <p>Registers the four thread-affinity qualifiers and builds the qualifier lattice:
  * <pre>
- *   @AnyThread  (top — marked with @DefaultQualifierInHierarchy)
+ *   {@literal @}AnyThread  (top - marked with {@literal @}DefaultQualifierInHierarchy)
  *       |
- *   @RegionThread   @AsyncThread   @GlobalRegionThread  (incomparable leaves via @SubtypeOf)
+ *   {@literal @}RegionThread   {@literal @}AsyncThread   {@literal @}GlobalRegionThread  (incomparable leaves via {@literal @}SubtypeOf)
  * </pre>
  *
  * <p>The qualifier hierarchy is derived automatically from the {@code @SubtypeOf} meta-annotations

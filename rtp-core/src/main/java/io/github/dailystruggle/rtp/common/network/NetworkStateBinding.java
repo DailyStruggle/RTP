@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
  * io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor}
  * (decision D3 of {@code MULTI_SERVER_PLAN.md}).
  *
- * <p>Historically this interface was an opaque marker. The Phase 2e-SQL slice
+ * <p>Historically this interface was an opaque marker. The SQL transport
  * landed an {@code api} dep from {@code rtp-core} on {@code rtp-proxy-common}
  * (per {@code rtp-proxy-ADR-011 §Module Dependencies}), so the marker now
  * carries an optional {@link #transport()} accessor returning the live

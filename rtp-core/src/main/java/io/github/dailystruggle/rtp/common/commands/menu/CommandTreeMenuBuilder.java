@@ -535,7 +535,7 @@ public final class CommandTreeMenuBuilder {
         // Stage A.6 — paginate value rows. The Adventure Book renderer caps
         // visible lines per page (~14 typical); large suggestion sets such
         // as biome names overflow a single page and the tail would be
-        // invisible. Slice into chunks of {@code PICKER_VALUES_PER_PAGE},
+        // invisible. Split into chunks of {@code PICKER_VALUES_PER_PAGE},
         // repeating back+header+type on every page so navigation works from
         // any page, and append prev/next ChangePage rows where applicable.
         // Single-page case (suggestions <= cap) preserves the original

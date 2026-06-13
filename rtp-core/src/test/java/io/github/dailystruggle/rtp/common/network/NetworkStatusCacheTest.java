@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Slice C row C8 / C9: {@link NetworkStatusCache} read/refresh semantics
+ * {@link NetworkStatusCache} read/refresh semantics
  * via {@link NetworkStatusCache#pollOnce()} (no scheduler dependency).
  */
 class NetworkStatusCacheTest {

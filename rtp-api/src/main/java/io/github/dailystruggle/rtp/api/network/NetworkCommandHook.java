@@ -31,7 +31,7 @@ import java.util.UUID;
  * {@link RoutingResult.CrossServer} implementations may offer a record to
  * the async enrolment buffer as their only side effect.</p>
  *
- * @since L6 (rtp-proxy-ADR-014)
+ * @since rtp-proxy-ADR-014
  */
 @FunctionalInterface
 public interface NetworkCommandHook {
@@ -51,7 +51,7 @@ public interface NetworkCommandHook {
 
   /**
    * Default install used when no network adapter is active. Always returns
-   * {@link RoutingResult.Local}, preserving the pre-L6 single-server
+   * {@link RoutingResult.Local}, preserving the single-server
    * pipeline.
    */
   NetworkCommandHook LOCAL_ONLY = (playerId, args) -> RoutingResult.LOCAL;

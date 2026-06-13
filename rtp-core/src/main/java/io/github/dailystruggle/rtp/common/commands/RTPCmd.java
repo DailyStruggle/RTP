@@ -258,7 +258,7 @@ public interface RTPCmd extends BaseRTPCmd {
       return true;
     }
 
-    // --- L6 cross-server pre-dispatch hook (rtp-proxy-ADR-014) ----------------
+    // --- Cross-server pre-dispatch hook (rtp-proxy-ADR-014) ----------------
     // Consult the platform-installed NetworkCommandHook BEFORE the local
     // pipeline runs. Default install (LOCAL_ONLY) is a zero-cost no-op for
     // single-server deployments. Network-mode adapters return CrossServer
@@ -280,10 +280,10 @@ public interface RTPCmd extends BaseRTPCmd {
           ConfigParser<MessagesKeys> langParser =
                   (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
           String tmpl = (String) langParser.getConfigValue(MessagesKeys.networkQueued, "");
-          // Empty-template fallback: a stale messages.yml (pre-Slice-5
+          // Empty-template fallback: a stale messages.yml (pre-network-mode
           // install missing the new key) must NEVER produce silent
           // dispatch, otherwise the player sees no response and spams
-          // /rtp. Mirror the hardcoded English fallback Slice-5
+          // /rtp. Mirror the hardcoded English fallback
           // NetworkWaitlistGuard / NetworkWaitlistNotifier already use.
           if (tmpl == null || tmpl.isEmpty()) {
             tmpl = "&7[RTP] Queued for a cross-server destination (position [position])"
@@ -301,7 +301,7 @@ public interface RTPCmd extends BaseRTPCmd {
           // by this JVM's "busy" set - but the side effect was that the
           // player could re-run /rtp on the same lobby and re-enrol
           // duplicates (REJECTED_DUPLICATE on the proxy, no feedback
-          // to the player, looks like nothing happens). The Slice-4
+          // to the player, looks like nothing happens). The
           // NetworkWaitlistGuard + lobby-side quit/terminal-status
           // listeners are the correct authoritative releases; until
           // they fire, this local lock is the anti-spam primitive.
@@ -333,7 +333,7 @@ public interface RTPCmd extends BaseRTPCmd {
         // RoutingResult.Local -> fall through to local pipeline
       }
     }
-    // --- end L6 hook ---------------------------------------------------------
+    // --- end cross-server hook -----------------------------------------------
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
     RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute ENTER senderId=" + senderId

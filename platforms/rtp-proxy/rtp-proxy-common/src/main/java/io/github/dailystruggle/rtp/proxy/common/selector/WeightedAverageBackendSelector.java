@@ -149,15 +149,14 @@ public final class WeightedAverageBackendSelector implements BackendSelector {
         if (!b.acceptingRequests()) {
             return false;
         }
-        // L6 D4: kill switch excludes backend from candidate scoring.
+        // Kill switch excludes backend from candidate scoring.
         if (b.killSwitch()) {
             return false;
         }
         if (req.regionKey().isPresent()) {
             String key = req.regionKey().get();
-            // L6 D4 option (ii): prefer the typed Set<regions> when populated;
-            // fall back to the legacy regionsAvailable list for backends that
-            // have not been upgraded to publish the L6 fields yet.
+            // Prefer the typed Set<regions> when populated;
+            // fall back to the legacy List<regionsAvailable> for older peers.
             boolean regionHosted = !b.regions().isEmpty()
                     ? b.regions().contains(key)
                     : (b.regionsAvailable().isEmpty()
@@ -165,10 +164,10 @@ public final class WeightedAverageBackendSelector implements BackendSelector {
             if (!regionHosted) {
                 return false;
             }
-            // L6 D4 option (ii): regionKeptCounts is scoped to
+            // regionKeptCounts is scoped to
             // networkKeptLocations. Only require a positive count when the
             // backend has opted into publishing the map at all; otherwise the
-            // peer is pre-L6 and we let the dispatcher's queue-vs-fail logic
+            // peer has no regionKeptCounts and we let the dispatcher's queue-vs-fail logic
             // handle "no coordinate" via the existing reservation path.
             if (!b.regionKeptCounts().isEmpty()
                     && b.regionKeptCounts().getOrDefault(key, 0) <= 0) {
@@ -176,7 +175,7 @@ public final class WeightedAverageBackendSelector implements BackendSelector {
             }
         } else {
             // No region pinned: prefer backends with a warm kept pool. Skip
-            // the predicate for pre-L6 peers that publish keptCount == 0
+            // the predicate for peers that publish keptCount == 0
             // because they do not yet report the field (default zero).
             if (b.keptCount() < 0) {
                 return false;

@@ -1,9 +1,8 @@
 package io.github.dailystruggle.rtp.common.configuration.enums;
 
 /**
- * Configuration keys for the {@code metrics.yml} surface introduced in
- * Phase M2 of the metrics plan (Section C of the metrics + multi-server
- * checklist). Reporting knobs only - throttle / tuning knobs continue to
+ * Configuration keys for the {@code metrics.yml} surface.
+ * Reporting knobs only - throttle / tuning knobs continue to
  * live under {@code performance.yml}.
  *
  * <p>Defaults match {@code docs/dev/METRICS_PLAN.md > Folia Aggregation}

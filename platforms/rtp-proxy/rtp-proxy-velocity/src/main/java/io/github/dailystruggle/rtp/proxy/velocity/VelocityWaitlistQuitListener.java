@@ -23,7 +23,7 @@ import java.util.UUID;
  * scheduled in {@code RtpVelocityPlugin}.</p>
  *
  * <p>{@link NetworkWaitlist#remove(UUID, NetworkWaitlist.CancelReason)} is
- * idempotent per Slice 1 SPI contract: calling it for a player who is not
+ * idempotent per SPI contract: calling it for a player who is not
  * (or no longer) on the waitlist is a no-op, so we never branch on whether
  * the player was actually enrolled.</p>
  *

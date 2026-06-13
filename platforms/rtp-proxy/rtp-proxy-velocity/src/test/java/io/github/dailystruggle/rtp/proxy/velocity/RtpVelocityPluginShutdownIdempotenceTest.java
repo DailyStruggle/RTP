@@ -91,7 +91,7 @@ class RtpVelocityPluginShutdownIdempotenceTest {
                 fakeServer, LoggerFactory.getLogger("test"), data);
         plugin.onProxyInitialize(new ProxyInitializeEvent());
 
-        // Slice E (CHECKLIST row E4): the Brigadier /rtp command was deleted;
+        // The Brigadier /rtp command is not registered on the proxy;
         // the new transport-driven trigger source must be running.
         org.junit.jupiter.api.Assertions.assertNotNull(plugin.requestTriggerSource(),
                 "TransportRequestTriggerSource must be wired on enabled init");
@@ -101,7 +101,7 @@ class RtpVelocityPluginShutdownIdempotenceTest {
         assertDoesNotThrow(() -> plugin.onProxyShutdown(new ProxyShutdownEvent()),
                 "first shutdown must not throw");
         org.junit.jupiter.api.Assertions.assertFalse(plugin.requestTriggerSource().isRunning(),
-                "TransportRequestTriggerSource must be stopped after the first shutdown (Slice E row E3)");
+                "TransportRequestTriggerSource must be stopped after the first shutdown");
         assertDoesNotThrow(() -> plugin.onProxyShutdown(new ProxyShutdownEvent()),
                 "second shutdown on enabled plugin must be a clean no-op");
 

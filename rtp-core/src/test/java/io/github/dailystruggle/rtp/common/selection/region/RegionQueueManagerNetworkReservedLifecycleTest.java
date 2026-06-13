@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Slice A row A5 - CHECKLIST-cross-server-rtp-L6.md. Verifies the
+ * Verifies the
  * reserve/redeem/release lifecycle of {@code networkReservedLocations},
  * concurrent reserver safety, double-release idempotence, the
  * coord-back-to-pool invariant on release, and regionKey scoping.

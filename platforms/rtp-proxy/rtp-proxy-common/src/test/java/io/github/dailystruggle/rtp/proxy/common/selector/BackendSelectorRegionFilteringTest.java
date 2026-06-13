@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Slice B (L6) row B4: verifies the L6 region predicate added to
+ * Verifies the region predicate added to
  * {@link WeightedAverageBackendSelector#choose}:
  * <ul>
  *   <li>filter peers whose {@code regions} set does not contain the requested
@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       the map is populated;</li>
  *   <li>exclude killSwitched backends;</li>
  *   <li>fall through to legacy {@code regionsAvailable} list when {@code regions}
- *       is empty (pre-L6 peer back-compat).</li>
+ *       is empty (backward-compat for peers that do not publish regions).</li>
  * </ul>
  */
 class BackendSelectorRegionFilteringTest {
@@ -101,19 +101,19 @@ class BackendSelectorRegionFilteringTest {
     }
 
     @Test
-    @DisplayName("Pre-L6 peer (empty regions Set) falls back to regionsAvailable list")
+    @DisplayName("Peer with empty regions Set falls back to regionsAvailable list")
     void preL6FallbackToRegionsAvailable() {
-        // Empty regions set + populated regionsAvailable list = pre-L6 peer.
-        BackendHeartbeat preL6 = new BackendHeartbeat(
+        // Empty regions set + populated regionsAvailable list = older peer.
+        BackendHeartbeat olderPeer = new BackendHeartbeat(
                 "a", 1, PluginState.READY, true, NOW,
                 10.0, 0, 20, 0L, 0L, 0,
                 List.of("default"), List.of(), false,
                 0, 0, Set.of(), Map.of());
         var sel = new WeightedAverageBackendSelector(LoadBalancerConfig.defaults());
         assertEquals(Optional.of("a"),
-                sel.choose(req(Optional.of("default")), snap(preL6)));
+                sel.choose(req(Optional.of("default")), snap(olderPeer)));
         // Region not present in the legacy list -> excluded.
-        assertTrue(sel.choose(req(Optional.of("nether")), snap(preL6)).isEmpty());
+        assertTrue(sel.choose(req(Optional.of("nether")), snap(olderPeer)).isEmpty());
     }
 
     @Test

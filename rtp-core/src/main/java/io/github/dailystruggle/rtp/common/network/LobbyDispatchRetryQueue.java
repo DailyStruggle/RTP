@@ -57,7 +57,7 @@ import java.util.logging.Level;
  * <p>S-004 compliance: every exit path emits a player-visible message
  * (success template, terminal-rejection template, or hardcoded English
  * fallback) and releases {@code processingPlayers} on every non-success
- * exit. The success path retains the lock so the Slice-4
+ * exit. The success path retains the lock so the
  * {@code NetworkWaitlistNotifier} can take over.</p>
  *
  * <p>Scheduler usage: timer dispatched via
@@ -371,7 +371,7 @@ public final class LobbyDispatchRetryQueue {
                             + " server=" + cs.serverHint().orElse(""));
             // The lobby already sent the initial networkQueued message
             // at enqueue time (synthetic-CrossServer return from the
-            // hook). No follow-up needed here; the Slice-4 notifier
+            // hook). No follow-up needed here; the waitlist notifier
             // will pick up the position updates from the status cache.
             return;
         }
@@ -425,7 +425,7 @@ public final class LobbyDispatchRetryQueue {
             tmpl = "";
         }
         if (tmpl == null || tmpl.isEmpty()) {
-            // Hardcoded English fallback - mirrors the Slice-5 pattern
+            // Hardcoded English fallback - mirrors the network-queued pattern
             // used by RTPCmd's CrossServer branch and by
             // NetworkWaitlistGuard.
             tmpl = "&c[RTP] Could not place you on a cross-server destination ([region]).";

@@ -122,7 +122,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
         r.shutDown();
       }
       RTP.selectionAPI.permRegionLookup.clear();
-      // L6 Slice J: lobby backends never register local regions; matches
+      // Lobby backends never register local regions; matches
       // Configs.reloadRegions() gating so /rtp reload regions on a lobby stays a no-op.
       if (RTP.lobbyMode) {
         RTP.configs.multiConfigParserMap.put(parser.myClass, newParser);

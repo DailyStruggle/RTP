@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * REQ-RTP-NET-015 (ADR-015): lobby-side cross-server waitlist UX.
  *
- * <p>Slice 4 covers four pieces of behavior, each exercised by a nested
+ * <p>REQ-RTP-NET-015 covers four pieces of behavior, each exercised by a nested
  * suite below:
  * <ol>
  *   <li>{@code WAITLISTED} is non-terminal for the command-lock predicate.</li>
@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Bukkit event-bus harness is set up here; the listener class is tiny and
  * the assertions below would only repeat that SPI contract.</p>
  */
-@DisplayName("REQ-RTP-NET-015 lobby-side cross-server waitlist UX (Slice 4)")
+@DisplayName("REQ-RTP-NET-015 lobby-side cross-server waitlist UX")
 class ReqRtpNet015NetworkWaitlistTest {
 
     private static NetworkStatusCache.QueueStatus row(UUID p,

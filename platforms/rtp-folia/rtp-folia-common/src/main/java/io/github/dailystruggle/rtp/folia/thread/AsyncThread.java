@@ -11,7 +11,7 @@ import org.checkerframework.framework.qual.SubtypeOf;
  * Declares that the annotated method or constructor must execute on a Folia {@code AsyncThread} —
  * a thread managed by {@code Bukkit.getAsyncScheduler()}.
  *
- * <h3>Thread-affinity contract</h3>
+ * <p><b>Thread-affinity contract</b>
  * <ul>
  *   <li>Economy / Vault transactions and any blocking database I/O <strong>must</strong> be
  *       annotated with {@code @AsyncThread} (or {@link GlobalRegionThread}).</li>
@@ -23,7 +23,7 @@ import org.checkerframework.framework.qual.SubtypeOf;
  *       (the caller makes no affinity promise, so no boundary is crossed).</li>
  * </ul>
  *
- * <h3>Systems engineering analogy</h3>
+ * <p><b>Systems engineering analogy</b>
  * Treat {@code @AsyncThread} as a separate hardware interrupt level. A region thread (level-N
  * interrupt handler) cannot directly invoke an async handler (level-M); it must post a message
  * to the async interrupt queue and return.

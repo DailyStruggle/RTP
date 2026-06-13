@@ -22,7 +22,7 @@ import java.util.Map;
  * {@code MapPalette.matchColor} over the ~144-entry vanilla palette) and
  * unsampled / outside-disk cells through {@code setPixel(PaletteIndex.BLACK)}.
  *
- * <h3>Data source</h3>
+ * <p><b>Data source</b>
  *
  * <p>Per-pixel biome data comes exclusively from the region's saved biome
  * data via {@link MemoryShape#biomeAt(int, int)} — i.e. the persisted,
@@ -38,7 +38,7 @@ import java.util.Map;
  * {@code CRIMSON_FOREST}, etc. each get distinct hues regardless of how
  * Mojang's {@code Biome#getMapColor()} quantises them.
  *
- * <h3>Per-pixel classification</h3>
+ * <p><b>Per-pixel classification</b>
  *
  * <ul>
  *   <li>{@link RegionBiomesRgb#MASK_OUTSIDE} — pixel outside the shape's
@@ -53,7 +53,7 @@ import java.util.Map;
  *       renderer paints these BLACK.</li>
  * </ul>
  *
- * <h3>Threading</h3>
+ * <p><b>Threading</b>
  *
  * <p>Classification reads only the in-memory saved biome cache via
  * {@link MemoryShape#biomeAt(int, int)} (S-005-clean: no chunk I/O, no
@@ -62,7 +62,7 @@ import java.util.Map;
  * and sidesteps the {@code REQ-RTP-MAP-006} prohibition on resolver-side
  * {@code CompletableFuture#get / #join}.
  *
- * <h3>Failure modes</h3>
+ * <p><b>Failure modes</b>
  *
  * <ul>
  *   <li>Spec is null / wrong kind / region missing -&gt;

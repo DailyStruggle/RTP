@@ -38,12 +38,12 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-NET-015 unit guards for the Slice-2 waitlist rewiring of
+ * REQ-RTP-NET-015 unit guards for the waitlist rewiring of
  * {@link DefaultRtpDispatcher}: when {@link BackendSelector#choose} returns
  * empty, the dispatcher parks the envelope on the configured
  * {@link NetworkWaitlist} and surfaces
  * {@link DispatchOutcome.Queued} + {@link QueueState#WAITLISTED} instead of
- * the pre-Slice-2 terminal {@link DispatchOutcome.Failed}.
+ * the no-waitlist terminal {@link DispatchOutcome.Failed}.
  */
 class DefaultRtpDispatcherWaitlistTest {
 
@@ -103,13 +103,13 @@ class DefaultRtpDispatcherWaitlistTest {
     }
 
     @Test
-    void no_waitlist_configured_keeps_pre_slice2_NO_BACKEND_path() throws Exception {
+    void no_waitlist_configured_keeps_NO_BACKEND_path() throws Exception {
         UUID player = UUID.randomUUID();
         FakeTransport transport = new FakeTransport(List.of(backend("b1")));
         FakeSender sender = new FakeSender(player);
         BackendSelector picker = (req, snap) -> Optional.empty();
 
-        // Pre-Slice-2 ctor: no waitlist.
+        // No-waitlist ctor.
         DefaultRtpDispatcher d = new DefaultRtpDispatcher(picker, transport, sender, Runnable::run);
 
         DispatchOutcome outcome = d.dispatch(request(player)).get();

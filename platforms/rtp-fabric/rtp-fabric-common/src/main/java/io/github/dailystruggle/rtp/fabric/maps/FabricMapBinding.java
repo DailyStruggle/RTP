@@ -23,8 +23,7 @@ import java.util.function.Supplier;
 import java.util.logging.Level;
 
 /**
- * Fabric concrete {@link MapBinding} (MULTI_PLATFORM_PLAN Step K,
- * rtp-fabric-ADR-014). Renders an RTP {@code ChartModel} into a 128x128 ARGB
+ * Fabric concrete {@link MapBinding} (rtp-fabric-ADR-014). Renders an RTP {@code ChartModel} into a 128x128 ARGB
  * pixel buffer via {@link FabricMapCanvas}, then hands the buffer to the
  * active {@link FabricVersionAdapter}'s NM-free
  * {@link FabricVersionAdapter#renderMapChart} seam, which performs the

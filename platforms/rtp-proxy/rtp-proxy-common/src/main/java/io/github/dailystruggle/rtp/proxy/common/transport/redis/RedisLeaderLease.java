@@ -22,7 +22,7 @@ import java.util.logging.Logger;
 /**
  * Redis-backed {@link WaitlistLeaderLease} implementing cross-proxy single-
  * leader election for the shared {@link io.github.dailystruggle.rtp.proxy.common.spi.NetworkWaitlist}
- * drainer. Slice 3a of `CHECKLIST-network-waitlist.md`; design in
+ * drainer. Design in
  * `rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md`.
  *
  * <p>Election protocol:
@@ -44,7 +44,7 @@ import java.util.logging.Logger;
  * <p>Mirrors the {@link JedisPool} + single-thread async executor pattern of
  * {@link RedisNetworkRequestQueue} and {@link RedisNetworkStateBinding}. The
  * Lua atomicity of the rest of the {@code RedisNetworkWaitlist} impl
- * (drain-batch, remove-by-uuid, position, reap, refreshAllTtl) is Slice 3b.</p>
+ * (drain-batch, remove-by-uuid, position, reap, refreshAllTtl) is in {@link RedisNetworkWaitlist}.</p>
  *
  * <p><strong>S-004 contract:</strong> every async path either resolves to a
  * typed boolean / void or completes exceptionally carrying the underlying

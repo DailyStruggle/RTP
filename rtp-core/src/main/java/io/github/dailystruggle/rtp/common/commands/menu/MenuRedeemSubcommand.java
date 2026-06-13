@@ -411,10 +411,6 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * <p>Must be S-005-safe: no synchronous chunk I/O. On Folia the
      * implementation shall dispatch player-affecting operations via the
      * player's {@code EntityScheduler}.
-     *
-     * @return {@code true} if the anvil GUI was opened, {@code false} if the
-     *         platform refused (player offline, no inventory subsystem, etc).
-     *         The caller treats {@code false} as an S-004 reject path.
      */
     @FunctionalInterface
     public interface AnvilInputOpener {
@@ -425,6 +421,10 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
          * shape {@code (uuid, parentPath, paramName, prefill) -> ...}. The
          * historical contract stands: on confirm, submit
          * {@code /rtp <parentPath...> <paramName>=<typed>} as the player.
+         *
+         * @return {@code true} if the anvil GUI was opened, {@code false} if the
+         *         platform refused (player offline, no inventory subsystem, etc).
+         *         The caller treats {@code false} as an S-004 reject path.
          */
         boolean open(UUID viewer,
                      java.util.List<String> parentPath,

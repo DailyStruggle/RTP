@@ -8,7 +8,7 @@ package io.github.dailystruggle.rtp.bukkit.metrics;
  * constants class so a typo in one chart-registration site doesn't silently
  * break the chart on the dashboard.
  *
- * <p>The catalogue here is the Phase M1 + Phase M2 *cost-metrics* subset
+ * <p>The catalogue here is the *cost-metrics* subset
  * approved 2026-05-07 for the {@code RTP cost metrics on servers} use case,
  * extended 2026-05-17 (checklist row B13) with the four remaining
  * configuration-adoption charts: {@code region_shapes_in_use},

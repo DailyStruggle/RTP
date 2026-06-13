@@ -19,8 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Opt-in live-Redis integration test for {@link RedisLeaderLease} (Slice 3a
- * of `CHECKLIST-network-waitlist.md`). Verifies the {@code SET NX PX} acquire
+ * Opt-in live-Redis integration test for {@link RedisLeaderLease}.
+ * Verifies the {@code SET NX PX} acquire
  * path, idempotent {@code SET XX PX} re-extend by the same holder, mutual
  * exclusion between two holders, compare-and-delete release semantics, and
  * TTL-expiry handover.

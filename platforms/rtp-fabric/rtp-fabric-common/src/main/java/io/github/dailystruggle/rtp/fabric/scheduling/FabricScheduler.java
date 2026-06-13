@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.server.MinecraftServer;
 
 /**
- * Fabric {@link RTPScheduler} (MULTI_PLATFORM_PLAN Phase 2 Step C).
+ * Fabric {@link RTPScheduler}.
  * Async: a private cached thread-pool executor (see {@link #ASYNC_EXECUTOR}).
  * We deliberately do NOT use {@code net.minecraft.Util#backgroundExecutor()} —
  * its intermediary mapping ({@code class_156.method_18349}) drifts across MC

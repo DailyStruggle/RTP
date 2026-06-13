@@ -361,6 +361,7 @@ Adventure / Paper `Book` pages render on a parchment-yellow background. Yellow (
 - **Bounded algorithms only** — no unbounded `while`-reroll loops. Use the Archimedean spiral 1D mapping; document complexity in an ADR if you add a new algorithm.
 - **Require-by-contract API entry points** — public `rtp-api` methods throw `IllegalStateException` (not null / no-op) when called before core is loaded.
 - **Tests must be traceable** — reference the REQ-* ID in the class name (e.g., `ReqRtpS005ChunkLoadingTest`) or a `@DisplayName` / Javadoc comment. Update [`TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) when adding a REQ-traceable test.
+- **No process-note labels in code comments or Javadoc.** Internal development shorthand — `L6`, `Slice X`, `Slice H2`, `D2`/`D3`/`D6`/`D7`, `Phase 2e`, `Phase 2e-Redis A1`, `Phase M2`, `Phase N1`/`N2`/`N2.x`, `Step A`/`Step G`/`Step G1`, `Session 3`, `CHECKLIST-*` references — must not appear in committed Java comments, Javadoc, or Kotlin/Groovy source. These labels are session-scoped scaffolding: they become meaningless noise once the work lands and actively mislead future readers about what is "done" vs. "deferred". Describe the current behavior or the remaining gap in plain terms instead (e.g. "not yet implemented" rather than "deferred to Step F"). The same prohibition applies to `.toml`, `.json`, and other non-YAML resource files. The existing rule 6 in *Locale Parity Maintenance* covers YAML config comments; this rule covers everything else.
 
 ---
 

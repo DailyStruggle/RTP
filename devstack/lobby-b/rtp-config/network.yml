@@ -17,7 +17,7 @@ reservation:
   reapIntervalMs: 5000
 
 routing:
-  # Slice J: lobby mode disables local region pre-fill/scan/hydrate.
+  # Lobby mode disables local region pre-fill/scan/hydrate.
   # Lobby backends only dispatch players to peer backends via cross-server /rtp.
   lobbyMode: true
 

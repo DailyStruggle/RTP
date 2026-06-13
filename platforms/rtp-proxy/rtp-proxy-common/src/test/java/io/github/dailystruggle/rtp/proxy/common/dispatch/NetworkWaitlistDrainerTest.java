@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-NET-015 unit guards for {@link NetworkWaitlistDrainer} (Slice 2).
+ * REQ-RTP-NET-015 unit guards for {@link NetworkWaitlistDrainer}.
  *
  * <p>Covers per-pulse outcomes:
  * <ul>

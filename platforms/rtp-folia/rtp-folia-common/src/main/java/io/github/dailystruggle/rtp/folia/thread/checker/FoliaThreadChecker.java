@@ -17,10 +17,10 @@ import org.checkerframework.framework.qual.StubFiles;
  *
  * <p>Qualifier lattice ({@code @AnyThread} on top; the three leaves are incomparable):
  * <pre>
- *   @AnyThread
- *   ├── @RegionThread        — chunk-region execution context
- *   ├── @AsyncThread         — Folia AsyncScheduler pool (I/O, economy/Vault)
- *   └── @GlobalRegionThread  — singleton global-tick thread
+ *   {@literal @}AnyThread
+ *   ├── {@literal @}RegionThread        - chunk-region execution context
+ *   ├── {@literal @}AsyncThread         - Folia AsyncScheduler pool (I/O, economy/Vault)
+ *   └── {@literal @}GlobalRegionThread  - singleton global-tick thread
  * </pre>
  *
  * <p>Enforcement (in {@link FoliaThreadVisitor}): a {@code @RegionThread} method may only be

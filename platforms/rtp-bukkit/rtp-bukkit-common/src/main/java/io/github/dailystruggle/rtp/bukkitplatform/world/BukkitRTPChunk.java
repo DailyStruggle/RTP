@@ -331,25 +331,24 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
    *   <li>{@link CompiledUnsafeSet#isEmpty()} → always safe, zero allocations.</li>
    *   <li>Anvil-backed chunks fall back to the legacy {@code Set<String>} path using
    *       {@link CompiledUnsafeSet#plainMaterials()} — state-predicate evaluation on
-   *       off-tick Anvil data is deferred to Slice 3.</li>
+   *       off-tick Anvil data is not yet supported.</li>
    *   <li>No state predicate configured for this material / tag / wildcard →
    *       {@link BlockData} is never materialised.</li>
    * </ul>
    *
-   * <p>Live tag membership is passed as an empty collection in Slice 2; the
-   * {@code Bukkit.getTag(...)} snapshot hand-off is Slice 3 per the plan. Tag-scoped
-   * predicates are therefore effectively inert on the live path until Slice 3 lands.</p>
+   * <p>Live tag membership is passed as an empty collection; tag-scoped
+   * predicates are therefore effectively inert on the live path.</p>
    */
   @Override
   public boolean isSafe(int x, int y, int z, CompiledUnsafeSet unsafeBlocks) {
     if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
 
     if (anvilView != null) {
-      // Slice 2: Anvil-backed snapshots evaluate only the plain-material bucket of the
-      // compiled set. State and tag predicates against Anvil palette data are deferred
-      // to Slice 3 (see plan §"Work Breakdown" item 3). The live re-check at teleport-
-      // commit time remains authoritative (ADR-016 §4), so any predicate this path
-      // misses is re-evaluated by the live BukkitRTPChunk before teleport.
+      // Anvil-backed snapshots evaluate only the plain-material bucket of the
+      // compiled set. State and tag predicates against Anvil palette data are not
+      // yet supported. The live re-check at teleport-commit time remains
+      // authoritative (ADR-016 §4), so any predicate this path misses is
+      // re-evaluated by the live BukkitRTPChunk before teleport.
       Set<String> plain = (reconciledUnsafe != null) ? reconciledUnsafe : unsafeBlocks.plainMaterials();
       return anvilView.isSafe(x & 0xF, y, z & 0xF, plain);
     }
@@ -365,7 +364,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
         ? extractProperties(block.getBlockData())
         : Collections.emptyMap();
 
-    // Slice 2: live tag membership is not yet populated. Slice 3 wires Bukkit.getTag.
+    // Live tag membership is not yet populated.
     return !unsafeBlocks.isUnsafe(materialName, Collections.emptyList(), props);
   }
 

@@ -143,7 +143,7 @@ public interface NetworkTransport extends AutoCloseable {
     /**
      * List every active (non-released, non-expired) reservation token whose
      * {@code serverId} matches {@code serverId}. Used by a backend's one-shot
-     * boot-time reconcile (cross-server RTP L6 / F1) to discover reservations
+     * boot-time reconcile to discover reservations
      * the proxy claimed against this backend while the backend was down, so
      * the backend can call {@code RegionQueueManager.reserveFromNetworkKept}
      * for each outstanding token and bring its in-memory

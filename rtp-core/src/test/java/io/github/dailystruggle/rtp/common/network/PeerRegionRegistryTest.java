@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * L6 Slice H2: {@link PeerRegionRegistry} read-only adapter over the cached
+ * {@link PeerRegionRegistry} read-only adapter over the cached
  * {@link NetworkSnapshot}. Covers self/killSwitch exclusion, hard-pin
  * reachability check, and the legacy {@code regionsAvailable} fallback.
  */
@@ -73,7 +73,7 @@ class PeerRegionRegistryTest {
 
     @Test
     void peerEntries_falls_back_to_regionsAvailable_for_legacy_peer() {
-        // Pre-L6 peer: regions Set empty, legacy regionsAvailable list populated.
+        // Older peer: regions Set empty, legacy regionsAvailable list populated.
         BackendHeartbeat legacy = new BackendHeartbeat(
                 "legacy-1", 1, BackendHeartbeat.PluginState.READY, true,
                 System.currentTimeMillis(), 5.0, 0, 100, 0L, 1L, 0,

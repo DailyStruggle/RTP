@@ -39,7 +39,7 @@ public final class FabricBackendStateSampler implements BackendStateSampler {
     private static final int SCHEMA_VERSION = 1;
 
     /**
-     * L6 Slice I lobby-mode flag. When {@code true}, heartbeats publish an
+     * Lobby-mode flag. When {@code true}, heartbeats publish an
      * empty {@code regions} set and {@code acceptingRequests = false} so peers
      * never select this backend as a cross-server destination.
      */
@@ -50,7 +50,7 @@ public final class FabricBackendStateSampler implements BackendStateSampler {
         this.lobbyMode = false;
     }
 
-    /** Slice I ctor. {@code lobbyMode == true} flips the suppression above. */
+    /** {@code lobbyMode == true} flips the suppression described on {@link #lobbyMode}. */
     public FabricBackendStateSampler(boolean lobbyMode) {
         this.lobbyMode = lobbyMode;
     }

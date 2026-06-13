@@ -22,8 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for {@link TransportRequestTriggerSource} (Slice E rows E2-E4
- * of CHECKLIST-cross-server-rtp-L6.md).
+ * Unit tests for {@link TransportRequestTriggerSource}.
  */
 class TransportRequestTriggerSourceTest {
 

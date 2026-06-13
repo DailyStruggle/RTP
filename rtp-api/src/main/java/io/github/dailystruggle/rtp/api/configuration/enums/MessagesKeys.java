@@ -698,7 +698,7 @@ public enum MessagesKeys {
    * REQ-RTP-F-013; surfaces ADR-047 / REQ-RTP-MAP-006. No placeholders.
    */
   menuInfoBadPointsLabel,
-  // --- L6 cross-server network mode (rtp-proxy-ADR-014) ---
+  // --- Cross-server network mode (rtp-proxy-ADR-014) ---
   /**
    * Sent to the player when {@code /rtp} (optionally with {@code region=<name>})
    * is enrolled on the cross-server wait queue. Placeholder {@code [position]}
@@ -707,7 +707,7 @@ public enum MessagesKeys {
   networkQueued,
   /**
    * Sent when a player runs {@code /rtp*} while already holding a non-terminal
-   * cross-server enrolment (ADR-015 / REQ-RTP-NET-015 Slice 4 command-lock).
+   * cross-server enrolment (ADR-015 / REQ-RTP-NET-015 command-lock).
    * Placeholder {@code [position]} carries the FIFO position when known;
    * an empty value indicates the proxy has not yet assigned one.
    * Configurable per REQ-RTP-F-013.
@@ -715,7 +715,7 @@ public enum MessagesKeys {
   alreadyQueued,
   /**
    * Sent when a cross-server waitlist entry was reaped after exceeding its
-   * configured TTL (ADR-015 Slice 5). No placeholders. Configurable per
+   * configured TTL (ADR-015). No placeholders. Configurable per
    * REQ-RTP-F-013.
    */
   networkTimedOut,

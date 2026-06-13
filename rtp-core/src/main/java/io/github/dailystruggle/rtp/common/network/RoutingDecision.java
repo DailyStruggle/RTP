@@ -15,7 +15,7 @@ import java.util.Optional;
  *       recorded for logging / status emission per S-004.</li>
  * </ul>
  *
- * <p>L6 of {@code CHECKLIST-cross-server-rtp.md}. Pinned by D1 ADR addendum
+ * <p>Pinned by D1 ADR addendum
  * (rtp-proxy-ADR-NNN-backend-owned-rtp-with-network-queue) and PROPOSAL
  * {@code §3 Router Decision Matrix}.</p>
  */

@@ -1,4 +1,4 @@
--- rtp-proxy-common Phase 2e-Redis A2 atomic release.
+-- rtp-proxy-common atomic release.
 -- Refines rtp-proxy-ADR-005. Terminal-state transition + active-index
 -- cleanup. Idempotent: re-releasing a missing or already-terminal token
 -- is a no-op (returns 0) so the caller's release CompletableFuture never

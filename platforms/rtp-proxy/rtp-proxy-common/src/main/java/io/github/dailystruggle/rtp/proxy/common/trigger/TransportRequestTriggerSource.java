@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Slice E (CHECKLIST-cross-server-rtp-L6.md row E2): the proxy-side trigger
+ * The proxy-side trigger
  * source that drives {@code /rtp} dispatch off the cross-server wait queue.
  *
  * <p>This replaces {@code CommandTriggerSource} on the proxy: the proxy no
@@ -116,7 +116,7 @@ public final class TransportRequestTriggerSource {
     /**
      * Spawn the worker threads and begin draining the queue. Single-shot:
      * re-invocation throws {@link IllegalStateException} (matches the
-     * {@code CommandTriggerSource} contract Slice E retires).
+     * {@code CommandTriggerSource} contract).
      */
     public synchronized void start() {
         if (started) {
@@ -280,7 +280,7 @@ public final class TransportRequestTriggerSource {
                         correlationId, playerId, cause.getMessage());
             }
             // Non-fatal outcomes are already emitted by the dispatcher's
-            // StatusSink (Slice D6); we deliberately do not double-log.
+            // StatusSink; we deliberately do not double-log.
         });
     }
 }

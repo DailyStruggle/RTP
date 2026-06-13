@@ -19,10 +19,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * via the registered {@link RTPProxyAccessor}; the transport is responsible
  * for whether the row reaches a peer.
  *
- * <p>Phase 2b ships the cadence + payload assembly. Phase 2e wires this to
- * the real Redis/SQL transports. With {@link NetworkConfig#enabled()} false
- * the publisher is never constructed at all, so REQ-RTP-NET-002 parity is
- * upheld by the adapter, not by an internal no-op flag.</p>
+ * <p>With {@link NetworkConfig#enabled()} false the publisher is never
+ * constructed at all, so REQ-RTP-NET-002 parity is upheld by the adapter,
+ * not by an internal no-op flag.</p>
  *
  * <p>Threading: callers supply a {@link ScheduledExecutorService}. The
  * publisher submits its own task and does not own the executor's lifecycle.
@@ -74,8 +73,7 @@ public final class ProxyStatePublisher {
 
     /**
      * Increment / decrement the in-flight RTP-request gauge reflected in
-     * every published heartbeat. Bound to the dispatcher in Phase 2e; for
-     * now exposed so callers can wire it manually in tests.
+     * every published heartbeat. Exposed so callers can wire it manually in tests.
      */
     public AtomicInteger inFlightRequests() {
         return inFlightRequests;
@@ -92,7 +90,7 @@ public final class ProxyStatePublisher {
                 accessor.proxyId(),
                 config.schemaVersion(),
                 System.currentTimeMillis(),
-                0,                          // playerCount: wired in Phase 2c
+                0,                          // playerCount: not yet wired
                 inFlightRequests.get(),
                 false                       // killSwitch: operator-driven, default false (ADR-010)
         );

@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
  * -Encoding utf8} prior to PS 6+) prepend a BOM by default; without an
  * explicit strip the BOM lands as a literal character at line 1, column
  * 0 and the lexer rejects it as "missing ':' in mapping entry". This
- * surfaced live as a devstack lobby boot failure in L6 Slice J and is
+ * surfaced live as a devstack lobby boot failure and is
  * a recurring papercut, so it gets a dedicated guard.
  */
 class RtpYamlReaderBomTest {

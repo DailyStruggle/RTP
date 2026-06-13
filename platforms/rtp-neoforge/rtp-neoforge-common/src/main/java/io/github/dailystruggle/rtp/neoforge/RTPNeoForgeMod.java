@@ -25,7 +25,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import java.util.logging.Level;
 
 /**
- * NeoForge {@code @Mod} entry point (Phase N2.2 core binding).
+ * NeoForge {@code @Mod} entry point.
  *
  * <p>This is the NeoForge analogue of Fabric's {@code ModInitializer}. The
  * registration trampoline differs from Fabric (NEOFORGE_NOTES.md §2/§4): the
@@ -40,16 +40,15 @@ import java.util.logging.Level;
  * constructs the {@code NeoForgeServerAccessor}, binds it into
  * {@code RTP.serverAccessor} + {@code RTP.scheduler}, constructs the rtp-core
  * {@code RTP} singleton, schedules the {@code ChunkUnloadProcessor}, and drains
- * the startup tasks (Phase N2.2). The per-tick {@code onServerTick} drains the
+ * the startup tasks. The per-tick {@code onServerTick} drains the
  * accessor's scheduler and refreshes any version-adapter chunk tickets.</p>
  * <p>The remaining seams are left as TODO for the platform maintainer
  * (project lead, {@code @leaf_26}) to fill in on a network-capable host where
  * the NeoForge/ModDevGradle artifacts resolve:</p>
  * <ul>
  *   <li>The native PvP combat tag (ADR-055) and the live network-mode boot
- *       (reservation-token redemption, ADR-049 Step J). The permission chain
- *       (N2.5), the menu / book / map / metrics / backend-sampler sinks (N2.6)
- *       are wired.</li>
+ *       (reservation-token redemption, ADR-049). The permission chain,
+ *       the menu / book / map / metrics / backend-sampler sinks are wired.</li>
  *   <li>The {@code ReqRtpNeoforgeS005ChunkLoadingTest} /
  *       {@code ReqRtpNeoforgeS006EarlyApiTest} REQ-traceable guards
  *       (see {@code platforms/rtp-neoforge/REQUIREMENTS.md}).</li>
@@ -102,7 +101,7 @@ public final class RTPNeoForgeMod {
     // the global NeoForge.EVENT_BUS rather than the mod bus.
     NeoForge.EVENT_BUS.register(this);
     // modBus is retained for future setup-phase wiring (registries, config).
-    // Intentionally unused in the skeleton; see Phase N1 TODO in the class doc.
+    // Intentionally unused in the skeleton.
   }
 
   @SubscribeEvent
@@ -321,12 +320,12 @@ public final class RTPNeoForgeMod {
 
     RTP.log(Level.INFO,
         "[RTP][NeoForge] Core bound \u2014 accessor + scheduler + event bridge + database + "
-            + "permissions (N2.5) + menu/book/map/metrics/backend sinks (N2.6) installed; "
+            + "permissions + menu/book/map/metrics/backend sinks installed; "
             + "/rtp command tree registers on RegisterCommandsEvent.");
-    // TODO(Phase N2.7+, @leaf_26): the S-00x regression guards + traceability
-    // rows (N2.7), the live network-mode boot (reservation-token redemption,
-    // ADR-049 Step J), and the native PvP combat tag (ADR-055). The version
-    // adapter (installed in onServerStarted) supplies the S-005 async chunk
+    // TODO(@leaf_26): the S-00x regression guards + traceability rows,
+    // the live network-mode boot (reservation-token redemption, ADR-049),
+    // and the native PvP combat tag (ADR-055). The version adapter
+    // (installed in onServerStarted) supplies the S-005 async chunk
     // path and non-persistent chunk tickets.
   }
 

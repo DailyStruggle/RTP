@@ -14,22 +14,22 @@ import java.util.TreeMap;
 import java.util.logging.Level;
 
 /**
- * Slice C row C3 (D6 C-warn): on post-first-heartbeat the bootstrap scans
+ * On post-first-heartbeat the bootstrap scans
  * the snapshot for region-name overlap across backends and logs one WARN
  * per overlap. {@code network.regionCollisionPolicy: warn} is the only
- * value shipped in L6; the {@code rename-local} and {@code reject-startup}
+ * value; the {@code rename-local} and {@code reject-startup}
  * policies are deferred follow-ups (see Out-of-Scope in the checklist).
  */
 public final class NetworkRegionCollisionWarner {
 
-    /** The collision-policy enum. L6 ships {@code WARN} only. */
+    /** The collision-policy enum. Currently only {@code WARN} is supported. */
     public enum Policy {
         WARN;
 
         public static Policy parse(String raw) {
             // Forwards-compatible default: anything unrecognised maps to WARN
             // rather than throwing, so a future operator's "rename-local"
-            // entry on an L6 backend logs warnings instead of failing boot.
+            // entry logs warnings instead of failing boot.
             return WARN;
         }
     }
@@ -40,7 +40,7 @@ public final class NetworkRegionCollisionWarner {
         if (snap == null) return regionToServers;
         for (BackendHeartbeat hb : snap.all()) {
             if (hb == null || hb.serverId() == null) continue;
-            // Prefer the L6 regions set; fall back to legacy regionsAvailable list.
+            // Prefer the typed regions set; fall back to legacy regionsAvailable list.
             Iterable<String> regions = hb.regions() != null && !hb.regions().isEmpty()
                     ? hb.regions()
                     : (hb.regionsAvailable() != null ? hb.regionsAvailable() : List.of());
@@ -69,7 +69,7 @@ public final class NetworkRegionCollisionWarner {
             RTP.log(Level.WARNING,
                     String.format(Locale.ROOT,
                             "[NETWORK] region collision: region '%s' is advertised by %d backends %s. "
-                                    + "L6 policy=%s: serving locally first when this backend is one of them (D6 A).",
+                                    + "policy=%s: serving locally first when this backend is one of them.",
                             e.getKey(), e.getValue().size(), servers, policy));
         }
     }

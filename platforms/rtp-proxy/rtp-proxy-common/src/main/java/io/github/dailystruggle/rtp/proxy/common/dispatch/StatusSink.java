@@ -11,7 +11,7 @@ import java.util.UUID;
  * state into the cross-server {@link NetworkRequestQueue} (or any other
  * audit sink) without coupling the dispatcher to the queue SPI.
  *
- * <p>Slice D row D6 of {@code CHECKLIST-cross-server-rtp-L6.md}. Default
+ * <p>Default
  * implementation is the {@link #NO_OP} singleton so adapters that have not
  * yet wired a queue (e.g. the in-memory test path) keep working
  * unchanged.</p>

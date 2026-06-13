@@ -25,7 +25,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Redis-backed {@link NetworkRequestQueue} for L6 Slice D row D4. Wires the
+ * Redis-backed {@link NetworkRequestQueue}. Wires the
  * four D3 Lua scripts ({@code enqueue_batch}, {@code pollStatus},
  * {@code dequeueReady}, {@code transition}) onto a {@link JedisPool}-managed
  * connection. Mirrors the pool + single-thread async executor pattern of
@@ -44,11 +44,11 @@ import java.util.logging.Logger;
  * underlying Jedis throwable. The caller (typically
  * {@code NetworkModeBootstrap}'s sink/supplier adapters) treats a failed
  * future as a transient transport fault and re-enqueues the affected work
- * per the Slice C dirty-write contract.</p>
+ * per the dirty-write contract.</p>
  *
  * <p>Operational invariants of the scripts (atomicity, terminal-state env
  * cleanup, LPOS positioning) are exercised end-to-end by the opt-in
- * {@code RedisNetworkRequestQueueIT} that ships with Slice D row D9.</p>
+ * {@code RedisNetworkRequestQueueIT}.</p>
  */
 public final class RedisNetworkRequestQueue implements NetworkRequestQueue, AutoCloseable {
 

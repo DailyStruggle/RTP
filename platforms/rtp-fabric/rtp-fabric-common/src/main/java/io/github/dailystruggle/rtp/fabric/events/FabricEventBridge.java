@@ -17,15 +17,10 @@ import java.util.logging.Level;
  * the {@link FabricScheduler} tick loop, and the {@link FabricDatabaseHandler}
  * lifecycle. Replaces what {@code PluginEventListener} (Bukkit-family) does.
  *
- * <p><b>Step E2 scope.</b> Lifecycle (server start/stop), per-world load/unload,
- * tick driver, and player join/disconnect. Permissions stay in Step F; world-
- * border / shape function plumbing in later sub-steps.
- *
  * <p><b>Memory hygiene (REQ-RTP-S-004).</b> Player disconnect drops the
  * wrapper from the accessor map and unbinds the underlying handle so the
  * teleport pipeline cannot leak entity references past session end. World
- * unload removes the {@code FabricRTPWorld} entry; chunk-ticket release
- * lands with Step C's {@code setForceLoadedImpl}.
+ * unload removes the {@code FabricRTPWorld} entry.
  *
  * <p><b>No Bukkit imports.</b> ADR-022 §4 invariant.
  */

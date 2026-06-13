@@ -91,7 +91,7 @@ class RedisCanonicalBackendOrderTest {
     @Test
     void canonical_starts_with_serverId_and_ends_with_regionKeptCounts() {
         // Pins the field order so downstream wire-format changes are caught.
-        // The L6 fields (keptCount, networkReservedCount, regions,
+        // The cross-server fields (keptCount, networkReservedCount, regions,
         // regionKeptCounts) are appended after killSwitch, so the canonical now
         // ends with regionKeptCounts and carries 18 fields.
         String canonical = RedisNetworkStateBinding.canonicalBackend(sampleFields());

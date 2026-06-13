@@ -9,7 +9,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * Slice 4 (ADR-015 / REQ-RTP-NET-015): on player quit, cancel
+ * ADR-015 / REQ-RTP-NET-015: on player quit, cancel
  * any in-flight cross-server enrolment for the disconnecting player so
  * their slot does not occupy the shared waitlist / pending queue.
  *
@@ -34,7 +34,7 @@ public final class NetworkWaitlistQuitListener {
 
     private final NetworkRequestQueue requestQueue;
     /**
-     * Optional lobby-side auto-retry queue (introduced post-Slice-4 to
+     * Optional lobby-side auto-retry queue (introduced to
      * fix the "non-processing state" symptom on lobby backends). When
      * non-null, a disconnect also removes the player from the local
      * retry queue and clears their {@code processingPlayers} lock so

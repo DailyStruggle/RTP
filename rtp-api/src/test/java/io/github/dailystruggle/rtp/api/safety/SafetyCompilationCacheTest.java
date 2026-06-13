@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Unit tests for {@link SafetyCompilationCache}.
  *
- * <p>Verifies the caching contract added in Slice 2 of the ADR-017 implementation:</p>
+ * <p>Verifies the caching contract (ADR-017):</p>
  * <ul>
  *   <li>Same input set → same compiled result instance (memoization).</li>
  *   <li>Different input sets → different compiled instances.</li>

@@ -21,7 +21,7 @@ import java.util.function.LongSupplier;
 
 /**
  * Folia-flavoured {@link MetricsBinding} that publishes per-region tick
- * metrics (Phase M2, Section C of the metrics + multi-server checklist).
+ * metrics.
  *
  * <p>Folia partitions the server into independently-ticked regions, so the
  * single-thread {@code BukkitTpsSampler} approach is insufficient: each

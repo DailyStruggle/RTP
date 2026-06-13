@@ -89,7 +89,7 @@ public final class ReservationTokenReaper implements AutoCloseable {
      * token transitioned to a released state. Used by backends co-located with
      * the reaper (single-process / dev / test) to drive
      * {@code RegionQueueManager.releaseToNetworkKept(UUID)} without a
-     * cross-process channel (REQ-RTP-NET-011, Slice D row D7).
+     * cross-process channel (REQ-RTP-NET-011).
      */
     public ReservationTokenReaper(NetworkTransport transport,
                                   Duration interval,

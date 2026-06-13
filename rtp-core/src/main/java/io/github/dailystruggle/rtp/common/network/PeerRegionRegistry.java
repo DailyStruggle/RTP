@@ -20,7 +20,7 @@ import java.util.function.Supplier;
 
 /**
  * Snapshot-adapter exposing peer-advertised {@code server:region} entries
- * to the local command pipeline. L6 Slice H2 (rtp-proxy-ADR-014).
+ * to the local command pipeline (rtp-proxy-ADR-014).
  *
  * <p>"Snapshot-adapter, not a timer" - this class reads from the already-
  * cached {@link NetworkSnapshot} that the heartbeat subscriber updates as
@@ -55,7 +55,7 @@ import java.util.function.Supplier;
  * this backend, skip load balancing). The {@code pickMostKept} lobby
  * picker still excludes self by design.</p>
  *
- * <p>Falls back to legacy {@code regionsAvailable} for pre-L6 peers that
+ * <p>Falls back to legacy {@code regionsAvailable} for older peers that
  * predate the {@code BackendHeartbeat.regions} field.</p>
  */
 public final class PeerRegionRegistry {
@@ -265,7 +265,7 @@ public final class PeerRegionRegistry {
                 // Self is intentionally NOT excluded: surfacing
                 // {@code <self>:default} alongside the unqualified {@code default}
                 // lets operators hard-pin to this backend (skip load balancing).
-                // Prefer the L6 typed regions Set; fall back to legacy list.
+                // Prefer the typed regions Set; fall back to legacy list.
                 Set<String> regions = hb.regions();
                 if (regions != null && !regions.isEmpty()) {
                     heartbeatServers.add(hb.serverId());

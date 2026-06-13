@@ -8,11 +8,11 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Trivial {@link WaitlistLeaderLease} that always returns {@code true} from
- * {@link #tryAcquire(Duration)}. Slice 2 of `CHECKLIST-network-waitlist.md`.
+ * {@link #tryAcquire(Duration)}.
  *
  * <p>Correct for single-proxy and in-memory devstack deployments where no
  * coordination is needed (one process, one drainer). The Redis-backed
- * lease using {@code SET NX PX} is deferred to Slice 3.
+ * lease using {@code SET NX PX} is not yet implemented in the Redis binding.
  */
 public final class AlwaysLeaderLease implements WaitlistLeaderLease {
 

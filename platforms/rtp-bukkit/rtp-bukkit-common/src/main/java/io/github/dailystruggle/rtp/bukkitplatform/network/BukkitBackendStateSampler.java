@@ -39,7 +39,7 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
     private static final int SCHEMA_VERSION = 1;
 
     /**
-     * L6 Slice I lobby-mode flag. When {@code true}, heartbeats publish an
+     * Lobby-mode flag. When {@code true}, heartbeats publish an
      * empty {@code regions} set and {@code acceptingRequests = false} so
      * peers never select this backend as a cross-server destination. The
      * local {@code RTP.selectionAPI.permRegionLookup} contents are ignored
@@ -49,14 +49,13 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
      */
     private volatile boolean lobbyMode;
 
-    /** Default ctor. Lobby mode off (pre-Slice-I behaviour). */
+    /** Default ctor. Lobby mode off. */
     public BukkitBackendStateSampler() {
         this.lobbyMode = false;
     }
 
     /**
-     * Slice I ctor. {@code lobbyMode == true} flips the suppression
-     * described on {@link #lobbyMode}.
+     * {@code lobbyMode == true} flips the suppression described on {@link #lobbyMode}.
      */
     public BukkitBackendStateSampler(boolean lobbyMode) {
         this.lobbyMode = lobbyMode;
@@ -114,9 +113,8 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
             // Defensive: tests may run without a Bukkit server in scope.
         }
 
-        // Queue depth: best-effort from the RTP region queue manager. Not
-        // wired to the network wait queue yet (Phase 2c). Default 0 keeps
-        // the SQL column happy without lying about the actual depth.
+        // Queue depth: best-effort from the RTP region queue manager.
+        // Default 0 keeps the SQL column happy without lying about the actual depth.
         int queueDepth = 0;
         try {
             RTP r = RTP.getInstance();
@@ -128,11 +126,11 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
         }
 
         // Regions available: lift the region keys from the loaded RTP config.
-        // For Phase 2e this is intentionally a coarse snapshot - the proxy
-        // selector only uses it for filtering "can this backend satisfy a
-        // request for region X?", not for fine-grained matching.
+        // This is intentionally a coarse snapshot - the proxy selector only uses
+        // it for filtering "can this backend satisfy a request for region X?",
+        // not for fine-grained matching.
         //
-        // L6 Slice I: lobby-mode backends publish an empty regions list and
+        // Lobby-mode backends publish an empty regions list and
         // acceptingRequests=false so peers never select them. The local
         // permRegionLookup is intentionally NOT consulted - even if the
         // operator left a default region defined locally, the network
@@ -143,8 +141,8 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
         // mode; lobby backends ship empty maps so peer pickers exclude them.
         // NOTE on field semantics: BackendHeartbeat.regionKeptCounts is
         // documented as "per-region count of locations in networkKeptLocations".
-        // For L6 Slice I lobby load balancing v1 we deliberately also publish
-        // local keptLocations.size() into the same map because the lobby's
+        // We deliberately also publish local keptLocations.size() into the same
+        // map because the lobby's
         // pickMostKept() needs *any* fresh signal of cached coordinate depth
         // and networkKeptLocations is empty on backends not yet running the
         // cross-server promotion loop. Sum is keptLocations + networkKeptLocations

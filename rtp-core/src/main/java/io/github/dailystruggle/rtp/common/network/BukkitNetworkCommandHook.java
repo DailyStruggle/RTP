@@ -12,10 +12,10 @@ import java.util.logging.Level;
 
 /**
  * Bukkit-platform implementation of the {@link NetworkCommandHook} SPI.
- * L6 Slice H2 (rtp-proxy-ADR-014).
+ * Network command hook (rtp-proxy-ADR-014).
  *
  * <p>Wires the cross-server router + enrolment buffer + peer-region registry
- * into the {@code /rtp} command pre-dispatch path defined by Slice H1's
+ * into the {@code /rtp} command pre-dispatch path defined by
  * {@code RTPCmd.compute(...)}. Responsibilities, in order on each call:</p>
  *
  * <ol>
@@ -36,7 +36,7 @@ import java.util.logging.Level;
  *             {@link NetworkEnrolmentBuffer.EnrolmentRecord} to the buffer
  *             and return {@link NetworkCommandHook.RoutingResult#crossServer}.</li>
  *         <li>{@link RoutingDecision.LocalFallback} -&gt; mostly silent
- *             local fallback per the user-confirmed UX (see Slice H sign-off
+ *             local fallback per the configured UX (see
  *             notes); the one exception is
  *             {@link RoutingDecision.FallbackReason#REGION_UNAVAILABLE},
  *             which fires the {@code networkRegionUnavailable} reject so the
@@ -58,9 +58,9 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
 
     private final NetworkRouter router;
     private final NetworkEnrolmentBuffer enrolmentBuffer;
-    /** L6 Slice I: live peer-region view used by lobby-mode no-arg dispatch. */
+    /** Live peer-region view used by lobby-mode no-arg dispatch. */
     private final PeerRegionRegistry peerRegionRegistry;
-    /** L6 Slice I: when true, no-arg {@code /rtp} auto-routes to a remote peer. */
+    /** When true, no-arg {@code /rtp} auto-routes to a remote peer. */
     private final boolean lobbyMode;
     /**
      * Optional. When non-null, every successful cross-server dispatch
@@ -106,16 +106,16 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
     }
 
     /**
-     * Legacy 2-arg ctor (pre-Slice-I). Equivalent to {@code lobbyMode = false}
+     * Legacy 2-arg ctor. Equivalent to {@code lobbyMode = false}
      * and a null {@code peerRegionRegistry}; the hook will not synthesise a
-     * lobby target for no-arg {@code /rtp}, preserving Slice H2 behaviour.
+     * lobby target for no-arg {@code /rtp}.
      */
     public BukkitNetworkCommandHook(NetworkRouter router, NetworkEnrolmentBuffer enrolmentBuffer) {
         this(router, enrolmentBuffer, null, false, null, null);
     }
 
     /**
-     * Slice I ctor. When {@code lobbyMode == true} AND the player invoked
+     * When {@code lobbyMode == true} AND the player invoked
      * {@code /rtp} with no {@code region=} argument, the hook consults
      * {@code peerRegionRegistry.pickMostKept()} to synthesise a
      * {@code (serverHint, regionKey)} pair and routes through
@@ -139,7 +139,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
     }
 
     /**
-     * Slice I follow-up ctor. Adds the optional {@code backendStatePublisher}
+     * Extended ctor. Adds the optional {@code backendStatePublisher}
      * so cross-server dispatches can force an immediate heartbeat publish,
      * propagating the local {@code recordDispatch} decrement to peers before
      * the next scheduled tick. The publisher is allowed to be {@code null}
@@ -197,7 +197,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
         String regionKey;
         String serverHint;
 
-        // L6 Slice I: lobby-mode no-arg dispatch. When the operator opted
+        // Lobby-mode no-arg dispatch. When the operator opted
         // into lobbyMode AND the player typed a bare `/rtp` with no
         // `region=` argument, synthesise a (serverHint, regionKey) target
         // from PeerRegionRegistry.pickMostKept() and route as if the
@@ -269,7 +269,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
                 try { lobbyRetryQueue.recordEnrolment(playerId, args, null); }
                 catch (Throwable ignored) {}
             }
-            // Slice I follow-up: bump our local view of the chosen peer's
+            // Bump our local view of the chosen peer's
             // kept count so the next pickMostKept() on this JVM does not
             // pile the next /rtp burst onto the same backend before the
             // peer's next heartbeat arrives. Then force an immediate

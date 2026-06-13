@@ -25,9 +25,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * SQL-backed {@link NetworkRequestQueue} implementation. Slice D row D5 of
- * `CHECKLIST-cross-server-rtp-L6.md`; design in
- * `PROPOSAL-cross-server-rtp-L6.md` Sections 4 and 7.
+ * SQL-backed {@link NetworkRequestQueue} implementation.
  *
  * <p>Reuses the shared {@link DataSource} owned by the host's
  * {@code AbstractSQLDatabaseAccessor} (rtp-proxy-ADR-011 §HikariCP Pool

@@ -335,7 +335,7 @@ public class Configs {
       }
     }
 
-    // L6 Slice J: lobby backends never serve teleports to local coords - they only
+    // Lobby backends never serve teleports to local coords - they only
     // dispatch players to peer backends via cross-server /rtp. Registering the
     // default (or any) local region here would advertise a local destination via
     // BackendStateSampler.regions and let /rtp resolve a no-arg request to the

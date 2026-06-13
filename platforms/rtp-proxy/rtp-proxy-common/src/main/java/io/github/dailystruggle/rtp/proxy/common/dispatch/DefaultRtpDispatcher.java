@@ -69,7 +69,7 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
     /**
      * Surfaced when the request was parked on the shared cross-proxy
      * {@link NetworkWaitlist} instead of being immediately routed. The
-     * lobby-side notifier (Slice 4) renders the player's queue position
+     * lobby-side notifier renders the player's queue position
      * against this key.
      */
     public static final MessageKey MSG_QUEUED        = new MessageKey("rtp.network.queued");
@@ -80,7 +80,7 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
     private final Executor executor;
     private final Duration reservationTtl;
     private final StatusSink statusSink;
-    /** Optional shared waitlist; when non-null the no-backend path enrols instead of failing. Slice 2. */
+    /** Optional shared waitlist; when non-null the no-backend path enrols instead of failing. */
     private final NetworkWaitlist waitlist;
     /** Stable id of the proxy node hosting this dispatcher; persisted in {@link NetworkWaitlist.WaitEnvelope}. */
     private final String proxyServerId;
@@ -116,12 +116,12 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
     }
 
     /**
-     * Full constructor (Slice D row D6). The {@link StatusSink} fires at
+     * Full constructor. The {@link StatusSink} fires at
      * every terminal outcome path so the proxy can push the player's queue
      * state into the cross-server {@link io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue}
      * without the dispatcher having to know about the queue SPI.
      *
-     * <p>Pass {@link StatusSink#NO_OP} to keep pre-L6 behaviour.</p>
+     * <p>Pass {@link StatusSink#NO_OP} to disable status sink callbacks.</p>
      */
     public DefaultRtpDispatcher(BackendSelector selector,
                                 NetworkTransport transport,
@@ -133,18 +133,18 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
     }
 
     /**
-     * Slice 2 constructor: in addition to the L6 inputs above, accept an
+     * Extended constructor: in addition to the inputs above, accept an
      * optional shared {@link NetworkWaitlist}. When {@code waitlist} is
      * non-null and {@link BackendSelector#choose} returns empty (no
      * qualifying backend), the dispatcher parks the envelope on the
      * waitlist and resolves with {@link DispatchOutcome.Queued} +
      * {@link QueueState#WAITLISTED}, instead of the terminal
-     * {@link DispatchOutcome.Failed} the pre-Slice-2 path produced. The
+     * {@link DispatchOutcome.Failed} the no-waitlist path produces. The
      * proxy-side {@link NetworkWaitlistDrainer} reinjects parked
      * envelopes when capacity appears.
      *
      * @param waitlist      shared cross-proxy waitlist, or {@code null}
-     *                      to keep pre-Slice-2 behaviour
+     *                      to keep no-waitlist behaviour
      * @param proxyServerId stable id of this proxy node; persisted in
      *                      {@link NetworkWaitlist.WaitEnvelope#originServerId()}
      */
@@ -161,7 +161,7 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
     }
 
     /**
-     * Slice 6 follow-up: full constructor that also accepts an optional
+     * Full constructor that also accepts an optional
      * {@link RegionAwareSelector} for proxy-side load-balanced fallback on
      * bare {@code /rtp} (no {@code regionKey} hint, e.g. proxy-driven
      * join-time RTP without a lobby pre-decision). When non-null, the
@@ -347,7 +347,7 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
     private CompletableFuture<DispatchAttempt> continueAfterPick(RtpRequest request,
                                                                  Optional<String> picked) {
         if (picked.isEmpty()) {
-            // Slice 2: park on the shared waitlist if one is configured, so
+            // Park on the shared waitlist if one is configured, so
             // the player gets Queued + WAITLISTED rather than a terminal
             // FAILED. The proxy-side NetworkWaitlistDrainer will reinject
             // when capacity appears. See rtp-proxy-ADR-015.
@@ -488,12 +488,12 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
     }
 
     /**
-     * Slice 2: park the envelope on the shared cross-proxy waitlist. The
+     * Park the envelope on the shared cross-proxy waitlist. The
      * dispatcher emits {@link QueueState#WAITLISTED} via the status sink
      * and surfaces {@link DispatchOutcome.Queued} to the caller so trigger
      * sources can update the player UX. Failures from the waitlist
      * binding (REJECTED_FULL, REJECTED_CLOSED, transport throw) fall
-     * back to the pre-Slice-2 NO_BACKEND outcome so the player never gets
+     * back to the NO_BACKEND outcome so the player never gets
      * a silent swallow.
      */
     private CompletableFuture<DispatchAttempt> parkOnWaitlist(RtpRequest request) {
@@ -529,7 +529,7 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
                         return DispatchAttempt.failed(new DispatchOutcome.Queued(0));
                     }
                     // REJECTED_FULL or REJECTED_CLOSED: fall back to the
-                    // pre-Slice-2 terminal NO_BACKEND outcome, so the
+                    // terminal NO_BACKEND outcome, so the
                     // player still gets a meaningful S-004 message.
                     LOG.log(Level.WARNING,
                             "RTP dispatch: waitlist refused enrol for player {0} ({1}); "

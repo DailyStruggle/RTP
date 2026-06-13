@@ -30,8 +30,8 @@ public interface BackendSelector {
 
     /**
      * Choose a backend with an optional pin to a specific {@code serverId}
-     * (L6 D6/D7 (B) plumbing for qualified {@code <server>=<region>} parsing;
-     * never set by L6 callers, but the SPI carries the parameter so the
+     * (plumbing for qualified {@code <server>=<region>} parsing;
+     * not yet set by callers, but the SPI carries the parameter so the
      * downstream rollout does not require an API break).
      *
      * <p>When {@code serverIdFilter} is present, the resulting candidate set is

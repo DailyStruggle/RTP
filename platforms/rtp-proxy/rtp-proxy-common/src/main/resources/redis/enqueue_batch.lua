@@ -1,5 +1,4 @@
--- rtp-proxy-common L6 Slice D3 cross-server network wait queue: batch enrol.
--- Refines PROPOSAL-cross-server-rtp-L6 Section 4.2 (write-batched dirty-write).
+-- rtp-proxy-common cross-server network wait queue: batch enrol.
 -- Atomic per-batch: each envelope is appended exactly once to the master
 -- ready FIFO, materialised into a per-correlationId env HASH, and reflected
 -- in the per-player status HASH. The seen SET enforces correlation-id

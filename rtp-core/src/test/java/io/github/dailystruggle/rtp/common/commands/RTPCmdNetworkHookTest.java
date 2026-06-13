@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Verifies the L6 cross-server pre-dispatch hook wired into {@code RTPCmd.compute}.
+ * Verifies the cross-server pre-dispatch hook wired into {@code RTPCmd.compute}.
  * Covers all four outcomes of {@link NetworkCommandHook.RoutingResult} plus the
  * S-004 degrade-on-throw path.
  *
@@ -133,7 +133,7 @@ public class RTPCmdNetworkHookTest {
 
   // ── 2b. Empty networkQueued template still emits a hardcoded fallback ───────
   //
-  // Regression for stale-messages.yml installs (pre-Slice-5 baseline that
+  // Regression for stale-messages.yml installs (baseline that
   // lacks the networkQueued key entirely): a missing/empty template
   // previously caused the CrossServer branch to silently drop the dispatch,
   // so the player got no feedback and re-typed /rtp. Now we substitute a
@@ -219,7 +219,7 @@ public class RTPCmdNetworkHookTest {
   // Local }) and exercises a runtime WARNING log path that is visible during
   // any full test run but cannot be asserted here without leaking
   // TeleportData / MemoryTracker entries into adjacent tests. Live coverage
-  // is provided by the Slice H2 Bukkit-adapter integration tests.
+  // is provided by the Bukkit-adapter integration tests.
 
   // ── 3c. Network short-circuits and the processingPlayers lock ───────────────
   //
@@ -228,7 +228,7 @@ public class RTPCmdNetworkHookTest {
   // duplicate envelope on the proxy every time they spam /rtp while
   // already parked on the cross-proxy waitlist. The lock is released
   // authoritatively by (a) PlayerQuitEvent (OnPlayerQuit listener),
-  // (b) Slice-4 NetworkStatusCache terminal transitions, or (c) plugin
+  // (b) NetworkStatusCache terminal transitions, or (c) plugin
   // shutdown. It MUST NOT be released by the CrossServer short-circuit
   // itself - that was the regression behind "I have to type /rtp twice"
   // and "spam with no response" (every subsequent /rtp got REJECTED_

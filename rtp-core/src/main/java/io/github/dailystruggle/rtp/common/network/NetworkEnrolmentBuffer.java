@@ -12,7 +12,7 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 
 /**
- * Dirty-write batching buffer for cross-server enrolments. Slice C row C5.
+ * Dirty-write batching buffer for cross-server enrolments.
  *
  * <p>Threading: producers ({@code /rtp} command path) call
  * {@link #offer(EnrolmentRecord)} cheaply on whatever thread Bukkit gave
@@ -20,7 +20,7 @@ import java.util.logging.Level;
  * deque on a fixed interval (default {@code network.queueFlushIntervalMs =
  * 250ms}) and hands the batch to the injected {@code flushSink}. The sink
  * does the actual transport-specific write (one pipelined Redis {@code EVAL}
- * per flush in Slice D; in-memory no-op in tests until D wires it).</p>
+ * per flush; in-memory no-op in tests).</p>
  *
  * <p>S-004: if the sink throws, the failed batch is re-enqueued at the head
  * so the next pulse retries; the exception is logged. Silent drop would
@@ -29,8 +29,8 @@ import java.util.logging.Level;
 public final class NetworkEnrolmentBuffer {
 
     /**
-     * One pending cross-server enrolment. Slice D defines the wire encoding;
-     * this record carries everything the Lua {@code enqueue_batch.lua} needs.
+     * One pending cross-server enrolment. Carries everything the Lua
+     * {@code enqueue_batch.lua} needs.
      */
     public record EnrolmentRecord(
             UUID playerId,

@@ -37,7 +37,7 @@ import java.util.TreeMap;
  *
  * <p>Per the locked design decision (2026-05-20), <strong>no</strong> prefab
  * overlay touches {@code backlogCacheCap}. {@code PrefabRegistryTest} guards
- * this at the registry level, and {@link PrefabApplierTest} re-asserts it
+ * this at the registry level, and {@code PrefabApplierTest} re-asserts it
  * survives the merge.
  */
 public final class PrefabApplier {

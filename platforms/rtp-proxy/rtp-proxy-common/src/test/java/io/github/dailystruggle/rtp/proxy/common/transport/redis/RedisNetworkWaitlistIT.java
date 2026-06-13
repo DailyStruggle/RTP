@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Opt-in live-Redis integration test for {@link RedisNetworkWaitlist}
- * (Slice 3b of {@code CHECKLIST-network-waitlist.md}). Exercises script
+ * Exercises script
  * atomicity, FIFO drain, point-remove, position lookup, reap, and
  * refreshAllTtl that the no-Redis script-load smoke test cannot reach.
  *

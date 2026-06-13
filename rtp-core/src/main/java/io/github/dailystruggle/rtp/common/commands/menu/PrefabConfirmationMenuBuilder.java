@@ -17,13 +17,13 @@ import java.util.UUID;
 /**
  * Curated confirmation-menu page builder rendered after a viewer clicks a
  * Setup-section prefab row in the admin panel (PROPOSAL-admin-panel-prefabs.md
- * v3.1, Session 5).
+ * v3.1).
  *
  * <p>The bare command surface is independent: {@code /rtp admin prefab apply
- * <id>} (Session 4a) mints a per-caller nonce, stashes the precomputed
+ * <id>} mints a per-caller nonce, stashes the precomputed
  * {@link PrefabApplier.Result#perFileDiff()} in the {@code PrefabNonceStore},
  * and surfaces the diff as paginated chat. The Bukkit-family entry point
- * (Session 4b D1 wiring in {@code RTPCmdBukkit}) additionally renders this
+ * ({@code RTPCmdBukkit}) additionally renders this
  * confirmation page so the viewer can click {@code Confirm} or {@code Cancel}
  * instead of typing the nonce by hand. Both surfaces dispatch the same
  * underlying {@code prefab confirm <id> <token>} verb.
@@ -32,7 +32,7 @@ import java.util.UUID;
  * renderer can emit {@code menu:<token>} click payloads.
  *
  * <p>All user-facing strings on this page are currently hardcoded English
- * fallbacks; Session 6 mirrors them through the locale TSV pipeline (new
+ * fallbacks; a future change should mirror them through the locale TSV pipeline (new
  * {@code MessagesKeys} entries {@code menuPrefabConfirmTitle},
  * {@code menuPrefabConfirmHint}, {@code menuPrefabConfirmRow},
  * {@code menuPrefabCancelRow}, plus the 14 per-prefab row/hover keys
@@ -81,7 +81,7 @@ public final class PrefabConfirmationMenuBuilder {
         List<MenuLine> lines = new ArrayList<>();
 
         // Title. Per-prefab `displayKey` is a forward-compatibility placeholder
-        // for the Session-6 MessagesKeys entry; until then we fall through to
+        // for a future MessagesKeys entry; until then we fall through to
         // the prefab id as the displayed name.
         String displayName = prefab.id();
         // Book parchment contrast: yellow (&6) and white (&f) wash out on

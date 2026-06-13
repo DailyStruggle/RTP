@@ -50,7 +50,7 @@ public class PrefabCommand extends BaseRTPCmdImpl {
         addSubCommand(new PrefabRollbackCmd(this));
     }
 
-    /** Exposed for tests and for the menu wiring in Session 5. */
+    /** Exposed for tests and for the menu wiring. */
     public PrefabNonceStore nonceStore() {
         return nonceStore;
     }

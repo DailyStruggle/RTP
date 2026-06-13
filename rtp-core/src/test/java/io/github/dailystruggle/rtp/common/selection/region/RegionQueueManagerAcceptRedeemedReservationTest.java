@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Slice F row F2 - CHECKLIST-cross-server-rtp-L6.md. Verifies
+ * Verifies
  * {@link RegionQueueManager#acceptRedeemedReservation(UUID, RTPLocation)}
  * delegates to the per-player queue mechanism so a backend-side
  * {@code JoinTriggerSource} can pin a redeemed cross-server coord for the

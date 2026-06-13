@@ -25,7 +25,7 @@ No menu, however polished, can make `/rtp` fast - only the engine behind it can.
 
 *Supported: Paper, Spigot, Fabric, and native NeoForge (1.21.x / 26.1.x) - Minecraft 1.20.x / 1.21.x / 26.x. Legacy Forge is not native: run this jar under Arclight / Mohist. Send your players to a safe, random spot, engineered to maintain 20.0 TPS without lag spikes.*
 
-**100% Free.** Same engine as the paid [**LeafRTP-Pro**](https://builtbybit.com/resources/rtp-pro.105418) build. No paywalled `/rtp` or nag screens, and no ads - just anonymous [bStats](https://bstats.org/) usage stats (server-admin opt-out via `plugins/bStats/config.yml`).
+**100% Free.** Same engine as the paid [**LeafRTP-Pro**](https://builtbybit.com/resources/rtp-pro.105418) build. No paywalled `/rtp` or nag screens, and no ads - just anonymous [bStats](https://bstats.org/) usage stats (server-admin opt-out via `plugins/bStats/config.yml`). Core engine and lite binary are **MIT-licensed** - open source, forkable, commercially usable.
 
 **Trusted since 2021: 4.6 stars over 30+ reviews, 430k+ downloads.**
 
@@ -46,6 +46,8 @@ No menu, however polished, can make `/rtp` fast - only the engine behind it can.
 - **No lag spikes when players spam `/rtp`.** Worst-case main-thread tick stays at 4 ms (vs. 70-852 ms for the next plugins) - your TPS holds at 20.00 during a teleport burst.
 - **Instant teleports, no "Finding a safe location..." wait.** Pre-verified location queue serves `/rtp` in one tick instead of loading chunks on demand.
 - **Works on plain Bukkit servers at Paper-class speed.** Off-tick `.mca` Anvil pre-filter, worst tick stays at 3 ms while competitors spike past 3 seconds.
+- **Runs on Folia** out of the box - regionized scheduling + async teleport, no extra config.
+- **Cross-server `/rtp` without Redis or SQL** - the `proxy-direct` transport lets a Velocity lobby send players to a backend region over a lightweight TCP socket, no database required.
 - **Clickable `/rtp menu` GUI world & region selection** - players pick worlds and regions from an interactive book menu (Paper / Folia; chat-paginated elsewhere), no commands to memorize.
 - **Eight claim-plugin integrations bundled** (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect) - no add-ons to install.
 - **Per-player cooldowns & usage limits** - per-permission cooldown and limit nodes out of the box, so `/rtp` spam is capped without an extra plugin.
@@ -74,7 +76,7 @@ Each capability below is paired with the part of that architecture that makes it
 | **Lifecycle effects engine** - particles, sounds, fireworks, potions, titles | Effect math and packet work run async, so they never cost you TPS. |
 | **8 bundled claim integrations** - GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect | Claim checks reroll inside the async pipeline, not on the tick that teleports the player. |
 | **Live map heatmaps** (`/rtp scan`) - green/red safety painted on a real held map | The `.mca` Anvil pre-filter and chunk-load passes run off-tick and throttled, so a scan runs on a live server without tanking TPS. |
-| **Built-in `/rtp info` diagnostics** - TPS/MSPT, heap, latency percentiles, rejection breakdown | Metrics are sampled without blocking a tick, so the dashboard reads pre-collected numbers at no hot-path cost. |
+| **Built-in `/rtp info` diagnostics** - TPS/MSPT (spark-enhanced when spark is installed), heap, latency percentiles, rejection breakdown, and a `/rtp info biomes` player-occupancy leaderboard | Metrics are sampled without blocking a tick, so the dashboard reads pre-collected numbers at no hot-path cost. |
 | **Optional PvP / combat-tag gate** - refuse or delay `/rtp` for players who recently dealt or took PvP damage, with native tracking plus PvPManager / CombatLogX / Simple Combat Log integration | Combat state is checked once at `/rtp` pre-dispatch through the `rtp-api` hook, so the anti-escape rule adds no per-tick cost to the teleport path. |
 | **Instant teleports** - no "Finding a safe location..." wait | A pre-warmed, pre-verified location queue serves `/rtp` in one tick instead of loading chunks on demand. |
 
@@ -130,7 +132,9 @@ A few hard requirements. If any are a **no**, EssentialsX `/rtp` or HuskHomes ar
 - ✅ **Java 21+** on your host (REQ-RTP-SYS-001, non-negotiable).
 - ✅ **Paper, Spigot, or a Bukkit-family fork** (Arclight / Mohist supported for Forge bridges). Fabric and NeoForge (1.21.x / 26.1.x) are supported and regularly tested, at feature parity with the Bukkit family in the latest builds.
 - ✅ **In-game editing or YAML, your call.** Browse and tune config from the clickable `/rtp menu` (book on Paper / Folia, chat-paginated elsewhere), or edit the plain YAML files directly and version-control them.
-- ✅ **Runs on Folia** out of the box (basic regionized scheduling + async teleport). The tuned, throughput-optimized Folia adapter ships first in **LeafRTP-Pro**, along with proxy/cross-server and SQL/Redis. (Vault economy works in the free build.)
+- ✅ **Runs on Folia** out of the box - regionized scheduling + async teleport, no extra config. The tuned, throughput-optimized Folia adapter ships first in **LeafRTP-Pro**.
+- ✅ **Vault economy** works in the free build - charge players per `/rtp` with per-region price, biome surcharges, and a balance floor; cost refunded automatically on cancel or pipeline failure; dormant when Vault is not installed.
+- ✅ **Cross-server `/rtp` without Redis or SQL** - the `proxy-direct` transport (Velocity) ships in the free build. SQL/Redis shared-state backends ship in **LeafRTP-Pro**.
 
 ---
 
@@ -157,10 +161,10 @@ Tune `plugins/RTP/config.yml` and `plugins/RTP/regions/*.yml` later - via `/rtp 
 - **Effects on every lifecycle phase** - particles, sounds, fireworks, potion, note effects via the in-tree `effects-api`, gated by `rtp.effects.<name>` permissions.
 - **Eight claim-plugin integrations bundled** - GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect.
 - Iris, Terra, and custom datapack generators work out of the box, with modded biome IDs preserved. **PlaceholderAPI** and **ProtocolLib** are supported as optional soft-deps.
-- **Optional Vault economy** - charge players per `/rtp` with per-region price, `priceOther`, params/biome surcharges, and a balance floor (`economy.yml`); dormant when Vault is not installed.
+- **Optional Vault economy** - charge players per `/rtp` with per-region price, `priceOther`, params/biome surcharges, and a balance floor (`economy.yml`); cost refunded automatically on cancel or pipeline failure (`refundOnCancel: true` default); dormant when Vault is not installed.
 - **Public `rtp-api`** - same surface as Pro. Trigger LeafRTP from a GUI, NPC, or quest; build your own UX without forking.
 - **Live map / heatmap visualizations** - `/rtp scan` paints region safety state (green safe / red unsafe) onto a real held map item while the chat readout streams cps, land %, and ETA; see *Real-Time Visual Diagnostics* above. Free on Paper, Spigot, Fabric, and NeoForge.
-- **Built-in runtime observability** - `/rtp info` reports TPS/MSPT, JVM heap, pipeline latency percentiles, and generation success/failure breakdown without a metrics add-on; see *Runtime observability* above.
+- **Built-in runtime observability** - `/rtp info` reports TPS/MSPT (spark-enhanced when spark is installed), JVM heap, pipeline latency percentiles, generation success/failure breakdown, and a `/rtp info biomes` player-occupancy leaderboard - no metrics add-on needed; see *Runtime observability* above.
 - **12 locales, parity-enforced** - shipped locales are CI-verified (`LocaleParityTest`) so a translated server never silently falls back to English on a new key.
 - **Unusually thorough engineering docs** - 28+ dated ADRs and a requirements-to-tests trace, public: [`docs/dev/INDEX.md`](https://github.com/dailystruggle/RTP/blob/V3/docs/dev/INDEX.md).
 
@@ -194,8 +198,8 @@ A lot of what people install companion plugins for is already in the free engine
 | **Paper** (+ forks: Purpur, Pufferfish, Leaf, Leaves, DivineMC) | ✅ Recommended          | Fully async via native `getChunkAtAsync`.                                                    |
 | **Spigot** (+ Spigot forks)                                  | ✅ Supported            | Off-tick `.mca` Anvil pre-filter -> Paper-class throughput on plain Spigot.                 |
 | **Arclight / Mohist** (Forge bridges)                        | ✅ Officially supported | Use the Spigot/Paper jar. Recommended way to run on Forge.                                  |
-| **Folia**                                                   | ✅ Basic support       | Runs on Folia via regionized scheduling + async teleport. The tuned, throughput-optimized adapter ships first in **LeafRTP-Pro**. |
-| **Multi-server / proxy** (Velocity)                         | ❌ Not in this build    | Cross-server queue ships in **LeafRTP-Pro**.                                                    |
+| **Folia**                                                   | ✅ Supported            | Runs on Folia via regionized scheduling + async teleport. The tuned, throughput-optimized adapter ships first in **LeafRTP-Pro**. |
+| **Multi-server / proxy** (Velocity)                         | ✅ proxy-direct (free) / full SQL+Redis (**Pro**) | `proxy-direct` transport ships in the free build: cross-server `/rtp` over a lightweight TCP socket, no Redis/SQL. SQL/Redis shared-state backends ship in **LeafRTP-Pro**. |
 | **Fabric**                                                  | ✅ Supported            | First-class, stable, in-scope platform; tested regularly, at feature parity with the Bukkit family in the latest builds. |
 | **Native NeoForge**                                         | ✅ Supported            | First-class adapter on Minecraft 1.21.x / 26.1.x.                                           |
 | **Native Forge**                                            | 🔁 Use Arclight / Mohist | No native adapter planned.                                                                  |
@@ -303,7 +307,7 @@ A: Use the `Polygon` shape - a triangle is a 3-vertex polygon and a diamond is a
 A: No. `/rtp scan` is a built-in, off-tick generator that walks a region and builds persistent spatial memory. Rather than loading every chunk up front, LeafRTP pre-verifies and remembers which sectors are unsafe so it avoids loading bad ground at all. Run Chunky alongside it if you still want a fully pre-generated map.
 
 **Q: What's the difference between LeafRTP and LeafRTP-Pro?**
-A: Same engine, same source tree. The free build already runs on Folia (basic regionized scheduling + async teleport) and ships multilingual locale switching and bundled (trimmed) `lang/**` packs. **LeafRTP-Pro** is the early-access tier: the tuned, throughput-optimized Folia adapter and new scaling backends land there first - multi-server / proxy support (Velocity), SQL/Redis backends - alongside the full curated `lang/**` locale set, the richer block-tag/state-predicate `safety.yml` grammar, and priority support. The tuned Folia adapter carries a real hands-on support burden (region-thread edge cases), so it ships and stabilizes on the paid tier - where guaranteed-response support lives - while the free build still runs on Folia in the meantime. The free build is fully sufficient for single-server deployments. Drop in the Pro jar later - same config, same data, same commands.
+A: Same engine, same source tree. The free build runs on Folia (regionized scheduling + async teleport), ships Vault economy, cross-server `/rtp` via the `proxy-direct` transport (no Redis/SQL), multilingual locale switching, and bundled (trimmed) `lang/**` packs. **LeafRTP-Pro** is the early-access tier: the tuned, throughput-optimized Folia adapter and SQL/Redis shared-state backends land there first - alongside the full curated `lang/**` locale set, the richer block-tag/state-predicate `safety.yml` grammar, and priority support. The tuned Folia adapter carries a real hands-on support burden (region-thread edge cases), so it ships and stabilizes on the paid tier - where guaranteed-response support lives - while the free build still runs on Folia in the meantime. The free build is fully sufficient for single-server and basic multi-server deployments. Drop in the Pro jar later - same config, same data, same commands.
 
 **Q: I'm on NeoForge.**
 A: NeoForge is a first-class supported platform on Minecraft 1.21.x / 26.1.x - just drop the mod in.
@@ -336,7 +340,7 @@ Support for the free build is **community-tier and best-effort** - a solo mainta
 <details>
 <summary><b>Known limitations</b></summary>
 
-- Free build runs on Folia with basic regionized scheduling, and ships multilingual locale switching and bundled (trimmed) `lang/**` packs. The tuned Folia adapter, SQL/Redis, multi-server, the full curated `lang/**` locale set, and the tag/state-predicate `safety.yml` grammar land in **LeafRTP-Pro** first - the tuned adapter and scaling backends ship on the paid tier ahead of the free build, where the hands-on support a new platform needs is guaranteed.
+- Free build runs on Folia (regionized scheduling + async teleport) and ships cross-server `/rtp` via `proxy-direct` (no Redis/SQL), Vault economy, multilingual locale switching, and bundled (trimmed) `lang/**` packs. The tuned Folia adapter, SQL/Redis shared-state backends, the full curated `lang/**` locale set, and the tag/state-predicate `safety.yml` grammar land in **LeafRTP-Pro** first.
 - `safety.yml` here accepts flat material names (`LAVA`, `MAGMA_BLOCK`, `CACTUS`, `FIRE`). Unknown materials log one warning, never silently dropped.
 - Edits to `safety.yml` and biome filters do not yet invalidate the persisted shape cache - workaround: `/rtp scan reset <region>`.
 - Emergency landing platform default is now `platformRadius: -1` (disabled). Set to `0` or higher to restore legacy 2.x behavior.
@@ -347,13 +351,13 @@ Live list: [CHANGELOG](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md
 
 ---
 
-## Need tuned Folia throughput, a proxy network, or paid support?
+## Need tuned Folia throughput, SQL/Redis backends, or paid support?
 
 [**LeafRTP-Pro**](https://builtbybit.com/resources/rtp-pro.105418) is a drop-in upgrade - same configuration, same data files, same commands. It adds:
 
-- **Tuned Folia** adapter (Region Scheduler + off-tick pre-filter, no 1-tick stalls) - the free build runs on Folia with a basic regionized scheduler; this throughput-optimized adapter ships here first, with the guaranteed-response support a region-threaded server needs
-- **Multi-server / proxy** support (Velocity), validated on the in-repo devstack (2 proxies, 2 lobbies, 2 backends behind shared Redis)
-- SQL / Redis shared-state backends (H2, SQLite, MySQL, PostgreSQL, Jedis)
+- **Tuned Folia** adapter (Region Scheduler + off-tick pre-filter, no 1-tick stalls) - the free build runs on Folia with a correctness-first scheduler; this throughput-optimized adapter ships here first, with the guaranteed-response support a region-threaded server needs
+- **SQL / Redis shared-state backends** (H2, SQLite, MySQL, PostgreSQL, Jedis) for multi-server deployments that need a durable shared store - the free build's `proxy-direct` transport covers the no-database case
+- **Multi-server / proxy** support validated on the in-repo devstack (2 proxies, 2 lobbies, 2 backends behind shared Redis)
 - Full curated `lang/**` locale set (free ships a trimmed set), login-reserve cache, visitor mode
 - The richer `safety.yml` grammar: vanilla block tags (`#minecraft:leaves`), state predicates (`OAK_SLAB[waterlogged=true]`), wildcards (`*[waterlogged=true]`)
 - Earliest releases on each version, and first access to new platforms and features + priority support within a documented response window

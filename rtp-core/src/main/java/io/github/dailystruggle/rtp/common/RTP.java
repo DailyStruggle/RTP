@@ -163,7 +163,7 @@ public class RTP {
       networkBridgeFactory;
 
   /**
-   * L6 Slice J: when {@code true}, this backend is configured as a pure
+   * When {@code true}, this backend is configured as a pure
    * cross-server lobby and skips all local region processing - the per-region
    * pre-fill ({@link io.github.dailystruggle.rtp.common.tasks.ScanTask}
    * scheduling), the per-region DB hydrate, and the steady-state
@@ -172,7 +172,7 @@ public class RTP {
    * instances (so {@code /rtp info} and config menus keep working), but those
    * regions never fill their {@code keptLocations}/{@code unkeptLocations}
    * pools and never accept reservations from peers (see
-   * {@link io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler}
+   * {@code BukkitBackendStateSampler}
    * which advertises {@code regions=[]} + {@code acceptingRequests=false}
    * under the same flag).
    *
@@ -183,7 +183,6 @@ public class RTP {
    * zero behavioural change. Volatile so the early-startup publish
    * happens-before the construction reads.
    *
-   * @since L6 Slice J
    */
   public static volatile boolean lobbyMode = false;
 

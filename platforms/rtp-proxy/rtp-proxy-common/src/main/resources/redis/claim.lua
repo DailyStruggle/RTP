@@ -1,4 +1,4 @@
--- rtp-proxy-common Phase 2e-Redis A2 atomic claim.
+-- rtp-proxy-common atomic claim.
 -- Refines rtp-proxy-ADR-005 Atomic Claim block. Single-call create-and-lock
 -- so the observable contract matches SqlNetworkStateBinding.claimSync:
 -- the winner sees the token row materialised in CLAIMED state; the loser
@@ -13,7 +13,7 @@
 -- ARGV[5] = createdEpochMs (string)
 -- ARGV[6] = ttlSeconds (string, integer)
 -- ARGV[7] = hmacHex (string, optional - empty string when verifier disabled).
---           Phase 2e-Redis A3 token envelope: Java pre-computes the HMAC
+--           Token envelope: Java pre-computes the HMAC
 --           over the canonical token payload (tokenId|serverId|playerId|
 --           expiresAtMs|createdAtMs|state=CLAIMED) and passes the hex
 --           digest in here; Lua stores it opaquely as the 'hmac' HSET

@@ -31,10 +31,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * clean teardown on shutdown.
  *
  * <p>The Velocity host is not booted; {@link ProxyServer} is a JDK reflective
- * proxy returning empty optionals for everything. Phase 2b only touches the
+ * proxy returning empty optionals for everything. This test only touches the
  * proxy server reference at transfer time, which this test does not exercise.</p>
  */
-@DisplayName("RtpVelocityPlugin Phase 2b participant skeleton")
+@DisplayName("RtpVelocityPlugin participant skeleton")
 class RtpVelocityPluginPhase2bTest {
 
     private ProxyServer fakeServer;
@@ -170,7 +170,7 @@ class RtpVelocityPluginPhase2bTest {
 
     /**
      * Reflective handler that returns default values for any ProxyServer
-     * method invoked during Phase 2b init. The init path itself does not call
+     * method invoked during init. The init path itself does not call
      * the ProxyServer, but Guice would inject one in production - this lets
      * the test construct the plugin directly.
      */

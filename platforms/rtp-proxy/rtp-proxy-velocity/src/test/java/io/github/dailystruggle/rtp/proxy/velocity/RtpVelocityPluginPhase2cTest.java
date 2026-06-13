@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * mock. The plugin runs against a live {@link InMemoryNetworkStateBinding}
  * so the listener's blocking lookup hits a real future.</p>
  */
-@DisplayName("RtpVelocityPlugin Phase 2c ServerPreConnectEvent")
+@DisplayName("RtpVelocityPlugin ServerPreConnectEvent")
 class RtpVelocityPluginPhase2cTest {
 
     /** Registered fake backends, keyed by server name. */

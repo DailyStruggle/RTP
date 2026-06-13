@@ -12,7 +12,7 @@ import org.checkerframework.framework.qual.SubtypeOf;
  * {@code GlobalRegionThread} — the single thread managed by
  * {@code Bukkit.getGlobalRegionScheduler()}.
  *
- * <h3>Thread-affinity contract</h3>
+ * <p><b>Thread-affinity contract</b>
  * <ul>
  *   <li>The global region thread is a singleton execution context for server-wide, non-spatial
  *       state (e.g., scoreboard, global game rules). It is <em>not</em> a region thread and
@@ -23,7 +23,7 @@ import org.checkerframework.framework.qual.SubtypeOf;
  *       directly; it must post work via {@code Bukkit.getGlobalRegionScheduler().run(...)}.</li>
  * </ul>
  *
- * <h3>Systems engineering analogy</h3>
+ * <p><b>Systems engineering analogy</b>
  * The global region thread is analogous to a privileged kernel thread that arbitrates shared
  * global state. Region threads are user-space processes that must use a syscall (the scheduler
  * API) to request global-state mutations — direct access is forbidden.

@@ -6,7 +6,7 @@ package io.github.dailystruggle.rtp.common.configuration.yaml;
  * <p>The in-house substrate (see ADR-025, 2026-05-15 revision) does not consume
  * any third-party YAML library; this class exists solely so call sites written
  * against the simpleyaml shape — {@code yamlFile.options().copyDefaults(true)},
- * {@code yamlFile.options().indent(2)} — continue to compile after the Session 2/3
+ * {@code yamlFile.options().indent(2)} — continue to compile after the
  * type swap. The setters are fluent (return {@code this}) to match the original API.</p>
  *
  * <p>Current semantic effects:</p>

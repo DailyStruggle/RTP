@@ -39,7 +39,7 @@ import java.util.logging.Level;
  * <ul>
  *   <li>{@code CfDiag.}</li>
  *   <li>{@code [RTP][CFDIAG]}</li>
- * </ul></p>
+ * </ul>
  */
 public final class CfDiag {
 

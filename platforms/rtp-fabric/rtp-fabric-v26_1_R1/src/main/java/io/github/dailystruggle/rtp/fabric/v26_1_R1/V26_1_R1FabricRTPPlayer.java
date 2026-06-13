@@ -30,8 +30,8 @@ import java.util.logging.Level;
  *
  * <p>Behaviorally a slimmed-down port of {@link io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer}:
  * identity, op-level perm check, system-chat / actionbar / title sinks, and
- * teleport via {@code MinecraftServer#submit}. Cooldown / delay are 0 (Step F
- * follow-up). Effects-api hover/click rich text is supported via
+ * teleport via {@code MinecraftServer#submit}. Cooldown / delay are 0.
+ * Effects-api hover/click rich text is supported via
  * {@link #sendComponent(Component)}.
  */
 public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,

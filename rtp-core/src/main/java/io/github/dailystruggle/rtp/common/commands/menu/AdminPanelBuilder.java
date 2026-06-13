@@ -374,11 +374,11 @@ public final class AdminPanelBuilder {
 
     /**
      * Setup-section variant of {@link #appendSection} that uses a hardcoded
-     * English divider literal until Session 6 lands the
-     * {@code menuAdminPanelSectionSetup} {@link MessagesKeys} entry through
-     * the locale TSV pipeline. Once that key exists, this method should be
-     * collapsed back into the standard {@code appendSection} call by Session
-     * 6's edit. Behavior is otherwise identical (empty body suppresses the
+     * English divider literal until the
+     * {@code menuAdminPanelSectionSetup} {@link MessagesKeys} entry is added
+     * through the locale TSV pipeline. Once that key exists, this method should be
+     * collapsed back into the standard {@code appendSection} call.
+     * Behavior is otherwise identical (empty body suppresses the
      * divider; spacer line inserted between sections).
      */
     private static void appendSetupSection(List<MenuLine> dest, List<MenuLine> body) {

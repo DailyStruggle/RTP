@@ -13,7 +13,7 @@ import java.util.logging.Logger;
  * {@link StatusSink} that propagates dispatcher-emitted state transitions
  * into the shared {@link NetworkRequestQueue} via its single-writer
  * {@link NetworkRequestQueue#transition(UUID, QueueState, Optional)}
- * op. ADR-015 Slice 4 wiring: the backend-side {@code NetworkStatusCache}
+ * op. The backend-side {@code NetworkStatusCache}
  * polls {@code NetworkRequestQueue.pollStatus(...)}, so persisting the
  * dispatcher's transitions through the same queue is how the lobby learns
  * that an envelope was parked on the cross-proxy waitlist (and later

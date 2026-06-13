@@ -11,7 +11,7 @@ import org.checkerframework.framework.qual.SubtypeOf;
  * Declares that the annotated method or constructor must execute exclusively on a Folia
  * {@code RegionThread} — the geographically-isolated thread that owns a specific chunk region.
  *
- * <h3>Thread-affinity contract</h3>
+ * <p><b>Thread-affinity contract</b>
  * <ul>
  *   <li>A {@code @RegionThread} method may only be <em>called directly</em> from another
  *       {@code @RegionThread} method.</li>
@@ -23,7 +23,7 @@ import org.checkerframework.framework.qual.SubtypeOf;
  *       {@code FoliaThreadChecker} is active.</li>
  * </ul>
  *
- * <h3>Checker Framework integration</h3>
+ * <p><b>Checker Framework integration</b>
  * This annotation is a {@link SubtypeOf} qualifier in the {@code FoliaThreadType} hierarchy:
  * <pre>
  *   {@literal @}AnyThread  (top / unknown)

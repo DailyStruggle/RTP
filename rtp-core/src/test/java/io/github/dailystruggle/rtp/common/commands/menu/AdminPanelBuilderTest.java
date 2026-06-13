@@ -345,7 +345,7 @@ final class AdminPanelBuilderTest {
     }
 
     // ------------------------------------------------------------------------
-    // Setup section (PROPOSAL-admin-panel-prefabs.md v3.1, Session 5)
+    // Setup section (PROPOSAL-admin-panel-prefabs.md v3.1)
     // ------------------------------------------------------------------------
 
     @Test

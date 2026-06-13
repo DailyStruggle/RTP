@@ -10,7 +10,7 @@ package io.github.dailystruggle.rtp.proxy.common.spi;
  * {@code RegionQueueManager.networkReservedLocations}) needs to learn when a
  * token TTL-expires (or is otherwise released) so it can call
  * {@code releaseToNetworkKept(networkTokenId)} and return the coordinate to
- * its {@code networkKeptLocations} buffer (REQ-RTP-NET-011, Slice A).</p>
+ * its {@code networkKeptLocations} buffer (REQ-RTP-NET-011).</p>
  *
  * <p>Threading. Fired on the originating component's executor (for the
  * reaper, that is the transport's executor - never the scheduler thread).
@@ -25,7 +25,6 @@ package io.github.dailystruggle.rtp.proxy.common.spi;
  * <p>Compatibility. The release plumbing pre-dates this hook; callers that
  * do not need an in-process notification pass {@link #NO_OP}.</p>
  *
- * @since L6 Slice D row D7
  */
 @FunctionalInterface
 public interface ReleaseSink {

@@ -46,7 +46,8 @@ commands:
 # Grouped by feature area:
 #   rtp.see / rtp.use       - baseline player permissions (default: true)
 #   rtp.free / rtp.no*      - bypasses for delays, cooldowns, cancellation (op)
-#   rtp.other / rtp.notme   - teleport-someone-else controls (op)
+#   rtp.other   - allow this player to teleport others
+#   rtp.notme   - prevent this player from being targeted by others
 #   rtp.world(s) / rtp.region(s) - cross-world / cross-region targeting (op)
 #   rtp.onevent.*           - automatic RTP on player events (default: false)
 #   rtp.biome.*             - biome-targeted teleports (op)
@@ -93,7 +94,7 @@ permissions:
     description: allow player to teleport another player.
     default: op
   rtp.notme:
-    description: don't let player be teleported by someone else.
+    description: prevent this player from being targeted by another player's /rtp player:<name> (console is exempt)
     default: op
   rtp.world:
     description: allow player to specify any world they have permission for

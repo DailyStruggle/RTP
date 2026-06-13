@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * </ul>
  *
  * <p>And that with {@code network.waitlist.enabled = false} every one of the
- * above is {@code null}, preserving the pre-Slice-2 dispatcher path
+ * above is {@code null}, preserving the no-waitlist dispatcher path
  * byte-for-byte.</p>
  *
  * <p>Velocity host is not booted; {@link ProxyServer} and its event manager
@@ -108,7 +108,7 @@ class RtpVelocityPluginWaitlistWiringTest {
     }
 
     @Test
-    @DisplayName("waitlist.enabled=false preserves the pre-Slice-2 dispatcher path")
+    @DisplayName("waitlist.enabled=false preserves the no-waitlist dispatcher path")
     void disabledLeavesWaitlistNull(@TempDir Path data) throws Exception {
         writeNetworkYaml(data, /* waitlistEnabled */ false);
 
@@ -128,7 +128,7 @@ class RtpVelocityPluginWaitlistWiringTest {
             assertNull(plugin.waitlistQuitListener(), "quit listener must be null when disabled");
 
             assertNotNull(plugin.dispatcher(),
-                    "dispatcher is still constructed (pre-Slice-2 path) when waitlist disabled");
+                    "dispatcher is still constructed (no-waitlist path) when waitlist disabled");
         } finally {
             plugin.onProxyShutdown(new ProxyShutdownEvent());
         }

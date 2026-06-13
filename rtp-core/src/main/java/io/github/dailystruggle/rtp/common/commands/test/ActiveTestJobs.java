@@ -10,7 +10,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * Process-wide registry of in-flight {@code rtp test *} jobs, so that
  * {@code rtp test cancel} can interrupt timer loops started by
- * {@link TestStressCmd} (and future subcommands) without each subcommand
+ * {@code TestStressCmd} (and future subcommands) without each subcommand
  * needing its own bespoke cancellation channel.
  *
  * <p>Rationale (see {@code RUNTIME_TEST_SUITE_PLAN.md §4 &mdash; cancel}):
@@ -42,7 +42,7 @@ public final class ActiveTestJobs {
   private static final Map<UUID, CopyOnWriteArrayList<Job>> JOBS = new ConcurrentHashMap<>();
 
   /**
-   * One-shot "owner is now drained" listeners, used by {@link TestFullCmd}
+   * One-shot "owner is now drained" listeners, used by {@code TestFullCmd}
    * to chain shipped subcommands without parking an async-pool worker on
    * a polling drain loop. Each listener fires at most once: either when
    * the owner's job list transitions to empty (last unregister hook), or
@@ -81,7 +81,7 @@ public final class ActiveTestJobs {
    * removes the owner's last job. The listener is removed after firing
    * regardless of outcome, so it cannot fire twice.
    *
-   * <p>This exists so {@link TestFullCmd} can convert its cross-subcommand
+   * <p>This exists so {@code TestFullCmd} can convert its cross-subcommand
    * drain wait from a parked-thread polling loop into an event-driven
    * chain that releases its async-pool slot between subcommands. Without
    * this hook, the umbrella sweep occupies one async worker for its full

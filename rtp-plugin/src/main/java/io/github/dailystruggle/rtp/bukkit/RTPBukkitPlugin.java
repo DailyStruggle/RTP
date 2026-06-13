@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 public final class RTPBukkitPlugin extends JavaPlugin {
   private static RTPBukkitPlugin instance = null;
   private static Metrics metrics;
-  /** Phase 2e-SQL: backend-side network mode lifecycle holder; never null after onLoad. */
+  /** Backend-side network mode lifecycle holder; never null after onLoad. */
   private final NetworkModeBootstrap networkBootstrap = new NetworkModeBootstrap();
   public BukkitTask commandTimer = null;
   public BukkitTask commandProcessing = null;
@@ -136,7 +136,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable constructing new RTP() -- wires API instance");
       RTP rtp = new RTP(); // constructor updates API instance
 
-      // L6 Slice J: read routing.lobbyMode from network.yml BEFORE setupDatabase
+      // Read routing.lobbyMode from network.yml BEFORE setupDatabase
       // (which loads regions.yml and constructs Region instances). The flag gates
       // the per-region ScanTask scheduling, DB hydrate, and steady-state
       // Region.execute() pulse - all of which would otherwise begin spending CPU
@@ -165,7 +165,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable BukkitDatabaseHandler.setupDatabase");
         BukkitDatabaseHandler.setupDatabase(rtp);
         RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable database setup complete");
-        // Phase 2e-SQL: boot backend-side network mode AFTER the DB is up
+        // Boot backend-side network mode AFTER the DB is up
         // (the SQL transport reuses the same accessor's DataSource). Strict
         // REQ-RTP-NET-002 parity: no-op when network.yml is absent or
         // network.enabled=false. Failure here is logged but never aborts
@@ -453,7 +453,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   @Override
   public void onDisable() {
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onDisable ENTER -- cancelling command timers");
-    // Phase 2e-SQL: stop the backend heartbeat publisher + close the network
+    // Stop the backend heartbeat publisher + close the network
     // transport BEFORE any DB shutdown. Reverse-order teardown - publisher
     // first (so it cannot enqueue more upserts), then transport (releases
     // any subscribers / poll thread). Idempotent; safe if network mode was
@@ -631,7 +631,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
               + t.getMessage(), t);
     }
 
-    // Slice 4 (ADR-015 / REQ-RTP-NET-015): register the cross-server
+    // ADR-015 / REQ-RTP-NET-015: register the cross-server
     // waitlist PlayerQuitEvent hook + install the command-lock sender
     // check on the live RTPCmdBukkit. Both are no-ops when network mode
     // is disabled (waitlistQuitListener / waitlistCommandGuard() are

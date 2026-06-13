@@ -52,7 +52,7 @@ public final class NetworkModeBootstrap {
      * finished. Volatile so the publish happens-before relationship is
      * tight.
      *
-     * @since L6 Slice H2
+     * @since rtp-proxy-ADR-014
      */
     public static volatile NetworkModeBootstrap LIVE;
 
@@ -60,22 +60,22 @@ public final class NetworkModeBootstrap {
     private BackendStatePublisher publisher;
     private ReservationTokenReaper reservationReaper;
     private JoinTriggerSource joinTriggerSource;
-    // L6 Slice C: backend-side router + dirty-write enrolment buffer + read-side status cache.
+    // Backend-side router + dirty-write enrolment buffer + read-side status cache.
     // All three live only while network mode is enabled and boot() has fully succeeded.
     private NetworkRouter router;
     private NetworkEnrolmentBuffer enrolmentBuffer;
     private NetworkStatusCache statusCache;
-    // L6 Slice D row D6: cross-server request queue SPI. Today only the
+    // Cross-server request queue SPI. Only the
     // in-memory binding is wired (D4/D5 still pending); for any other
-    // transport kind this stays null and the Slice C no-op sinks remain.
+    // transport kind this stays null and the no-op sinks remain.
     private NetworkRequestQueue requestQueue;
-    // L6 Slice H2 (rtp-proxy-ADR-014): peer-region registry view over the
+    // Peer-region registry view over the
     // cached snapshot + Bukkit-platform NetworkCommandHook installed into
     // RTP.networkCommandHook. Null when network mode is disabled or
     // boot() did not complete past router wiring.
     private PeerRegionRegistry peerRegionRegistry;
     private BukkitNetworkCommandHook commandHook;
-    // Slice 4 (ADR-015 / REQ-RTP-NET-015): lobby-side waitlist UX.
+    // ADR-015 / REQ-RTP-NET-015: lobby-side waitlist UX.
     // - notifier: periodic player-facing 'queued, position N' message.
     // - waitlistGuard: sender-check predicate registered on RTPCmdBukkit
     //   so /rtp* is locked while the player has a non-terminal entry.
@@ -87,7 +87,7 @@ public final class NetworkModeBootstrap {
     private NetworkWaitlistQuitListener waitlistQuitListener;
     private boolean waitlistQuitListenerRegistered;
     /**
-     * Lobby-side auto-retry queue (post-Slice-4 fix for the lobby
+     * Lobby-side auto-retry queue (fix for the lobby
      * "non-processing state" symptom). Non-null only when network mode
      * is enabled, boot() reached router wiring, AND the local
      * {@code network.routing.lobbyMode} is true. See
@@ -109,7 +109,7 @@ public final class NetworkModeBootstrap {
     // Platform-scheduler task handle for the periodic snapshot refresh.
     // Stored so shutdown() can cancel via RTP.scheduler.cancelTask.
     private Object snapshotRefreshTask;
-    // Slice D item 19: when transport.type=auto resolves to the plugin-message
+    // When transport.type=auto resolves to the plugin-message
     // tier, the auto-detect state machine is stored here so boot() can pump it
     // (tick + carrier-availability re-probe) on RTP.scheduler and shutdown()
     // can cancel the pump. Null for every other transport.type.
@@ -187,7 +187,7 @@ public final class NetworkModeBootstrap {
         long reapMs = reservation == null ? 30_000L : reservation.getLong("reapIntervalMs", 30_000L);
         if (reapMs <= 0) reapMs = 30_000L;
 
-        // L6 HMAC envelope wiring (REQ-RTP-PROXY-007 / ADR-010): load the shared
+        // HMAC envelope wiring (REQ-RTP-PROXY-007 / ADR-010): load the shared
         // HMAC verifier the same way NetworkBindings.open does on the Velocity
         // proxy. Without this the backend constructs RedisNetworkStateBinding
         // with verifier=null and publishes UNSIGNED heartbeat rows; the proxy
@@ -232,7 +232,7 @@ public final class NetworkModeBootstrap {
             // The D3 slot is a convenience; absence does not block heartbeat publishing.
         }
 
-        // L6 Slice I: read routing.lobbyMode early so the sampler can be
+        // Read routing.lobbyMode early so the sampler can be
         // constructed with the right advertisement profile from heartbeat-tick 1.
         // Re-read inside the router-wiring try-block below for the command-hook
         // ctor; the two reads are intentionally separated by the publisher
@@ -292,7 +292,7 @@ public final class NetworkModeBootstrap {
         this.snapshotRefreshTask =
                 RTP.scheduler.runTaskTimerAsynchronously(refresh, refreshTicks, refreshTicks);
 
-        // Slice D item 19: pump the auto-detect state machine for
+        // Pump the auto-detect state machine for
         // transport.type=auto on the plugin-message tier. The detector is
         // platform-neutral and starts no threads itself (guideline Scheduler
         // Usage); we drive it from RTP.scheduler. Each pulse:
@@ -349,8 +349,7 @@ public final class NetworkModeBootstrap {
         // proxy-direct arrival listener is needed.
         this.joinTriggerSource = new JoinTriggerSource(selected, serverId);
 
-        // L6 Slice C: wire router + enrolment buffer + status cache.
-        // The actual Redis EVAL sink + status supplier are attached by Slice D.
+        // Wire router + enrolment buffer + status cache.
         // Until then the buffer's flushSink is a no-op and the cache's
         // supplier returns an empty Collection, so the timers spin but do
         // not move any cross-server traffic - matching D2 (routing.mode=local).
@@ -366,10 +365,10 @@ public final class NetworkModeBootstrap {
             int rps = queue == null ? 5 : (int) queue.getLong("crossServerRequestsPerSecond", 5L);
             int burst = queue == null ? 10 : (int) queue.getLong("crossServerRequestsBurst", 10L);
 
-            // Slice D row D6: build the cross-server queue alongside the
+            // Build the cross-server queue alongside the
             // transport. Today only the in-memory kind is wired; for sql /
             // redis the factory throws UnsupportedOperationException and we
-            // fall through to the Slice C no-op sinks (the C7 wiring catch
+            // fall through to the no-op sinks (the wiring catch
             // block below picks it up). Failure of openRequestQueue is NOT
             // fatal - the rest of network mode (heartbeat publish, snapshot
             // read, join redeem) keeps working.
@@ -404,10 +403,10 @@ public final class NetworkModeBootstrap {
             }
             this.requestQueue = rq;
 
-            // Slice C -> Slice D adapters. When the queue is non-null we
+            // When the queue is non-null we
             // pipe enrolments into queue.flushPending(...) and pull status
             // from queue.pollStatus(...). When null (sql/redis not yet wired)
-            // we keep the Slice C no-op sinks so the bootstrap stays
+            // we keep the no-op sinks so the bootstrap stays
             // resilient and /rtp continues to serve locally.
             final NetworkRequestQueue qref = rq;
             java.util.function.Consumer<java.util.List<NetworkEnrolmentBuffer.EnrolmentRecord>> flushSink;
@@ -421,7 +420,7 @@ public final class NetworkModeBootstrap {
                                 r.playerId(), r.correlationId(), r.regionKey(),
                                 r.serverHint(), r.createdAtMs()));
                     }
-                    // Slice D contract: flushPending is async; we still
+                    // flushPending is async; we still
                     // block here (with a bounded wait) because the buffer's
                     // S-004 head-re-enqueue is driven by whether the sink
                     // throws. Any failure - timeout, transport error, queue
@@ -559,7 +558,7 @@ public final class NetworkModeBootstrap {
                 }
             });
 
-            // Slice 4 (ADR-015 / REQ-RTP-NET-015): waitlist UX.
+            // ADR-015 / REQ-RTP-NET-015: waitlist UX.
             // Knobs live under network.waitlist.* with conservative defaults:
             //   notifyIntervalSeconds: 5  (min re-notify gap per UUID)
             // The notifier pulse uses the same pollIntervalMs as the status
@@ -575,7 +574,7 @@ public final class NetworkModeBootstrap {
             this.waitlistNotifier.start(pollTicks);
             this.waitlistGuard = new NetworkWaitlistGuard(this.statusCache);
 
-            // Post-Slice-4 lobby auto-retry queue. Instantiated BEFORE
+            // Lobby auto-retry queue. Instantiated BEFORE
             // the quit listener (so disconnect can clear the parked
             // entry) and BEFORE the command hook (so transient
             // LocalFallbacks park instead of falling through to a dead
@@ -592,7 +591,7 @@ public final class NetworkModeBootstrap {
                 this.waitlistQuitListener = new NetworkWaitlistQuitListener(rq, this.lobbyRetryQueue);
             }
 
-            // L6 Slice H2 (rtp-proxy-ADR-014): install the cross-server
+            // rtp-proxy-ADR-014: install the cross-server
             // command hook into RTP.networkCommandHook so /rtp consults
             // the router on every invocation. The hook also drives
             // RegionParameter's extras supplier (the snapshot-adapter
@@ -639,13 +638,13 @@ public final class NetworkModeBootstrap {
                         this.autoDetector;
                 return d == null ? java.util.Set.of() : d.peerServerIds();
             });
-            // L6 Slice I: pass lobbyMode through so a no-arg /rtp on a
+            // Pass lobbyMode through so a no-arg /rtp on a
             // lobby backend auto-routes to the "most kept" remote region.
-            // Slice I follow-up: pass the backend state publisher so
+            // Pass the backend state publisher so
             // cross-server dispatches force an immediate heartbeat publish
             // (propagating the local PeerRegionRegistry.recordDispatch
             // decrement to peers before the next 1s tick).
-            // Post-Slice-4: pass the LobbyDispatchRetryQueue so transient
+            // Pass the LobbyDispatchRetryQueue so transient
             // LocalFallbacks (NETWORK_DISABLED / NO_LIVE_PEER /
             // QUEUE_FULL / TOKEN_BUCKET_EXHAUSTED) park the player on
             // the local retry pulse instead of silently falling through
@@ -708,7 +707,7 @@ public final class NetworkModeBootstrap {
             if (LIVE == this) LIVE = null;
         }
 
-        // L6 Slice F row F1 (one-shot boot reconcile, per user-confirmed
+        // One-shot boot reconcile (per
         // sub-scope "skip steady-state pulse, do startup reconcile only"):
         // ask the transport for every active reservation (PENDING/CLAIMED,
         // expiresAtMs > now) owned by this backend's serverId and try to
@@ -763,7 +762,7 @@ public final class NetworkModeBootstrap {
     }
 
     /**
-     * Slice 4 (ADR-015 / REQ-RTP-NET-015): register the cross-server
+     * ADR-015 / REQ-RTP-NET-015: register the cross-server
      * waitlist player-quit hook so a quit cancels any in-flight
      * enrolment. No-op when network mode is disabled or when boot() did not
      * reach queue wiring. Idempotent.
@@ -787,7 +786,7 @@ public final class NetworkModeBootstrap {
     }
 
     /**
-     * Slice 4 (ADR-015 / REQ-RTP-NET-015): register the cross-server
+     * ADR-015 / REQ-RTP-NET-015: register the cross-server
      * waitlist sender-check predicate on the live {@code RTPCmdBukkit} so
      * any {@code /rtp*} invocation by a player with a non-terminal entry
      * is short-circuited with a configurable message. No-op when network
@@ -801,7 +800,7 @@ public final class NetworkModeBootstrap {
 
     /** Reverse-order teardown. Idempotent. */
     public void shutdown() {
-        // L6 Slice H2: unwire the global command hook FIRST so any in-flight
+        // Unwire the global command hook FIRST so any in-flight
         // /rtp call from this point on takes the local-only pipeline. This
         // must come before the enrolment buffer / router teardown so a
         // late command thread doesn't NPE on a half-shut router.
@@ -811,10 +810,10 @@ public final class NetworkModeBootstrap {
         this.commandHook = null;
         this.peerRegionRegistry = null;
         if (LIVE == this) LIVE = null;
-        // L6 Slice D: tear down the queue after the buffer/cache stop
+        // Tear down the queue after the buffer/cache stop
         // firing into it but before the transport closes (so any in-flight
         // flush/poll futures complete first).
-        // L6 Slice C: tear down the router scaffolding first so its timers
+        // Tear down the router scaffolding first so its timers
         // stop firing before we yank the transport out from under them.
         if (waitlistNotifier != null) {
             try { waitlistNotifier.shutdown(); } catch (Throwable ignored) { /* best-effort */ }
@@ -867,7 +866,7 @@ public final class NetworkModeBootstrap {
             catch (Throwable ignored) { /* best-effort */ }
             snapshotRefreshTask = null;
         }
-        // Slice D item 19: stop pumping the auto-detect state machine.
+        // Stop pumping the auto-detect state machine.
         if (autoDetectorTask != null) {
             try { RTP.scheduler.cancelTask(autoDetectorTask); }
             catch (Throwable ignored) { /* best-effort */ }
@@ -895,31 +894,31 @@ public final class NetworkModeBootstrap {
     /** Visible for tests. */
     JoinTriggerSource joinTriggerSource() { return joinTriggerSource; }
 
-    /** Visible for tests / and for the {@code /rtp} command path in Slice D. */
+    /** Visible for tests and for the {@code /rtp} command path. */
     public NetworkRouter router() { return router; }
 
-    /** Visible for tests / Slice D wiring. */
+    /** Visible for tests. */
     public NetworkEnrolmentBuffer enrolmentBuffer() { return enrolmentBuffer; }
 
-    /** Visible for tests / Slice D wiring. */
+    /** Visible for tests. */
     public NetworkStatusCache statusCache() { return statusCache; }
 
-    /** Visible for tests / Slice D wiring. Null when {@code transport.type}
-     *  is {@code sql} or {@code redis} (D4/D5 not yet wired). */
+    /** Visible for tests. Null when {@code transport.type}
+     *  is {@code sql} or {@code redis} and the queue is not yet wired. */
     public NetworkRequestQueue requestQueue() { return requestQueue; }
 
-    /** Visible for tests / {@code RTPCmdBukkit} validator wiring (H2). Null
+    /** Visible for tests / {@code RTPCmdBukkit} validator wiring. Null
      *  when network mode is disabled or wiring failed. */
     public PeerRegionRegistry peerRegionRegistry() { return peerRegionRegistry; }
 
-    /** Visible for tests (H2). Null when network mode is disabled or
+    /** Visible for tests. Null when network mode is disabled or
      *  wiring failed; otherwise also installed at {@code RTP.networkCommandHook}. */
     public BukkitNetworkCommandHook commandHook() { return commandHook; }
 
     /**
-     * Slice D row D6 hook: open a {@link NetworkRequestQueue} matching the
-     * configured transport kind. {@code in-memory} (D2), {@code sql} (D5)
-     * and {@code redis} (D4) are all wired. The static factory
+     * Open a {@link NetworkRequestQueue} matching the
+     * configured transport kind. {@code in-memory}, {@code sql},
+     * and {@code redis} are all wired. The static factory
      * {@link io.github.dailystruggle.rtp.proxy.common.transport.NetworkBindings#openRequestQueue}
      * is the canonical entry point for vendor-free callers; this local
      * helper mirrors its dispatch but sources connection settings from
@@ -935,7 +934,7 @@ public final class NetworkModeBootstrap {
             case "memory":
                 return new InMemoryNetworkRequestQueue();
             case "sql": {
-                // Slice D row D5: reuse the host's existing
+                // SQL: reuse the host's existing
                 // AbstractSQLDatabaseAccessor pool (rtp-proxy-ADR-011
                 // §HikariCP Pool Sharing). Mirrors {@link #openTransport}.
                 AbstractSQLDatabaseAccessor accessor = sqlAccessorOrNull();
@@ -948,7 +947,7 @@ public final class NetworkModeBootstrap {
                         accessor.asDataSource());
             }
             case "redis": {
-                // Slice D row D4: source host/port/password from the same
+                // Redis: source host/port/password from the same
                 // {@code transport.redis.*} section that {@link #openTransport}
                 // reads for the state binding, so the queue and binding both
                 // connect to the same Redis instance from one config block.
@@ -985,7 +984,7 @@ public final class NetworkModeBootstrap {
     }
 
     /**
-     * L6 Slice F row F1 one-shot boot reconcile. Lists every active
+     * One-shot boot reconcile. Lists every active
      * reservation token owned by this backend's {@code serverId} from the
      * shared store, then for each token tries every known region (perm +
      * temp) until {@link io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager#reserveFromNetworkKept}
@@ -1077,8 +1076,8 @@ public final class NetworkModeBootstrap {
     /**
      * Sum {@link io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager#keptCount()}
      * across every permanent and temporary region known to
-     * {@link RTP#selectionAPI}. Slice D row D6: gives the router a real
-     * local-hot-queue depth instead of the Slice C placeholder
+     * {@link RTP#selectionAPI}. Gives the router a real
+     * local-hot-queue depth instead of the placeholder
      * {@code () -> 0} so the {@code routing.mode = auto} 7-gate matrix
      * can correctly prefer local-serve when there are warm coordinates.
      */
@@ -1110,7 +1109,7 @@ public final class NetworkModeBootstrap {
     private static final int PROXY_DIRECT_DEFAULT_PORT = 25599;
 
     /**
-     * Open the transport binding matching {@code type}. Phase 2e supports
+     * Open the transport binding matching {@code type}. Supports
      * {@code in-memory} (dev/test) and {@code sql} (real cross-process).
      * {@code redis} surfaces a clear "not yet" message rather than failing
      * silently.
@@ -1157,7 +1156,7 @@ public final class NetworkModeBootstrap {
                         .ProxyCacheNetworkBinding(bridge, staleAfterMs, System::currentTimeMillis);
             }
             case "auto": {
-                // Proxy auto-detect (Slice D item 19): build the detector and
+                // Proxy auto-detect: build the detector and
                 // run its cheap passive evaluation. When the bridge is absent
                 // or the passive proxy-forwarding probe is disarmed we resolve
                 // silently to disabled (return null -> boot() short-circuits)
@@ -1241,8 +1240,8 @@ public final class NetworkModeBootstrap {
                 return new SqlNetworkStateBinding(accessor.asDataSource(), intervalMs);
             }
             case "redis": {
-                // Phase 2e-Redis A1: heartbeats + snapshot + pub/sub fan-out.
-                // A3 (L6): HMAC envelope verifier MUST be passed through so the
+                // Redis: heartbeats + snapshot + pub/sub fan-out.
+                // HMAC envelope verifier MUST be passed through so the
                 // backend publishes signed rows that the Velocity proxy (which
                 // configures its own verifier via NetworkBindings.open) can
                 // verify. Passing null here silently disables signing and
@@ -1297,7 +1296,7 @@ public final class NetworkModeBootstrap {
     }
 
     /**
-     * L6 Slice J: read {@code routing.lobbyMode} from {@code network.yml}
+     * Read {@code routing.lobbyMode} from {@code network.yml}
      * without booting anything else. Called by the host plugin (e.g.
      * {@code RTPBukkitPlugin.onEnable}) BEFORE
      * {@code BukkitDatabaseHandler#setupDatabase}
@@ -1309,13 +1308,12 @@ public final class NetworkModeBootstrap {
      * <p>Strictly defensive: any failure (missing file, malformed YAML,
      * {@code network.enabled=false}, missing {@code routing} section) returns
      * {@code false}. Single-server deployments and network-disabled backends
-     * therefore behave byte-identically to pre-Slice-J builds.
+     * therefore behave byte-identically to non-lobby builds.
      *
      * @param networkYml the {@code network.yml} file under the plugin's data
      *                   folder; may be {@code null} or absent
      * @return {@code true} iff {@code network.enabled=true} AND
      *         {@code routing.lobbyMode=true}
-     * @since L6 Slice J
      */
     public static boolean readLobbyModeEarly(File networkYml) {
         if (networkYml == null || !networkYml.isFile()) return false;
@@ -1329,7 +1327,7 @@ public final class NetworkModeBootstrap {
             return routing.getBoolean("lobbyMode", false);
         } catch (Throwable t) {
             // Defensive: any failure means "not a lobby" so the backend keeps
-            // its existing pre-Slice-J behaviour.
+            // its existing non-lobby behaviour.
             RTP.log(Level.FINE,
                     "[NETWORK] readLobbyModeEarly degraded to non-lobby: " + t.getMessage());
             return false;

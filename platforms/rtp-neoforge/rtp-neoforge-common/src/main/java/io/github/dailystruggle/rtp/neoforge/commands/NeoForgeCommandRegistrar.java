@@ -13,7 +13,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * NeoForge command-registration trampoline (Phase N2.4 — Step NG).
+ * NeoForge command-registration trampoline.
  *
  * <p>NeoForge fires {@code RegisterCommandsEvent} on the game bus, exposing the
  * vanilla {@link CommandDispatcher} of {@link CommandSourceStack}

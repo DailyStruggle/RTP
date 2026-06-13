@@ -47,11 +47,6 @@ import java.util.logging.Level;
 /**
  * Fabric platform implementation of {@link RTPServerAccessor}.
  *
- * <p><b>Phase 2 status:</b> Step B (this class) wires {@link #getLocationGenerator()} so
- * the teleport pipeline can resolve a generator from the Fabric adapter. Every other
- * abstract method currently fails loud with {@link UnsupportedOperationException},
- * tagged with the implementation step that owns it (see
- * {@code docs/dev/MULTI_PLATFORM_PLAN.md} Phase 2 Steps A&ndash;H).
  *
  * <p><b>Why fail-loud:</b> per <b>REQ-RTP-S-006</b> ("require-by-contract API entry
  * points"), addons calling an unimplemented method must see an immediate
@@ -63,7 +58,7 @@ import java.util.logging.Level;
 public final class FabricServerAccessor implements RTPServerAccessor {
 
   // ---------------------------------------------------------------------------
-  // Step E2 state — populated by FabricEventBridge.
+  // State populated by FabricEventBridge.
   // Maps are platform-internal; getRTPWorld/getPlayer expose immutable views.
   // ---------------------------------------------------------------------------
 
@@ -382,7 +377,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   }
 
   // ---------------------------------------------------------------------------
-  // Step B - implemented (REQ-RTP-S-006)
+  // REQ-RTP-S-006
   // ---------------------------------------------------------------------------
 
   @Override
@@ -399,16 +394,9 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     return new LocationGenerator();
   }
 
-  // ---------------------------------------------------------------------------
-  // Stubs - implementations land in later Phase 2 steps. Each throws with a
-  // deterministic message so that any code path reaching them surfaces the gap
-  // loudly during the Step H dual-runtime smoke test.
-  // ---------------------------------------------------------------------------
-
-  private static UnsupportedOperationException notYet(String method, String step) {
+  private static UnsupportedOperationException notYet(String method) {
     return new UnsupportedOperationException(
-        "[RTP] FabricServerAccessor." + method + " not yet implemented (Step " + step
-            + " of MULTI_PLATFORM_PLAN.md).");
+        "[RTP] FabricServerAccessor." + method + " not yet implemented.");
   }
 
   @Override
@@ -579,9 +567,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public RTPCommandSender getSender(UUID uuid) {
-    // Step G G1 minimal: players resolved via the wrapper map; the sentinel
+    // Players resolved via the wrapper map; the sentinel
     // server UUID resolves to a console sender backed by MinecraftServer.
-    // Full perms-aware sender (Step F) layers atop this.
     if (uuid == null) return null;
     if (uuid.equals(RTPAPI.serverId)) {
       return new FabricConsoleSender(server);
@@ -604,7 +591,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public File getPluginDirectory() {
-    // Step D anchor: Fabric stores per-mod config under <run>/config/<modid>/.
+    // Fabric stores per-mod config under <run>/config/<modid>/.
     // Ensure the directory exists — rtp-core's Configs ctor reads/writes
     // immediately on construction, so a missing dir would fail YAML init.
     File dir = FabricLoader.getInstance().getConfigDir().resolve("rtp").toFile();
@@ -617,8 +604,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(UUID target, MessagesKeys msgType, String tag) {
-    // Step G G1 minimal: resolve the lang template by key and forward.
-    // Full multi-target / sender-relative variants remain Step E work.
+    // Resolve the lang template by key and forward.
     if (target == null || msgType == null) return;
     String template = lookupMessageTemplate(msgType);
     if (template == null) return;
@@ -704,8 +690,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(UUID sender, UUID target, String message, String tag) {
-    // Step G G1 minimal: deliver to both endpoints. Full cross-sender
-    // formatting (placeholders sourced from `sender`) is a Step E follow-up.
+    // Deliver to both endpoints.
     if (target != null) sendMessage(target, message, tag);
     if (sender != null && !sender.equals(target)) sendMessage(sender, message, tag);
   }
@@ -960,8 +945,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   public void announce(String msg, String permission, String tag) {
     // Bukkit parity: iterate online players, send to those holding the
     // permission, then route to console. Permission gating reuses the same
-    // op-level fallback that FabricRTPPlayer.hasPermission uses (Step F
-    // replaces with fabric-permissions-api).
+    // op-level fallback that FabricRTPPlayer.hasPermission uses.
     if (msg == null) return;
     // Run the messages.yml placeholder pipeline so tokens such as
     // [P0], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_regions],
@@ -1689,7 +1673,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     // Mirror AbstractServerAccessor: TimeBoundTaskPipe is the canonical default
     // for Spigot/Paper. Folia uses CountBound; Fabric's tick model is closest
     // to a single-region Folia, but for Phase 2 startup parity we use the same
-    // default Bukkit ships. Step H may revisit per Folia threading nuance.
+    // default Bukkit ships.
     return new TimeBoundTaskPipe();
   }
 
@@ -1868,8 +1852,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    * back to an empty set when the server is not yet bound (e.g. before
    * SERVER_STARTED) so callers get a deterministic empty result rather than
    * an NPE. The {@code rtpWorld} argument is currently ignored — Fabric's
-   * biome registry is server-wide on 1.21.1; per-world filtering is a Step E
-   * follow-up if needed.
+   * biome registry is server-wide on 1.21.1; per-world filtering is not yet implemented.
    */
   private Set<String> defaultBiomesFor(@Nullable RTPWorld<?> rtpWorld) {
     MinecraftServer s = server;
@@ -2136,7 +2119,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   }
 
   // ---------------------------------------------------------------------------
-  // Step G G1 helpers
+  // Helpers
   // ---------------------------------------------------------------------------
 
   /** Look up a {@code messages.yml} template by key, returning null if unset. */
@@ -2152,13 +2135,12 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   }
 
   /**
-   * Minimal console sender for the Fabric server console (Step G G1).
+   * Minimal console sender for the Fabric server console.
    *
    * <p>Always reports op-level permissions (Fabric console is unconditionally
    * privileged), routes {@link #sendMessage(String)} through Log4j2 in
    * legacy {@code §}-form so MC's TerminalConsoleAppender renders ANSI
-   * colour on the dedicated server. Step F replaces the permission
-   * contract with fabric-permissions-api.
+   * colour on the dedicated server.
    */
   private static final class FabricConsoleSender implements RTPCommandSender {
     private final @Nullable MinecraftServer server;

@@ -30,25 +30,14 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * Fabric root {@code /rtp} command (Phase 2 Step G — G1 minimal scope).
- *
- * <p><b>G1 scope:</b> bare-minimum {@code /rtp} that triggers the default RTP
- * teleport on the caller. <em>No parameters, no subcommands.</em> Brigadier
- * registration via {@link RTPCmdFabric#register} from
- * {@code RTPFabricMod.onInitialize()} using
- * {@code CommandRegistrationCallback.EVENT}.
- *
- * <p><b>Why minimal:</b> the user explicitly scoped Step G to "let permissions
- * be deferred and focus on getting `/rtp` to work" so a Fabric server can be
- * smoke-tested end-to-end before parameter/subcommand parity work begins. See
- * {@code MULTI_PLATFORM_PLAN.md} Step G status block.
+ * Fabric root {@code /rtp} command.
  *
  * <p><b>Pure delegation.</b> All teleport logic lives in
  * {@link RTPCmd#compute(UUID, Map, CommandsAPICommand, java.util.function.Consumer)};
- * this class exists solely to provide a concrete, named, parameter-free
+ * this class exists solely to provide a concrete, named
  * {@link CommandsAPICommand} the Brigadier adapter can convert.
  *
- * <h2>TODO — Full Bukkit parity (deferred follow-up Step G2)</h2>
+ * <h2>TODO — Full Bukkit parity</h2>
  *
  * The Bukkit equivalent ({@code RTPCmdBukkit}, ~115 line ctor) registers:
  * <ul>
@@ -67,8 +56,8 @@ import java.util.logging.Level;
  * {@code RTP.serverAccessor.getPlayer(s)} instead.
  *
  * <p>Permission-based parameter gating ({@code rtp.region}, {@code rtp.biome},
- * {@code rtp.world.*}, {@code rtp.other}) blocks on Step F
- * (fabric-permissions-api integration). The current G1 root is permissive —
+ * {@code rtp.world.*}, {@code rtp.other}) requires fabric-permissions-api
+ * integration. The current root is permissive —
  * any player can run {@code /rtp} on themselves.
  */
 public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
@@ -80,8 +69,8 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
         // Validators route world/player lookups through RTP.serverAccessor.* so
         // no org.bukkit.* leaks into rtp-fabric (ADR-022 §4 / S-005 nuance).
         // Permission checks use RTP.serverAccessor.getSender(uuid).hasPermission(...);
-        // until Step F lands the BrigadierBridgeContext predicate is permissive,
-        // but the validator shape stays correct so perms work for free once
+        // The BrigadierBridgeContext predicate is currently permissive;
+        // the validator shape stays correct so perms work for free once
         // fabric-permissions-api is wired.
 
         // region (with nested world / price / worldborderoverride / shape / vert)
@@ -186,7 +175,8 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
                     RTPPlayer target = RTP.serverAccessor.getPlayer(s);
                     if (target == null || !target.name().equalsIgnoreCase(s)) return false;
                     RTPCommandSender targetSender = RTP.serverAccessor.getSender(target.uuid());
-                    return targetSender == null || !targetSender.hasPermission("rtp.notme");
+                    // Console (non-player sender) is exempt from rtp.notme - parity with RTPCmdBukkit.
+                    return targetSender == null || !(sender instanceof RTPPlayer) || !targetSender.hasPermission("rtp.notme");
                 }) {
                 @Override
                 public Set<String> values() {
@@ -219,8 +209,7 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
         // ---- Subcommands (parity with RTPCmdBukkit lines 146–151) ----
         // TestCmd is intentionally deferred — the Bukkit TestCmd lives in
         // rtp-plugin/.../bukkit/commands/test/TestCmd.java and depends on
-        // Bukkit-only types. A platform-neutral lift is tracked under Step G2
-        // follow-ups in MULTI_PLATFORM_PLAN.md.
+        // Bukkit-only types. A platform-neutral lift is tracked in MULTI_PLATFORM_PLAN.md.
         addSubCommand(new ReloadCmd(this));
         // /rtp help intentionally NOT registered: commands-api's TreeCommand
         // auto-emits a complete built-in help listing when no HELP
@@ -259,11 +248,10 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
                 }
                 return RTP.serverAccessor.menuPermissionProbe(viewer).test(perm);
             };
-        // rtp-fabric-ADR-012 §4 un-defer (Step I Session 3): prefer the
-        // written-book modal where the active carrier supports it (1.21+ and
-        // the deobf 26.x line), falling back transparently to the chat
-        // renderer on 1.20.x (where FabricVersionAdapter.openBookMenu keeps
-        // its default false).
+        // Prefer the written-book modal where the active carrier supports it
+        // (1.21+ and the deobf 26.x line), falling back transparently to the
+        // chat renderer on 1.20.x (where FabricVersionAdapter.openBookMenu
+        // keeps its default false).
         final io.github.dailystruggle.rtp.api.menu.MenuRenderer menuRenderer =
             new io.github.dailystruggle.rtp.fabric.menu.FabricBookMenuRenderer(
                 new io.github.dailystruggle.rtp.common.commands.menu.ChatMenuRenderer());
@@ -309,15 +297,13 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
 
     @Override
     public void successEvent(RTPCommandSender sender, RTPPlayer player) {
-        // Intentional no-op on Fabric (by design, not deferred). The Bukkit
-        // overrides fire TeleportCommandSuccessEvent / TeleportCommandFailEvent
-        // on the Bukkit plugin event bus for third-party plugin observability;
-        // those events are org.bukkit.event.Event subclasses and cannot be
-        // reused on Fabric. Fabric has no equivalent plugin-event-bus consumer
-        // surface in scope, and RTP's in-house runnable-collection hooks
-        // (RTPRunnable / TeleportData) already cover internal observability,
-        // so firing nothing here is the correct Fabric behaviour. See
-        // MULTI_PLATFORM_PLAN.md Step G2 (resolved 2026-05-24).
+        // Intentional no-op on Fabric (by design). The Bukkit overrides fire
+        // TeleportCommandSuccessEvent / TeleportCommandFailEvent on the Bukkit
+        // plugin event bus for third-party plugin observability; those events
+        // are org.bukkit.event.Event subclasses and cannot be reused on Fabric.
+        // Fabric has no equivalent plugin-event-bus consumer surface in scope,
+        // and RTP's in-house runnable-collection hooks (RTPRunnable /
+        // TeleportData) already cover internal observability.
     }
 
     @Override
