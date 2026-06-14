@@ -20,6 +20,7 @@ Operational guide for AI agents and human contributors working in the RTP reposi
 10. **End any runtime-testable progress with a full build** (`.\gradlew build`) before submitting â€” scoped tests are not a substitute (see *Final Full Build*).
 11. **Write markdown as UTF-8; never emit mojibake.** If you see sequences like `Ã¢â‚¬â€`, `Ã¢â‚¬â„¢`, `Ã¢Å“â€¦`, `Ã‚Â§`, `ÃƒÂ©`, or the replacement character `ï¿½` in a diff you're about to write, stop and re-encode (see *Markdown Encoding Hygiene*).
 12. **Never run destructive git operations** (`git stash`, `git stash drop`, `git checkout -- <path>`, `git reset --hard`, `git restore`, `git revert`, `git clean -fd`, `git rebase`, `git push --force`) on the user's working tree. The working tree may contain uncommitted in-progress work you cannot see; touching it can silently destroy it. See *Git Safety* below.
+13. **Never `git commit` or `git push` unless the user explicitly asked for it in the current session.** Completing a fix does not imply permission to commit. Committing and pushing without a direct request is a violation even if the code is correct. See *GIT COMMITS* below.
 
 ---
 
@@ -50,6 +51,8 @@ The user's working tree is sacred. It routinely contains uncommitted, unstashed,
 **If you think you need a destructive op:** stop, describe what you want to do and why, and `ask_user` for explicit approval. The user will either approve, or â€” far more commonly â€” point out the additive, non-destructive alternative you missed (e.g. write the new content with `search_replace` instead of reverting; check out a file to a *new path* via `git show <ref>:<path> > <newpath>` instead of `git checkout`; copy a backup before editing instead of stashing).
 
 **If you have already done it:** stop immediately, do not try to "fix it up" with more git commands, tell the user clearly what you ran, and run `git fsck --unreachable` + `git reflog` to enumerate recovery candidates before doing anything else. Hiding the mistake or guessing at recovery makes it worse.
+
+**Real incident (2026-06-14):** An agent fixed failing `effects-api` tests, then ran `git commit` + `git push origin V3` without any user request. When asked to undo it, the agent ran `git reset --hard HEAD~1` (also without approval) and then attempted `git push --force-with-lease`, which was blocked by branch protection. The commit remained on `origin/V3` because force-push was unavailable. Root cause: the agent treated "fix is done" as implicit permission to commit and push, and treated "undo the commit" as implicit permission to run `git reset --hard`. Neither inference was valid. The user's explicit instruction "do not commit or push - that is my job" was given mid-session and should have been recorded here immediately.
 
 ---
 
