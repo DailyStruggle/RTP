@@ -36,6 +36,9 @@
 # 占位符: [remainingCooldown] - 剩余时间
 冷却消息: "&7[P0] ⚡ 你必须等待 [remainingCooldown] 才能再次传送"
 
+# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+lockedAfterUses: "&7[P0] ⌖ 你已达到随机传送次数上限，请稍后再试。"
+
 # 当区域没有排队的位置且玩家没有 rtp.unqueued 权限时
 队列中无可用位置: "#f5eb73[P0] ⌖ 当前没有可用的位置"
 
@@ -114,6 +117,10 @@ pvpInCombat: "&c[P0] 战斗中无法进行随机传送。"
 扫描未运行: "&c[P0] 以下区域当前没有扫描任务: [scan_regions]"
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 扫描状态: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 陆地 &8| &7ETA #7E9CC8[scan_eta]"
+# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
+# Set to empty string to disable the boss-bar.
+# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
 
 # ###############################################################################
 # 第 7 节: 信息命令

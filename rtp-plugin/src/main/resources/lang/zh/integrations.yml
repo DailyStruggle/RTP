@@ -1,9 +1,14 @@
-# --- RTP 集成设置 ---
-# 如果传送点落在指定插件的领地/区域内，每个开关都会重新随机选择目的地（仅当安装了该插件时生效）。
-# 如果落点位于 Factions 领地内，则重新随机选择位置。
+# Reroll the location if it lands inside a SaberFactions claim.
 # @type: boolean
 # @default: false
-rerollFactions: false
+rerollSaberFactions: false
+
+# Reroll the location if it lands inside Factions territory reported via the FactionsBridge API.
+# FactionsBridge bridges many Factions forks (FactionsUUID, SaberFactions, FactionsX, KingdomsX, ...)
+# behind one API; enable this when the FactionsBridge plugin is installed.
+# @type: boolean
+# @default: false
+rerollFactionsBridge: false
 
 # 如果落点位于 GriefDefender 领地内，则重新随机选择位置。
 # @type: boolean
@@ -15,11 +20,6 @@ rerollGriefDefender: false
 # @default: false
 rerollGriefPrevention: false
 
-# 如果落点位于 HuskTowns 领地内，则重新随机选择位置。
-# @type: boolean
-# @default: false
-rerollHuskTowns: false
-
 # 如果落点位于 Lands 领地内，则重新随机选择位置。
 # @type: boolean
 # @default: false
@@ -29,6 +29,26 @@ rerollLands: false
 # @type: boolean
 # @default: false
 rerollRedProtect: false
+
+# Reroll the location if it lands inside a Residence claim.
+# @type: boolean
+# @default: false
+rerollResidence: false
+
+# Reroll the location if it lands inside a CrashClaim claim.
+# @type: boolean
+# @default: false
+rerollCrashClaim: false
+
+# Reroll the location if it lands inside a HuskClaims claim.
+# @type: boolean
+# @default: false
+rerollHuskClaims: false
+
+# Reroll the location if it lands inside KingdomsX claimed land.
+# @type: boolean
+# @default: false
+rerollKingdomsX: false
 
 # 如果落点位于 Towny Advanced 领地内，则重新随机选择位置。
 # @type: boolean

@@ -32,6 +32,13 @@ public enum MessagesKeys {
   unsafe,
   /** Sent when the player attempts to teleport before their cooldown has expired. */
   cooldownMessage,
+  /**
+   * Sent when the player has reached the configured usage cap
+   * ({@code lockAfterUses}) and is locked out until the reset window elapses
+   * (BetterRTP {@code LockAfter} parity). Configurable per REQ-RTP-F-013.
+   * No placeholders.
+   */
+  lockedAfterUses,
   /** Sent when the pre-generation queue is empty and no location is immediately available. */
   noLocationsQueued,
   /** Sent to notify the player that the queue is being replenished. */
@@ -102,6 +109,14 @@ public enum MessagesKeys {
   scanNotRunning,
   /** Template for the scan status report line shown by {@code /rtp scan status}. */
   scanStatus,
+  /**
+   * Title template for the in-game boss-bar shown to players with {@code rtp.scan} permission
+   * while a world scan is running. Placeholders: {@code [scan_regions]},
+   * {@code [scan_chunks]}, {@code [scan_totalChunks]}, {@code [scan_cps]},
+   * {@code [scan_landPercentage]}, {@code [scan_eta]}.
+   * Empty string disables the boss-bar entirely.
+   */
+  scanBossBar,
   // --- /rtp info display ---
   /** Header title line of the {@code /rtp info} output. */
   infoTitle,

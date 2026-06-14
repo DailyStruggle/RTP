@@ -25,7 +25,7 @@ dependencies {
     api project(':metrics-api')
 
     compileOnly 'org.jetbrains:annotations:24.1.0'
-    // Checker Framework processor — runs during compileJava only, not shipped in the JAR.
+    // Checker Framework processor â€” runs during compileJava only, not shipped in the JAR.
     // checker-qual (the annotation classes) is inherited from the root subprojects block.
     checkerFramework 'org.checkerframework:checker:3.42.0'
 }

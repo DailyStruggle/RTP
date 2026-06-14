@@ -1,8 +1,9 @@
 package io.github.dailystruggle.effectsapi.bukkit.commands;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.NoteEffect;
-import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.enums.NoteTypeNames;
+import io.github.dailystruggle.effectsapi.common.effects.NoteEffect;
+import io.github.dailystruggle.effectsapi.common.effects.NoteEffect.NoteKeys;
+import org.bukkit.Instrument;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 
@@ -29,23 +30,23 @@ public class NoteCommand extends GenericEffectCommand<NoteEffect> {
     @Override
     public boolean onCommand(CommandSender sender, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
         List<NoteEffect> effects = new ArrayList<>();
-        NoteEffect mainEffect = new NoteEffect();
+        NoteEffect mainEffect = new NoteEffect(Instrument.PIANO);
         effects.add(mainEffect);
         mainEffect.setTarget(sender);
-        EnumMap<NoteTypeNames, Object> data = mainEffect.getData();
+        EnumMap<NoteKeys, Object> data = mainEffect.getData();
         for (Map.Entry<String, List<String>> entry : parameterValues.entrySet()) {
             List<String> vals = entry.getValue();
             String name = entry.getKey().toLowerCase();
-            NoteTypeNames enumLookup = NoteTypeNames.valueOf(name.toUpperCase());
+            NoteKeys enumLookup = NoteKeys.valueOf(name.toUpperCase());
             String value = entry.getValue().get(0);
             data.put(enumLookup, value);
             mainEffect.setData(data);
             while (effects.size() < vals.size()) {
-                effects.add(new NoteEffect());
+                effects.add(new NoteEffect(Instrument.PIANO));
             }
             for (int i = 1; i < vals.size(); i++) {
                 NoteEffect effect = effects.get(i);
-                enumLookup = NoteTypeNames.valueOf(name.toUpperCase());
+                enumLookup = NoteKeys.valueOf(name.toUpperCase());
                 value = entry.getValue().get(i);
                 data.put(enumLookup, value);
                 effect.setData(data);

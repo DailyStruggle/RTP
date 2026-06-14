@@ -1,16 +1,19 @@
 package io.github.dailystruggle.effectsapi.bukkit;
 
 import io.github.dailystruggle.effectsapi.EffectsAPI;
-import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.FireworkEffect;
-import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.GlideEffect;
-import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.NoteEffect;
-import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.NoteEffect_1_12;
-import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.ParticleEffect;
-import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.PotionEffect;
-import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.SoundEffect;
+import io.github.dailystruggle.effectsapi.common.effects.FireworkEffect;
+import io.github.dailystruggle.effectsapi.common.effects.GlideEffect;
+import io.github.dailystruggle.effectsapi.common.effects.NoteEffect;
+import io.github.dailystruggle.effectsapi.common.effects.SoundEffect;
+import io.github.dailystruggle.effectsapi.common.effects.ParticleEffect;
+import io.github.dailystruggle.effectsapi.common.effects.PotionEffect;
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import org.bukkit.Bukkit;
+import org.bukkit.Color;
+import org.bukkit.Instrument;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.permissions.Permission;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.plugin.Plugin;
@@ -56,18 +59,10 @@ public final class BukkitEffectsInitializer {
      * {@link Effect#run()} call if the scheduler rejects the task (e.g. on a
      * Folia region thread under unusual ownership conditions), preserving
      * the resilience of the prior {@code try{runTask} catch{run}} idiom.
-     *
-     * <p>Special-cases {@link NoteEffect}, which schedules a 1-tick follow-up
-     * task in its overridden {@code runTask(Plugin)} — call that directly so
-     * the follow-up still fires.
      */
     public static void runEffect(@NotNull Plugin plugin, @NotNull Effect<?> effect) {
         try {
-            if (effect instanceof NoteEffect) {
-                ((NoteEffect) effect).runTask(plugin);
-            } else {
-                Bukkit.getScheduler().runTask(plugin, (Runnable) effect);
-            }
+            Bukkit.getScheduler().runTask(plugin, (Runnable) effect);
         } catch (Throwable t) {
             effect.run();
         }
@@ -82,13 +77,15 @@ public final class BukkitEffectsInitializer {
         // Bind the Bukkit-side ValueCoercer before any Effect can be cloned /
         // parsed. Per effects-api-ADR-004, Effect#canParse / #str2Obj /
         // #fixData all delegate to EffectFactory.getCoercer().
+        BukkitHandles.register();
         EffectFactory.setCoercer(new BukkitValueCoercer());
-        EffectFactory.addEffect("FIREWORK", new FireworkEffect());
-        if (EffectsAPI.getServerIntVersion() > 16) EffectFactory.addEffect("NOTE", new NoteEffect());
-        else EffectFactory.addEffect("NOTE", new NoteEffect_1_12());
-        if (EffectsAPI.getServerIntVersion() > 8) EffectFactory.addEffect("PARTICLE", new ParticleEffect());
-        EffectFactory.addEffect("POTION", new PotionEffect());
-        EffectFactory.addEffect("SOUND", new SoundEffect());
+        EffectFactory.addEffect("FIREWORK", new FireworkEffect(org.bukkit.FireworkEffect.Type.BALL, Color.WHITE));
+        EffectFactory.addEffect("NOTE", new NoteEffect(Instrument.PIANO));
+        if (EffectsAPI.getServerIntVersion() > 8) {
+            EffectFactory.addEffect("PARTICLE", new ParticleEffect(Particle.EXPLOSION_NORMAL));
+        }
+        EffectFactory.addEffect("POTION", new PotionEffect(PotionEffectType.BLINDNESS));
+        EffectFactory.addEffect("SOUND", new SoundEffect(Sound.valueOf("ENTITY_PLAYER_LEVELUP")));
         // Glide requires elytra (1.9+); register conditionally to keep older servers happy.
         if (EffectsAPI.getServerIntVersion() >= 9) EffectFactory.addEffect("GLIDE", new GlideEffect());
     }

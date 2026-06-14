@@ -41,6 +41,9 @@ unsafe: "&7[P0] ⌖ impossible de trouver un emplacement sûr en [attempts] tent
 # espace réservé : [remainingCooldown] - le temps restant
 cooldownMessage: "&7[P0] ⚡ Vous ne pouvez pas vous téléporter avant [remainingCooldown]"
 
+# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+lockedAfterUses: "&7[P0] ⌖ Vous avez atteint votre limite de téléportation aléatoire. Réessayez plus tard."
+
 # si la région n'a aucun emplacement en file et que le joueur n'a pas la permission rtp.unqueued
 noLocationsQueued: "#f5eb73[P0] ⌖ aucun emplacement prêt pour le moment"
 
@@ -127,6 +130,10 @@ scanRunning: "&c[P0] scan task already running for regions: [scan_regions]"
 scanNotRunning: "&c[P0] scan task not running for regions: [scan_regions]"
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 terres &8| &7ETA #7E9CC8[scan_eta]"
+# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
+# Set to empty string to disable the boss-bar.
+# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
 
 # ###############################################################################
 # Section 7: Info Command

@@ -24,7 +24,7 @@ description: 'a fast and flexible random teleportation plugin'
 # spark is listed for load-order only: when present it loads before RTP so the
 # spark API is ready when the metrics binding queries it (richer TPS/MSPT than
 # the native server calls). Never required - absence degrades to the native binding.
-softdepend: [ WorldGuard, WorldEdit, PlaceholderAPI, Vault, Chunky, ChunkyBorder, GriefDefender, GriefPrevention, Towny, HuskTowns, Factions, Lands, RedProtect, CombatLogX, PvPManager, SimpleCombatLog, spark ]
+softdepend: [ WorldGuard, WorldEdit, PlaceholderAPI, Vault, Chunky, ChunkyBorder, GriefDefender, GriefPrevention, Towny, Factions, FactionsBridge, Lands, RedProtect, Residence, CrashClaim, HuskClaims, Kingdoms, CombatLogX, PvPManager, SimpleCombatLog, spark ]
 folia-supported: true
 
 # --- Commands ---

@@ -47,4 +47,23 @@ public interface RTPPlayer extends RTPCommandSender {
    * @return {@code true} if the player is online, {@code false} otherwise
    */
   boolean isOnline();
+
+  /**
+   * Sets the given location as the player's persistent spawn anchor (the point
+   * they respawn at after death), backing the {@code setRespawnOnTeleport} config
+   * knob (BetterRTP {@code SetAsRespawn} parity).
+   *
+   * <p>The default implementation is a no-op so existing {@link RTPPlayer}
+   * implementations (and addon test doubles) remain source- and binary-compatible;
+   * each platform adapter overrides it with the native respawn-point call.
+   *
+   * <p>Must be called from the thread that owns the destination (the main server
+   * thread, or the owning region thread on Folia).
+   *
+   * @param location the location to anchor the player's respawn to; must not be
+   *                 {@code null}
+   */
+  default void setRespawnLocation(RTPLocation location) {
+    // no-op by default; platform adapters override with the native call
+  }
 }

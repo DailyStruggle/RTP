@@ -1,13 +1,13 @@
 // rtp-fabric-ADR-001 - Fabric multiversion V26_2_R1 submodule.
 //
-// EARLY/EXPERIMENTAL adapter pinned to the MC 26.2 pre-release (26.2-pre-3).
+// EARLY/EXPERIMENTAL adapter pinned to the MC 26.2 pre-release (26.2-rc-2).
 // The 26.2 line is deobfuscated (same regime as 26.1), so the build-script
 // shape matches the v26_1_R1 submodule: Loom 1.15 unobf plugin, JDK 25
 // toolchain, no `mappings` line, plain implementation/compileOnly. Cloned
 // from v26_1_R1; see rtp-fabric-ADR-014 for the 26.2 line rationale and the
 // pre-release-version-string dispatch caveat.
 //
-// WARNING: 26.2-pre-3 is a moving target. The pinned minecraftVersion,
+// WARNING: 26.2-rc-2 is a moving target. The pinned minecraftVersion,
 // loaderVersion and fabricApiVersion below, plus the dispatch matcher in
 // RTPFabricMod#adapterFqnFor, must be re-verified when 26.2 reaches final.
 //
@@ -15,7 +15,7 @@
 // JDK 25 installed will see this submodule fail toolchain provisioning;
 // the rest of the project (Java 21) is unaffected. A Java 25 server can
 // load Java 21 bytecode from common / v1_20_R1 / v1_21_R1 in the same
-// shaded jar — bytecode compatibility is forward-only.
+// shaded jar â€” bytecode compatibility is forward-only.
 plugins {
     // Loom 1.15 splits its plugin IDs by obfuscation status: 26.1+ is
     // UNOBFUSCATED so it uses `net.fabricmc.fabric-loom` (no `mappings`
@@ -26,7 +26,7 @@ plugins {
 }
 
 ext {
-    minecraftVersion       = '26.2-pre-3'
+    minecraftVersion       = '26.2-rc-2'
     loaderVersion          = '0.19.2'
     fabricApiVersion       = '0.150.2+26.2'
     permissionsApiVersion  = '0.3.1'
@@ -57,12 +57,12 @@ dependencies {
     api project(':rtp-core')
     api project(':commands-api')
     api project(':rtp-fabric:rtp-fabric-common')
-    // ADR-009 step 4 — unobf carrier of NM-typed common surfaces (FabricEffectsHandlerUnobf,
+    // ADR-009 step 4 â€” unobf carrier of NM-typed common surfaces (FabricEffectsHandlerUnobf,
     // FabricRTP{World,Chunk,Player}Unobf). Edge is `api` because v26.x adapters call into
     // these types directly from Mojmap-typed shims (see V26_2_R1FabricVersionAdapter#installEffectsWiring).
     api project(':rtp-fabric:rtp-fabric-common-unobf')
-    // See V26_2_R1FabricEffectDispatchers — Loom-compiled effect dispatchers.
+    // See V26_2_R1FabricEffectDispatchers â€” Loom-compiled effect dispatchers.
     compileOnly project(':effects-api')
-    // ADR-006 amendment 2026-05-09 — unobf carrier of NM-typed effect runtime.
+    // ADR-006 amendment 2026-05-09 â€” unobf carrier of NM-typed effect runtime.
     compileOnly project(':effects-api:effects-api-fabric-unobf')
 }

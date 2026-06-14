@@ -357,6 +357,17 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     // Count only actual live chunk-load attempts (post probe-cache miss). The probe
     // entry getChunkAt MUST NOT bump this; see RTPWorld.totalChunkLoads Javadoc.
     totalChunkLoads.incrementAndGet();
+    // Stamp the start so ChunkLoadProfile can record the wall-clock floor (smallest
+    // single-chunk load). Only genuine live loads reach here; the ADR-016 anvil
+    // prefilter short-circuit republishes a cached view upstream in getChunkAt and
+    // never calls this method, so the floor is not polluted by non-load samples.
+    final long chunkLoadStartNanos = System.nanoTime();
+    // Classify already-generated (loaded from disk) vs ungenerated (this load
+    // triggers generation - the expensive path) BEFORE the load runs, while
+    // isChunkGenerated still reflects on-disk state. ChunkLoadProfile keeps the
+    // two floors / costs separate so operators can see how much of RTP's cost is
+    // generation (removable by pre-generating the world) versus loading.
+    final boolean chunkGenerated = isChunkGenerated(cx, cz);
     return world
         .getChunkAtAsync(cx, cz, true)
         .thenApply(
@@ -380,6 +391,14 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
                   + " chunk=(" + cx + "," + cz + ")",
               ex);
           return null;
+        })
+        .whenComplete((k, ex) -> {
+          // Record only successful loads (non-null key, no throwable). A failed load
+          // is not a measurement of how fast a chunk can be loaded.
+          if (ex == null && k != null) {
+            io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile.GLOBAL
+                .record(chunkGenerated, System.nanoTime() - chunkLoadStartNanos);
+          }
         });
   }
 

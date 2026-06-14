@@ -936,7 +936,7 @@ public final class RTPFabricMod implements ModInitializer {
         }
         if (mcVersion.startsWith("26.2")) {
             // EARLY/EXPERIMENTAL MC 26.2 line. FabricLoader's friendly string
-            // for the pre-release (e.g. "26.2-pre-3") begins with "26.2", so
+            // for the pre-release (e.g. "26.2-rc-2") begins with "26.2", so
             // this prefix match catches both the pre-release builds and the
             // eventual 26.2.x finals. Re-verify the pin and this matcher when
             // 26.2 ships final (rtp-fabric-ADR-014). Java 25 bytecode — never

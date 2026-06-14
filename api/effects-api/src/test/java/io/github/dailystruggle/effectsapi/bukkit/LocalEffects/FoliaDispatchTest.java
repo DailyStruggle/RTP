@@ -1,5 +1,9 @@
 package io.github.dailystruggle.effectsapi.bukkit.LocalEffects;
 
+import io.github.dailystruggle.effectsapi.common.effects.FireworkEffect;
+import io.github.dailystruggle.effectsapi.common.effects.PotionEffect;
+import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
+import io.github.dailystruggle.effectsapi.bukkit.BukkitHandles;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -22,7 +26,7 @@ import static org.mockito.Mockito.*;
  * Verifies that the Folia-aware dispatch paths in
  * {@link PotionEffect#applyOnEntityThread} and {@link FireworkEffect#run}
  * actually call into the pluggable scheduler hooks
- * ({@link PotionEffect#entityDispatcher} / {@link FireworkEffect#regionDispatcher}).
+ * ({@link PotionEffect#entityDispatcher} / {@link BukkitHandles#regionDispatcher}).
  *
  * <p>The reason these tests exist is concrete: on Folia the firework was
  * never spawning and the potion effect was throwing
@@ -35,13 +39,14 @@ import static org.mockito.Mockito.*;
 class FoliaDispatchTest {
 
     private PotionEffect.EntityDispatcher savedEntityDispatcher;
-    private FireworkEffect.RegionDispatcher savedRegionDispatcher;
+    private BukkitHandles.RegionDispatcher savedRegionDispatcher;
     private Plugin savedEffectsApiInstance;
 
     @BeforeEach
     void saveDefaults() {
+        BukkitHandles.register();
         savedEntityDispatcher = PotionEffect.entityDispatcher;
-        savedRegionDispatcher = FireworkEffect.regionDispatcher;
+        savedRegionDispatcher = BukkitHandles.regionDispatcher;
         // EffectsAPI.getInstance() now throws IllegalStateException (S-006)
         // when uninitialized. The production code under test calls it before
         // consulting the dispatcher seam, so seed a mock Plugin for the test
@@ -55,7 +60,7 @@ class FoliaDispatchTest {
     @AfterEach
     void restoreDefaults() {
         PotionEffect.entityDispatcher = savedEntityDispatcher;
-        FireworkEffect.regionDispatcher = savedRegionDispatcher;
+        BukkitHandles.regionDispatcher = savedRegionDispatcher;
         writeEffectsApiInstance(savedEffectsApiInstance);
     }
 
@@ -149,7 +154,7 @@ class FoliaDispatchTest {
         // so spawnFirework is never reached.
         Location loc = new Location(null, 0, 64, 0);
 
-        FireworkEffect.regionDispatcher = (caller, location, task) -> {
+        BukkitHandles.regionDispatcher = (caller, location, task) -> {
             dispatched.set(true);
             seenLocation.set(location);
             // Simulate Folia accepting the task — but do not execute it, since
@@ -159,7 +164,7 @@ class FoliaDispatchTest {
             return true;
         };
 
-        FireworkEffect effect = new FireworkEffect();
+        FireworkEffect effect = new FireworkEffect(org.bukkit.FireworkEffect.Type.BALL, org.bukkit.Color.WHITE);
         effect.setTarget(loc);
         effect.run();
 
@@ -177,12 +182,12 @@ class FoliaDispatchTest {
         org.bukkit.entity.Entity entity = mock(org.bukkit.entity.Entity.class);
         when(entity.getLocation()).thenReturn(entityLoc);
 
-        FireworkEffect.regionDispatcher = (caller, location, task) -> {
+        BukkitHandles.regionDispatcher = (caller, location, task) -> {
             seenLocation.set(location);
             return true;
         };
 
-        FireworkEffect effect = new FireworkEffect();
+        FireworkEffect effect = new FireworkEffect(org.bukkit.FireworkEffect.Type.BALL, org.bukkit.Color.WHITE);
         effect.setTarget(entity);
         effect.run();
 

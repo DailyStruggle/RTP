@@ -1,9 +1,14 @@
-# --- Paramètres d'intégration de RTP ---
-# Chaque option relance le tirage de la destination si elle tombe dans un claim/une région du plugin indiqué (actif uniquement si ce plugin est installé).
-# Relance le tirage si la position tombe dans un claim Factions.
+# Reroll the location if it lands inside a SaberFactions claim.
 # @type: boolean
 # @default: false
-rerollFactions: false
+rerollSaberFactions: false
+
+# Reroll the location if it lands inside Factions territory reported via the FactionsBridge API.
+# FactionsBridge bridges many Factions forks (FactionsUUID, SaberFactions, FactionsX, KingdomsX, ...)
+# behind one API; enable this when the FactionsBridge plugin is installed.
+# @type: boolean
+# @default: false
+rerollFactionsBridge: false
 
 # Relance le tirage si la position tombe dans un claim GriefDefender.
 # @type: boolean
@@ -15,11 +20,6 @@ rerollGriefDefender: false
 # @default: false
 rerollGriefPrevention: false
 
-# Relance le tirage si la position tombe dans un claim HuskTowns.
-# @type: boolean
-# @default: false
-rerollHuskTowns: false
-
 # Relance le tirage si la position tombe dans un claim Lands.
 # @type: boolean
 # @default: false
@@ -29,6 +29,26 @@ rerollLands: false
 # @type: boolean
 # @default: false
 rerollRedProtect: false
+
+# Reroll the location if it lands inside a Residence claim.
+# @type: boolean
+# @default: false
+rerollResidence: false
+
+# Reroll the location if it lands inside a CrashClaim claim.
+# @type: boolean
+# @default: false
+rerollCrashClaim: false
+
+# Reroll the location if it lands inside a HuskClaims claim.
+# @type: boolean
+# @default: false
+rerollHuskClaims: false
+
+# Reroll the location if it lands inside KingdomsX claimed land.
+# @type: boolean
+# @default: false
+rerollKingdomsX: false
 
 # Relance le tirage si la position tombe dans un claim Towny Advanced.
 # @type: boolean

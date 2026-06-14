@@ -2,17 +2,17 @@
 
 **Scope:** This roadmap tracks known shortfalls in the current release and the concrete work planned
 to address them, plus forward-looking features that are not driven by a known caveat. Version
-anchor: `3.0.0-beta.1` (see [`REQUIREMENTS.md`](REQUIREMENTS.md)).
+anchor: `3.1.2` (see [`REQUIREMENTS.md`](REQUIREMENTS.md)).
 
 Each item is expressed as a checklist line so completed work can be struck through with the
 commit/ADR that closed it.
 
 Tier ordering reflects priority, not chronology:
 
-- **Tier 0** — must-ship items before `3.0.0` loses the `-beta.1` tag.
+- **Tier 0** — must-ship items before `3.0.0` loses the `-beta.1` tag. *(All Tier 0 items complete; `3.0.0` shipped.)*
 - **Tier 1** — directly narrows a caveat currently documented in `docs/FRONT_PAGE.bbcode` or
   `docs/admin/`.
-- **Tier 2** — new capability that earns a `3.1.0` release note.
+- **Tier 2** — new capability that earns a `3.1.0` / `3.1.x` release note.
 - **Tier 3** — polish, long-tail, and infrastructure.
 
 ---
@@ -124,10 +124,33 @@ reproducible by readers".
 
 ## Tier 2 — Upcoming features (not caveat-driven)
 
-- [ ] **World-scan UX polish.** The admin lifecycle exists; operator affordances around it do not.
+- [x] ~~**World-scan UX polish.** The admin lifecycle exists; operator affordances around it do not.
   Concretely: progress indication (both console and in-game bossbar), resume-across-restart
   semantics, and a per-region "warmth report" export. This is what converts the feature from
-  *implemented* to *sellable*.
+  *implemented* to *sellable*.~~ Resolved: the boss-bar progress indicator landed, resume-across-restart
+  was already shipped (`ScanTask.save`/`loadProgress` + `Region` wiring), and the "warmth report" need
+  is covered by the delivered learned-state inspector. See the sub-items below.
+  - [x] ~~**In-game boss-bar progress indicator.** A `BossBar` (green, solid) is shown to all
+    players with the `rtp.scan` permission while any world scan is active. The bar fills from 0
+    to 1 as `latestAbsolutePos / latestAbsoluteTotal` across all active `ScanTask`s; the title
+    is the configurable `scanBossBar` key in `messages.yml` (same placeholders as `scanStatus`:
+    `[scan_regions]`, `[scan_chunks]`, `[scan_totalChunks]`, `[scan_cps]`,
+    `[scan_landPercentage]`, `[scan_eta]`). Set `scanBossBar` to an empty string to disable.
+    Bars are removed automatically when the scan finishes or is cancelled. Implemented in
+    `ScanTaskProcessing` (Bukkit-family adapter); Fabric uses the existing console/chat path.~~
+  - [x] ~~**Resume-across-restart semantics.**~~ Already shipped. `ScanTask.save()` persists scan
+    progress (`scanIter`, `spatialResolution`, `currentOffset`, `isFine`, `scanPhase`; transient
+    `GENSCAN` collapsed to `PRESCAN` on disk so a resumed scan skips the chunk-generation pre-pass)
+    to `database/regionData/<region>_<cacheKey>.scan`, and `ScanTask.loadProgress()` reads it back.
+    `Region` reschedules a partial scan at construction and again in `rebindWorld(...)` when
+    `0 < iter < range`; the `cacheKey()` suffix (ADR-022) invalidates the resume on a config/seed
+    change, and the `MemoryShape` bad-location bitmap survives the restart alongside it.
+  - [ ] ~~Per-region "warmth report" export.~~ Dropped: the operator-facing "how warmed-up is this
+    region" need is already met by the delivered learned-state inspector on `/rtp info
+    region:<name>` (`[memCoveragePct]`, `[memBadPct]`, `[memBadCount]`, `[memTopCause]`,
+    `[memTopCausePct]`) plus the auto-exported `database/regionData/debug/<region>.json` scan dump.
+    No distinct "warmth report" artifact was ever specified; reopen with a concrete definition (e.g.
+    per-region L1/L2/L3 queue depths + coverage % to JSON) if a separate export is actually wanted.
 - [x] ~~**Persistent learned-state inspector.** A `/rtp memory dump <region>` subcommand producing a
   human-readable summary — flagged-bad sector count, coverage %, age of oldest entry, last-write
   timestamp. The H2/SQLite persistence is a front-page promise; inspection is the operator's
@@ -155,9 +178,8 @@ reproducible by readers".
   `docs/admin/CLAIM_PLUGIN_COMPATIBILITY.md` with per-plugin version matrices. At least one
   integration is almost certainly lagging.
 - [ ] **CI matrix across platforms.** The Jenkinsfile builds, but `rtp test full` should run against
-  Spigot + Paper + Folia (and eventually Fabric) in parallel matrix form, even with mock servers
-  where necessary. This is the step that converts `TRACEABILITY.md` from "documented" to
-  "continuously enforced".
+  Spigot + Paper + Folia + Fabric in parallel matrix form, even with mock servers where necessary.
+  This is the step that converts `TRACEABILITY.md` from "documented" to "continuously enforced".
 - [x] ~~**Addon-developer quickstart.** `docs/FOR_ADDON_DEVELOPERS.md` is linked from the front
   page, but a one-page *"register a custom shape in 20 lines"* tutorial is the document that
   actually drives third-party adoption.~~ Added [`docs/ADDON_QUICKSTART.md`](../ADDON_QUICKSTART.md)
@@ -195,11 +217,14 @@ reproducible by readers".
   live tile); the `SURFACE_CENTER` anchor (drops the structure to a standable surface in one pass,
   no re-paste, keeping players inside roofed structures); and a decode cache in
   `AbstractFileSchematicPaster` (each `.schem` decoded once, cleared on `/rtp reload`).
-  **Deferred follow-ups (tracked separately):** the footprint claim check (S-003) ahead of the paste; the Fabric native paster
-  (`BlockArgumentParser` through the obf/unobf carrier per
-  [rtp-fabric-ADR-009](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md));
+  **Deferred follow-ups (tracked separately):** the footprint claim check (S-003) ahead of the paste;
   non-container block-entity NBT (sign text, custom data - still placed as empty blocks, audited);
   and a `docs/admin/` page plus traceability rows for the paste-on-region-thread regression test.
+  The Fabric native paster landed in `3.1.2` via the platform-neutral `WorldBlockSchematicPaster`
+  (`rtp-api`) driving `RTPWorld.setBlocks` / `restoreBlockEntities`; the deobf 26.x Fabric carriers
+  implement `setBlocks` via `BlockStateParser` + `ServerLevel.setBlock` on the server thread
+  (S-005-clean). The former `BukkitSchematicPaster` was removed and collapsed onto the same shared
+  translator (`BukkitBlockWriter`).
 - [x] ~~**Optional PvP / combat-tag check.** Optional pre-flight check that refuses (or delays)
   `/rtp` when the requesting player has recently taken or dealt PvP damage, so players cannot `/rtp`
   to escape mid-fight. Off by default.~~ Delivered via
@@ -217,6 +242,19 @@ reproducible by readers".
   [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) per
   [ADR-026](../adr/ADR-026-external-hook-api-surface.md). Tests: `PvPGateTest`,
   `NativePvPCombatTrackerTest`, `RTPCmdPvPGateTest`, `PvPCombatAdapterTest`.
+- [x] ~~**NeoForge platform (`rtp-neoforge`).** First-class NeoForge support as a fifth platform
+  family.~~ **Complete as of 2026-06-13 — NeoForge is a complete, runtime-functional, first-class
+  platform.** Phase N0 (scope unlock, D-005 approval, [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md),
+  [rtp-neoforge-ADR-001](../../platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md))
+  complete 2026-06-01. Phase N1 module skeleton (`rtp-neoforge-common` + `rtp-neoforge-v1_21_R1`,
+  `RTPNeoForgeMod`, `NeoForgeScheduler`, `NeoForgeCommandRegistrar`) landed 2026-06-02. All Phase N2
+  steps (NA async chunk load, NB `getLocationGenerator`, NC scheduler, ND database, NE event bridge,
+  NE-perf anvil parity, NF permissions, NG Brigadier command tree, NH stabilization + runtime smoke,
+  NI book-menu + chat-prompt, NJ network-mode backend parity incl. live boot + reservation-token
+  redemption, NK maps API + metrics binding + backend-state sampler) and Phase N3 (docs,
+  traceability, beta release) are complete. See
+  [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) Phase 4 for the full step breakdown.
+
 - [ ] **Rich book-menu drawing via resource-pack soft-dependencies.** The written-book menu renderer
   (Paper's `BookMenuRenderer`, Fabric's `FabricBookMenuRenderer` on the 1.21+ / deobf 26.x carriers)
   currently renders text, colour, and click/hover only. Native books cannot draw images; plugins
@@ -299,14 +337,15 @@ reproducible by readers".
   the player's persistent spawn/bed anchor, not just the respawn-event location. Default off; one
   config flag. Minor, low-risk.
 - [ ] **BetterRTP parity: widen built-in claim-plugin coverage.** BetterRTP ships ~18 respect-targets
-  out of the box; RTP ships ~7. This is integration breadth, not architecture: each new target is a
+  out of the box; RTP ships 12 (`ClaimIntegrations`: SaberFactions, FactionsBridge, GriefDefender,
+  GriefPrevention, Lands, RedProtect, Residence, CrashClaim, HuskClaims, KingdomsX, TownyAdvanced,
+  WorldGuard). This is integration breadth, not architecture: each new target is a
   soft-depend adapter on the existing claim-exclusion seam (S-003 /
   [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)), cataloged in
   [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) per [ADR-026](../adr/ADR-026-external-hook-api-surface.md).
-  Candidate gap list (audit each for current upstream API before adding): MinePlots, RedProtect,
-  KingdomsX, hClaims, UltimateClaims, Pueblos, SaberFactions, HuskClaims, FactionsBridge, CrashClaim,
-  Residence. Folds into the existing "Claim-plugin integration audit" item above — same workstream,
-  this just sharpens the target list.
+  Candidate gap list (audit each for current upstream API before adding; already-shipped targets
+  pruned): MinePlots, hClaims, UltimateClaims, Pueblos. Folds into the existing "Claim-plugin
+  integration audit" item above — same workstream, this just sharpens the target list.
 - [ ] **Foreign config importer (`rtp config import <plugin>`, one-shot migration aid).** Design
   settled in [ADR-066](../adr/ADR-066-foreign-config-importer.md) (Proposed, D-005). Lower the
   switching cost for operators moving off a competitor by translating its on-disk config into RTP's
@@ -343,6 +382,60 @@ reproducible by readers".
   - **D-005 + ADR.** Design settled in
     [ADR-066](../adr/ADR-066-foreign-config-importer.md) (Proposed): generic `ConfigImporter` seam
     with BetterRTP first, EzRTP / JakesRTP to follow.
+
+- [ ] **3D Archimedean helix coordinate generator (1.18+ vertical biome targeting).** Extend the
+  existing 1D Archimedean spiral mapping ([ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md))
+  with a vertical pitch term: `y_n = round(c * theta_n + y_start)`, producing a 3D helix that maps
+  directly onto the same 1D index. The original pitch was that combining this with the `rtp-anvil`
+  prefilter ([ADR-016](../adr/ADR-016-anvil-subsystem.md)) would let the helix skip vertical intervals
+  without chunk loads for vertical biomes (Deep Dark, Lush Caves, Sky Islands).
+
+  **Likely redundant - demote/close unless a coverage-loss-tolerant use case is shown.** Two
+  objections, both raised in review, undercut the headline:
+  - **Coverage is already config, not code.** RTP cleanly separates horizontal placement (the shape's
+    1D spiral over X/Z) from vertical placement (`VerticalAdjustor`, which only ever picks a Y inside
+    `[minY(), maxY()]`). "Reach the Deep Dark" vs "reach Sky Islands" is therefore just a
+    `VerticalAdjustor` with a different `miny`/`maxy` window today; N stacked vertical bands over the
+    same footprint = N regions (or adjustor configs). No new generator is needed to *reach* a vertical
+    biome band.
+  - **A Y-coupled index segments the biome.** Because `y_n` is a monotonic function of the index, the
+    helix corkscrews upward as it spirals outward; it only intersects any fixed Y band over the
+    contiguous index slice where `c * theta_n + y_start` falls inside the band, then climbs out of it
+    while X/Z in that band is still unsearched. The result is a thin helical ribbon through the target
+    biome (coverage shrinks as the pitch `c` grows), a coverage regression versus a fixed-`[minY,maxY]`
+    region that searches the whole X/Z footprint at every Y in the band. The "skip" the helix buys is a
+    1D interval skip on the index, and the *win and the bug are the same property* (you only skip the
+    out-of-band indices by accepting the coverage loss). The cheap "is this column's band acceptable"
+    NBT check it claimed is already provided, decoupled from the spiral, by the existing probe fast-path
+    (`VerticalAdjustor.adjustFromProbe`, one NBT column read, no chunk load).
+
+  Net: for coverage, stacked `minY`/`maxY` regions win (no segmentation); for performance, the anvil
+  probe fast-path already wins (same NBT prune, no coverage loss). The only defensible residue is
+  deterministic *sparse sampling* of a vertical biome when full coverage is explicitly not wanted - a
+  niche affordance, not the "vertical biome targeting" headline. Do not open an ADR unless that
+  coverage-loss-tolerant use case is demonstrated and a benchmark shows the per-column vertical scan
+  (not chunk I/O) is the actual bottleneck; the `c` pitch parameter and `y_start` anchor would be
+  per-region configurable if it is ever pursued.
+- [ ] **"Virtual Rift" warmup effects addon (`addons/rtp-effects-rift`).** During the standing
+  warmup countdown, send fake client-side block packets to the player making the surrounding terrain
+  appear to dissolve - processed entirely client-side with zero physical block updates, zero physics
+  checks, and zero chunk loads on any region thread. Delivered as an optional addon under `addons/`
+  depending only on `rtp-api` + a ProtocolLib soft-depend (Paper/Spigot only; Folia requires the
+  entity scheduler for per-player packet sends; Fabric/NeoForge out of scope for this addon). The
+  `effects-api` SPI already provides warmup start/tick/end hooks; the addon must restore original
+  block state (re-send real block packets) on teleport or warmup cancel to avoid visual corruption.
+  Catalog the ProtocolLib soft-depend in [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) per
+  [ADR-026](../adr/ADR-026-external-hook-api-surface.md).
+- [ ] **Adaptive queue demand scaler (in-memory, zero-config).** Track the rate of change of queue
+  consumption (dQ/dt) and player connection frequency in-memory using an exponentially-weighted
+  moving average. When a surge is detected, dynamically scale up `AnvilIoPool`'s thread count (via
+  `ThreadPoolExecutor.setMaximumPoolSize`) and expand `backlogCacheCap` on-the-fly; throttle back
+  when command velocity returns to baseline. No new dependencies - `AnvilIoPool` is already a
+  documented carve-out from the raw-executor prohibition ([ADR-016](../adr/ADR-016-anvil-subsystem.md))
+  and `MetricsBinding` already captures queue depth and TPS data the scaler would consume. The scaler
+  reads from `RTP.metrics` and writes only to the pool size and the existing `backlogCacheCap` knob;
+  all periodic work routes through `RTP.scheduler` (no raw threads). Requires a D-005 proposal before
+  implementation; the EWMA window and floor/ceiling pool sizes must be configurable with safe defaults.
 
 ---
 

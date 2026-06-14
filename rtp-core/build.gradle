@@ -30,10 +30,12 @@ dependencies {
     // io.github.dailystruggle.rtp.common.configuration.yaml (ADR-025
     // 2026-05-15 revision; zero third-party dep). These declarations remain
     // only to satisfy compile-time references in tests and any residual
-    // Bukkit-side reflection probes — never to ship the library.
+    // Bukkit-side reflection probes â€” never to ship the library.
     compileOnly 'org.yaml:snakeyaml:2.3'
     testRuntimeOnly 'org.yaml:snakeyaml:2.3'
     api project(':commands-api')
+    // effects-api is an in-tree module (api/effects-api). 'api' so downstream
+    // platform adapters and addons keep seeing the effectsapi types transitively.
     api project(':effects-api')
     api project(':metrics-api')
     // maps-api SPI (ADR-046, ADR-047). rtp-core composes ChartSpec -> ChartModel
@@ -42,7 +44,7 @@ dependencies {
     // downstream platform adapters and addons can author resolvers without
     // re-declaring the dependency.
     api project(':maps-api')
-    // Phase 2e-SQL slice (rtp-proxy-ADR-011 §Module Dependencies): backend-side
+    // Phase 2e-SQL slice (rtp-proxy-ADR-011 Â§Module Dependencies): backend-side
     // wiring (BackendStatePublisher + BackendStateSampler) lives in rtp-core so
     // every backend platform adapter inherits it without re-implementing.
     // The reverse direction stays clean: rtp-proxy-common does NOT depend on
@@ -97,7 +99,7 @@ jacocoTestCoverageVerification {
 check.dependsOn jacocoTestCoverageVerification
 
 // Static analysis: SpotBugs catches null-dereference, improper synchronisation,
-// and incorrect volatile/atomic usage — common failure modes in concurrent Java.
+// and incorrect volatile/atomic usage â€” common failure modes in concurrent Java.
 // effort='max' enables the deepest analysis pass.
 // reportLevel='high' makes only HIGH-priority bugs block the build;
 // MEDIUM/LOW findings still appear in the HTML report for review.

@@ -29,6 +29,7 @@ allprojects {
     // Lite is brought up to parity with Pro at 3.1.3 alongside the free
     // build's basic Folia support (see CHANGELOG 3.1.3).
     repositories {
+        mavenLocal()
         mavenCentral()
         maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
         maven { url = 'https://repo.papermc.io/repository/maven-public/' }
@@ -53,6 +54,20 @@ subprojects {
 
     tasks.withType(JavaCompile) {
         options.encoding = 'UTF-8'
+    }
+
+    // Javadoc strictness is concentrated on the addon-facing surface. rtp-api and
+    // rtp-core are consumed by out-of-repo addon authors (see the publishing block
+    // below), so they keep the JDK's default doclint checks (missing tags included).
+    // Every other module (platform adapters, rtp-plugin, addons, the helper api/*
+    // SPI modules) only needs javadoc to *build*, not to be exhaustively documented,
+    // so doclint is disabled and javadoc warnings no longer fail their builds.
+    tasks.withType(Javadoc).configureEach {
+        options.encoding = 'UTF-8'
+        if (project.path != ':rtp-api' && project.path != ':rtp-core') {
+            options.addStringOption('Xdoclint:none', '-quiet')
+            failOnError = false
+        }
     }
 
     dependencies {
@@ -110,19 +125,20 @@ subprojects {
 //
 // Closure rationale (transitive `api`/`implementation` project edges):
 //   rtp-api  -> commands-api, yaml-api, metrics-api
-//   rtp-core -> rtp-api, yaml-api, commands-api, effects-api, metrics-api,
+//   rtp-core -> rtp-api, commands-api, yaml-api, effects-api, metrics-api,
 //               maps-api, rtp-proxy:rtp-proxy-common
-//   effects-api        -> commands-api, rtp-api
 //   rtp-proxy-common   -> rtp-api
 // Every coordinate that can appear in a generated POM must itself be published,
-// otherwise a consumer's transitive resolution fails.
+// otherwise a consumer's transitive resolution fails. commands-api and
+// effects-api are in-tree modules re-exported via `api` from rtp-api/rtp-core,
+// so they are published from this build alongside the rest of the closure.
 def publishedModulePaths = [
         ':rtp-api',
         ':rtp-core',
         ':commands-api',
+        ':effects-api',
         ':yaml-api',
         ':metrics-api',
-        ':effects-api',
         ':maps-api',
         ':rtp-proxy:rtp-proxy-common',
 ]

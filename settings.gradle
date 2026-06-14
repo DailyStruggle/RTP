@@ -80,6 +80,15 @@ pluginManagement {
 
 rootProject.name = 'RTP'
 
+// commands-api and effects-api are in-tree Gradle modules (under api/), consumed
+// by every plugin/adapter through plain project(':commands-api') /
+// project(':effects-api') edges. They were briefly extracted to sibling repos
+// (CommandsAPI / EffectsAPI) and consumed as published / composite-build
+// coordinates; that was reverted because (a) effects-api applies fabric-loom and
+// a published intermediary jar cannot satisfy RTP's mojmap Fabric modules, and
+// (b) co-evolving the API with its only consumer through a publish round-trip is
+// slower than an in-tree edge. See the include lines + projectDir overrides below.
+
 // JDK-25 / unobfuscated-Loom modules can be excluded from the build graph by
 // passing `-PexcludeJdk25` (or setting the JITPACK env var). These modules
 // (effects-api-fabric-unobf, rtp-fabric-common-unobf, rtp-fabric-v26_1_R1)
@@ -96,18 +105,30 @@ def excludeJdk25 = startParameter.projectProperties.containsKey('excludeJdk25') 
 include 'rtp-api'
 // Non-rtp-exclusive, platform-neutral API modules are grouped under the
 // api/ folder to declutter the repo root. The Gradle project paths and
-// Maven coordinates are intentionally KEPT FLAT (':yaml-api', ':commands-api',
+// Maven coordinates are intentionally KEPT FLAT (':yaml-api',
 // ':effects-api', ':maps-api', ':metrics-api', and the nested
 // ':effects-api:effects-api-fabric-unobf'); only the on-disk location moves,
 // applied via projectDir overrides at the bottom of this section. This keeps
 // every existing project(':...') dependency, Maven coordinate, and ADR/doc
 // reference valid.
+// commands-api -- platform-neutral command-tree framework (commands-api-ADR-001).
+// In-tree module: consumed by rtp-api/rtp-core and every platform adapter via
+// project(':commands-api'). Pure Java (Brigadier as compileOnly), no Loom.
+include 'commands-api'
 // yaml-api -- in-house zero-dependency YAML substrate (ADR-025), extracted from
 // rtp-core so rtp-api can host the configurable selection model without a core
 // dependency. Pure Java, no platform/Loom dependency.
 include 'yaml-api'
-include 'commands-api'
+// effects-api -- in-module platform split (effects-api-ADR-003). Applies
+// fabric-loom so its fabric/ subpackage resolves net.minecraft.* at compile
+// time; consumed in-tree via project(':effects-api').
 include 'effects-api'
+// effects-api-fabric-unobf -- nested Mojmap-unobf carrier for the deobf MC 26.x
+// runtime (effects-api-ADR-006, rtp-fabric-ADR-009). Requires JDK 25 + Loom
+// 1.15; excluded on JDK-21-only hosts alongside the other JDK-25 modules.
+if (!excludeJdk25) {
+    include 'effects-api:effects-api-fabric-unobf'
+}
 // maps-api — runtime cartography SPI (ADR-046, maps-api-ADR-001).
 // Pure Java SPI: no Bukkit / Fabric / Loom dependency. Concrete bindings
 // (BukkitMapBinding, FoliaMapBinding, FabricMapBinding) land in Stage 2/3
@@ -131,34 +152,21 @@ include 'anvil-api'
 // JSON lib), so it groups under api/ with the other non-rtp-exclusive modules.
 // Renamed from the former ':rtp-tags' coordinate; on-disk at api/tags-api.
 include 'tags-api'
-// effects-api-fabric-unobf -- nested sibling Gradle module hosting the
-// Mojmap-unobfuscated carrier for effectsapi/fabric_unobf/*. Compiled under
-// unobfuscated 1.15 Loom (same regime as rtp-fabric-v26_1_R1 and
-// rtp-fabric-common-unobf) so its NM constant-pool entries survive on a
-// deobf MC 26.x runtime. Required because fabric-loom owns project-level MC
-// + mappings config and cannot host both intermediary (1.21.1) and
-// unobfuscated (26.1.2) mappings inside :effects-api itself. Mirrors the
-// :rtp-fabric:rtp-fabric-common-unobf precedent. Requires JDK 25 +
-// fabric-loom 1.15+ (same toolchain as v26_1_R1). See effects-api-ADR-006
-// (amendment 2026-05-09) and rtp-fabric-ADR-009.
-if (!excludeJdk25) {
-    include 'effects-api:effects-api-fabric-unobf'
-}
 
 // Relocate the grouped api/ modules on disk while keeping their flat Gradle
 // project paths (see the comment block above the include lines). The nested
 // unobf carrier inherits no projectDir from its parent in Gradle, so it is
 // overridden explicitly.
-project(':yaml-api').projectDir     = file('api/yaml-api')
 project(':commands-api').projectDir = file('api/commands-api')
 project(':effects-api').projectDir  = file('api/effects-api')
+if (!excludeJdk25) {
+    project(':effects-api:effects-api-fabric-unobf').projectDir = file('api/effects-api/effects-api-fabric-unobf')
+}
+project(':yaml-api').projectDir     = file('api/yaml-api')
 project(':maps-api').projectDir     = file('api/maps-api')
 project(':metrics-api').projectDir  = file('api/metrics-api')
 project(':anvil-api').projectDir    = file('api/anvil-api')
 project(':tags-api').projectDir     = file('api/tags-api')
-if (!excludeJdk25) {
-    project(':effects-api:effects-api-fabric-unobf').projectDir = file('api/effects-api/effects-api-fabric-unobf')
-}
 
 include 'rtp-core'
 
@@ -251,7 +259,7 @@ if (!excludeJdk25) {
     include 'rtp-fabric:rtp-fabric-v26_1_R1'
 }
 // v26_2_R1 -- EARLY/EXPERIMENTAL, pinned to the MC 26.2 pre-release
-// (26.2-pre-3). Same deobf regime as v26_1_R1 (Loom 1.15, JDK 25, no
+// (26.2-rc-2). Same deobf regime as v26_1_R1 (Loom 1.15, JDK 25, no
 // mappings), cloned from it. See rtp-fabric-ADR-014. Re-pin the MC /
 // loader / fabric-api versions when 26.2 reaches final.
 if (!excludeJdk25) {

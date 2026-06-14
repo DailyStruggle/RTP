@@ -174,6 +174,21 @@ public final class FoliaRTPPlayer implements RTPPlayer {
     return player.isOnline();
   }
 
+  @Override
+  @SuppressWarnings("deprecation")
+  public void setRespawnLocation(RTPLocation to) {
+    // BetterRTP SetAsRespawn parity. Setting the bed/respawn anchor touches the
+    // player's state, which on Folia must happen on the player's entity scheduler
+    // (the teleport completion callback does not necessarily own the player's
+    // region). Dispatch there regardless of the calling thread.
+    World world = ((FoliaRTPWorld) to.world()).world();
+    Location location = new Location(world, to.x() + 0.5, to.y(), to.z() + 0.5);
+    Plugin plugin = (Plugin) RTP.getInstance().getPlugin();
+    if (plugin == null || !plugin.isEnabled()) return;
+    player.getScheduler().run(
+        plugin, task -> player.setBedSpawnLocation(location, true), null);
+  }
+
   @RegionThread
   Player player() {
     return player;

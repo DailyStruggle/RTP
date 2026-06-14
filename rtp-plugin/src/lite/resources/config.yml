@@ -5,6 +5,9 @@
 teleportDelay: 2          # Wait time (seconds) before teleport
 cancelDistance: 2         # Max move distance during delay before cancellation
 teleportCooldown: 300     # Wait time (seconds) between successful uses
+lockAfterUses: 0          # Usage cap per window before lockout (0 disables; bypass rtp.nolock)
+lockAfterResetSeconds: 0  # Rolling window (seconds) for lockAfterUses (0 = never resets)
+setRespawnOnTeleport: false # Set the landed location as the player's persistent spawn anchor
 
 consoleCommands:
   - "say [player] has just randomly teleported!"

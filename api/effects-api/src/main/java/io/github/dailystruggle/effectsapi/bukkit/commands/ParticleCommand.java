@@ -1,15 +1,15 @@
 package io.github.dailystruggle.effectsapi.bukkit.commands;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.ParticleEffect;
-import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.enums.ParticleTypeNames;
+import io.github.dailystruggle.effectsapi.common.effects.ParticleEffect;
+import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class ParticleCommand extends GenericEffectCommand<ParticleEffect> {
     public ParticleCommand(Plugin plugin) {
@@ -29,26 +29,24 @@ public class ParticleCommand extends GenericEffectCommand<ParticleEffect> {
     @Override
     public boolean onCommand(CommandSender sender, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
         List<ParticleEffect> effects = new ArrayList<>();
-        ParticleEffect mainEffect = new ParticleEffect();
+        ParticleEffect mainEffect = (ParticleEffect) Objects.requireNonNull(EffectFactory.buildEffect("particle"));
         effects.add(mainEffect);
         mainEffect.setTarget(sender);
-        EnumMap<ParticleTypeNames, Object> data = mainEffect.getData();
+
         for (Map.Entry<String, List<String>> entry : parameterValues.entrySet()) {
             List<String> vals = entry.getValue();
             String name = entry.getKey().toLowerCase();
-            ParticleTypeNames enumLookup = ParticleTypeNames.valueOf(name.toUpperCase());
             String value = entry.getValue().get(0);
-            data.put(enumLookup, value);
-            mainEffect.setData(data);
+            
+            mainEffect.setData(name, value);
+
             while (effects.size() < vals.size()) {
-                effects.add(new ParticleEffect());
+                effects.add((ParticleEffect) Objects.requireNonNull(EffectFactory.buildEffect("particle")));
             }
             for (int i = 1; i < vals.size(); i++) {
                 ParticleEffect effect = effects.get(i);
-                enumLookup = ParticleTypeNames.valueOf(name.toUpperCase());
                 value = entry.getValue().get(i);
-                data.put(enumLookup, value);
-                effect.setData(data);
+                effect.setData(name, value);
             }
         }
         for (ParticleEffect effect : effects) {

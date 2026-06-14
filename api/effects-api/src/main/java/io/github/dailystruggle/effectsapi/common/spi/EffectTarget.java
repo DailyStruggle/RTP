@@ -1,14 +1,12 @@
 package io.github.dailystruggle.effectsapi.common.spi;
 
-import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Platform-neutral target for a single {@link io.github.dailystruggle.effectsapi.common.Effect}
- * application. Wraps the {@link RTPPlayer} the effect is acting on (may be
- * {@code null} for ambient world effects) and the {@link RTPLocation} the
+ * Platform-neutral target for a single {@link io.github.dailystruggle.effectsapi.Effect}
+ * application. Wraps the player the effect is acting on (may be
+ * {@code null} for ambient world effects) and the location the
  * effect is anchored to (e.g. the destination of a teleport for the
  * {@code postteleport} hook).
  *
@@ -21,25 +19,25 @@ import org.jetbrains.annotations.Nullable;
  * <p>Immutable.</p>
  */
 public final class EffectTarget {
+    private final @Nullable PlayerHandle player;
+    private final @NotNull LocationHandle location;
 
-    private final @Nullable RTPPlayer player;
-    private final @NotNull RTPLocation location;
-
-    public EffectTarget(@Nullable RTPPlayer player, @NotNull RTPLocation location) {
-        if (location == null) {
-            throw new IllegalArgumentException("EffectTarget location shall not be null");
+    public EffectTarget(@Nullable Object player, @NotNull Object location) {
+        this.player = player == null ? null : HandleRegistry.wrapPlayer(player);
+        LocationHandle loc = HandleRegistry.wrapLocation(location);
+        if (loc == null) {
+            throw new IllegalArgumentException("EffectTarget location shall not be null or unresolvable");
         }
-        this.player = player;
-        this.location = location;
+        this.location = loc;
     }
 
     /** The player the effect targets, or {@code null} for ambient world effects. */
-    public @Nullable RTPPlayer player() {
+    public @Nullable PlayerHandle player() {
         return player;
     }
 
     /** The location the effect is anchored to. Never {@code null}. */
-    public @NotNull RTPLocation location() {
+    public @NotNull LocationHandle location() {
         return location;
     }
 

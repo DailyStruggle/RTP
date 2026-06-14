@@ -48,8 +48,8 @@ dependencies {
     implementation project(':commands-api')
     implementation 'org.jetbrains:annotations:24.1.0'
 
-    // effects-api-ADR-003: the common/ SPI types reference RTPPlayer +
-    // RTPLocation from rtp-api. No cycle — rtp-api has no internal deps,
-    // and rtp-core already depends on both rtp-api and effects-api.
-    implementation project(':rtp-api')
+    // effects-api no longer depends on rtp-api: the common/ SPI was decoupled
+    // from RTPPlayer/RTPLocation onto its own PlayerHandle/LocationHandle +
+    // HandleProvider/HandleRegistry handle SPI, so the module carries zero
+    // io.github.dailystruggle.rtp references and can be reused standalone.
 }

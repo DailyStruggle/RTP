@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
+import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
@@ -65,6 +66,12 @@ public final class TeleportPipelineTask extends RTPRunnable {
     public static String teleportMessage = "";
     public static long viewDistanceTeleport = 0;
     public static boolean postTeleportQueueing = false;
+    /** BetterRTP SetAsRespawn parity: anchor the player's respawn to the landed location. */
+    public static boolean setRespawnOnTeleport = false;
+    /** BetterRTP LockAfter parity: usage cap (0 disables). */
+    public static long lockAfterUses = 0;
+    /** BetterRTP LockAfter parity: rolling window length in milliseconds (0 = never resets). */
+    public static long lockAfterResetMillis = 0;
 
     static {
       Configs.onReload(ConfigCache::reload);
@@ -82,6 +89,16 @@ public final class TeleportPipelineTask extends RTPRunnable {
       viewDistanceTeleport = perf.getNumber(PerformanceKeys.viewDistanceTeleport, 0L).longValue();
       postTeleportQueueing = Boolean.parseBoolean(
           perf.getConfigValue(PerformanceKeys.postTeleportQueueing, false).toString());
+
+      ConfigParser<ConfigKeys> cfg =
+          (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+      if (cfg != null) {
+        setRespawnOnTeleport = Boolean.parseBoolean(
+            cfg.getConfigValue(ConfigKeys.setRespawnOnTeleport, false).toString());
+        lockAfterUses = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
+        lockAfterResetMillis =
+            cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
+      }
     }
   }
 
@@ -748,6 +765,27 @@ public final class TeleportPipelineTask extends RTPRunnable {
               }
               if (aBoolean != null && aBoolean) {
                 RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage);
+
+                // BetterRTP SetAsRespawn parity: anchor the player's respawn to the
+                // landed location. Runs on the teleport completion thread (the owning
+                // thread of the destination), so the native call is region-safe. S-004:
+                // a failure is logged, never silently swallowed, and never aborts cleanup.
+                if (ConfigCache.setRespawnOnTeleport) {
+                  try {
+                    player.setRespawnLocation(location);
+                  } catch (Throwable t) {
+                    RTP.log(Level.WARNING,
+                        "[RTP] setRespawnOnTeleport failed for " + playerId, t);
+                  }
+                }
+
+                // BetterRTP LockAfter parity: count this successful use toward the
+                // per-player cap. No-op while lockAfterUses <= 0.
+                if (ConfigCache.lockAfterUses > 0) {
+                  RTP.getInstance().usageCaps.recordSuccess(playerId,
+                      ConfigCache.lockAfterUses, ConfigCache.lockAfterResetMillis,
+                      System.currentTimeMillis());
+                }
               } else {
                 RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
               }

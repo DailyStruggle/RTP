@@ -37,6 +37,54 @@ Append to the *Open* section below using the template. Keep entries short — on
 
 ## Open
 
+### 2026-06-14 - claim-integration `integrations.yml` reroll toggles are startup-only; `/rtp reload` does not (un)register verifiers
+
+- **Discovered during:** claim-plugin audit follow-up (this session). High-severity items (WorldGuard inversion, legacy Factions removal) and the sync-verifier fail-safe (#4) were fixed; this reload-toggle finding was reported and deliberately left for a separate pass.
+- **Location:** `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/tools/softdepends/claims/ClaimIntegrations.java` (`setup` -> `registerVerifiers`, called once at startup); the `Configs.onReload` hook only rebuilds the `ConfigParser`. There is no per-verifier unregister path on `GlobalRegionVerifiers` (only `clearGlobalRegionVerifiers()`).
+- **Symptom / hypothesis:** `ClaimIntegrations.setup` registers each enabled claim verifier exactly once. Turning an integration off in `integrations.yml` and running `/rtp reload` leaves its verifier active; turning one on after startup never registers it. The live-reload hook implies the toggles are dynamic, but they are effectively restart-only.
+- **Impact:** Operator confusion / config that silently does not take effect until a full restart. No safety regression (a stale-active verifier still rejects claimed land; a never-registered one only fails to add protection the operator just enabled).
+- **Suggested next step:** Either (a) document the `rerollX` keys as restart-only in the `integrations.yml` comments and the docs, or (b) add a targeted unregister/re-register path. Option (b) is non-trivial: a blanket `clearGlobalRegionVerifiers()` + re-register on reload would also drop any third-party verifiers registered via `RTPAPI.hooks().verifiers()`, so it needs a token/handle-based remove API on `GlobalRegionVerifiers` (and the `RegionVerifierRegistry` facade) so each `*Checker` removes only its own registration.
+
+### 2026-06-14 - global `Semaphore(1)` serializes every per-attempt verification pass
+
+- **Discovered during:** claim-plugin audit follow-up (this session).
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/selection/region/GlobalRegionVerifiers.java` - `regionVerifiersLock` (`Semaphore(1)`) is held for the entire sync-verifier loop and while assembling the async chain in `checkGlobalRegionVerifiers`, on every candidate coordinate.
+- **Symptom / hypothesis:** Under a busy multi-region queue, every concurrent per-attempt verification serializes on the single permit, even though the common case is a read-only iteration of two small lists. This is a throughput bottleneck, not a correctness bug.
+- **Impact:** Reduced verification throughput under concurrent load (multiple regions / large queues). No functional defect.
+- **Suggested next step:** Replace the read-side lock with a copy-on-write snapshot of the two verifier lists (e.g. `CopyOnWriteArrayList`, or volatile immutable-list references swapped on register/clear) so `checkGlobalRegionVerifiers` runs lock-free and only the rare register/clear mutations synchronize.
+
+### 2026-06-14 - claim `*Checker`s query third-party / Bukkit APIs from the async verification thread (Folia thread-safety caveat)
+
+- **Discovered during:** claim-plugin audit follow-up (this session).
+- **Location:** `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/tools/softdepends/claims/*Checker.java` registered as *sync* verifiers via `ClaimIntegrations`; the verification chain executes on the async/region pipeline thread (`GlobalRegionVerifiers.checkGlobalRegionVerifiers`).
+- **Symptom / hypothesis:** Querying WorldGuard / GriefPrevention / `Bukkit.getWorld(...)` and similar off the main thread relies on each third-party plugin being thread-safe; most claim plugins are not Folia-aware. These are CPU/lookup calls (not blocking chunk I/O), so REQ-RTP-S-005 is not violated, but a non-thread-safe lookup could race on Folia.
+- **Impact:** Potential thread-safety races on Folia with claim plugins that mutate shared state during a lookup. No observed failure; functionally correct on Paper/Spigot today.
+- **Suggested next step:** Document the off-thread-lookup caveat in `EXTERNAL_HOOKS.md` (verifier threading row) and `ADR-019`; where a claim plugin exposes an async/region-safe query, prefer registering the checker via `addGlobalRegionVerifierAsync` and hop to the appropriate scheduler.
+
+### 2026-06-14 - claim `*Checker`s log "Critical architectural incompatibility" SEVERE on first absence/NPE rather than a benign not-initialized message
+
+- **Discovered during:** claim-plugin audit follow-up (this session).
+- **Location:** `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/tools/softdepends/claims/LandsChecker.java` (`isInClaim` dereferences `landsIntegration` with no null check after a failed `landsSetup`), `GriefPreventionChecker.java` (mixes the resolved-instance check with the static `GriefPrevention.instance.dataStore`), and the shared SEVERE-on-first-`Throwable` log pattern across the `*Checker`s.
+- **Symptom / hypothesis:** When a checker's setup silently failed (swallowed `NoClassDefFoundError`/NPE), the first lookup NPEs and is reported as a "Critical architectural incompatibility" SEVERE line, rather than a benign "plugin not initialized" notice.
+- **Impact:** Misleading SEVERE log noise that looks like a serious defect to operators; the checker still fails-safe (disables itself), so no teleport-safety impact.
+- **Suggested next step:** Add an explicit null/initialization guard before the first API call in each checker (especially `LandsChecker`) and downgrade the "not initialized / plugin absent" path to a single INFO/FINE line, reserving SEVERE for a genuine unexpected `Throwable` from a present, initialized plugin.
+
+### 2026-06-14 - GriefPrevention / Lands claim checks use chunk-resolution granularity (conservative, lowers candidate yield)
+
+- **Discovered during:** claim-plugin audit follow-up (this session).
+- **Location:** `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/tools/softdepends/claims/GriefPreventionChecker.java` and `LandsChecker.java` - both test claim membership at chunk resolution (`>> 4`).
+- **Symptom / hypothesis:** A partially-claimed chunk is rejected wholesale, so unclaimed portions of that chunk are never offered as RTP destinations. This is conservative (never a false-accept, so REQ-RTP-S-003 stays safe) but reduces candidate yield.
+- **Impact:** Slightly lower destination yield near claim borders; no safety impact.
+- **Suggested next step:** Where the plugin API supports a per-block claim query (GriefPrevention `getClaimAt` accepts a precise location; Lands has a per-block `isClaimed` overload), switch to block-resolution testing to recover yield. Validate the precise-overload availability against the bumped Lands `7.x` API.
+
+### 2026-06-14 - `LandsChecker` compiles against deprecated `LandsIntegration` constructor + `isClaimed` overload
+
+- **Discovered during:** claim-plugin dependency refresh + audit follow-up (this session). The Lands artifact was bumped to `com.github.IncrediblePlugins:LandsAPI:7.19.1`; the checker still uses the now-deprecated 6.x-style API surface.
+- **Location:** `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/tools/softdepends/claims/LandsChecker.java` - `LandsIntegration` constructor and the `isClaimed` chunk overload (deprecation warnings only; compiles green).
+- **Symptom / hypothesis:** The deprecated ctor/overload could be removed in a future Lands major, breaking compilation at the next bump.
+- **Impact:** None today (deprecation warning only). Future Lands API removal would break the `rtp-plugin` build until the checker is rewritten to the current factory/query API.
+- **Suggested next step:** Rewrite `LandsChecker` against the current `LandsIntegration.of(plugin)` factory and the non-deprecated land/area query API for 7.x, ideally with a precise (block-resolution) claim check (see the granularity entry above).
+
 ### 2026-05-24 - `BukkitRTPWorld.getBiomes(world)` / `FoliaRTPWorld.getBiomes(world)` return empty set when the platform setter is null-returning instead of falling back to the world enumeration
 
 - **Discovered during:** /rtp biome=minecraft:BADLANDS namespace-parity fix (this session). User flagged the empty-set fallback explicitly.

@@ -24,10 +24,10 @@ jdk:
 install:
   - ./gradlew --no-daemon -PexcludeJdk25
       :commands-api:publishToMavenLocal
+      :effects-api:publishToMavenLocal
       :yaml-api:publishToMavenLocal
       :metrics-api:publishToMavenLocal
       :maps-api:publishToMavenLocal
-      :effects-api:publishToMavenLocal
       :rtp-proxy:rtp-proxy-common:publishToMavenLocal
       :rtp-api:publishToMavenLocal
       :rtp-core:publishToMavenLocal

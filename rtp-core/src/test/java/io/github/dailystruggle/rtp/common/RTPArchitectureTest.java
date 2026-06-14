@@ -188,10 +188,21 @@ public class RTPArchitectureTest {
                     // to a live server.  It lives in testFixtures (not src/main), so ArchUnit
                     // would otherwise flag it as a production violation.
                     .and().resideOutsideOfPackage("..mock..")
+                    // Exclude ProfilingRTPScheduler: it is NOT a platform scheduler implementation
+                    // (it creates no threads and owns no platform API), but a platform-neutral
+                    // delegating decorator that times the RTP-submitted tasks it forwards to the
+                    // real platform scheduler. It must live in core because it is installed
+                    // around RTP.scheduler in the core RTP() constructor; the thread-isolation
+                    // intent of this rule is not weakened because all threading still belongs to
+                    // the wrapped platform scheduler.
+                    .and().doNotHaveFullyQualifiedName(
+                            "io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler")
                     .should().resideInAPackage(CORE_PACKAGE)
                     .allowEmptyShould(true) // platform modules are separate Gradle subprojects
                     .because("RTPScheduler implementations are platform-specific and must be "
-                            + "isolated to the spigot, paper, or folia modules, not rtp-core.");
+                            + "isolated to the spigot, paper, or folia modules, not rtp-core. "
+                            + "The sole core-resident exception is the non-thread-creating "
+                            + "ProfilingRTPScheduler decorator, excluded by name above.");
 
     /**
      * Rule 5 – Chunk Ticket Allocation Boundary (Subsystem 1).

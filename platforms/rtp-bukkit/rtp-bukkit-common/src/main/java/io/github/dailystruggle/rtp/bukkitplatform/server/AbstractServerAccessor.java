@@ -662,6 +662,133 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   // ---------------------------------------------------------------------------
+  // Progress-bar surface (platform-neutral on-screen progress feedback)
+  //
+  // Renders RTPServerAccessor#updateProgressBars / #clearProgressBars as Bukkit
+  // BossBars. The platform-agnostic caller (e.g. core ScanProgressBars) supplies
+  // only ProgressBar value objects; all BossBar/BarColor/Player handling lives
+  // here so no Bukkit UI type leaks into core or the neutral adapters.
+  // ---------------------------------------------------------------------------
+
+  /** Active boss-bars keyed by caller-chosen id. Accessed only on the primary thread. */
+  private final Map<String, org.bukkit.boss.BossBar> activeProgressBars = new HashMap<>();
+
+  @Override
+  public void updateProgressBars(Map<String, io.github.dailystruggle.rtp.api.server.ProgressBar> bars) {
+    if (bars == null || bars.isEmpty()) {
+      clearProgressBars();
+      return;
+    }
+
+    // Hide bars that are no longer requested.
+    Set<String> stale = new HashSet<>();
+    for (String id : activeProgressBars.keySet()) {
+      if (!bars.containsKey(id)) stale.add(id);
+    }
+    for (String id : stale) {
+      org.bukkit.boss.BossBar bar = activeProgressBars.remove(id);
+      if (bar != null) bar.removeAll();
+    }
+
+    for (Map.Entry<String, io.github.dailystruggle.rtp.api.server.ProgressBar> entry : bars.entrySet()) {
+      String id = entry.getKey();
+      io.github.dailystruggle.rtp.api.server.ProgressBar spec = entry.getValue();
+      if (spec == null) continue;
+
+      org.bukkit.boss.BarColor color = barColorFromTemplate(spec.title());
+      String title = sanitizeBarTitle(spec.title());
+      double progress = Math.max(0.0, Math.min(1.0, spec.progress()));
+
+      org.bukkit.boss.BossBar bar = activeProgressBars.get(id);
+      if (bar == null) {
+        bar = Bukkit.createBossBar(title, color, org.bukkit.boss.BarStyle.SOLID);
+        activeProgressBars.put(id, bar);
+      } else {
+        bar.setTitle(title);
+        bar.setColor(color);
+      }
+      bar.setProgress(progress);
+
+      // Reconcile visible players against the bar's viewer permission.
+      String permission = spec.viewerPermission();
+      Set<Player> eligible = new HashSet<>();
+      for (Player player : Bukkit.getOnlinePlayers()) {
+        if (permission == null || permission.isEmpty() || player.hasPermission(permission)) {
+          eligible.add(player);
+        }
+      }
+      Set<Player> current = new HashSet<>(bar.getPlayers());
+      for (Player p : eligible) {
+        if (!current.contains(p)) bar.addPlayer(p);
+      }
+      for (Player p : current) {
+        if (!eligible.contains(p)) bar.removePlayer(p);
+      }
+    }
+  }
+
+  @Override
+  public void clearProgressBars() {
+    for (org.bukkit.boss.BossBar bar : activeProgressBars.values()) {
+      bar.removeAll();
+    }
+    activeProgressBars.clear();
+  }
+
+  /**
+   * Strips legacy {@code &x} color codes and {@code #RRGGBB} hex codes from a bar title
+   * (BossBar titles render as plain text on most clients) and truncates to Bukkit's
+   * 64-character title limit.
+   */
+  private static String sanitizeBarTitle(String title) {
+    if (title == null) return "";
+    String out = title.replaceAll("&[0-9a-fA-FklmnorKLMNOR]", "").replaceAll("#[0-9a-fA-F]{6}", "");
+    return out.length() > 64 ? out.substring(0, 64) : out;
+  }
+
+  /**
+   * Maps the first legacy color code ({@code &x}) found in {@code template} to a
+   * {@link org.bukkit.boss.BarColor}. Returns {@link org.bukkit.boss.BarColor#GREEN} when no
+   * recognizable color code is present.
+   */
+  private static org.bukkit.boss.BarColor barColorFromTemplate(String template) {
+    if (template == null) return org.bukkit.boss.BarColor.GREEN;
+    for (int i = 0; i + 1 < template.length(); i++) {
+      if (template.charAt(i) != '&') continue;
+      char c = Character.toLowerCase(template.charAt(i + 1));
+      switch (c) {
+        case '4':
+        case 'c':
+          return org.bukkit.boss.BarColor.RED;
+        case '6':
+        case 'e':
+          return org.bukkit.boss.BarColor.YELLOW;
+        case '2':
+        case 'a':
+          return org.bukkit.boss.BarColor.GREEN;
+        case '1':
+        case '3':
+        case '9':
+        case 'b':
+          return org.bukkit.boss.BarColor.BLUE;
+        case '5':
+          return org.bukkit.boss.BarColor.PURPLE;
+        case 'd':
+          return org.bukkit.boss.BarColor.PINK;
+        case 'f':
+        case '7':
+        case '8':
+        case '0':
+          return org.bukkit.boss.BarColor.WHITE;
+        default:
+          // Formatting code (k/l/m/n/o/r) or unknown: keep scanning.
+          break;
+      }
+    }
+    return org.bukkit.boss.BarColor.GREEN;
+  }
+
+  // ---------------------------------------------------------------------------
   // Menu platform surface (ADR-048)
   // ---------------------------------------------------------------------------
 

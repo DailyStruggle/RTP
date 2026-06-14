@@ -158,6 +158,59 @@ public final class RTPCostMetricsCharts {
       return b;
     }));
 
+    // --- Players per server (bucketised online player count) ---
+    // AdvancedPie of the host server's online-player count, bucketised so the
+    // fleet dashboard gets a population-size distribution without ever emitting
+    // a raw, potentially-fingerprinting player count for an individual server.
+    metrics.addCustomChart(new AdvancedPie(BStatsChartIds.PLAYER_COUNT_BUCKETS, () -> {
+      Map<String, Integer> b = new HashMap<>();
+      b.put(playerCountBucket(detectOnlinePlayerCount()), 1);
+      return b;
+    }));
+
+    // --- RTP tick cost per RTP (sync/region vs async), bucketised + windowed ---
+    // Two AdvancedPies driven by RtpSchedulerProfile: the wall-clock time RTP's
+    // OWN scheduler spends executing RTP tasks, split into the main-thread /
+    // region family ("sync") and the asynchronous family ("async"), divided by
+    // the number of RTPs served. Unlike MSPT (whole-server tick utilisation,
+    // not attributable to RTP), every nanosecond counted here was spent running
+    // a task RTP submitted, so this is the plugin's real per-RTP cost. Both are
+    // accumulated over a rolling ~30-minute window (the bStats rollover) in
+    // 1-minute delta buckets, so trailing cost (cache refill after a teleport)
+    // is still counted against the same window's RTP population. Bucketised so
+    // no raw timing or RTP count is ever emitted.
+    // Each chart is a DrilldownPie broken into cost components (outer slice),
+    // each carrying its own bucketised ms-per-RTP (inner slice): "scheduler" is
+    // RTP's own scheduler cost on both charts; "chunk_generated" /
+    // "chunk_ungenerated" are the wall-clock cost of loading already-generated vs
+    // ungenerated chunks, folded in ONLY on the chart whose family matches the
+    // backend's chunk-load mode (async backends load chunks off-thread -> async
+    // chart; sync backends on the main thread -> sync chart). Summed, the
+    // components are the overall per-RTP cost an operator should expect; the split
+    // shows that RTP-ing into ungenerated terrain (generation) is the expensive
+    // part - removable by pre-generating the world.
+    startRtpCostSampler();
+    metrics.addCustomChart(new DrilldownPie(BStatsChartIds.RTP_SYNC_COST_PER_RTP,
+            () -> rtpCostDrilldown(true)));
+    metrics.addCustomChart(new DrilldownPie(BStatsChartIds.RTP_ASYNC_COST_PER_RTP,
+            () -> rtpCostDrilldown(false)));
+
+    // --- Chunk-load floor (smallest single-chunk load time), by mode + gen state ---
+    // DrilldownPie driven by ChunkLoadProfile: the smallest single-chunk live-load
+    // wall-clock time ever observed on this server, bucketised. We never see exactly
+    // when the platform begins a load after the request, so the running minimum is
+    // taken as the assumed shortest time to start and complete a load (the "floor").
+    // The outer slice encodes BOTH how this backend loads chunks (sync/async,
+    // assumed from the detected platform since we know the backend and what it does)
+    // AND whether the chunk was already generated on disk vs had to be generated -
+    // e.g. "async/generated", "async/ungenerated" - because generation is a
+    // different (more expensive) cost than loading and can be either sync or async.
+    // ChunkLoadProfile only times genuine live loads (not anvil-prefilter
+    // short-circuits or already-resident chunks), so cache hits don't peg the floor
+    // at ~0. Both levels are categorical / bucketised, so no raw timing is emitted.
+    metrics.addCustomChart(new DrilldownPie(BStatsChartIds.CHUNK_LOAD_FLOOR_MS,
+            RTPCostMetricsCharts::chunkLoadFloorDrilldown));
+
     // --- M2 Runtime health (additive, Section C / row C4) ---
     // TPS trendlines: 1m / 5m / 15m EMA, reported as int *100 so bStats line
     // charts (int-only) preserve sub-integer resolution (e.g. 19.87 -> 1987).
@@ -500,10 +553,14 @@ public final class RTPCostMetricsCharts {
                   "GriefDefender",
                   "GriefPrevention",
                   "Towny",
-                  "HuskTowns",
                   "Factions",
+                  "FactionsBridge",
                   "Lands",
-                  "RedProtect"));
+                  "RedProtect",
+                  "Residence",
+                  "CrashClaim",
+                  "HuskClaims",
+                  "Kingdoms"));
 
   /**
    * Tally of region shape simple-class-names across all configured regions.
@@ -596,6 +653,318 @@ public final class RTPCostMetricsCharts {
   private static RTPMetricsExtension rtpExt(MetricsSnapshot snap) {
     RTPMetricsExtension ext = (snap == null) ? null : snap.extension(RTPMetricsExtension.class);
     return (ext != null) ? ext : new RTPMetricsExtension(0, 0, 0, 0, Double.NaN, -1);
+  }
+
+  /**
+   * Number of players currently online on the host server, read from
+   * {@link Bukkit#getOnlinePlayers()}. Returns {@code -1} when the count can't
+   * be resolved (no live server in the test fixture, or any error); callers
+   * bucket {@code -1} into {@code "unknown"}.
+   */
+  static int detectOnlinePlayerCount() {
+    try {
+      return Bukkit.getOnlinePlayers().size();
+    } catch (Throwable t) {
+      return -1;
+    }
+  }
+
+  /**
+   * Fingerprint-safe bucket for the online-player count. Never emits a raw
+   * count, so a uniquely-sized server can't be identified by its population.
+   * Negative input (unresolved count) buckets into {@code "unknown"}.
+   */
+  static String playerCountBucket(int n) {
+    if (n < 0) return "unknown";
+    if (n == 0) return "0";
+    if (n <= 5) return "1-5";
+    if (n <= 20) return "6-20";
+    if (n <= 50) return "21-50";
+    if (n <= 100) return "51-100";
+    if (n <= 250) return "101-250";
+    return "250+";
+  }
+
+  /**
+   * Number of one-minute buckets retained for the RTP-cost windows. Sized to the
+   * default bStats submission cadence (~30 minutes) so the whole rollover window
+   * is covered: a burst of RTP commands and the scheduler cost that trails it
+   * (cache refill in the minutes after the teleport) are both counted within the
+   * same window, against the same RTP population.
+   */
+  static final int RTP_COST_WINDOW_MINUTES = 30;
+
+  /** Rolling sync/region scheduler-cost / RTP-served accumulator (30 x 1-minute window). */
+  static final RtpCostWindow RTP_SYNC_COST_WINDOW = new RtpCostWindow(true);
+
+  /** Rolling async scheduler-cost / RTP-served accumulator (30 x 1-minute window). */
+  static final RtpCostWindow RTP_ASYNC_COST_WINDOW = new RtpCostWindow(false);
+
+  /**
+   * Rolling wall-clock cost / RTP-served accumulator for loading already-generated
+   * chunks (loaded from disk). Folded into whichever per-RTP cost chart matches the
+   * backend's chunk-load mode (async backend -> async chart, sync -> sync chart).
+   */
+  static final RtpCostWindow RTP_CHUNK_GEN_COST_WINDOW = new RtpCostWindow(true);
+
+  /**
+   * Rolling wall-clock cost / RTP-served accumulator for loading ungenerated chunks
+   * (the load triggers generation - the expensive path). Folded into the same
+   * mode-matched per-RTP cost chart as {@link #RTP_CHUNK_GEN_COST_WINDOW}.
+   */
+  static final RtpCostWindow RTP_CHUNK_UNGEN_COST_WINDOW = new RtpCostWindow(false);
+
+  /** Handle for the 1-minute sampler task, so it can be cancelled on shutdown. */
+  private static volatile Object rtpCostSamplerTask;
+
+  /**
+   * Starts the 1-minute RTP-cost sampler on {@link RTP#scheduler}. Idempotent and
+   * null-defended: a missing scheduler (e.g. a test fixture) is a no-op, and the
+   * sampler body never propagates a throwable onto the scheduler thread. Each
+   * fire records, into both windows, the delta of the cumulative scheduler-cost
+   * counters ({@link io.github.dailystruggle.rtp.common.metrics.RtpSchedulerProfile})
+   * and the RTP-served counter ({@link RtpOutcomeStats}) since the previous fire.
+   */
+  static synchronized void startRtpCostSampler() {
+    try {
+      if (rtpCostSamplerTask != null) return;
+      if (RTP.scheduler == null) return;
+      // 1 minute == 1200 server ticks (20 tps).
+      rtpCostSamplerTask = RTP.scheduler.runTaskTimerAsynchronously(() -> {
+        try {
+          long rtp = RtpOutcomeStats.GLOBAL.successCount();
+          RTP_SYNC_COST_WINDOW.sample(
+                  io.github.dailystruggle.rtp.common.metrics.RtpSchedulerProfile.GLOBAL.syncNanos(), rtp);
+          RTP_ASYNC_COST_WINDOW.sample(
+                  io.github.dailystruggle.rtp.common.metrics.RtpSchedulerProfile.GLOBAL.asyncNanos(), rtp);
+          // Chunk-load wall-clock cost, split generated vs ungenerated, folded into
+          // whichever per-RTP cost chart matches the backend's chunk-load mode.
+          RTP_CHUNK_GEN_COST_WINDOW.sample(
+                  io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile.GLOBAL.totalNanos(true), rtp);
+          RTP_CHUNK_UNGEN_COST_WINDOW.sample(
+                  io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile.GLOBAL.totalNanos(false), rtp);
+        } catch (Throwable ignored) {
+          // Sampler must never poison the scheduler thread.
+        }
+      }, 1200L, 1200L);
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING, "[bStats] failed to start rtp-cost sampler", t);
+    }
+  }
+
+  /**
+   * Rolling-window accumulator for one RTP scheduler-cost chart. Sampled once a
+   * minute from a cumulative nanosecond counter and the cumulative RTP-served
+   * counter; each minute bucket stores the delta of both since the previous
+   * sample. Summing per-minute deltas over the window is exact (the counters are
+   * cumulative, so no spike is missed regardless of sampling cadence), and
+   * dividing total nanoseconds by total RTP served yields the mean cost per RTP.
+   * Thread-safe: the sampler (scheduler thread) writes and the bStats submission
+   * thread reads.
+   *
+   * <p>The {@code sync} flag is informational only (it labels which counter feeds
+   * this instance); the accumulation logic is identical for both families.
+   */
+  static final class RtpCostWindow {
+    private final boolean sync;
+    private final int minutes;
+    private final long[] nanosByMinute;
+    private final long[] rtpByMinute;
+    private final boolean[] filled;
+    private int cursor = 0;
+    private long lastCumulativeNanos = -1L;
+    private long lastCumulativeRtp = -1L;
+
+    RtpCostWindow(boolean sync) {
+      this(sync, RTP_COST_WINDOW_MINUTES);
+    }
+
+    RtpCostWindow(boolean sync, int minutes) {
+      this.sync = sync;
+      this.minutes = minutes;
+      this.nanosByMinute = new long[minutes];
+      this.rtpByMinute = new long[minutes];
+      this.filled = new boolean[minutes];
+    }
+
+    /** Whether this window is fed by the sync/region (true) or async (false) counter. */
+    boolean isSync() {
+      return sync;
+    }
+
+    /**
+     * Records one minute's cumulative scheduler-cost nanoseconds and cumulative
+     * RTP-served counter. The first call only seeds the baselines (deltas
+     * unknown), recording a zero-cost / zero-RTP minute.
+     */
+    synchronized void sample(long cumulativeNanos, long cumulativeRtp) {
+      long nanosDelta;
+      long rtpDelta;
+      if (lastCumulativeNanos < 0L) {
+        nanosDelta = 0L;
+        rtpDelta = 0L;
+      } else {
+        nanosDelta = cumulativeNanos - lastCumulativeNanos;
+        rtpDelta = cumulativeRtp - lastCumulativeRtp;
+        if (nanosDelta < 0L) nanosDelta = 0L; // defensive: counter reset
+        if (rtpDelta < 0L) rtpDelta = 0L;
+      }
+      lastCumulativeNanos = cumulativeNanos;
+      lastCumulativeRtp = cumulativeRtp;
+      nanosByMinute[cursor] = nanosDelta;
+      rtpByMinute[cursor] = rtpDelta;
+      filled[cursor] = true;
+      cursor = (cursor + 1) % minutes;
+    }
+
+    /**
+     * Mean milliseconds of scheduler cost per RTP served over the window: total
+     * nanoseconds divided by total RTP served, converted to ms.
+     * {@link Double#NaN} when no minute has been recorded or no RTP has been
+     * served in the window.
+     */
+    synchronized double msPerRtp() {
+      long nanosAccum = 0L;
+      long rtpAccum = 0L;
+      boolean any = false;
+      for (int i = 0; i < minutes; i++) {
+        if (!filled[i]) continue;
+        any = true;
+        nanosAccum += nanosByMinute[i];
+        rtpAccum += rtpByMinute[i];
+      }
+      if (!any || rtpAccum <= 0L) return Double.NaN;
+      return (nanosAccum / 1.0e6) / (double) rtpAccum;
+    }
+
+    /** Test hook: clears the window to its freshly-constructed state. */
+    synchronized void reset() {
+      Arrays.fill(nanosByMinute, 0L);
+      Arrays.fill(rtpByMinute, 0L);
+      Arrays.fill(filled, false);
+      cursor = 0;
+      lastCumulativeNanos = -1L;
+      lastCumulativeRtp = -1L;
+    }
+  }
+
+  /**
+   * Fingerprint-safe bucket for an RTP scheduler-cost-per-RTP figure in
+   * milliseconds. {@code "unknown"} on the NaN sentinel (window not yet usable).
+   * Never emits a raw timing or RTP count.
+   */
+  static String rtpCostBucket(double ms) {
+    if (Double.isNaN(ms) || ms < 0.0) return "unknown";
+    if (ms < 0.1) return "<0.1";
+    if (ms < 0.5) return "0.1-0.5";
+    if (ms < 2.0) return "0.5-2";
+    if (ms < 10.0) return "2-10";
+    if (ms < 50.0) return "10-50";
+    return "50+";
+  }
+
+  /**
+   * How this backend loads chunks for the RTP pipeline, assumed from the detected
+   * platform rather than runtime-probed (we know the backend and what it does):
+   * Paper / Paper-fork / Folia load chunks asynchronously off the tick thread;
+   * vanilla Spigot / CraftBukkit resolve the load on the main thread. Returns
+   * {@code "unknown"} when the platform can't be determined. Cardinality is
+   * bounded to {sync, async, unknown}.
+   */
+  static String detectChunkLoadMode() {
+    String platform = detectPlatform();
+    switch (platform) {
+      case "folia":
+      case "paper":
+      case "paper-fork":
+        return "async";
+      case "spigot":
+      case "craftbukkit":
+        return "sync";
+      default:
+        return "unknown";
+    }
+  }
+
+  /**
+   * Fingerprint-safe bucket for the smallest single-chunk live-load time, given
+   * the running-minimum in nanoseconds ({@code -1} when no load recorded yet ->
+   * {@code "unknown"}). Bucketised in milliseconds so no raw timing is emitted.
+   */
+  static String chunkLoadFloorBucket(long minNanos) {
+    if (minNanos < 0L) return "unknown";
+    double ms = minNanos / 1.0e6;
+    if (ms < 0.1) return "<0.1";
+    if (ms < 0.5) return "0.1-0.5";
+    if (ms < 2.0) return "0.5-2";
+    if (ms < 10.0) return "2-10";
+    if (ms < 50.0) return "10-50";
+    return "50+";
+  }
+
+  /** A one-entry inner-slice map ({@code label -> 1}) for a DrilldownPie. */
+  private static Map<String, Integer> singleBucket(String label) {
+    Map<String, Integer> inner = new HashMap<>();
+    inner.put(label, 1);
+    return inner;
+  }
+
+  /**
+   * Builds the DrilldownPie payload for one per-RTP cost chart (sync or async
+   * family). Outer slices are cost components, each carrying its own bucketised
+   * ms-per-RTP inner slice:
+   * <ul>
+   *   <li>{@code scheduler} - RTP's own scheduler cost per RTP (always present).</li>
+   *   <li>{@code chunk_generated} / {@code chunk_ungenerated} - wall-clock cost
+   *       per RTP of loading already-generated vs ungenerated chunks, present
+   *       ONLY when this chart's family matches the backend's chunk-load mode
+   *       ({@link #detectChunkLoadMode()}): an async backend loads chunks
+   *       off-thread so its cost lands on the async chart, a sync backend on the
+   *       sync chart. An {@code unknown} mode attributes chunk cost to neither.</li>
+   * </ul>
+   * Every value is a bucket label, so no raw timing or RTP count is emitted.
+   */
+  static Map<String, Map<String, Integer>> rtpCostDrilldown(boolean sync) {
+    Map<String, Map<String, Integer>> map = new HashMap<>();
+    RtpCostWindow scheduler = sync ? RTP_SYNC_COST_WINDOW : RTP_ASYNC_COST_WINDOW;
+    map.put("scheduler", singleBucket(rtpCostBucket(scheduler.msPerRtp())));
+    String mode = detectChunkLoadMode();
+    boolean modeMatches =
+            ("async".equals(mode) && !sync) || ("sync".equals(mode) && sync);
+    if (modeMatches) {
+      map.put("chunk_generated",
+              singleBucket(rtpCostBucket(RTP_CHUNK_GEN_COST_WINDOW.msPerRtp())));
+      map.put("chunk_ungenerated",
+              singleBucket(rtpCostBucket(RTP_CHUNK_UNGEN_COST_WINDOW.msPerRtp())));
+    }
+    return map;
+  }
+
+  /**
+   * Builds the DrilldownPie payload for the chunk-load floor chart. Outer slice
+   * is {@code "<mode>/<genstate>"} (e.g. {@code async/generated},
+   * {@code async/ungenerated}), inner slice is the bucketised running-minimum
+   * floor for that generated/ungenerated class. Only classes with a recorded
+   * load emit; if neither has one yet, a single {@code "unknown"} slice is
+   * reported so the chart still appears on the dashboard.
+   */
+  static Map<String, Map<String, Integer>> chunkLoadFloorDrilldown() {
+    Map<String, Map<String, Integer>> map = new HashMap<>();
+    String mode = detectChunkLoadMode();
+    io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile profile =
+            io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile.GLOBAL;
+    long genFloor = profile.minNanos(true);
+    long ungenFloor = profile.minNanos(false);
+    if (genFloor >= 0L) {
+      map.put(mode + "/generated", singleBucket(chunkLoadFloorBucket(genFloor)));
+    }
+    if (ungenFloor >= 0L) {
+      map.put(mode + "/ungenerated", singleBucket(chunkLoadFloorBucket(ungenFloor)));
+    }
+    if (map.isEmpty()) {
+      map.put(mode + "/generated", singleBucket(chunkLoadFloorBucket(-1L)));
+    }
+    return map;
   }
 
   private static int safeRegionCount() {

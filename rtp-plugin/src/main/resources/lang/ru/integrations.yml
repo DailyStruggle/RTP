@@ -1,9 +1,14 @@
-# --- Настройки интеграций RTP ---
-# Каждый переключатель заново выбирает точку назначения, если она оказывается внутри клейма/региона указанного плагина (действует только если этот плагин установлен).
-# Заново выбирает местоположение, если оно оказывается внутри клейма плагина Factions.
+# Reroll the location if it lands inside a SaberFactions claim.
 # @type: boolean
 # @default: false
-rerollFactions: false
+rerollSaberFactions: false
+
+# Reroll the location if it lands inside Factions territory reported via the FactionsBridge API.
+# FactionsBridge bridges many Factions forks (FactionsUUID, SaberFactions, FactionsX, KingdomsX, ...)
+# behind one API; enable this when the FactionsBridge plugin is installed.
+# @type: boolean
+# @default: false
+rerollFactionsBridge: false
 
 # Заново выбирает местоположение, если оно оказывается внутри клейма плагина GriefDefender.
 # @type: boolean
@@ -15,11 +20,6 @@ rerollGriefDefender: false
 # @default: false
 rerollGriefPrevention: false
 
-# Заново выбирает местоположение, если оно оказывается внутри клейма плагина HuskTowns.
-# @type: boolean
-# @default: false
-rerollHuskTowns: false
-
 # Заново выбирает местоположение, если оно оказывается внутри клейма плагина Lands.
 # @type: boolean
 # @default: false
@@ -29,6 +29,26 @@ rerollLands: false
 # @type: boolean
 # @default: false
 rerollRedProtect: false
+
+# Reroll the location if it lands inside a Residence claim.
+# @type: boolean
+# @default: false
+rerollResidence: false
+
+# Reroll the location if it lands inside a CrashClaim claim.
+# @type: boolean
+# @default: false
+rerollCrashClaim: false
+
+# Reroll the location if it lands inside a HuskClaims claim.
+# @type: boolean
+# @default: false
+rerollHuskClaims: false
+
+# Reroll the location if it lands inside KingdomsX claimed land.
+# @type: boolean
+# @default: false
+rerollKingdomsX: false
 
 # Заново выбирает местоположение, если оно оказывается внутри клейма плагина Towny Advanced.
 # @type: boolean

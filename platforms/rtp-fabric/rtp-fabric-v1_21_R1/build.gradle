@@ -1,4 +1,4 @@
-// rtp-fabric-ADR-001 — Fabric multiversion v1_21_R1 submodule (reference impl).
+// rtp-fabric-ADR-001 â€” Fabric multiversion v1_21_R1 submodule (reference impl).
 //
 // Pinned to MC 1.21.1, mojmap, Loom 1.11+, Java 21. This is the reference
 // FabricVersionAdapter implementation that v1_20_R1 and v26_1_R1 will port
@@ -6,7 +6,7 @@
 //
 // MC + fabric-api versions intentionally match rtp-fabric-common's
 // compileOnly pin so the relocation of the existing common-side glue into
-// this submodule is purely structural — no porting work in this module.
+// this submodule is purely structural â€” no porting work in this module.
 plugins {
     // Version pinned in settings.gradle pluginManagement.plugins {}.
     id 'fabric-loom'
@@ -38,6 +38,6 @@ dependencies {
     api project(':rtp-core')
     api project(':commands-api')
     api project(':rtp-fabric:rtp-fabric-common')
-    // See V1_21_R1FabricEffectDispatchers — Loom-compiled effect dispatchers.
+    // See V1_21_R1FabricEffectDispatchers â€” Loom-compiled effect dispatchers.
     compileOnly project(':effects-api')
 }

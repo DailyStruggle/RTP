@@ -161,6 +161,18 @@ public final class BukkitRTPPlayer implements RTPPlayer {
     return player.isOnline();
   }
 
+  @Override
+  @SuppressWarnings("deprecation")
+  public void setRespawnLocation(RTPLocation to) {
+    // BetterRTP SetAsRespawn parity: anchor the player's bed/respawn point to the
+    // landed location. setBedSpawnLocation(Location, force=true) is used over the
+    // newer setRespawnLocation(...) for compatibility with the Spigot API this
+    // module compiles against; the force flag persists the anchor even with no bed.
+    World world = ((BukkitRTPWorld) to.world()).world();
+    Location location = new Location(world, to.x() + 0.5, to.y(), to.z() + 0.5);
+    player.setBedSpawnLocation(location, true);
+  }
+
   public Player player() {
     return player;
   }

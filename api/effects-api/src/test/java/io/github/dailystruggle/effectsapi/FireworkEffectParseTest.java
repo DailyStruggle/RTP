@@ -1,7 +1,7 @@
 package io.github.dailystruggle.effectsapi;
 
 import io.github.dailystruggle.effectsapi.bukkit.BukkitValueCoercer;
-import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.FireworkEffect;
+import io.github.dailystruggle.effectsapi.common.effects.FireworkEffect;
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,7 +23,7 @@ class FireworkEffectParseTest {
 
     @Test
     void parsesCanonicalFireworkTokenSequence() {
-        FireworkEffect effect = new FireworkEffect();
+        FireworkEffect effect = new FireworkEffect(org.bukkit.FireworkEffect.Type.BALL, org.bukkit.Color.WHITE);
         // Mirrors the user-facing example in effects/default.yml:
         // FIREWORK.BALL.1.1.RED.YELLOW.true.true.true.0.0.0
         effect.setData("BALL", "1", "1", "RED", "YELLOW",
@@ -41,7 +41,7 @@ class FireworkEffectParseTest {
         // "[FireworkEffect] ignored 5 token(s)" diagnostic. After the fix,
         // "0" is no longer a color and the named colors land on their
         // intended slots even when DX/DY/DZ-shaped zeros appear first.
-        FireworkEffect effect = new FireworkEffect();
+        FireworkEffect effect = new FireworkEffect(org.bukkit.FireworkEffect.Type.BALL, org.bukkit.Color.WHITE);
         effect.setData("BALL", "1", "1", "BLUE", "WHITE",
                 "true", "true", "true", "0", "0", "0");
         assertTrue(warnings.isEmpty(),
@@ -50,7 +50,7 @@ class FireworkEffectParseTest {
 
     @Test
     void sixDigitHexStillParsesAsColor() {
-        FireworkEffect effect = new FireworkEffect();
+        FireworkEffect effect = new FireworkEffect(org.bukkit.FireworkEffect.Type.BALL, org.bukkit.Color.WHITE);
         effect.setData("BALL", "1", "1", "FF8800", "00AAFF",
                 "true", "true", "true", "0", "0", "0");
         assertTrue(warnings.isEmpty(),

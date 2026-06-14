@@ -1,4 +1,4 @@
-// rtp-fabric-ADR-009 — Obf/unobf split of rtp-fabric-common.
+// rtp-fabric-ADR-009 â€” Obf/unobf split of rtp-fabric-common.
 //
 // Sibling module to `rtp-fabric-common`. Compiled under unobfuscated 1.15 Loom
 // (mirroring `rtp-fabric-v26_1_R1`) so its `net.minecraft.*` constant-pool
@@ -6,14 +6,14 @@
 // references would fail to link.
 //
 // Hosts the version-agnostic, NM-typed surfaces consumed by deobf-MC
-// version-adapters (V26_1_R1FabricVersionAdapter, …). Per-MC submodules
+// version-adapters (V26_1_R1FabricVersionAdapter, â€¦). Per-MC submodules
 // (rtp-fabric-v26_*_R1) depend on this module via `api project(...)` so they
 // can name FabricWorldUnobf / FabricEffectsHandlerUnobf without crossing the
-// obf↔unobf line.
+// obfâ†”unobf line.
 //
 // Companion: effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md.
 plugins {
-    // Loom 1.15 unobfuscated plugin ID — same as rtp-fabric-v26_1_R1.
+    // Loom 1.15 unobfuscated plugin ID â€” same as rtp-fabric-v26_1_R1.
     // Version pinned in root settings.gradle pluginManagement.plugins {}.
     id 'net.fabricmc.fabric-loom'
 }
@@ -40,7 +40,7 @@ java {
 
 dependencies {
     minecraft "com.mojang:minecraft:${minecraftVersion}"
-    // No `mappings` line — 26.1+ ships deobfuscated.
+    // No `mappings` line â€” 26.1+ ships deobfuscated.
     implementation "net.fabricmc:fabric-loader:${loaderVersion}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
     compileOnly "me.lucko:fabric-permissions-api:${permissionsApiVersion}"
@@ -58,7 +58,7 @@ dependencies {
     // from effects-api-ADR-006 is the actual artifact consumed at runtime;
     // see that ADR for the source-set wiring.
     compileOnly project(':effects-api')
-    // Phase D2 — names effectsapi.fabric_unobf.FabricEffectRuntimeUnobf and
+    // Phase D2 â€” names effectsapi.fabric_unobf.FabricEffectRuntimeUnobf and
     // effectsapi.fabric_unobf.FabricEffectsInitializer from FabricEffectsHandlerUnobf.
     compileOnly project(':effects-api:effects-api-fabric-unobf')
 }

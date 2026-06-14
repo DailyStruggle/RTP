@@ -36,6 +36,9 @@ onveilig: "&7[P0] ⌖ geen veilige locatie gevonden in [attempts] pogingen"
 # placeholder: [remainingCooldown] - de resterende tijd
 wachttijdBericht: "&7[P0] ⚡ Je kunt pas weer teletransporteren over [remainingCooldown]"
 
+# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+lockedAfterUses: "&7[P0] ⌖ Je hebt je limiet voor willekeurige teleportatie bereikt. Probeer het later opnieuw."
+
 # als de regio geen locaties in de wachtrij heeft en de speler geen rtp.unqueued-permissie heeft
 geenLocatiesInWachtrij: "#f5eb73[P0] ⌖ er zijn momenteel geen locaties beschikbaar"
 
@@ -114,6 +117,10 @@ scanActief: "&c[P0] er is al een scantaak actief voor regio's: [scan_regions]"
 scanNietActief: "&c[P0] er is geen scantaak actief voor regio's: [scan_regions]"
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 land &8| &7ETA #7E9CC8[scan_eta]"
+# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
+# Set to empty string to disable the boss-bar.
+# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
 
 # ###############################################################################
 # Sectie 7: Info-opdracht

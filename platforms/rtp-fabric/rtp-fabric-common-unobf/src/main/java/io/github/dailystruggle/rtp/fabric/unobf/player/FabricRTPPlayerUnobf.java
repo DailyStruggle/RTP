@@ -423,6 +423,84 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         });
     }
 
+    @Override
+    public void setRespawnLocation(RTPLocation to) {
+        // BetterRTP SetAsRespawn parity. Anchors the respawn point on the server
+        // thread via reflective setRespawnPosition (signature drift across MC
+        // versions). S-004: failures are logged, never swallowed.
+        ServerPlayer p = handle;
+        if (p == null || to == null) return;
+        RTPWorld<?> rtpWorld = to.world();
+        if (!(rtpWorld instanceof FabricRTPWorldUnobf fw)) return;
+        ServerLevel target = fw.level();
+        if (target == null) return;
+        net.minecraft.server.MinecraftServer srv = target.getServer();
+        if (srv == null) {
+            ServerLevel here = ((ServerLevel) p.level());
+            srv = here == null ? null : here.getServer();
+        }
+        if (srv == null) return;
+        final int bx = to.getBlockX();
+        final int by = to.getBlockY();
+        final int bz = to.getBlockZ();
+        final ServerLevel targetFinal = target;
+        srv.submit(() -> {
+            ServerPlayer cur = handle;
+            if (cur == null || cur.isRemoved()) return Boolean.FALSE;
+            anchorRespawn(cur, targetFinal, bx, by, bz);
+            return Boolean.TRUE;
+        });
+    }
+
+    private static void anchorRespawn(ServerPlayer cur, ServerLevel target, int x, int y, int z) {
+        try {
+            Object dim = target.dimension();
+            Object pos = new net.minecraft.core.BlockPos(x, y, z);
+            for (java.lang.reflect.Method m : ServerPlayer.class.getMethods()) {
+                if (!m.getName().equals("setRespawnPosition")) continue;
+                Class<?>[] pt = m.getParameterTypes();
+                if (pt.length == 5) {
+                    m.invoke(cur, dim, pos, 0.0f, true, false);
+                    return;
+                }
+                if (pt.length == 2) {
+                    Object cfg = buildRespawnConfig(pt[0], dim, pos);
+                    if (cfg != null) {
+                        m.invoke(cur, cfg, false);
+                        return;
+                    }
+                }
+            }
+            RTP.log(java.util.logging.Level.WARNING,
+                "[RTP] setRespawnOnTeleport: no setRespawnPosition method on this MC version");
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.WARNING,
+                "[RTP] FabricRTPPlayerUnobf setRespawnPosition failed", t);
+        }
+    }
+
+    private static Object buildRespawnConfig(Class<?> cfgClass, Object dim, Object pos) {
+        try {
+            for (java.lang.reflect.Constructor<?> c : cfgClass.getConstructors()) {
+                Class<?>[] pt = c.getParameterTypes();
+                Object[] args = new Object[pt.length];
+                boolean ok = true;
+                for (int i = 0; i < pt.length; i++) {
+                    Class<?> pc = pt[i];
+                    if (pc.isInstance(dim)) args[i] = dim;
+                    else if (pc.isInstance(pos)) args[i] = pos;
+                    else if (pc == float.class || pc == Float.class) args[i] = 0.0f;
+                    else if (pc == boolean.class || pc == Boolean.class) args[i] = Boolean.TRUE;
+                    else { ok = false; break; }
+                }
+                if (ok) return c.newInstance(args);
+            }
+        } catch (Throwable ignored) {
+            // fall through; caller logs the overall failure
+        }
+        return null;
+    }
+
     /**
      * Teleport implementation that survives Yarn/intermediary drift across MC patch
      * releases. On 1.21.11 the 6-arg {@code ServerPlayer#teleportTo(ServerLevel,double,

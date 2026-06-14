@@ -65,7 +65,12 @@ public class WorldGuardChecker {
       RegionManager regionManager =
           WorldGuard.getInstance().getPlatform().getRegionContainer().get(world);
       ApplicableRegionSet set = Objects.requireNonNull(regionManager).getApplicableRegions(pt);
-      return set.testState(null, CAN_RTP_SELECT_HERE);
+      // Wilderness (no applicable WorldGuard region) is selectable: not "in a claim".
+      if (set.size() == 0) return false;
+      // Inside one or more regions: this location is protected and shall be rerolled,
+      // unless an admin has explicitly opted-in by setting the can-rtp-select-here flag
+      // to ALLOW on the region(s) covering this point.
+      return !set.testState(null, CAN_RTP_SELECT_HERE);
     } catch (Throwable t) {
       exists = false;
       RTP.log(

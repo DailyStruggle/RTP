@@ -16,7 +16,7 @@ import org.jetbrains.annotations.NotNull;
  * </ul>
  *
  * <p>This interface is the single chokepoint that decouples
- * {@link io.github.dailystruggle.effectsapi.common.Effect} from any platform import.
+ * {@link io.github.dailystruggle.effectsapi.Effect} from any platform import.
  * It is intentionally narrow: title / actionbar are already routed through
  * {@code RTPPlayer}-equivalent surfaces (see {@code FabricRTPPlayer#sendTitle}
  * and {@code SendMessage#title} on Bukkit) and are therefore not duplicated
