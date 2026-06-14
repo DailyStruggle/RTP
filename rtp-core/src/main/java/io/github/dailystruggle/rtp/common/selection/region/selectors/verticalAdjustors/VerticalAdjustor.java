@@ -92,6 +92,9 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
    * Typed result of {@link #adjustFromProbeWithReason(ChunkColumnProbe, String)}.
    * Either {@code picked} is non-null and {@code reason == NONE}, or
    * {@code picked} is null and {@code reason} names which gate fired.
+   *
+   * @param picked the selected coordinates, or {@code null} when no Y was found
+   * @param reason the rejection reason; {@link ProbeRejectReason#NONE} when {@code picked} is non-null
    */
   public record AdjustResult(@Nullable RTPCoords picked, @NotNull ProbeRejectReason reason) {
     public static final AdjustResult WINDOW_REJECT =

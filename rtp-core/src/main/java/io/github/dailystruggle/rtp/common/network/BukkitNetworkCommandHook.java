@@ -100,6 +100,8 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
     /**
      * Install the lobby-side enrolment seeder. See {@link #enrolmentSeeder}.
      * Null collapses to a no-op.
+     *
+     * @param seeder the seeder to install; {@code null} installs a no-op
      */
     public void setEnrolmentSeeder(java.util.function.Consumer<UUID> seeder) {
         this.enrolmentSeeder = seeder == null ? u -> {} : seeder;
@@ -109,6 +111,9 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
      * Legacy 2-arg ctor. Equivalent to {@code lobbyMode = false}
      * and a null {@code peerRegionRegistry}; the hook will not synthesise a
      * lobby target for no-arg {@code /rtp}.
+     *
+     * @param router           the network router; never {@code null}
+     * @param enrolmentBuffer  the enrolment buffer; never {@code null}
      */
     public BukkitNetworkCommandHook(NetworkRouter router, NetworkEnrolmentBuffer enrolmentBuffer) {
         this(router, enrolmentBuffer, null, false, null, null);
@@ -130,6 +135,8 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
      * @param peerRegionRegistry registry view; may be {@code null} when
      *                           {@code lobbyMode == false}
      * @param lobbyMode          true to enable no-arg lobby dispatch
+     * @param router             the network router; never {@code null}
+     * @param enrolmentBuffer    the enrolment buffer; never {@code null}
      */
     public BukkitNetworkCommandHook(NetworkRouter router,
                                     NetworkEnrolmentBuffer enrolmentBuffer,
@@ -145,6 +152,12 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
      * the next scheduled tick. The publisher is allowed to be {@code null}
      * (test paths, non-network deployments); the hook silently skips the
      * forced publish in that case.
+     *
+     * @param router                the network router; never {@code null}
+     * @param enrolmentBuffer       the enrolment buffer; never {@code null}
+     * @param peerRegionRegistry    peer region registry; may be {@code null}
+     * @param lobbyMode             true to enable no-arg lobby dispatch
+     * @param backendStatePublisher optional publisher for forced heartbeats; may be {@code null}
      */
     public BukkitNetworkCommandHook(NetworkRouter router,
                                     NetworkEnrolmentBuffer enrolmentBuffer,
@@ -162,6 +175,13 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
      * Allowed to be {@code null}; when null, the hook preserves the
      * prior behaviour of returning {@link RoutingResult#local()} for
      * transient fallbacks.
+     *
+     * @param router                the network router; never {@code null}
+     * @param enrolmentBuffer       the enrolment buffer; never {@code null}
+     * @param peerRegionRegistry    peer region registry; may be {@code null}
+     * @param lobbyMode             true to enable no-arg lobby dispatch
+     * @param backendStatePublisher optional publisher for forced heartbeats; may be {@code null}
+     * @param lobbyRetryQueue       optional retry queue for transient fallbacks; may be {@code null}
      */
     public BukkitNetworkCommandHook(NetworkRouter router,
                                     NetworkEnrolmentBuffer enrolmentBuffer,
@@ -385,9 +405,17 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
         return rawArg == null ? "" : rawArg;
     }
 
-    /** Visible for tests. */
+    /**
+     * Visible for tests.
+     *
+     * @return the network router
+     */
     public NetworkRouter router() { return router; }
 
-    /** Visible for tests. */
+    /**
+     * Visible for tests.
+     *
+     * @return the enrolment buffer
+     */
     public NetworkEnrolmentBuffer enrolmentBuffer() { return enrolmentBuffer; }
 }

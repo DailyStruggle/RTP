@@ -20,6 +20,11 @@ import java.util.logging.Level;
  * Abstract SQL database accessor with a batched async write queue.
  */
 public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Connection> {
+
+  /** Default constructor. Subclasses supply the JDBC connection. */
+  protected AbstractSQLDatabaseAccessor() {
+  }
+
   /** Queue for teleport data write operations */
   protected final ConcurrentLinkedQueue<TeleportData> writeQueue = new ConcurrentLinkedQueue<>();
 
@@ -40,6 +45,8 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
   private volatile NetworkStateBinding networkStateBinding;
 
   /**
+   * Returns the installed network-state binding.
+   *
    * @return the installed network-state binding, or {@code null} if network
    *     mode is disabled (the shipping default).
    */
@@ -54,6 +61,8 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
    * publish anything or alter previously-flushed rows. Intended to be called
    * once during boot, after the proxy-side wiring has chosen a binding
    * implementation per the configured {@code network.transport.type}.
+   *
+   * @param binding the binding to install, or {@code null} to disable network mode
    */
   public void setNetworkStateBinding(NetworkStateBinding binding) {
     this.networkStateBinding = binding;
@@ -82,6 +91,8 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
    * and delegates every {@code getConnection()} call to this accessor's
    * abstract {@link #getConnection()}. Callers that need to share the pool
    * (proxy + binding + addons) should all use this single facade.</p>
+   *
+   * @return a {@link javax.sql.DataSource} facade backed by this accessor's connection pool
    */
   public javax.sql.DataSource asDataSource() {
     return new AccessorDataSource(this);
