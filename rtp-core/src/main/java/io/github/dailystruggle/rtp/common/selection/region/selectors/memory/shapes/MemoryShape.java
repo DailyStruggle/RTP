@@ -104,6 +104,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   /**
    * Returns the RNG to use for this shape. Falls back to {@link ThreadLocalRandom#current()} when
    * no explicit RNG has been set so that production code is unaffected.
+   *
+   * @return the active {@link Random} instance; never {@code null}
    */
   protected final Random rng() {
     return rng != null ? rng : ThreadLocalRandom.current();
@@ -632,6 +634,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * Marks a single 1D index bad and records the rejection {@code cause}. The cause
    * is carried on the pending entry's value (its {@link LocationGenerator.FailTypes}
    * ordinal) and surfaces as the per-run cause after the next rebuild.
+   *
+   * @param location the 1D spiral index to mark bad
+   * @param cause    the rejection reason; {@code null} is treated as {@link LocationGenerator.FailTypes#misc}
    */
   public void addBadLocation(long location, LocationGenerator.FailTypes cause) {
     long ord = (cause == null) ? MISC_CAUSE : cause.ordinal();
@@ -665,7 +670,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * directly. The default returns {@code 0}, which causes the default
    * implementation to skip the radial probe and rely on the angular walk only.
    *
-   * @return non-negative offset, or {@code 0} to disable the radial probe.
+   * @param cx chunk x in the shape's chunk-unit coordinate system
+   * @param cz chunk z in the shape's chunk-unit coordinate system
+   * @return non-negative offset, or {@code 0} to disable the radial probe
    */
   protected long neighbourRingOffset(int cx, int cz) {
     return 0L;

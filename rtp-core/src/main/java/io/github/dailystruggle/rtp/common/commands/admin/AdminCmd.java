@@ -54,7 +54,11 @@ public class AdminCmd extends BaseRTPCmdImpl {
         this.openAdminPanel = openAdminPanel;
     }
 
-    /** Convenience constructor with no opener; bare form rejects until one is wired. */
+    /**
+     * Convenience constructor with no opener; bare form rejects until one is wired.
+     *
+     * @param parent the parent command tree (the {@code /rtp} root), or {@code null}
+     */
     public AdminCmd(@Nullable CommandsAPICommand parent) {
         this(parent, null);
     }

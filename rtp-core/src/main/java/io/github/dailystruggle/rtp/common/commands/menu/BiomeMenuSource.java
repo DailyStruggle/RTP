@@ -123,6 +123,10 @@ public final class BiomeMenuSource {
     /**
      * Whether {@code regionName} has any recorded observation of {@code biome}.
      * Chunk-I/O-free; reads only persisted spatial memory.
+     *
+     * @param regionName the region to check; {@code null} returns {@code false}
+     * @param biome      the biome name to look up; {@code null} returns {@code false}
+     * @return {@code true} if the region has observed the biome at least once
      */
     public static boolean regionObservesBiome(String regionName, String biome) {
         if (regionName == null || biome == null || RTP.selectionAPI == null) return false;

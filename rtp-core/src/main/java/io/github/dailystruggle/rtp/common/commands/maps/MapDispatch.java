@@ -118,6 +118,9 @@ public final class MapDispatch {
    * it here because installation churn is not a server-disable event;
    * callers that want explicit teardown shall call {@link #fireDisable}
    * before installing a replacement.
+   *
+   * @param binding the new {@link MapBinding} to install; never {@code null}
+   * @return the previously-installed binding; never {@code null}
    */
   public static MapBinding setMapBinding(MapBinding binding) {
     Objects.requireNonNull(binding, "binding");
@@ -136,6 +139,8 @@ public final class MapDispatch {
    * {@link #setMapBinding}; this entry point exists for tests and for
    * standalone lifecycle observers that aren't themselves the active
    * binding.
+   *
+   * @param lifecycle the lifecycle listener to register; never {@code null}
    */
   public static void registerLifecycle(MapBindingLifecycle lifecycle) {
     Objects.requireNonNull(lifecycle, "lifecycle");
@@ -147,6 +152,8 @@ public final class MapDispatch {
   /**
    * Deregisters a previously-installed {@link MapBindingLifecycle}. Safe to
    * call with a listener that was never registered.
+   *
+   * @param lifecycle the lifecycle listener to remove; ignored when {@code null}
    */
   public static void unregisterLifecycle(MapBindingLifecycle lifecycle) {
     if (lifecycle == null) return;
@@ -157,6 +164,8 @@ public final class MapDispatch {
    * Fan-out for the platform {@code PlayerQuitEvent} bridge. Each registered
    * {@link MapBindingLifecycle} is notified; an exception from one listener
    * is logged at WARNING and does not block notification of the others.
+   *
+   * @param viewer the UUID of the player who quit; ignored when {@code null}
    */
   public static void firePlayerQuit(UUID viewer) {
     if (viewer == null) return;
@@ -194,6 +203,8 @@ public final class MapDispatch {
    * Test-only accessor: the number of currently-registered lifecycle
    * listeners. Exposed for {@code MapDispatchTest} regression coverage of
    * REQ-RTP-MAP-003.
+   *
+   * @return the number of currently-registered lifecycle listeners
    */
   public static int registeredLifecycleCount() {
     return LIFECYCLES.size();
@@ -201,8 +212,9 @@ public final class MapDispatch {
 
   /**
    * Returns the active {@link MapBinding}. Never {@code null}; returns a
-   * {@link NoopMapBinding} sentinel until a real binding is installed
-   * (Stage 2 of CHECKLIST-maps-api.md).
+   * {@link NoopMapBinding} sentinel until a real binding is installed.
+   *
+   * @return the active {@link MapBinding}; never {@code null}
    */
   public static MapBinding getMapBinding() {
     return BINDING.get();

@@ -31,6 +31,13 @@ public final class AnvilColumnProbeAdapter implements ChunkColumnProbe {
   private final int chunkX;
   private final int chunkZ;
 
+  /**
+   * Constructs an adapter wrapping the given {@link ColumnProbe}.
+   *
+   * @param probe  the decoded anvil column probe; never {@code null}
+   * @param chunkX chunk X coordinate in the world's chunk grid
+   * @param chunkZ chunk Z coordinate in the world's chunk grid
+   */
   public AnvilColumnProbeAdapter(ColumnProbe probe, int chunkX, int chunkZ) {
     if (probe == null) throw new NullPointerException("probe");
     this.probe = probe;

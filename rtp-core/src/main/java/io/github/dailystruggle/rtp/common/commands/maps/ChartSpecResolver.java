@@ -61,6 +61,9 @@ public interface ChartSpecResolver {
    * {@link ChartModel} so heterogeneous resolvers can be registered behind
    * the same SPI; the {@code model} is the concrete subtype the renderer
    * expects, paired by construction.
+   *
+   * @param renderer the chart renderer; never {@code null}
+   * @param model    the chart model matched to {@code renderer}; never {@code null}
    */
   record Resolution(ChartRenderer<ChartModel> renderer, ChartModel model) {
     public Resolution {
@@ -76,6 +79,11 @@ public interface ChartSpecResolver {
      * Convenience factory that erases the {@code <M>} type parameter so a
      * resolver may write {@code Resolution.of(HeatmapRenderer.INSTANCE,
      * heatmap)} without a manual unchecked cast at the call site.
+     *
+     * @param <M>      the concrete chart model type
+     * @param renderer the chart renderer; never {@code null}
+     * @param model    the chart model; never {@code null}
+     * @return a new {@link Resolution} with the erased renderer type
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static <M extends ChartModel> Resolution of(ChartRenderer<M> renderer, M model) {
@@ -86,7 +94,14 @@ public interface ChartSpecResolver {
   /** Thrown by {@link #resolve} when the underlying data is unavailable. */
   final class UnresolvableChartSpecException extends Exception {
     private static final long serialVersionUID = 1L;
+
+    /** @param message description of why the chart spec could not be resolved */
     public UnresolvableChartSpecException(String message) { super(message); }
+
+    /**
+     * @param message description of why the chart spec could not be resolved
+     * @param cause   the underlying cause
+     */
     public UnresolvableChartSpecException(String message, Throwable cause) {
       super(message, cause);
     }

@@ -44,6 +44,11 @@ import java.util.logging.Level;
  * <p>All mutating operations are thread-safe.
  */
 public final class BiomeActivityTracker {
+
+  /** Constructs an empty tracker. */
+  public BiomeActivityTracker() {
+  }
+
   private final ConcurrentHashMap<String, AtomicLong> biomeCounts = new ConcurrentHashMap<>();
   private final AtomicLong totalSamples = new AtomicLong();
 
@@ -52,6 +57,8 @@ public final class BiomeActivityTracker {
    * blank biome names are ignored (the player's chunk could not be read).
    * Biome names are upper-cased so casing differences across platforms collapse
    * to one bucket.
+   *
+   * @param biome the biome name to record; {@code null} or blank is ignored
    */
   public void record(String biome) {
     if (biome == null) return;
@@ -106,12 +113,20 @@ public final class BiomeActivityTracker {
     return futures;
   }
 
-  /** Total number of occupancy observations recorded since the last reset. */
+  /**
+   * Returns the total number of occupancy observations recorded since the last reset.
+   *
+   * @return total sample count
+   */
   public long totalSamples() {
     return totalSamples.get();
   }
 
-  /** Number of distinct biomes observed since the last reset. */
+  /**
+   * Returns the number of distinct biomes observed since the last reset.
+   *
+   * @return distinct biome count
+   */
   public int distinctBiomes() {
     return biomeCounts.size();
   }
@@ -120,6 +135,8 @@ public final class BiomeActivityTracker {
    * Returns an occupancy snapshot ordered by descending sample count (ties
    * broken by biome name for stable output). The returned map is a copy and is
    * safe to iterate without further synchronization.
+   *
+   * @return a copy of the current biome counts, ordered by descending count
    */
   public Map<String, Long> snapshot() {
     List<Map.Entry<String, Long>> entries = new ArrayList<>(biomeCounts.size());

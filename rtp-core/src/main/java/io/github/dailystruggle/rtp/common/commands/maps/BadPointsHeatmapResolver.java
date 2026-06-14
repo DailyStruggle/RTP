@@ -35,6 +35,10 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
  */
 public final class BadPointsHeatmapResolver implements ChartSpecResolver {
 
+  /** Constructs a resolver. Stateless; a single instance may be shared. */
+  public BadPointsHeatmapResolver() {
+  }
+
   /** Resolution of the binned heatmap. Matches the vanilla 128px canvas exactly. */
   public static final int BINS = 128;
 

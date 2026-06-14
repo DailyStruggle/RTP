@@ -104,6 +104,7 @@ public final class AdminPanelBuilder {
      * @param permission permission probe for {@code viewer}; consulted per
      *                   row, never for the admin gate (that is the dispatch
      *                   arm's responsibility).
+     * @return the assembled {@link MenuModel} ready for rendering
      */
     public MenuModel build(TreeCommand rtpRoot, UUID viewer, Predicate<String> permission) {
         Objects.requireNonNull(rtpRoot, "rtpRoot");

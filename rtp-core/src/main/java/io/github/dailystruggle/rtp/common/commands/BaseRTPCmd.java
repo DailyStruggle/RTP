@@ -66,6 +66,14 @@ public interface BaseRTPCmd extends TreeCommand {
     RTP.log(Level.WARNING, msg);
   }
 
+  /**
+   * Sends a bad-parameter message to the caller with an optional hover/click tag.
+   *
+   * @param callerId       UUID of the command sender
+   * @param parameterName  the name of the invalid parameter
+   * @param parameterValue the value that was rejected
+   * @param tag            optional message tag passed to the server accessor; may be {@code null}
+   */
   default void msgBadParameter(UUID callerId, String parameterName, String parameterValue, String tag) {
     String msg = msg(MessagesKeys.badArg, "[P0] bad parameter - [arg]");
     msg = msg.replace("[arg]", parameterName + "=" + parameterValue);
