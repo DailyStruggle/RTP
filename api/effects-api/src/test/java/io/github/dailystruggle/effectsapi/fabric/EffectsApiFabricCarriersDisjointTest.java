@@ -47,13 +47,23 @@ class EffectsApiFabricCarriersDisjointTest {
         }
     }
 
+    // The handle-SPI rework intentionally lets the unobf carrier reuse the
+    // shared Mojmap handle provider effectsapi.fabric.FabricHandles (both the
+    // intermediary and the unobf carrier run on Mojmap-named net.minecraft
+    // types, so FabricHandles links cleanly on either runtime). That single
+    // class is therefore allow-listed below; every other effectsapi.fabric.*
+    // reference from the unobf carrier remains forbidden.
+    private static final String ALLOWED_SHARED_OBF_IMPORT =
+            "io.github.dailystruggle.effectsapi.fabric.FabricHandles";
+
     @Test
-    @DisplayName("effectsapi.fabric_unobf.* sources do not import effectsapi.fabric.*")
+    @DisplayName("effectsapi.fabric_unobf.* sources do not import effectsapi.fabric.* (except the shared FabricHandles)")
     void unobfDoesNotReferenceObf() throws IOException {
         // Sibling module path, resolved from effects-api/ working dir.
         Path root = projectDir().resolve("effects-api-fabric-unobf/src/main/java/io/github/dailystruggle/effectsapi/fabric_unobf").normalize();
         assertTrue(Files.isDirectory(root), "unobf carrier root not found: " + root);
-        List<String> offenders = scanForForbiddenImport(root, OBF_PKG);
+        List<String> offenders = new ArrayList<>(scanForForbiddenImport(root, OBF_PKG));
+        offenders.removeIf(o -> o.contains(ALLOWED_SHARED_OBF_IMPORT));
         if (!offenders.isEmpty()) {
             fail("effectsapi.fabric_unobf.* must not reference fabric.* — offenders:\n  "
                     + String.join("\n  ", offenders));
