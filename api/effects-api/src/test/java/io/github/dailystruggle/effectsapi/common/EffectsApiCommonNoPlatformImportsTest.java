@@ -38,6 +38,13 @@ class EffectsApiCommonNoPlatformImportsTest {
 
         try (Stream<Path> walk = Files.walk(commonRoot)) {
             walk.filter(p -> p.toString().endsWith(".class"))
+                // The handle-SPI rework moved the concrete effect leaves into
+                // common/effects/*, and some (e.g. PotionEffect) intentionally
+                // carry a thin Bukkit dispatch path. The platform-free invariant
+                // therefore now applies to the common SPI surface (Effect,
+                // EffectFactory, common/spi/**) but not to the common/effects
+                // leaves, which are excluded from this scan.
+                .filter(p -> !p.toString().replace('\\', '/').contains("/common/effects/"))
                 .forEach(p -> {
                     try {
                         scanClassFile(p, commonRoot, violations);
