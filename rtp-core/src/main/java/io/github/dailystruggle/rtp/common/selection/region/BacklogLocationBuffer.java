@@ -91,12 +91,20 @@ public final class BacklogLocationBuffer {
       this.pinnedBinList = Objects.requireNonNull(binList, "binList");
     }
 
-    /** @return the candidate location; never {@code null}. */
+    /**
+     * Returns the candidate location.
+     *
+     * @return the candidate location; never {@code null}
+     */
     public RTPLocation location() {
       return location;
     }
 
-    /** @return current validity; reads are visible across threads ({@code volatile}). */
+    /**
+     * Returns the current validity tag.
+     *
+     * @return current validity; reads are visible across threads ({@code volatile})
+     */
     public Validity validity() {
       return validity;
     }
@@ -117,6 +125,8 @@ public final class BacklogLocationBuffer {
   private final Deque<BacklogEntry> entries;
 
   /**
+   * Constructs a new buffer with the given maximum capacity.
+   *
    * @param capacity maximum number of entries; must be positive. Mirrors
    *                 {@code RegionSettings.backlogCacheCap}.
    * @throws IllegalArgumentException if {@code capacity <= 0}
@@ -129,7 +139,11 @@ public final class BacklogLocationBuffer {
     this.entries = new ArrayDeque<>(Math.min(capacity, 1024));
   }
 
-  /** @return the buffer's maximum capacity. */
+  /**
+   * Returns the buffer's maximum capacity.
+   *
+   * @return the buffer's maximum capacity
+   */
   public int capacity() {
     return capacity;
   }
@@ -178,9 +192,11 @@ public final class BacklogLocationBuffer {
   }
 
   /**
-   * @return the oldest entry whose validity is still {@link Validity#UNVERIFIED},
-   *         or {@code null} if the buffer contains no such entry. Used to pick
-   *         the next bin to verify in {@code Region.execute()}.
+   * Returns the oldest entry whose validity is still {@link Validity#UNVERIFIED},
+   * or {@code null} if the buffer contains no such entry. Used to pick
+   * the next bin to verify in {@code Region.execute()}.
+   *
+   * @return the oldest unverified entry, or {@code null} if none
    */
   public BacklogEntry peekOldestUnverified() {
     for (BacklogEntry e : entries) {
@@ -189,12 +205,20 @@ public final class BacklogLocationBuffer {
     return null;
   }
 
-  /** @return current entry count, including all validity states. */
+  /**
+   * Returns the current entry count, including all validity states.
+   *
+   * @return current entry count
+   */
   public int size() {
     return entries.size();
   }
 
-  /** @return number of entries currently tagged {@link Validity#VALIDATED}. */
+  /**
+   * Returns the number of entries currently tagged {@link Validity#VALIDATED}.
+   *
+   * @return number of validated entries
+   */
   public int validatedSize() {
     int n = 0;
     for (BacklogEntry e : entries) {
@@ -232,7 +256,11 @@ public final class BacklogLocationBuffer {
     return removed;
   }
 
-  /** @return {@code true} if no entries are present. */
+  /**
+   * Returns {@code true} if no entries are present.
+   *
+   * @return {@code true} if the buffer is empty
+   */
   public boolean isEmpty() {
     return entries.isEmpty();
   }

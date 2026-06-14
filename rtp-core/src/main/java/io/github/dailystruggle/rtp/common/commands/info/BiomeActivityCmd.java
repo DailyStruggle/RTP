@@ -32,6 +32,9 @@ public class BiomeActivityCmd extends BaseRTPCmdImpl {
   /** Character width of the textual share bar. */
   private static final int BAR_WIDTH = 20;
 
+  /**
+   * @param parent the parent command tree (the {@code /rtp} root), or {@code null}
+   */
   public BiomeActivityCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
   }

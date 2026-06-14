@@ -35,6 +35,10 @@ import java.util.logging.Level;
  */
 public final class AddonRegistry {
 
+  /** Constructs an empty registry. */
+  public AddonRegistry() {
+  }
+
   private final List<RTPAddon> addons = new CopyOnWriteArrayList<>();
   private final AtomicBoolean loaded = new AtomicBoolean(false);
 
@@ -119,6 +123,8 @@ public final class AddonRegistry {
   }
 
   /**
+   * Returns an immutable snapshot of the currently-registered addons.
+   *
    * @return an immutable snapshot of the currently-registered addons
    */
   public List<RTPAddon> registered() {

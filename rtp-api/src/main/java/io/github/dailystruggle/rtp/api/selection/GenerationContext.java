@@ -66,8 +66,7 @@ public final class GenerationContext {
    *
    * @return the biome name filter, or {@code null} if no filter is applied
    */
-    @Nullable
-    public Set<String> biomeNames() {
+    public @Nullable Set<String> biomeNames() {
         return biomeNames;
     }
 }

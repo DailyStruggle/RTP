@@ -27,6 +27,9 @@ public interface BackendStateSampler {
      * {@code serverId} parameter is the operator-configured identity from
      * {@code network.yml}; samplers must echo it back so heartbeats are
      * trivially routable to the right backend row.
+     *
+     * @param serverId the operator-configured backend server id from {@code network.yml}
+     * @return a fresh {@link BackendHeartbeat} reflecting current host state; never {@code null}
      */
     BackendHeartbeat sample(String serverId);
 }

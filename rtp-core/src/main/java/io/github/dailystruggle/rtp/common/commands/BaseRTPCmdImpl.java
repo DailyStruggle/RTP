@@ -64,7 +64,15 @@ public abstract class BaseRTPCmdImpl implements BaseRTPCmd {
    * This bridge is the only legal way for subclasses (e.g. the runtime
    * test command tree's {@code TestCmd}) to wrap the default dispatch
    * with cross-cutting behaviour such as the per-caller test-isolation
-   * semaphore (see {@code RTP_TEST_ISOLATION_PLAN.md}, Phase 1.3).
+   * semaphore.
+   *
+   * @param callerId             UUID of the command sender
+   * @param permissionCheckMethod predicate that tests a permission node for the sender
+   * @param messageMethod        consumer that sends a message to the sender
+   * @param args                 raw command arguments
+   * @param i                    current argument index
+   * @param tempParameters       per-invocation parameter overrides, or {@code null}
+   * @return a future that resolves to {@code true} on success
    */
   protected final CompletableFuture<Boolean> defaultOnCommand(
       @NotNull java.util.UUID callerId,

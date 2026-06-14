@@ -28,10 +28,17 @@ public final class ActiveTestJobs {
 
   /** Description of a running test job and the hook used to cancel it. */
   public static final class Job {
-    public final String subcommand; // e.g. "stress"
+    /** Subcommand name, e.g. {@code "stress"}. */
+    public final String subcommand;
+    /** Wall-clock start time in nanoseconds. */
     public final long startedAtNanos;
+    /** Hook invoked by {@link ActiveTestJobs#cancelOwned(UUID)} to stop this job. */
     public final Runnable canceller;
 
+    /**
+     * @param subcommand name of the test subcommand that created this job
+     * @param canceller  runnable that stops the job when invoked
+     */
     public Job(String subcommand, Runnable canceller) {
       this.subcommand = subcommand;
       this.startedAtNanos = System.nanoTime();
@@ -57,7 +64,13 @@ public final class ActiveTestJobs {
 
   private ActiveTestJobs() {}
 
-  /** Registers a job owned by {@code owner}. Returns an unregister hook. */
+  /**
+   * Registers a job owned by {@code owner}.
+   *
+   * @param owner the player or console UUID that owns the job
+   * @param job   the job to register
+   * @return an unregister hook that removes the job and fires drain listeners if the owner is now empty
+   */
   public static Runnable register(UUID owner, Job job) {
     JOBS.computeIfAbsent(owner, k -> new CopyOnWriteArrayList<>()).add(job);
     return () -> {
@@ -86,6 +99,9 @@ public final class ActiveTestJobs {
    * chain that releases its async-pool slot between subcommands. Without
    * this hook, the umbrella sweep occupies one async worker for its full
    * wall-clock duration, starving other server async work.
+   *
+   * @param owner    the player or console UUID to watch
+   * @param listener the one-shot callback to fire when the owner is drained
    */
   public static void addOnEmptyListener(UUID owner, Runnable listener) {
     if (listener == null) return;
@@ -120,6 +136,9 @@ public final class ActiveTestJobs {
    * Removes a previously-registered drain listener without firing it.
    * Used by the umbrella sweep's timeout watchdog to ensure the listener
    * cannot race the watchdog and double-advance the chain.
+   *
+   * @param owner    the player or console UUID whose listener to remove
+   * @param listener the listener to remove
    */
   public static void removeOnEmptyListener(UUID owner, Runnable listener) {
     if (listener == null) return;
@@ -133,6 +152,9 @@ public final class ActiveTestJobs {
    * Cancels every job owned by {@code owner} and returns the number
    * cancelled. Each {@code canceller} is invoked inside a try/catch so
    * one misbehaving subcommand cannot block others from being stopped.
+   *
+   * @param owner the player or console UUID whose jobs to cancel
+   * @return the number of jobs cancelled
    */
   public static int cancelOwned(UUID owner) {
     CopyOnWriteArrayList<Job> list = JOBS.remove(owner);
@@ -160,7 +182,11 @@ public final class ActiveTestJobs {
     return n;
   }
 
-  /** Cancels every job across every owner and returns the count. */
+  /**
+   * Cancels every job across every owner.
+   *
+   * @return the total number of jobs cancelled
+   */
   public static int cancelAll() {
     int n = 0;
     for (UUID owner : JOBS.keySet().toArray(new UUID[0])) {
@@ -169,7 +195,11 @@ public final class ActiveTestJobs {
     return n;
   }
 
-  /** Read-only snapshot of all active jobs, for {@code rtp test cancel} reporting. */
+  /**
+   * Read-only snapshot of all active jobs, for {@code rtp test cancel} reporting.
+   *
+   * @return an unmodifiable map from owner UUID to their active jobs
+   */
   public static Map<UUID, Collection<Job>> snapshot() {
     Map<UUID, Collection<Job>> out = new java.util.HashMap<>();
     for (Map.Entry<UUID, CopyOnWriteArrayList<Job>> e : JOBS.entrySet()) {

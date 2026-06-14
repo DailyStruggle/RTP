@@ -48,6 +48,14 @@ public final class BackendStatePublisher {
      */
     private volatile Object task;
 
+    /**
+     * Constructs a publisher that will tick at the given interval.
+     *
+     * @param transport  the network transport to publish heartbeats to; never {@code null}
+     * @param sampler    the sampler that produces each {@link BackendHeartbeat}; never {@code null}
+     * @param serverId   this backend's server id; never {@code null}
+     * @param intervalMs publish interval in milliseconds; must be &gt; 0
+     */
     public BackendStatePublisher(NetworkTransport transport,
                                  BackendStateSampler sampler,
                                  String serverId,
@@ -115,6 +123,9 @@ public final class BackendStatePublisher {
         }
     }
 
+    /** Returns this backend's server id. */
     public String serverId() { return serverId; }
+
+    /** Returns the publish interval in milliseconds. */
     public long intervalMs() { return intervalMs; }
 }
