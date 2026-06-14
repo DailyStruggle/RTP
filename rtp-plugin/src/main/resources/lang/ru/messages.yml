@@ -34,6 +34,9 @@
 # подстановка: [remainingCooldown] - оставшееся время
 сообщениеПерезарядки: "&7[P0] ⚡ Вы не можете телепортироваться снова в течение [remainingCooldown]"
 
+# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+lockedAfterUses: "&7[P0] ⌖ Вы достигли лимита случайных телепортаций. Попробуйте позже."
+
 # если у региона нет ожидающих локаций, а у игрока нет права rtp.unqueued
 нетЛокацийВОчереди: "#f5eb73[P0] ⌖ сейчас нет готовых локаций"
 
@@ -120,6 +123,10 @@ invalidCommand: "&c[P0] недопустимая команда - [arg]"
 сканированиеНеАктивно: "&c[P0] нет выполняющейся задачи сканирования для регионов: [scan_regions]"
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 статусСканирования: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 суша &8| &7ETA #7E9CC8[scan_eta]"
+# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
+# Set to empty string to disable the boss-bar.
+# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
 
 # ###############################################################################
 # Section 7: Info Command

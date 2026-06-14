@@ -1,10 +1,10 @@
-// Per ADR-022 §2 (Single-JAR Multi-Loader Packaging) this module is the
+// Per ADR-022 Â§2 (Single-JAR Multi-Loader Packaging) this module is the
 // multi-loader bootstrap: it ships both plugin.yml (Bukkit) and
 // fabric.mod.json (Fabric) in one JAR. Loom remaps only the Fabric entry-
 // point package; Bukkit-family classes retain Spigot/Paper-mapped bytecode.
 //
-// Loom is scoped here AND in :rtp-fabric:** only — never at root or in any
-// platform-free / Bukkit-family module (ADR-022 §3, MULTI_PLATFORM_PLAN
+// Loom is scoped here AND in :rtp-fabric:** only â€” never at root or in any
+// platform-free / Bukkit-family module (ADR-022 Â§3, MULTI_PLATFORM_PLAN
 // Phase 1).
 plugins {
     id 'com.gradleup.shadow'
@@ -69,8 +69,8 @@ configurations {
     // adapter's `installEffectsWiring` path (which references
     // FabricEffectsHandlerUnobf and friends) does not throw
     // NoClassDefFoundError at SERVER_STARTED time. Effects-api wiring
-    // would otherwise silently degrade — see effects-api-ADR-006 and
-    // POTENTIAL_BUGS.md `2026-05-08 — Fabric effects-api wiring leaks
+    // would otherwise silently degrade â€” see effects-api-ADR-006 and
+    // POTENTIAL_BUGS.md `2026-05-08 â€” Fabric effects-api wiring leaks
     // intermediary symbols on MC 26.1.2`.
     fabricCommonUnobfBytecode {
         canBeResolved = true
@@ -85,7 +85,7 @@ configurations {
     // FabricEffectRuntimeUnobf and the Mojmap-named LocalEffects
     // implementations consumed transitively by FabricEffectsHandlerUnobf
     // on MC 26.1.2. Same JDK-25 / Loom-1.15-unobf variant story as
-    // fabricCommonUnobfBytecode — must merge post-remap so its
+    // fabricCommonUnobfBytecode â€” must merge post-remap so its
     // `net.minecraft.*` references survive into the released jar.
     // Without this, the v26_1_R1 adapter's installEffectsWiring path
     // raises `NoClassDefFoundError:
@@ -126,18 +126,18 @@ dependencies {
     // change one, change the other.
     //
     // IMPORTANT: use modCompileOnly (not modImplementation) for fabric-loader
-    // and fabric-api. Both are provided by the Fabric runtime — fabric-loader
+    // and fabric-api. Both are provided by the Fabric runtime â€” fabric-loader
     // is the runtime itself, and fabric-api is declared as a hard `depends`
     // in fabric.mod.json so the user must install it as a separate mod in
     // mods/. Bundling them via modImplementation puts them on runtimeClasspath,
     // which Shadow then slurps into the released JAR (~5MB of nested mod jars
     // plus duplicate Loader bytecode). compileOnly keeps them on the compile
-    // classpath only — Loom still drives remapJar correctly.
+    // classpath only â€” Loom still drives remapJar correctly.
     //
     // The `minecraft` configuration cannot be compileOnly (Loom requires it),
     // so we instead subtract it from shadowJar's configurations below; that
     // strips MC server+client bytecode, fastutil, ICU4J, JNA, LWJGL, log4j,
-    // Netty, Mojang datafixers, etc. — all of which the host server provides.
+    // Netty, Mojang datafixers, etc. â€” all of which the host server provides.
     minecraft 'com.mojang:minecraft:1.21.1'
     mappings  loom.officialMojangMappings()
     modCompileOnly 'net.fabricmc:fabric-loader:0.16.5'
@@ -147,20 +147,20 @@ dependencies {
     // the only class that resolves it on a Fabric runtime.
     implementation project(':rtp-fabric:rtp-fabric-common')
 
-    // rtp-fabric-ADR-001 — version-specific Fabric adapters. RTPFabricMod.installVersionAdapter()
+    // rtp-fabric-ADR-001 â€” version-specific Fabric adapters. RTPFabricMod.installVersionAdapter()
     // resolves these by FQN at runtime via Class.forName, so the bytecode must
     // be present in the shaded jar but is never compile-time imported here.
     // Mirrors the rtp-bukkit/-paper/-folia v-submodule inclusion pattern above.
     implementation project(':rtp-fabric:rtp-fabric-v1_20_R1')
     implementation project(':rtp-fabric:rtp-fabric-v1_21_R1')
     implementation project(':rtp-fabric:rtp-fabric-v1_21_R5')
-    // :rtp-fabric:rtp-fabric-v1_21_R11 — re-enabled 2026-05-06 after rtp-fabric-ADR-007
+    // :rtp-fabric:rtp-fabric-v1_21_R11 â€” re-enabled 2026-05-06 after rtp-fabric-ADR-007
     // (Mojmap-name-decoupling) landed and the R11 adapter was ported to the new
     // wrapper-based FabricVersionAdapter SPI. RTPFabricMod.adapterFqnFor now resolves
-    // V1_21_R11FabricVersionAdapter on a 1.21.11+ runtime; on 1.21.5–1.21.10 the R5
+    // V1_21_R11FabricVersionAdapter on a 1.21.11+ runtime; on 1.21.5â€“1.21.10 the R5
     // adapter still wins. See settings.gradle and CHECKLIST-fabric-1.21.11-multiversion.md.
     implementation project(':rtp-fabric:rtp-fabric-v1_21_R11')
-    // :rtp-fabric:rtp-fabric-v26_1_R1 — re-enabled 2026-05-07 after the
+    // :rtp-fabric:rtp-fabric-v26_1_R1 â€” re-enabled 2026-05-07 after the
     // project-wide bump to fabric-loom 1.15-SNAPSHOT (settings.gradle
     // pluginManagement). With one Loom version across all subprojects
     // the LoomGradleExtension ClassCastException no longer fires, and
@@ -255,7 +255,7 @@ dependencies {
     testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     testImplementation testFixtures(project(':rtp-core'))
     testImplementation project(':rtp-folia:rtp-folia-common')
-    // C6 (CHECKLIST-metrics-and-multiserver §1.6.5) — ArchUnit guard pinning
+    // C6 (CHECKLIST-metrics-and-multiserver Â§1.6.5) â€” ArchUnit guard pinning
     // raw TPS / player-count / max-players reads to the *MetricsBinding and
     // *TpsSampler classes. rtp-plugin is the only module that aggregates
     // every platform-common bytecode on its classpath, so the guard lives
@@ -269,14 +269,12 @@ dependencies {
     compileOnly 'org.popcraft:chunky-common:1.2.217'
 
     // Bundled claim-plugin integrations (compile-only; runtime via Bukkit soft-depends).
-    compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.9'
+    compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.12'
     compileOnly 'com.sk89q.worldedit:worldedit-bukkit:7.2.15'
     compileOnly 'com.github.TechFortress:GriefPrevention:16.18.1'
-    compileOnly 'com.github.WiIIiam278:HuskTowns:1.6.2'
-    compileOnly 'com.github.LlmDl:Towny:0.97.5.0'
-    compileOnly 'com.massivecraft:Factions:1.6.9.5-U0.6.9'
+    compileOnly 'com.github.LlmDl:Towny:0.102.0.13'
     compileOnly 'com.griefdefender:api:2.1.0-SNAPSHOT'
-    compileOnly 'com.github.angeschossen:LandsAPI:6.22.0'
+    compileOnly 'com.github.IncrediblePlugins:LandsAPI:7.19.1'
     compileOnly 'br.net.fabiozumbi12.RedProtect:RedProtect-Core:7.7.3'
     compileOnly('br.net.fabiozumbi12.RedProtect:RedProtect-Spigot:7.7.3') {
         exclude group: 'com.destroystokyo.paper', module: 'paper-api'
@@ -319,7 +317,7 @@ tasks.register('copyDocs', Copy) {
     // Contributor-facing material (`docs/dev/**`, `docs/adr/**`,
     // `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `FOR_CONTRIBUTORS.md`,
     // SpigotMC `*.bbcode` listing sources, `DOCS_OPTIMIZATION_PLAN.md`, ...)
-    // is intentionally NOT bundled — it remains available in the public
+    // is intentionally NOT bundled â€” it remains available in the public
     // repository. The `docs/admin/**` tree stays in the jar so admins who
     // unzip the release can read Quick Start, Configuration, etc., without
     // needing GitHub access. The `docs/architecture/**` tree is contributor-
@@ -412,7 +410,7 @@ shadowJar {
         exclude(dependency('net.fabricmc:.*'))
     }
     // Strip Mojang asset trees and remap metadata that may sneak through
-    // any of the above (defence-in-depth — these are ~30MB combined).
+    // any of the above (defence-in-depth â€” these are ~30MB combined).
     exclude 'assets/minecraft/**'
     exclude 'data/minecraft/**'
     exclude 'mappings/**'
@@ -455,7 +453,7 @@ shadowJar {
     // remaps the ENTIRE jar's net.minecraft.* references from Mojmap to
     // intermediary. The v26_1_R1 module's bytecode is built without
     // intermediary remapping (its build.gradle uses `net.fabricmc.fabric-loom`
-    // — Loom 1.15+ unobfuscated plugin, no `mappings` line) because MC 26.1.2
+    // â€” Loom 1.15+ unobfuscated plugin, no `mappings` line) because MC 26.1.2
     // ships fully deobfuscated and has NO intermediary lookup table at runtime.
     // If its classes pass through remapJar, Mojang names like
     // `net/minecraft/server/level/ServerPlayer` get rewritten to intermediary
@@ -774,7 +772,6 @@ remapJar {
     dependsOn ':rtp-fabric:rtp-fabric-v26_1_R1:jar'
     dependsOn ':rtp-fabric:rtp-fabric-v26_2_R1:jar'
     dependsOn ':rtp-fabric:rtp-fabric-common-unobf:jar'
-    dependsOn ':effects-api:effects-api-fabric-unobf:jar'
     // Resolve carrier jars and capture the merge closure at configuration
     // time so doLast does not invoke Task.project at execution time
     // (deprecated in Gradle 9, fatal in Gradle 10).
@@ -928,7 +925,7 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
             'the v26_1_R1 / *-unobf bytecode merge onto this jar.'
 
     // The released lite artifact is `LeafRTP-<version>.jar` (unclassified, produced by
-    // `remapLiteJar` below — mirrors Pro's `shadowJar` -> `remapJar` chain). This task's
+    // `remapLiteJar` below â€” mirrors Pro's `shadowJar` -> `remapJar` chain). This task's
     // output is the pre-remap input; it carries the `-dev` classifier to avoid clashing
     // with the released artifact's filename, identical in spirit to Loom's own
     // `jar` / `remapJar` split.

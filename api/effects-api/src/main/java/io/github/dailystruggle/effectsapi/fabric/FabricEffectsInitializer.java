@@ -1,10 +1,15 @@
 package io.github.dailystruggle.effectsapi.fabric;
 
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
-import io.github.dailystruggle.effectsapi.fabric.LocalEffects.FabricParticleEffect;
-import io.github.dailystruggle.effectsapi.fabric.LocalEffects.FabricPotionEffect;
-import io.github.dailystruggle.effectsapi.fabric.LocalEffects.FabricSoundEffect;
-import io.github.dailystruggle.effectsapi.fabric.LocalEffects.FabricTitleEffect;
+import io.github.dailystruggle.effectsapi.common.effects.SoundEffect;
+import io.github.dailystruggle.effectsapi.common.effects.ParticleEffect;
+import io.github.dailystruggle.effectsapi.common.effects.PotionEffect;
+import io.github.dailystruggle.effectsapi.common.effects.TitleEffect;
+import io.github.dailystruggle.effectsapi.common.effects.GlideEffect;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.core.particles.ParticleTypes;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -44,12 +49,14 @@ public final class FabricEffectsInitializer {
     public static void registerAll() {
         if (!REGISTERED.compareAndSet(false, true)) return;
 
+        FabricHandles.register();
         // ADR-004: per-platform leaf operations live in FabricValueCoercer.
         EffectFactory.setCoercer(new FabricValueCoercer());
 
-        EffectFactory.addEffect("SOUND",    new FabricSoundEffect());
-        EffectFactory.addEffect("PARTICLE", new FabricParticleEffect());
-        EffectFactory.addEffect("TITLE",    new FabricTitleEffect());
-        EffectFactory.addEffect("POTION",   new FabricPotionEffect());
+        EffectFactory.addEffect("SOUND",    new SoundEffect(BuiltInRegistries.SOUND_EVENT.get(ResourceLocation.withDefaultNamespace("entity.player.levelup"))));
+        EffectFactory.addEffect("PARTICLE", new ParticleEffect(ParticleTypes.EXPLOSION));
+        EffectFactory.addEffect("TITLE",    new TitleEffect());
+        EffectFactory.addEffect("POTION",   new PotionEffect(MobEffects.BLINDNESS.value()));
+        EffectFactory.addEffect("GLIDE",    new GlideEffect());
     }
 }

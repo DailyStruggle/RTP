@@ -15,12 +15,20 @@ public enum IntegrationsKeys {
   rerollGriefPrevention,
   /** Whether to reroll if inside a TownyAdvanced town */
   rerollTownyAdvanced,
-  /** Whether to reroll if inside a HuskTowns town */
-  rerollHuskTowns,
-  /** Whether to reroll if inside a Factions territory */
-  rerollFactions,
+  /** Whether to reroll if inside a SaberFactions territory */
+  rerollSaberFactions,
+  /** Whether to reroll if inside Factions territory reported via the FactionsBridge API */
+  rerollFactionsBridge,
   /** Whether to reroll if inside a Lands land */
   rerollLands,
   /** Whether to reroll if inside a RedProtect region */
   rerollRedProtect,
+  /** Whether to reroll if inside a Residence claim */
+  rerollResidence,
+  /** Whether to reroll if inside a CrashClaim claim */
+  rerollCrashClaim,
+  /** Whether to reroll if inside a HuskClaims claim */
+  rerollHuskClaims,
+  /** Whether to reroll if inside KingdomsX claimed land */
+  rerollKingdomsX,
 }

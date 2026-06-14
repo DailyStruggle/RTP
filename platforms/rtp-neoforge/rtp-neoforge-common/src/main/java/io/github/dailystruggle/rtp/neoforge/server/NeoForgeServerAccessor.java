@@ -520,6 +520,47 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     }
 
     // ---------------------------------------------------------------------------
+    // Progress-bar surface (platform-neutral on-screen progress feedback)
+    //
+    // Delegates to NeoForgeProgressBars, which holds all ServerBossEvent / Component
+    // handling. Keeping the net.minecraft.network.chat.Component reference out of this
+    // class is deliberate: this accessor is instantiated by pure unit tests whose
+    // classpath does not include the full Minecraft client UI classes, and HotSpot
+    // would otherwise NoClassDefFoundError at verify time. The helper is only loaded
+    // when a bar is actually rendered at runtime.
+    // ---------------------------------------------------------------------------
+
+    /** Lazily-instantiated boss-bar renderer; created on first use to avoid eager MC UI linking. */
+    private NeoForgeProgressBars progressBars;
+
+    @Override
+    public void updateProgressBars(Map<String, io.github.dailystruggle.rtp.api.server.ProgressBar> bars) {
+        MinecraftServer s = this.server;
+        if (s == null) {
+            clearProgressBars();
+            return;
+        }
+        if (progressBars == null) progressBars = new NeoForgeProgressBars();
+        progressBars.update(s, this::eligibleViewerIds, bars);
+    }
+
+    @Override
+    public void clearProgressBars() {
+        if (progressBars != null) progressBars.clear();
+    }
+
+    /** Collects the uuids of online players who hold {@code permission} (or all if blank). */
+    private Set<UUID> eligibleViewerIds(String permission) {
+        Set<UUID> out = new HashSet<>();
+        for (RTPPlayer p : playersById.values()) {
+            if (permission == null || permission.isEmpty() || p.hasPermission(permission)) {
+                out.add(p.uuid());
+            }
+        }
+        return out;
+    }
+
+    // ---------------------------------------------------------------------------
     // Biomes / materials / block tags (typed Mojmap)
     // ---------------------------------------------------------------------------
 

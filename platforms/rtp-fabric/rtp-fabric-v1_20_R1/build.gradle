@@ -1,6 +1,6 @@
-// rtp-fabric-ADR-001 — Fabric multiversion v1_20_R1 submodule.
+// rtp-fabric-ADR-001 â€” Fabric multiversion v1_20_R1 submodule.
 //
-// Pinned to MC 1.20.1, mojmap, Loom 1.11+, Java 21. Stub adapter — bodies
+// Pinned to MC 1.20.1, mojmap, Loom 1.11+, Java 21. Stub adapter â€” bodies
 // will be ported in a follow-up Phase 2.5 task once the v1_21_R1 reference
 // implementation is exercised end-to-end.
 //
@@ -39,6 +39,6 @@ dependencies {
     api project(':rtp-core')
     api project(':commands-api')
     api project(':rtp-fabric:rtp-fabric-common')
-    // See V1_20_R1FabricEffectDispatchers — Loom-compiled effect dispatchers.
+    // See V1_20_R1FabricEffectDispatchers â€” Loom-compiled effect dispatchers.
     compileOnly project(':effects-api')
 }

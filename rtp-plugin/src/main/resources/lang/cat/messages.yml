@@ -43,6 +43,9 @@ spooky: "&7[P0] ⌖ could not find a safe paw-spot within [attempts] attempts"
 # placeholder: [remainingCooldown] - the remaining time
 nap_message: "&7[P0] ⚡ you can't pounce again for [remainingCooldown]. nap first."
 
+# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+lockedAfterUses: "&7[P0] ⌖ You're all out of zoomies for now. Nap a bit and pounce again later."
+
 # no warm spots ready
 no_warm_spots_left: "#f5eb73[P0] ⌖ no warm spots ready at this time"
 
@@ -129,6 +132,10 @@ sniffing_now: "&c[P0] already sniffing territories: [scan_regions]"
 not_sniffing: "&c[P0] not sniffing territories: [scan_regions]"
 # placeholders: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 sniff_status: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 sniffs/s &8| #7E9CC8[scan_landPercentage]%&7 land smell &8| &7ETA #7E9CC8[scan_eta]"
+# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
+# Set to empty string to disable the boss-bar.
+# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+sniff_bar: "Sniffing [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% warm-spots) ETA [scan_eta]"
 
 # ###############################################################################
 # Section 7: Info (Meow) Command

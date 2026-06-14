@@ -51,6 +51,36 @@ public final class BStatsChartIds {
   public static final String CHUNK_LOAD_BACKLOG_PRESSURE = "chunk_load_backlog_pressure";
   public static final String QUEUE_DEPTH_PRESSURE = "queue_depth_pressure";
 
+  // --- Players per server (bucketised online player count) ---
+  // AdvancedPie reporting the bucketised count of online players on the host
+  // server. Bucketised (never a raw player count) so a long-lived or uniquely-
+  // sized server cannot be fingerprinted by an exact population figure; the
+  // fleet dashboard still gets a population-size distribution.
+  public static final String PLAYER_COUNT_BUCKETS = "player_count_buckets";
+
+  // --- RTP scheduler cost per RTP (sync/region vs async) ---
+  // Two AdvancedPies reporting the bucketised wall-clock cost RTP's own
+  // scheduler spends per RTP served, split by submission family: the
+  // main-thread / region tasks ("sync") and the asynchronous tasks ("async").
+  // Driven by RtpSchedulerProfile (which only ever times RTP-submitted work, so
+  // it is RTP-attributable cost, unlike whole-server MSPT) over a rolling
+  // ~30-minute window in 1-minute delta buckets. Bucketised (never a raw timing
+  // or RTP count) so the per-server cost can't be fingerprinted.
+  public static final String RTP_SYNC_COST_PER_RTP = "rtp_sync_cost_per_rtp";
+  public static final String RTP_ASYNC_COST_PER_RTP = "rtp_async_cost_per_rtp";
+
+  // --- Chunk-load floor (smallest single-chunk load time), by chunk-load mode ---
+  // DrilldownPie: outer slice = how this backend loads chunks (sync / async,
+  // assumed from the detected platform rather than runtime-probed), inner slice
+  // = the bucketised smallest single-chunk live-load wall-clock time ever
+  // observed on this server. We never see exactly when the platform begins a
+  // load after it is requested, so the running minimum is taken as the assumed
+  // shortest time to start and complete a load (the "floor"). Driven by
+  // ChunkLoadProfile, which only times genuine live loads (not anvil-prefilter
+  // short-circuits or already-resident chunks). Both levels are categorical /
+  // bucketised, so no raw timing is ever emitted.
+  public static final String CHUNK_LOAD_FLOOR_MS = "chunk_load_floor_ms";
+
   // --- M2 Runtime health (added 2026-05-17, Section C / row C4) ---
   // Additive only: existing IDs above are unchanged. These charts consume the
   // same MetricsSnapshot already populated on every platform (Paper, Bukkit,

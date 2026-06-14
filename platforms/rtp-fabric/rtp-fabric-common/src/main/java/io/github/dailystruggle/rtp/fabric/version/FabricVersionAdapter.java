@@ -1,12 +1,15 @@
 package io.github.dailystruggle.rtp.fabric.version;
 
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.api.server.ProgressBar;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 /**
  * Per-MC-version SPI for the Fabric platform — see rtp-fabric-ADR-001 and
@@ -616,5 +619,50 @@ public interface FabricVersionAdapter {
      */
     default boolean supportsMapCharts() {
         return false;
+    }
+
+    // -------------------------------------------------------------------------
+    // On-screen progress bars (world-scan boss-bar). Same per-version rationale
+    // as the effects / map seams above: the obf carrier's typed
+    // {@code net.minecraft.server.level.ServerBossEvent} calls in
+    // {@code FabricServerAccessor#updateProgressBars} are Loom-remapped to
+    // intermediary and do not link on the deobf MC 26.x runtime, so they
+    // silently no-op there. A per-version adapter compiled against the live
+    // (mojmap) runtime can render the bar through the unobf carrier instead,
+    // restoring parity with the 1.20/1.21 family.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Whether this adapter renders on-screen progress bars itself (via the
+     * unobf carrier). When {@code true}, {@code FabricServerAccessor} routes
+     * {@code updateProgressBars}/{@code clearProgressBars} through this adapter
+     * instead of its own obf {@code ServerBossEvent} path. Default {@code false}
+     * so the 1.20/1.21 carriers keep using the obf path unchanged.
+     */
+    default boolean supportsProgressBars() {
+        return false;
+    }
+
+    /**
+     * Reconcile the displayed progress bars against {@code bars} (an empty or
+     * {@code null} map clears all bars). The {@code server} argument is the raw
+     * NM {@code MinecraftServer}; {@code eligibleViewers} maps a viewer-permission
+     * string to the set of online uuids that may see a bar (blank/{@code null}
+     * permission = everyone). Only invoked when {@link #supportsProgressBars()}
+     * returns {@code true}. Default no-op.
+     */
+    default void dispatchProgressBars(Object server,
+                                      Map<String, ProgressBar> bars,
+                                      Function<String, Set<UUID>> eligibleViewers) {
+        // no-op — adapters that ship an unobf boss-bar renderer override this.
+    }
+
+    /**
+     * Hide and discard every progress bar previously shown via
+     * {@link #dispatchProgressBars}. Only invoked when
+     * {@link #supportsProgressBars()} returns {@code true}. Default no-op.
+     */
+    default void clearProgressBars() {
+        // no-op — adapters that ship an unobf boss-bar renderer override this.
     }
 }

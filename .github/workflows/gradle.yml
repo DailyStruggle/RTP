@@ -2,9 +2,9 @@ name: Java CI with Gradle
 
 on:
   push:
-    branches: [ main ]
+    branches: [ V3, V2, V1, main ]
   pull_request:
-    branches: [ main ]
+    branches: [ V3, V2, V1, main ]
   workflow_dispatch:
 
 jobs:
@@ -20,9 +20,6 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: gradle
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
 
       - name: Check traceability
         run: ./check_traceability.sh

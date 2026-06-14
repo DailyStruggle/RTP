@@ -185,6 +185,32 @@ public interface RTPCmd extends BaseRTPCmd {
       }
     }
 
+    // --------------------------------------------------------------------------------------------------------------
+    // BetterRTP LockAfter parity: per-player usage cap. Inert unless lockAfterUses > 0;
+    // bypassed by rtp.nolock. The counter is incremented on a successful teleport in
+    // TeleportPipelineTask; here we only reject when the player is already locked out.
+    if (!hasSubCommand && !sender.hasPermission("rtp.nolock")) {
+      ConfigParser<ConfigKeys> cfg =
+              (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+      if (cfg != null) {
+        long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
+        if (cap > 0) {
+          long resetMillis =
+                  cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
+          if (RTP.getInstance().usageCaps.isLocked(
+                  senderId, cap, resetMillis, System.currentTimeMillis())) {
+            ConfigParser<MessagesKeys> langParser =
+                    (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+            String msg = (String) langParser.getConfigValue(MessagesKeys.lockedAfterUses, "");
+            messageMethod.accept(msg);
+            RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT lockAfterUses senderId="
+                    + senderId + " cap=" + cap);
+            return true;
+          }
+        }
+      }
+    }
+
     if (RTP.reloading.get()) {
       ConfigParser<MessagesKeys> langParser =
               (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);

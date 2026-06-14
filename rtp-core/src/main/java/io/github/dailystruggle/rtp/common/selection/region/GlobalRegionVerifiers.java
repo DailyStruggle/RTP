@@ -120,7 +120,12 @@ public class GlobalRegionVerifiers {
                         return CompletableFuture.completedFuture(false);
                     }
                 } catch (Throwable throwable) {
+                    // Fail safe: a throwing verifier is logged at WARNING and the location is
+                    // rejected (treated as false), never silently accepted (REQ-RTP-S-004).
+                    // This mirrors the async-verifier path below and the documented contract
+                    // in docs/dev/EXTERNAL_HOOKS.md.
                     RTP.log(Level.WARNING, "Global region verifier threw an exception", throwable);
+                    return CompletableFuture.completedFuture(false);
                 }
             }
 

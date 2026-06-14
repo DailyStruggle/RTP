@@ -37,6 +37,9 @@ inseguro: "&7[P0] ⌖ no se encontró una ubicación segura en [attempts] intent
 # marcador: [remainingCooldown] - el tiempo restante
 mensajeEnfriamiento: "&7[P0] ⚡ No puedes teletransportarte otra vez hasta dentro de [remainingCooldown]"
 
+# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+lockedAfterUses: "&7[P0] ⌖ Has alcanzado tu límite de teletransporte aleatorio. Inténtalo de nuevo más tarde."
+
 # si la región no tiene ubicaciones en cola y el jugador no tiene el permiso rtp.unqueued
 sinUbicacionesEnCola: "#f5eb73[P0] ⌖ no hay ubicaciones listas en este momento"
 
@@ -115,6 +118,10 @@ escaneoActivo: "&c[P0] ya hay una tarea de escaneo en curso para las regiones: [
 escaneoNoActivo: "&c[P0] no hay ninguna tarea de escaneo en curso para las regiones: [scan_regions]"
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 estadoEscaneo: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 tierra &8| &7ETA #7E9CC8[scan_eta]"
+# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
+# Set to empty string to disable the boss-bar.
+# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
 
 # ###############################################################################
 # Sección 7: Comando Info

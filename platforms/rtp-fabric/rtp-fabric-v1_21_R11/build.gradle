@@ -1,10 +1,10 @@
-// rtp-fabric-ADR-001 — Fabric multiversion v1_21_R11 submodule.
-// rtp-fabric-ADR-007 — TicketType refactor at MC 1.21.11.
+// rtp-fabric-ADR-001 â€” Fabric multiversion v1_21_R11 submodule.
+// rtp-fabric-ADR-007 â€” TicketType refactor at MC 1.21.11.
 //
 // Pinned to MC 1.21.11, mojmap, Loom 1.11+, Java 21. Covers MC 1.21.11
 // onward (until the next breaking ChunkTicketType / ServerChunkCache
 // change). Mojang refactored ChunkTicketType from a record
-// (long timeout, boolean persist, TicketUse use) [1.21.5–1.21.10] into
+// (long timeout, boolean persist, TicketUse use) [1.21.5â€“1.21.10] into
 // (long expiryTicks, int flags) [1.21.11+], where `flags` is a bitfield
 // over five named constants (SERIALIZE, FOR_LOADING, FOR_SIMULATION,
 // RESETS_IDLE_TIMEOUT, CAN_EXPIRE_BEFORE_LOAD). The R5 adapter cannot
@@ -15,7 +15,7 @@ plugins {
 }
 
 ext {
-    // Per fabricmc.net release notes (2025-12-05): MC 1.21.11 → Loom 1.14,
+    // Per fabricmc.net release notes (2025-12-05): MC 1.21.11 â†’ Loom 1.14,
     // Fabric Loader 0.18.1, Fabric API 0.136.0+1.21.11. Loom version is
     // controlled centrally in settings.gradle's `pluginManagement` block;
     // changing it project-wide risks breaking the v1_21_R5 / v1_21_R1 /

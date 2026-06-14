@@ -6,8 +6,8 @@ Bundled `Effect<T>` implementations. Registered automatically in `EffectFactory`
 
 | Name (registry key) | Class | Enum keys (`setData(String...)` order) | Version gate | `run()` calls |
 |---|---|---|---|---|
-| `FIREWORK` | `FireworkEffect` | `TYPE, NUMBER, POWER, DX, DY, DZ, COLOR, FADE, FLICKER, TRAIL, SAFE` | — | `World#spawnEntity(FIREWORK)` + `FireworkSafetyListener.addFirework` |
-| `NOTE`     | `NoteEffect` (>=1.17) / `NoteEffect_1_12` (<1.17) | `TYPE, TONE` | ≥1.17 vs <1.17 | `World#playNote` |
+| `FIREWORK` | `common.effects.FireworkEffect` | `TYPE, NUMBER, POWER, DX, DY, DZ, COLOR, FADE, FLICKER, TRAIL, SAFE` | — | `PlayerHandle/LocationHandle#spawnFirework` (Bukkit handle does `World#spawnEntity(FIREWORK)` + `FireworkSafetyListener.addFirework`) |
+| `NOTE`     | `common.effects.NoteEffect` | `TYPE, TONE` | — | `PlayerHandle/LocationHandle#playNote` |
 | `PARTICLE` | `ParticleEffect` | `TYPE, NUMBER` | **≥1.9 only** | `World#spawnParticle` |
 | `POTION`   | `PotionEffect`   | `TYPE, DURATION, AMPLIFIER, AMBIENT, PARTICLES, ICON` | — | `LivingEntity#addPotionEffect` |
 | `SOUND`    | `SoundEffect`    | `TYPE, VOLUME, PITCH, DX, DY, DZ` | — | `World#playSound` |

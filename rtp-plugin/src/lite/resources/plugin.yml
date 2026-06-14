@@ -31,7 +31,7 @@ description: 'Random teleport, lite edition (no SQL; basic Folia support) -- see
 # CombatLogX / PvPManager / SimpleCombatLog are listed so the PvP gate's bundled
 # combat-tag adapters (ADR-055) can resolve those plugins' API classes at runtime
 # (Paper/Folia gates cross-plugin class access behind a declared dependency).
-softdepend: [ Vault, GriefDefender, GriefPrevention, Towny, HuskTowns, Factions, Lands, RedProtect, WorldGuard, CombatLogX, PvPManager, SimpleCombatLog ]
+softdepend: [ Vault, GriefDefender, GriefPrevention, Towny, Factions, FactionsBridge, Lands, RedProtect, Residence, CrashClaim, HuskClaims, Kingdoms, WorldGuard, CombatLogX, PvPManager, SimpleCombatLog ]
 # Basic Folia support (ADR-024 / ADR-061): the free build ships a correctness-first
 # regionized scheduler (FoliaAwareScheduler) + async teleport in the Paper adapter so it
 # runs on Folia. The tuned, throughput-optimized rtp-folia adapter stays a LeafRTP-Pro

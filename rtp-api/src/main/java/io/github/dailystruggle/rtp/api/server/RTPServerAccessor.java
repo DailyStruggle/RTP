@@ -635,6 +635,40 @@ public interface RTPServerAccessor {
   double getTPS(int ticks);
 
   // ---------------------------------------------------------------------------
+  // Progress-bar surface (platform-neutral on-screen progress feedback)
+  //
+  // Used by long-running operations (e.g. world scans) to surface progress to
+  // players without coupling the core / neutral adapters to any platform UI
+  // type (Bukkit {@code BossBar}, action bar, etc.). The default
+  // implementations are no-ops so platforms with no progress-bar surface
+  // (or pre-init callers) degrade gracefully.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Shows or updates a set of progress bars, keyed by a stable, caller-chosen id.
+   *
+   * <p>Each call reconciles the displayed bars against {@code bars}: ids present in the map
+   * are created or updated, and any bar previously shown via this method whose id is absent
+   * from {@code bars} is hidden and discarded. Passing an empty map hides every bar (the same
+   * effect as {@link #clearProgressBars()}).
+   *
+   * <p>Each {@link ProgressBar} carries its title (which may contain legacy/hex color codes),
+   * its fill fraction, and the permission a viewer must hold. The platform implementation owns
+   * all rendering decisions (color extraction, title sanitising, per-viewer visibility).
+   *
+   * <p><b>Threading:</b> implementations may require this to be called on the primary thread.
+   *
+   * @param bars desired bar state keyed by stable id; must not be {@code null}
+   */
+  default void updateProgressBars(Map<String, ProgressBar> bars) {}
+
+  /**
+   * Hides and discards every progress bar previously shown via
+   * {@link #updateProgressBars(Map)}.
+   */
+  default void clearProgressBars() {}
+
+  // ---------------------------------------------------------------------------
   // Menu platform surface (ADR-048)
   //
   // Default implementations are conservative; platform adapters should override

@@ -1,9 +1,14 @@
-# --- Configurações de integração do RTP ---
-# Cada opção sorteia o destino novamente se ele cair dentro de um claim/região do plugin indicado (ativa apenas se esse plugin estiver instalado).
-# Sorteia a localização novamente se ela cair dentro de um claim do Factions.
+# Reroll the location if it lands inside a SaberFactions claim.
 # @type: boolean
 # @default: false
-rerollFactions: false
+rerollSaberFactions: false
+
+# Reroll the location if it lands inside Factions territory reported via the FactionsBridge API.
+# FactionsBridge bridges many Factions forks (FactionsUUID, SaberFactions, FactionsX, KingdomsX, ...)
+# behind one API; enable this when the FactionsBridge plugin is installed.
+# @type: boolean
+# @default: false
+rerollFactionsBridge: false
 
 # Sorteia a localização novamente se ela cair dentro de um claim do GriefDefender.
 # @type: boolean
@@ -15,11 +20,6 @@ rerollGriefDefender: false
 # @default: false
 rerollGriefPrevention: false
 
-# Sorteia a localização novamente se ela cair dentro de um claim do HuskTowns.
-# @type: boolean
-# @default: false
-rerollHuskTowns: false
-
 # Sorteia a localização novamente se ela cair dentro de um claim do Lands.
 # @type: boolean
 # @default: false
@@ -29,6 +29,26 @@ rerollLands: false
 # @type: boolean
 # @default: false
 rerollRedProtect: false
+
+# Reroll the location if it lands inside a Residence claim.
+# @type: boolean
+# @default: false
+rerollResidence: false
+
+# Reroll the location if it lands inside a CrashClaim claim.
+# @type: boolean
+# @default: false
+rerollCrashClaim: false
+
+# Reroll the location if it lands inside a HuskClaims claim.
+# @type: boolean
+# @default: false
+rerollHuskClaims: false
+
+# Reroll the location if it lands inside KingdomsX claimed land.
+# @type: boolean
+# @default: false
+rerollKingdomsX: false
 
 # Sorteia a localização novamente se ela cair dentro de um claim do Towny Advanced.
 # @type: boolean

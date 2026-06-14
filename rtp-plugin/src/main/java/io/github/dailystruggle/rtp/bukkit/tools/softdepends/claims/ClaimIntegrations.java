@@ -72,9 +72,13 @@ public final class ClaimIntegrations {
     // this site auditable per docs/dev/EXTERNAL_HOOKS.md.
     RegionVerifierRegistry verifiers = RTPAPI.hooks().verifiers();
 
-    if (flag(configParser, IntegrationsKeys.rerollFactions)
+    if (flag(configParser, IntegrationsKeys.rerollSaberFactions)
         && Bukkit.getPluginManager().isPluginEnabled("Factions")) {
-      verifiers.register(loc -> !FactionsChecker.isInClaim(loc));
+      verifiers.register(loc -> !SaberFactionsChecker.isInClaim(loc));
+    }
+    if (flag(configParser, IntegrationsKeys.rerollFactionsBridge)
+        && Bukkit.getPluginManager().isPluginEnabled("FactionsBridge")) {
+      verifiers.register(loc -> !FactionsBridgeChecker.isInClaim(loc));
     }
     if (flag(configParser, IntegrationsKeys.rerollGriefDefender)
         && Bukkit.getPluginManager().isPluginEnabled("GriefDefender")) {
@@ -88,13 +92,25 @@ public final class ClaimIntegrations {
         && Bukkit.getPluginManager().isPluginEnabled("Lands")) {
       verifiers.register(loc -> !LandsChecker.isInClaim(loc));
     }
-    if (flag(configParser, IntegrationsKeys.rerollHuskTowns)
-        && Bukkit.getPluginManager().isPluginEnabled("HuskTowns")) {
-      verifiers.register(loc -> !HuskTownsChecker.isInClaim(loc));
-    }
     if (flag(configParser, IntegrationsKeys.rerollRedProtect)
         && Bukkit.getPluginManager().isPluginEnabled("RedProtect")) {
       verifiers.register(loc -> !RedProtectChecker.isInClaim(loc));
+    }
+    if (flag(configParser, IntegrationsKeys.rerollResidence)
+        && Bukkit.getPluginManager().isPluginEnabled("Residence")) {
+      verifiers.register(loc -> !ResidenceChecker.isInClaim(loc));
+    }
+    if (flag(configParser, IntegrationsKeys.rerollCrashClaim)
+        && Bukkit.getPluginManager().isPluginEnabled("CrashClaim")) {
+      verifiers.register(loc -> !CrashClaimChecker.isInClaim(loc));
+    }
+    if (flag(configParser, IntegrationsKeys.rerollHuskClaims)
+        && Bukkit.getPluginManager().isPluginEnabled("HuskClaims")) {
+      verifiers.register(loc -> !HuskClaimsChecker.isInClaim(loc));
+    }
+    if (flag(configParser, IntegrationsKeys.rerollKingdomsX)
+        && Bukkit.getPluginManager().isPluginEnabled("Kingdoms")) {
+      verifiers.register(loc -> !KingdomsXChecker.isInClaim(loc));
     }
     if (flag(configParser, IntegrationsKeys.rerollTownyAdvanced)
         && Bukkit.getPluginManager().isPluginEnabled("Towny")) {

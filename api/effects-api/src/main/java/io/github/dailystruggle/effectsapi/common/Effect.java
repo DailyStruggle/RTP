@@ -203,10 +203,17 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
             // effectsapi.common stays free of net.minecraft.* imports.
             if (n.equals("net.minecraft.class_1297")) return true;
             if (n.equals("net.minecraft.class_243")) return true;
+
+            // Platform-neutral handles (effects-api-ADR-007)
+            if (n.equals("io.github.dailystruggle.effectsapi.common.spi.PlayerHandle")) return true;
+            if (n.equals("io.github.dailystruggle.effectsapi.common.spi.LocationHandle")) return true;
+
             for (Class<?> i : c.getInterfaces()) {
                 String in = i.getName();
                 if (in.equals("org.bukkit.entity.Entity")) return true;
                 if (in.equals("org.bukkit.Location")) return true;
+                if (in.equals("io.github.dailystruggle.effectsapi.common.spi.PlayerHandle")) return true;
+                if (in.equals("io.github.dailystruggle.effectsapi.common.spi.LocationHandle")) return true;
             }
         }
         return false;

@@ -33,7 +33,7 @@ From `RTPHooks` you reach every behavior-modification registry in one place. Dir
 | **When invoked** | Every per-attempt verification pass (`PregenTask`, `QueueTask`, `ScanTask`). |
 | **Threading** | Sync verifiers run on the verification chain — non-blocking. Async verifiers return a `CompletableFuture` and may do off-thread I/O but shall not block a region/tick thread. |
 | **Failure mode** | A throwing verifier is logged at WARNING and treated as `false` (location rejected). RTP does not silently swallow failures (REQ-RTP-S-004). |
-| **Producers (today)** | `softdepends/claims/{Factions,GriefDefender,GriefPrevention,HuskTowns,Lands,RedProtect,TownyAdvanced,WorldGuard}Checker` via `ClaimIntegrations`; `addons/RTP_ExampleAddon`; `addons/RTP_Glide`. |
+| **Producers (today)** | `softdepends/claims/{SaberFactions,FactionsBridge,GriefDefender,GriefPrevention,Lands,RedProtect,Residence,CrashClaim,HuskClaims,KingdomsX,TownyAdvanced,WorldGuard}Checker` via `ClaimIntegrations` (`SaberFactionsChecker`, `FactionsBridgeChecker`, `ResidenceChecker`, `CrashClaimChecker`, `HuskClaimsChecker`, and `KingdomsXChecker` resolve their plugin APIs reflectively, so they carry no compile-only dependency); `addons/RTP_ExampleAddon`; `addons/RTP_Glide`. |
 | **REQ / S-rule** | REQ-RTP-S-003, REQ-API-F-003. |
 | **Backward compat** | Legacy static methods on `GlobalRegionVerifiers` continue to work and are bidirectional with the new registry. |
 

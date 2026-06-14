@@ -303,8 +303,9 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
 
     // Step 10: bundled claim-plugin integrations (ADR-019). Lite registers the
     // claim-plugin verifiers identically to the full bootstrap: each enabled
-    // soft-dep (Lands, GriefDefender, GriefPrevention, Towny, HuskTowns,
-    // Factions, RedProtect, WorldGuard) contributes a GlobalRegionVerifier.
+    // soft-dep (Lands, GriefDefender, GriefPrevention, Towny,
+    // Factions, SaberFactions, FactionsBridge, RedProtect, Residence, CrashClaim,
+    // HuskClaims, KingdomsX, WorldGuard) contributes a GlobalRegionVerifier.
     // Vault/economy is wired here identically to the full bootstrap: when Vault
     // is present and no economy provider is bound yet, bind VaultChecker through
     // the public RTPHooks facade. Lite ships economy.yml, so optional per-region

@@ -65,12 +65,10 @@ dependencies {
     compileOnly "me.lucko:fabric-permissions-api:${permissionsApiVersion}"
 
     // The unobf carrier names types from effects-api's common/ SPI
-    // (Effect, EffectFactory, EffectRuntime, …) and from rtp-api
-    // (RTPPlayer, RTPLocation). compileOnly keeps both edges off this
-    // module's runtime classpath; the actual runtime consumer is
-    // :rtp-fabric:rtp-fabric-common-unobf, which brings effects-api +
-    // rtp-api in via its own classpath. See effects-api-ADR-006 §
-    // `effects-api/effects-api-fabric-unobf/build.gradle` shape.
+    // (Effect, EffectFactory, EffectRuntime, the common/effects/* leaves, …).
+    // compileOnly keeps that edge off this module's runtime classpath; the
+    // actual runtime consumer is :rtp-fabric:rtp-fabric-common-unobf, which
+    // brings effects-api in via its own classpath. The rtp-api edge was
+    // dropped with the handle-SPI decoupling (zero rtp references here now).
     compileOnly project(':effects-api')
-    compileOnly project(':rtp-api')
 }

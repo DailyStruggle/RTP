@@ -507,6 +507,13 @@ public class RTP {
 
   public final ConcurrentHashMap<UUID, TeleportData> priorTeleportData = new ConcurrentHashMap<>();
   public final ConcurrentHashMap<UUID, TeleportData> latestTeleportData = new ConcurrentHashMap<>();
+  /**
+   * Per-player rolling usage-cap state backing the BetterRTP {@code LockAfter}
+   * parity feature ({@code lockAfterUses} / {@code lockAfterResetSeconds}).
+   * Inert while {@code lockAfterUses <= 0}.
+   */
+  public final io.github.dailystruggle.rtp.common.playerData.UsageCapTracker usageCaps =
+      new io.github.dailystruggle.rtp.common.playerData.UsageCapTracker();
   public final ConcurrentSkipListSet<UUID> processingPlayers = new ConcurrentSkipListSet<>();
   public RTPTaskPipe miscSyncTasks;
   public RTPTaskPipe miscAsyncTasks;
@@ -523,9 +530,28 @@ public class RTP {
    */
   public io.github.dailystruggle.rtp.common.network.RTPNetworkManager networkManager;
 
+  /**
+   * Wraps the installed platform {@link #scheduler} in a {@link io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler}
+   * so the wall-clock cost of RTP's own sync/async tasks is attributable. Idempotent:
+   * never double-wraps if a previous instance already installed the decorator. Kept
+   * static so the write to the static {@code scheduler} field is not performed from an
+   * instance method.
+   */
+  private static synchronized void installProfilingScheduler() {
+    if (!(scheduler instanceof io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler)) {
+      scheduler = new io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler(scheduler);
+    }
+  }
+
   public RTP() {
     if (serverAccessor == null) throw new IllegalStateException("null serverAccessor");
     if (scheduler == null) throw new IllegalStateException("null scheduler");
+
+    // Wrap the platform scheduler in a profiling decorator so the wall-clock cost
+    // of RTP's own sync (main-thread / region) and async tasks is attributable
+    // and reportable, independent of whole-server MSPT. Idempotent: never
+    // double-wrap if a previous instance already installed one.
+    installProfilingScheduler();
 
     // Install the active scheduler into RTPRunnable so tasks can self-dispatch onto the
     // correct thread via RTPRunnable#schedule() (entity/region/async routing).
@@ -632,6 +658,12 @@ public class RTP {
 
     long syncTime = TimeUnit.MILLISECONDS.toNanos(5);
     trackedTasks.add(scheduler.runTaskTimer(new io.github.dailystruggle.rtp.common.tasks.tick.SyncTaskProcessing(syncTime), 1, 1));
+
+    // Drive the world-scan on-screen progress bar from a platform-neutral main/server-thread
+    // timer (once per second). The platform RTPServerAccessor renders it (boss-bar on
+    // Bukkit/Fabric/NeoForge, no-op elsewhere); an empty scanBossBar template disables it.
+    trackedTasks.add(scheduler.runTaskTimer(
+        io.github.dailystruggle.rtp.common.tasks.tick.ScanProgressBars::update, 20, 20));
 
     long asyncTime = TimeUnit.MILLISECONDS.toNanos(25); // Bumped to 5ms since async has more headroom
     trackedTasks.add(scheduler.runTaskTimerAsynchronously(new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(asyncTime), 1, 1));

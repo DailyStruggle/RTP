@@ -108,6 +108,39 @@ public final class V26_1_R1FabricVersionAdapter implements FabricVersionAdapter 
         return true;
     }
 
+    // -------------------------------------------------------------------------
+    // On-screen progress bars (world-scan boss-bar) — rendered through the unobf
+    // carrier so the typed ServerBossEvent calls link on the deobf 26.1.x
+    // runtime where the obf carrier's intermediary-remapped path no-ops.
+    // -------------------------------------------------------------------------
+
+    /** Lazily-created unobf boss-bar renderer; holds the active-bar state. */
+    private io.github.dailystruggle.rtp.fabric.unobf.server.FabricProgressBarsUnobf progressBars;
+
+    @Override
+    public boolean supportsProgressBars() {
+        return true;
+    }
+
+    @Override
+    public void dispatchProgressBars(Object server,
+                                     java.util.Map<String, io.github.dailystruggle.rtp.api.server.ProgressBar> bars,
+                                     java.util.function.Function<String, java.util.Set<java.util.UUID>> eligibleViewers) {
+        if (!(server instanceof MinecraftServer mc)) {
+            clearProgressBars();
+            return;
+        }
+        if (progressBars == null) {
+            progressBars = new io.github.dailystruggle.rtp.fabric.unobf.server.FabricProgressBarsUnobf();
+        }
+        progressBars.update(mc, eligibleViewers, bars);
+    }
+
+    @Override
+    public void clearProgressBars() {
+        if (progressBars != null) progressBars.clear();
+    }
+
     /**
      * Typed mojmap implementation of {@link FabricVersionAdapter#extractPlayerFromConnection}.
      * MC 26.x exposes {@code ServerGamePacketListenerImpl#getPlayer()}; no reflection.

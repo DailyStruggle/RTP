@@ -44,6 +44,9 @@ unsafe: "&7[P0] ⌖ could not find a safe location within [attempts] attempts"
 # placeholder: [remainingCooldown] - the remaining time
 cooldownMessage: "&7[P0] ⚡ You can't teleport again for [remainingCooldown]"
 
+# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+lockedAfterUses: "&7[P0] ⌖ You have reached your random-teleport limit. Please try again later."
+
 # if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
 noLocationsQueued: "#f5eb73[P0] ⌖ no locations ready at this time"
 
@@ -130,6 +133,13 @@ scanRunning: "&c[P0] scan task already running for regions: [scan_regions]"
 scanNotRunning: "&c[P0] scan task not running for regions: [scan_regions]"
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 land &8| &7ETA #7E9CC8[scan_eta]"
+# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
+# Set to empty string to disable the boss-bar.
+# The bar's color is taken from the first legacy color code in this value:
+#   &c/&4 = red, &e/&6 = yellow, &a/&2 = green, &9/&1/&3/&b = blue,
+#   &5 = purple, &d = pink, &f/&7/&8/&0 = white. Defaults to green if none.
+# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+scanBossBar: "&aScanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
 
 # ###############################################################################
 # Section 7: Info Command

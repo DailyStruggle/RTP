@@ -2016,6 +2016,194 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   }
 
   // ---------------------------------------------------------------------------
+  // Progress-bar surface (platform-neutral on-screen progress feedback)
+  //
+  // Renders RTPServerAccessor#updateProgressBars / #clearProgressBars as vanilla
+  // ServerBossEvents. The platform-agnostic caller (core ScanProgressBars) supplies
+  // only ProgressBar value objects; all ServerBossEvent / color / player handling
+  // lives here so no Minecraft UI type leaks into core or the neutral adapters.
+  //
+  // Typed net.minecraft calls are Loom-remapped to intermediary for the 1.20/1.21
+  // runtime family. On the deobf MC 26.x runtime the remapped descriptors may not
+  // resolve; every path is wrapped so a failure degrades to "no bar shown" rather
+  // than throwing (S-004 does not apply: this is non-essential progress feedback,
+  // not a teleport outcome).
+  // ---------------------------------------------------------------------------
+
+  /** Active boss-bars keyed by caller-chosen id. Accessed only on the server thread. */
+  private final Map<String, net.minecraft.server.level.ServerBossEvent> activeProgressBars =
+      new java.util.HashMap<>();
+
+  @Override
+  public void updateProgressBars(Map<String, io.github.dailystruggle.rtp.api.server.ProgressBar> bars) {
+    if (bars == null || bars.isEmpty()) {
+      clearProgressBars();
+      return;
+    }
+    MinecraftServer s = server;
+    if (s == null) return;
+
+    // Deobf MC 26.x carrier: the typed ServerBossEvent calls below are Loom-remapped
+    // to intermediary descriptors that don't resolve on the deobf runtime, so they
+    // silently no-op there. When the active per-version adapter ships an unobf
+    // boss-bar renderer (mojmap-typed), route through it instead to preserve parity.
+    io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+        io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+    if (adapter != null && adapter.supportsProgressBars()) {
+      try {
+        adapter.dispatchProgressBars(s, bars, this::eligibleViewerIds);
+      } catch (Throwable t) {
+        log(Level.FINER, "[RTP][Fabric] adapter scan progress bar update skipped: "
+            + t.getClass().getSimpleName() + ": " + t.getMessage());
+      }
+      return;
+    }
+
+    try {
+      // Hide bars that are no longer requested.
+      Set<String> stale = new HashSet<>();
+      for (String id : activeProgressBars.keySet()) {
+        if (!bars.containsKey(id)) stale.add(id);
+      }
+      for (String id : stale) {
+        net.minecraft.server.level.ServerBossEvent bar = activeProgressBars.remove(id);
+        if (bar != null) bar.removeAllPlayers();
+      }
+
+      for (Map.Entry<String, io.github.dailystruggle.rtp.api.server.ProgressBar> entry : bars.entrySet()) {
+        String id = entry.getKey();
+        io.github.dailystruggle.rtp.api.server.ProgressBar spec = entry.getValue();
+        if (spec == null) continue;
+
+        net.minecraft.world.BossEvent.BossBarColor color = barColorFromTemplate(spec.title());
+        String title = sanitizeBarTitle(spec.title());
+        float progress = (float) Math.max(0.0, Math.min(1.0, spec.progress()));
+
+        net.minecraft.server.level.ServerBossEvent bar = activeProgressBars.get(id);
+        if (bar == null) {
+          bar = new net.minecraft.server.level.ServerBossEvent(
+              net.minecraft.network.chat.Component.literal(title),
+              color,
+              net.minecraft.world.BossEvent.BossBarOverlay.PROGRESS);
+          activeProgressBars.put(id, bar);
+        } else {
+          bar.setName(net.minecraft.network.chat.Component.literal(title));
+          bar.setColor(color);
+        }
+        bar.setProgress(progress);
+
+        // Reconcile visible players against the bar's viewer permission.
+        String permission = spec.viewerPermission();
+        Set<UUID> eligibleIds = new HashSet<>();
+        for (RTPPlayer p : playersById.values()) {
+          if (permission == null || permission.isEmpty() || p.hasPermission(permission)) {
+            eligibleIds.add(p.uuid());
+          }
+        }
+        Set<net.minecraft.server.level.ServerPlayer> eligible = new HashSet<>();
+        for (UUID uuid : eligibleIds) {
+          Object sp = lookupOnlineServerPlayerByUuid(uuid);
+          if (sp instanceof net.minecraft.server.level.ServerPlayer typed) eligible.add(typed);
+        }
+        Set<net.minecraft.server.level.ServerPlayer> current = new HashSet<>(bar.getPlayers());
+        for (net.minecraft.server.level.ServerPlayer sp : eligible) {
+          if (!current.contains(sp)) bar.addPlayer(sp);
+        }
+        for (net.minecraft.server.level.ServerPlayer sp : current) {
+          if (!eligible.contains(sp)) bar.removePlayer(sp);
+        }
+      }
+    } catch (Throwable t) {
+      // Boss-bar feedback is non-essential; never let a UI/mapping failure escape.
+      log(Level.FINER, "[RTP][Fabric] scan progress bar update skipped: "
+          + t.getClass().getSimpleName() + ": " + t.getMessage());
+    }
+  }
+
+  @Override
+  public void clearProgressBars() {
+    io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+        io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+    if (adapter != null && adapter.supportsProgressBars()) {
+      try {
+        adapter.clearProgressBars();
+      } catch (Throwable ignored) {
+        // best-effort hide
+      }
+      return;
+    }
+    try {
+      for (net.minecraft.server.level.ServerBossEvent bar : activeProgressBars.values()) {
+        bar.removeAllPlayers();
+      }
+    } catch (Throwable ignored) {
+      // best-effort hide
+    }
+    activeProgressBars.clear();
+  }
+
+  /** Collects the uuids of online players who hold {@code permission} (or all if blank). */
+  private Set<UUID> eligibleViewerIds(String permission) {
+    Set<UUID> out = new HashSet<>();
+    for (RTPPlayer p : playersById.values()) {
+      if (permission == null || permission.isEmpty() || p.hasPermission(permission)) {
+        out.add(p.uuid());
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Strips legacy {@code &x} color codes and {@code #RRGGBB} hex codes from a bar title
+   * (boss-bar titles render as plain text) and truncates to a sane length.
+   */
+  private static String sanitizeBarTitle(String title) {
+    if (title == null) return "";
+    String out = title.replaceAll("&[0-9a-fA-FklmnorKLMNOR]", "").replaceAll("#[0-9a-fA-F]{6}", "");
+    return out.length() > 64 ? out.substring(0, 64) : out;
+  }
+
+  /**
+   * Maps the first legacy color code ({@code &x}) found in {@code template} to a vanilla
+   * {@link net.minecraft.world.BossEvent.BossBarColor}. Returns {@code GREEN} when none is found.
+   */
+  private static net.minecraft.world.BossEvent.BossBarColor barColorFromTemplate(String template) {
+    if (template == null) return net.minecraft.world.BossEvent.BossBarColor.GREEN;
+    for (int i = 0; i + 1 < template.length(); i++) {
+      if (template.charAt(i) != '&') continue;
+      char c = Character.toLowerCase(template.charAt(i + 1));
+      switch (c) {
+        case '4':
+        case 'c':
+          return net.minecraft.world.BossEvent.BossBarColor.RED;
+        case '6':
+        case 'e':
+          return net.minecraft.world.BossEvent.BossBarColor.YELLOW;
+        case '2':
+        case 'a':
+          return net.minecraft.world.BossEvent.BossBarColor.GREEN;
+        case '1':
+        case '3':
+        case '9':
+        case 'b':
+          return net.minecraft.world.BossEvent.BossBarColor.BLUE;
+        case '5':
+          return net.minecraft.world.BossEvent.BossBarColor.PURPLE;
+        case 'd':
+          return net.minecraft.world.BossEvent.BossBarColor.PINK;
+        case 'f':
+        case '7':
+        case '8':
+        case '0':
+          return net.minecraft.world.BossEvent.BossBarColor.WHITE;
+        default:
+          break;
+      }
+    }
+    return net.minecraft.world.BossEvent.BossBarColor.GREEN;
+  }
+
+  // ---------------------------------------------------------------------------
   // Menu platform surface (ADR-048)
   //
   // permissionProbe / effectivePermissions: the SPI defaults already route

@@ -1,12 +1,12 @@
-// Phase 1 — Fabric platform adapter, version-agnostic common module.
+// Phase 1 â€” Fabric platform adapter, version-agnostic common module.
 //
-// Per ADR-022 §3 (Build Discipline) Loom is applied here AND in :rtp-plugin
+// Per ADR-022 Â§3 (Build Discipline) Loom is applied here AND in :rtp-plugin
 // (the multi-loader bootstrap), and nowhere else. Mojang official mappings
 // are used; Yarn is reserved for re-evaluation.
 //
-// Architectural invariants (ADR-022 §4):
+// Architectural invariants (ADR-022 Â§4):
 //   * No org.bukkit.* imports in this module.
-//   * Shared business logic remains in :rtp-core / :rtp-api — this module
+//   * Shared business logic remains in :rtp-core / :rtp-api â€” this module
 //     contains Fabric platform glue only.
 //
 // Note: the root build.gradle's `subprojects { apply plugin: 'java-library' }`
@@ -35,11 +35,11 @@ ext {
 }
 
 dependencies {
-    // Mojang official mappings — see ADR-022 §3.
+    // Mojang official mappings â€” see ADR-022 Â§3.
     minecraft "com.mojang:minecraft:${minecraftVersion}"
     mappings  loom.officialMojangMappings()
 
-    // rtp-fabric-ADR-001: rtp-fabric-common ships no MC / loader / fabric-api classes —
+    // rtp-fabric-ADR-001: rtp-fabric-common ships no MC / loader / fabric-api classes â€”
     // each rtp-fabric-vXX_YY_R1 submodule carries its own runtime mod jar
     // with its own pinned MC version. Common compiles against the 1.21.1
     // mojmap line above purely to typecheck; flipping these to
@@ -54,10 +54,10 @@ dependencies {
     // Platform-free abstractions consumed by every Fabric adapter class.
     api project(':rtp-api')
     api project(':rtp-core')
-    // commands-api-ADR-001 — Brigadier Bridge. The bridge classes live in :commands-api;
+    // commands-api-ADR-001 â€” Brigadier Bridge. The bridge classes live in :commands-api;
     // this module supplies the Fabric-side registration shim (RTPCmdFabric).
     api project(':commands-api')
-    // ADR-016 — anvil pre-filter. Platform-neutral .mca decoder used by
+    // ADR-016 â€” anvil pre-filter. Platform-neutral .mca decoder used by
     // FabricRTPWorld#probeChunkColumn so the ScanTask refill loop can serve
     // most candidates without a synchronous tick-thread chunk generation.
     // See rtp-fabric-ADR-005-anvil-prefilter-parity.md.

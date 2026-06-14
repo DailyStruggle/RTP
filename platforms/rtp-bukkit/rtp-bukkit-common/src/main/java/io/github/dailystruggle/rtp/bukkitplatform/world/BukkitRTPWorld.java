@@ -549,6 +549,18 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // double-count that previously occurred when RTPWorld.getOrLoadChunk called both
     // getChunkAt (probe) and getChunkAtAsync (live) for the same logical attempt.
     totalChunkLoads.incrementAndGet();
+    // Stamp the start of this live-load attempt so ChunkLoadProfile can record the
+    // wall-clock floor (smallest single-chunk load). Only genuine live loads reach
+    // here; the ADR-016 anvil prefilter short-circuit republishes a cached view
+    // upstream in getChunkAt and never calls this method, so the floor is not
+    // polluted by non-load near-zero samples.
+    final long chunkLoadStartNanos = System.nanoTime();
+    // Classify the load as already-generated (loaded from disk) vs ungenerated
+    // (this load triggers generation - the expensive path) BEFORE the load runs,
+    // while isChunkGenerated still reflects on-disk state. ChunkLoadProfile keeps
+    // the two floors / costs separate so operators can see how much of RTP's cost
+    // is generation (removable by pre-generating the world) versus loading.
+    final boolean chunkGenerated = isChunkGenerated(cx, cz);
     // Prefer Bukkit's async chunk API (present in Spigot since 1.13). This avoids
     // hopping work back onto the primary thread for a synchronous world.getChunkAt()
     // call and keeps the location pipeline off the tick thread wherever the server
@@ -582,7 +594,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
             cacheChunk(cx, cz, chunk);
             out.complete(key);
           });
-          return out;
+          return profileChunkLoad(out, chunkLoadStartNanos, chunkGenerated);
         }
       } catch (Throwable t) {
         // Some test doubles (e.g. MockBukkit builds) or very old forks may not
@@ -596,7 +608,24 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
     CompletableFuture<Long> future = new CompletableFuture<>();
     completeViaSyncGenerate(cx, cz, key, future);
-    return future;
+    return profileChunkLoad(future, chunkLoadStartNanos, chunkGenerated);
+  }
+
+  /**
+   * Records a successful single-chunk live-load's wall-clock duration into the
+   * process-global {@link io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile}.
+   * Failed loads (null key or exceptional completion) are not counted - a failed
+   * load is not a measurement of how fast a chunk can be loaded. Returns the same
+   * future so call sites compose unchanged.
+   */
+  private static CompletableFuture<Long> profileChunkLoad(
+      CompletableFuture<Long> future, long startNanos, boolean generated) {
+    return future.whenComplete((k, ex) -> {
+      if (ex == null && k != null) {
+        io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile.GLOBAL
+            .record(generated, System.nanoTime() - startNanos);
+      }
+    });
   }
 
   /**

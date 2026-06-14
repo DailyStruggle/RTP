@@ -12,8 +12,8 @@ import java.util.function.Predicate;
  * a player is sent there.
  *
  * <p>This is the canonical extension point for claim-plugin integrations
- * (GriefPrevention, GriefDefender, WorldGuard, Lands, HuskTowns, RedProtect, Towny,
- * Factions) and for any addon that wants to refuse locations based on its own rules
+ * (GriefPrevention, GriefDefender, WorldGuard, Lands, RedProtect, Towny,
+ * Factions, SaberFactions, FactionsBridge, Residence, CrashClaim, HuskClaims, KingdomsX) and for any addon that wants to refuse locations based on its own rules
  * (REQ-RTP-S-003, REQ-API-F-003). It is the API-level facade in front of
  * {@code rtp-core}'s {@code GlobalRegionVerifiers}; the legacy static entry points on
  * {@code GlobalRegionVerifiers} continue to work for source compatibility (ADR-026).
