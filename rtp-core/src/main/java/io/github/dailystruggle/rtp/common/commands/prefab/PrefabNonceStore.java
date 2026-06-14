@@ -37,6 +37,12 @@ public final class PrefabNonceStore {
      * The {@code token} field is retained as the empty string for binary
      * compatibility with tests that still call {@code entry.token()}; new
      * call sites should ignore it.
+     *
+     * @param token       always the empty string; retained for call-site compatibility
+     * @param callerId    UUID of the player or console that initiated the apply
+     * @param prefabId    id of the prefab being confirmed
+     * @param perFileDiff per-file list of changes computed by {@link PrefabApplier}
+     * @param newTrees    precomputed merged YAML trees to write on confirm
      */
     public record Entry(
             String token,

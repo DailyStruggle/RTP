@@ -151,13 +151,23 @@ public abstract class DatabaseAccessor<D> {
     }
   }
 
-  /** Enqueue an asynchronous background file write */
+  /**
+   * Enqueue an asynchronous background file write.
+   *
+   * @param absolutePath absolute path of the file to write
+   * @param payload      raw bytes to write; ignored when {@code null}
+   */
   public void saveFile(String absolutePath, byte[] payload) {
     if (absolutePath == null || absolutePath.isEmpty() || payload == null) return;
     fileWriteQueue.add(new FileWriteRequest(absolutePath, payload));
   }
 
-  /** Enqueue an asynchronous background file read */
+  /**
+   * Enqueue an asynchronous background file read.
+   *
+   * @param absolutePath absolute path of the file to read
+   * @return a future that completes with the file bytes, or {@link Optional#empty()} when absent
+   */
   @NotNull
   public CompletableFuture<Optional<byte[]>> loadFile(String absolutePath) {
     CompletableFuture<Optional<byte[]>> fut = new CompletableFuture<>();

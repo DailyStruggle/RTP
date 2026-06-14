@@ -259,6 +259,9 @@ public final class NetworkRouter {
      * colon-to-equals param migration); it is rejected outright. The
      * {@code :} character now splits {@code server:region} exactly once;
      * additional colons (e.g. {@code a:b:c}) are a syntax error.</p>
+     *
+     * @param serverHint optional backend server id prefix; {@code null} means no constraint
+     * @param regionKey  the region key, or {@code null} when no region was specified
      */
     public record ParsedRegion(String serverHint, String regionKey) {
         public ParsedRegion {

@@ -53,6 +53,10 @@ public final class PrefabSchematicInstaller {
      * {@code skippedExisting} were already present on disk, and
      * {@code missingResource} are referenced by the prefab but absent from the
      * jar (a defect to audit, never fatal).
+     *
+     * @param installed       schematic names copied from the jar this call
+     * @param skippedExisting schematic names already present on disk
+     * @param missingResource schematic names referenced by the prefab but absent from the jar
      */
     public record Result(
             List<String> installed,

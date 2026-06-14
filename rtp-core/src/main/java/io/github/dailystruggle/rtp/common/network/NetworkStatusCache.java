@@ -27,7 +27,16 @@ import java.util.logging.Level;
  */
 public final class NetworkStatusCache {
 
-    /** Per-player queue snapshot. */
+    /**
+     * Per-player queue snapshot.
+     *
+     * @param playerId        UUID of the player
+     * @param state           current queue state
+     * @param positionInQueue zero-based position in the queue; 0 when not queued
+     * @param serverId        optional backend server id the player is being routed to
+     * @param regionKey       optional region key associated with this enrolment
+     * @param updatedAtMs     wall-clock time of the last status update in milliseconds
+     */
     public record QueueStatus(
             UUID playerId,
             State state,

@@ -47,6 +47,8 @@ public sealed interface RoutingDecision
     /**
      * Wanted to go cross-server but cannot right now. Caller serves locally
      * and emits the {@code network.fallback} message keyed by {@link #reason()}.
+     *
+     * @param reason why the cross-server route was not taken
      */
     record LocalFallback(FallbackReason reason) implements RoutingDecision {
         public LocalFallback {

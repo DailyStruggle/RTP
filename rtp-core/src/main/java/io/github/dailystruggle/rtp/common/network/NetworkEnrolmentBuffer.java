@@ -31,6 +31,12 @@ public final class NetworkEnrolmentBuffer {
     /**
      * One pending cross-server enrolment. Carries everything the Lua
      * {@code enqueue_batch.lua} needs.
+     *
+     * @param playerId      UUID of the player being enrolled
+     * @param correlationId correlation UUID for this enrolment request
+     * @param regionKey     optional preferred region key
+     * @param serverHint    optional preferred backend server id
+     * @param createdAtMs   wall-clock creation time in milliseconds
      */
     public record EnrolmentRecord(
             UUID playerId,
@@ -63,7 +69,11 @@ public final class NetworkEnrolmentBuffer {
         this.maxBatchSize = maxBatchSize;
     }
 
-    /** Producer entry. Lock-free; safe from any thread. */
+    /**
+     * Enqueues a record for the next flush. Lock-free; safe from any thread.
+     *
+     * @param record the enrolment record to enqueue; ignored when {@code null}
+     */
     public void offer(EnrolmentRecord record) {
         if (record == null) return;
         deque.addLast(record);

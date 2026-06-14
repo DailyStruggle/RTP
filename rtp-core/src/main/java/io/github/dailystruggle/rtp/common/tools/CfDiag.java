@@ -45,12 +45,19 @@ public final class CfDiag {
 
     /** Hot-path counters. Increment from the documented call sites only. */
     public static final LongAdder pregenAttemptStart       = new LongAdder();
+    /** PregenTask allOf dispatch count. */
     public static final LongAdder pregenAllOfDispatch      = new LongAdder();
+    /** PregenTask allOf timeout count. */
     public static final LongAdder pregenAllOfTimeout       = new LongAdder();
+    /** QueueTask allOf dispatch count. */
     public static final LongAdder queueAllOfDispatch       = new LongAdder();
+    /** QueueTask allOf timeout count. */
     public static final LongAdder queueAllOfTimeout        = new LongAdder();
+    /** RegionCacheTask issue count. */
     public static final LongAdder regionCacheTaskIssue     = new LongAdder();
+    /** LocationGenerator pregen entry count. */
     public static final LongAdder locationGenPregenEntry   = new LongAdder();
+    /** LocationGenerator queue entry count. */
     public static final LongAdder locationGenQueueEntry    = new LongAdder();
     /** PregenTask attempt resubmits via {@code rescheduleNextAttempt} (the retry-storm proxy). */
     public static final LongAdder pregenReschedule         = new LongAdder();
@@ -60,14 +67,22 @@ public final class CfDiag {
     // chunk futures (rtp-api/.../ChunkSet.java:21). That allOf is the smallest
     // BiApply/BiRelay-shaped construct in the codebase, so per-callsite ChunkSet
     // ctor rates fingerprint which call path multiplies CFs.
-    public static final LongAdder chunkSetPregenLive       = new LongAdder(); // PregenTask:449 single-chunk live-load reservation
-    public static final LongAdder chunkSetPregenVerified   = new LongAdder(); // PregenTask:791 multi-chunk neighbour reservation
-    public static final LongAdder chunkSetQueueLive        = new LongAdder(); // QueueTask:302
-    public static final LongAdder chunkSetQueueVd          = new LongAdder(); // QueueTask:638 view-distance set
-    public static final LongAdder chunkSetRegion           = new LongAdder(); // Region:652
-    public static final LongAdder chunkSetRegionCache      = new LongAdder(); // RegionCacheTask:237
-    public static final LongAdder chunkSetPipeline         = new LongAdder(); // TeleportPipelineTask:292
-    public static final LongAdder chunkSetFabricGetChunk   = new LongAdder(); // FabricRTPWorld.getChunkAtAsync:741
+    /** PregenTask single-chunk live-load reservation ChunkSet ctor count. */
+    public static final LongAdder chunkSetPregenLive       = new LongAdder();
+    /** PregenTask multi-chunk neighbour reservation ChunkSet ctor count. */
+    public static final LongAdder chunkSetPregenVerified   = new LongAdder();
+    /** QueueTask live-load ChunkSet ctor count. */
+    public static final LongAdder chunkSetQueueLive        = new LongAdder();
+    /** QueueTask view-distance set ChunkSet ctor count. */
+    public static final LongAdder chunkSetQueueVd          = new LongAdder();
+    /** Region ChunkSet ctor count. */
+    public static final LongAdder chunkSetRegion           = new LongAdder();
+    /** RegionCacheTask ChunkSet ctor count. */
+    public static final LongAdder chunkSetRegionCache      = new LongAdder();
+    /** TeleportPipelineTask ChunkSet ctor count. */
+    public static final LongAdder chunkSetPipeline         = new LongAdder();
+    /** FabricRTPWorld.getChunkAtAsync ChunkSet ctor count. */
+    public static final LongAdder chunkSetFabricGetChunk   = new LongAdder();
     /** Fabric per-call entry counter for getChunkAtAsync (one ChunkSet allocation per call). */
     public static final LongAdder fabricGetChunkAtAsync    = new LongAdder();
     /** Fabric loadLiveChunk entry. */
@@ -82,11 +97,16 @@ public final class CfDiag {
     // getOrLoadChunk(cx,cz).orTimeout(30 s).whenComplete(...) — a 30 s
     // pinning ceiling and a chain of CFs per call. Region.execute's
     // cold-promote deficit loop is also a candidate. Instrument both.
-    public static final LongAdder scanRunBatch            = new LongAdder(); // ScanTask.run() entry
-    public static final LongAdder scanTestPos             = new LongAdder(); // ScanTask.testPos entry
-    public static final LongAdder scanRunFullLoad         = new LongAdder(); // ScanTask.runFullLoadPath entry
-    public static final LongAdder regionExecute           = new LongAdder(); // Region.execute pulse entry
-    public static final LongAdder regionDeficitDispatch   = new LongAdder(); // Region.execute deficit-loop getChunkAtAsync
+    /** ScanTask.run() entry count. */
+    public static final LongAdder scanRunBatch            = new LongAdder();
+    /** ScanTask.testPos entry count. */
+    public static final LongAdder scanTestPos             = new LongAdder();
+    /** ScanTask.runFullLoadPath entry count. */
+    public static final LongAdder scanRunFullLoad         = new LongAdder();
+    /** Region.execute pulse entry count. */
+    public static final LongAdder regionExecute           = new LongAdder();
+    /** Region.execute deficit-loop getChunkAtAsync dispatch count. */
+    public static final LongAdder regionDeficitDispatch   = new LongAdder();
 
     /** Snapshot of last-emitted totals for delta computation. */
     private static long s_pregenAttemptStart, s_pregenAllOfDispatch, s_pregenAllOfTimeout;

@@ -49,6 +49,10 @@ public final class PrefabApplier {
      * A single change inside one file. {@code keyPath} is dot-delimited from
      * the file root (e.g. {@code "queue.maxSize"}). {@code oldValue} is
      * {@code null} when the key was previously absent.
+     *
+     * @param keyPath  dot-delimited key path from the file root
+     * @param oldValue previous value, or {@code null} if the key was absent
+     * @param newValue new value after the overlay
      */
     public record Change(String keyPath, Object oldValue, Object newValue) {
     }
@@ -58,6 +62,9 @@ public final class PrefabApplier {
      * input {@code currentTrees} (same file-id keys), with overlays merged in.
      * {@code perFileDiff} is keyed by file id and lists every {@link Change}
      * in stable iteration order (overlay-key order, then nested recursively).
+     *
+     * @param newTrees    merged YAML trees keyed by file id
+     * @param perFileDiff per-file list of changes in stable iteration order
      */
     public record Result(
             Map<String, Map<String, Object>> newTrees,
