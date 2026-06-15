@@ -61,6 +61,7 @@ public final class ConfigSearchResultsBuilder {
             boolean keyMatched,
             String rawValue,
             List<int[]> matchRanges) {
+        /** Validates and normalises the record components. */
         public Hit {
             if (fileName == null) throw new IllegalArgumentException("fileName");
             if (keyName == null) throw new IllegalArgumentException("keyName");
@@ -89,7 +90,13 @@ public final class ConfigSearchResultsBuilder {
         return search(query, configs);
     }
 
-    /** Variant accepting an explicit {@link Configs}; used by tests. */
+    /**
+     * Variant accepting an explicit {@link Configs}; used by tests.
+     *
+     * @param query   free-form user input; trimmed; matched case-insensitively
+     * @param configs the configs instance to search; {@code null} returns empty
+     * @return ordered list of hits; empty if query is too short or configs is null
+     */
     public static List<Hit> search(String query, Configs configs) {
         if (query == null || configs == null) return List.of();
         String trimmed = query.trim();

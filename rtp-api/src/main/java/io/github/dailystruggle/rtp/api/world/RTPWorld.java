@@ -328,6 +328,21 @@ public abstract class RTPWorld<T> {
   }
 
   /**
+   * The destination world's environment as a platform-neutral string (e.g.
+   * {@code "NORMAL"}, {@code "NETHER"}, {@code "THE_END"}, or a custom-dimension
+   * name), or {@code null} when the platform cannot supply one. Used purely as a
+   * display hint so a menu can pick a representative surface block locally.
+   *
+   * <p>Default {@code null}; adapters that can resolve their world's environment
+   * ({@code BukkitRTPWorld}, {@code FoliaRTPWorld}) override this.
+   *
+   * @return the environment string, or {@code null} when unknown
+   */
+  public String environment() {
+    return null;
+  }
+
+  /**
    * Non-blocking "is this chunk on disk?" check (ADR-016 §13.3). Must not trigger
    * generation or block. Gates the seed-synthesised biome pre-check off for already-generated
    * chunks even on vanilla worlds — Mojang's biome source drifts across MC versions, so the

@@ -15,24 +15,51 @@ import org.jetbrains.annotations.Nullable;
  * @param <T> type of values this factory will hold
  */
 public class Factory<T extends FactoryValue<?>> {
+
+  /** Constructs an empty factory. */
+  public Factory() {}
+
+  /** The backing map of upper-cased {@code .YML}-suffixed names to values. */
   public final ConcurrentHashMap<String, T> map = new ConcurrentHashMap<>();
 
+  /**
+   * Adds a value under the given name (upper-cased, {@code .YML}-suffixed).
+   *
+   * @param name  the name to register under
+   * @param value the value to store
+   */
   public void add(String name, T value) {
     name = name.toUpperCase();
     if (!name.endsWith(".YML")) name = name + ".YML";
     map.put(name, value);
   }
 
+  /**
+   * Removes the value registered under the given name.
+   *
+   * @param name the name to remove
+   */
   public void remove(String name) {
     name = name.toUpperCase();
     if (!name.endsWith(".YML")) name = name + ".YML";
     map.remove(name);
   }
 
+  /**
+   * Returns an enumeration of all registered names.
+   *
+   * @return enumeration of registered names
+   */
   public Enumeration<String> list() {
     return map.keys();
   }
 
+  /**
+   * Returns {@code true} if a value is registered under the given name.
+   *
+   * @param name the name to check
+   * @return {@code true} if the name is registered
+   */
   public boolean contains(String name) {
     name = name.toUpperCase();
     if (!name.endsWith(".YML")) name = name + ".YML";
@@ -65,6 +92,12 @@ public class Factory<T extends FactoryValue<?>> {
     return value.clone();
   }
 
+  /**
+   * Returns a clone of the value registered under the given name, or {@code null} if absent.
+   *
+   * @param name the name to look up
+   * @return a clone of the registered value, or {@code null}
+   */
   @Nullable
   public FactoryValue<?> get(String name) {
     name = name.toUpperCase();
@@ -74,6 +107,13 @@ public class Factory<T extends FactoryValue<?>> {
     return t.clone();
   }
 
+  /**
+   * Returns a clone of the value registered under the given name, falling back to the
+   * {@code DEFAULT.YML} entry or any available entry when the name is absent.
+   *
+   * @param name the name to look up
+   * @return a clone of the best-matching value; never {@code null} when the map is non-empty
+   */
   @NotNull
   public FactoryValue<?> getOrDefault(String name) {
     name = name.toUpperCase();

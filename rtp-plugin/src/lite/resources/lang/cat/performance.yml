@@ -47,6 +47,19 @@ async_nap_time: 50
 # @default: 19.0
 minimum_purrs_per_second: 19.0
 
+# Da biggest amount of JVM nap-pile (purrcent of da max nap-pile) afore da
+# behind-da-scenes warm-spot makin' takes a catnap. Every warm-spot held in
+# memory pins a chunk, so fillin' up furever on a teeny-nap-pile server can
+# make da JVM cough up endless furballs (garbage collection) an' leave da
+# server frozen like a startled kitty wif no error in da hooman-box.
+# While usage sits at or above dis line, RTP stops toppin' up da warm-spot
+# stash but keeps handin' out already-warmed spots to waitin' kitties. 0 or
+# 100 turns da gate off.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapPurrcent: 85.0
+
 # Refill the warm-spot pile right after a pounce
 # @type: boolean
 # @default: false

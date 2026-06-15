@@ -29,17 +29,27 @@ public final class RtpTarget {
     /** Resolve to a region by its configured name; {@link #name()} is the region name. */
     REGION,
     /** Resolve to the target region of a world; {@link #name()} is the world name. */
-    WORLD
+    WORLD,
+    /**
+     * Resolve to a region advertised by a specific peer backend across the
+     * network. {@link #name()} is the (unqualified) region name and
+     * {@link #serverId()} is the destination backend's network id. A teleport
+     * to a network target is dispatched across the cross-server wait queue
+     * rather than served from the local pipeline.
+     */
+    NETWORK
   }
 
-  private static final RtpTarget DEFAULT = new RtpTarget(Kind.DEFAULT, null);
+  private static final RtpTarget DEFAULT = new RtpTarget(Kind.DEFAULT, null, null);
 
   private final Kind kind;
   private final String name;
+  private final String serverId;
 
-  private RtpTarget(Kind kind, String name) {
+  private RtpTarget(Kind kind, String name, String serverId) {
     this.kind = kind;
     this.name = name;
+    this.serverId = serverId;
   }
 
   /**
@@ -64,7 +74,30 @@ public final class RtpTarget {
     if (regionName == null || regionName.trim().isEmpty()) {
       throw new IllegalArgumentException("regionName must not be null or blank");
     }
-    return new RtpTarget(Kind.REGION, regionName);
+    return new RtpTarget(Kind.REGION, regionName, null);
+  }
+
+  /**
+   * Target a region advertised by a specific peer backend across the network.
+   * A teleport to this target is routed across the cross-server wait queue
+   * (the same path a {@code /rtp region=<server>:<region>} command takes),
+   * not served from the local pipeline.
+   *
+   * @param serverId the destination backend's network id; must not be
+   *     {@code null} or blank
+   * @param regionName the (unqualified) region name as advertised by the
+   *     destination backend; must not be {@code null} or blank
+   * @return a network-kind target
+   * @throws IllegalArgumentException if either argument is {@code null} or blank
+   */
+  public static RtpTarget network(String serverId, String regionName) {
+    if (serverId == null || serverId.trim().isEmpty()) {
+      throw new IllegalArgumentException("serverId must not be null or blank");
+    }
+    if (regionName == null || regionName.trim().isEmpty()) {
+      throw new IllegalArgumentException("regionName must not be null or blank");
+    }
+    return new RtpTarget(Kind.NETWORK, regionName, serverId);
   }
 
   /**
@@ -78,7 +111,7 @@ public final class RtpTarget {
     if (worldName == null || worldName.trim().isEmpty()) {
       throw new IllegalArgumentException("worldName must not be null or blank");
     }
-    return new RtpTarget(Kind.WORLD, worldName);
+    return new RtpTarget(Kind.WORLD, worldName, null);
   }
 
   /**
@@ -113,21 +146,35 @@ public final class RtpTarget {
     return name;
   }
 
+  /**
+   * Returns the destination backend's network id for a {@link Kind#NETWORK}
+   * target.
+   *
+   * @return the server id, or {@code null} for any non-network target
+   */
+  public String serverId() {
+    return serverId;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
     if (!(o instanceof RtpTarget)) return false;
     RtpTarget that = (RtpTarget) o;
-    return kind == that.kind && Objects.equals(name, that.name);
+    return kind == that.kind
+        && Objects.equals(name, that.name)
+        && Objects.equals(serverId, that.serverId);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(kind, name);
+    return Objects.hash(kind, name, serverId);
   }
 
   @Override
   public String toString() {
-    return "RtpTarget[" + kind + (name == null ? "" : ":" + name) + ']';
+    return "RtpTarget[" + kind
+        + (serverId == null ? "" : ":" + serverId)
+        + (name == null ? "" : ":" + name) + ']';
   }
 }

@@ -81,7 +81,13 @@ public final class CommandTreeMenuBuilder {
      * Back-compatible 4-arg form. Delegates to the 5-arg
      * {@link #build(TreeCommand, UUID, Predicate, MenuConsumerProfile, List)}
      * with an empty {@code assembledPath} (i.e. treats {@code root} as the
-     * top-level {@code /rtp} menu page — no Back row, no Execute row).
+     * top-level {@code /rtp} menu page - no Back row, no Execute row).
+     *
+     * @param root       the command tree node to reflect
+     * @param callerId   UUID of the viewing player
+     * @param permission permission probe for the viewer
+     * @param profile    consumer profile controlling label/prefix rendering
+     * @return the assembled {@link MenuModel}
      */
     public MenuModel build(TreeCommand root,
                            UUID callerId,
@@ -122,6 +128,13 @@ public final class CommandTreeMenuBuilder {
      * additionally excluded: the menu is already the navigable rendering of
      * the tree, so a clickable {@code help} would dump plaintext, and a
      * clickable {@code menu} would loop the player back into the same page.
+     *
+     * @param root          the command tree node to reflect
+     * @param callerId      UUID of the viewing player
+     * @param permission    permission probe for the viewer
+     * @param profile       consumer profile controlling label/prefix rendering
+     * @param assembledPath path segments from {@code /rtp} root down to this node
+     * @return the assembled {@link MenuModel}
      */
     public MenuModel build(TreeCommand root,
                            UUID callerId,
@@ -397,8 +410,16 @@ public final class CommandTreeMenuBuilder {
      *
      * <p>If the parameter doesn't exist on {@code parent} or has no
      * suggestions, the page contains just Back + a header row indicating
-     * the empty state — the caller (MenuRedeemSubcommand) is expected to
+     * the empty state - the caller (MenuRedeemSubcommand) is expected to
      * have already validated reachability, so this branch is defensive only.
+     *
+     * @param parent     the command tree node that owns the parameter
+     * @param callerId   UUID of the viewing player
+     * @param permission permission probe for the viewer
+     * @param profile    consumer profile controlling label/prefix rendering
+     * @param parentPath path segments from {@code /rtp} root down to {@code parent}
+     * @param paramName  name of the parameter to pick a value for
+     * @return the assembled {@link MenuModel}
      */
     public MenuModel buildParamPicker(TreeCommand parent,
                                       UUID callerId,
@@ -603,6 +624,10 @@ public final class CommandTreeMenuBuilder {
      * enforce the {@code rtp.config.view} permission: gating happens (a) at
      * the row that opens the selector from the root page and (b) in the
      * redeem dispatch (checklist step 5).
+     *
+     * @param callerId  UUID of the viewing player
+     * @param fileNames ordered list of config file names to display
+     * @return the assembled {@link MenuModel}
      */
     public MenuModel buildConfigSelector(UUID callerId, List<String> fileNames) {
         Objects.requireNonNull(callerId, "callerId");
@@ -695,6 +720,12 @@ public final class CommandTreeMenuBuilder {
      * <p>If the parser has zero enum constants (degenerate case, kept for
      * v3.7.4 empty-file handling parity) the page contains Back + header +
      * a non-clickable empty-state hint row.
+     *
+     * @param <E>      the enum type of the config parser
+     * @param callerId UUID of the viewing player
+     * @param fileName the config file name (used as page title and Back target)
+     * @param parser   the config parser whose keys populate the page
+     * @return the assembled {@link MenuModel}
      */
     public <E extends Enum<E>> MenuModel buildConfigFile(UUID callerId,
                                                          String fileName,
@@ -712,6 +743,13 @@ public final class CommandTreeMenuBuilder {
      * Changeable list when the cart is non-empty. Keys present in
      * {@code cartSnapshot} are removed from the Changeable list so the same
      * key never appears twice on the page.
+     *
+     * @param <E>          the enum type of the config parser
+     * @param callerId     UUID of the viewing player
+     * @param fileName     the config file name
+     * @param parser       the config parser whose keys populate the page
+     * @param cartSnapshot snapshot of the viewer's staged changes; may be empty
+     * @return the assembled {@link MenuModel}
      */
     public <E extends Enum<E>> MenuModel buildConfigFile(UUID callerId,
                                                          String fileName,
@@ -963,6 +1001,14 @@ public final class CommandTreeMenuBuilder {
      *
      * <p>Permission gating ({@code rtp.config.view}) belongs in the redeem
      * dispatch arm (checklist step 5 ext), not in the builder.
+     *
+     * @param callerId        UUID of the viewing player
+     * @param fileName        config file name
+     * @param paramName       the shape/vert parameter name (e.g. {@code "shape"})
+     * @param currentTypeName the currently stored type name, or {@code null} if unset
+     * @param typeNames       ordered list of available type names
+     * @param writeCommandPath command path segments used to build the write command
+     * @return the assembled {@link MenuModel}
      */
     public MenuModel buildShapeVertTypePicker(UUID callerId,
                                               String fileName,
@@ -1044,6 +1090,14 @@ public final class CommandTreeMenuBuilder {
      * or pre-load defensive state) the page degrades to Back + header + a
      * non-clickable hint row (mirrors {@link #buildConfigFile}'s empty-enum
      * branch).
+     *
+     * @param callerId        UUID of the viewing player
+     * @param fileName        config file name
+     * @param paramName       the shape/vert parameter name
+     * @param typeName        the currently active type name
+     * @param subParamValues  map of sub-parameter names to their current values
+     * @param writeCommandPath command path segments used to build write commands
+     * @return the assembled {@link MenuModel}
      */
     public MenuModel buildShapeVertSubParamPage(UUID callerId,
                                                 String fileName,

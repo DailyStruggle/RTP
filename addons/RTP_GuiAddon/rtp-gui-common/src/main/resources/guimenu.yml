@@ -1,0 +1,71 @@
+# RTP GUI addon menu configuration.
+#
+# This file is registered with RTP's own config system (ConfigParser), so it is
+# created automatically on first boot, picked up on /rtp reload, and lives in the
+# RTP plugin data folder alongside RTP's other config - no manual pasting needed.
+#
+# The out-of-the-box layout deliberately mimics the popular "DonutSMP-style" RTP
+# menu so a casual admin gets a polished, clickable destination picker the moment
+# the jar is dropped in. Values are platform-neutral: icon names are mapped to the
+# right item by each platform renderer (chest item on Bukkit, etc.).
+#
+# A chest menu does not use the parchment background, so bright colors are fine.
+
+# Renderer style opened by a bare /rtp. Each platform module registers one or more
+# styles (the Bukkit module ships 'chest'); a book renderer registers as 'book'.
+# Set this to the style you want; an unknown value falls back to any available one.
+menuStyle: "chest"
+# Menu title. Supports '&' color codes.
+menuTitle: "&1&lRandom Teleport"
+# Chest rows (1-6). Renderers without a grid ignore this.
+menuRows: 6
+# Material name to fill empty slots. Use AIR to leave them blank.
+menuFiller: "GRAY_STAINED_GLASS_PANE"
+# Show the server-health (TPS / MSPT / players) tile.
+showDashboard: true
+
+# Per-target icon material names. An unknown name falls back to the renderer default.
+# These are the per-kind fallback blocks used when a region has no explicit entry in
+# the 'regionIcons' map below. They default to a representative surface block (grass for
+# the overworld) rather than a filled map, which does not render in a vanilla client.
+iconDefault: "COMPASS"
+iconWorld: "GRASS_BLOCK"
+iconRegion: "GRASS_BLOCK"
+# Icon for a cross-server (network/peer) region advertised by another backend.
+iconNetwork: "ENDER_PEARL"
+# Per-region icon overrides: pin a specific block to a region by name. The key is the
+# (unqualified) region or world name for a local destination, or the 'server:region'
+# qualified form for a cross-server (network/peer) destination. Use the most common
+# surface block for the region's environment (e.g. NETHERRACK for a nether region,
+# END_STONE for the end). A region not listed here uses the per-kind fallback above.
+regionIcons:
+  # default: "GRASS_BLOCK"
+  # nether: "NETHERRACK"
+  # end: "END_STONE"
+  # backend-b:default: "NETHERRACK"
+# Environment -> block translation, applied to a cross-server destination when it has
+# no 'regionIcons' override above and its backend did not advertise a block of its own.
+# The destination backend advertises its world environment (NORMAL / NETHER / THE_END,
+# or a custom-dimension name) in its heartbeat; this server translates that string to a
+# block here. The three vanilla environments below are built in (shown commented as the
+# defaults); add entries to map custom dimensions your network's backends run.
+environmentIcons:
+  # NORMAL: "GRASS_BLOCK"
+  # NETHER: "NETHERRACK"
+  # THE_END: "END_STONE"
+  # my_custom_dim: "AMETHYST_BLOCK"
+iconOnCooldown: "CLOCK"
+iconUnavailable: "BARRIER"
+iconNoFunds: "GOLD_NUGGET"
+iconDashboard: "PAPER"
+
+# User-facing text. Supports '&' color codes.
+textReady: "&aClick to teleport!"
+textUnavailable: "&cUnavailable right now."
+textSearching: "&bFinding you a spot..."
+textSuccess: "&aTeleported!"
+# Shown when a cross-server teleport request is accepted and queued for transfer.
+textQueued: "&aQueued for a cross-server destination - sit tight!"
+textFailurePrefix: "&cTeleport failed: "
+
+version: "1.0"

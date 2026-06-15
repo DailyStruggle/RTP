@@ -123,9 +123,17 @@ public final class BackendStatePublisher {
         }
     }
 
-    /** Returns this backend's server id. */
+    /**
+     * Returns this backend's server id.
+     *
+     * @return the server id
+     */
     public String serverId() { return serverId; }
 
-    /** Returns the publish interval in milliseconds. */
+    /**
+     * Returns the publish interval in milliseconds.
+     *
+     * @return the interval in milliseconds
+     */
     public long intervalMs() { return intervalMs; }
 }

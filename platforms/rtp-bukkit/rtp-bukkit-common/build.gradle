@@ -7,6 +7,14 @@ dependencies {
     api project(':anvil-api')
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     compileOnly 'me.clip:placeholderapi:2.11.6'
+    // MiniMessage support: parse <tag>-style markup into an Adventure Component,
+    // then bridge it into the existing bungee BaseComponent[] send path via the
+    // Gson chat-component serializer. These are provided at runtime by Paper/
+    // Folia (compileOnly here); on a pure Spigot server they are absent and the
+    // SendMessage MiniMessage path transparently falls back to legacy color codes.
+    compileOnly 'net.kyori:adventure-api:4.17.0'
+    compileOnly 'net.kyori:adventure-text-minimessage:4.17.0'
+    compileOnly 'net.kyori:adventure-text-serializer-gson:4.17.0'
     implementation 'xyz.tozymc.spigot:title-api:1.0'
     implementation project(':commands-api')
     testImplementation testFixtures(project(':rtp-core'))

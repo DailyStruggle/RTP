@@ -1,0 +1,40 @@
+# --- RTP Region Configuration (devstack demo) ---
+# backend-c (Fabric) default region -> End. Demonstrates per-server load
+# distribution: each backend's default lands in a distinct dimension.
+# Fabric dimension id for the End is "minecraft:the_end". Tight band around the
+# central End island; skylight not required.
+
+# Cosmetic display name (color/gradient supported); advertised to lobbies.
+displayName: "&#c77dffVoid Reaches"
+# Target world (Fabric dimension id).
+world: "minecraft:the_end"
+worldBorderOverride: false
+
+shape:
+  name: "CIRCLE"
+  mode: "ACCUMULATE"
+  radius: 150
+  centerRadius: 16
+  centerX: 0
+  centerZ: 0
+  weight: 1.0
+  uniquePlacements: false
+  expand: false
+
+vert:
+  name: "JUMP"
+  minY: 48
+  maxY: 72
+  step: 4
+  requireSkyLight: false
+
+requirePermission: false
+override: "default"
+cacheCap: 50
+backlogCacheCap: 1000
+activeChunkCap: 10
+price: 0.0
+spatialResolution: 3
+
+# DO NOT TOUCH VERSION NUMBER
+version: "1.0"

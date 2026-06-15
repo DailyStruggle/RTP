@@ -3,8 +3,9 @@
 # SECONDARY component of the locale config pipeline (the "changeset" workflow).
 #
 # Reads the translated scripts/out/changeset.csv produced (and filled in) from
-# locale-changeset-to-csv.ps1 and propagates each per-language column back into
-# the corresponding scripts/out/locale-<lang>.tsv row, matched by the same
+# locale-changeset-to-csv.ps1 and propagates each per-language value column, its
+# paired '<locale>_comment' column, AND its paired '<locale>_key' column back
+# into the corresponding scripts/out/locale-<lang>.tsv row, matched by the same
 # langmap logic the reconcile step uses (relpath -> locale relpath, base_key ->
 # translated key).
 #
@@ -13,16 +14,23 @@
 # and verify:
 #     .\gradlew :rtp-plugin:test --tests "*LocaleParityTest*"
 #
-# Cell semantics:
-#   - A non-empty per-language cell that differs from the row's `english`
-#     column overwrites the locale TSV value (this is a real translation).
-#   - A cell equal to `english`, or empty, is treated as "not translated yet"
-#     and left unchanged by default (so a partially-filled changeset is safe to
-#     apply repeatedly). Use -IncludeEnglish to also write English-equal cells
-#     (e.g. when a string legitimately reads the same in that language).
-#   - Only the `value` of an EXISTING locale TSV row is updated; rows absent
-#     from a locale TSV are reported and skipped (run reconcile first to seed
-#     them).
+# Cell semantics (applied independently to the value, comment and key of a row):
+#   - A non-empty per-language cell that differs from the matching `english` /
+#     `english_comment` column (or, for the key, the `base_key` column)
+#     overwrites the locale TSV value / preceding comment / key (a real
+#     translation).
+#   - A cell equal to its English column, or empty, is treated as "not
+#     translated yet" and left unchanged by default (so a partially-filled
+#     changeset is safe to apply repeatedly). Use -IncludeEnglish to also write
+#     English-equal cells (e.g. a string that legitimately reads the same).
+#   - Comment cells use the same backslash escaping as the per-locale TSV's
+#     preceding_comment column (newline -> \n, tab -> \t) so a multi-line
+#     comment block round-trips on a single CSV line.
+#   - The '<locale>_key' cell localizes the key name itself (fed into the
+#     synthesized <file>.lang.yml rename map on regen). It is compared against
+#     the `base_key` (English key) column.
+#   - Only EXISTING locale TSV rows are updated; rows absent from a locale TSV
+#     are reported and skipped (run reconcile first to seed them).
 #
 # Options:
 #   -IncludeEnglish     Also write per-language cells that equal the `english`
@@ -64,13 +72,15 @@ if (-not (Test-Path -LiteralPath $InFile)) {
 
 $csv = Read-Csv $InFile
 $header = $csv.Header
-$fixedCols = @('relpath','parent_path','base_key','index','english')
+$fixedCols = @('relpath','parent_path','base_key','index','english','english_comment')
 foreach ($c in $fixedCols) {
     if ($header -notcontains $c) {
-        throw "changeset.csv is missing required column '$c'. Expected header: $($fixedCols -join ', '), <locale>, ..."
+        throw "changeset.csv is missing required column '$c'. Expected header: $($fixedCols -join ', '), <locale>, <locale>_comment, ..."
     }
 }
-$locales = @($header | Where-Object { $_ -notin $fixedCols })
+# Per-locale value columns are everything that is neither a fixed column nor a
+# paired '<locale>_comment' / '<locale>_key' column.
+$locales = @($header | Where-Object { $_ -notin $fixedCols -and $_ -notlike '*_comment' -and $_ -notlike '*_key' })
 if ($locales.Count -eq 0) {
     throw "changeset.csv has no per-locale columns to apply."
 }
@@ -98,11 +108,22 @@ foreach ($loc in $locales) {
     $skipped = 0
     $missing = New-Object System.Collections.Generic.List[string]
 
+    $commentCol = "${loc}_comment"
+    $hasCommentCol = ($csv.Header -contains $commentCol)
+    $keyCol = "${loc}_key"
+    $hasKeyCol = ($csv.Header -contains $keyCol)
+
     foreach ($cr in $csv.Rows) {
         $cell = [string]$cr.$loc
         $english = [string]$cr.english
-        if ([string]::IsNullOrEmpty($cell)) { continue }
-        if (-not $IncludeEnglish -and $cell -eq $english) { continue }
+        $commentCell = if ($hasCommentCol) { ConvertFrom-CommentCell ([string]$cr.$commentCol) } else { '' }
+        $englishComment = ConvertFrom-CommentCell ([string]$cr.english_comment)
+        $keyCell = if ($hasKeyCol) { [string]$cr.$keyCol } else { '' }
+        $englishKey = [string]$cr.base_key
+        $hasValue = -not [string]::IsNullOrEmpty($cell) -and ($IncludeEnglish -or $cell -ne $english)
+        $hasComment = -not [string]::IsNullOrEmpty($commentCell) -and ($IncludeEnglish -or $commentCell -ne $englishComment)
+        $hasKey = -not [string]::IsNullOrEmpty($keyCell) -and ($IncludeEnglish -or $keyCell -ne $englishKey)
+        if (-not $hasValue -and -not $hasComment -and -not $hasKey) { continue }
 
         $basePath = [string]$cr.relpath
         $locPath = Get-LocaleRelpath $basePath $loc
@@ -134,16 +155,39 @@ foreach ($loc in $locales) {
 
         $lk = "{0}|{1}|{2}|{3}" -f $locPath, $effParent, $effKey, $index
         if ($idx.ContainsKey($lk)) {
-            $current = [string]$idx[$lk].value
-            if ($UntranslatedOnly -and $current -ne '' -and $current -ne $english) {
-                # Target already carries a real translation; do not clobber it.
-                $skipped++
-                continue
+            $row = $idx[$lk]
+            $rowApplied = $false
+            if ($hasValue) {
+                $current = [string]$row.value
+                if ($UntranslatedOnly -and $current -ne '' -and $current -ne $english) {
+                    # Target already carries a real translation; do not clobber it.
+                    $skipped++
+                } elseif ($current -ne $cell) {
+                    $row.value = $cell
+                    $rowApplied = $true
+                }
             }
-            if ($current -ne $cell) {
-                $idx[$lk].value = $cell
-                $applied++
+            if ($hasComment) {
+                $currentComment = [string]$row.preceding_comment
+                if ($UntranslatedOnly -and $currentComment -ne '' -and $currentComment -ne $englishComment) {
+                    # Target already carries a real comment translation; keep it.
+                    $skipped++
+                } elseif ($currentComment -ne $commentCell) {
+                    $row.preceding_comment = $commentCell
+                    $rowApplied = $true
+                }
             }
+            if ($hasKey) {
+                $currentKey = [string]$row.key
+                if ($UntranslatedOnly -and $currentKey -ne '' -and $currentKey -ne $englishKey) {
+                    # Target already carries a localized key; keep it.
+                    $skipped++
+                } elseif ($currentKey -ne $keyCell) {
+                    $row.key = $keyCell
+                    $rowApplied = $true
+                }
+            }
+            if ($rowApplied) { $applied++ }
         } else {
             $missing.Add(("{0} :: {1} :: {2}" -f $basePath, $baseKey, $index)) | Out-Null
         }

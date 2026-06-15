@@ -497,6 +497,16 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
                 ? " (further occurrences suppressed to FINE)" : ""));
   }
 
+  @Override
+  public String environment() {
+    try {
+      World w = world();
+      return (w == null) ? null : w.getEnvironment().name();
+    } catch (Throwable ignored) {
+      return null;
+    }
+  }
+
   /**
    * Vanilla region-folder subpath for the Folia environment. Folia preserves
    * the vanilla layout: overworld in {@code region/}, nether in

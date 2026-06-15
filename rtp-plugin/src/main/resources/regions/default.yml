@@ -1,6 +1,14 @@
 # --- RTP Region Configuration ---
 # Documentation: plugins/RTP/docs/admin/REGIONS.md
 
+# Optional cosmetic display name shown in user-facing surfaces (the /rtp info
+# [displayName] placeholder and the RTP GUI menu). Does NOT change the region's
+# identity: commands, permissions (rtp.regions.<name>) and config still use the
+# file/region name. Supports color/gradient codes (e.g. &#55ff55 or &a). When
+# omitted, the region name is used. On a network it is advertised to lobbies so
+# a cross-server destination shows this server's chosen words.
+# displayName: "&#55ff55Wild Overworld"
+
 # Target world. [0] = main world.
 world: "[0]"
 # Use vanilla /worldborder radius if true

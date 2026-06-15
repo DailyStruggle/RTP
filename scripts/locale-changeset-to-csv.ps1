@@ -15,15 +15,23 @@
 #
 #     scripts/out/changeset.csv
 #
-# with one ROW per changed baseline key and one COLUMN per language:
+# with one ROW per changed baseline key and, like the prior per-locale TSV
+# (which pairs a `value` column with a `preceding_comment` column AND a
+# per-locale `key` column), a TRIPLE of columns per language - the translated
+# value, its leading comment block, AND the localized key name:
 #
-#     relpath, parent_path, base_key, index, english, de, es, fr, it, ja, ...
+#     relpath, parent_path, base_key, index, english, english_comment,
+#       de, de_comment, de_key, es, es_comment, es_key, ...
 #
-# A translator (human or agent) fills in the per-language columns for just
-# those rows, then locale-changeset-from-csv.ps1 propagates the translations
-# back into every locale-<lang>.tsv (matched by the same langmap logic the
+# A translator (human or agent) fills in the per-language value, comment AND key
+# columns for just those rows, then locale-changeset-from-csv.ps1 propagates all
+# three back into every locale-<lang>.tsv (matched by the same langmap logic the
 # reconcile step uses). The normal locale-files-from-csv.ps1 then regenerates
-# the YAML tree.
+# the YAML tree (the per-locale key columns feed the synthesized <file>.lang.yml
+# rename maps). The `base_key` column is the English key name; a per-language
+# `<loc>_key` cell left empty or equal to `base_key` means the key is not
+# localized. Comment cells embed newlines as \n (same escape convention as the
+# per-locale TSV's preceding_comment column) and keep the leading '#'.
 #
 # It is deliberately a real CSV (RFC-4180 comma-quoted), not the tab-separated
 # .tsv the internal pipeline uses, because it is meant to be opened in a
@@ -140,9 +148,9 @@ function Test-MatchesKeysSelection($r, $sel) {
     return $false
 }
 
-# Resolve the locale's current value for a baseline row (using the langmap to
+# Resolve the locale's current row for a baseline row (using the langmap to
 # compute the translated key/parent). Returns $null when the locale has no row.
-function Get-LocaleValue($loc, $br, $basePath) {
+function Get-LocaleRow($loc, $br, $basePath) {
     $idx = $localeIdxByLoc[$loc]
     if (-not $idx) { return $null }
     $locPath = Get-LocaleRelpath $basePath $loc
@@ -159,7 +167,7 @@ function Get-LocaleValue($loc, $br, $basePath) {
         $effParent = $langmap[$br.parent_path]
     }
     $lk = "{0}|{1}|{2}|{3}" -f $locPath, $effParent, $effKey, $br.index
-    if ($idx.ContainsKey($lk)) { return $idx[$lk].value }
+    if ($idx.ContainsKey($lk)) { return $idx[$lk] }
     return $null
 }
 
@@ -173,31 +181,47 @@ foreach ($basePath in $baselineByPath.Keys) {
             if (-not (Test-MatchesKeysSelection $br $Keys)) { continue }
         }
 
-        # Gather per-locale current values.
+        # Gather per-locale current values, comments and key names.
         $localeVals = @{}
+        $localeComments = @{}
+        $localeKeys = @{}
         $anyUntranslated = $false
         foreach ($loc in $locales) {
-            $v = Get-LocaleValue $loc $br $basePath
-            if ($null -eq $v) { $v = '' }
+            $lr = Get-LocaleRow $loc $br $basePath
+            $v = if ($null -eq $lr) { '' } else { [string]$lr.value }
+            $c = if ($null -eq $lr) { '' } else { [string]$lr.preceding_comment }
+            $k = if ($null -eq $lr) { '' } else { [string]$lr.key }
             $localeVals[$loc] = $v
+            $localeComments[$loc] = $c
+            $localeKeys[$loc] = $k
+            # A locale is untranslated when the value, the comment, or the key
+            # is still empty or identical to the English baseline.
             if ($v -eq '' -or $v -eq $br.value) { $anyUntranslated = $true }
+            if ($br.preceding_comment -ne '' -and ($c -eq '' -or $c -eq $br.preceding_comment)) { $anyUntranslated = $true }
+            if ($br.key -ne '' -and ($k -eq '' -or $k -eq $br.key)) { $anyUntranslated = $true }
         }
 
         if ($UntranslatedOnly -and -not $anyUntranslated) { continue }
 
         $row = [ordered]@{
-            relpath     = $basePath
-            parent_path = $br.parent_path
-            base_key    = $br.base_key
-            index       = $br.index
-            english     = $br.value
+            relpath         = $basePath
+            parent_path     = $br.parent_path
+            base_key        = $br.base_key
+            index           = $br.index
+            english         = $br.value
+            english_comment = ConvertTo-CommentCell $br.preceding_comment
         }
-        foreach ($loc in $locales) { $row[$loc] = $localeVals[$loc] }
+        foreach ($loc in $locales) {
+            $row[$loc] = $localeVals[$loc]
+            $row["${loc}_comment"] = ConvertTo-CommentCell $localeComments[$loc]
+            $row["${loc}_key"] = $localeKeys[$loc]
+        }
         $outRows.Add([pscustomobject]$row) | Out-Null
     }
 }
 
-$header = @('relpath','parent_path','base_key','index','english') + $locales
+$header = @('relpath','parent_path','base_key','index','english','english_comment')
+foreach ($loc in $locales) { $header += $loc; $header += "${loc}_comment"; $header += "${loc}_key" }
 Write-Csv -Rows $outRows -Columns $header -Path $OutFile
 
 Write-Host ("Wrote {0} changeset row(s) for {1} locale(s) -> {2}" -f $outRows.Count, $locales.Count, $OutFile)

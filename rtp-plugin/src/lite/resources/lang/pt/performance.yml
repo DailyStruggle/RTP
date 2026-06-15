@@ -62,6 +62,19 @@ tempoAlocadoAssincrono: 50
 # @default: 19.0
 tpsMinimo: 19.0
 
+# Uso máximo do heap da JVM (porcentagem do heap máximo) antes que a geração
+# do cache em segundo plano seja pausada. Cada localização em cache fixa um
+# chunk, portanto um preenchimento ilimitado em um servidor com pouco heap pode
+# levar a JVM a uma coleta de lixo constante e deixar o servidor sem resposta
+# sem nenhum erro no console. Enquanto o uso estiver igual ou acima desse
+# limite, o RTP para de reabastecer o cache de localizações, mas continua
+# servindo as localizações já armazenadas aos jogadores em espera. 0 ou 100
+# desativa o limite.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapPorcentagem: 85.0
+
 # Enfileiramento pós-teletransporte
 # Se true, o plugin tentará preencher o cache de localizações imediatamente após um RTP.
 # Impacto: MÉDIO

@@ -686,11 +686,35 @@ final class QueueTask {
     }
 
     /**
-     * Fallback branch: either dispatch the pregen path (custom biomes OR the sender
-     * has {@code rtp.unqueued}), or enqueue the player and return null.
+     * Determines whether {@code region} is pumped by {@link io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing},
+     * i.e. whether {@code Region.execute()} is periodically invoked for it.
+     *
+     * <p>Only the permanently-configured regions in {@code permRegionLookup} are
+     * ticked; synthetic temp regions (shape/vert overrides and ADR-065
+     * world-override regions such as {@code default_world_nether}) are never
+     * pumped, so their teleport waitlist ({@code queueManager.playerQueue}) is
+     * never drained. Enqueuing a player on such a region traps them in the
+     * teleporting state forever. The check is by object identity because
+     * {@link Region#equals(Object)} is value-based (shape/vert/world) and a
+     * temp region cloned from {@code default} would otherwise compare equal to
+     * the pumped {@code default} region.
      */
+    private boolean isRegionPumped() {
+        for (Region r : RTP.selectionAPI.permRegionLookup.values()) {
+            if (r == region) return true;
+        }
+        return false;
+    }
+
     private void fallback() {
-        boolean unqueuedFast = custom || (sender != null && sender.hasPermission("rtp.unqueued"));
+        // A region that is not pumped by AsyncTaskProcessing (every synthetic
+        // temp region: shape/vert overrides and ADR-065 world-override regions)
+        // can never drain its teleport waitlist, so enqueuing would trap the
+        // player. Serve it through the pregen path so the teleport completes on
+        // first use instead.
+        boolean unqueuedFast = custom
+                || !isRegionPumped()
+                || (sender != null && sender.hasPermission("rtp.unqueued"));
         if (unqueuedFast) {
             RTP.log(Level.FINE,
                     "[ENQUEUE_TRACE] LocationGenerator taking UNQUEUED fast-path playerId=" + playerId);

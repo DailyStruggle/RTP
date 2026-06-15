@@ -89,7 +89,18 @@ public final class NetworkRouter {
         this.nowMs = nowMs;
     }
 
+    /**
+     * Returns the configured routing mode.
+     *
+     * @return the routing mode
+     */
     public Mode mode() { return mode; }
+
+    /**
+     * Returns the local backend server id.
+     *
+     * @return the local server id
+     */
     public String localServerId() { return localServerId; }
 
     /**
@@ -101,6 +112,7 @@ public final class NetworkRouter {
      * @param regionKey optional region constraint parsed from the command
      *                  arguments (see {@link #parseRegionArg(String)}); null
      *                  treated as "no constraint"
+     * @return the routing decision; never {@code null}
      */
     public RoutingDecision route(UUID playerId, String regionKey) {
         return route(playerId, regionKey, null);
@@ -117,8 +129,11 @@ public final class NetworkRouter {
      * {@link RoutingDecision.FallbackReason#REGION_UNAVAILABLE} so the caller
      * can emit the localized {@code networkRegionUnavailable} message.
      *
+     * @param playerId   the invoking player UUID
+     * @param regionKey  optional region constraint; {@code null} means no constraint
      * @param serverHint optional pinned backend server id; {@code null}/empty
      *                   for "selector picks per snapshot"
+     * @return the routing decision; never {@code null}
      */
     public RoutingDecision route(UUID playerId, String regionKey, String serverHint) {
         String hint = (serverHint == null || serverHint.isEmpty()) ? null : serverHint;
@@ -277,6 +292,7 @@ public final class NetworkRouter {
      * non-network-mode callers can stay on this signature; H2 hooks should
      * prefer {@link #parseRegionArgQualified(String)}.
      *
+     * @param arg the raw region argument from the command; may be {@code null}
      * @return the unqualified region key, or {@code null} when the argument
      *         is null/empty
      * @throws IllegalArgumentException when the input contains the still-
@@ -291,6 +307,8 @@ public final class NetworkRouter {
      * Parse an optionally-qualified region argument. Returns {@code null}
      * when {@code arg} is null or whitespace-only.
      *
+     * @param arg the raw region argument; may be {@code null}
+     * @return the parsed region, or {@code null} when {@code arg} is null or whitespace-only
      * @throws IllegalArgumentException when {@code arg} contains the
      *         reserved {@code =} character (D7) or more than one colon
      */

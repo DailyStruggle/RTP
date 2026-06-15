@@ -52,6 +52,16 @@ import java.util.Set;
  *                           the selector to filter peers that actually have a
  *                           coordinate ready for cross-server reservation.
  *                           Default empty.
+ * @param regionMetadata     open-ended, per-region descriptive attributes
+ *                           advertised by the backend, keyed
+ *                           {@code "<region>.<attribute>"} (e.g.
+ *                           {@code "default.env" -> "NORMAL"},
+ *                           {@code "nether.block" -> "NETHERRACK"}). Purely
+ *                           informational (icon / display hints for menus and
+ *                           addons); the selector does not score against it.
+ *                           Flat {@code String -> String} so any producer can
+ *                           add new attributes without a schema change.
+ *                           Default empty.
  */
 public record BackendHeartbeat(
         String serverId,
@@ -71,7 +81,8 @@ public record BackendHeartbeat(
         int keptCount,
         int networkReservedCount,
         Set<String> regions,
-        Map<String, Integer> regionKeptCounts
+        Map<String, Integer> regionKeptCounts,
+        Map<String, String> regionMetadata
 ) {
     public BackendHeartbeat {
         Objects.requireNonNull(serverId, "serverId");
@@ -80,10 +91,40 @@ public record BackendHeartbeat(
         Objects.requireNonNull(worldsLoaded, "worldsLoaded");
         Objects.requireNonNull(regions, "regions");
         Objects.requireNonNull(regionKeptCounts, "regionKeptCounts");
+        Objects.requireNonNull(regionMetadata, "regionMetadata");
         regionsAvailable = List.copyOf(regionsAvailable);
         worldsLoaded = List.copyOf(worldsLoaded);
         regions = Set.copyOf(regions);
         regionKeptCounts = Map.copyOf(regionKeptCounts);
+        regionMetadata = Map.copyOf(regionMetadata);
+    }
+
+    /**
+     * Convenience constructor for callers that carry the cross-server fields
+     * but have not opted into {@code regionMetadata}; defaults it to empty.
+     */
+    public BackendHeartbeat(String serverId,
+                            int schemaVersion,
+                            PluginState pluginState,
+                            boolean acceptingRequests,
+                            long lastSeenEpochMs,
+                            double mspt,
+                            int queueDepth,
+                            int softCap,
+                            long heapUsedBytes,
+                            long heapMaxBytes,
+                            int playerCount,
+                            List<String> regionsAvailable,
+                            List<String> worldsLoaded,
+                            boolean killSwitch,
+                            int keptCount,
+                            int networkReservedCount,
+                            Set<String> regions,
+                            Map<String, Integer> regionKeptCounts) {
+        this(serverId, schemaVersion, pluginState, acceptingRequests, lastSeenEpochMs,
+                mspt, queueDepth, softCap, heapUsedBytes, heapMaxBytes, playerCount,
+                regionsAvailable, worldsLoaded, killSwitch,
+                keptCount, networkReservedCount, regions, regionKeptCounts, Map.of());
     }
 
     /**
@@ -108,7 +149,7 @@ public record BackendHeartbeat(
         this(serverId, schemaVersion, pluginState, acceptingRequests, lastSeenEpochMs,
                 mspt, queueDepth, softCap, heapUsedBytes, heapMaxBytes, playerCount,
                 regionsAvailable, worldsLoaded, false,
-                0, 0, Set.of(), Map.of());
+                0, 0, Set.of(), Map.of(), Map.of());
     }
 
     /**
@@ -134,7 +175,7 @@ public record BackendHeartbeat(
         this(serverId, schemaVersion, pluginState, acceptingRequests, lastSeenEpochMs,
                 mspt, queueDepth, softCap, heapUsedBytes, heapMaxBytes, playerCount,
                 regionsAvailable, worldsLoaded, killSwitch,
-                0, 0, Set.of(), Map.of());
+                0, 0, Set.of(), Map.of(), Map.of());
     }
 
     /** Plugin lifecycle state on the backend at heartbeat publication time. */

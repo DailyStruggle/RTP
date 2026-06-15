@@ -33,6 +33,8 @@ public class BiomeActivityCmd extends BaseRTPCmdImpl {
   private static final int BAR_WIDTH = 20;
 
   /**
+   * Constructs the biome activity subcommand.
+   *
    * @param parent the parent command tree (the {@code /rtp} root), or {@code null}
    */
   public BiomeActivityCmd(@Nullable CommandsAPICommand parent) {

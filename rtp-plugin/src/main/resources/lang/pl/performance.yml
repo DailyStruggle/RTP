@@ -50,6 +50,19 @@ przydzielonyCzasAsync: 50
 # @default: 19.0
 minTPS: 19.0
 
+# Maksymalne wykorzystanie sterty JVM (procent maksymalnej sterty) przed
+# wstrzymaniem generowania pamięci podręcznej w tle. Każda zapisana w pamięci
+# podręcznej lokalizacja blokuje chunk, więc nieograniczone wypełnianie na
+# serwerze z małą stertą może wpędzić JVM w ciągłe odśmiecanie pamięci i
+# sprawić, że serwer przestanie odpowiadać bez żadnego błędu w konsoli.
+# Dopóki użycie jest równe lub przekracza ten próg, RTP przestaje uzupełniać
+# pamięć podręczną lokalizacji, ale nadal udostępnia już zapisane lokalizacje
+# oczekującym graczom. 0 lub 100 wyłącza ten limit.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapProcent: 85.0
+
 # Uzupełnij pamięć podręczną regionu natychmiast po udanej teleportacji.
 # @type: boolean
 # @default: false

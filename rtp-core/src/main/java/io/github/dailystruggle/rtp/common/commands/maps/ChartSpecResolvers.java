@@ -54,6 +54,10 @@ public final class ChartSpecResolvers {
    * replacing any prior registration. Returns the displaced resolver (or
    * {@code null} if none was registered). Intended for platform adapters
    * and addons to supply a richer implementation than the rtp-core default.
+   *
+   * @param kind     the chart kind to register for; never {@code null}
+   * @param resolver the resolver to register; never {@code null}
+   * @return the previously-registered resolver, or {@code null} if none
    */
   public static ChartSpecResolver register(ChartSpec.Kind kind, ChartSpecResolver resolver) {
     Objects.requireNonNull(kind, "kind");
@@ -66,6 +70,9 @@ public final class ChartSpecResolvers {
    * registered. {@link MapDispatch#paint} translates a {@code null} result
    * into the configurable {@code mapResolverMissing} message
    * (REQ-RTP-F-013 / S-004).
+   *
+   * @param kind the chart kind to look up; never {@code null}
+   * @return the registered resolver, or {@code null} if none is registered
    */
   public static ChartSpecResolver get(ChartSpec.Kind kind) {
     Objects.requireNonNull(kind, "kind");

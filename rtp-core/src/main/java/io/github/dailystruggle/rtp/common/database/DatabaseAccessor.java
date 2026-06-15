@@ -51,9 +51,17 @@ public abstract class DatabaseAccessor<D> {
 
   /** Container for a database deletion request */
   protected static final class DeleteRequest {
+    /** The table to delete from. */
     public final String tableName;
+    /** The lookup key-value pair identifying the row to delete. */
     public final Map.Entry<String, Object> lookup;
 
+    /**
+     * Constructs a deletion request.
+     *
+     * @param tableName the table to delete from
+     * @param lookup    the key-value pair identifying the row
+     */
     public DeleteRequest(String tableName, Map.Entry<String, Object> lookup) {
       this.tableName = tableName;
       this.lookup = lookup;
@@ -84,14 +92,23 @@ public abstract class DatabaseAccessor<D> {
       this.playerId = playerId;
     }
 
+    /** @return the unique location id */
     public String getId() { return id; }
+    /** @return the region name this location belongs to */
     public String getRegionName() { return regionName; }
+    /** @return the world name */
     public String getWorldName() { return worldName; }
+    /** @return the X coordinate */
     public int getX() { return x; }
+    /** @return the Y coordinate */
     public int getY() { return y; }
+    /** @return the Z coordinate */
     public int getZ() { return z; }
+    /** @return the number of generation attempts */
     public int getAttempts() { return attempts; }
+    /** @return the RNG seed used to generate this location */
     public long getSeed() { return seed; }
+    /** @return the player UUID this location was reserved for, or {@code null} */
     @Nullable public UUID getPlayerId() { return playerId; }
   }
 
@@ -112,6 +129,11 @@ public abstract class DatabaseAccessor<D> {
   /** Default constructor for DatabaseAccessor */
   protected DatabaseAccessor() {}
 
+  /**
+   * Returns {@code true} when system-level database logging is enabled in {@code logging.yml}.
+   *
+   * @return {@code true} if system database logging is enabled
+   */
   public boolean isSystemDatabaseLoggingEnabled() {
     if (RTP.configs != null) {
       io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys> logging =
@@ -131,9 +153,17 @@ public abstract class DatabaseAccessor<D> {
 
   /** Simple container describing a file write request */
   protected static final class FileWriteRequest {
+    /** Absolute path of the file to write. */
     public final String path;
+    /** Raw bytes to write. */
     public final byte[] data;
 
+    /**
+     * Constructs a file write request.
+     *
+     * @param path absolute path of the file to write
+     * @param data raw bytes to write
+     */
     public FileWriteRequest(String path, byte[] data) {
       this.path = path;
       this.data = data;
@@ -142,9 +172,17 @@ public abstract class DatabaseAccessor<D> {
 
   /** Simple container describing a file read request */
   protected static final class FileReadRequest {
+    /** Absolute path of the file to read. */
     public final String path;
+    /** Future that will be completed with the file bytes. */
     public final CompletableFuture<Optional<byte[]>> result;
 
+    /**
+     * Constructs a file read request.
+     *
+     * @param path   absolute path of the file to read
+     * @param result future to complete with the file bytes
+     */
     public FileReadRequest(String path, CompletableFuture<Optional<byte[]>> result) {
       this.path = path;
       this.result = result;

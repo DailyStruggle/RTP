@@ -87,7 +87,8 @@ public final class SqlNetworkStateSchema {
                 kept_count             INT           NOT NULL DEFAULT 0,
                 network_reserved_count INT           NOT NULL DEFAULT 0,
                 regions                VARCHAR(4000) NOT NULL DEFAULT '',
-                region_kept_counts     VARCHAR(4000) NOT NULL DEFAULT ''
+                region_kept_counts     VARCHAR(4000) NOT NULL DEFAULT '',
+                region_metadata        VARCHAR(4000) NOT NULL DEFAULT ''
             )
             """;
 
@@ -115,13 +116,15 @@ public final class SqlNetworkStateSchema {
             "ALTER TABLE rtp_network_backends ADD COLUMN IF NOT EXISTS kept_count INT NOT NULL DEFAULT 0",
             "ALTER TABLE rtp_network_backends ADD COLUMN IF NOT EXISTS network_reserved_count INT NOT NULL DEFAULT 0",
             "ALTER TABLE rtp_network_backends ADD COLUMN IF NOT EXISTS regions VARCHAR(4000) NOT NULL DEFAULT ''",
-            "ALTER TABLE rtp_network_backends ADD COLUMN IF NOT EXISTS region_kept_counts VARCHAR(4000) NOT NULL DEFAULT ''"
+            "ALTER TABLE rtp_network_backends ADD COLUMN IF NOT EXISTS region_kept_counts VARCHAR(4000) NOT NULL DEFAULT ''",
+            "ALTER TABLE rtp_network_backends ADD COLUMN IF NOT EXISTS region_metadata VARCHAR(4000) NOT NULL DEFAULT ''"
     };
     private static final String[] DDL_BACKENDS_ADD_L6_MYSQL = {
             "ALTER TABLE rtp_network_backends ADD COLUMN kept_count INT NOT NULL DEFAULT 0",
             "ALTER TABLE rtp_network_backends ADD COLUMN network_reserved_count INT NOT NULL DEFAULT 0",
             "ALTER TABLE rtp_network_backends ADD COLUMN regions VARCHAR(4000) NOT NULL DEFAULT ''",
-            "ALTER TABLE rtp_network_backends ADD COLUMN region_kept_counts VARCHAR(4000) NOT NULL DEFAULT ''"
+            "ALTER TABLE rtp_network_backends ADD COLUMN region_kept_counts VARCHAR(4000) NOT NULL DEFAULT ''",
+            "ALTER TABLE rtp_network_backends ADD COLUMN region_metadata VARCHAR(4000) NOT NULL DEFAULT ''"
     };
 
     private static final String DDL_TOKENS = """

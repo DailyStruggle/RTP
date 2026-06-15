@@ -235,7 +235,16 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
         }
       }
 
-      for (int i = minY; i < maxY; i++) {
+      // Phase 3 scans inclusively up to maxY. Phase 2 narrows maxY DOWN onto
+      // the lowest air-pair it samples, which on simple terrain is exactly the
+      // valid standing Y (feet just above the ground). An exclusive `i < maxY`
+      // bound never re-tested that converged candidate, so a live, generated
+      // land chunk whose only landing aligned with the Phase-2 step grid was
+      // silently dropped at cold->hot promotion ([PROMOTE_DIAG] vert.adjust=null).
+      // Cap the head read (i + 1) at the world top so the inclusive bound never
+      // reads past getMaxHeight().
+      int scanTop = Math.min(maxY, chunk.getWorld().getMaxHeight() - 2);
+      for (int i = minY; i <= scanTop; i++) {
         int skylight = 15;
         if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
         if (!chunk.isAir(x, i - 1, z)
@@ -253,6 +262,56 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
       }
     }
     return false;
+  }
+
+  /**
+   * Re-validates a single, caller-specified column using the same ground +
+   * headroom + safety predicate as Phase 3 of {@link #adjust(RTPChunk,
+   * MutableRTPCoords)}. The cold-&gt;hot promotion path uses this to re-verify
+   * the exact column where a candidate was originally selected, rather than
+   * re-sampling the fixed {@code testCoords} sub-columns (which silently
+   * dropped good land locations whose only safe column was not one of the
+   * sampled few - the {@code [PROMOTE_DIAG] vert.adjust=null} drop).
+   */
+  @Override
+  public @Nullable RTPCoords adjustColumn(@NotNull RTPChunk chunk, int localX, int localZ) {
+    if (chunk == null) throw new NullPointerException("Chunk cannot be null");
+
+    int maxY = getNumber(JumpAdjustorKeys.maxY, 256L).intValue();
+    int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();
+    maxY = Math.min(maxY, chunk.getWorld().getMaxHeight());
+
+    boolean requireSkyLight;
+    Object o = getData().getOrDefault(JumpAdjustorKeys.requireSkyLight, false);
+    if (o instanceof Boolean) {
+      requireSkyLight = (Boolean) o;
+    } else requireSkyLight = Boolean.parseBoolean(o.toString());
+
+    SafetySnapshot snap = readSafetySnapshot();
+    Set<String> unsafeBlocks = snap.unsafeBlocks();
+    int platformDepth = snap.platformDepth();
+
+    int x = localX & 15;
+    int z = localZ & 15;
+    int globalX = (chunk.x() << 4) + x;
+    int globalZ = (chunk.z() << 4) + z;
+
+    // Inclusive scan to maxY with a one-cell headroom cap (mirrors Phase 3).
+    int scanTop = Math.min(maxY, chunk.getWorld().getMaxHeight() - 2);
+    for (int i = minY; i <= scanTop; i++) {
+      int skylight = 15;
+      if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
+      if (!chunk.isAir(x, i - 1, z)
+          && chunk.isAir(x, i, z)
+          && chunk.isAir(x, i + 1, z)
+          && skylight > 7
+          && chunk.isSafe(x, i + 1, z, unsafeBlocks)
+          && chunk.isSafe(x, i, z, unsafeBlocks)
+          && isGroundSafe(chunk, x, i, z, unsafeBlocks, platformDepth)) {
+        return new MutableRTPCoords(chunk.getWorld().name(), globalX, i, globalZ).toImmutable();
+      }
+    }
+    return null;
   }
 
   /**

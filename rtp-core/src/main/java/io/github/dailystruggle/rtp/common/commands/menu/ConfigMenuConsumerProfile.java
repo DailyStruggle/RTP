@@ -40,6 +40,8 @@ public final class ConfigMenuConsumerProfile implements MenuConsumerProfile {
     private final YamlCommentLookup commentLookup;
 
     /**
+     * Constructs a profile backed by the given section resolver.
+     *
      * @param sectionResolver maps a config-file basename without {@code .yml}
      *                        (e.g. {@code "performance"}, {@code "config"}) to the
      *                        loaded {@link RtpYamlSection} root, or returns
@@ -108,6 +110,8 @@ public final class ConfigMenuConsumerProfile implements MenuConsumerProfile {
     /**
      * Visible for tests: expose the caller-supplied resolver. Production
      * callers should not need this.
+     *
+     * @return the section resolver supplied at construction time
      */
     public Function<String, RtpYamlSection> sectionResolver() {
         return sectionResolver;

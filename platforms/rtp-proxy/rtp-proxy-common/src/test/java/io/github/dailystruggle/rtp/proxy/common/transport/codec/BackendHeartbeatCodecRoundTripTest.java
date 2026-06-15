@@ -91,6 +91,30 @@ class BackendHeartbeatCodecRoundTripTest {
     }
 
     @Test
+    @DisplayName("regionMetadata (per-region descriptive attributes) survives the round-trip")
+    void regionMetadataRoundTrip() {
+        Map<String, String> meta = Map.of(
+                "default.env", "NORMAL",
+                "default.block", "GRASS_BLOCK",
+                "nether.env", "NETHER",
+                "nether.block", "NETHERRACK");
+        BackendHeartbeat in = new BackendHeartbeat(
+                "backend-a", 3, PluginState.READY, true,
+                1_700_000_000_000L, 12.5, 7, 100,
+                512L * 1024 * 1024, 2048L * 1024 * 1024, 3,
+                List.of("default", "nether"), List.of("world", "world_nether"),
+                false,
+                42, 5,
+                Set.of("default", "nether"),
+                Map.of("default", 10, "nether", 7),
+                meta);
+        BackendHeartbeat out = BackendHeartbeatCodec.decode(BackendHeartbeatCodec.encode(in));
+        assertEquals(meta, out.regionMetadata());
+        // The earlier cross-server fields are unaffected by the new trailing field.
+        assertEquals(in.regionKeptCounts(), out.regionKeptCounts());
+    }
+
+    @Test
     @DisplayName("a legacy row (no cross-server fields) decodes to zero/empty defaults")
     void preL6RowDecodesToDefaults() {
         // Encode a legacy heartbeat that predates the cross-server field set; the canonical

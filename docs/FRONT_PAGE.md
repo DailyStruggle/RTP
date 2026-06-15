@@ -323,6 +323,7 @@ Watch the background scan crawl the spiral and accumulate spatial memory in real
 - **Per-region arrival schematics.** Drop a `.schem` named after a region into `plugins/RTP/schematics/` (e.g. `schematics/default.schem`) and every teleport into that region pastes it - a lobby pad, arrival shrine, or custom platform - centered on the landing spot. Cross-platform Sponge `.schem`, decoded in-house (no WorldEdit required), claim-aware (never overwrites protected land) and audited; the bundled Skyblock prefab ships one ready to go.
 - PlaceholderAPI: queue depth (total/public/personal), last-teleport coordinates, player status.
 - Public `rtp-api` (same surface as Free) - trigger LeafRTP from GUI, NPC, quest reward; build your own UX without forking.
+- **Platform-agnostic addons** - addons compile against `rtp-api` only and load through the `RTPAddon` `ServiceLoader` SPI, so one addon module runs unchanged on Spigot, Paper, Folia, Fabric, and NeoForge. Config, safety hooks, teleport-pipeline callbacks, and scheduling are all reached through platform-neutral APIs; you only add a platform module when the addon opens a platform-native UI. See the bundled `RTP_ExampleAddon`.
 
 **Bundled claim integrations** (no extra download, folded in per ADR-019): Factions, GriefDefender, GriefPrevention, HuskTowns, Lands, RedProtect, TownyAdvanced, WorldGuard.
 
@@ -345,6 +346,7 @@ LeafRTP-Pro ships, in the core engine, a long list of capabilities that competin
 | Built-in operator diagnostics in `/rtp info` | Live queue depth and growth, pipeline latency percentiles, chunk-ticket leak rate, TPS/MSPT, database latency, a per-region Folia table, plus generation success/failure rate and the top coordinate-rejection cause (biome, unsafe block, claim, ...). No separate metrics add-on. |
 | Command-block & console ready | The unified command framework parses player, console, and command-block callers with equal safety - drive `/rtp` from redstone, datapacks, or scripts. |
 | Self-scheduling API tasks | `RTPRunnable` routes work onto the correct entity / region / async thread automatically via `schedule()` - addon authors get Folia-correct scheduling for free. |
+| Platform-agnostic addons (one module, every platform) | Addons compile against `rtp-api` only and load via the `RTPAddon` `ServiceLoader` SPI, so the same addon jar runs on Spigot, Paper, Folia, Fabric, and NeoForge - config, safety hooks, and teleport-pipeline callbacks are all platform-neutral. A platform module is needed only when the addon opens a platform-native UI (compare the bundled `RTP_ExampleAddon` with the GUI addon). |
 | Live config reload (no restart) | Retune regions/safety/effects without a restart: `/rtp reload` (all) or `/rtp reload <file>` (one file); `/rtp config <file> set k=v` saves and reloads automatically. |
 
 </details>

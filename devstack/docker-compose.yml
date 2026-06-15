@@ -141,7 +141,7 @@ services:
     entrypoint:
       - /bin/bash
       - -c
-      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+      - 'mkdir -p /data/plugins/RTP/regions && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && (cp -f /seed/regions/*.yml /data/plugins/RTP/regions/ 2>/dev/null || true) && chown -R 1000:1000 /data/plugins/RTP && exec /start'
     volumes:
       # Plugin jars: bind a PER-BACKEND plugins dir into /data/plugins (writable).
       # We MUST NOT share ./jars/plugin between backend-a and backend-b: Paper writes
@@ -160,6 +160,12 @@ services:
       # logs (BukkitNetworkBridge push/snapshot, PeerRegionRegistry peerEntries)
       # are visible without an in-container edit.
       - ./backend-a/rtp-config/logging.yml:/seed/logging.yml:ro
+      # Seed-only (read-only): the single default region (overworld). Copied into
+      # /data/plugins/RTP/regions/ by the entrypoint shim above; the plugin reads
+      # it on first load and never overwrites an existing region file. Each backend
+      # ships one default region in a distinct dimension (a=overworld, b=nether,
+      # c=end) to demo per-server load distribution + configurable displayName.
+      - ./backend-a/rtp-config/regions:/seed/regions:ro
       # PATCH_DEFINITIONS source: a single JSON patch shared across both backends
       # that flips velocity.enabled=true + sets secret-file. mc-image-helper applies
       # it after refreshing the upstream Paper defaults, so the setting is permanent.
@@ -184,6 +190,12 @@ services:
       # lock file. Bind mounts also auto-clear on `down -v` via host rm fallback
       # below; for plain `down`, the dir simply persists on disk and is reused.
       - ./backend-a/world:/data/world
+      # Nether + End as host binds too, so the pre-generated spawn-area chunks
+      # seeded by seed-pregen-worlds.ps1 are present (Paper keeps these as
+      # top-level dirs). backend-a's default region targets the overworld; these
+      # extra worlds remain available for ad-hoc testing.
+      - ./backend-a/world_nether:/data/world_nether
+      - ./backend-a/world_the_end:/data/world_the_end
     depends_on:
       redis:
         condition: service_healthy
@@ -343,7 +355,7 @@ services:
     entrypoint:
       - /bin/bash
       - -c
-      - 'mkdir -p /data/plugins/RTP && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+      - 'mkdir -p /data/plugins/RTP/regions && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && (cp -f /seed/regions/*.yml /data/plugins/RTP/regions/ 2>/dev/null || true) && chown -R 1000:1000 /data/plugins/RTP && exec /start'
     volumes:
       # See backend-a: per-backend plugins dir (shared host bind corrupts the
       # .paper-remapped cache when both backends race on it).
@@ -352,12 +364,20 @@ services:
       - ./backend-b/rtp-config/network.yml:/seed/network.yml:ro
       # See backend-a: seed logging.yml (min_level: FINE).
       - ./backend-b/rtp-config/logging.yml:/seed/logging.yml:ro
+      # Seed-only (read-only): the single default region (Nether). See backend-a
+      # for the seed-copy contract; backend-b's default lands in the Nether to
+      # demo per-server load distribution + configurable displayName.
+      - ./backend-b/rtp-config/regions:/seed/regions:ro
       - ./shared/paper-patches:/paper-patches:ro
       - ./shared/forwarding.secret:/data/forwarding.secret
       # See backend-a: shared mc-image-helper download cache.
       - mc-image-cache:/data/.cache
       # See backend-a: world dir as a host bind, not a named volume.
       - ./backend-b/world:/data/world
+      # Nether + End host binds for the pre-generated spawn-area chunks.
+      # backend-b's default region targets the Nether (world_nether).
+      - ./backend-b/world_nether:/data/world_nether
+      - ./backend-b/world_the_end:/data/world_the_end
     depends_on:
       redis:
         condition: service_healthy
@@ -419,12 +439,19 @@ services:
       # parent /data/config stays root-owned (created by this mkdir), the mod
       # cannot create that file and crashes with
       # "./config/FabricProxy-Lite.toml (Permission denied)".
-      - 'mkdir -p /data/config/rtp && cp -f /seed/network.yml /data/config/rtp/network.yml && chown -R 1000:1000 /data/config && chmod -R u+rwX /data/config && exec /start'
+      - 'mkdir -p /data/config/rtp/regions && cp -f /seed/network.yml /data/config/rtp/network.yml && (cp -f /seed/regions/*.yml /data/config/rtp/regions/ 2>/dev/null || true) && chown -R 1000:1000 /data/config && chmod -R u+rwX /data/config && exec /start'
     volumes:
       # Fabric mods directory (NOT plugins).
       - ./backend-c/mods:/data/mods
       # Seed-only (read-only); copied into /data/config/rtp/network.yml at boot.
       - ./backend-c/rtp-config/network.yml:/seed/network.yml:ro
+      # Seed-only (read-only): the single default region (End). Copied into
+      # /data/config/rtp/regions/ by the entrypoint shim (Fabric config dir is
+      # lowercase `rtp`, not `RTP`). backend-c's default lands in the End to demo
+      # per-server load distribution + configurable displayName. Fabric keeps
+      # Nether/End inside /data/world (DIM-1 / DIM1), so no extra world binds are
+      # needed beyond the ./backend-c/world mount below.
+      - ./backend-c/rtp-config/regions:/seed/regions:ro
       - ./shared/forwarding.secret:/data/forwarding.secret
       # See backend-a: shared mc-image-helper download cache.
       - mc-image-cache:/data/.cache

@@ -14,7 +14,14 @@ import java.util.UUID;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.jetbrains.annotations.Nullable;
 
+/** Top-level {@code /rtp config} command. Dynamically registers sub-commands for each loaded config file. */
 public class ConfigCmd extends BaseRTPCmdImpl {
+
+  /**
+   * Constructs the config command and schedules sub-command registration.
+   *
+   * @param parent the parent command tree, or {@code null}
+   */
   public ConfigCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
 
@@ -37,6 +44,7 @@ public class ConfigCmd extends BaseRTPCmdImpl {
     return true;
   }
 
+  /** Registers sub-commands for each loaded config file. Called asynchronously after startup. */
   public void addCommands() {
     if (!getCommandLookup().containsKey("language")) {
       addSubCommand(new LanguageCmd(this));

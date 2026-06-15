@@ -45,6 +45,7 @@ import org.jetbrains.annotations.Nullable;
  * triggers a synchronous chunk load.</p>
  */
 public class FixedAdjustor extends VerticalAdjustor<FixedAdjustorKeys> {
+  /** Command parameters for tab-completion of {@code /rtp vert:fixed}. */
   protected static final Map<String, CommandParameter> subParameters = new ConcurrentHashMap<>();
 
   private static final EnumMap<FixedAdjustorKeys, Object> defaults =
@@ -74,6 +75,11 @@ public class FixedAdjustor extends VerticalAdjustor<FixedAdjustorKeys> {
             -64, 0, 64, 128, 256));
   }
 
+  /**
+   * Constructs a FixedAdjustor with the given placement verifiers.
+   *
+   * @param verifiers list of placement verifiers applied after Y selection
+   */
   public FixedAdjustor(List<Predicate<RTPCoords>> verifiers) {
     super(FixedAdjustorKeys.class, "fixed", verifiers, defaults);
   }

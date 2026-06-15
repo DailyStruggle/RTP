@@ -44,18 +44,31 @@ public class ConfigSearchSubCmd extends BaseRTPCmdImpl {
     @FunctionalInterface
     public interface Handler {
         /**
-         * @param callerId the submitting player's UUID.
-         * @param query    the raw query string typed in the anvil GUI.
+         * Runs the search and renders the results for the given player.
+         *
+         * @param callerId the submitting player's UUID
+         * @param query    the raw query string typed in the anvil GUI
          */
         void onSearch(UUID callerId, String query);
     }
 
     private @Nullable Handler handler;
 
+    /**
+     * Constructs the subcommand with no handler wired.
+     *
+     * @param parent the parent command tree, or {@code null}
+     */
     public ConfigSearchSubCmd(@Nullable CommandsAPICommand parent) {
         this(parent, null);
     }
 
+    /**
+     * Constructs the subcommand with an optional handler.
+     *
+     * @param parent  the parent command tree, or {@code null}
+     * @param handler the search handler, or {@code null} to wire later
+     */
     public ConfigSearchSubCmd(@Nullable CommandsAPICommand parent, @Nullable Handler handler) {
         super(parent);
         this.handler = handler;
@@ -76,6 +89,8 @@ public class ConfigSearchSubCmd extends BaseRTPCmdImpl {
      * {@link ConfigCmd#addCommands()} (5-tick deferred) and have its handler
      * filled in once the renderer + token registry + search builder are
      * available.
+     *
+     * @param handler the new handler, or {@code null} to disable
      */
     public void setHandler(@Nullable Handler handler) {
         this.handler = handler;

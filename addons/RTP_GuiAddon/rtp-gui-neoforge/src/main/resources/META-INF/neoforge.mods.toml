@@ -1,0 +1,41 @@
+# NeoForge mod metadata for the RTP GUI addon.
+# The entry point is the @Mod-annotated RTPGuiNeoForgeMod. This descriptor ships
+# inside the single multi-loader addon jar alongside fabric.mod.json + plugin.yml.
+
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "GPL-3.0-or-later"
+issueTrackerURL = "https://github.com/DailyStruggle/RTP/issues"
+
+[[mods]]
+modId = "rtp_gui"
+version = "${file.jarVersion}"
+displayName = "RTP GUI Addon"
+authors = "DailyStruggle"
+description = '''
+DonutSMP-style destination picker GUI for RTP. NeoForge entry point of the single multi-loader addon jar.
+'''
+
+# RTP itself must be present - the addon binds to RTP's API and engine.
+[[dependencies.rtp_gui]]
+modId = "rtp"
+type = "required"
+versionRange = "[3,)"
+ordering = "AFTER"
+side = "BOTH"
+
+# NeoForge runtime dependency (MC 26.1 line; JDK 25).
+[[dependencies.rtp_gui]]
+modId = "neoforge"
+type = "required"
+versionRange = "[26.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+# Minecraft runtime dependency.
+[[dependencies.rtp_gui]]
+modId = "minecraft"
+type = "required"
+versionRange = "[26.1,)"
+ordering = "NONE"
+side = "BOTH"

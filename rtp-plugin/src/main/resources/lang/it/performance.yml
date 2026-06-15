@@ -50,6 +50,19 @@ tempoAssegnatoAsinc: 50
 # @default: 19.0
 tpsMinimo: 19.0
 
+# Utilizzo massimo dell'heap della JVM (percentuale dell'heap massimo) prima
+# che la generazione della cache in background venga messa in pausa. Ogni
+# posizione memorizzata nella cache blocca un chunk, quindi un riempimento
+# illimitato su un server con heap ridotto può portare la JVM a una garbage
+# collection continua e rendere il server non reattivo senza alcun errore in
+# console. Finché l'utilizzo è pari o superiore a questa soglia, RTP smette di
+# riempire la cache delle posizioni ma continua a servire le posizioni già
+# memorizzate ai giocatori in attesa. 0 o 100 disabilita il limite.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapPercentuale: 85.0
+
 # Riempi la cache della regione immediatamente dopo un teletrasporto riuscito.
 # @type: boolean
 # @default: false

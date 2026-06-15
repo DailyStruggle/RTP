@@ -194,7 +194,10 @@ public class Configs {
     return true;
   }
 
-  // 1. Isolate Configuration Parsing
+  /**
+   * Reloads all configuration parsers from disk, replacing the current parser maps atomically.
+   * Cancels any in-flight teleports and kills the scan task before reloading.
+   */
   public void reloadConfigs() {
     RTP.log(Level.FINE, "[RTP] reloadConfigs(): killing ScanTask and clearing processingPlayers");
     ScanTask.kill();
@@ -299,7 +302,10 @@ public class Configs {
     RTP.log(Level.FINE, "[RTP] reloadConfigs(): complete (in-flight tasks retain old snapshots)");
   }
 
-  // 2. Isolate Region Instantiation
+  /**
+   * Reloads all regions from the current region config parsers.
+   * Shuts down existing regions and re-instantiates them from disk.
+   */
   public void reloadRegions() {
     RTP.log(Level.FINE,
         "[RTP] reloadRegions(): shutting down " + RTP.selectionAPI.permRegionLookup.size()
@@ -411,7 +417,10 @@ public class Configs {
         "[RTP] reloadRegions(): built " + regionCount + " region(s) (" + dormantCount + " dormant)");
   }
 
-  // 3. Preserve original method for standard reload commands
+  /**
+   * Performs a full reload: configs, then regions, then fires all registered
+   * {@link #onReload} callbacks.
+   */
   public void reloadAction() {
     RTP.log(Level.FINE, "[RTP] reloadAction(): begin");
     reloadConfigs();

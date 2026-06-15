@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "rtp_gui",
+  "version": "1.0.0",
+  "name": "RTP GUI Addon",
+  "description": "DonutSMP-style destination picker GUI for RTP (Fabric entry point of the single multi-loader addon jar).",
+  "authors": ["leaf26"],
+  "contact": {
+    "homepage": "https://github.com/dailystruggle/RTP",
+    "sources": "https://github.com/dailystruggle/RTP",
+    "issues": "https://github.com/dailystruggle/RTP/issues"
+  },
+  "license": "GPL-3.0-only",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "io.github.dailystruggle.rtp.guiaddon.fabric.RTPGuiFabricInitializer"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": ">=26.1",
+    "java": ">=25",
+    "fabric-api": "*",
+    "rtp": "*"
+  }
+}

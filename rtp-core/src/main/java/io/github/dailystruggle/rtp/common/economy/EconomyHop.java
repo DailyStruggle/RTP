@@ -27,7 +27,11 @@ import io.github.dailystruggle.rtp.common.RTP;
 public final class EconomyHop {
   private EconomyHop() {}
 
-  /** Fire-and-forget hop for write-side economy calls (e.g. {@code take}, {@code give}). */
+  /**
+   * Fire-and-forget hop for write-side economy calls (e.g. {@code take}, {@code give}).
+   *
+   * @param task the economy write task to dispatch; never {@code null}
+   */
   public static void run(Runnable task) {
     if (RTP.scheduler == null) {
       task.run();

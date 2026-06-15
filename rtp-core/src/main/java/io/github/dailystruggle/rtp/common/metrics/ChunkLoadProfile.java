@@ -43,6 +43,9 @@ public final class ChunkLoadProfile {
   /** Shared process-wide instance fed by the platform live-load paths. */
   public static final ChunkLoadProfile GLOBAL = new ChunkLoadProfile();
 
+  /** Constructs an empty profile. Use {@link #GLOBAL} for the shared instance. */
+  public ChunkLoadProfile() {}
+
   /**
    * One generated/ungenerated sub-bucket: cumulative total/count plus a
    * CAS-updated running minimum. Wait-free.
@@ -93,6 +96,7 @@ public final class ChunkLoadProfile {
    * @param generated {@code true} when the chunk was already generated on disk
    *                  (loaded from the region file); {@code false} when the load
    *                  triggered generation of a previously-ungenerated chunk.
+   * @param nanos     wall-clock duration of the load in nanoseconds; non-positive values are ignored
    */
   public void record(boolean generated, long nanos) {
     if (nanos <= 0L) return;
@@ -103,17 +107,30 @@ public final class ChunkLoadProfile {
    * Smallest single-chunk live-load duration observed for the given
    * generated/ungenerated class since process start (or last {@link #reset()}),
    * in nanoseconds; {@code -1L} when no such load has been recorded yet.
+   *
+   * @param generated {@code true} for the pre-generated bucket; {@code false} for the ungenerated bucket
+   * @return minimum observed load duration in nanoseconds, or {@code -1L} if no load recorded
    */
   public long minNanos(boolean generated) {
     return (generated ? this.generated : this.ungenerated).min();
   }
 
-  /** Cumulative nanoseconds spent in recorded live chunk loads of the given class. */
+  /**
+   * Returns cumulative nanoseconds spent in recorded live chunk loads of the given class.
+   *
+   * @param generated {@code true} for the pre-generated bucket; {@code false} for the ungenerated bucket
+   * @return cumulative load time in nanoseconds
+   */
   public long totalNanos(boolean generated) {
     return (generated ? this.generated : this.ungenerated).total();
   }
 
-  /** Cumulative count of recorded live chunk loads of the given class. */
+  /**
+   * Returns the cumulative count of recorded live chunk loads of the given class.
+   *
+   * @param generated {@code true} for the pre-generated bucket; {@code false} for the ungenerated bucket
+   * @return cumulative load count
+   */
   public long loadCount(boolean generated) {
     return (generated ? this.generated : this.ungenerated).count();
   }
@@ -121,6 +138,8 @@ public final class ChunkLoadProfile {
   /**
    * Smallest single-chunk live-load duration across both classes, in
    * nanoseconds; {@code -1L} when no load has been recorded yet.
+   *
+   * @return minimum observed load duration in nanoseconds across both buckets, or {@code -1L}
    */
   public long minNanos() {
     long g = generated.min();
@@ -130,12 +149,20 @@ public final class ChunkLoadProfile {
     return Math.min(g, u);
   }
 
-  /** Cumulative nanoseconds across both classes. */
+  /**
+   * Returns cumulative nanoseconds across both classes.
+   *
+   * @return total load time in nanoseconds
+   */
   public long totalNanos() {
     return generated.total() + ungenerated.total();
   }
 
-  /** Cumulative count across both classes. */
+  /**
+   * Returns cumulative count across both classes.
+   *
+   * @return total load count
+   */
   public long loadCount() {
     return generated.count() + ungenerated.count();
   }

@@ -47,6 +47,19 @@ tempsAlloueAsync: 50
 # @default: 19.0
 tpsMin: 19.0
 
+# Utilisation maximale du tas de la JVM (pourcentage du tas maximal) avant que
+# la génération du cache en arrière-plan ne se mette en pause. Chaque
+# emplacement mis en cache verrouille un chunk, donc un remplissage illimité
+# sur un serveur disposant d'un petit tas peut entraîner la JVM dans un ramasse-
+# miettes constant et rendre le serveur insensible sans aucune erreur dans la
+# console. Tant que l'utilisation est égale ou supérieure à ce seuil, RTP cesse
+# de remplir le cache d'emplacements mais continue de servir les emplacements
+# déjà mis en cache aux joueurs en attente. 0 ou 100 désactive la limite.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapPourcentage: 85.0
+
 # Refill cache immediately after teleport
 # @type: boolean
 # @default: false

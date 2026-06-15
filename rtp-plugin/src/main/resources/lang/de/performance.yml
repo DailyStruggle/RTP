@@ -50,6 +50,20 @@ asyncZugeteilteZeit: 50
 # @default: 19.0
 minimaleTPS: 19.0
 
+# Maximale JVM-Heap-Auslastung (Prozent des maximalen Heaps), bevor das
+# Auffüllen des Hintergrund-Caches pausiert. Jede zwischengespeicherte
+# Position hält einen Chunk fest, daher kann ein unbegrenztes Auffüllen auf
+# einem Server mit kleinem Heap die JVM in eine ständige Garbage Collection
+# treiben und den Server ohne Konsolenfehler nicht mehr reagieren lassen.
+# Solange die Auslastung auf oder über diesem Schwellenwert liegt, füllt RTP
+# den Positions-Cache nicht mehr auf, liefert aber weiterhin bereits
+# zwischengespeicherte Positionen an wartende Spieler. 0 oder 100 deaktiviert
+# die Sperre.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapProzent: 85.0
+
 # Den Regions-Cache unmittelbar nach einem erfolgreichen Teleport auffüllen.
 # @type: boolean
 # @default: false

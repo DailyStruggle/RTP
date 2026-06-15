@@ -36,6 +36,34 @@ public class SendMessage {
       Pattern.compile("(&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F])");
   private static final List<Consumer<String>> interceptors = new CopyOnWriteArrayList<>();
   /**
+   * Detects MiniMessage {@code <tag>} markup (named colours, {@code <#rrggbb>}
+   * hex, gradients, decorations, {@code <click:...>} / {@code <hover:...>}, and
+   * their closing {@code </tag>} forms). Deliberately conservative: it only
+   * matches a {@code <}, optional {@code /}, a leading letter or {@code #}, then
+   * a run of non-bracket characters up to a {@code >}. Plain legacy text that
+   * merely contains a lone {@code <} (e.g. a less-than sign) is left on the
+   * legacy color-code path.
+   */
+  private static final Pattern miniMessageTagPattern =
+      Pattern.compile("<(/?[a-zA-Z#][^<>]*)>");
+  /**
+   * Whether Adventure (and the MiniMessage + Gson serializer it relies on) is
+   * present on the runtime classpath. Paper, Folia, and their forks bundle it;
+   * a pure Spigot server does not. When {@code false}, MiniMessage markup is
+   * left untouched and rendered through the legacy color-code pipeline.
+   */
+  private static final boolean MINIMESSAGE_AVAILABLE = detectMiniMessage();
+
+  private static boolean detectMiniMessage() {
+    try {
+      Class.forName("net.kyori.adventure.text.minimessage.MiniMessage");
+      Class.forName("net.kyori.adventure.text.serializer.gson.GsonComponentSerializer");
+      return true;
+    } catch (Throwable ignored) {
+      return false;
+    }
+  }
+  /**
    * Level-aware interceptors. Receive the same formatted message that
    * string-only {@link #interceptors} receive, plus the {@link Level} the
    * caller supplied to {@link #log(Level, String)} / {@link #log(Level, String, Throwable)}.
@@ -110,16 +138,12 @@ public class SendMessage {
     // Bukkit.getLogger().info("[diag/sendMessage(CS)] after intercept(): \"" + message + "\"");
     if (sender instanceof Player) sendMessage((Player) sender, message);
     else {
-      String beforeFormat = message;
-      message = format(Bukkit.getOfflinePlayer(RTPAPI.serverId), message);
-      // Bukkit.getLogger().info("[diag/sendMessage(CS)] after format(): before=\"" + beforeFormat + "\" after=\"" + message + "\"");
+      OfflinePlayer console = Bukkit.getOfflinePlayer(RTPAPI.serverId);
       if (RTP.serverAccessor.getServerIntVersion() > 12) {
-        BaseComponent[] components = TextComponent.fromLegacyText(message);
-        // Bukkit.getLogger().info("[diag/sendMessage(CS)] dispatching via spigot().sendMessage(BaseComponent[]) for legacy text=\"" + message + "\"");
+        BaseComponent[] components = toComponents(console, message);
         sender.spigot().sendMessage(components);
       } else {
-        // Bukkit.getLogger().info("[diag/sendMessage(CS)] dispatching via sender.sendMessage(String) text=\"" + message + "\"");
-        sender.sendMessage(message);
+        sender.sendMessage(format(console, message));
       }
     }
   }
@@ -127,11 +151,10 @@ public class SendMessage {
   public static void sendMessage(Player player, String message) {
     if (message == null || message.isEmpty()) return;
     intercept(message);
-    message = format(player, message);
     if (RTP.serverAccessor.getServerIntVersion() > 12) {
-      BaseComponent[] components = TextComponent.fromLegacyText(message);
+      BaseComponent[] components = toComponents(player, message);
       player.spigot().sendMessage(components);
-    } else player.sendMessage(message);
+    } else player.sendMessage(format(player, message));
   }
 
   public static void sendMessage(
@@ -155,13 +178,11 @@ public class SendMessage {
     if (sender instanceof Player) player = (OfflinePlayer) sender;
     else player = Bukkit.getOfflinePlayer(RTPAPI.serverId).getPlayer();
 
-    message = format(player, message);
-
     if (RTP.serverAccessor.getServerIntVersion() > 12) {
-      BaseComponent[] textComponents = TextComponent.fromLegacyText(message);
+      BaseComponent[] textComponents = toComponents(player, message);
 
       if (!hover.isEmpty()) {
-        BaseComponent[] hoverComponents = TextComponent.fromLegacyText(format(player, hover));
+        BaseComponent[] hoverComponents = toComponents(player, hover);
         HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(hoverComponents));
         for (BaseComponent component : textComponents) {
           component.setHoverEvent(hoverEvent);
@@ -186,7 +207,34 @@ public class SendMessage {
           Bukkit.getConsoleSender().spigot().sendMessage(textComponents);
         }
       }
-    } else sender.sendMessage(message);
+    } else sender.sendMessage(format(player, message));
+  }
+
+  /**
+   * Renders {@code text} into bungee {@link BaseComponent}s for dispatch.
+   *
+   * <p>When Adventure is available on the runtime classpath (Paper/Folia and
+   * forks) and {@code text} contains MiniMessage {@code <tag>} markup, the text
+   * is rendered through MiniMessage (placeholders resolved first via
+   * {@link #formatNoColor}, with no legacy color translation) and bridged into
+   * bungee components by {@link MiniMessageRenderer}. Otherwise (or if MiniMessage
+   * rendering fails for any reason) the legacy color-code pipeline
+   * ({@link #format} + {@link TextComponent#fromLegacyText}) is used, so existing
+   * {@code &}/hex configs keep rendering exactly as before.
+   */
+  public static BaseComponent[] toComponents(@Nullable OfflinePlayer player, @Nullable String text) {
+    if (text == null) return new BaseComponent[0];
+    if (MINIMESSAGE_AVAILABLE && miniMessageTagPattern.matcher(text).find()) {
+      try {
+        return MiniMessageRenderer.render(formatNoColor(player, text));
+      } catch (Throwable t) {
+        RTP.log(
+            Level.FINE,
+            "[RTP] MiniMessage render failed; falling back to legacy color codes for: " + text,
+            t);
+      }
+    }
+    return TextComponent.fromLegacyText(format(player, text));
   }
 
   public static String format(@Nullable OfflinePlayer player, @Nullable String text) {

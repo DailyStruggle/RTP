@@ -276,6 +276,126 @@ public class RTP {
           return future;
         }
 
+        // Cooldown guard, mirroring RTPCmd.compute(): reject while the player is
+        // still within their teleport cooldown window. A completed prior teleport
+        // is the signal to clear a stale processingPlayers entry (same preemptive
+        // cleanup the command path performs) so the alreadyTeleporting guard below
+        // does not misfire on a finished teleport.
+        TeleportData priorData = getInstance().latestTeleportData.get(uuid);
+        if (priorData != null) {
+          long dt = System.currentTimeMillis() - priorData.time;
+          if (dt < 0) dt = Long.MAX_VALUE + dt;
+          if (dt < player.cooldown()) {
+            future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                io.github.dailystruggle.rtp.api.RTPResult.Reason.COOLDOWN,
+                "Teleport is on cooldown for this player"));
+            return future;
+          } else if (priorData.completed) {
+            getInstance().processingPlayers.remove(uuid);
+          }
+        }
+
+        // Usage-cap guard (BetterRTP LockAfter parity), mirroring RTPCmd.compute():
+        // reject when the player has exhausted lockAfterUses within the rolling
+        // window. Inert unless lockAfterUses > 0; bypassed by rtp.nolock. The
+        // increment happens in TeleportPipelineTask on success, so GUI/API
+        // teleports already count toward the cap - only the rejection gate was
+        // command-only before now.
+        if (!player.hasPermission("rtp.nolock")) {
+          ConfigParser<ConfigKeys> cfg =
+              (ConfigParser<ConfigKeys>) configs.getParser(ConfigKeys.class);
+          if (cfg != null) {
+            long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
+            if (cap > 0) {
+              long resetMillis =
+                  cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
+              if (getInstance().usageCaps.isLocked(
+                  uuid, cap, resetMillis, System.currentTimeMillis())) {
+                future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                    io.github.dailystruggle.rtp.api.RTPResult.Reason.LOCKED,
+                    "Player is locked out after reaching the usage cap"));
+                return future;
+              }
+            }
+          }
+        }
+
+        // Reloading guard, mirroring RTPCmd.compute(): refuse new teleports while
+        // the plugin is swapping configuration so the pipeline never runs against
+        // half-applied config.
+        if (reloading.get()) {
+          future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+              io.github.dailystruggle.rtp.api.RTPResult.Reason.RELOADING,
+              "Teleport denied while the plugin is reloading"));
+          return future;
+        }
+
+        // Concurrency guard, mirroring RTPCmd.compute()'s alreadyTeleporting
+        // check: a player with a teleport already in flight must not start a
+        // second one through the addon-facing API (e.g. repeated GUI clicks, or
+        // clicking the menu while a /rtp is already warming up). The local
+        // launch paths below register the player in processingPlayers; the
+        // pipeline's terminal cleanup (TeleportPipelineTask / Region) clears it.
+        if (getInstance().processingPlayers.contains(uuid)) {
+          future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+              io.github.dailystruggle.rtp.api.RTPResult.Reason.ALREADY_TELEPORTING,
+              "A teleport is already in progress for this player"));
+          return future;
+        }
+
+        // Network/peer target: route across the cross-server wait queue via the
+        // platform-installed NetworkCommandHook, exactly as a
+        // `/rtp region=<server>:<region>` command would. The enrolment side
+        // effect happens inside route(); we map the routing decision onto the
+        // teleport future (QUEUED on enrolment, failure on reject/unavailable).
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.NETWORK) {
+          String serverId = target.serverId();
+          String regionKey = target.name();
+          io.github.dailystruggle.rtp.api.network.NetworkCommandHook hook = networkCommandHook;
+          if (hook == null
+              || hook == io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY) {
+            future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+                "Network mode is not enabled on this server"));
+            return future;
+          }
+          java.util.Map<String, java.util.List<String>> netArgs = new java.util.HashMap<>();
+          netArgs.put("region",
+              java.util.Collections.singletonList(serverId + ":" + regionKey));
+          io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult decision;
+          try {
+            decision = hook.route(uuid, netArgs);
+          } catch (Throwable t) {
+            future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                io.github.dailystruggle.rtp.api.RTPResult.Reason.ERROR,
+                "Cross-server routing failed: " + t.getMessage()));
+            return future;
+          }
+          if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.CrossServer cross) {
+            future.complete(io.github.dailystruggle.rtp.api.RTPResult.queued(
+                "Queued for " + cross.serverHint().orElse(serverId)
+                    + ":" + cross.regionKey().orElse(regionKey)));
+          } else if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.Reject reject) {
+            future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+                reject.placeholder() == null || reject.placeholder().isEmpty()
+                    ? "Destination unavailable" : reject.placeholder()));
+          } else {
+            // RoutingResult.Local: the hook elected to serve the request on this
+            // backend (e.g. a self-pin). Fall through to the local pipeline using
+            // the bare region name.
+            Region localRegion = selectionAPI.getRegionOrDefault(regionKey);
+            if (localRegion == null || localRegion.getWorld() == null) {
+              future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                  io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+                  "Could not resolve a region/world for " + regionKey));
+              return future;
+            }
+            runLocalTeleport(uuid, player, localRegion, future);
+          }
+          return future;
+        }
+
         Region region;
         try {
           region = resolveApiRegion(target, player);
@@ -318,9 +438,11 @@ public class RTP {
                 new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, null),
                 targetRegion);
         data.nextTask = task;
+        getInstance().processingPlayers.add(uuid);
         targetRegion.inFlightCalculations.incrementAndGet();
         scheduler.runTaskAsynchronously(task);
       } catch (Throwable t) {
+        getInstance().processingPlayers.remove(uuid);
         future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
             io.github.dailystruggle.rtp.api.RTPResult.Reason.ERROR, String.valueOf(t.getMessage())));
       }
@@ -374,6 +496,47 @@ public class RTP {
           }
           out.add(io.github.dailystruggle.rtp.api.RtpTarget.region(name));
         }
+
+        // Network/peer regions (rtp-proxy-ADR-014): surface the live
+        // `server:region` entries advertised across the network so a GUI / addon
+        // can offer cross-server destinations alongside local ones. Permission
+        // gating mirrors the `/rtp region=<server>:<region>` command path:
+        // `rtp.servers.<server>` AND `rtp.regions.<region>`. Reads are defensive -
+        // a missing/flaky network layer simply contributes no extra targets.
+        try {
+          io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap live =
+              io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE;
+          if (live != null) {
+            io.github.dailystruggle.rtp.common.network.PeerRegionRegistry registry =
+                live.peerRegionRegistry();
+            if (registry != null) {
+              String localServerId = registry.localServerId();
+              for (String entry : registry.peerEntries()) {
+                if (entry == null) continue;
+                int colon = entry.indexOf(':');
+                if (colon <= 0 || colon >= entry.length() - 1) continue;
+                String serverId = entry.substring(0, colon);
+                String regionKey = entry.substring(colon + 1);
+                // Deduplicate: a self-qualified entry (e.g. backend-a:default while
+                // running on backend-a) names the same region already offered locally
+                // as the unqualified `default`/`<region>` above, so skip it rather than
+                // listing the backend's own regions twice in the menu.
+                if (localServerId != null && localServerId.equals(serverId)) {
+                  continue;
+                }
+                if (player != null
+                    && (!player.hasPermission("rtp.servers." + serverId)
+                        || !player.hasPermission("rtp.regions." + regionKey))) {
+                  continue;
+                }
+                out.add(io.github.dailystruggle.rtp.api.RtpTarget.network(serverId, regionKey));
+              }
+            }
+          }
+        } catch (Throwable networkEx) {
+          log(Level.FINE,
+              "[RTP API] getAllowedTargets network enumeration skipped: " + networkEx.getMessage());
+        }
       } catch (RuntimeException ex) {
         log(Level.WARNING, "[RTP API] getAllowedTargets failed: " + ex.getMessage(), ex);
       }
@@ -386,6 +549,49 @@ public class RTP {
         if (player == null) {
           return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
               io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.UNKNOWN, 0L, 0.0);
+        }
+
+        // Network/peer target: resolves on a remote backend, so there is no
+        // local Region to inspect. Gate on the same two permissions the command
+        // path uses (`rtp.servers.<server>` + `rtp.regions.<region>`) and report
+        // reachability from the live peer registry. Cost is unknown locally (the
+        // destination backend owns its economy), so 0.0 is reported here.
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.NETWORK) {
+          String serverId = target.serverId();
+          String regionKey = target.name();
+          if (!player.hasPermission("rtp.servers." + serverId)
+              || !player.hasPermission("rtp.regions." + regionKey)) {
+            return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
+                io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION, 0L, 0.0);
+          }
+          boolean reachable = false;
+          // Peer-advertised display hints (icon block / environment string)
+          // surfaced from the destination backend's heartbeat regionMetadata so
+          // a GUI can show a recognisable cross-server icon. Purely cosmetic.
+          String iconBlock = null;
+          String environment = null;
+          // Peer-advertised cosmetic display label (the backend's configured
+          // region displayName), so a lobby shows the destination's chosen words.
+          String label = null;
+          try {
+            io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap live =
+                io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE;
+            if (live != null && live.peerRegionRegistry() != null) {
+              io.github.dailystruggle.rtp.common.network.PeerRegionRegistry reg =
+                  live.peerRegionRegistry();
+              reachable = reg.isReachableHardPin(serverId, regionKey);
+              iconBlock = reg.peerRegionAttribute(serverId, regionKey, "block");
+              environment = reg.peerRegionAttribute(serverId, regionKey, "env");
+              label = reg.peerRegionAttribute(serverId, regionKey, "label");
+            }
+          } catch (Throwable ignored) {
+            // Defensive: a flaky network layer must not crash status reads.
+          }
+          return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
+              reachable
+                  ? io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.READY
+                  : io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.DISABLED,
+              0L, 0.0, iconBlock, environment, label);
         }
 
         Region region;
@@ -461,8 +667,23 @@ public class RTP {
         } else {
           availability = io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.READY;
         }
+        // Advertise the destination world's environment so the menu can pick a
+        // recognisable surface block locally (consumer-side env -> block
+        // translation), matching how a cross-server target's environment is
+        // surfaced. Block selection itself stays on the consuming side; we only
+        // supply the environment string here (custom-dimension friendly).
+        String localEnv = null;
+        String localLabel = null;
+        try {
+          localEnv = region.getWorld().environment();
+          // Cosmetic display label from the region's configured displayName
+          // (falls back to the region name); the same value /rtp info uses.
+          localLabel = region.displayName();
+        } catch (Throwable ignored) {
+          // Defensive: env/label enrichment is a cosmetic hint and must never break status.
+        }
         return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
-            availability, remaining, Math.max(0.0, cost));
+            availability, remaining, Math.max(0.0, cost), null, localEnv, localLabel);
       } catch (RuntimeException ex) {
         log(Level.WARNING, "[RTP API] getTargetStatus failed: " + ex.getMessage(), ex);
         return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
@@ -473,6 +694,47 @@ public class RTP {
     // Runtime-health snapshot for dashboard tiles. Sampled by the active metrics
     // binding, not computed on the caller's thread (no main-thread cost / chunk I/O).
     io.github.dailystruggle.rtp.api.RTPAPI.metricsSnapshotDelegate = () -> metrics.snapshot();
+  }
+
+  /**
+   * Launch the standard local teleport pipeline for {@code targetRegion} and
+   * complete {@code future} with the outcome. Mirrors the inline default/region
+   * path of {@code teleportDelegate}; used by the network target's
+   * {@code RoutingResult.Local} fall-through (self-pin served locally).
+   */
+  private static void runLocalTeleport(
+      UUID uuid,
+      RTPPlayer player,
+      Region targetRegion,
+      java.util.concurrent.CompletableFuture<io.github.dailystruggle.rtp.api.RTPResult> future) {
+    TeleportData data = new TeleportData();
+    io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(
+        data, "TeleportData-" + uuid, 120000L);
+    data.sender = player;
+    data.targetRegion = targetRegion;
+    data.onComplete = td -> {
+      if (td.completed && td.selectedCoords != null) {
+        RTPWorld<?> w = serverAccessor.getRTPWorld(td.selectedCoords.worldName());
+        if (w == null) w = targetRegion.getWorld();
+        future.complete(io.github.dailystruggle.rtp.api.RTPResult.success(
+            new io.github.dailystruggle.rtp.api.world.RTPLocation(
+                w, td.selectedCoords.x(), td.selectedCoords.y(), td.selectedCoords.z())));
+      } else {
+        future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+            io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_SAFE_LOCATION,
+            "No safe location was found"));
+      }
+    };
+    getInstance().latestTeleportData.put(uuid, data);
+
+    io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask task =
+        new io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask(
+            new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, null),
+            targetRegion);
+    data.nextTask = task;
+    getInstance().processingPlayers.add(uuid);
+    targetRegion.inFlightCalculations.incrementAndGet();
+    scheduler.runTaskAsynchronously(task);
   }
 
   /**
@@ -674,6 +936,15 @@ public class RTP {
     // loaded eagerly by AddonRegistry#register).
     startupTasks.add(new RTPRunnable(() -> {
       addons.discover();
+      // Also scan an optional RTP-owned folder so operators can drop addon jars into
+      // <pluginDir>/addons instead of plugins/, where the server's plugin loader would
+      // reject them for lacking a plugin.yml. A missing/empty folder is a no-op.
+      if (serverAccessor != null) {
+        File pluginDir = serverAccessor.getPluginDirectory();
+        if (pluginDir != null) {
+          addons.discoverFromDirectory(new File(pluginDir, "addons"));
+        }
+      }
       addons.loadAll();
     }, 20));
 
