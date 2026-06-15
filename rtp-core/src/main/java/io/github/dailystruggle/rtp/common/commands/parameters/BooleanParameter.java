@@ -10,6 +10,8 @@ import java.util.function.BiFunction;
 public class BooleanParameter extends CommandParameter {
 
   /**
+   * Constructs a boolean parameter.
+   *
    * @param permission  permission node required to use this parameter
    * @param description human-readable description shown in help/tab-complete
    * @param isRelevant  predicate that determines whether this parameter applies for a given sender

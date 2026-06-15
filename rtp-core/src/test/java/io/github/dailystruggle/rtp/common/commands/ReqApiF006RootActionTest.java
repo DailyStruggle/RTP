@@ -171,6 +171,29 @@ public class ReqApiF006RootActionTest {
     }
 
     @Test
+    @DisplayName("explicit teleport parameters skip the bound action (parameterised /rtp)")
+    void parameterisedRtp_doesNotInvokeAction() {
+        MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "test", null);
+        accessor.addPlayer(sender);
+
+        AtomicBoolean invoked = new AtomicBoolean(false);
+        RTPAPI.hooks().rootAction().bind((player, feedback) -> {
+            invoked.set(true);
+            return true;
+        });
+
+        TestRTPCmd rtpCmd = new TestRTPCmd();
+        sender.sentMessages.clear();
+
+        // A non-subcommand argument (a teleport parameter such as region=foo) is an
+        // explicit destination, so the GUI/menu override must be skipped.
+        rtpCmd.onCommand(sender, rtpCmd, "rtp", new String[]{"region=foo"});
+
+        assertFalse(invoked.get(),
+                "explicit teleport parameters must not be routed through the root action");
+    }
+
+    @Test
     @DisplayName("unbound (cleared) root action performs the classic teleport")
     void unboundAction_classicBehavior() {
         MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "test", null);

@@ -89,20 +89,20 @@ class RedisCanonicalBackendOrderTest {
     }
 
     @Test
-    void canonical_starts_with_serverId_and_ends_with_regionKeptCounts() {
+    void canonical_starts_with_serverId_and_ends_with_regionMetadata() {
         // Pins the field order so downstream wire-format changes are caught.
         // The cross-server fields (keptCount, networkReservedCount, regions,
-        // regionKeptCounts) are appended after killSwitch, so the canonical now
-        // ends with regionKeptCounts and carries 18 fields.
+        // regionKeptCounts) plus regionMetadata are appended after killSwitch,
+        // so the canonical now ends with regionMetadata and carries 19 fields.
         String canonical = RedisNetworkStateBinding.canonicalBackend(sampleFields());
         assertTrue(canonical.startsWith("serverId=backend-a\n"),
                 "first line must be serverId; got: " + canonical.substring(0, Math.min(40, canonical.length())));
-        assertTrue(canonical.endsWith("\nregionKeptCounts="),
-                "last line must be regionKeptCounts; got tail: "
+        assertTrue(canonical.endsWith("\nregionMetadata="),
+                "last line must be regionMetadata; got tail: "
                         + canonical.substring(Math.max(0, canonical.length() - 40)));
-        // 18 fields = 17 newlines.
+        // 19 fields = 18 newlines.
         long newlines = canonical.chars().filter(c -> c == '\n').count();
-        assertEquals(17, newlines, "canonical must have exactly 17 newlines (18 fields)");
+        assertEquals(18, newlines, "canonical must have exactly 18 newlines (19 fields)");
     }
 
     @Test
@@ -113,9 +113,9 @@ class RedisCanonicalBackendOrderTest {
         String canonical = RedisNetworkStateBinding.canonicalBackend(partial);
         assertTrue(canonical.startsWith("serverId=backend-a\nschemaVersion=\n"),
                 "missing fields must serialize as empty strings to keep canonical length stable");
-        // Still 18 fields total -> 17 newlines.
+        // Still 19 fields total -> 18 newlines.
         long newlines = canonical.chars().filter(c -> c == '\n').count();
-        assertEquals(17, newlines);
+        assertEquals(18, newlines);
     }
 
     @Test

@@ -38,6 +38,9 @@ import java.util.function.Predicate;
  */
 public final class DefaultRTPHooks implements RTPHooks {
 
+  /** Constructs a DefaultRTPHooks instance with all registries initialised to their empty state. */
+  public DefaultRTPHooks() {}
+
   private final RegionVerifierRegistry verifierRegistry = new RegionVerifierRegistry() {
     @Override public void register(Predicate<RTPCoords> verifier) {
       GlobalRegionVerifiers.addGlobalRegionVerifier(verifier);

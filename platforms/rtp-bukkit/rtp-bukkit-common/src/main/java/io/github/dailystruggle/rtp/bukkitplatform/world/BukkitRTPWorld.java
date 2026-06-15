@@ -485,6 +485,16 @@ public class BukkitRTPWorld extends RTPWorld<World> {
                 ? " (further occurrences suppressed to FINE)" : ""));
   }
 
+  @Override
+  public String environment() {
+    try {
+      World w = world();
+      return (w == null) ? null : w.getEnvironment().name();
+    } catch (Throwable ignored) {
+      return null;
+    }
+  }
+
   /**
    * Map a Bukkit {@link World#getEnvironment()} to the on-disk region subdirectory used
    * by vanilla. Inlined here (rather than in the platform-neutral {@code AnvilPrefilter})

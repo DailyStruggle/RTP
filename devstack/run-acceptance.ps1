@@ -128,6 +128,45 @@ function New-RandomSecret {
   return ([Convert]::ToBase64String($buf)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 }
 
+function Ensure-DockerRunning {
+  # Make the harness a true one-command experience: if the Docker daemon is not
+  # reachable (Docker Desktop not started yet), launch Docker Desktop and wait
+  # for the engine to come up before any `docker compose` call. Idempotent: when
+  # the daemon already answers, this returns immediately without launching
+  # anything. Times out with a clear message rather than hanging forever.
+  param([int]$TimeoutSeconds = 180)
+
+  # Fast path: daemon already up.
+  $null = Invoke-Native { docker info --format '{{.ServerVersion}}' }
+  if ($LASTEXITCODE -eq 0) { return }
+
+  Write-Host '[docker] daemon not reachable; attempting to start Docker Desktop...' -ForegroundColor Cyan
+
+  $candidates = @(
+    (Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'),
+    (Join-Path ${env:ProgramFiles(x86)} 'Docker\Docker\Docker Desktop.exe'),
+    (Join-Path $env:LOCALAPPDATA 'Docker\Docker Desktop.exe')
+  ) | Where-Object { $_ -and (Test-Path $_) }
+
+  if ($candidates.Count -gt 0) {
+    Start-Process -FilePath $candidates[0] | Out-Null
+    Write-Host "[docker] launched $($candidates[0])" -ForegroundColor DarkGray
+  } else {
+    Write-Host '[docker] could not locate Docker Desktop.exe; waiting in case it is already starting...' -ForegroundColor Yellow
+  }
+
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  while ((Get-Date) -lt $deadline) {
+    Start-Sleep -Seconds 3
+    $null = Invoke-Native { docker info --format '{{.ServerVersion}}' }
+    if ($LASTEXITCODE -eq 0) {
+      Write-Host '[docker] daemon is up.' -ForegroundColor Green
+      return
+    }
+  }
+  throw "Docker daemon did not become reachable within $TimeoutSeconds s. Start Docker Desktop manually and re-run."
+}
+
 function Initialize-Secrets {
   # Ensures `.env` (RTP_NET_SECRET) and `shared/forwarding.secret` exist with
   # non-empty values before any `docker compose` call. Idempotent: existing
@@ -818,6 +857,11 @@ function Test-KillSwitch {
 # $EvidenceLog lives inside the per-run dir (created above) so it is never
 # pre-existing; no Remove-Item needed.
 Write-Evidence 'session' "start scenario=$Scenario waitSeconds=$WaitSeconds runDir=$RunLogDir"
+
+# Ensure the Docker daemon is up (launch Docker Desktop and wait if needed)
+# before any `docker compose` call - otherwise compose fails fast with a
+# "cannot connect to the Docker daemon" / named-pipe error.
+Ensure-DockerRunning
 
 # Seed `.env` (RTP_NET_SECRET) and `shared/forwarding.secret` before any
 # `docker compose` call; compose fails fast on missing variable interpolation.

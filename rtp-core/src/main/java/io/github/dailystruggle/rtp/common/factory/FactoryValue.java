@@ -32,16 +32,18 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     numberParsers.put(Byte.class, Byte::parseByte);
   }
 
-  // hacky way just to do Enum.valueOf on the correct enum
+  /** The enum class used as the key type for this factory value's data map. */
   public final Class<E> myClass;
   protected final EnumMap<E, String[]> desc;
 
   protected final Map<String, E> enumLookup;
 
-  /** data - container for arbitrary data values mapped enum value to object to stay organized */
+  /** The name of this factory value (typically the config file name). */
   public String name;
 
+  /** Maps canonical key names to their locale-translated equivalents. */
   public Map<String, Object> language_mapping = new ConcurrentHashMap<>();
+  /** Maps locale-translated key names back to their canonical equivalents. */
   public Map<String, String> reverse_language_mapping = new ConcurrentHashMap<>();
   // Volatile so {@link #setData(EnumMap)} can publish a fresh map by reference
   // assignment and concurrent readers always observe either the old map intact
@@ -52,6 +54,12 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   protected volatile EnumMap<E, Object> data;
   private Set<String> keys = null;
 
+  /**
+   * Constructs a factory value for the given enum class and name.
+   *
+   * @param myClass the enum class used as the key type
+   * @param name    the name of this factory value
+   */
   protected FactoryValue(Class<E> myClass, String name) {
     this.myClass = myClass;
     enumLookup = new ConcurrentHashMap<>();

@@ -3,6 +3,11 @@ package io.github.dailystruggle.rtp.common.addon;
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.common.RTP;
 
+import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
@@ -83,6 +88,47 @@ public final class AddonRegistry {
     } catch (ServiceConfigurationError e) {
       RTP.log(Level.WARNING, "[ADDONS] failed to enumerate RTPAddon services", e);
     }
+  }
+
+  /**
+   * Discovers addons from a standalone folder of jar files (e.g. {@code plugins/RTP/addons/}).
+   *
+   * <p>Each {@code .jar} directly inside {@code directory} is added to a child
+   * {@link URLClassLoader} whose parent is the classloader that loaded {@code rtp-core}, so the
+   * addon's {@link RTPAddon} implementation and the {@code rtp-api}/{@code rtp-core} types it
+   * depends on resolve to the same classes the running plugin uses. {@link ServiceLoader}
+   * enumeration then registers every discovered implementation.
+   *
+   * <p>This lets server operators drop an addon jar into a dedicated RTP-owned folder instead of
+   * {@code plugins/}, where the server's plugin loader would reject it for lacking a
+   * {@code plugin.yml}. A missing or empty folder is a no-op.
+   *
+   * @param directory the folder to scan for addon jars
+   */
+  public void discoverFromDirectory(File directory) {
+    if (directory == null) return;
+    if (!directory.isDirectory()) return;
+
+    File[] jars = directory.listFiles(
+        (dir, fileName) -> fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".jar"));
+    if (jars == null || jars.length == 0) return;
+
+    List<URL> urls = new ArrayList<>(jars.length);
+    for (File jar : jars) {
+      try {
+        urls.add(jar.toURI().toURL());
+      } catch (MalformedURLException e) {
+        RTP.log(Level.WARNING, "[ADDONS] skipping unreadable addon jar: " + jar.getName(), e);
+      }
+    }
+    if (urls.isEmpty()) return;
+
+    ClassLoader parent = AddonRegistry.class.getClassLoader();
+    URLClassLoader addonClassLoader =
+        new URLClassLoader(urls.toArray(new URL[0]), parent);
+    RTP.log(Level.INFO,
+        "[ADDONS] scanning " + jars.length + " jar(s) in " + directory.getAbsolutePath());
+    discover(addonClassLoader);
   }
 
   /**

@@ -66,14 +66,21 @@ path that matches your platform:
 
 | Platform | How to load |
 |----------|-------------|
-| Bukkit / Spigot / Paper / Folia | Place the addon jar on the same classloader as the RTP plugin. The simplest supported path is bundling the addon inside the RTP distribution (shaded or on the shared classpath). A thin Bukkit `JavaPlugin` shim that calls `RTP.addons.register(new MyAddon())` is also possible for back-compat. |
+| Any backend platform | Drop the addon jar into the RTP-owned `<pluginDir>/addons/` folder (`plugins/RTP/addons/` on Bukkit/Spigot/Paper/Folia; the platform's RTP config directory on Fabric/NeoForge). RTP scans this folder at startup, loads each jar in a child classloader (parent = RTP's own classloader), and discovers the addon via `ServiceLoader`. This is the recommended path: the jar does **not** go in `plugins/`, where the server's plugin loader would reject it for lacking a `plugin.yml`. |
+| Bukkit / Spigot / Paper / Folia | Alternatively, place the addon jar on the same classloader as the RTP plugin (bundled/shaded into the RTP distribution), or use a thin Bukkit `JavaPlugin` shim that calls `RTP.addons.register(new MyAddon())` for back-compat. |
 | Fabric | Ship the addon classes inside (or alongside) the RTP mod jar so they share the mod classloader, or have a mod entrypoint call `RTP.addons.register(new MyAddon())`. |
 | Proxy (Velocity / BungeeCord) | Only addons that use the `RTPAPI` query/teleport surface are supported proxy-side: place the jar on the RTP proxy plugin's classpath. Addons touching `RTP.configs` or world state are backend-only. |
 
-> There is currently no standalone `plugins/RTP/addons/` folder scanner; loading means the jar
-> is on RTP's classpath (bundled) or its instance is handed to the registry via
-> `RTP.addons.register(...)`. A per-platform folder scanner can be added later without changing
-> the SPI (ADR-057).
+### The `<pluginDir>/addons/` folder
+
+At startup (after core init settles) RTP calls `AddonRegistry.discoverFromDirectory(new File(pluginDir, "addons"))`
+in addition to the classpath `discover()`. Every `*.jar` directly inside that folder is added to a
+child `URLClassLoader` whose parent is the classloader that loaded `rtp-core`, so the addon and the
+`rtp-api`/`rtp-core` types it references resolve to the same classes the running plugin uses.
+`ServiceLoader` enumeration then registers every discovered `RTPAddon`. A missing or empty folder
+is a silent no-op, so the folder is purely optional. The jar must still contain a valid
+`META-INF/services/io.github.dailystruggle.rtp.api.addon.RTPAddon` descriptor (see above); a plain
+plugin jar with only a `plugin.yml` is ignored.
 
 ### Programmatic registration
 
@@ -92,7 +99,8 @@ pass, a late registration is loaded eagerly so it is never silently dropped.
 ## Lifecycle and timing
 
 1. **Discovery + load.** After `rtp-core` finishes initialising, a startup task runs
-   `RTP.addons.discover()` then `RTP.addons.loadAll()`. `loadAll()` calls `onLoad()` exactly
+   `RTP.addons.discover()`, then `RTP.addons.discoverFromDirectory(<pluginDir>/addons)`, then
+   `RTP.addons.loadAll()`. `loadAll()` calls `onLoad()` exactly
    once per addon. Loading is deferred to a startup task so the `RTPAPI` delegates installed by
    the platform adapter (`serverAccessor`, `hooks`, the teleport delegate) are guaranteed
    non-null inside `onLoad()`.

@@ -706,6 +706,7 @@ Watch the background scan crawl the spiral and accumulate spatial memory in real
 [*][B]Per-region arrival schematics.[/B] [I]Drop a [I].schem[/I] named after a region into [I]plugins/RTP/schematics/[/I] (e.g. [I]schematics/default.schem[/I]) and every teleport into that region pastes it - a lobby pad, arrival shrine, or custom platform - centered on the landing spot. Cross-platform Sponge [I].schem[/I], decoded in-house (no WorldEdit required), claim-aware (never overwrites protected land) and audited; the bundled Skyblock prefab ships one ready to go.[/I]
 [*][I]PlaceholderAPI: queue depth (total/public/personal), last-teleport coordinates, player status.[/I]
 [*][I]Public [I]rtp-api[/I] (same surface as Free) - trigger LeafRTP from GUI, NPC, quest reward; build your own UX without forking.[/I]
+[*][B]Platform-agnostic addons[/B] [I]- addons compile against [I]rtp-api[/I] only and load through the [I]RTPAddon[/I] ServiceLoader SPI, so one addon module runs unchanged on Spigot, Paper, Folia, Fabric, and NeoForge. Config, safety hooks, teleport-pipeline callbacks, and scheduling are reached through platform-neutral APIs; you only add a platform module when the addon opens a platform-native UI. See the bundled RTP_ExampleAddon.[/I]
 [/LIST]
 
 [B]Bundled claim integrations[/B] (no extra download, folded in per ADR-019): Factions, GriefDefender, GriefPrevention, HuskTowns, Lands, RedProtect, TownyAdvanced, WorldGuard.

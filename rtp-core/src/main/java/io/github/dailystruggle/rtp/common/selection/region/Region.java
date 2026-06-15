@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask.ConfigCache;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
@@ -421,8 +422,13 @@ public class Region extends FactoryValue<RegionKeys> {
    * generated chunk with a sensible {@code surfaceY} but {@code adjust==null}
    * points at the vertical adjustor; an anvil-backed view (or {@code surfaceY} at
    * world-min with all-air reads) points at an ungenerated/empty chunk being
-   * verified instead of generated; a {@code null} cached chunk points at the
-   * world's chunk cache not retaining the (re)loaded chunk.
+   * verified instead of generated.
+   *
+   * <p>A {@code null} cached chunk (chunk not retained through the verify
+   * window) is a self-healing transient, not a drop: the caller re-queues the
+   * location for a later retry, so this case is logged at {@code FINE} only to
+   * avoid flooding the console under burst promotion. The genuinely-unsafe
+   * {@code vert.adjust==null} drop stays at {@code INFO}.
    */
   private void logPromotionDropDiag(
       RTPLocation coldLoc,
@@ -430,11 +436,21 @@ public class Region extends FactoryValue<RegionKeys> {
       int cx, int cz) {
     try {
       if (rtpChunk == null) {
-        RTP.log(Level.INFO,
+        // Self-healing TRANSIENT, NOT a drop: the caller has already returned
+        // this location to the unkept queue for a later retry (see the
+        // rtpChunk==null branch in the promotion verify). Under burst cold->hot
+        // promotion the shared anvil-view cache and the WeakReference live-chunk
+        // caches get clobbered by other in-flight candidates before this
+        // candidate's verify reads getCachedChunk(key), so a transient null here
+        // is expected and self-corrects as the queues fill and concurrency
+        // drops. Logging it at INFO produced the recurring console flood on
+        // Fabric backends; FINE keeps it available for opt-in diagnosis without
+        // spamming operators about a condition the retry already handles.
+        RTP.log(Level.FINE,
             "[RTP][PROMOTE_DIAG] region=" + name + " cold=(" + coldLoc.coords().x() + ","
                 + coldLoc.coords().y() + "," + coldLoc.coords().z() + ") chunk=(" + cx + "," + cz
-                + ") DROPPED: getCachedChunk returned null "
-                + "(world chunk cache did not retain the (re)loaded chunk).");
+                + ") transient: getCachedChunk returned null "
+                + "(chunk not retained through the verify window; returned to unkept for retry).");
         return;
       }
       int surfaceY = rtpChunk.getSurfaceHeight(8, 8);
@@ -524,7 +540,21 @@ public class Region extends FactoryValue<RegionKeys> {
               + ", kept=" + currentHot + ", inFlight=" + inFlightCalculations.get() + ")");
     }
 
-    for (int i = 0; i < deficit; i++) {
+    // Heap-pressure gate: each cold->hot promotion below loads (and retains via
+    // a chunk ticket) a chunk. On a small-heap server an unbounded fill grows
+    // the retained set until the JVM thrashes GC and the server appears to hang
+    // with no console error. Skip the fill while the heap is above
+    // PerformanceKeys.maxHeapPercent; serving already-cached locations to
+    // waiting players (the playerQueue drain below) continues regardless.
+    boolean heapUnderPressure =
+        io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.underPressure();
+    long fillDeficit = heapUnderPressure ? 0 : deficit;
+    if (heapUnderPressure && deficit > 0) {
+      RTP.log(Level.FINE,
+          "[Region:" + name + "] hot-cache fill paused (heap pressure); deficit=" + deficit);
+    }
+
+    for (int i = 0; i < fillDeficit; i++) {
       // Silent poll: this location is about to be re-offered to keptLocations under an
       // identical DB composite key (region:world:x:y:z). Firing the delete callback here
       // and the save callback on the kept offer races inside DatabaseAccessor's
@@ -605,7 +635,16 @@ public class Region extends FactoryValue<RegionKeys> {
                         + ") verify cachedChunk=" + (rtpChunk == null ? "null" : "present")
                         + " vert=" + (v == null ? "null" : v.getClass().getSimpleName()));
                 if (rtpChunk != null && v != null) {
-                  resolved = v.adjust(rtpChunk);
+                  // Re-validate the column where this candidate was originally
+                  // selected (spiral or L3 anvil backlog) before falling back to
+                  // the adjustor's fixed sub-column sweep. The sweep samples only
+                  // a few columns and silently dropped good land locations whose
+                  // safe column was not among them ([PROMOTE_DIAG] vert.adjust=null).
+                  RTPCoords storedCoords = coldLoc.coords();
+                  resolved = v.adjustColumn(rtpChunk, storedCoords.x() & 15, storedCoords.z() & 15);
+                  if (resolved == null) {
+                    resolved = v.adjust(rtpChunk);
+                  }
                 }
                 RTP.log(Level.FINER,
                     "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
@@ -619,6 +658,23 @@ public class Region extends FactoryValue<RegionKeys> {
                     Level.FINE,
                     "[Region] unkept→kept safety re-verification failed: "
                         + verifyEx.getClass().getSimpleName() + ": " + verifyEx.getMessage());
+              }
+
+              if (rtpChunk == null) {
+                // [PROMOTE_DIAG] TRANSIENT failure: the (re)loaded chunk was
+                // not retained by the world's chunk cache by the time this
+                // verification ran. On platforms that do not pin a freshly
+                // loaded chunk (e.g. Fabric, where vanilla can immediately
+                // unload a ticket-less chunk), getCachedChunk returns null even
+                // though the load reported success. This is NOT an unsafe
+                // location, so it MUST NOT be purged: return it to the unkept
+                // queue (pollSilently above skipped the delete callback, so the
+                // persisted row survives) and let a later promotion attempt
+                // retry once the chunk is retained. Purging here permanently
+                // lost known-good cold locations and flooded the log.
+                logPromotionDropDiag(coldLoc, null, cx, cz);
+                queueManager.unkeptLocations.offer(coldLoc);
+                return;
               }
 
               if (resolved == null) {
@@ -1035,7 +1091,12 @@ public class Region extends FactoryValue<RegionKeys> {
       }
     }
 
-    if (currentShape != null && backlogRefillActive) {
+    // Heap-pressure gate (see deficit loop in execute()): pause L3 backlog
+    // refill while the heap is above PerformanceKeys.maxHeapPercent so the
+    // accumulator stops growing the retained set during a memory crunch.
+    boolean heapUnderPressure =
+        io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.underPressure();
+    if (currentShape != null && backlogRefillActive && !heapUnderPressure) {
       // Bounded rejection sampling: cap *consecutive* pregenPref rejections per
       // pulse so a sparsely-pregenerated world with a high pregeneratedPreference
       // cannot endlessly spin the refill loop. After the cap is hit, we break
@@ -1457,6 +1518,39 @@ public class Region extends FactoryValue<RegionKeys> {
 
   public RTPWorld<?> getWorld() {
     return settings.world();
+  }
+
+  /**
+   * The operator-configured cosmetic display name for this region, read from the
+   * optional {@code displayName} key in the region's config file. This is purely
+   * a label for user-facing surfaces (the {@code /rtp info} command, the GUI menu,
+   * cross-server heartbeat advertisement); it never changes the region's identity,
+   * which remains {@link #name}. Supports RTP's hex/gradient color formatting like
+   * any other config string.
+   *
+   * <p>Falls back to the region {@link #name} when the key is absent, blank, or
+   * cannot be read, so existing configs behave exactly as before.
+   *
+   * @return the configured display name, or the region name when none is set
+   */
+  public String displayName() {
+    try {
+      MultiConfigParser<RegionKeys> regions =
+          (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+      if (regions != null) {
+        ConfigParser<RegionKeys> parser = regions.getParser(name);
+        if (parser != null) {
+          Object v = parser.getConfigValue(RegionKeys.displayName, null);
+          if (v != null) {
+            String s = String.valueOf(v).trim();
+            if (!s.isEmpty()) return s;
+          }
+        }
+      }
+    } catch (Throwable ignored) {
+      // Cosmetic only - never let a label lookup break a caller.
+    }
+    return name;
   }
 
   private static boolean isFoliaPlatform() {

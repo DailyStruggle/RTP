@@ -66,6 +66,7 @@ public interface ChartSpecResolver {
    * @param model    the chart model matched to {@code renderer}; never {@code null}
    */
   record Resolution(ChartRenderer<ChartModel> renderer, ChartModel model) {
+    /** Validates that neither component is null. */
     public Resolution {
       if (renderer == null) {
         throw new IllegalArgumentException("renderer shall not be null");
@@ -95,10 +96,16 @@ public interface ChartSpecResolver {
   final class UnresolvableChartSpecException extends Exception {
     private static final long serialVersionUID = 1L;
 
-    /** @param message description of why the chart spec could not be resolved */
+    /**
+     * Constructs the exception with a detail message.
+     *
+     * @param message description of why the chart spec could not be resolved
+     */
     public UnresolvableChartSpecException(String message) { super(message); }
 
     /**
+     * Constructs the exception with a detail message and cause.
+     *
      * @param message description of why the chart spec could not be resolved
      * @param cause   the underlying cause
      */

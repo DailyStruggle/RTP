@@ -5,10 +5,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Platform-agnostic addon lifecycle (ADR-057).
@@ -20,6 +27,25 @@ import org.junit.jupiter.api.Test;
  */
 @DisplayName("AddonRegistry platform-agnostic addon lifecycle (ADR-057)")
 class AddonRegistryTest {
+
+  /**
+   * Public, no-arg addon used as a {@link java.util.ServiceLoader} provider in the
+   * folder-scan tests. Must be public with a public no-arg constructor.
+   */
+  public static final class FolderScanAddon implements RTPAddon {
+    public FolderScanAddon() {}
+
+    @Override
+    public void onLoad() {}
+
+    @Override
+    public void onUnload() {}
+
+    @Override
+    public String name() {
+      return "folder-scan-addon";
+    }
+  }
 
   private static final class RecordingAddon implements RTPAddon {
     final String id;
@@ -135,5 +161,48 @@ class AddonRegistryTest {
     registry.loadAll();
     assertTrue(events.contains("load:b"));
     assertFalse(events.contains("load:a") && events.lastIndexOf("load:a") > events.indexOf("unload:a"));
+  }
+
+  @Test
+  @DisplayName("discoverFromDirectory tolerates null, missing, and empty folders as no-ops")
+  void discoverFromDirectory_noop_on_missing_or_empty(@TempDir File tempDir) {
+    AddonRegistry registry = new AddonRegistry();
+
+    registry.discoverFromDirectory(null);
+    registry.discoverFromDirectory(new File(tempDir, "does-not-exist"));
+    registry.discoverFromDirectory(tempDir); // empty folder
+
+    assertTrue(registry.registered().isEmpty(), "no addons should be discovered");
+  }
+
+  @Test
+  @DisplayName("discoverFromDirectory registers an addon declared in a jar's service descriptor")
+  void discoverFromDirectory_registers_addon_from_jar() throws Exception {
+    // A self-managed temp dir (not @TempDir): discoverFromDirectory opens a URLClassLoader over
+    // the jar and keeps it open by design (addons need their loader alive at runtime), so the
+    // jar cannot be deleted on Windows until the loader is GC'd. Best-effort cleanup only.
+    File addonsDir = Files.createTempDirectory("rtp-addons-scan").toFile();
+    addonsDir.deleteOnExit();
+    try {
+      // Build a jar whose only content is a ServiceLoader descriptor pointing at FolderScanAddon.
+      // The class itself resolves through the parent (test) classloader.
+      File jar = new File(addonsDir, "my-addon.jar");
+      jar.deleteOnExit();
+      try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(jar))) {
+        jos.putNextEntry(new JarEntry("META-INF/services/" + RTPAddon.class.getName()));
+        jos.write((FolderScanAddon.class.getName() + "\n").getBytes(StandardCharsets.UTF_8));
+        jos.closeEntry();
+      }
+
+      AddonRegistry registry = new AddonRegistry();
+      registry.discoverFromDirectory(addonsDir);
+
+      assertEquals(1, registry.registered().size(), "addon from jar should be registered");
+      assertEquals("folder-scan-addon", registry.registered().get(0).name());
+    } finally {
+      // best-effort: the loader may still hold the jar open on Windows
+      new File(addonsDir, "my-addon.jar").delete();
+      addonsDir.delete();
+    }
   }
 }

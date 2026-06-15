@@ -26,6 +26,11 @@ public class ClearCacheCmd extends BaseRTPCmdImpl {
   /** Permission key for {@code /rtp clearcache}. */
   public static final String PERMISSION = "rtp.admin";
 
+  /**
+   * Constructs the clearcache subcommand.
+   *
+   * @param parent the parent command tree (the {@code /rtp} root), or {@code null}
+   */
   public ClearCacheCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
   }

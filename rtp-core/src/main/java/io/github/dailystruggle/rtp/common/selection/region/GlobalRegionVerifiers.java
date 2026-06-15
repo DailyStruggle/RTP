@@ -63,8 +63,10 @@ public class GlobalRegionVerifiers {
     }
 
     /**
-     * @return the total number of currently registered verifiers (sync + async).
-     *         Used by the {@code RegionVerifierRegistry#size()} facade (ADR-026).
+     * Returns the total number of currently registered verifiers (sync + async).
+     * Used by the {@code RegionVerifierRegistry#size()} facade (ADR-026).
+     *
+     * @return the total registered verifier count
      */
     public static int registeredCount() {
         boolean acquired = false;

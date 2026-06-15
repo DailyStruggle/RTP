@@ -41,6 +41,9 @@ public final class MenuActionToCommand {
      * Returns the literal {@code /rtp ...} command to dispatch on click for
      * the given {@link MenuAction}, or {@code null} for renderer-only
      * variants that do not map to a server-side command (see class Javadoc).
+     *
+     * @param action the menu action to convert; {@code null} returns {@code null}
+     * @return the literal run-command string, or {@code null} for renderer-only actions
      */
     public static @Nullable String toRunCommand(@Nullable MenuAction action) {
         if (action == null) return null;
@@ -141,6 +144,9 @@ public final class MenuActionToCommand {
      * the record stores 0-indexed array positions). The book renderer
      * prefers Adventure's native {@code ClickEvent.changePage(int)} and
      * does not need this.
+     *
+     * @param change the change-page action; never {@code null}
+     * @return the literal {@code /rtp menu page n=<n>} command
      */
     public static String changePageCommand(MenuAction.ChangePage change) {
         // 0-based -> 1-based wire form.
@@ -151,6 +157,9 @@ public final class MenuActionToCommand {
      * Encodes a {@link MenuAction.RunRtpCommand} as a literal {@code /rtp}
      * invocation. The args are joined with single spaces; empty args degrade
      * to bare {@code /rtp}.
+     *
+     * @param run the run-command action; never {@code null}
+     * @return the literal {@code /rtp ...} command string
      */
     public static String buildRunCommand(MenuAction.RunRtpCommand run) {
         String[] args = run.args();
@@ -166,6 +175,9 @@ public final class MenuActionToCommand {
      * Encodes a {@link MenuAction.PromptAnvilInput} as the concrete
      * {@code /rtp menu anvil ...} command consumed by
      * {@code MenuConcreteCommandLeavesB.AnvilCmd}.
+     *
+     * @param prompt the anvil-input action; never {@code null}
+     * @return the literal {@code /rtp menu anvil ...} command string
      */
     public static String buildAnvilCommand(MenuAction.PromptAnvilInput prompt) {
         StringBuilder sb = new StringBuilder("/rtp menu anvil")
@@ -184,6 +196,9 @@ public final class MenuActionToCommand {
      * Joins a path array as a dot-separated string for the {@code path=}
      * parameter of the open / picker / anvil leaves. Empty arrays return
      * the empty string (the leaves treat an empty path as root).
+     *
+     * @param path the path segments; {@code null} or empty returns the empty string
+     * @return dot-joined path string, or the empty string when path is null/empty
      */
     public static String dotted(String[] path) {
         if (path == null || path.length == 0) return "";
@@ -201,6 +216,9 @@ public final class MenuActionToCommand {
      * leaf's onCommand runs (TreeCommand.java:224), so an empty path must
      * NOT be emitted as {@code path=}; instead the leaf treats a missing
      * {@code path=} as root.
+     *
+     * @param path the path segments; {@code null} or empty returns the empty string
+     * @return {@code " path=<dotted>"} or the empty string
      */
     public static String pathArg(String[] path) {
         String d = dotted(path);
@@ -212,6 +230,9 @@ public final class MenuActionToCommand {
      * parameter of {@code /rtp menu info}. Format matches
      * {@code InfoCmd.parseScope}: {@code global}, {@code world:<name>},
      * {@code region:<name>}.
+     *
+     * @param scope the scope token to encode; never {@code null}
+     * @return the wire-form scope string
      */
     public static String scopeWire(MenuAction.InfoScopeToken scope) {
         return switch (scope.kind()) {

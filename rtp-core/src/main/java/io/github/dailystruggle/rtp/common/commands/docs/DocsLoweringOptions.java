@@ -32,6 +32,7 @@ public record DocsLoweringOptions(
         boolean exposeDeveloperDocs,
         long maxFileBytes) {
 
+    /** Validates the record components. */
     public DocsLoweringOptions {
         if (maxLineWidth < 16) {
             throw new IllegalArgumentException("maxLineWidth must be >= 16, got " + maxLineWidth);
@@ -44,7 +45,11 @@ public record DocsLoweringOptions(
         }
     }
 
-    /** Defaults per ADR-045 §"Configuration surface". */
+    /**
+     * Returns the default options per ADR-045 §"Configuration surface".
+     *
+     * @return a {@link DocsLoweringOptions} with default values
+     */
     public static DocsLoweringOptions defaults() {
         return new DocsLoweringOptions(56, 48, false, 262144L);
     }

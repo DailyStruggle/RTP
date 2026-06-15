@@ -65,6 +65,35 @@ function Write-Tsv($rows, [string]$path) {
     [System.IO.File]::WriteAllBytes($path, $enc.GetBytes($sb.ToString()))
 }
 
+# --- Comment-cell escaping (single-line CSV transport) ----------------------
+#
+# The changeset CSV is parsed line-by-line (Read-Csv below), so a comment block
+# that spans multiple physical lines must be flattened to a single line. We use
+# the same backslash convention as the per-locale TSV's preceding_comment
+# column: '\' -> '\\', newline -> '\n', tab -> '\t'. This keeps each changeset
+# row on one CSV line while round-tripping the comment exactly.
+
+function ConvertTo-CommentCell([string]$s) {
+    if ($null -eq $s) { return '' }
+    $v = $s
+    $v = $v -replace '\\', '\\\\'
+    $v = $v -replace "`r`n", "`n"
+    $v = $v -replace "`n", '\n'
+    $v = $v -replace "`t", '\t'
+    return $v
+}
+
+function ConvertFrom-CommentCell([string]$s) {
+    if ($null -eq $s) { return '' }
+    $PH = [char]0x1
+    $v = $s
+    $v = $v -replace '\\\\', [string]$PH
+    $v = $v -replace '\\n', "`n"
+    $v = $v -replace '\\t', "`t"
+    $v = $v -replace [string]$PH, '\'
+    return $v
+}
+
 # --- User-facing changeset CSV (RFC-4180 comma-quoted, UTF-8 no BOM) --------
 
 function ConvertTo-CsvField([string]$s) {

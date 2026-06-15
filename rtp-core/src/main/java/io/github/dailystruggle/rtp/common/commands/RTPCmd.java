@@ -135,7 +135,13 @@ public interface RTPCmd extends BaseRTPCmd {
     // teleport-specific guards (cooldown / processingPlayers), exactly as a
     // subcommand does. An action that throws is logged (REQ-RTP-S-004) and treated
     // as not-handled, so the classic teleport still runs.
-    if (!hasSubCommand) {
+    //
+    // The action fires only for a *bare* `/rtp` (no arguments at all). When the
+    // player supplies teleport parameters (e.g. `region=foo`, `world=bar`,
+    // coordinates), they have expressed an explicit destination, so the GUI/menu
+    // override is skipped and the classic parameterised teleport runs directly.
+    boolean bareInvocation = (args == null || args.length == 0);
+    if (!hasSubCommand && bareInvocation) {
       io.github.dailystruggle.rtp.api.hooks.RootActionRegistry.Action rootAction = null;
       try {
         io.github.dailystruggle.rtp.api.hooks.RootActionRegistry rootActionRegistry =

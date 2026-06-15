@@ -475,8 +475,8 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                 INSERT INTO rtp_network_backends(server_id, schema_version, plugin_state, accepting_requests,
                         last_seen_ms, mspt, queue_depth, soft_cap, heap_used_bytes, heap_max_bytes,
                         player_count, regions_available, worlds_loaded, kill_switch, updated_at_ms, hmac,
-                        kept_count, network_reserved_count, regions, region_kept_counts)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        kept_count, network_reserved_count, regions, region_kept_counts, region_metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(server_id) DO UPDATE SET
                     schema_version = excluded.schema_version,
                     plugin_state = excluded.plugin_state,
@@ -496,14 +496,15 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                     kept_count = excluded.kept_count,
                     network_reserved_count = excluded.network_reserved_count,
                     regions = excluded.regions,
-                    region_kept_counts = excluded.region_kept_counts
+                    region_kept_counts = excluded.region_kept_counts,
+                    region_metadata = excluded.region_metadata
                 """;
             case MYSQL -> """
                 INSERT INTO rtp_network_backends(server_id, schema_version, plugin_state, accepting_requests,
                         last_seen_ms, mspt, queue_depth, soft_cap, heap_used_bytes, heap_max_bytes,
                         player_count, regions_available, worlds_loaded, kill_switch, updated_at_ms, hmac,
-                        kept_count, network_reserved_count, regions, region_kept_counts)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        kept_count, network_reserved_count, regions, region_kept_counts, region_metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     schema_version = VALUES(schema_version),
                     plugin_state = VALUES(plugin_state),
@@ -523,14 +524,15 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                     kept_count = VALUES(kept_count),
                     network_reserved_count = VALUES(network_reserved_count),
                     regions = VALUES(regions),
-                    region_kept_counts = VALUES(region_kept_counts)
+                    region_kept_counts = VALUES(region_kept_counts),
+                    region_metadata = VALUES(region_metadata)
                 """;
             default -> """
                 MERGE INTO rtp_network_backends(server_id, schema_version, plugin_state, accepting_requests,
                         last_seen_ms, mspt, queue_depth, soft_cap, heap_used_bytes, heap_max_bytes,
                         player_count, regions_available, worlds_loaded, kill_switch, updated_at_ms, hmac,
-                        kept_count, network_reserved_count, regions, region_kept_counts)
-                KEY(server_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        kept_count, network_reserved_count, regions, region_kept_counts, region_metadata)
+                KEY(server_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         };
         try (Connection c = dataSource.getConnection();
@@ -568,6 +570,8 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                     BackendHeartbeatCodec.joinSet(row.regions())))));
             ps.setString(20, joinTrimmed(java.util.List.of(
                     BackendHeartbeatCodec.joinIntMap(row.regionKeptCounts()))));
+            ps.setString(21, joinTrimmed(java.util.List.of(
+                    BackendHeartbeatCodec.joinStrMap(row.regionMetadata()))));
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("SqlNetworkStateBinding.publishBackendHeartbeat failed: " + e.getMessage(), e);
@@ -579,7 +583,7 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                 SELECT server_id, schema_version, plugin_state, accepting_requests,
                        last_seen_ms, mspt, queue_depth, soft_cap, heap_used_bytes, heap_max_bytes,
                        player_count, regions_available, worlds_loaded, kill_switch, hmac,
-                       kept_count, network_reserved_count, regions, region_kept_counts
+                       kept_count, network_reserved_count, regions, region_kept_counts, region_metadata
                 FROM rtp_network_backends
                 """;
         Map<String, BackendHeartbeat> map = new LinkedHashMap<>();
@@ -616,7 +620,8 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                 rs.getInt("kept_count"),
                 rs.getInt("network_reserved_count"),
                 BackendHeartbeatCodec.splitSet(rs.getString("regions")),
-                BackendHeartbeatCodec.splitIntMap(rs.getString("region_kept_counts")));
+                BackendHeartbeatCodec.splitIntMap(rs.getString("region_kept_counts")),
+                BackendHeartbeatCodec.splitStrMap(rs.getString("region_metadata")));
         // A3 envelope: verify against the row's persisted hmac column. Legacy
         // (pre-A3) rows have NULL hmac; under signed mode they are dropped
         // with REQ-RTP-S-004 WARNING and self-heal on the next heartbeat tick

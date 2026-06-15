@@ -128,6 +128,14 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
 
   /**
    * Locale-aware constructor (no custom class loader).
+   *
+   * @param eClass          the enum class for configuration keys
+   * @param name            the name of the configuration file (without {@code .yml} if desired)
+   * @param version         the version string stamped into the file
+   * @param pluginDirectory the plugin data directory
+   * @param langFile        the language file, or {@code null} to use the default
+   * @param fileDatabase    the file database used for async I/O
+   * @param locale          the locale code, e.g. {@code "en"}
    */
   public ConfigParser(
       Class<E> eClass,
@@ -167,6 +175,13 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
 
   /**
    * Locale-aware constructor (default lang file, no class loader).
+   *
+   * @param eClass          the enum class for configuration keys
+   * @param name            the name of the configuration file
+   * @param version         the version string stamped into the file
+   * @param pluginDirectory the plugin data directory
+   * @param fileDatabase    the file database used for async I/O
+   * @param locale          the locale code, e.g. {@code "en"}
    */
   public ConfigParser(
       Class<E> eClass,
@@ -797,6 +812,13 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     return data.getOrDefault(key, def);
   }
 
+  /**
+   * Returns the configuration value for {@code key} as a {@link Map}, or an empty map
+   * when the value is absent or not a map type.
+   *
+   * @param key the configuration key
+   * @return the value as a map; never {@code null}
+   */
   public Map<String, Object> getMap(E key) {
     Object o = getData(key);
     if (o instanceof RtpYamlSection) {
@@ -982,6 +1004,12 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     set(k, value);
   }
 
+  /**
+   * Sets a configuration value by its string key name. Delegates to {@link #set(String, Object)}.
+   *
+   * @param key   the string key name
+   * @param value the value to set
+   */
   public void setConfigValue(String key, Object value) {
     set(key, value);
   }

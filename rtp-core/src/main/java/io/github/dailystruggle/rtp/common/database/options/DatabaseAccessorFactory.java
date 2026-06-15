@@ -46,6 +46,9 @@ public final class DatabaseAccessorFactory {
     /**
      * Probe whether the given JDBC driver class is reachable from the current
      * classloader. Returns {@code true} for {@code null} (no driver required, e.g. yaml).
+     *
+     * @param driverClass the fully-qualified JDBC driver class name, or {@code null}
+     * @return {@code true} if the driver is available or {@code driverClass} is {@code null}
      */
     public static boolean isDriverAvailable(String driverClass) {
         if (driverClass == null) return true;
@@ -192,7 +195,9 @@ public final class DatabaseAccessorFactory {
 
     /** Result of {@link #create}: the accessor plus the effective type after any fallback. */
     public static final class Result {
+        /** The constructed database accessor. */
         public final DatabaseAccessor<?> accessor;
+        /** The effective backend type string after any fallback (e.g. {@code "h2"}, {@code "yaml"}). */
         public final String effectiveType;
 
         Result(DatabaseAccessor<?> accessor, String effectiveType) {

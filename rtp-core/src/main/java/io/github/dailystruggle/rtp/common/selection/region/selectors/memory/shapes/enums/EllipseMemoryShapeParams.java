@@ -12,7 +12,7 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
  * constants present" invariant.
  */
 public enum EllipseMemoryShapeParams {
-  /** @see GenericMemoryShapeParams#mode */
+  /** Selection mode. @see GenericMemoryShapeParams#mode */
   mode,
 
   /** The first axis radius. */
@@ -24,7 +24,7 @@ public enum EllipseMemoryShapeParams {
    */
   radius2,
 
-  /** @see GenericMemoryShapeParams#centerRadius */
+  /** Inner exclusion radius. @see GenericMemoryShapeParams#centerRadius */
   centerRadius,
 
   /**
@@ -42,18 +42,18 @@ public enum EllipseMemoryShapeParams {
    */
   rotation,
 
-  /** @see GenericMemoryShapeParams#centerX */
+  /** Center X coordinate. @see GenericMemoryShapeParams#centerX */
   centerX,
 
-  /** @see GenericMemoryShapeParams#centerZ */
+  /** Center Z coordinate. @see GenericMemoryShapeParams#centerZ */
   centerZ,
 
-  /** @see GenericMemoryShapeParams#weight */
+  /** Region selection weight. @see GenericMemoryShapeParams#weight */
   weight,
 
-  /** @see GenericMemoryShapeParams#uniquePlacements */
+  /** Unique placements flag. @see GenericMemoryShapeParams#uniquePlacements */
   uniquePlacements,
 
-  /** @see GenericMemoryShapeParams#expand */
+  /** Expand flag. @see GenericMemoryShapeParams#expand */
   expand
 }

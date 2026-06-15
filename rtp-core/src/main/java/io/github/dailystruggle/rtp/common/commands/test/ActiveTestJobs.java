@@ -36,6 +36,8 @@ public final class ActiveTestJobs {
     public final Runnable canceller;
 
     /**
+     * Constructs a job descriptor.
+     *
      * @param subcommand name of the test subcommand that created this job
      * @param canceller  runnable that stops the job when invoked
      */

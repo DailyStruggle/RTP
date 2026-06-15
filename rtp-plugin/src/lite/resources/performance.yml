@@ -17,6 +17,7 @@ period: 20                # Ticks between background cache cycles
 syncAllottedTime: 50      # Max ms per tick for sync tasks
 asyncAllottedTime: 50     # Max ms per tick for async tasks
 minTPS: 19.0              # Min TPS to continue background queueing
+maxHeapPercent: 85.0      # Pause background cache generation above this % of max heap (0/100 disables)
 postTeleportQueueing: false  # Refill cache immediately after teleport
 syncLoading: false        # Use sync chunk loading (NOT RECOMMENDED)
 biomeRecall: true         # Reuse found biome locations

@@ -361,13 +361,28 @@ if (!excludeNeoforge) {
 }
 
 include 'addons:RTP_ExampleAddon'
-// RTP_GuiAddon — reference inventory (chest) destination picker built ONLY on the
-// stable rtp-api GUI-author surface (getAllowedTargets / getTargetStatus /
-// teleport / getMetricsSnapshot). Demonstrates the security boundary from
-// docs/dev/scratch/PROPOSAL-gui-author-spi.md: RTP owns validation, the addon
-// owns presentation + click handling. Bukkit-family only (Fabric has no Bukkit
-// inventory API).
-include 'addons:RTP_GuiAddon'
+// RTP_GuiAddon - DonutSMP-style destination picker, split on the project platform
+// model. rtp-gui-common is platform-neutral (menu model, config via RTP's
+// ConfigParser, the MenuRenderer render seam, and the teleport submit through
+// RTP.scheduler / serverAccessor); rtp-gui-bukkit, rtp-gui-fabric, and
+// rtp-gui-neoforge are the per-platform chest-inventory renderers, all bundled
+// into the single rtp-gui assembly jar. RTP owns validation
+// (getAllowedTargets / getTargetStatus / teleport); the addon owns presentation.
+include 'addons:RTP_GuiAddon:rtp-gui-common'
+include 'addons:RTP_GuiAddon:rtp-gui-bukkit'
+// Single multi-loader assembly jar (shades common + every platform renderer +
+// all three loader descriptors), mirroring RTP's unified-jar model. Always built.
+include 'addons:RTP_GuiAddon:rtp-gui'
+// Fabric renderer carrier - deobf MC 26.x (Loom-unobf, JDK 25). Gated like the
+// RTP Fabric 26.x carriers: dropped on JDK-21-only / network-constrained hosts.
+if (!excludeJdk25) {
+    include 'addons:RTP_GuiAddon:rtp-gui-fabric'
+}
+// NeoForge renderer carrier - MC 26.x (ModDevGradle, JDK 25). Gated by both the
+// whole-NeoForge switch and the JDK-25 switch, matching rtp-neoforge-v26_1_R1.
+if (!excludeNeoforge && !excludeJdk25) {
+    include 'addons:RTP_GuiAddon:rtp-gui-neoforge'
+}
 
 // Standalone helper plugins (no rtp-api / rtp-core dependency).
 // See helpers/PeriodicWorldSaver/README.md for the directory rationale.

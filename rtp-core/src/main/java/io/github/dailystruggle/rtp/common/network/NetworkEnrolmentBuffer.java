@@ -59,6 +59,8 @@ public final class NetworkEnrolmentBuffer {
     private volatile Object timerTaskHandle;
 
     /**
+     * Constructs a buffer with the given flush sink and batch size cap.
+     *
      * @param flushSink    receives one List per flush pulse; must be
      *                     thread-safe (called from the scheduler's async tier)
      * @param maxBatchSize hard cap per flush pulse; {@code <= 0} means
@@ -79,7 +81,11 @@ public final class NetworkEnrolmentBuffer {
         deque.addLast(record);
     }
 
-    /** Visible for tests / metrics. */
+    /**
+     * Returns the number of records currently pending flush.
+     *
+     * @return pending record count
+     */
     public int pendingDepth() { return deque.size(); }
 
     /**
@@ -87,6 +93,8 @@ public final class NetworkEnrolmentBuffer {
      * Idempotent: a second call returns the existing handle. {@code period}
      * is in server ticks (20 ticks per second) to match
      * {@link io.github.dailystruggle.rtp.api.scheduling.RTPScheduler#runTaskTimerAsynchronously}.
+     *
+     * @param periodTicks flush interval in server ticks
      */
     public synchronized void start(long periodTicks) {
         if (timerTaskHandle != null) return;

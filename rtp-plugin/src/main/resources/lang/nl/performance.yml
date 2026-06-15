@@ -62,6 +62,19 @@ asynchroonToegewezenTijd: 50
 # @default: 19.0
 minimaalTPS: 19.0
 
+# Maximaal JVM-heapgebruik (percentage van de maximale heap) voordat het
+# genereren van de achtergrondcache pauzeert. Elke gecachte locatie vergrendelt
+# een chunk, dus een onbegrensde vulling op een server met een kleine heap kan
+# de JVM in een constante garbage collection drijven en de server zonder
+# consolefout onbereikbaar maken. Zolang het gebruik op of boven deze drempel
+# ligt, stopt RTP met het aanvullen van de locatiecache, maar blijft het reeds
+# gecachte locaties aan wachtende spelers leveren. 0 of 100 schakelt de grens
+# uit.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapPercentage: 85.0
+
 # Wachtrij na teletransport
 # Als true probeert de plugin de locatiecache direct na een RTP te vullen.
 # Impact: GEMIDDELD

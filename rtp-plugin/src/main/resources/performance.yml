@@ -50,6 +50,18 @@ asyncAllottedTime: 50
 # @default: 19.0
 minTPS: 19.0
 
+# Maximum JVM heap usage (percent of max heap) before background cache
+# generation pauses. Each cached location pins a chunk, so an unbounded
+# fill on a small-heap server can drive the JVM into constant garbage
+# collection and make the server unresponsive with no console error.
+# While usage is at or above this threshold, RTP stops refilling the
+# location cache but keeps serving already-cached locations to waiting
+# players. 0 or 100 disables the gate.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapPercent: 85.0
+
 # Refill the region cache immediately after a successful teleport.
 # @type: boolean
 # @default: false

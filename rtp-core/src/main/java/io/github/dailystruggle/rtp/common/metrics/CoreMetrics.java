@@ -29,6 +29,9 @@ import java.util.logging.Level;
  */
 public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Metrics {
 
+    /** Constructs a CoreMetrics instance with the NOOP binding. */
+    public CoreMetrics() {}
+
     private final PipelineHistogram pipelineHistogram = new PipelineHistogram();
     private final MetricsSnapshotRing snapshotRing = new MetricsSnapshotRing();
     private volatile io.github.dailystruggle.metrics.api.MetricsBinding binding =
@@ -45,6 +48,8 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
     /**
      * Replaces the platform binding. Safe to call from any thread; the new binding takes
      * effect on the next {@link #snapshot()} call.
+     *
+     * @param binding the new binding; {@code null} resets to {@link io.github.dailystruggle.metrics.api.MetricsBinding#NOOP}
      */
     public void setBinding(io.github.dailystruggle.metrics.api.MetricsBinding binding) {
         this.binding = (binding == null) ? io.github.dailystruggle.metrics.api.MetricsBinding.NOOP : binding;
@@ -54,10 +59,20 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
         io.github.dailystruggle.metrics.api.Metrics.registerBinding(this.binding);
     }
 
+    /**
+     * Returns the currently installed binding.
+     *
+     * @return the active binding; never {@code null}
+     */
     public io.github.dailystruggle.metrics.api.MetricsBinding getBinding() {
         return binding;
     }
 
+    /**
+     * Returns the pipeline histogram for recording teleport latencies.
+     *
+     * @return the pipeline histogram; never {@code null}
+     */
     public PipelineHistogram pipelineHistogram() {
         return pipelineHistogram;
     }
@@ -66,6 +81,8 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
      * Resolved slow-teleport audit threshold (ms) from {@code performance.yml >
      * slowPipelineThresholdMs} (default {@code 5000}). A value {@code <= 0} disables the
      * audit. Never throws; falls back to the default if the parser is unavailable.
+     *
+     * @return the threshold in milliseconds; {@code <= 0} means disabled
      */
     public long slowPipelineThresholdMs() {
         try {
@@ -82,6 +99,8 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
      * Resolved queue-growth audit threshold (player count) from {@code performance.yml >
      * queueGrowthWarnThreshold} (default {@code 0} = disabled). A value {@code <= 0} disables
      * the audit. Never throws.
+     *
+     * @return the threshold as a player count; {@code <= 0} means disabled
      */
     public int queueGrowthWarnThreshold() {
         try {
@@ -94,12 +113,20 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
         }
     }
 
-    /** Cumulative count of slow immediate/unqueued teleports audited (ADR-053 §2a). */
+    /**
+     * Returns the cumulative count of slow immediate/unqueued teleports audited (ADR-053 §2a).
+     *
+     * @return cumulative slow-teleport count
+     */
     public long slowPipelineCount() {
         return slowPipelineCount.get();
     }
 
-    /** Cumulative count of edge-triggered queue-growth warnings (ADR-053 §2b). */
+    /**
+     * Returns the cumulative count of edge-triggered queue-growth warnings (ADR-053 §2b).
+     *
+     * @return cumulative queue-growth warning count
+     */
     public long queueGrowthWarnCount() {
         return queueGrowthWarnCount.get();
     }
@@ -162,11 +189,18 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
      * Returns the rolling MSPT+heap ring populated by the 1 Hz sampler
      * installed in {@code RTP.start}. Drives the {@code METRIC_SPARKLINE}
      * chart kind.
+     *
+     * @return the snapshot ring; never {@code null}
      */
     public MetricsSnapshotRing snapshotRing() {
         return snapshotRing;
     }
 
+    /**
+     * Samples the current runtime state and returns a snapshot.
+     *
+     * @return a fresh {@link io.github.dailystruggle.metrics.api.MetricsSnapshot}; never {@code null}
+     */
     @Override
     public io.github.dailystruggle.metrics.api.MetricsSnapshot snapshot() {
         io.github.dailystruggle.metrics.api.MetricsBinding b = this.binding;

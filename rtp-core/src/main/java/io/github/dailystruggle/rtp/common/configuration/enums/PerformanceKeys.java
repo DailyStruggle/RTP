@@ -6,6 +6,7 @@ public enum PerformanceKeys {
   syncAllottedTime,
   asyncAllottedTime,
   minTPS,
+  maxHeapPercent,
   viewDistanceSelect,
   viewDistanceTeleport,
   postTeleportQueueing,

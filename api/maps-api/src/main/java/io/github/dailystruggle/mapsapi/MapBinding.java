@@ -94,4 +94,17 @@ public interface MapBinding {
     default void deliverTo(MapHandle handle, UUID viewer) {
         // no-op: NoopMapBinding and test doubles inherit this.
     }
+
+    // Future direction (maps-api-ADR-002, Proposed): a second delivery path is
+    // anticipated for GUI-slot consumers (e.g. RTP_GuiAddon rendering a region's
+    // biome chart as a FILLED_MAP icon in a chest slot) that returns the rendered
+    // map as a platform item handle rather than dropping it into the viewer's
+    // inventory, plus an off-main raw-packet render path that builds the palette
+    // buffer off-thread from the in-memory chart model. That path is deferred and
+    // intentionally not part of this SPI yet. Until it lands, consumers shall reuse
+    // the renderEphemeral + MapView path and route the allocate / paint / stamp
+    // steps to the correct thread through the RTP scheduler abstraction
+    // (RTP.scheduler) - the same way MapDispatch already dispatches deliverTo - and
+    // shall not spin up raw threads for map work (project Scheduler Usage rule,
+    // REQ-RTP-MAP-002).
 }

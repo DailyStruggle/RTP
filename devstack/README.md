@@ -236,6 +236,75 @@ docker compose -f docker-compose.yml -f docker-compose.lobby-world.yml up -d
 To disable: delete `shared/lobby-world.zip`. Lobbies revert to vanilla on the
 next boot. See `shared/lobby-world/README.md` for the full contract.
 
+## Multi-server / multi-world GUI demo
+
+The devstack ships pre-configured to showcase the `RTP_GuiAddon` (the
+"DonutSMP-style" `/rtp` destination picker) across **multiple servers**, with
+each backend's destination in a **different dimension** to demo per-server load
+distribution. Three pieces make the menu rich:
+
+1. **One `default` region per backend, each in a distinct dimension, with a
+   configurable `displayName`.** Committed under each backend's
+   `rtp-config/regions/default.yml` and seed-copied into the running container
+   by the compose entrypoint shim (into `/data/plugins/RTP/regions/` on
+   Paper/Folia, `/data/config/rtp/regions/` on Fabric):
+
+   | Backend            | Dimension | `displayName`          |
+   |--------------------|-----------|------------------------|
+   | backend-a (Paper)  | Overworld | `&#55ff55Verdant Wilds`|
+   | backend-b (Folia)  | Nether    | `&#ff5533Ashen Wastes` |
+   | backend-c (Fabric) | End       | `&#c77dffVoid Reaches` |
+
+   The optional cosmetic `displayName` key (color/gradient supported) renames the
+   region in `/rtp info` and the GUI menu without changing its identity (the
+   region key stays `default`), and is advertised over the network so a lobby
+   shows each backend's chosen words for its cross-server destination. All
+   regions are centered on `(0,0)` with radii well inside +/-512 blocks so they
+   land in the pre-generated spawn-area chunks (below). backend-c (Fabric)
+   targets the dimension id `minecraft:the_end` because `FabricRTPWorld` names
+   worlds by dimension id, not by the Bukkit save-folder name.
+
+2. **A supplied pre-generated world.** A freshly-booted world generates chunks
+   on demand, and under load the async chunk loads can time out and surface as
+   null-chunk pipeline failures (most visibly on Fabric). `seed-pregen-worlds.ps1`
+   copies a known pre-generated single-server world into each backend's
+   **gitignored** bind-mounted world dirs. By default it copies the **full
+   world** (every `.mca`), which both eliminates the null-chunk timeouts and
+   gives the L3 backlog cache (`backlogCacheCap`, set in the region files) real
+   `.mca` files to anvil-prefilter - the backlog cache only does useful work
+   when there are on-disk `.mca` files to check. backend-a/backend-b also bind
+   their `world_nether` and `world_the_end` dirs (Paper keeps Nether/End as
+   separate top-level dirs); backend-c keeps them inside `world/` (`DIM-1` /
+   `DIM1`, vanilla layout). Pass `-RegionRadius <n>` (>= 0) to copy only a small
+   spawn-area window instead (cheaper, but supplies too few `.mca` for the
+   backlog cache to do meaningful prefiltering).
+
+3. **The GUI addon**, installed into the Bukkit-family instances so a bare
+   `/rtp` opens the chest menu (see `add-gui-addon.ps1`).
+
+### One command
+
+```powershell
+cd devstack
+.\setup-multiworld-demo.ps1                 # pre-gen worlds + install the GUI addon
+.\setup-multiworld-demo.ps1 -NoGuiAddon     # pre-gen worlds + regions only (opt out of the addon)
+docker compose up -d
+```
+
+Then connect a 1.21.x client to `localhost:25577` (proxy-a). You land on a
+lobby, whose own `regions/` is intentionally empty - so `/rtp` there shows the
+**cross-server peer regions** advertised by all three backends, each labelled by
+its configured `displayName` and landing in a different dimension (Verdant Wilds
+-> Overworld, Ashen Wastes -> Nether, Void Reaches -> End). Run `/server
+backend-a` (or `backend-b` / `backend-c`) and `/rtp` to teleport into that
+backend's default region directly.
+
+Pass `-Source <path>` to point at a different pre-generated world, or
+`-RegionRadius <n>` (>= 0) to copy only a small spawn-area window instead of the
+full world. The demo regions survive
+`reset-rtp-config.ps1` (they live in the seed `rtp-config/regions/` tree, not in
+the runtime `plugins/RTP/` tree it wipes).
+
 ## Teardown
 
 ```powershell

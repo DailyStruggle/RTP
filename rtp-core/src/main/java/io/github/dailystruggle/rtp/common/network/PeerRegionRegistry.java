@@ -131,6 +131,50 @@ public final class PeerRegionRegistry {
     }
 
     /**
+     * This backend's own network id (the {@code serverId} a peer would use to
+     * hard-pin to this backend), or {@code null} when not running as a network
+     * backend. Used by callers (e.g. the addon-facing allowed-targets list) to
+     * deduplicate a self-qualified {@code <self>:<region>} peer entry against the
+     * unqualified local region of the same name.
+     *
+     * @return the local server id, or {@code null}
+     */
+    public String localServerId() {
+        return localServerId;
+    }
+
+    /**
+     * Read a single descriptive attribute a peer backend advertised for one of
+     * its regions (e.g. {@code "env"} -&gt; {@code "NETHER"}, {@code "block"} -&gt;
+     * {@code "NETHERRACK"}). Backed by the heartbeat's open-ended
+     * {@code regionMetadata} map, keyed {@code "<region>.<attribute>"}.
+     *
+     * <p>Purely informational (icon / display hints for menus and addons);
+     * never affects routing. Defensive: a null/flaky snapshot, an unknown
+     * peer, or a missing attribute all yield {@code null}.</p>
+     *
+     * @param serverId  the peer backend's network id
+     * @param regionKey the (unqualified) region name on that backend
+     * @param attribute the attribute name (e.g. {@code "env"}, {@code "block"})
+     * @return the advertised attribute value, or {@code null} when absent
+     */
+    public String peerRegionAttribute(String serverId, String regionKey, String attribute) {
+        if (serverId == null || serverId.isEmpty()) return null;
+        if (regionKey == null || regionKey.isEmpty()) return null;
+        if (attribute == null || attribute.isEmpty()) return null;
+        try {
+            NetworkSnapshot snap = snapshotSupplier.get();
+            if (snap == null) return null;
+            BackendHeartbeat hb = snap.backend(serverId).orElse(null);
+            if (hb == null) return null;
+            return hb.regionMetadata().get(regionKey + "." + attribute);
+        } catch (Throwable ignored) {
+            // Defensive: a flaky transport must not crash a menu render.
+            return null;
+        }
+    }
+
+    /**
      * Install the topology-peer supplier (Option 1, plugin-message tier).
      * The supplier returns the set of backend server IDs the proxy has
      * advertised via {@code GetServers} (typically

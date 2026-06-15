@@ -6,6 +6,10 @@
 # to keep the lite UX simple. The full assembly documents and ships
 # `backlogCacheCap` (ADR-028); lite users do not need to know about it.
 
+# Optional cosmetic display name shown in /rtp info ([displayName]) and the RTP
+# GUI menu. Does NOT change the region's identity (commands/permissions still use
+# the region name). Supports color/gradient codes. Omitted = use the region name.
+# displayName: "&#55ff55Wild Overworld"
 world: "[0]" # Target world. [0] = main world.
 worldBorderOverride: false # Use vanilla /worldborder radius if true
 

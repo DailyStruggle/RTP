@@ -69,6 +69,41 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     private final ConcurrentHashMap<Long, WeakReference<FabricRTPChunkUnobf>> rtpChunkCache = new ConcurrentHashMap<>();
 
     /**
+     * Max number of recently live-loaded chunks pinned by strong reference in
+     * {@link #recentlyLoadedChunks}.
+     */
+    private static final int RECENT_LOADED_CAP = 1024;
+
+    /**
+     * Bounded strong-reference holder for recently live-loaded
+     * {@link ChunkAccess} instances. {@link #chunkCache} / {@link #rtpChunkCache}
+     * are intentionally {@link WeakReference}s so the JVM can reclaim chunk
+     * memory under pressure, but that let a freshly loaded cold->hot promotion
+     * candidate be GC'd (and vanilla unload its ticket-less chunk) in the window
+     * between {@link #getChunkAtAsync(int, int)} completing and the promotion's
+     * safety re-verify reading {@link #getCachedChunk(long)} — surfacing as the
+     * "getCachedChunk returned null" promotion-drop flood on Fabric backends.
+     *
+     * <p>Pinning the backing {@code ChunkAccess} with a strong reference here
+     * keeps it resolvable (the weak {@link #chunkCache} entry's referent stays
+     * reachable) through the verify window, after which the promotion opens a
+     * {@code ChunkReservation} that applies a real chunk ticket for the
+     * teleport. The access-order LRU bounds memory: the eldest pin drops once
+     * {@link #RECENT_LOADED_CAP} is exceeded (by then the verify has already
+     * run). Entries are also dropped explicitly on
+     * {@link #forgetChunkAt(int, int)} / {@link #forgetChunks()}.
+     */
+    private final java.util.Map<Long, ChunkAccess> recentlyLoadedChunks =
+            java.util.Collections.synchronizedMap(
+                    new java.util.LinkedHashMap<Long, ChunkAccess>(64, 0.75f, true) {
+                        @Override
+                        protected boolean removeEldestEntry(
+                                java.util.Map.Entry<Long, ChunkAccess> eldest) {
+                            return size() > RECENT_LOADED_CAP;
+                        }
+                    });
+
+    /**
      * ADR-016 anvil-backed chunk-snapshot cache. Populated by
      * {@link #getChunkAt(int, int)} when the persisted {@code .mca} probe
      * succeeds and consulted by {@link #getCachedChunk(long)} as a fall-through
@@ -483,19 +518,35 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                     result.completeExceptionally(cause);
                     return;
                 }
+                boolean cached = false;
                 if (handle != null) {
                     ChunkAccess chunk = handle.as(ChunkAccess.class);
                     if (chunk != null) {
                         chunkCache.put(key, new WeakReference<>(chunk));
                         rtpChunkCache.put(key,
                                 new WeakReference<>(new FabricRTPChunkUnobf(chunk, world, id)));
+                        // Pin the backing ChunkAccess with a bounded strong
+                        // reference so it survives the cold->hot promotion's
+                        // verify window. The caches above are WeakReferences;
+                        // without this pin the JVM could reclaim the chunk (and
+                        // vanilla unload the still-ticket-less chunk) before the
+                        // promotion's getCachedChunk(key) read, which produced
+                        // the "getCachedChunk returned null" drop flood.
+                        recentlyLoadedChunks.put(key, chunk);
                         // A live chunk supersedes any anvil snapshot — drop the
                         // stale view so subsequent getCachedChunk lookups don't
                         // return outdated palette data.
                         anvilProbeSupport.evict(key);
+                        cached = true;
                     }
                 }
-                result.complete(key);
+                // Only report success when a chunk was actually loaded AND cached.
+                // A null handle (the load produced no chunk) previously still
+                // completed with `key`, which mis-reported a failed load as a
+                // success (REQ-RTP-S-004) and left the caller's getCachedChunk(key)
+                // returning null. Completing with null routes the attempt through
+                // the orchestration layer's FailTypes.nullChunk attribution path.
+                result.complete(cached ? key : null);
             } finally {
                 if (acquiredPermit) {
                     // Release first, then resume one waiter (non-recursive: we
@@ -1301,6 +1352,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
             long key = ((long) chunkX & 0xffffffffL) | ((long) chunkZ << 32);
             chunkCache.remove(key);
             rtpChunkCache.remove(key);
+            recentlyLoadedChunks.remove(key);
             anvilProbeSupport.evict(key);
         });
     }
@@ -1321,6 +1373,7 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         });
         chunkCache.clear();
         rtpChunkCache.clear();
+        recentlyLoadedChunks.clear();
         anvilProbeSupport.clear();
     }
 

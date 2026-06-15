@@ -3,7 +3,14 @@ package io.github.dailystruggle.rtp.common.tasks;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.common.RTP;
 
+/**
+ * Periodic task that drains up to 50 entries from the
+ * {@link RTP#chunksToUnload} queue and unloads each loaded chunk.
+ */
 public class ChunkUnloadProcessor implements Runnable {
+
+  /** Constructs a processor. */
+  public ChunkUnloadProcessor() {}
   @Override
   public void run() {
     try {

@@ -256,6 +256,87 @@ public class JumpAdjustorTest {
         assertNull(result, "Phase-2 adjustor should return null when entire range is solid");
     }
 
+    /**
+     * Regression for the cold->hot promotion drop ([PROMOTE_DIAG] vert.adjust=null).
+     *
+     * <p>With the default region's parameters (minY=32, maxY=255, step=16) over
+     * terrain whose surface sits at Y=67 (solid 32..67, air 68+), Phase 2 narrows
+     * the window down to exactly {@code maxY=68} — which is the one valid standing
+     * Y (feet at 68, ground at 67, head at 69). The Phase-3 final scan must include
+     * that converged {@code maxY}; previously it used an exclusive {@code i < maxY}
+     * bound, never re-tested Y=68, and returned {@code null}, dropping a perfectly
+     * good live, generated land chunk at promotion.
+     */
+    @Test
+    void phase2_convergedMaxYIsTheOnlyLanding_isNotDropped() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        for (int y = 32; y <= 67; y++) chunk.setSolidSafe(y); // solid ground up to 67, air 68+
+
+        JumpAdjustor adj = buildAdjustor(32, 255, 16);
+        RTPCoords result = adj.adjust(chunk);
+
+        assertNotNull(result,
+                "JumpAdjustor must not drop a valid landing when Phase 2 converges maxY onto it");
+        assertEquals(68, result.y(), "Landing should be Y=68 (one above the solid ground at Y=67)");
+    }
+
+    // -----------------------------------------------------------------------
+    // adjustColumn — per-column re-validation (cold->hot promotion path)
+    // -----------------------------------------------------------------------
+
+    /**
+     * {@code adjustColumn} re-validates exactly the requested column and returns
+     * the landing Y derived with the same Phase-3 predicate as {@code adjust},
+     * with the global X/Z resolved from the requested in-chunk local column.
+     * This is the entry point the promotion verify uses to avoid re-sampling
+     * the fixed sub-columns ([PROMOTE_DIAG] vert.adjust=null regression).
+     */
+    @Test
+    void adjustColumn_findsLandingOnRequestedColumn() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(2, 3, world);
+        for (int y = 32; y <= 67; y++) chunk.setSolidSafe(y); // ground up to 67, air 68+
+
+        JumpAdjustor adj = buildAdjustor(32, 255, 16);
+        RTPCoords result = adj.adjustColumn(chunk, 5, 9);
+
+        assertNotNull(result, "adjustColumn should find the landing on the requested column");
+        assertEquals(68, result.y(), "Landing should be Y=68 (one above the solid ground at Y=67)");
+        assertEquals((2 << 4) + 5, result.x(), "Global X should be derived from the requested local X");
+        assertEquals((3 << 4) + 9, result.z(), "Global Z should be derived from the requested local Z");
+    }
+
+    /**
+     * {@code adjustColumn} returns {@code null} when the requested column has no
+     * safe standing spot (entire range solid-unsafe), so the caller falls back
+     * to the full {@code adjust} sweep.
+     */
+    @Test
+    void adjustColumn_entireRangeUnsafe_returnsNull() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        for (int y = 32; y <= 100; y++) chunk.setSolid(y); // all unsafe
+
+        JumpAdjustor adj = buildAdjustor(32, 100, 16);
+        assertNull(adj.adjustColumn(chunk, 7, 7),
+                "adjustColumn should return null when the column has no safe landing");
+    }
+
+    /**
+     * Out-of-range local coordinates are masked into {@code [0..15]}, so a
+     * global block X/Z passed verbatim still resolves to the correct in-chunk
+     * column.
+     */
+    @Test
+    void adjustColumn_masksLocalCoordsIntoChunk() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        for (int y = 32; y <= 67; y++) chunk.setSolidSafe(y);
+
+        JumpAdjustor adj = buildAdjustor(32, 255, 16);
+        RTPCoords result = adj.adjustColumn(chunk, 21, 0); // 21 & 15 == 5
+
+        assertNotNull(result, "adjustColumn should mask local coords and still find a landing");
+        assertEquals(5, result.x(), "Local X should be masked (21 & 15 == 5)");
+    }
+
     // -----------------------------------------------------------------------
     // testPlacement — verifier integration
     // -----------------------------------------------------------------------

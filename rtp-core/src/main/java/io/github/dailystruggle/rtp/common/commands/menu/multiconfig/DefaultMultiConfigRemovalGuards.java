@@ -30,7 +30,11 @@ public final class DefaultMultiConfigRemovalGuards {
         // utility class
     }
 
-    /** Returns the default-region guard (locks {@code default} case-insensitively). */
+    /**
+     * Returns the default-region guard (locks {@code default} case-insensitively).
+     *
+     * @return a guard that locks the entry named {@code default}
+     */
     public static MultiConfigRemovalGuard regions() {
         return new MultiConfigRemovalGuard() {
             @Override
@@ -45,7 +49,11 @@ public final class DefaultMultiConfigRemovalGuards {
         };
     }
 
-    /** Returns the default-world guard (locks any name the server reports as loaded). */
+    /**
+     * Returns the default-world guard (locks any name the server reports as loaded).
+     *
+     * @return a guard that locks entries whose world is currently loaded on the server
+     */
     public static MultiConfigRemovalGuard worlds() {
         return new MultiConfigRemovalGuard() {
             @Override

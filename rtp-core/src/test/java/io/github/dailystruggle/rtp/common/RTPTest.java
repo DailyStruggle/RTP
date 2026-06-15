@@ -1,8 +1,13 @@
 package io.github.dailystruggle.rtp.common;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.RTPResult;
+import io.github.dailystruggle.rtp.api.RtpTarget;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender;
+import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
@@ -203,6 +208,118 @@ class RTPTest {
 
         RTP.getInstance().processingPlayers.remove(id);
         assertFalse(RTP.getInstance().processingPlayers.contains(id));
+    }
+
+    @Test
+    void teleportApi_rejectsWhenPlayerAlreadyTeleporting() throws Exception {
+        // The addon-facing RTPAPI.teleport path must honour the same
+        // alreadyTeleporting guard the /rtp command enforces: a player already
+        // registered in processingPlayers must not start a second teleport.
+        UUID id = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(
+                id, "AlreadyTeleporting",
+                new RTPLocation(new MockRTPWorld("default"), 0, 0, 0));
+        accessor.addPlayer(player);
+        RTP.getInstance().processingPlayers.add(id);
+
+        RTPResult result = RTPAPI.teleport(id, RtpTarget.defaultRegion()).get();
+
+        assertFalse(result.isSuccess());
+        assertEquals(RTPResult.Reason.ALREADY_TELEPORTING, result.reason());
+    }
+
+    @Test
+    void teleportApi_rejectsWhenOnCooldown() throws Exception {
+        // The addon-facing path must honour the /rtp cooldown guard: a player
+        // with a recent (incomplete) prior teleport inside their cooldown window
+        // must be rejected with COOLDOWN rather than starting a new teleport.
+        UUID id = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(
+                id, "OnCooldown",
+                new RTPLocation(new MockRTPWorld("default"), 0, 0, 0)) {
+            @Override
+            public long cooldown() {
+                return 1_000_000L;
+            }
+        };
+        accessor.addPlayer(player);
+
+        TeleportData recent = new TeleportData();
+        recent.sender = player;
+        recent.time = System.currentTimeMillis();
+        recent.completed = false;
+        RTP.getInstance().latestTeleportData.put(id, recent);
+
+        RTPResult result = RTPAPI.teleport(id, RtpTarget.defaultRegion()).get();
+
+        assertFalse(result.isSuccess());
+        assertEquals(RTPResult.Reason.COOLDOWN, result.reason());
+    }
+
+    @Test
+    void teleportApi_rejectsWhenLockedAfterUses() throws Exception {
+        // The addon-facing path must honour the lockAfterUses usage cap: a player
+        // who has exhausted the cap (and lacks rtp.nolock) must be rejected with
+        // LOCKED rather than teleporting.
+        var cfg = (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
+                RTP.configs.getParser(
+                        io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
+        // Drive the in-memory config value directly (the test harness has no YAML
+        // backing, so ConfigParser.set would NPE). setData does an atomic swap of
+        // the value map that getNumber reads.
+        java.util.EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys, Object> saved =
+                cfg.getData();
+        try {
+            java.util.EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys, Object> mutated =
+                    new java.util.EnumMap<>(saved);
+            mutated.put(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.lockAfterUses, 1L);
+            mutated.put(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.lockAfterResetSeconds, 0L);
+            cfg.setData(mutated);
+
+            UUID id = UUID.randomUUID();
+            MockRTPPlayer player = new MockRTPPlayer(
+                    id, "Locked",
+                    new RTPLocation(new MockRTPWorld("default"), 0, 0, 0)) {
+                @Override
+                public boolean hasPermission(String permission) {
+                    // Deny only the lock bypass; allow everything else.
+                    return !"rtp.nolock".equals(permission);
+                }
+            };
+            accessor.addPlayer(player);
+            RTP.getInstance().usageCaps.recordSuccess(id, 1L, 0L, System.currentTimeMillis());
+
+            RTPResult result = RTPAPI.teleport(id, RtpTarget.defaultRegion()).get();
+
+            assertFalse(result.isSuccess());
+            assertEquals(RTPResult.Reason.LOCKED, result.reason());
+        } finally {
+            cfg.setData(saved);
+            RTP.getInstance().usageCaps.clear();
+        }
+    }
+
+    @Test
+    void teleportApi_rejectsWhileReloading() throws Exception {
+        // The addon-facing path must honour the reloading guard: while the plugin
+        // is swapping configuration, new teleports are refused with RELOADING.
+        UUID id = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(
+                id, "Reloading",
+                new RTPLocation(new MockRTPWorld("default"), 0, 0, 0));
+        accessor.addPlayer(player);
+
+        boolean saved = RTP.reloading.get();
+        try {
+            RTP.reloading.set(true);
+            RTPResult result = RTPAPI.teleport(id, RtpTarget.defaultRegion()).get();
+
+            assertFalse(result.isSuccess());
+            assertEquals(RTPResult.Reason.RELOADING, result.reason());
+        } finally {
+            RTP.reloading.set(saved);
+        }
     }
 
     @Test

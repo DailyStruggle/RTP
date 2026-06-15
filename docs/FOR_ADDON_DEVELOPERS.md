@@ -15,6 +15,71 @@ If you are implementing a custom shape, vertical adjustor, biome filter, or clai
 
 ---
 
+## Addons Are Platform-Agnostic by Default
+
+The single most important thing to understand before you write an RTP addon: **most addons need no
+platform-specific code at all.** You write one module, compile it against `rtp-api` (and `rtp-core`
+where you need core types), and the same jar loads and runs unchanged on Spigot, Paper, Folia,
+Fabric, and NeoForge. You do **not** write a Bukkit plugin, a Fabric `ModInitializer`, or a NeoForge
+`@Mod` entry point, and you do **not** re-solve threading per platform.
+
+This works because RTP abstracts the platform behind a set of platform-neutral seams that your addon
+talks to instead of talking to the server directly:
+
+| You want to... | Use this (platform-neutral) | You do **not** touch |
+|---|---|---|
+| Be discovered and loaded on every platform | Implement `RTPAddon` + a `META-INF/services/io.github.dailystruggle.rtp.api.addon.RTPAddon` descriptor (`ServiceLoader`) | Bukkit `plugin.yml`, Fabric `fabric.mod.json`, NeoForge `@Mod` |
+| Schedule async / delayed / repeating / region-correct work | `RTP.scheduler` (the `RTPScheduler` SPI) and `RTPRunnable.schedule()` | `Bukkit.getScheduler()`, Folia entity/region schedulers, Fabric server-thread executors, raw `Thread` / `Executors` |
+| Add or veto a teleport destination | `RTPAPI.hooks().verifiers().register(...)` (the claim/biome/distance verifier seam, ADR-026) | Direct claim-plugin API calls in the hot path |
+| React to a completed teleport | `TeleportPipelineTask.teleportPostActions` | Bukkit `PostTeleportEvent` listeners |
+| Read/write your own config + honor `/rtp reload` | `RTP.configs.putParser(...)`, `Configs.onReload(...)` | Platform config loaders |
+| Register a custom shape or vertical adjustor | `RTP.addShape(...)` / the adjustor registry | Platform-specific anything |
+| Resolve players / worlds / locations | `RTP.serverAccessor` (`RTPServerAccessor`) and the `rtp-api` `RTPPlayer` / `RTPWorld` / `RTPLocation` wrappers | `org.bukkit.*`, `net.minecraft.*` types |
+| Log | `RTP.log(...)` | `Bukkit.getLogger()`, `System.out` |
+
+### The proof: `RTP_ExampleAddon`
+
+[`addons/RTP_ExampleAddon/`](../addons/RTP_ExampleAddon/) is the canonical reference. It is a
+**single module with no platform sub-module** - three Java files, one `example.yml`, and one
+`ServiceLoader` descriptor line - and it has **zero `org.bukkit.*` imports**. It is discovered by
+`rtp-core` through the `RTPAddon` SPI and runs identically on Bukkit/Paper/Folia, Fabric, and
+NeoForge. Despite that, it exercises the real addon surface: registering a `ConfigParser`,
+re-registering on `/rtp reload`, contributing a safety verifier via `RTPAPI.hooks()`, observing
+post-teleport via `TeleportPipelineTask.teleportPostActions`, and registering countdowns. Read it
+end-to-end before writing your own - it is intentionally a working template, not a toy.
+
+### Concurrency is inherited, not re-implemented
+
+The scheduling seam is worth calling out on its own. Because `RTP.scheduler` / `RTPRunnable` route
+your work onto the correct thread for the platform (the main thread on Spigot/Paper, the owning
+player's entity scheduler or a region thread on Folia, the server-thread executor on Fabric), an
+addon gets Folia-correct, region-safe scheduling **for free** - without importing a single platform
+scheduler API, and without learning each platform's threading model. The same code is also
+testable through `MockRTPScheduler` instead of mocking three different platform schedulers. This is
+the heaviest cross-platform burden in most plugins, and RTP solves it once on your behalf. The hard
+rules still apply (choose the right method - async vs. main vs. per-location/per-chunk - and never
+do synchronous chunk I/O on the main thread, S-005); what you skip is the per-platform plumbing.
+
+### When you *do* need a platform shim
+
+A platform-specific module is required only when your addon reaches for a surface RTP deliberately
+does **not** abstract - typically a platform-native UI or API with no cross-platform equivalent. The
+bundled GUI addon ([`addons/RTP_GuiAddon/`](../addons/RTP_GuiAddon/)) is the worked example: it opens
+a native Bukkit inventory, so it has a thin `rtp-gui-bukkit` module (a handful of files) sitting on
+top of a platform-neutral `rtp-gui-common` module that holds the menu model, actions, and renderer
+seam. Even then, the split is the point: the model and behavior stay in `common`, and only the
+render/translate layer is platform-specific. A Fabric or NeoForge GUI would add a similarly thin
+renderer over the same `common` model rather than re-implementing the addon.
+
+Rule of thumb: **if your addon reacts to RTP or reconfigures RTP, it is one platform-agnostic
+module. If it opens a platform-native UI or calls a platform-only API, isolate just that surface in
+a thin platform module over a shared `common` core.**
+
+The decision behind the addon SPI is [ADR-057](adr/ADR-057-platform-agnostic-addon-spi.md); the
+addon-as-external-Gradle-project model is [ADR-013](adr/ADR-013-addons-as-external-gradle-projects.md).
+
+---
+
 ## Recommended Reading Order
 
 ### 1. [CONCEPTS.md](dev/CONCEPTS.md)

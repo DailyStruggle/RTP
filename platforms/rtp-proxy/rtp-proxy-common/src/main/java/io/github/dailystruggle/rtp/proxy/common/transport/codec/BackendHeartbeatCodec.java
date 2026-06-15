@@ -73,6 +73,7 @@ public final class BackendHeartbeatCodec {
         m.put("networkReservedCount", Integer.toString(r.networkReservedCount()));
         m.put("regions", joinSet(r.regions()));
         m.put("regionKeptCounts", joinIntMap(r.regionKeptCounts()));
+        m.put("regionMetadata", joinStrMap(r.regionMetadata()));
         return m;
     }
 
@@ -101,6 +102,7 @@ public final class BackendHeartbeatCodec {
         appendField(sb, m, "networkReservedCount", false);
         appendField(sb, m, "regions", false);
         appendField(sb, m, "regionKeptCounts", false);
+        appendField(sb, m, "regionMetadata", false);
         return sb.toString();
     }
 
@@ -141,7 +143,8 @@ public final class BackendHeartbeatCodec {
                     Integer.parseInt(m.getOrDefault("keptCount", "0")),
                     Integer.parseInt(m.getOrDefault("networkReservedCount", "0")),
                     splitSet(m.getOrDefault("regions", "")),
-                    splitIntMap(m.getOrDefault("regionKeptCounts", ""))
+                    splitIntMap(m.getOrDefault("regionKeptCounts", "")),
+                    splitStrMap(m.getOrDefault("regionMetadata", ""))
             );
         } catch (Exception e) {
             return null;
@@ -212,6 +215,42 @@ public final class BackendHeartbeatCodec {
             sb.append(key).append('=').append(e.getValue());
         }
         return sb.toString();
+    }
+
+    /**
+     * Joins a {@code key:value} string map as {@code key=value} pairs separated
+     * by commas, in sorted key order for a stable canonical byte sequence.
+     * Keys and values containing reserved separators ({@code , = \n}) are
+     * sanitised to {@code _} (these never legitimately appear in the region
+     * names / material names / environment strings this carries; underscores
+     * already present, e.g. {@code GRASS_BLOCK}, are preserved).
+     */
+    public static String joinStrMap(Map<String, String> m) {
+        if (m == null || m.isEmpty()) return "";
+        Map<String, String> sorted = new TreeMap<>(m);
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (Map.Entry<String, String> e : sorted.entrySet()) {
+            if (e.getKey() == null || e.getValue() == null) continue;
+            if (!first) sb.append(',');
+            first = false;
+            String key = e.getKey().replace(',', '_').replace('=', '_').replace('\n', '_');
+            String val = e.getValue().replace(',', '_').replace('=', '_').replace('\n', '_');
+            sb.append(key).append('=').append(val);
+        }
+        return sb.toString();
+    }
+
+    public static Map<String, String> splitStrMap(String s) {
+        if (s == null || s.isEmpty()) return Map.of();
+        Map<String, String> out = new LinkedHashMap<>();
+        for (String tok : s.split(",")) {
+            if (tok.isEmpty()) continue;
+            int eq = tok.indexOf('=');
+            if (eq <= 0) continue;
+            out.put(tok.substring(0, eq), tok.substring(eq + 1));
+        }
+        return out;
     }
 
     public static Map<String, Integer> splitIntMap(String s) {

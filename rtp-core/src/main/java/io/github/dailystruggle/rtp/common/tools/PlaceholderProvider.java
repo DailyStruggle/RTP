@@ -944,6 +944,18 @@ public class PlaceholderProvider {
             return "";
         });
 
+        // Cosmetic, operator-configured display name for the region (the optional
+        // `displayName` config key), falling back to the region's identity name
+        // when unset. Available in any region-context message (e.g. regionInfo) as
+        // [displayName]; identity-bearing [region] is unchanged.
+        placeholders.put("displayName", uuid -> {
+            Region region = RTP.regionContext.get();
+            if (region != null) return region.displayName();
+            RTPWorld world = RTP.worldContext.get();
+            if (world != null) return RTP.selectionAPI.getRegion(world).displayName();
+            return "";
+        });
+
         placeholders.put("requirePermission", uuid -> {
             Region region = RTP.regionContext.get();
             if (region != null) {
