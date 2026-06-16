@@ -74,7 +74,7 @@ oldFile: "&b[P0] old [filename] detected. Updating"
 
 # monde bukkit détecté qui n'est pas dans le fichier de configuration
 # espace réservé : [world] - le monde détecté
-newWorld: "&b[P0] detected a new world '[world]'"
+nouveauMonde: "&b[P0] nouveau monde '[world]' détecté"
 
 # le monde n'existe pas dans bukkit
 # espace réservé : [world] - le nom du monde

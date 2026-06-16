@@ -11,13 +11,13 @@ Operational guide for AI agents and human contributors working in the RTP reposi
 1. Run the **Pre-Flight Checklist** before every code or terminal action.
 2. Never perform synchronous chunk I/O on the main thread (S-005).
 3. Never silently swallow a teleport failure (S-004).
-4. Use **PowerShell** syntax (`.\gradlew`, `;` not `&&`).
+4. Run Gradle via the wrapper (`./gradlew`); run one command per line rather than chaining.
 5. Use the `search_project` tool â€” not `grep`/`find` â€” to search the codebase.
 6. Java 21+ is required (REQ-RTP-SYS-001).
 7. Before modifying an uncommitted **code** file, create a `.bak` copy beside it. Skip for git-clean files and for docs/markdown.
 8. **Stay on task.** If you spot an unrelated potential bug, record it in [`docs/dev/POTENTIAL_BUGS.md`](../docs/dev/POTENTIAL_BUGS.md) and keep going â€” do not fix it in the current change.
 9. **Maintain a task checklist** for any multi-step task, and tick items off as you complete them â€” this preserves state if the session is interrupted (see *Checklist-Based State Tracking*).
-10. **End any runtime-testable progress with a full build** (`.\gradlew build`) before submitting â€” scoped tests are not a substitute (see *Final Full Build*).
+10. **End any runtime-testable progress with a full build** (`./gradlew build`) before submitting â€” scoped tests are not a substitute (see *Final Full Build*).
 11. **Write markdown as UTF-8; never emit mojibake.** If you see sequences like `Ã¢â‚¬â€`, `Ã¢â‚¬â„¢`, `Ã¢Å“â€¦`, `Ã‚Â§`, `ÃƒÂ©`, or the replacement character `ï¿½` in a diff you're about to write, stop and re-encode (see *Markdown Encoding Hygiene*).
 12. **Never run destructive git operations** (`git stash`, `git stash drop`, `git checkout -- <path>`, `git reset --hard`, `git restore`, `git revert`, `git clean -fd`, `git rebase`, `git push --force`) on the user's working tree. The working tree may contain uncommitted in-progress work you cannot see; touching it can silently destroy it. See *Git Safety* below.
 13. **Never `git commit` or `git push` unless the user explicitly asked for it in the current session.** Completing a fix does not imply permission to commit. Committing and pushing without a direct request is a violation even if the code is correct. See *GIT COMMITS* below.
@@ -63,7 +63,7 @@ Before generating code or terminal commands, explicitly state and verify:
 1. **Target platform** â€” Folia, Paper, Spigot, or Fabric.
 2. **Thread context** â€” on Folia, `Bukkit.isOwnedByCurrentRegion` before scheduling.
 3. **Chunk I/O** â€” zero synchronous chunk loads or blocking `.get()` on the main thread.
-4. **Terminal** â€” PowerShell (`.\gradlew`, `;`, correctly-escaped quotes).
+4. **Terminal** â€” run Gradle via `./gradlew`; one command per line, with correctly-escaped quotes.
 5. **Safety rule** â€” name the S-00x rule(s) that apply (see table below).
 6. **Backups** â€” `.bak` copy required only for uncommitted **code** files. Skip for git-clean files and for docs/markdown.
 7. **Architecture** â€” if multi-class/module, has the proposal been approved? (Rule D-005)
@@ -335,7 +335,7 @@ Rules:
 6. **Don't "preserve" mojibake to minimise diff noise.** If your edit lands on a line that already contains mojibake, fix that line's encoding while you're there. Leaving `Ã¢â‚¬â€` next to a freshly-written `â€”` is worse than fixing both.
 7. **Prefer ASCII punctuation over em/en dashes.** Em dashes (`â€”`, U+2014) and en dashes (`â€“`, U+2013) are an AI stylistic artifact, not a project convention; do not introduce them into new docs, ADRs, CHANGELOG entries, `messages.yml` values, code comments, or commit messages. Use ASCII hyphen (`-`), colon (`:`), or parentheses instead. This rule is **forward-only**: do not sweep existing occurrences just to swap punctuation â€” replace naturally as files are edited for substantive reasons. Rationale: ASCII punctuation is immune to the YAML-`\u2014`-literal bug (unquoted/single-quoted YAML scalars do not decode `\uâ€¦.` escapes), survives every console encoding, and produces clean diffs regardless of editor settings.
 
-8. **Intentional UI icon glyphs are not mojibake.** `messages.yml` values (and their locale mirrors) deliberately embed single-codepoint UI icons for menu/chat rows: `âœŽ` (U+270E type-a-value), `Â«` / `Â»` (U+00AB / U+00BB paginator arrows), `â–¶` (U+25B6 run/row marker), `âš¡` (U+26A1), `âš™` (U+2699), `âŒ–` (U+2316), and the Minecraft section sign `Â§` (U+00A7, as in the `Â§8` legacy color code). These are valid Unicode and **must be preserved as their proper codepoints** â€” do not "fix", ASCII-fold, or strip them, and do not flag them as mojibake. What *is* a defect is their corrupted forms: a replacement character `ï¿½` (U+FFFD) where an icon was lost, or a Windows-1252 double-encoding such as `Ã‚Â§` (stray `Ã‚` before `Â§`) or `Ã¢Å“`/`Ã°Å¸` byte runs. The `locale-files-from-csv.ps1 -Verify` gate flags only the corrupted forms (its marker set does not include the clean icons); when it trips on a locale value, restore the intended icon codepoint rather than deleting it. Icons are language-neutral: copy the baseline's icon verbatim into every locale (only the surrounding words are translated).
+8. **Intentional UI icon glyphs are not mojibake.** `messages.yml` values (and their locale mirrors) deliberately embed single-codepoint UI icons for menu/chat rows: `âœŽ` (U+270E type-a-value), `Â«` / `Â»` (U+00AB / U+00BB paginator arrows), `â–¶` (U+25B6 run/row marker), `âš¡` (U+26A1), `âš™` (U+2699), `âŒ–` (U+2316), and the Minecraft section sign `Â§` (U+00A7, as in the `Â§8` legacy color code). These are valid Unicode and **must be preserved as their proper codepoints** â€” do not "fix", ASCII-fold, or strip them, and do not flag them as mojibake. What *is* a defect is their corrupted forms: a replacement character `ï¿½` (U+FFFD) where an icon was lost, or a Windows-1252 double-encoding such as `Ã‚Â§` (stray `Ã‚` before `Â§`) or `Ã¢Å“`/`Ã°Å¸` byte runs. The `locale-files-from-csv.py --verify` gate flags only the corrupted forms (its marker set does not include the clean icons); when it trips on a locale value, restore the intended icon codepoint rather than deleting it. Icons are language-neutral: copy the baseline's icon verbatim into every locale (only the surrounding words are translated).
 
 Common origin of these regressions: copying rendered text out of a terminal that displayed a UTF-8 file as if it were Windows-1252, then pasting that already-corrupted text back into a tool call. The fix is always to read the file's real bytes (via `open`) and re-type the canonical character, not to copy from the rendered view.
 
@@ -377,8 +377,8 @@ Hard rules:
 1. **Mirror every new baseline key into every shipped locale, in the same change.** If you add a top-level key to any `<file>.yml` under `rtp-plugin/src/main/resources/`, you must also add a row to `lang/<file>.lang.yml` (identity row is allowed) AND a corresponding entry in **every** `lang/<locale>/<file>.yml` under its effective translated name. Skipping a locale lets it silently fall back to English at runtime, which is the bug class [ADR-020](../docs/adr/ADR-020-locale-bootstrap-and-yaml-baseline.md) was written to eliminate.
 2. **Effective key name lookup chain** (used by `ConfigParser` and `LocaleParityTest`): `localeLangMap.get(key)` -> `baselineLangMap.get(key)` -> identity `key`. When in doubt about what name to write under in the locale's `<file>.yml`, run `LocaleParityTest` and read the assertion - it reports the expected name verbatim (e.g. `missing 'menuInvalid' (expected as 'menuInvalid')`).
 3. **CI guard**: `rtp-plugin` ships [`LocaleParityTest`](../rtp-plugin/src/test/java/io/github/dailystruggle/rtp/bukkit/configuration/LocaleParityTest.java) - a single consolidated suite with `@Nested ResourceParity` (no `.bak` leakage, lang-map / value-file lookup, placeholder fidelity) and `@Nested FullParity` (baseline lang-map coverage, every-locale-every-key, no stale rows). Run before submitting any change that touches `messages.yml`, `config.yml`, `safety.yml`, `economy.yml`, `effects.yml`, `logging.yml`, `performance.yml`, `regions.yml`, or `worlds.yml`:
-   ```powershell
-   .\gradlew :rtp-plugin:test --tests "*LocaleParityTest*"
+   ```bash
+   ./gradlew :rtp-plugin:test --tests "*LocaleParityTest*"
    ```
 4. **First-pass translation is acceptable** when adding a new locale or filling a gap in an existing one. Identity-mapped entries (left == right in `<file>.lang.yml`) carry no locale signal but pass parity per [`TRANSLATION_GUIDE.md`](../docs/dev/TRANSLATION_GUIDE.md) section 8. For known-stale locales (locales that lag far behind English), prefer appending the English baseline value under the identity key with a `# TODO(i18n):` comment block rather than machine-translating into a language whose native speakers will see the awkward output - leave the placeholder visible so contributor PRs can replace it.
 5. **Do not edit the Spanish content guards.** [`ReqRtpF013SpanishLocaleContentTest`](../rtp-plugin/src/test/java/io/github/dailystruggle/rtp/bukkit/configuration/ReqRtpF013SpanishLocaleContentTest.java) is the REQ-traceable Spanish-specific suite (Norway-problem guard, typed-key resolution, enum coverage) and intentionally lives outside `LocaleParityTest`. Its guarantees are Spanish-flavored and do not generalize.
@@ -390,17 +390,17 @@ Hard rules:
 
 The per-locale YAML tree under `rtp-plugin/src/main/resources/` is **derived output**. The editable source of truth for locale maintenance is a set of tab-separated files under `scripts/out/` (one `baseline.tsv` + one `locale-<lang>.tsv` per shipped locale). Each `locale-<lang>.tsv` is the **single source of truth** for that locale's translated keys, values, **and** comments â€” there is no separate overlay file. Whenever you add, rename, or remove a user-facing config key (or touch a baseline value or comment), the workflow is:
 
-> **Intent (read first): the TSV is a consolidation surface, not an auto-translator.** Its purpose is to gather a whole set of locale changes into one file per locale (`scripts/out/locale-<lang>.tsv`) so the translation work happens in a single place, instead of hopping across dozens of scattered `lang/<locale>/<file>.yml` files. The scripts only move text and enforce structural parity; **the agent is still the translator.** `reconcile-locale-csvs.ps1` seeds new or changed rows with the *English* baseline text as a placeholder - those English cells are a to-do list to translate inside the TSV (step 4), not a finished result. Skipping step 4 and regenerating ships English under every locale's translated key.
+> **Intent (read first): the TSV is a consolidation surface, not an auto-translator.** Its purpose is to gather a whole set of locale changes into one file per locale (`scripts/out/locale-<lang>.tsv`) so the translation work happens in a single place, instead of hopping across dozens of scattered `lang/<locale>/<file>.yml` files. The scripts only move text and enforce structural parity; **the agent is still the translator.** `reconcile-locale-csvs.py` seeds new or changed rows with the *English* baseline text as a placeholder - those English cells are a to-do list to translate inside the TSV (step 4), not a finished result. Skipping step 4 and regenerating ships English under every locale's translated key.
 
 1. **Edit the baseline only.** Add or update the key in `rtp-plugin/src/main/resources/<file>.yml` with its English value and leading comment block. Do not hand-edit any `lang/<locale>/*.yml` or `lang/<locale>/*.lang.yml` file â€” they will be regenerated.
 2. **Export the tree to TSV.**
-   ```powershell
-   .\scripts\locale-files-to-csv.ps1
+   ```bash
+   python scripts/locale-files-to-csv.py
    ```
    This rewrites `scripts/out/baseline.tsv` and every `scripts/out/locale-<lang>.tsv` from the on-disk YAML. Existing native translations of values **and comments** are preserved in the locale TSVs at this stage.
 3. **Reconcile to enforce structural parity.**
-   ```powershell
-   .\scripts\reconcile-locale-csvs.ps1
+   ```bash
+   python scripts/reconcile-locale-csvs.py
    ```
    Every locale TSV is forced to match baseline's `(relpath, base_key, index)` sequence: new baseline keys seed from English (value AND comment) under the locale's translated key name, stale keys are dropped, and stale-placeholder drift is healed.
 4. **Translate before regenerating.** This is the step that is easy to skip and must not be. Any locale row whose `value` or `preceding_comment` column is still English after step 3 is a freshly-seeded placeholder. Translate all three columns directly in `scripts/out/locale-<lang>.tsv`:
@@ -410,14 +410,14 @@ The per-locale YAML tree under `rtp-plugin/src/main/resources/` is **derived out
    - Mask `[placeholders]`, `&a` / `#hex` color codes, `Â§` section markers, and `@type`/`@range`/`@unit`/`@default`/`@options` doc-tags to sentinels before machine-translating; unmask after. Doc-tags, URLs, and version banners stay verbatim regardless.
    - Per [`TRANSLATION_GUIDE.md`](../docs/dev/TRANSLATION_GUIDE.md) Â§8: prefer native-speaker review one locale at a time over machine-translating ten languages in one shot. Mark known-stale rows with a `# TODO(i18n):` comment block so contributors can replace them.
 5. **Regenerate the YAML tree.**
-   ```powershell
-   .\scripts\locale-files-from-csv.ps1
+   ```bash
+   python scripts/locale-files-from-csv.py
    ```
    This rewrites every `lang/<locale>/<file>.yml` and synthesizes every `<file>.lang.yml` from the TSV's `(base_key, key)` columns. Never edit a `.lang.yml` by hand.
 6. **Verify.**
-   ```powershell
-   .\gradlew :rtp-plugin:test --tests "*LocaleParityTest*"
-   .\gradlew build
+   ```bash
+   ./gradlew :rtp-plugin:test --tests "*LocaleParityTest*"
+   ./gradlew build
    ```
 
 Notes:
@@ -425,7 +425,7 @@ Notes:
 - The TSV is the **only** place that mass renames, mass comment edits, or mass translations are tractable; hand-editing dozens of locale YAMLs is forbidden because the next reconcile pass will overwrite undocumented hand-edits.
 - New baseline files are picked up automatically (the to-csv scanner globs `*.yml`). No script change is needed when adding a `network.yml` or similar.
 - The `shape/<x>.lang.yml` and `vert/<x>.lang.yml` rename-map files have no sibling value file and are **not** synthesized â€” their rows live in each locale TSV directly.
-- **Adding a new locale**: do not copy an existing `lang/<other-locale>/` directory as a seed â€” that carries the other locale's translated keys/values/comments into the new TSV and forces a double-translation. Instead, add an empty `lang/<new-locale>/` directory (or just add the locale name to `reconcile-locale-csvs.ps1`'s known list if it iterates a fixed list), run the pipeline once so `reconcile` seeds every row from English baseline, then translate the resulting `scripts/out/locale-<new>.tsv` directly.
+- **Adding a new locale**: do not copy an existing `lang/<other-locale>/` directory as a seed â€” that carries the other locale's translated keys/values/comments into the new TSV and forces a double-translation. Instead, add an empty `lang/<new-locale>/` directory (or just add the locale name to `reconcile-locale-csvs.py`'s known list if it iterates a fixed list), run the pipeline once so `reconcile` seeds every row from English baseline, then translate the resulting `scripts/out/locale-<new>.tsv` directly.
 - Skipping step 4 (translation) is the documented anti-pattern: it ships English values under every locale's translated key name. That passes `LocaleParityTest` but degrades the user experience and is not the intended endpoint of a config change.
 
 ### Secondary "changeset" workflow (translate a finite set of changes across every locale)
@@ -435,32 +435,32 @@ The full per-locale TSV above is the right surface when you want to translate or
 For that case use the changeset scripts (a secondary component layered on top of the same TSVs):
 
 1. **Edit the English baseline** under `rtp-plugin/src/main/resources/<file>.yml` (add/reword keys). Optionally run the primary pipeline through reconcile so the exported changeset shows each locale's current value/comment/key as context:
-   ```powershell
-   .\scripts\locale-files-to-csv.ps1
-   .\scripts\reconcile-locale-csvs.ps1
+   ```bash
+   python scripts/locale-files-to-csv.py
+   python scripts/reconcile-locale-csvs.py
    ```
-   This is now an **optimization, not a hard prerequisite**: if a key has no row in a locale's TSV when the changeset is imported (step 4), `locale-changeset-from-csv.ps1` seeds the row automatically (exactly what reconcile would have produced), so a skipped reconcile no longer silently drops translations.
+   This is now an **optimization, not a hard prerequisite**: if a key has no row in a locale's TSV when the changeset is imported (step 4), `locale-changeset-from-csv.py` seeds the row automatically (exactly what reconcile would have produced), so a skipped reconcile no longer silently drops translations.
 2. **Export a changeset** - a single, wide, spreadsheet-friendly **comma-separated** `scripts/out/changeset.csv` with one row per changed key and one column per language:
-   ```powershell
+   ```bash
    # only the keys you changed:
-   .\scripts\locale-changeset-to-csv.ps1 -Keys "messages.yml:alreadyTeleporting","messages.yml:teleportSuccess"
+   python scripts/locale-changeset-to-csv.py --keys "messages.yml:alreadyTeleporting" "messages.yml:teleportSuccess"
    # or a whole file, or (default) every row still untranslated in some locale:
-   .\scripts\locale-changeset-to-csv.ps1 -Keys "messages.yml"
-   .\scripts\locale-changeset-to-csv.ps1          # -UntranslatedOnly (default)
-   .\scripts\locale-changeset-to-csv.ps1 -All     # every translatable value row
+   python scripts/locale-changeset-to-csv.py --keys "messages.yml"
+   python scripts/locale-changeset-to-csv.py                 # --untranslated-only (default)
+   python scripts/locale-changeset-to-csv.py --all           # every translatable value row
    ```
    Columns: `relpath, parent_path, base_key, index, english, english_comment`, then a **triple** of columns per language - `<loc>` (the translated value), `<loc>_comment` (its leading comment block), and `<loc>_key` (the localized key name). This mirrors the per-locale TSV's `value` / `preceding_comment` / `key` triple, so a single changeset can carry the value, the operator-facing comment, AND the config key name in one row. Each locale cell is prefilled with that locale's current value/comment/key (often the English placeholder) for context. Comment cells embed newlines as `\n` and tabs as `\t` (same escaping as the TSV's `preceding_comment` column) so a multi-line comment block round-trips on one CSV line. Unlike the internal `.tsv`, this is a real RFC-4180 `.csv` (UTF-8 no BOM) so it opens cleanly in a spreadsheet.
 3. **Translate the per-language columns** for just those rows (same masking rules as step 4 above: preserve `[placeholders]`, `&a`/`#hex`, doc-tags). Fill `<loc>` (value), `<loc>_comment` (comment), and/or `<loc>_key` (localized key name) as needed. A value cell empty or equal to `english`, a comment cell empty or equal to `english_comment`, or a key cell empty or equal to `base_key` all mean "not translated yet" for that field and are left alone on import. Each field is applied independently, so you can translate just the comment, just the key, or all three.
 4. **Import** the filled changeset back into every `locale-<lang>.tsv` (matched by the same langmap logic reconcile uses, so translated key names resolve correctly):
-   ```powershell
-   .\scripts\locale-changeset-from-csv.ps1
+   ```bash
+   python scripts/locale-changeset-from-csv.py
    ```
-   For each row the value, comment, and key are applied independently: a cell that differs from its English column (or all, with `-IncludeEnglish`) overwrites the locale TSV's `value` / `preceding_comment` / `key`; the `<loc>_key` cell feeds the synthesized `<file>.lang.yml` rename map and renames the key in that locale's YAML. Use `-UntranslatedOnly` to protect existing human translations from an old/partial changeset. Rows that have no row yet in a locale's TSV are **seeded automatically** (relpath, localized key, value/comment with English fallback) instead of being skipped, so the changeset import never silently drops a translation even if `reconcile` was not run in step 1.
-5. **Regenerate and verify** exactly as the primary pipeline (`locale-files-from-csv.ps1`, then `LocaleParityTest` + full build).
+   For each row the value, comment, and key are applied independently: a cell that differs from its English column (or all, with `--include-english`) overwrites the locale TSV's `value` / `preceding_comment` / `key`; the `<loc>_key` cell feeds the synthesized `<file>.lang.yml` rename map and renames the key in that locale's YAML. Use `--untranslated-only` to protect existing human translations from an old/partial changeset. Rows that have no row yet in a locale's TSV are **seeded automatically** (relpath, localized key, value/comment with English fallback) instead of being skipped, so the changeset import never silently drops a translation even if `reconcile` was not run in step 1.
+5. **Regenerate and verify** exactly as the primary pipeline (`locale-files-from-csv.py`, then `LocaleParityTest` + full build).
 
-The changeset never bypasses the TSVs - it is a focused editing surface that reads and writes them. `scripts/locale-changeset-common.ps1` holds the shared TSV/CSV/langmap helpers for both changeset scripts.
+The changeset never bypasses the TSVs - it is a focused editing surface that reads and writes them. `scripts/locale_common.py` holds the shared TSV/CSV/langmap helpers for both changeset scripts.
 
-**Encoding-safe translation (no inline-literal trap).** Edit non-ASCII translations directly in `scripts/out/changeset.csv` (it is UTF-8 no-BOM and the `Read-Csv`/`Write-Csv` helpers read/write UTF-8). **Never** paste CJK/Cyrillic/accented translations as inline string literals into a BOM-less `.ps1` helper: Windows PowerShell parses a BOM-less `.ps1` as cp1252 and silently corrupts those literals into C1 control characters (0x80-0x9F), which snakeyaml then rejects at load time with `special characters are not allowed` (a green `LocaleParityTest` will still fail). If you must script a bulk fill, keep the translations in a UTF-8 **data** file and read it with `[IO.File]::ReadAllText(<path>, [Text.Encoding]::UTF8)` - do not hardcode them in the script body. Do not leave throwaway helper scripts or staging files behind; the two changeset scripts are the only repeatable surface.
+**Encoding-safe translation (no inline-literal trap).** Edit non-ASCII translations directly in `scripts/out/changeset.csv` (it is UTF-8 no-BOM and the `read_csv`/`write_csv` helpers in `scripts/locale_common.py` read/write UTF-8). The pipeline scripts are Python 3.12 (stdlib only) and run identically on Windows, Linux, and macOS; invoke them with `python scripts/<name>.py`. **Never** paste CJK/Cyrillic/accented translations as inline string literals into a script body to bulk-fill the CSV: keep the translations in a UTF-8 **data** file and read it explicitly as UTF-8 (e.g. `Path(p).read_text(encoding="utf-8")`), so an editor or shell with a non-UTF-8 default encoding cannot silently corrupt them into bytes that snakeyaml later rejects at load time with `special characters are not allowed` (a green `LocaleParityTest` will still fail). Do not leave throwaway helper scripts or staging files behind; the two changeset scripts are the only repeatable surface.
 
 **Localizing the key name is required for pattern maintenance.** The `<loc>_key` column localizes the config key itself (e.g. `maxHeapPercent` -> `maxHeapProzent`), and parity stays correct because it resolves through the `<file>.lang.yml` rename map. Translate the `<loc>_key` cell for every locale in the **same** changeset pass that translates the value and comment - do not leave it identity-mapped as an afterthought. Treating the key as a first-class translated field keeps the three-column triple (`<loc>` / `<loc>_comment` / `<loc>_key`) uniformly populated across the whole locale tree, which is what makes the changeset round-trip predictable and the per-locale TSVs self-consistent; a half-localized row (translated value/comment but identity key) is the drift this pipeline exists to prevent. The localized key still resolves through the rename map, so the English docs/support threads remain cross-referenceable via `base_key`. Apply the same encoding discipline and masking rules to the `<loc>_key` cell as to the value and comment.
 
@@ -468,19 +468,19 @@ The changeset never bypasses the TSVs - it is a focused editing surface that rea
 
 ## Environment & Execution
 
-- **Shell**: PowerShell on Windows. Use `.\gradlew`, chain with `;` (never `&&`).
+- **Gradle**: run through the wrapper (`./gradlew`). Run one command per line; do not rely on a specific shell's command-chaining operator.
 - **Multi-module Gradle**:
-  - One module build: `.\gradlew :<module>:build`
-  - Targeted tests: `.\gradlew :<module>:test --tests "<pattern>"`
-  - Filter output: append `2>&1 | Select-String "BUILD|PASSED|FAILED|ERROR"`
+  - One module build: `./gradlew :<module>:build`
+  - Targeted tests: `./gradlew :<module>:test --tests "<pattern>"`
 - **Preferred runner**: the `run_test` tool is faster than the Gradle CLI for pass/fail checks over a directory of tests.
-- **Search**: use `search_project` with short keywords. Never `grep`/`find`. For file listings: `Get-ChildItem -Recurse <path> -Filter "*.java"`.
-- **Blank-output trap on directory listings (verify before you act, never destroy on an "empty" read)**: a bare `Get-ChildItem ... | Select-Object FullName` (or `-ExpandProperty FullName`) frequently comes back with **no visible output** in this terminal even when the directory is full â€” the rows are silently dropped on the way to stdout. Treat an empty listing as **"unknown"**, never as **"the directory is empty"**. Real incident: two blank `Get-ChildItem` reads led to the false conclusion that an existing, fully-implemented carrier module was an empty stub, and a follow-up `Copy-Item` then clobbered a real committed source file. Rules:
-  - Force the rows through a real sink before trusting them: `(Get-ChildItem -Recurse <path> -File | Select-Object -ExpandProperty FullName) -join "`n" | Write-Output`. If that *also* prints nothing, the path is genuinely empty/missing.
-  - Cross-check existence another way before any destructive/overwriting action (`Test-Path`, `git status --porcelain <path>`, `git ls-files <path>`, or the `search_project` tool).
-  - **Never overwrite or delete a file based on an apparently-empty directory listing.** `Copy-Item`/`Move-Item`/`Out-File`/`Set-Content` to an existing path silently overwrites; confirm the target does not exist (or is intended to be replaced) first.
+- **Search**: use `search_project` with short keywords. Never `grep`/`find`.
+- **Blank-output trap on directory listings (verify before you act, never destroy on an "empty" read)**: a directory listing can come back with **no visible output** even when the directory is full â€” the rows are silently dropped on the way to stdout. Treat an empty listing as **"unknown"**, never as **"the directory is empty"**. Real incident: two blank listings led to the false conclusion that an existing, fully-implemented carrier module was an empty stub, and a follow-up copy then clobbered a real committed source file. Rules:
+  - If a listing prints nothing, re-run it a different way before trusting it; if it *still* prints nothing, the path is genuinely empty/missing.
+  - Cross-check existence another way before any destructive/overwriting action (`git status --porcelain <path>`, `git ls-files <path>`, or the `search_project` tool).
+  - **Never overwrite or delete a file based on an apparently-empty directory listing.** Copy/move/write to an existing path silently overwrites; confirm the target does not exist (or is intended to be replaced) first.
   - If you do clobber a tracked file you created/copied *this session*, restore it with `git checkout HEAD -- <path>` (allowed for your own session change) and re-verify the content + `git status` afterward.
 - **Runtime**: Java 21+ required.
+- **Repo scripts are Python**: everything under `scripts/` is Python 3.12+ (stdlib only), so a single script serves Windows/Linux/macOS - there are no longer parallel per-shell copies. Run them with `python scripts/<name>.py` (e.g. `python scripts/locale-files-to-csv.py`). Shared helpers live in `scripts/locale_common.py`.
 - **Known-harmless warnings**, **Gradle daemon / JDK mismatch**, **`run_test` stdout suppression**, **`rtp test full` interpretation** â€” see [`LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md).
 - **Database / shutdown-flush / command-pipeline pitfalls** â€” see [`LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md).
 
@@ -491,7 +491,7 @@ The changeset never bypasses the TSVs - it is a focused editing surface that rea
 Any task that produces runtime-testable progress â€” i.e. any change to code, resources, build scripts, or anything else that could affect the compiled artifacts or test outcomes â€” **shall end with a full multi-module build** before `submit`:
 
 ```
-.\gradlew build
+./gradlew build
 ```
 
 Rules:
@@ -552,7 +552,7 @@ When you discover something durable, record it in the **correct** file:
 
 | Discovery | Destination |
 |-----------|-------------|
-| Toolset / PowerShell / Gradle environment fix | this file (`Environment & Execution` section) |
+| Toolset / shell / Gradle environment fix | this file (`Environment & Execution` section) |
 | Dated engineering pitfall, reproduction note, non-obvious behavior | [`docs/dev/LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md) |
 | Overloaded or ambiguous domain term | [`docs/dev/GLOSSARY.md`](../docs/dev/GLOSSARY.md) (Multipurpose Terms table) |
 | Informal alias / nickname for an existing code symbol | this file (*Domain Analogies & Aliases* table) |
