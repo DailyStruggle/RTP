@@ -3,9 +3,9 @@
 # @default: false
 rerollSaberFactions: false
 
-# Reroll the location if it lands inside Factions territory reported via the FactionsBridge API.
-# FactionsBridge bridges many Factions forks (FactionsUUID, SaberFactions, FactionsX, KingdomsX, ...)
-# behind one API; enable this when the FactionsBridge plugin is installed.
+# 如果位置落在通过 FactionsBridge API 报告的 Factions 领地内则重新抽取。
+# FactionsBridge 将多个 Factions 分支（FactionsUUID、SaberFactions、FactionsX、KingdomsX 等）
+# 统一到一个 API；安装了 FactionsBridge 插件时启用此选项。
 # @type: boolean
 # @default: false
 rerollFactionsBridge: false
@@ -30,22 +30,22 @@ rerollLands: false
 # @default: false
 rerollRedProtect: false
 
-# Reroll the location if it lands inside a Residence claim.
+# 如果位置落在 Residence 领地内则重新抽取。
 # @type: boolean
 # @default: false
 rerollResidence: false
 
-# Reroll the location if it lands inside a CrashClaim claim.
+# 如果位置落在 CrashClaim 领地内则重新抽取。
 # @type: boolean
 # @default: false
 rerollCrashClaim: false
 
-# Reroll the location if it lands inside a HuskClaims claim.
+# 如果位置落在 HuskClaims 领地内则重新抽取。
 # @type: boolean
 # @default: false
 rerollHuskClaims: false
 
-# Reroll the location if it lands inside KingdomsX claimed land.
+# 如果位置落在 KingdomsX 已认领土地内则重新抽取。
 # @type: boolean
 # @default: false
 rerollKingdomsX: false

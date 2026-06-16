@@ -29,8 +29,12 @@
 #   - The '<locale>_key' cell localizes the key name itself (fed into the
 #     synthesized <file>.lang.yml rename map on regen). It is compared against
 #     the `base_key` (English key) column.
-#   - Only EXISTING locale TSV rows are updated; rows absent from a locale TSV
-#     are reported and skipped (run reconcile first to seed them).
+#   - Rows absent from a locale TSV are SEEDED automatically from the changeset's
+#     baseline-space data (relpath -> locale relpath, base_key, parent_path,
+#     index) and then the translated value/comment/key is applied. This is what
+#     reconcile-locale-csvs.ps1 would have produced, so the changeset workflow is
+#     self-sufficient: running reconcile first is an optimization (it pre-fills
+#     the changeset with current per-locale context), not a hard prerequisite.
 #
 # Options:
 #   -IncludeEnglish     Also write per-language cells that equal the `english`
@@ -106,6 +110,7 @@ foreach ($loc in $locales) {
 
     $applied = 0
     $skipped = 0
+    $seeded = 0
     $missing = New-Object System.Collections.Generic.List[string]
 
     $commentCol = "${loc}_comment"
@@ -189,7 +194,34 @@ foreach ($loc in $locales) {
             }
             if ($rowApplied) { $applied++ }
         } else {
-            $missing.Add(("{0} :: {1} :: {2}" -f $basePath, $baseKey, $index)) | Out-Null
+            # No matching locale TSV row exists yet (reconcile was not run after
+            # the baseline edit, or the locale never had this key). Rather than
+            # silently dropping the translation, SEED the row here from the
+            # changeset's baseline-space data - exactly what reconcile would have
+            # produced - then apply the translated value/comment/key. This makes
+            # the changeset workflow self-sufficient and order-independent.
+            $seedKey = $effKey
+            if ($hasKey) { $seedKey = $keyCell }
+            $seedValue = if ($hasValue) { $cell } else { $english }
+            $seedComment = if ($hasComment) { $commentCell } else { $englishComment }
+            $newRow = [pscustomobject]@{
+                relpath           = $locPath
+                parent_path       = $effParent
+                key               = $seedKey
+                index             = $index
+                value             = $seedValue
+                preceding_comment = $seedComment
+                blank_before      = ''
+                base_key          = $baseKey
+            }
+            $rows.Add($newRow) | Out-Null
+            $idx[$lk] = $newRow
+            # Re-key the index entry to reflect the (possibly localized) seed key
+            # so a later changeset row for the same baseline key resolves to it.
+            $seedLk = "{0}|{1}|{2}|{3}" -f $locPath, $effParent, $seedKey, $index
+            $idx[$seedLk] = $newRow
+            $seeded++
+            $applied++
         }
     }
 
@@ -199,9 +231,9 @@ foreach ($loc in $locales) {
     $totalApplied += $applied
     $missingByLoc[$loc] = $missing
     if ($UntranslatedOnly) {
-        Write-Host ("{0}: applied={1} skipped(already-translated)={2} missing={3}" -f $loc, $applied, $skipped, $missing.Count)
+        Write-Host ("{0}: applied={1} seeded={2} skipped(already-translated)={3} missing={4}" -f $loc, $applied, $seeded, $skipped, $missing.Count)
     } else {
-        Write-Host ("{0}: applied={1} missing={2}" -f $loc, $applied, $missing.Count)
+        Write-Host ("{0}: applied={1} seeded={2} missing={3}" -f $loc, $applied, $seeded, $missing.Count)
     }
 }
 

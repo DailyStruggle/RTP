@@ -23,25 +23,23 @@
 # @default: 300
 传送冷却: 300
 
-# Maximum number of successful /rtp uses a player may make within the
-# lockAfterResetSeconds window before being locked out (BetterRTP LockAfter parity).
-# 0 disables the cap. Bypassed by rtp.nolock.
+# 玩家在 lockAfterResetSeconds 窗口内可成功使用 /rtp 的最大次数，超过后被锁定
+#（BetterRTP LockAfter 兼容）。0 禁用上限。rtp.nolock 权限可绕过。
 # @type: integer
 # @range: [0, null]
 # @default: 0
 lockAfterUses: 0
 
-# Length of the rolling usage-cap window for lockAfterUses. The counter resets this
-# many seconds after the window's first use. 0 means the cap never resets (a hard
-# lifetime cap).
+# lockAfterUses 滚动使用上限窗口的长度。计数器在窗口首次使用后经过此秒数重置。
+# 0 表示上限永不重置（硬性终身上限）。
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
 # @default: 0
 lockAfterResetSeconds: 0
 
-# When true, a successful /rtp sets the landed location as the player's persistent
-# spawn anchor (BetterRTP SetAsRespawn parity).
+# 为 true 时，成功的 /rtp 将着陆位置设为玩家的持久重生锚点
+#（BetterRTP SetAsRespawn 兼容）。
 # @type: boolean
 # @default: false
 setRespawnOnTeleport: false
@@ -72,10 +70,10 @@ setRespawnOnTeleport: false
   # @options: ["yaml", "sqlite", "mysql", "postgresql"]
   # @default: "sqlite"
   type: "sqlite"
-  # 网络数据库凭据（本地类型会忽略）
+  # Redis 主机。
   # @type: string
   host: "127.0.0.1"
-  # 数据库端口。仅由 mysql/postgresql 使用。
+  # Redis 端口。
   # @type: integer
   # @range: [1, 65535]
   port: 3306
@@ -85,7 +83,7 @@ setRespawnOnTeleport: false
   # 数据库用户名。仅 mysql/postgresql 使用。
   # @type: string
   username: "root"
-  # 数据库密码。仅 mysql/postgresql 使用。
+  # Redis 密码。空字符串禁用认证。
   # @type: string
   password: "password"
 
@@ -114,9 +112,9 @@ setRespawnOnTeleport: false
 # 路径将回退到可配置的 `menuInvalid` 消息。可用 id: book。(聊天
 # 渲染器将在后续版本中提供，届时会加入默认列表。)
 menu:
-  # Ordered preference list of renderer ids.
+  # 渲染器 id 的有序偏好列表。
   # @type: list<enum>
-  # @options: ["book", "chat"]
+  # @options: [\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\book\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\chat\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]
   renderer:
     # 通用菜单框架。
     # `renderer` 是渲染器 id 的有序偏好列表。出现异常或缺少适配器时，

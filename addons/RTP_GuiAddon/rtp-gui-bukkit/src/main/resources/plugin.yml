@@ -1,7 +1,7 @@
 name: RTP_GuiAddon
 version: '${version}'
 main: io.github.dailystruggle.rtp.guiaddon.bukkit.RTPGuiBukkitPlugin
-api-version: 1.17
+api-version: '1.21'
 folia-supported: true
 prefix: RTP-GUI
 authors: [ leaf26 ]

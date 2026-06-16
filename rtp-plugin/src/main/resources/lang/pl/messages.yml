@@ -29,9 +29,9 @@ juzTeleportowany: "&7[P0] ⚡ już jesteś teleportowany!"
 
 # gdy wtyczka jest aktualnie przeładowywana
 teleportOdmowaPrzeladowanie: "&7[P0] teleportacje są tymczasowo wyłączone, gdy plugin się przeładowuje. Spróbuj ponownie za chwilę."
-wiadomoscOpoznienia: "&7[P0] ⚡ Teleportacja za [delay]. Nie ruszaj sie."
+wiadomoscOpoznienia: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teleportacja za [delay]. Nie ruszaj sie.</gradient>"
 ladowanieChunkow: "&7[P0] ⚙ Wczytywanie chunkow! prosze czekac..."
-wiadomoscTeleportu: "&7[P0] ⚡ Przeteleportowano w [attempts] probach, w [processingTime]"
+wiadomoscTeleportu: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Przeteleportowano w [attempts] probach, w [processingTime]</gradient>"
 
 # jesli teleportacja zostanie anulowana
 teleportAnulowano: "&7[P0] ⚡ Teleportacja anulowana!"
@@ -195,15 +195,15 @@ infoProgWiekSieciZolty: 5.0
 infoFoliaRegionyNaglowek: "&7--- Regiony Folia ---"
 # Szablon wiersza dla pojedynczego regionu Folia. Zmienne: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
-infoFoliaRegion: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
+infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 infoZastrzezenieNaglowek: "&7--- Zastrzeżenie diagnostyczne ---"
 infoZastrzezenie: "&7Uwaga diagnostyczna: Jeśli całkowita liczba osieroconych chunków serwera przekracza łączną liczbę wczytań tego pluginu ([loads]), ten plugin nie jest jedynym źródłem wycieku pamięci."
 infoSwiatNaglowek: "#008080Światy:"
 infoKonsolaSwiatNaglowek: "&7--- Światy ---"
-infoSwiat: "  #21ADA8[world]"
+infoSwiat: "#21ADA8[world]"
 infoRegionNaglowek: "#63C5DARegiony:"
 infoKonsolaRegionNaglowek: "&7--- Regiony ---"
-infoRegion: "  #52B2BF[region]"
+infoRegion: "#52B2BF[region]"
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
@@ -579,8 +579,8 @@ GRACZ_TELEPORTACJA: "&bTELEPORTACJA"
 # ustawienia tytulu
 # usun lub ustaw title na "", aby wylaczyc
 # zalecane jest PlaceholderAPI dla wspolrzednych
-tytul: "#FF6B6BT#FF8560e#FF9F55l#FFBA4Ae#FFD53Fp#E8E040o#BFED41r#96F542t#6DF543e#44F2A0d#3BEFC8!#38ECF0"
-podtytul: "#A78BFAh#B47EF8a#C171F6v#CE64F4e#DB57F2 #E84AF0f#E855D8u#E860C0n#E86BA8!#E876A0"
+tytul: "<rainbow>Przeteleportowano!</rainbow>"
+podtytul: "<gradient:#A78BFA:#E876A0>baw się dobrze!</gradient>"
 pojawienie: 20
 pozostanie: 20
 zanik: 20

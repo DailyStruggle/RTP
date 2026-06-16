@@ -4,6 +4,10 @@
 # Formatting:
 #   - Bukkit legacy color codes (e.g. &a, &e, &c)
 #   - Hex color codes (e.g. #2636ef)
+#   - MiniMessage tags (e.g. <gradient:#5e4fa2:#f79459>, <rainbow>, <#rrggbb>)
+#     On Paper/Folia all MiniMessage tags are supported.
+#     On Spigot, gradient/rainbow/transition tags are expanded to per-character
+#     hex codes; other MiniMessage tags are stripped by the legacy pipeline.
 #   - PlaceholderAPI placeholders (when PAPI is installed)
 #
 # Placeholders:
@@ -18,8 +22,9 @@
 # list of additional placeholders
 # format: Pn - where n is the index in this list
 placeholders:
-  # P0
-  - "[RTP]"
+  # P0 - plugin prefix shown in every message. Uses a rainbow gradient on
+  # Paper/Folia and per-character hex codes on Spigot.
+  - "<rainbow>[RTP]</rainbow>"
 
 # ###############################################################################
 # Section 2: Teleportation
@@ -29,9 +34,9 @@ alreadyTeleporting: "&7[P0] ⚡ you're already teleporting!"
 
 # if the plugin is currently reloading
 teleportDeniedReloading: "&7[P0] teleports are temporarily disabled while the plugin reloads. Please try again shortly."
-delayMessage: "#9D7CD8[P0] ⚡ Teleporting in [delay]. Don't move"
+delayMessage: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teleporting in [delay]. Don't move</gradient>"
 chunkLoading: "&7[P0] ⚙ Loading chunks! please wait..."
-teleportMessage: "#5FB3B3[P0] ⚡ Teleported in [attempts] attempts, in [processingTime]"
+teleportMessage: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teleported in [attempts] attempts, in [processingTime]</gradient>"
 
 # if teleport is cancelled
 teleportCancel: "&7[P0] ⚡ Teleport cancelled!"
@@ -584,8 +589,8 @@ PLAYER_TELEPORTING: "&bTELEPORTING"
 # title settings
 # remove or set title to "" to disable
 # PlaceholderAPI is recommended for coordinates
-title: "#FF6B6BT#FF8560e#FF9F55l#FFBA4Ae#FFD53Fp#E8E040o#BFED41r#96F542t#6DF543e#44F2A0d#3BEFC8!#38ECF0"
-subtitle: "#A78BFAh#B47EF8a#C171F6v#CE64F4e#DB57F2 #E84AF0f#E855D8u#E860C0n#E86BA8!#E876A0"
+title: "<rainbow>Teleporte!</rainbow>"
+subtitle: "<gradient:#A78BFA:#E876A0>have fun!</gradient>"
 fadeIn: 20
 stay: 20
 fadeOut: 20

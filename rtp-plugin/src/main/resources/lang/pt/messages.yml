@@ -22,9 +22,9 @@ jaTeletransportando: "&7[P0] ⚡ você já está se teletransportando!"
 
 # se o plugin está sendo recarregado no momento
 teletransporteNegadoRecarregando: "&7[P0] os teletransportes estão temporariamente desativados enquanto o plugin recarrega. Tente novamente em alguns instantes."
-mensagemAtraso: "&7[P0] ⚡ Teletransportando em [delay]. Nao se mova."
+mensagemAtraso: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teletransportando em [delay]. Nao se mova.</gradient>"
 carregamentoChunk: "&7[P0] ⚙ Carregando chunks, por favor aguarde..."
-mensagemTeletransporte: "&7[P0] ⚡ Teletransportado em [attempts] tentativas, em [processingTime]"
+mensagemTeletransporte: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teletransportado em [attempts] tentativas, em [processingTime]</gradient>"
 
 # if teleport is cancelled
 cancelarTeletransporte: "&7[P0] ⚡ Teletransporte cancelado!"
@@ -181,15 +181,15 @@ infoThresholdNetworkAgeYellow: 5.0
 infoFoliaRegionsHeader: "&7--- Folia regions ---"
 # Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
-infoFoliaRegion: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
+infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 cabecalhoAvisoInfo: "&7--- Aviso de diagnóstico ---"
 avisoInfo: "&7Nota de diagnóstico: Se o número total de chunks órfãos do servidor exceder o total histórico de cargas deste plugin ([loads]), este plugin não é a única causa do vazamento de memória."
 cabecalhoMundoInfo: "#008080Mundos:"
 cabecalhoMundoConsoleInfo: "&7--- Mundos ---"
-infoMundo: "  #21ADA8[world]"
+infoMundo: "#21ADA8[world]"
 cabecalhoRegiaoInfo: "#63C5DARegiões:"
 cabecalhoRegiaoConsoleInfo: "&7--- Regiões ---"
-infoRegiao: "  #52B2BF[region]"
+infoRegiao: "#52B2BF[region]"
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
@@ -551,8 +551,8 @@ JOGADOR_TELETRANSPORTANDO: "&bTELETRANSPORTANDO"
 # ###############################################################################
 # Seção 10: Elementos visuais
 # ###############################################################################
-titulo: "#FF6B6BT#FF7E63e#FF9155l#FFA447e#FFB739t#FFCA2Br#FFDD1Da#F0F00Fn#C8F010s#A0F011p#78F012o#50F013r#38EF6Bt#3BECC8a#38ECF0d#35E9FFo#32E6FF!"
-subtitulo: "#A78BFAd#AF84F9i#B77DF7v#BF76F5i#C76FF3r#CF68F1t#D761EFa#DF5AEDi#E753EBs#EF4CE9!"
+titulo: "<rainbow>Teletransportado!</rainbow>"
+subtitulo: "<gradient:#A78BFA:#E876A0>divirta-se!</gradient>"
 aparecer: 20
 permanecer: 20
 desaparecer: 20

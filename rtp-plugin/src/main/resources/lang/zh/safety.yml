@@ -63,7 +63,7 @@ anvilPrefilterEnabled: true
 # @default: -1
 平台半径: -1
 
-# Depth (vertical thickness) of the emergency platform.
+# 紧急平台的深度（垂直厚度）。
 # @type: integer
 # @range: [1, null]
 # @unit: blocks
@@ -84,13 +84,11 @@ anvilPrefilterEnabled: true
 # @default: GLASS
 平台材质: "GLASS"
 
-# Optional timeout, in seconds, after which the emergency landing platform's
-# footprint is restored to the blocks that were there before it was built.
-# -1 disables restoration (the platform is permanent, the previous behaviour).
-# 0 restores as soon as the footprint chunk is loaded again; a positive value
-# restores after that many seconds of loaded time. The countdown only advances
-# while the footprint chunk is loaded (it pauses while the area is unloaded),
-# and pending restores survive a server restart.
+# 可选超时（秒），超时后紧急着陆平台的占地面积将恢复为建造前的方块。
+# -1 禁用恢复（平台永久存在，即原有行为）。
+# 0 在占地区块加载后立即恢复；正值在加载后经过该秒数后恢复。
+# 倒计时仅在占地区块已加载时推进（区域卸载时暂停），
+# 待处理的恢复在服务器重启后仍然有效。
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
@@ -236,7 +234,7 @@ platformRestoreSeconds: -1
 # @default: false
 生物群系白名单: false
 
-# Biomes treated as whitelist or blacklist members per biomeWhitelist.
+# 根据 biomeWhitelist 被视为白名单或黑名单成员的生物群系。
 # @type: list<biome>
 # @source: biome
 生物群系:
@@ -269,48 +267,47 @@ platformRestoreSeconds: -1
   - "DEEP_DARK"
   - "THE_VOID"
 
-# --- Optional PvP / combat-tag pre-flight gate ---
-# Master toggle. When true, /rtp consults the active combat-state authority
-# before enrolling a player and again before applying the destination, and
-# applies pvpOnCombat below. Off by default.
+# --- 可选 PvP / 战斗标记预检门 ---
+# 主开关。为 true 时，/rtp 在注册玩家前和应用目标前咨询活跃的战斗状态权威，
+# 并应用下方的 pvpOnCombat。默认关闭。
 # @type: boolean
 # @default: false
 pvpCheckEnabled: false
 
-# How long after dealing or taking PvP damage a player is considered "in combat"
-# by RTP's native tracker. Ignored when an external combat-tag plugin is bound.
+# 玩家在造成或受到 PvP 伤害后被 RTP 原生追踪器视为「战斗中」的时长。
+# 绑定了外部战斗标记插件时忽略此值。
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
 # @default: 15
 pvpCombatTagSeconds: 15
 
-# What to do when a combat-tagged player requests (or is mid-)/rtp.
-# ALLOW  - permit, but log an audit line
-# DENY   - refuse the command with the busy message
-# DELAY  - postpone until the combat tag expires, then proceed
-# CANCEL - abort an in-progress / queued teleport
-# Unknown values fail safe to DENY.
+# 当处于战斗标记的玩家请求（或正在进行）/rtp 时的处理方式。
+# ALLOW  - 允许，但记录审计日志
+# DENY   - 以繁忙消息拒绝命令
+# DELAY  - 推迟到战斗标记过期后再继续
+# CANCEL - 中止正在进行/排队的传送
+# 未知值安全回退到 DENY。
 # @type: enum
 # @options: [ALLOW, DENY, DELAY, CANCEL]
 # @default: DENY
 pvpOnCombat: "DENY"
 
-# Combat-state source preference.
-# AUTO     - external combat-tag plugin if one is bound, else native tracker
-# NATIVE   - always use RTP's native damage tracker
-# EXTERNAL - only a bound combat-tag plugin (no native fallback)
+# 战斗状态来源偏好。
+# AUTO     - 如果绑定了外部战斗标记插件则使用，否则使用原生追踪器
+# NATIVE   - 始终使用 RTP 的原生伤害追踪器
+# EXTERNAL - 仅使用绑定的战斗标记插件（无原生回退）
 # @type: enum
 # @options: [AUTO, NATIVE, EXTERNAL]
 # @default: AUTO
 pvpSource: "AUTO"
 
-# Native tracker: tag a player who TAKES PvP damage.
+# 原生追踪器: 标记受到 PvP 伤害的玩家。
 # @type: boolean
 # @default: true
 pvpTagVictim: true
 
-# Native tracker: tag a player who DEALS PvP damage.
+# 原生追踪器: 标记造成 PvP 伤害的玩家。
 # @type: boolean
 # @default: true
 pvpTagAggressor: true

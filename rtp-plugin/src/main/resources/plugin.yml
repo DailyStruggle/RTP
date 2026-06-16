@@ -12,7 +12,7 @@
 name: RTP
 version: '${version}'
 main: io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin
-api-version: 1.13
+api-version: '1.21'
 prefix: 'RTP'
 authors: [ leaf26 ]
 description: 'a fast and flexible random teleportation plugin'

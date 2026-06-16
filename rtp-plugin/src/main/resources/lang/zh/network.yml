@@ -1,50 +1,35 @@
-# RTP Network Mode (multi-server / multi-proxy)
+# RTP 网络模式（多服务器 / 多代理）
 #
-# Disabled by default; flipping
-# `network.enabled: true` opts this backend into the cross-server network.
+# 默认禁用；将 network.enabled: true 翻转后，此后端加入跨服网络。
 #
-# REQ-RTP-NET-002 (Behavioural Parity When Disabled): when `enabled: false`
-# this file is read, validated, and otherwise ignored - no threads start,
-# no database tables are created, no transport opens. The backend behaves
-# byte-identically to a build without network mode.
+# REQ-RTP-NET-002（禁用时的行为一致性）：当 enabled: false 时，
+# 此文件被读取和验证，但其他方面被忽略 - 不启动线程，
+# 不创建数据库表，不打开传输。后端行为与不含网络模式的构建完全相同。
 network:
   enabled: false
-  # Stable backend identity. Required when `enabled: true`. No default - the
-  # operator MUST supply one; two backends sharing a serverId will overwrite
-  # each other's heartbeat row.
+  # 稳定的后端标识符。当 enabled: true 时必填。无默认值 -
+  # 运营商必须提供；两个共享同一 serverId 的后端会互相覆盖心跳行。
   serverId: ""
-  # Environment variable holding the shared HMAC secret. Required when
-  # `enabled: true` AND `transport.type: redis`; SQL binding currently
-  # treats the env var as optional (DB connection auth + TLS is the
-  # security boundary).
+  # 持有共享 HMAC 密钥的环境变量。当 enabled: true 且 transport.type: redis 时必填；
+  # SQL 绑定目前将该环境变量视为可选（DB 连接认证 + TLS 是安全边界）。
   secretEnv: "RTP_NET_SECRET"
 
 transport:
-  # Backing store for cross-process state.
-  # - `in-memory`: development only; nothing leaves the JVM (REQ-RTP-NET-002
-  #   parity-by-construction).
-  # - `sql`: DB-as-bus. Reuses the existing RTP database
-  #   accessor pool from `database.yml`. Fallback when redis is not available.
-  # - `redis`: Jedis-backed heartbeats + pub/sub fan-out.
-  #   Heartbeats and snapshot work; atomic claim (used for
-  #   cross-backend reservation tokens) is not yet available. Project goal is
-  #   redis-first; flip `type: redis` once you have a Redis instance shared
-  #   across every backend and proxy.
+  # @type: enum
+  # @options: [\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\linear\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\exponential\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\logarithmic\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\sigmoid\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\step\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\power\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]
   type: "auto"
   # Plugin-messaging transport tuning. Used when `type` is `auto` (and a
   # proxy was detected) or `plugin-message`. Ignored by the other transports.
   pluginMessage:
-    # Proxy plugin-messaging channel. Leave as the default unless your proxy
-    # is configured to use a non-standard channel name.
+    # 代理插件消息通道。除非代理配置了非标准通道名称，否则保持默认值。
     channel: "bungeecord:main"
   redis:
-    # Required when `type: redis`. Hostname or IP of the Redis instance
-    # shared by every backend and proxy in the network.
+    # 当 type: redis 时必填。网络中所有后端和代理共享的 Redis 实例的主机名或 IP。
     host: "localhost"
-    # Default Redis port. Override if your deployment uses a non-standard one.
+    # 默认 Redis 端口。如果部署使用非标准端口，请覆盖此值。
     port: 6379
-    # Optional. Leave empty / omitted for unauthenticated Redis (dev/test);
-    # set when Redis ACL or `requirepass` is configured.
+    # 可选。未认证 Redis（开发/测试）时留空或省略；
+    # 配置了 Redis ACL 或 requirepass 时设置。
     password: ""
 
 heartbeat:
@@ -52,76 +37,53 @@ heartbeat:
   # used by both proxy-side and backend-side publishers; the proxy's
   # poll loop must observe rows within `staleAfterMs` to consider them live.
   intervalMs: 1000
-  # How long a peer's last-seen state stays trusted before it is treated as
-  # unknown. On the plugin-message tier this is also the snapshot stale
-  # window: a peer that goes unknown is still accepted as a destination (the
-  # destination decides on arrival), it just stops being suggested. Keep it
-  # comfortably above `intervalMs` so one dropped heartbeat does not flap a
-  # peer to unknown.
+  # 对等节点的最后可见状态在被视为未知之前保持可信的时长。
+  # 在插件消息层，这也是快照陈旧窗口：变为未知的对等节点仍被接受为目标，
+  # 只是不再被建议。保持远高于 intervalMs，以免单次心跳丢失导致对等节点状态抖动。
   staleAfterMs: 5000
-# Backend-side router. When `routing.mode` is
-# `local` (the default), `/rtp` runs the local pipeline only and the rest
-# of this file is informational. Flip to `auto` to opt this backend into
-# the cross-server wait queue (still local-first when the local backend
-# has the requested region available).
+# 后端路由器。当 routing.mode 为 local（默认值）时，
+# /rtp 仅运行本地管道，此文件其余部分仅供参考。
+# 切换为 auto 可将此后端加入跨服等待队列
+#（当本地后端有请求的区域时仍优先本地）。
 routing:
-  # `local`  - never enrol into the cross-server wait queue (default;
-  #            zero behaviour change).
-  # `auto`   - prefer local when this backend can serve the region; enrol
-  #            into the wait queue only when local cannot serve.
-  # `always` - always enrol into the wait queue (developer / acceptance
-  #            harness mode; not recommended for production).
+  # local  - 永不加入跨服等待队列（默认；零行为变化）。
+  # auto   - 当本地后端可以服务该区域时优先本地；仅当本地无法服务时加入等待队列。
+  # always - 始终加入等待队列（开发者/验收测试模式；不建议用于生产环境）。
   mode: "local"
-  # Lobby mode. When true, this backend becomes a pure dispatch
-  # node:
-  #  - Heartbeats publish an empty `regions` set and `acceptingRequests:false`
-  #    so peers never select this backend as a cross-server destination.
-  #  - A bare `/rtp` (no `region=` argument) auto-routes to the peer +
-  #    region with the largest `regionKeptCounts` value across the snapshot
-  #    ("most-kept" policy). Explicit `rtp region=<server>:<region>`
-  #    still works.
-  #  - When no peer advertises any region, bare `/rtp` rejects with the
-  #    localized `networkRegionUnavailable` message instead of silently
-  #    falling through to the (empty) local pipeline.
-  # Default false preserves the prior behaviour.
+  # 大厅模式。为 true 时，此后端成为纯调度节点：
+  # - 心跳发布空的 regions 集合和 acceptingRequests:false，
+  #   使对等节点永不将此后端选为跨服目标。
+  # - 裸 /rtp（无 region= 参数）自动路由到快照中 regionKeptCounts 最大的对等节点+区域。
+  # - 当没有对等节点发布任何区域时，裸 /rtp 以 networkRegionUnavailable 消息拒绝。
+  # 默认 false 保持原有行为。
   lobbyMode: false
-# Cross-server wait queue. All keys here are
-# ignored when `network.enabled: false` or `routing.mode: local`.
+# 队列深度；小队列静默，大队列急剧上升。
 queue:
-  # Maximum number of locally-buffered enrolments before backpressure
-  # rejects new `/rtp` calls with `RoutingDecision.FallbackReason.QUEUE_FULL`.
+  # 本地缓冲注册的最大数量，超过后背压将以 QUEUE_FULL 拒绝新的 /rtp 调用。
   maxDepth: 50
-  # Backend dirty-write flush cadence (ms). Lower = lower end-to-end
-  # latency, higher = fewer round trips to the transport. 250ms is the
-  # default.
+  # 后端脏写刷新节奏（毫秒）。越低端到端延迟越低，越高往返传输次数越少。默认 250ms。
   flushIntervalMs: 250
-  # Backend status-cache poll cadence (ms). Drives how often the backend
-  # reads `rtp:net:wq:status:<pid>` to refresh per-player progress.
+  # 后端状态缓存轮询节奏（毫秒）。驱动后端读取 rtp:net:wq:status:<pid> 刷新每玩家进度的频率。
   pollIntervalMs: 1000
-  # Optional passive aging of envelope HASHes. `0` disables (terminal
-  # transitions still DEL the env HASH explicitly); set to a
-  # positive value if you want operator-visible TTL on stuck envelopes.
+  # 可选的信封 HASH 被动老化。0 禁用（终态转换仍会显式 DEL 信封 HASH）；
+  # 设置正值可在卡住的信封上显示运营商可见的 TTL。
   entryTtlMs: 0
-  # Cross-server `/rtp` enrolment rate limit (token bucket). Operator
-  # safety net against runaway clients.
+  # 跨服 /rtp 注册速率限制（令牌桶）。防止失控客户端的运营商安全网。
   crossServerRequestsPerSecond: 5
   crossServerRequestsBurst: 10
-  # Proxy-side BLPOP worker count (rtp-proxy-velocity). Increase only when
-  # the proxy is observed to saturate a single worker; the dispatcher and
-  # transport pool are the real bottlenecks.
+  # 代理端 BLPOP 工作线程数（rtp-proxy-velocity）。
+  # 仅当观察到代理使单个工作线程饱和时才增加；调度器和传输池才是真正的瓶颈。
   workerThreads: 1
-# Reservation-token lifecycle (REQ-RTP-NET-011).
+# 预留令牌生命周期（REQ-RTP-NET-011）。
 reservation:
-  # Proxy-side TTL reaper cadence (ms). The reaper sweeps expired tokens
-  # and fires `ReleaseSink.onRelease(tokenId, TTL_EXPIRED)` so co-located
-  # backends can return the coordinate to `networkKeptLocations`.
+  # 代理端 TTL 回收器节奏（毫秒）。回收器清除过期令牌并触发
+  # ReleaseSink.onRelease(tokenId, TTL_EXPIRED)，使同位后端可将坐标归还给 networkKeptLocations。
   reapIntervalMs: 30000
-  # Per-token TTL (ms). A claimed-but-not-consumed reservation older than
-  # this is treated as abandoned and released.
+  # 每个令牌的 TTL（毫秒）。已认领但未消费且超过此时长的预留被视为已放弃并释放。
   ttlMs: 60000
-# Region-collision policy.
-# Only `warn` is shipped; `rename-local` and `reject-startup` are
-# documented follow-ups. Unknown values silently degrade to `warn`.
+# 区域冲突策略。
+# 仅提供 warn；rename-local 和 reject-startup 是已记录的后续功能。
+# 未知值静默降级为 warn。
 regionCollision:
   policy: "warn"
 # Load balancer scoring table.
@@ -177,24 +139,23 @@ regionCollision:
 # regionScarcityWeight is 0 because the explicit `region` term below owns
 # the kept-region signal.
 loadBalancer:
-  # Weight of the built-in region-scarcity term. 0 here because the explicit
-  # `region` term below already owns the kept-region signal.
+  # 内置区域稀缺性项的权重。此处为 0，因为下方的显式 region 项已拥有 kept-region 信号。
   # @type: number
   # @default: 0
   regionScarcityWeight: 0
-  # Scoring terms, one per metric. Each has an `input`, a `weight`, and a
-  # `curve` (type + parameters). Defaults gate overloaded backends.
+  # 评分项，每个指标一项。每项包含 input、weight 和 curve（类型 + 参数）。
+  # 默认值用于限制过载的后端。
   terms:
-    # Tick pressure; sigmoid knee at 0.6.
+    # Tick 压力；sigmoid 拐点在 0.6。
     mspt:
       # @type: enum
-      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @options: [\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\mspt\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\queueDepth\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\heapUsed\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\heapFree\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\playerCount\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\keptCount\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\tps\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\keptRegion\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]
       input: "mspt"
       # @type: number
       weight: 1.0
       curve:
         # @type: enum
-        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @options: [\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\linear\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\exponential\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\logarithmic\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\sigmoid\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\step\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\power\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]
         type: "sigmoid"
         # @type: number
         # @range: [0.1, 20]
@@ -202,32 +163,57 @@ loadBalancer:
         # @type: number
         # @range: [0, 1]
         x0: 0.6
-    # Queue depth; small queues silent, large ones explode.
+    # 队列深度；小队列静默，大队列急剧上升。
     queue:
+      # @type: enum
+      # @options: [\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\mspt\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\queueDepth\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\heapUsed\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\heapFree\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\playerCount\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\keptCount\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\tps\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\keptRegion\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]
       input: "queueDepth"
+      # @type: number
       weight: 1.0
       curve:
+        # @type: enum
+        # @options: [\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\linear\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\exponential\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\logarithmic\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\sigmoid\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\step\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\power\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]
         type: "exponential"
+        # @type: number
+        # @range: [0.1, 20]
         k: 3.0
-    # Heap gate; fires at >= 85% used.
+    # 堆内存门控；在已用内存 >= 85% 时触发。
     heap:
+      # @type: enum
+      # @options: [\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\mspt\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\queueDepth\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\heapUsed\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\heapFree\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\playerCount\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\keptCount\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\tps\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\keptRegion\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]
       input: "heapUsed"
+      # @type: number
       weight: 5.0
       curve:
+        # @type: enum
+        # @options: [\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\linear\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\exponential\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\logarithmic\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\sigmoid\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\step\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\power\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]
         type: "step"
         # @range: [0, 1]
         threshold: 0.85
-    # Region gate; fires when the kept pool is >= 95% full.
+    # 区域门控；当 kept 池 >= 95% 满时触发。
     region:
+      # @type: enum
+      # @options: [\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\mspt\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\queueDepth\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\heapUsed\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\heapFree\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\playerCount\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\keptCount\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\tps\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\keptRegion\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]
       input: "keptRegion"
+      # @type: number
       weight: 5.0
       curve:
+        # @type: enum
+        # @options: [\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\linear\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\exponential\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\logarithmic\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\sigmoid\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\step\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\power\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]
         type: "step"
+        # @range: [0, 1]
         threshold: 0.95
-    # Gentle tie-breaker on kept count.
+    # kept 数量上的温和平局打破器。
     kept:
+      # @type: enum
+      # @options: [\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\mspt\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\queueDepth\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\heapUsed\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\heapFree\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\playerCount\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\keptCount\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\tps\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\keptRegion\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]
       input: "keptCount"
+      # @type: number
       weight: 0.25
       curve:
+        # @type: enum
+        # @options: [\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\linear\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\exponential\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\logarithmic\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\sigmoid\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\step\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\power\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]
         type: "logarithmic"
+        # @type: number
+        # @range: [0.1, 20]
         k: 9.0

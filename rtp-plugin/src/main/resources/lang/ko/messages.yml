@@ -21,9 +21,9 @@
 
 # 플러그인이 현재 리로드 중일 때
 텔레포트거부_리로드중: "&7[P0] 플러그인 리로드 중이므로 텔레포트가 일시적으로 비활성화되었습니다. 잠시 후 다시 시도해 주세요."
-지연메시지: "&7[P0] ⚡ [delay] 후 텔레포트합니다. 움직이지 마세요."
+지연메시지: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ [delay] 후 텔레포트합니다. 움직이지 마세요.</gradient>"
 청크로딩중: "&7[P0] ⚙ 청크 로딩 중. 잠시 기다려 주세요.."
-텔레포트메시지: "&7[P0] ⚡ [attempts] 번 시도 후 텔레포트 완료 ([processingTime])"
+텔레포트메시지: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ [attempts] 번 시도 후 텔레포트 완료 ([processingTime])</gradient>"
 
 # if teleport is cancelled
 텔레포트취소: "&7[P0] ⚡ 텔레포트가 취소되었습니다!"
@@ -178,15 +178,15 @@ infoThresholdNetworkAgeYellow: 5.0
 infoFoliaRegionsHeader: "&7--- Folia regions ---"
 # Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
-infoFoliaRegion: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
+infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 정보_면책_헤더: "&7--- 진단 노트 ---"
 정보_면책: "&7진단 노트: 서버의 고립 청크 총수가 본 플러그인의 누적 로드 수 ([loads]) 를 초과하는 경우, 본 플러그인이 메모리 누수의 유일한 원인은 아닙니다."
 정보_월드헤더: "#008080월드:"
 정보_콘솔_월드헤더: "&7--- 월드 ---"
-정보월드: "  #21ADA8[world]"
+정보월드: "#21ADA8[world]"
 정보_리전헤더: "#63C5DA리전:"
 정보_콘솔_리전헤더: "&7--- 리전 ---"
-정보리전: "  #52B2BF[region]"
+정보리전: "#52B2BF[region]"
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
@@ -554,9 +554,9 @@ multiconfigResultNameTaken: "&can entry named '[name]' already exists."
 # ###############################################################################
 # 섹션 10: 시각 요소
 # ###############################################################################
-타이틀: "#FF6B6B랜#FF7E63덤#FF9155 텔#FFA447레#FFB739포트!"
-# B77DF7가#BF76F5보자!
-서브타이틀: "#A78BFA자#AF84F9,"
+타이틀: "<rainbow>텔레포트됨!</rainbow>"
+# B77DF7?#BF76F5??!
+?????: "<gradient:#A78BFA:#E876A0>즐겨봐요!</gradient>"
 페이드인: 20
 표시시간: 20
 페이드아웃: 20

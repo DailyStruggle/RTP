@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.softdepends.PAPIChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.tools.GradientExpander;
 import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -234,6 +235,11 @@ public class SendMessage {
             t);
       }
     }
+    // Expand gradient/rainbow/transition tags to per-character legacy hex codes
+    // so they render on servers that do not bundle Adventure (e.g. pure Spigot).
+    // On Paper/Folia the MiniMessage path above already handled them; this only
+    // fires when MINIMESSAGE_AVAILABLE is false or the MiniMessage render threw.
+    text = GradientExpander.expand(text);
     return TextComponent.fromLegacyText(format(player, text));
   }
 

@@ -28,9 +28,9 @@ already_pouncing: "&7[P0] ⚡ mrrp! you're already pouncing!"
 
 # plugin is grooming itself
 pounce_denied_grooming: "&7[P0] pounces are paused while the kitty grooms. try again after a few licks."
-hold_paw_message: "&7[P0] ⚡ Pouncing in [delay]. Don't twitch your tail"
+hold_paw_message: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Pouncing in [delay]. Don't twitch your tail</gradient>"
 kibble_loading: "&7[P0] ⚙ Loading kibble! please wait..."
-pounce_message: "&7[P0] ⚡ Pounced in [attempts] attempts, in [processingTime]"
+pounce_message: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Pounced in [attempts] attempts, in [processingTime]</gradient>"
 
 # pounce cancelled
 pounce_cancelled: "&7[P0] ⚡ Pounce cancelled! mrow."
@@ -199,10 +199,10 @@ hairball_warning_header: "&7--- Hairball disclaimer ---"
 hairball_warning: "&7Hairball note: if the server's total orphaned-kibble count exceeds this kitty's lifetime loads ([loads]), this kitty is not the only droolster."
 box_header: "#008080Boxes:"
 tall_human_box_header: "&7--- Boxes ---"
-box_info_meow: "  #21ADA8[world]"
+box_info_meow: "#21ADA8[world]"
 territory_header: "#63C5DATerritories:"
 tall_human_territory_header: "&7--- Territories ---"
-territory_meow: "  #52B2BF[region]"
+territory_meow: "#52B2BF[region]"
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
@@ -575,8 +575,8 @@ KITTY_POUNCING: "&bPOUNCING"
 # title settings
 # remove or set big_meow to "" to disable
 # PlaceholderAPI is recommended for coordinates
-big_meow: "#FF6B6BM#FF8560e#FF9F55o#FFBA4Aw#FFD53F!#E8E040 #BFED41p#96F542o#6DF543u#44F2A0n#3BEFC8c#38ECF0e#38ECF0d#38ECF0!"
-little_meow: "#A78BFAm#B47EF8r#C171F6r#CE64F4p#DB57F2 #E84AF0h#E855D8a#E860C0v#E86BA8e#E876A0 #E876A0f#E876A0u#E876A0n#E876A0!"
+big_meow: "<rainbow>Teletransportat!</rainbow>"
+little_meow: "<gradient:#A78BFA:#E876A0>purr-fect fun!</gradient>"
 slow_blink_in: 20
 stay_visible: 20
 slow_blink_out: 20
