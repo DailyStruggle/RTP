@@ -64,7 +64,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 ## Operator-facing (`admin/`)
 - [`admin/proxies/INDEX.md`](admin/proxies/INDEX.md) — proxy-mode admin docs (stub; populated as multi-server plan lands).
 - [`admin/QUICK_START.md`](admin/QUICK_START.md)
-- [`admin/CONFIGURATION.md`](admin/CONFIGURATION.md)
+- [`admin/CONFIGURATION.md`](admin/configuration/CONFIGURATION.md)
 - [`admin/COMMANDS.md`](admin/COMMANDS.md)
 - [`admin/HAZARDS.md`](admin/HAZARDS.md) — failure modes + mitigations (absorbs `FAILURE_MODES.md`).
 - [`admin/FAQ.md`](admin/FAQ.md)

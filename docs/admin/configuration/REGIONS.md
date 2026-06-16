@@ -109,7 +109,7 @@ The backlog cache (controlled by `backlogCacheCap`) is an optional **unverified*
 
 ### Relationship to other caches
 
-`backlogCacheCap` (L3, unverified) → `unkeptLocations` (L2, verified, chunks released) → `keptLocations` (L1, verified, chunks held). `/rtp` polls L1 first, falls back to L2 (which re-loads chunks on use), and the L3 pulse keeps L2 supplied. See [ADR-028](../adr/ADR-028-l3-backlog-cache.md) for the full design.
+`backlogCacheCap` (L3, unverified) → `unkeptLocations` (L2, verified, chunks released) → `keptLocations` (L1, verified, chunks held). `/rtp` polls L1 first, falls back to L2 (which re-loads chunks on use), and the L3 pulse keeps L2 supplied. See [ADR-028](../../adr/ADR-028-l3-backlog-cache.md) for the full design.
 
 ---
 

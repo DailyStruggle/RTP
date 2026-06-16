@@ -1,5 +1,5 @@
 # --- RTP World Configuration ---
-# Documentation: plugins/RTP/docs/admin/WORLDS.md
+# Documentation: plugins/RTP/docs/admin/configuration/WORLDS.md
 
 # Default region for this world
 region: "default"

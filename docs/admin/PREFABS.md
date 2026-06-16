@@ -8,7 +8,7 @@
 
 ## Why prefabs exist
 
-A fresh RTP install picks one set of defaults that has to work everywhere: shared-CPU VPS, dedicated bare metal, Folia regional scheduler, Paper, small-population creative server, 1000-player survival network. The defaults are the conservative middle. Prefabs let you jump to a curated tuning bundle in one click, instead of reading [PERFORMANCE.md](PERFORMANCE.md) + [REGIONS.md](REGIONS.md) and hand-tuning four files.
+A fresh RTP install picks one set of defaults that has to work everywhere: shared-CPU VPS, dedicated bare metal, Folia regional scheduler, Paper, small-population creative server, 1000-player survival network. The defaults are the conservative middle. Prefabs let you jump to a curated tuning bundle in one click, instead of reading [PERFORMANCE.md](configuration/PERFORMANCE.md) + [REGIONS.md](configuration/REGIONS.md) and hand-tuning four files.
 
 Prefabs are **starting points**, not config-management substitutes. After applying a prefab you can still hand-edit any file the prefab touched. Prefabs only set the knobs they explicitly mention; everything else is preserved as you had it.
 
@@ -121,8 +121,8 @@ If you have players mid-teleport when the confirm runs, their in-flight pipeline
 ## Related docs
 
 - [QUICK_START.md](QUICK_START.md) - end-to-end first-install sequence; prefabs are an optional shortcut, not a replacement.
-- [PERFORMANCE.md](PERFORMANCE.md) - reference for every knob a prefab might set in `performance.yml`.
-- [REGIONS.md](REGIONS.md) - reference for every knob a prefab might set in `regions/<id>.yml`.
+- [PERFORMANCE.md](configuration/PERFORMANCE.md) - reference for every knob a prefab might set in `performance.yml`.
+- [REGIONS.md](configuration/REGIONS.md) - reference for every knob a prefab might set in `regions/<id>.yml`.
 - [RUNBOOK.md](RUNBOOK.md) - what to run when things go wrong after an apply (`/rtp info`, `/rtp test`, `/rtp scan reset`).
 - [`docs/adr/ADR-024-rtp-lite-assembly-variant.md`](../adr/ADR-024-rtp-lite-assembly-variant.md) - the `lightweight` prefab is the pro-portable subset of the lite assembly's `regions/default.yml`; `backlogCacheCap` stays a lite-assembly-only knob.
 - [`docs/dev/scratch/PROPOSAL-admin-panel-prefabs.md`](../dev/scratch/PROPOSAL-admin-panel-prefabs.md) - design rationale.

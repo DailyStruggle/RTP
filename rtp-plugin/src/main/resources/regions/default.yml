@@ -1,5 +1,5 @@
 # --- RTP Region Configuration ---
-# Documentation: plugins/RTP/docs/admin/REGIONS.md
+# Documentation: plugins/RTP/docs/admin/configuration/REGIONS.md
 
 # Optional cosmetic display name shown in user-facing surfaces (the /rtp info
 # [displayName] placeholder and the RTP GUI menu). Does NOT change the region's

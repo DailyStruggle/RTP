@@ -1,5 +1,5 @@
 # --- RTP Safety Configuration ---
-# Documentation: plugins/RTP/docs/admin/SAFETY.md
+# Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
 # Seconds of invulnerability granted after a teleport completes.
 # 0 disables the post-teleport invulnerability window.
 # @type: integer

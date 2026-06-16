@@ -1,5 +1,5 @@
 # --- RTP Leistungseinstellungen ---
-# Dokumentation: plugins/RTP/docs/admin/PERFORMANCE.md
+# Dokumentation: plugins/RTP/docs/admin/configuration/PERFORMANCE.md
 # Maximale Suchversuche pro /rtp-Aufruf, bevor aufgegeben wird.
 # @type: integer
 # @range: [1, null]

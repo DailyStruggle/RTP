@@ -323,6 +323,9 @@ public final class Runner {
             if (a != null) recorder.onTimeout(a);
             deadlines.remove(id);
         }
+        // Close the per-run heap-pressure series so the file is flushed and
+        // no idle-server samples bleed into the run's data after it ends.
+        sampler.stopHeapSeries();
     }
 
     /** Async tick: ~10 Hz. Reaps timeouts then dispatches up to the concurrency cap. */

@@ -1,5 +1,5 @@
 # --- RTP Performance Settings ---
-# Documentation: plugins/RTP/docs/admin/PERFORMANCE.md
+# Documentation: plugins/RTP/docs/admin/configuration/PERFORMANCE.md
 # Max search attempts before giving up
 # @type: integer
 # @range: [1, null]

@@ -7,7 +7,7 @@ Two related but distinct extension points in RTP:
 
 > Supported server versions: **Minecraft 1.20.1 and above**. Anything in this document assumes that baseline — legacy-version caveats have been omitted.
 
-> See also: [`COMMANDS.md`](COMMANDS.md) for permission reference, [`CONFIGURATION.md`](CONFIGURATION.md) for `performance.yml` toggles.
+> See also: [`COMMANDS.md`](../COMMANDS.md) for permission reference, [`CONFIGURATION.md`](CONFIGURATION.md) for `performance.yml` toggles.
 
 ---
 
@@ -296,7 +296,7 @@ All events live in `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/
 
 ### Developer do / don't
 
-Pulled from [`REQUIREMENTS.md §3`](../dev/REQUIREMENTS.md) (S-00x rules):
+Pulled from [`REQUIREMENTS.md §3`](../../dev/REQUIREMENTS.md) (S-00x rules):
 
 - **Do** put chunk / claim / biome checks inside a `GlobalRegionVerifiers` lambda — it runs asynchronously and is S-005 safe.
 - **Do** log via `RTP.log(Level, msg[, throwable])`. Never `Bukkit.getLogger()`, never `printStackTrace()`.
@@ -312,5 +312,5 @@ Pulled from [`REQUIREMENTS.md §3`](../dev/REQUIREMENTS.md) (S-00x rules):
 - Source of truth, effect registry: `effects-api/src/main/java/io/github/dailystruggle/effectsapi/EffectFactory.java`
 - Parameter enums: `effects-api/src/main/java/io/github/dailystruggle/effectsapi/LocalEffects/enums/`
 - Developer walkthrough: `addons/RTP_ExampleAddon/README.md`
-- Safety rules every listener must follow: [`../dev/REQUIREMENTS.md §3`](../dev/REQUIREMENTS.md)
-- Auto-teleport (`rtp.onevent.*`) permissions: [`COMMANDS.md`](COMMANDS.md)
+- Safety rules every listener must follow: [`../dev/REQUIREMENTS.md §3`](../../dev/REQUIREMENTS.md)
+- Auto-teleport (`rtp.onevent.*`) permissions: [`COMMANDS.md`](../COMMANDS.md)

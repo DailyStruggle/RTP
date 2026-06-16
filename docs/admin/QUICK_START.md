@@ -86,7 +86,7 @@ shape:
 > **Tip:** `radius` is measured in **chunks**, not blocks. Multiply by 16 for the block distance.
 > A radius of 256 chunks = 4 096 blocks from centre.
 
-For the full key list (vertical clamps, biome filters, cache cap, mode options, etc.) see [REGIONS.md](REGIONS.md). For safety filters (biome blacklist, unsafe blocks, hazards) see [SAFETY.md](SAFETY.md) — and remember that any change to `safety.yml` must be followed by `/rtp scan reset` + `/rtp scan start` in Step 9 to discard memory validated under the old rules ([RUNBOOK.md](RUNBOOK.md)).
+For the full key list (vertical clamps, biome filters, cache cap, mode options, etc.) see [REGIONS.md](configuration/REGIONS.md). For safety filters (biome blacklist, unsafe blocks, hazards) see [SAFETY.md](configuration/SAFETY.md) — and remember that any change to `safety.yml` must be followed by `/rtp scan reset` + `/rtp scan start` in Step 9 to discard memory validated under the old rules ([RUNBOOK.md](RUNBOOK.md)).
 
 Save the file and run `/rtp reload` to apply changes without restarting.
 
@@ -106,7 +106,7 @@ override: "[0]"              # fallback world if the player lacks permission
 - Set `requirePermission: true` to gate the world behind `rtp.worlds.<world>`.
 - Point `override` at the world to redirect to when permission is missing.
 
-Full reference: [WORLDS.md](WORLDS.md).
+Full reference: [WORLDS.md](configuration/WORLDS.md).
 
 ---
 
@@ -152,7 +152,7 @@ price: 50.0          # cost per /rtp
 refundOnCancel: true # refund if teleport is cancelled
 ```
 
-Set `price: 0.0` to disable the cost entirely. Full options: [ECONOMY.md](ECONOMY.md).
+Set `price: 0.0` to disable the cost entirely. Full options: [ECONOMY.md](configuration/ECONOMY.md).
 
 ---
 
@@ -297,11 +297,11 @@ Once Steps 0–10 are green, the recurring loop is small:
 
 - [CONCEPTS.md](../dev/CONCEPTS.md) — how RTP works under the hood (queue, shapes, pipeline)
 - [COMMANDS.md](COMMANDS.md) — full command and permission reference
-- [WORLDS.md](WORLDS.md) — every `worlds/<world>.yml` key
-- [REGIONS.md](REGIONS.md) — every `regions/<name>.yml` key
-- [CONFIGURATION.md](CONFIGURATION.md) — every config key explained
-- [SAFETY.md](SAFETY.md) — biome / block / hazard filters
-- [ECONOMY.md](ECONOMY.md) — pricing and refunds
+- [WORLDS.md](configuration/WORLDS.md) — every `worlds/<world>.yml` key
+- [REGIONS.md](configuration/REGIONS.md) — every `regions/<name>.yml` key
+- [CONFIGURATION.md](configuration/CONFIGURATION.md) — every config key explained
+- [SAFETY.md](configuration/SAFETY.md) — biome / block / hazard filters
+- [ECONOMY.md](configuration/ECONOMY.md) — pricing and refunds
 - [RUNBOOK.md](RUNBOOK.md) — incident response and operational procedures
 - [FAQ.md](FAQ.md) — common questions and gotchas
 - [CONTRIBUTING.md](../../CONTRIBUTING.md) — how to build and extend the plugin

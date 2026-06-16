@@ -1,6 +1,6 @@
 # Safety filters (RTP-lite)
 
-> Stripped from `docs/admin/SAFETY.md` and `docs/admin/HAZARDS.md`. Lite ships
+> Stripped from `docs/admin/configuration/SAFETY.md` and `docs/admin/HAZARDS.md`. Lite ships
 > a **flat material allow/deny list** only — block-tag / state-predicate
 > sections from ADR-017 are not present (use RTP-Pro for those).
 

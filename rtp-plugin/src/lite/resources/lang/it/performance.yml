@@ -1,5 +1,5 @@
 # --- Impostazioni di prestazione di RTP ---
-# Documentazione: plugins/RTP/docs/admin/PERFORMANCE.md
+# Documentazione: plugins/RTP/docs/admin/configuration/PERFORMANCE.md
 # Numero massimo di tentativi di ricerca per invocazione di /rtp prima di rinunciare.
 # @type: integer
 # @range: [1, null]

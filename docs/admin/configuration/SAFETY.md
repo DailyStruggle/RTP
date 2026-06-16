@@ -23,7 +23,7 @@ Used as a legacy fallback if no solid ground is found.
 | `platformDepth` | Integer | `1` | Depth (downward) of the platform. |
 | `platformAirHeight` | Integer | `2` | Height of air to ensure above the platform. |
 | `platformMaterial` | String | `GLASS` | Block type used if no solid block exists. |
-| `platformRestoreSeconds` | Integer | `-1` | Optional timeout after which a built platform's footprint is restored to its original blocks. `-1` disables restoration (permanent platform). `0` restores as soon as the footprint chunk is loaded again; a positive value restores after that many seconds. The countdown only advances while the footprint chunk is loaded (it pauses while the area is unloaded), and pending restores survive a server restart. See [ADR-060](../adr/ADR-060-emergency-platform-block-restoration-timeout.md). |
+| `platformRestoreSeconds` | Integer | `-1` | Optional timeout after which a built platform's footprint is restored to its original blocks. `-1` disables restoration (permanent platform). `0` restores as soon as the footprint chunk is loaded again; a positive value restores after that many seconds. The countdown only advances while the footprint chunk is loaded (it pauses while the area is unloaded), and pending restores survive a server restart. See [ADR-060](../../adr/ADR-060-emergency-platform-block-restoration-timeout.md). |
 
 > **Note on `platformRestoreSeconds`.** Restoration writes the captured original blocks back; every restore (and any failure) is logged, never silently dropped. Available on the Bukkit/Spigot/Paper and Folia platforms; the Fabric platform does not build emergency platforms, so the timeout has no effect there. Because the platform is only ever built on land the safety pipeline already cleared of claims (S-003), the footprint starts in unclaimed terrain; if you expect players to build on top of the temporary platform before it expires, leave restoration disabled (`-1`).
 
@@ -33,7 +33,7 @@ Used as a legacy fallback if no solid ground is found.
 
 The `airBlocks` and `unsafeBlocks` lists use a specific grammar (ADR-017) to match blocks and properties.
 
-> **Edition note (Pro only).** The plain-material rows below work in every edition, but the **block-tag and block-state-predicate grammar** (`#namespace:tag`, `MATERIAL[...]`, `*[...]`, including the numeric range predicates) ships only in the full (Pro) edition. The **rtp-lite** assembly variant ([ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md)) parses `unsafeBlocks` / `airBlocks` as a **flat material allow/deny list** and does not honour any `#tag` token or `[...]` predicate. See the bundled lite docs (`SAFETY.md` inside the lite jar) for the lite-only surface.
+> **Edition note (Pro only).** The plain-material rows below work in every edition, but the **block-tag and block-state-predicate grammar** (`#namespace:tag`, `MATERIAL[...]`, `*[...]`, including the numeric range predicates) ships only in the full (Pro) edition. The **rtp-lite** assembly variant ([ADR-024](../../adr/ADR-024-rtp-lite-assembly-variant.md)) parses `unsafeBlocks` / `airBlocks` as a **flat material allow/deny list** and does not honour any `#tag` token or `[...]` predicate. See the bundled lite docs (`SAFETY.md` inside the lite jar) for the lite-only surface.
 
 ### Grammar (Token Syntax)
 - `MATERIAL` — Plain material (e.g., `LAVA`). *(All editions.)*

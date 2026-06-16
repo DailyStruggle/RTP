@@ -242,10 +242,10 @@ Walk the diagram as a repair tool:
 - **"Player gets teleported to the wrong world."** Almost always a `WorldKeys.override` chain that quietly redirects. Dump the `worldsAttempted` set by enabling verbose logging, or trace `SelectionAPI.getRegion(player)` by hand.
 - **"`IllegalStateException: infinite override loop`."** A config author wrote a cycle (e.g., `world_nether.override: world` and `world.override: world_nether` both with `requirePermission: true`). Fix the config; do not catch the exception.
 - **"Shape feels clustered."** Not a decision-tree bug — see [§2 step 4](#2-teleport-pipeline-end-to-end) and [ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md).
-- **"Effects don't fire."** Effects are a *separate* decision tree driven by `rtp.effect.<stage>.*` permissions; set `effectParsing: true` in `performance.yml`. See [`docs/admin/EVENTS_AND_EFFECTS.md`](../admin/EVENTS_AND_EFFECTS.md).
+- **"Effects don't fire."** Effects are a *separate* decision tree driven by `rtp.effect.<stage>.*` permissions; set `effectParsing: true` in `performance.yml`. See [`docs/admin/EVENTS_AND_EFFECTS.md`](../admin/configuration/EVENTS_AND_EFFECTS.md).
 - **"I want one command to use a custom shape."** Use `SelectionAPI.tempRegion(params, baseRegionName)` — it clones a base region and overrides specific `RegionKeys`. Never subclass `Region` in an addon.
 
-> Deep read (optional): [`REQUIREMENTS.md §3`](REQUIREMENTS.md) (S-007 configurable messages), [`docs/admin/EVENTS_AND_EFFECTS.md`](../admin/EVENTS_AND_EFFECTS.md), [`GLOSSARY.md`](GLOSSARY.md) for the canonical meaning of *region* vs *world* vs *shape*.
+> Deep read (optional): [`REQUIREMENTS.md §3`](REQUIREMENTS.md) (S-007 configurable messages), [`docs/admin/EVENTS_AND_EFFECTS.md`](../admin/configuration/EVENTS_AND_EFFECTS.md), [`GLOSSARY.md`](GLOSSARY.md) for the canonical meaning of *region* vs *world* vs *shape*.
 
 ---
 

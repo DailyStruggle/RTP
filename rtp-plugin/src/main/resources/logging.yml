@@ -1,5 +1,5 @@
 # --- Plugin Logging Toggles ---
-# Documentation: plugins/RTP/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# Documentation: plugins/RTP/docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
 # Log all files reloaded during /rtp reload
 # @type: boolean
 # @default: false

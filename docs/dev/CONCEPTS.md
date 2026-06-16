@@ -155,7 +155,7 @@ The core logic in `rtp-core` is identical across all three. Only the scheduling 
 ## Where to Go Next
 
 - [QUICK_START.md](../admin/QUICK_START.md) — set up the plugin in 5 minutes
-- [CONFIGURATION.md](../admin/CONFIGURATION.md) — every config key explained
+- [CONFIGURATION.md](../admin/configuration/CONFIGURATION.md) — every config key explained
 - [COMMANDS.md](../admin/COMMANDS.md) — command and permission reference
 - [FAQ.md](../admin/FAQ.md) — common questions and gotchas
 - [DESIGN.md](DESIGN.md) — deep-dive into the bounded execution and concurrency design
