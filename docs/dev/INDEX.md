@@ -36,7 +36,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Anvil prefilter / biome / shared module | [`../adr/ADR-016-anvil-subsystem.md`](../adr/ADR-016-anvil-subsystem.md) |
 | Block tags / state predicates in safety lists | [`../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md`](../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md) |
 | Coverage targets | [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) |
-| Server-admin docs | [`../FOR_SERVER_ADMINS.md`](../FOR_SERVER_ADMINS.md) → [`../admin/`](../admin/) ([CONFIGURATION.md](../admin/CONFIGURATION.md), [REGIONS.md](../admin/REGIONS.md), [CORE_CONFIG.md](../admin/CORE_CONFIG.md), [PERFORMANCE.md](../admin/PERFORMANCE.md), [ECONOMY.md](../admin/ECONOMY.md), [SAFETY.md](../admin/SAFETY.md)) |
+| Server-admin docs | [`../FOR_SERVER_ADMINS.md`](../FOR_SERVER_ADMINS.md) → [`../admin/`](../admin/) ([CONFIGURATION.md](../admin/configuration/CONFIGURATION.md), [REGIONS.md](../admin/configuration/REGIONS.md), [CORE_CONFIG.md](../admin/configuration/CORE_CONFIG.md), [PERFORMANCE.md](../admin/configuration/PERFORMANCE.md), [ECONOMY.md](../admin/configuration/ECONOMY.md), [SAFETY.md](../admin/configuration/SAFETY.md)) |
 | Addon author docs | [`../FOR_ADDON_DEVELOPERS.md`](../FOR_ADDON_DEVELOPERS.md) |
 | How to load / deploy an addon (ServiceLoader, classpath, lifecycle) | [`ADDON_LOADING.md`](ADDON_LOADING.md) (ADR-057) |
 | Flat map of every doc | [`../MAP.md`](../MAP.md) |

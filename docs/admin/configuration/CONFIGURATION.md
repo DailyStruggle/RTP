@@ -20,6 +20,11 @@ All configuration files live in `plugins/RTP/` after the first server start. Edi
 | `safety.yml` | Landing safety checks, invulnerability, biome filters | [SAFETY.md](SAFETY.md) |
 | `messages.yml` | All player-facing message strings | *(See below)* |
 | `logging.yml` | Console logging verbosity | *(See below)* |
+| `language.yml` | Locale selection (loaded before all other files) | [LANGUAGE.md](LANGUAGE.md) |
+| `integrations.yml` | Claim/region protection plugin reroll toggles | [INTEGRATIONS.md](INTEGRATIONS.md) |
+| `metrics.yml` | Runtime-health metrics SPI reporting knobs | [METRICS.md](METRICS.md) |
+| `network.yml` | Multi-server / multi-proxy network mode | [proxies/CONFIGURATION.md](../proxies/CONFIGURATION.md) |
+| `effects/*.yml` | Per-event teleport effects (sounds, particles, potions) | [EVENTS_AND_EFFECTS.md](EVENTS_AND_EFFECTS.md) |
 
 ---
 
@@ -38,7 +43,7 @@ Each file in the `regions/` folder defines one teleport region. The filename (wi
 | `requirePermission` | Boolean | `false` | If `true`, players need `rtp.regions.<regionName>` to use this region. |
 | `override` | String | `"default"` | Region to redirect to if a player lacks permission for this region. |
 | `cacheCap` | Integer | `50` | Maximum pre-generated safe locations to hold in the queue. Set to `0` to disable background caching. |
-| `backlogCacheCap` | Integer | `1000` (lite: `0`) | Maximum **unverified** candidates staged upstream of `cacheCap`. Spiral picks land here without chunk I/O, then a per-region pulse verifies one `.mca` bin at a time and promotes in insertion order. Set to `0` to disable. See [REGIONS.md → Backlog Cache (L3)](REGIONS.md#backlog-cache-l3) and [ADR-028](../adr/ADR-028-l3-backlog-cache.md). |
+| `backlogCacheCap` | Integer | `1000` (lite: `0`) | Maximum **unverified** candidates staged upstream of `cacheCap`. Spiral picks land here without chunk I/O, then a per-region pulse verifies one `.mca` bin at a time and promotes in insertion order. Set to `0` to disable. See [REGIONS.md → Backlog Cache (L3)](REGIONS.md#backlog-cache-l3) and [ADR-028](../../adr/ADR-028-l3-backlog-cache.md). |
 | `activeChunkCap` | Integer | `10` | Maximum chunks kept loaded simultaneously for zero-latency teleportation. |
 | `price` | Double | `0.0` | Economy cost override for this region (overrides the global `economy.yml` price). |
 | `spatialResolution` | Integer | `3` | Precision level for storing spatial memory in the database. Higher = more memory, finer detail. |
@@ -229,7 +234,7 @@ Requires **Vault** and a compatible economy plugin. If Vault is absent, all econ
 
 All five built-in shape engines (`CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `RECTANGLE`) are configured inline inside each region's `shape:` block, as there are no separate per-shape config files.
 
-Custom shapes can be registered at runtime via `rtp-api`. See [`addons/`](../addons/) for examples. A registered custom shape appears as a valid `shape.name` value in any region config.
+Custom shapes can be registered at runtime via `rtp-api`. See [`addons/`](../../addons/) for examples. A registered custom shape appears as a valid `shape.name` value in any region config.
 
 ---
 

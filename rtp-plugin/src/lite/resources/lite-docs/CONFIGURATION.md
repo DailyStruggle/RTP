@@ -1,6 +1,6 @@
 # Configuration (RTP-lite)
 
-> Stripped from `docs/admin/CONFIGURATION.md`. Only files actually shipped in
+> Stripped from `docs/admin/configuration/CONFIGURATION.md`. Only files actually shipped in
 > the lite jar are documented here (ADR-024).
 
 ## Files in `plugins/RTP/`

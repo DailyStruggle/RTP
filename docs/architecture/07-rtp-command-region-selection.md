@@ -73,7 +73,7 @@ How to read this chart:
   - `rtp.worlds.<worldName>` — gates access to a world; failure falls through the world `override`.
   - `rtp.regions.<regionName>` — gates access to a region; failure falls through the region `override`.
   - `rtp.unqueued` — bypasses the public queue and forces an ad-hoc async search. Dangerous on large servers; see [ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md) on why the search is still bounded.
-  - `rtp.effect.<stage>.*` — decorates pipeline stages with sounds/particles/etc. (see [`docs/admin/EVENTS_AND_EFFECTS.md`](../admin/EVENTS_AND_EFFECTS.md)).
+  - `rtp.effect.<stage>.*` — decorates pipeline stages with sounds/particles/etc. (see [`docs/admin/EVENTS_AND_EFFECTS.md`](../admin/configuration/EVENTS_AND_EFFECTS.md)).
   - `rtp.onevent.<event>` — opts the player into auto-teleport on lifecycle events (join / respawn / …). Requires `onEventParsing: true`.
 - **`RegionSettings`** (`shape`, `vert`, `cacheCap`, `activeChunkCap`, `price`, `spatialResolution`, `worldBorderOverride`) is the *only* source of truth for per-region behavior. To change a region's shape or cache size, edit `region.yml`; never fork code per region.
 - **Busy / invalid messages are configurable** (S-007, REQ-RTP-F-013). All user-visible strings come from `messages.yml`; never hardcode them in a command or adapter.

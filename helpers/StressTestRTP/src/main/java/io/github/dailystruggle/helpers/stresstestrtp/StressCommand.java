@@ -221,6 +221,10 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
             }
         }
         sb.append("\nraw csv: ").append(csv.getFileName()).append('\n');
+        // Heap-pressure-over-time series for this run: plot heap_used_mb vs
+        // attempts_since_start (or read mb_per_attempt) to see RAM per /rtp.
+        sb.append("heap series csv: ")
+          .append(stripExt(csv.getFileName().toString())).append("-heap.csv").append('\n');
         Files.writeString(summary, sb.toString(), StandardCharsets.UTF_8);
         sender.sendMessage("StressTestRTP: wrote " + summary.getFileName());
         return true;

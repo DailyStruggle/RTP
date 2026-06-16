@@ -1,5 +1,5 @@
 # --- RTP Region Configuration (lite assembly) ---
-# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/REGIONS.md
+# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/configuration/REGIONS.md
 #
 # Lite override (ADR-024): identical to the full assembly's regions/default.yml
 # except the L3 backlog-cache knob (`backlogCacheCap`) is intentionally omitted

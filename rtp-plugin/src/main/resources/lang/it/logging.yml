@@ -1,5 +1,5 @@
 # --- Interruttori di logging del plugin ---
-# Documentazione: plugins/RTP/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# Documentazione: plugins/RTP/docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
 # Registra tutti i file ricaricati durante /rtp reload
 # @type: boolean
 # @default: false

@@ -4,7 +4,7 @@
 # needs an explicit min_level so FINE/FINER/FINEST logs do not flood the
 # console. Without this file, no logging filter is loaded and every fine log
 # call prints. Documentation:
-# https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# https://github.com/DailyStruggle/RTP/blob/master/docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
 command: false              # Log player-executed RTP commands
 teleport: true              # Log successful teleport events
 event_changeworld: true     # Log RTP triggered by world changes

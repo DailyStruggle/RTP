@@ -3,12 +3,20 @@ package io.github.dailystruggle.helpers.stresstestrtp;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
 import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryUsage;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.IntSupplier;
 
 /**
  * Periodic sampler for TPS, MSPT, and heap-used (MB).
@@ -65,6 +73,23 @@ public final class TpsMsptHeapSampler {
     private final Method getTpsMethod;
     private final Method getAvgTickTimeMethod;
 
+    // Heap-pressure-over-time series. Optional per-run CSV that records one
+    // row per sample so heap-used can be plotted against cumulative /rtp
+    // attempts — the slope is RAM consumed per teleport. Started by
+    // beginRun() and stopped on run-stop / disable. All access is guarded by
+    // heapSeriesLock because start/stop run on the command thread while the
+    // writes happen on the async sampler thread.
+    public static final String HEAP_SERIES_HEADER =
+            "epoch_ms,elapsed_ms,heap_used_mb,heap_committed_mb,heap_max_mb,"
+                    + "tps,mspt,attempts_completed,attempts_since_start,"
+                    + "heap_delta_mb,mb_per_attempt";
+    private final Object heapSeriesLock = new Object();
+    private BufferedWriter heapSeriesWriter = null;
+    private IntSupplier heapSeriesAttempts = null;
+    private long heapSeriesStartMs = -1L;
+    private long heapSeriesBaselineMb = -1L;
+    private int  heapSeriesBaselineAttempts = -1;
+
     public TpsMsptHeapSampler(Plugin plugin, long periodMs) {
         this.plugin = plugin;
         this.periodMs = periodMs;
@@ -115,8 +140,8 @@ public final class TpsMsptHeapSampler {
     private void sample() {
         double tps = readTps();
         double mspt = readMspt();
-        long heapMb = ManagementFactory.getMemoryMXBean()
-                .getHeapMemoryUsage().getUsed() / (1024L * 1024L);
+        MemoryUsage heap = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
+        long heapMb = heap.getUsed() / (1024L * 1024L);
         latest = new Snapshot(tps, mspt, heapMb);
         synchronized (tpsSamples) {
             if (tps  >= 0) tpsSamples.add(tps);
@@ -127,6 +152,94 @@ public final class TpsMsptHeapSampler {
             // in spigotMspt at sample time.
             if (mspt >= 0 && getAvgTickTimeMethod != null) msptSamples.add(mspt);
             heapSamples.add(heapMb);
+        }
+        writeHeapSeriesRow(heap, heapMb, tps, mspt);
+    }
+
+    /**
+     * Begins a heap-pressure-over-time series at {@code csvPath}. One row is
+     * appended per sample for as long as the series is active, capturing
+     * heap-used/committed/max alongside the cumulative attempt count read
+     * from {@code attemptsSupplier} (typically {@code MetricsRecorder#totalAttempts}).
+     * Plotting {@code heap_used_mb} against {@code attempts_since_start} yields
+     * RAM consumed per /rtp (the {@code mb_per_attempt} column is that slope
+     * relative to the series baseline). Calling this while a series is active
+     * closes the previous one first.
+     */
+    public void startHeapSeries(Path csvPath, IntSupplier attemptsSupplier) throws IOException {
+        synchronized (heapSeriesLock) {
+            closeHeapSeriesWriter();
+            Files.createDirectories(csvPath.getParent());
+            Files.writeString(csvPath, HEAP_SERIES_HEADER + System.lineSeparator(),
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            heapSeriesWriter = Files.newBufferedWriter(csvPath, StandardCharsets.UTF_8,
+                    StandardOpenOption.APPEND);
+            heapSeriesAttempts = attemptsSupplier;
+            heapSeriesStartMs = -1L;          // captured on first row
+            heapSeriesBaselineMb = -1L;
+            heapSeriesBaselineAttempts = -1;
+        }
+    }
+
+    /** Flushes and closes the active heap series, if any. Null-safe. */
+    public void stopHeapSeries() {
+        synchronized (heapSeriesLock) {
+            closeHeapSeriesWriter();
+            heapSeriesAttempts = null;
+        }
+    }
+
+    private void closeHeapSeriesWriter() {
+        if (heapSeriesWriter != null) {
+            try {
+                heapSeriesWriter.flush();
+                heapSeriesWriter.close();
+            } catch (IOException e) {
+                plugin.getLogger().warning("[StressTestRTP] failed to close heap series: " + e.getMessage());
+            }
+            heapSeriesWriter = null;
+        }
+    }
+
+    private void writeHeapSeriesRow(MemoryUsage heap, long heapMb, double tps, double mspt) {
+        synchronized (heapSeriesLock) {
+            BufferedWriter w = heapSeriesWriter;
+            if (w == null) return;
+            long now = System.currentTimeMillis();
+            int attempts = heapSeriesAttempts != null ? heapSeriesAttempts.getAsInt() : -1;
+            if (heapSeriesStartMs < 0) {
+                heapSeriesStartMs = now;
+                heapSeriesBaselineMb = heapMb;
+                heapSeriesBaselineAttempts = Math.max(0, attempts);
+            }
+            long elapsed = now - heapSeriesStartMs;
+            long committedMb = heap.getCommitted() / (1024L * 1024L);
+            long maxMb = heap.getMax() < 0 ? -1L : heap.getMax() / (1024L * 1024L);
+            int attemptsSince = attempts < 0 ? -1 : Math.max(0, attempts - heapSeriesBaselineAttempts);
+            long heapDelta = heapMb - heapSeriesBaselineMb;
+            String mbPerAttempt = attemptsSince > 0
+                    ? String.format(java.util.Locale.ROOT, "%.4f", (double) heapDelta / attemptsSince)
+                    : "";
+            String row = String.join(",",
+                    Long.toString(now),
+                    Long.toString(elapsed),
+                    Long.toString(heapMb),
+                    Long.toString(committedMb),
+                    maxMb < 0 ? "" : Long.toString(maxMb),
+                    tps  >= 0 ? String.format(java.util.Locale.ROOT, "%.3f", tps)  : "",
+                    mspt >= 0 ? String.format(java.util.Locale.ROOT, "%.3f", mspt) : "",
+                    attempts < 0 ? "" : Integer.toString(attempts),
+                    attemptsSince < 0 ? "" : Integer.toString(attemptsSince),
+                    Long.toString(heapDelta),
+                    mbPerAttempt);
+            try {
+                w.write(row);
+                w.newLine();
+                w.flush();
+            } catch (IOException e) {
+                plugin.getLogger().warning("[StressTestRTP] heap series append failed: " + e.getMessage());
+            }
         }
     }
 

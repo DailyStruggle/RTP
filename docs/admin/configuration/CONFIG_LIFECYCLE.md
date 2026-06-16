@@ -9,7 +9,7 @@ It is intended for server operators who want to understand:
 - Why a version bump never wipes your settings.
 - How locale switches preserve your edits across renamed keys.
 
-For the **key reference** (what each setting does), see [CONFIGURATION.md](CONFIGURATION.md) and [CORE_CONFIG.md](CORE_CONFIG.md). For **upgrade procedure** (which command to run, when), see [MIGRATION.md](MIGRATION.md). This document only covers the **mechanics** of how the on-disk files are managed.
+For the **key reference** (what each setting does), see [CONFIGURATION.md](CONFIGURATION.md) and [CORE_CONFIG.md](CORE_CONFIG.md). For **upgrade procedure** (which command to run, when), see [MIGRATION.md](../MIGRATION.md). This document only covers the **mechanics** of how the on-disk files are managed.
 
 ---
 
@@ -150,7 +150,7 @@ flowchart TD
     K --> L[Save and finish reload]
 ```
 
-This is governed by [ADR-020](../adr/ADR-020-language-bootstrap-and-locale-aware-configparser.md). The in-memory representation is always enum-keyed (locale-independent); locale only affects what the YAML key looks like on disk. Switching locale rewrites the file under new key names but your numeric/string/boolean values come along for the ride.
+This is governed by [ADR-020](../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser.md). The in-memory representation is always enum-keyed (locale-independent); locale only affects what the YAML key looks like on disk. Switching locale rewrites the file under new key names but your numeric/string/boolean values come along for the ride.
 
 If you customized a value under the old locale's key name, after `/rtp reload` with a new `language:` you will find your customization under the new locale's key name in the same file. Nothing is lost.
 
@@ -162,8 +162,8 @@ These are not bugs but they are worth knowing:
 
 1. **You hand-renamed a key.** If you renamed a baseline key in your live file to something neither the old nor new locale recognizes, RTP cannot map it back to an enum constant. The value will be dropped on the next upgrade. Always edit values, not key names.
 2. **You changed a value's type.** If a key expects an integer and you set a string, RTP logs a warning and either coerces or falls back to default. The `.old1` file still has your original.
-3. **The new version intentionally retires a key.** When a release note in [CHANGELOG.md](../../CHANGELOG.md) lists a key as removed, the overlay will re-introduce it on the immediate next upgrade only if RTP did not add an explicit removal step. Either way, the key will no longer have any effect because the enum constant is gone. Remove it from your live file at your leisure.
-4. **You edited a `.lang.yml` rename map by hand.** Do not do this. The rename maps are generated from `scripts/out/locale-<lang>.tsv` (see [TRANSLATION_GUIDE](../dev/TRANSLATION_GUIDE.md) for contributors). Hand edits will be overwritten the next time the locale pipeline runs.
+3. **The new version intentionally retires a key.** When a release note in [CHANGELOG.md](../../../CHANGELOG.md) lists a key as removed, the overlay will re-introduce it on the immediate next upgrade only if RTP did not add an explicit removal step. Either way, the key will no longer have any effect because the enum constant is gone. Remove it from your live file at your leisure.
+4. **You edited a `.lang.yml` rename map by hand.** Do not do this. The rename maps are generated from `scripts/out/locale-<lang>.tsv` (see [TRANSLATION_GUIDE](../../dev/TRANSLATION_GUIDE.md) for contributors). Hand edits will be overwritten the next time the locale pipeline runs.
 
 ---
 
@@ -183,7 +183,7 @@ flowchart TD
 
 `.oldN` files are plain YAML. You can read them with any editor. The newest snapshot is always `.old1`.
 
-If a key was renamed across versions, the safest reference is the **new** file's defaults plus the value you find in `.oldN`. The plugin's [CHANGELOG.md](../../CHANGELOG.md) lists any key renames per release.
+If a key was renamed across versions, the safest reference is the **new** file's defaults plus the value you find in `.oldN`. The plugin's [CHANGELOG.md](../../../CHANGELOG.md) lists any key renames per release.
 
 ---
 
@@ -203,6 +203,6 @@ If any of those are wrong, attach the `.old1` file and the relevant server log s
 
 - [CONFIGURATION.md](CONFIGURATION.md) — key-by-key reference for every managed file.
 - [CORE_CONFIG.md](CORE_CONFIG.md) — detailed reference for `config.yml`.
-- [MIGRATION.md](MIGRATION.md) — version-specific upgrade notes.
-- [ADR-020](../adr/ADR-020-language-bootstrap-and-locale-aware-configparser.md) — design rationale for locale-aware config loading.
+- [MIGRATION.md](../MIGRATION.md) — version-specific upgrade notes.
+- [ADR-020](../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser.md) — design rationale for locale-aware config loading.
 - For contributors: `rtp-core/src/main/java/.../configuration/ConfigParser.java` is the implementation of the lifecycle described here.

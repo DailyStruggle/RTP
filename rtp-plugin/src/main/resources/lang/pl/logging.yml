@@ -1,5 +1,5 @@
 # --- Przełączniki logowania pluginu ---
-# Documentation: plugins/RTP/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# Documentation: plugins/RTP/docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
 # Loguj wszystkie pliki przeładowane podczas /rtp reload
 # @type: boolean
 # @default: false

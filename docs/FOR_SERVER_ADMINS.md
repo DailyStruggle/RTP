@@ -17,7 +17,7 @@ Covers installation, the default region, adding a nether region, and essential p
 Every `/rtp` subcommand, parameter, and permission node with examples.
 Reference this any time you are unsure of command syntax or available options.
 
-### 3. [CONFIGURATION.md](admin/CONFIGURATION.md)
+### 3. [CONFIGURATION.md](admin/configuration/CONFIGURATION.md)
 Every configuration key across all files (`config.yml`, `performance.yml`, `safety.yml`, `economy.yml`, region files, world files) with type, default value, and description.
 
 ### 4. [FAQ.md](admin/FAQ.md)

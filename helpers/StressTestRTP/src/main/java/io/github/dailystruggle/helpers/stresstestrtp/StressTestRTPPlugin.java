@@ -116,7 +116,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         if (consoleWatcher != null) consoleWatcher.stop();
         if (probe != null) probe.unregister();
         if (chunkCounter != null) chunkCounter.unregister();
-        if (sampler != null) sampler.stop();
+        if (sampler != null) { sampler.stopHeapSeries(); sampler.stop(); }
     }
 
     /** Roll a new CSV for the next run. Called by {@link StressCommand} on start/burst. */
@@ -127,6 +127,18 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         recorder = new MetricsRecorder(csv);
         if (cpuSampler != null) recorder.setCpuSampler(cpuSampler);
         if (chunkCounter != null) recorder.setChunkCounter(chunkCounter);
+        // Roll a per-run heap-pressure-over-time series next to the per-attempt
+        // CSV (<stamp>-heap.csv). One row per sampler tick records heap
+        // used/committed/max against the cumulative attempt count, so the
+        // heap-vs-attempts slope (mb_per_attempt) shows RAM consumed per /rtp.
+        if (sampler != null) {
+            Path heapCsv = dir.resolve(stamp + "-heap.csv");
+            sampler.startHeapSeries(heapCsv, () -> {
+                MetricsRecorder r = recorder();
+                return r != null ? r.totalAttempts() : 0;
+            });
+            getLogger().info("StressTestRTP: rolled new heap series CSV \u2192 " + heapCsv);
+        }
         // Per-chunk-load CPU cost calibration. When > 0, MetricsRecorder
         // amends process_cpu_ms with (chunks_loaded * chunkLoadCostNs) so
         // that work the server attributes to its own chunk-system threads

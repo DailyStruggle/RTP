@@ -188,7 +188,7 @@ appear to take effect.
 
 **Diagnosis:**
 1. Some configuration keys require a full server restart rather than a reload. Check
-   [`CONFIGURATION.md`](CONFIGURATION.md) for the reload vs. restart annotation on the
+   [`CONFIGURATION.md`](configuration/CONFIGURATION.md) for the reload vs. restart annotation on the
    changed key.
 2. Verify there are no YAML syntax errors in the edited file, as a parse failure causes the
    reload to silently retain the last valid config. Check the console for ERROR messages

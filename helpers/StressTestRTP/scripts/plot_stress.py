@@ -14,6 +14,8 @@ and emits, into an output directory:
   - tps_over_time.png    (TPS sampled at each dispatch, per target_label)
   - mspt_over_time.png   (MSPT sampled at each dispatch, per target_label)
   - heap_over_time.png   (heap MB sampled at each dispatch, per target_label)
+  - heap_pressure_over_time.png (heap MB vs elapsed time, from <stamp>-heap.csv)
+  - heap_per_attempt.png (heap MB vs cumulative /rtp attempts; slope = MB per /rtp)
   - success_rate.png     (success vs total attempts per target_label)
   - throughput_over_time.png (successful teleports per time bucket, per target_label)
   - throughput_bars.png  (mean successful teleports/sec per target_label)
@@ -60,7 +62,10 @@ def expand_inputs(inputs: List[str]) -> List[Path]:
     for s in inputs:
         p = Path(s)
         if p.is_dir():
-            out.extend(sorted(p.glob("*.csv")))
+            # Only per-attempt CSVs; the sibling `-phases.csv` / `-heap.csv`
+            # series are loaded explicitly by their own loaders.
+            out.extend(sorted(c for c in p.glob("*.csv")
+                              if not (c.stem.endswith("-phases") or c.stem.endswith("-heap"))))
         elif p.is_file():
             out.append(p)
         else:
@@ -100,6 +105,99 @@ def load_phase_rows(paths: Iterable[Path]) -> List[dict]:
                 r["_source"] = sibling.name
                 out.append(r)
     return out
+
+
+def load_heap_rows(paths: Iterable[Path]) -> "OrderedDict[str, List[dict]]":
+    """Load sibling `<stamp>-heap.csv` heap-pressure-over-time series.
+
+    Returns an OrderedDict mapping the heap-CSV file name to its rows. Each
+    row has columns: epoch_ms, elapsed_ms, heap_used_mb, heap_committed_mb,
+    heap_max_mb, tps, mspt, attempts_completed, attempts_since_start,
+    heap_delta_mb, mb_per_attempt. Missing siblings are skipped silently.
+    """
+    out: "OrderedDict[str, List[dict]]" = OrderedDict()
+    seen: set = set()
+    for p in paths:
+        # `<stamp>.csv` -> `<stamp>-heap.csv`. Skip heap CSVs given directly.
+        if p.stem.endswith("-heap") or p.stem.endswith("-phases"):
+            continue
+        sibling = p.with_name(p.stem + "-heap" + p.suffix)
+        if sibling in seen or not sibling.is_file():
+            continue
+        seen.add(sibling)
+        with sibling.open("r", newline="", encoding="utf-8") as fh:
+            rows = list(csv.DictReader(fh))
+        if rows:
+            out[sibling.name] = rows
+    return out
+
+
+def plot_heap_pressure_over_time(heap_series, out_path: Path) -> None:
+    """Heap-used (MB) vs elapsed run time, one line per run heap CSV."""
+    if not heap_series:
+        return
+    fig, ax = plt.subplots(figsize=(9, 5))
+    any_data = False
+    for name, rows in heap_series.items():
+        xs, ys = [], []
+        for r in rows:
+            t = to_float(r.get("elapsed_ms", ""))
+            v = to_float(r.get("heap_used_mb", ""))
+            if not math.isnan(t) and not math.isnan(v):
+                xs.append(t / 1000.0)
+                ys.append(v)
+        if xs:
+            ax.plot(xs, ys, label=name, linewidth=1, marker=".", markersize=3, alpha=0.85)
+            any_data = True
+    ax.set_xlabel("time since run start (s)")
+    ax.set_ylabel("heap used (MB)")
+    ax.set_title("Heap pressure over time")
+    ax.grid(True, linestyle=":", alpha=0.5)
+    if any_data:
+        ax.legend()
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=120)
+    plt.close(fig)
+
+
+def plot_heap_per_attempt(heap_series, out_path: Path) -> None:
+    """Heap used (MB) vs cumulative /rtp attempts. The slope is RAM per /rtp;
+    a least-squares fit is annotated per run as MB/attempt."""
+    if not heap_series:
+        return
+    fig, ax = plt.subplots(figsize=(9, 5))
+    any_data = False
+    for name, rows in heap_series.items():
+        xs, ys = [], []
+        for r in rows:
+            a = to_float(r.get("attempts_since_start", ""))
+            v = to_float(r.get("heap_used_mb", ""))
+            if not math.isnan(a) and not math.isnan(v):
+                xs.append(a)
+                ys.append(v)
+        if not xs:
+            continue
+        # Least-squares slope (MB per attempt) when the attempt axis varies.
+        slope = float("nan")
+        n = len(xs)
+        if n >= 2 and max(xs) > min(xs):
+            mx = sum(xs) / n
+            my = sum(ys) / n
+            denom = sum((x - mx) ** 2 for x in xs)
+            if denom > 0:
+                slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / denom
+        lbl = name if math.isnan(slope) else f"{name} (~{slope:.3f} MB/rtp)"
+        ax.plot(xs, ys, label=lbl, linewidth=1, marker=".", markersize=3, alpha=0.85)
+        any_data = True
+    ax.set_xlabel("cumulative /rtp attempts since run start")
+    ax.set_ylabel("heap used (MB)")
+    ax.set_title("Heap usage vs /rtp attempts (slope = RAM per /rtp)")
+    ax.grid(True, linestyle=":", alpha=0.5)
+    if any_data:
+        ax.legend()
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=120)
+    plt.close(fig)
 
 
 def aggregate_phase_cpu(phase_rows: List[dict]) -> "OrderedDict[str, dict]":
@@ -543,6 +641,10 @@ def main(argv: List[str]) -> int:
     plot_metric_over_time(groups, "heap_used_mb_at_dispatch", "heap used (MB)",
                           "Heap usage sampled at each dispatch", out / "heap_over_time.png")
     plot_success_rate(groups, out / "success_rate.png")
+    # Heap-pressure-over-time series (sibling `<stamp>-heap.csv`), if present.
+    heap_series = load_heap_rows(paths)
+    plot_heap_pressure_over_time(heap_series, out / "heap_pressure_over_time.png")
+    plot_heap_per_attempt(heap_series, out / "heap_per_attempt.png")
     plot_throughput_over_time(groups, out / "throughput_over_time.png")
     plot_throughput_bars(groups, out / "throughput_bars.png")
     plot_destination_scatter(groups, out / "destinations_scatter.png")
