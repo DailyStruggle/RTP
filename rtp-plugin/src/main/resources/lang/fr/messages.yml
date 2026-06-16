@@ -26,9 +26,9 @@ alreadyTeleporting: "&7[P0] ⚡ vous êtes déjà en téléportation !"
 
 # si le plugin est en cours de rechargement
 teleportDeniedReloading: "&7[P0] les téléportations sont temporairement désactivées pendant le rechargement du plugin. Réessayez bientôt."
-delayMessage: "&7[P0] ⚡ Téléportation dans [delay]. Ne bougez pas."
+delayMessage: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Téléportation dans [delay]. Ne bougez pas.</gradient>"
 chunkLoading: "&7[P0] ⚙ Chargement des chunks ! veuillez patienter..."
-teleportMessage: "&7[P0] ⚡ Téléporté en [attempts] tentatives, en [processingTime]"
+teleportMessage: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Téléporté en [attempts] tentatives, en [processingTime]</gradient>"
 
 # if teleport is cancelled
 teleportCancel: "&7[P0] ⚡ Téléportation annulée !"
@@ -192,15 +192,15 @@ infoThresholdNetworkAgeYellow: 5.0
 infoFoliaRegionsHeader: "&7--- Folia regions ---"
 # Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
-infoFoliaRegion: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
+infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 infoDisclaimerHeader: "&7--- Diagnostic Disclaimer ---"
 infoDisclaimer: "&7Diagnostic Note: If the server's total orphaned chunk count exceeds this plugin's lifetime loads ([loads]), this plugin is not the sole source of the memory leak."
 infoWorldHeader: "#008080Worlds:"
 infoConsoleWorldHeader: "&7--- Worlds ---"
-infoWorld: "  #21ADA8[world]"
+infoWorld: "#21ADA8[world]"
 infoRegionHeader: "#63C5DARegions:"
 infoConsoleRegionHeader: "&7--- Regions ---"
-infoRegion: "  #52B2BF[region]"
+infoRegion: "#52B2BF[region]"
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
@@ -572,8 +572,8 @@ PLAYER_TELEPORTING: "&bTÉLÉPORTATION"
 # title settings
 # remove or set title to "" to disable
 # PlaceholderAPI is recommended for coordinates
-title: "#FF6B6BT#FF8560e#FF9F55l#FFBA4Ae#FFD53Fp#E8E040o#BFED41r#96F542t#6DF543e#44F2A0d#3BEFC8!#38ECF0"
-subtitle: "#A78BFAh#B47EF8a#C171F6v#CE64F4e#DB57F2 #E84AF0f#E855D8u#E860C0n#E86BA8!#E876A0"
+title: "<rainbow>Teleporte!</rainbow>"
+subtitle: "<gradient:#A78BFA:#E876A0>amusez-vous!</gradient>"
 fadeIn: 20
 stay: 20
 fadeOut: 20

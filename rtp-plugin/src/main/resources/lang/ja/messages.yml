@@ -21,9 +21,9 @@
 
 # プラグインが現在リロード中のとき
 テレポート拒否_リロード中: "&7[P0] プラグインがリロード中のため、テレポートは一時的に無効です。後ほど再試行してください。"
-遅延メッセージ: "&7[P0] ⚡ [delay] 後にテレポートします。動かないでください"
+遅延メッセージ: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ [delay] 後にテレポートします。動かないでください</gradient>"
 チャンクロード中: "&7[P0] ⚙ チャンクを読み込み中です。お待ちください.."
-テレポートメッセージ: "&7[P0] ⚡ [attempts] 回の試行でテレポートしました ([processingTime])"
+テレポートメッセージ: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ [attempts] 回の試行でテレポートしました ([processingTime])</gradient>"
 
 # if teleport is cancelled
 テレポート取消: "&7[P0] ⚡ テレポートをキャンセルしました！"
@@ -178,15 +178,15 @@ infoThresholdNetworkAgeYellow: 5.0
 infoFoliaRegionsHeader: "&7--- Folia regions ---"
 # Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
-infoFoliaRegion: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
+infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 情報_免責_ヘッダ: "&7--- 診断ノート ---"
 情報_免責: "&7診断ノート: サーバーの孤立チャンク総数が本プラグインの累計ロード数 ([loads]) を超える場合、本プラグインがメモリリークの唯一の原因ではありません。"
 情報_ワールドヘッダ: "#008080ワールド:"
 情報_コンソール_ワールドヘッダ: "&7--- ワールド ---"
-情報ワールド: "  #21ADA8[world]"
+情報ワールド: "#21ADA8[world]"
 情報_リージョンヘッダ: "#63C5DAリージョン:"
 情報_コンソール_リージョンヘッダ: "&7--- リージョン ---"
-情報リージョン: "  #52B2BF[region]"
+情報リージョン: "#52B2BF[region]"
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
@@ -554,8 +554,8 @@ multiconfigResultNameTaken: "&can entry named '[name]' already exists."
 # ###############################################################################
 # セクション 10: ビジュアル要素
 # ###############################################################################
-タイトル: "#FF6B6Bラ#FF7E63ン#FF9155ダ#FFA447ム#FFB739テレポート！"
-サブタイトル: "#A78BFAさ#AF84F9あ#B77DF7行#BF76F5こう！"
+タイトル: "<rainbow>テレポートしました！</rainbow>"
+??????: "<gradient:#A78BFA:#E876A0>楽しんでね！</gradient>"
 フェードイン: 20
 表示時間: 20
 フェードアウト: 20

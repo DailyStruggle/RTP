@@ -21,9 +21,9 @@ alTeletransporteert: "&7[P0] ⚡ je wordt al geteletransporteerd!"
 
 # als de plugin momenteel wordt herladen
 teletransportGeweigerdHerladen: "&7[P0] teletransports zijn tijdelijk uitgeschakeld terwijl de plugin herlaadt. Probeer het over een ogenblik opnieuw."
-vertragingsBericht: "&7[P0] ⚡ Teletransporteren over [delay]. Beweeg niet."
+vertragingsBericht: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teletransporteren over [delay]. Beweeg niet.</gradient>"
 chunkLaden: "&7[P0] ⚙ Chunks laden, even geduld..."
-teletransportBericht: "&7[P0] ⚡ Geteletransporteerd in [attempts] pogingen, in [processingTime]"
+teletransportBericht: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Geteletransporteerd in [attempts] pogingen, in [processingTime]</gradient>"
 
 # if teleport is cancelled
 teletransportAnnuleren: "&7[P0] ⚡ Teletransport geannuleerd!"
@@ -178,15 +178,15 @@ infoThresholdNetworkAgeYellow: 5.0
 infoFoliaRegionsHeader: "&7--- Folia regions ---"
 # Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
-infoFoliaRegion: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
+infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 infoDisclaimerKoptekst: "&7--- Diagnostische opmerking ---"
 infoDisclaimer: "&7Diagnostische opmerking: Als het totale aantal verweesde chunks op de server het historische totaal van ladingen door deze plugin ([loads]) overschrijdt, is deze plugin niet de enige oorzaak van het geheugenlek."
 infoWereldKoptekst: "#008080Werelden:"
 infoConsoleWereldKoptekst: "&7--- Werelden ---"
-infoWereld: "  #21ADA8[world]"
+infoWereld: "#21ADA8[world]"
 infoRegioKoptekst: "#63C5DARegio's:"
 infoConsoleRegioKoptekst: "&7--- Regio's ---"
-infoRegio: "  #52B2BF[region]"
+infoRegio: "#52B2BF[region]"
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
@@ -554,8 +554,8 @@ SPELER_TELETRANSPORTEERT: "&bTELETRANSPORTEERT"
 # ###############################################################################
 # Sectie 10: Visuele elementen
 # ###############################################################################
-titel: "#FF6B6BG#FF7E63e#FF9155t#FFA447e#FFB739l#FFCA2Be#FFDD1Dp#F0F00Fo#C8F010r#A0F011t#78F012e#50F013e#38EF6Br#3BECC8d#38ECF0!"
-ondertitel: "#A78BFA#AF84F9V#B77DF7e#BF76F5e#C76FF3l#CF68F1 #D761EFp#DF5AEDl#E753EBe#EF4CE9z#E855D0i#E860B8e#E86BA0r!"
+titel: "<rainbow>Geteleporteerd!</rainbow>"
+ondertitel: "<gradient:#A78BFA:#E876A0>veel plezier!</gradient>"
 infaden: 20
 blijven: 20
 uitfaden: 20

@@ -19,9 +19,9 @@
 
 # если плагин в данный момент перезагружается
 телепортОтклонёнПерезагрузка: "&7[P0] телепорты временно отключены, пока плагин перезагружается. Попробуйте снова через несколько мгновений."
-сообщениеОтсрочки: "&7[P0] ⚡ Телепортация через [delay]. Не двигайтесь."
+сообщениеОтсрочки: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Телепортация через [delay]. Не двигайтесь.</gradient>"
 загрузкаЧанков: "&7[P0] ⚙ Загрузка чанков, подождите..."
-сообщениеТелепорта: "&7[P0] ⚡ Телепортирован за [attempts] попыток, за [processingTime]"
+сообщениеТелепорта: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Телепортирован за [attempts] попыток, за [processingTime]</gradient>"
 
 # if teleport is cancelled
 отменаТелепорта: "&7[P0] ⚡ Телепорт отменён!"
@@ -185,15 +185,15 @@ infoThresholdNetworkAgeYellow: 5.0
 infoFoliaRegionsHeader: "&7--- Folia regions ---"
 # Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
-infoFoliaRegion: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
+infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 заголовокПримечанияИнфо: "&7--- Диагностическое примечание ---"
 примечаниеИнфо: "&7Диагностика: Если общее число потерянных чанков сервера превышает исторический итог загрузок этого плагина ([loads]), этот плагин не единственная причина утечки памяти."
 заголовокМираИнфо: "#008080Миры:"
 заголовокМираКонсолиИнфо: "&7--- Миры ---"
-инфоМир: "  #21ADA8[world]"
+инфоМир: "#21ADA8[world]"
 заголовокРегионаИнфо: "#63C5DAРегионы:"
 заголовокРегионаКонсолиИнфо: "&7--- Регионы ---"
-инфоРегион: "  #52B2BF[region]"
+инфоРегион: "#52B2BF[region]"
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
@@ -566,8 +566,8 @@ multiconfigResultNameTaken: "&can entry named '[name]' already exists."
 # title settings
 # remove or set title to "" to disable
 # PlaceholderAPI is recommended for coordinates
-заголовок: "#FF6B6BТ#FF7E63е#FF9155л#FFA447е#FFB739п#FFCA2Bо#FFDD1Dр#F0F00Fт#C8F010и#A0F011р#78F012о#50F013в#38EF6Bа#3BECC8н!"
-подзаголовок: "#A78BFAп#AF84F9р#B77DF7и#BF76F5к#C76FF3л#CF68F1ю#D761EFч#DF5AEDе#E753EBн#EF4CE9и#E855D0е!"
+заголовок: "<rainbow>Телепортирован!</rainbow>"
+????????????: "<gradient:#A78BFA:#E876A0>веселитесь!</gradient>"
 появление: 20
 оставаться: 20
 исчезновение: 20

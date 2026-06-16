@@ -434,11 +434,12 @@ The full per-locale TSV above is the right surface when you want to translate or
 
 For that case use the changeset scripts (a secondary component layered on top of the same TSVs):
 
-1. **Edit the English baseline** under `rtp-plugin/src/main/resources/<file>.yml` (add/reword keys), then run the primary pipeline through reconcile so each locale TSV has a seeded row:
+1. **Edit the English baseline** under `rtp-plugin/src/main/resources/<file>.yml` (add/reword keys). Optionally run the primary pipeline through reconcile so the exported changeset shows each locale's current value/comment/key as context:
    ```powershell
    .\scripts\locale-files-to-csv.ps1
    .\scripts\reconcile-locale-csvs.ps1
    ```
+   This is now an **optimization, not a hard prerequisite**: if a key has no row in a locale's TSV when the changeset is imported (step 4), `locale-changeset-from-csv.ps1` seeds the row automatically (exactly what reconcile would have produced), so a skipped reconcile no longer silently drops translations.
 2. **Export a changeset** - a single, wide, spreadsheet-friendly **comma-separated** `scripts/out/changeset.csv` with one row per changed key and one column per language:
    ```powershell
    # only the keys you changed:
@@ -448,16 +449,20 @@ For that case use the changeset scripts (a secondary component layered on top of
    .\scripts\locale-changeset-to-csv.ps1          # -UntranslatedOnly (default)
    .\scripts\locale-changeset-to-csv.ps1 -All     # every translatable value row
    ```
-   Columns: `relpath, parent_path, base_key, index, english, <loc1>, <loc2>, ...`. Each locale cell is prefilled with that locale's current value (often the English placeholder) for context. Unlike the internal `.tsv`, this is a real RFC-4180 `.csv` (UTF-8 no BOM) so it opens cleanly in a spreadsheet.
-3. **Translate the per-language columns** for just those rows (same masking rules as step 4 above: preserve `[placeholders]`, `&a`/`#hex`, doc-tags). Leaving a cell empty or equal to `english` means "not translated yet".
+   Columns: `relpath, parent_path, base_key, index, english, english_comment`, then a **triple** of columns per language - `<loc>` (the translated value), `<loc>_comment` (its leading comment block), and `<loc>_key` (the localized key name). This mirrors the per-locale TSV's `value` / `preceding_comment` / `key` triple, so a single changeset can carry the value, the operator-facing comment, AND the config key name in one row. Each locale cell is prefilled with that locale's current value/comment/key (often the English placeholder) for context. Comment cells embed newlines as `\n` and tabs as `\t` (same escaping as the TSV's `preceding_comment` column) so a multi-line comment block round-trips on one CSV line. Unlike the internal `.tsv`, this is a real RFC-4180 `.csv` (UTF-8 no BOM) so it opens cleanly in a spreadsheet.
+3. **Translate the per-language columns** for just those rows (same masking rules as step 4 above: preserve `[placeholders]`, `&a`/`#hex`, doc-tags). Fill `<loc>` (value), `<loc>_comment` (comment), and/or `<loc>_key` (localized key name) as needed. A value cell empty or equal to `english`, a comment cell empty or equal to `english_comment`, or a key cell empty or equal to `base_key` all mean "not translated yet" for that field and are left alone on import. Each field is applied independently, so you can translate just the comment, just the key, or all three.
 4. **Import** the filled changeset back into every `locale-<lang>.tsv` (matched by the same langmap logic reconcile uses, so translated key names resolve correctly):
    ```powershell
    .\scripts\locale-changeset-from-csv.ps1
    ```
-   Only cells that differ from `english` (or all, with `-IncludeEnglish`) overwrite the locale TSV value; absent rows are reported so you can re-run reconcile to seed them.
+   For each row the value, comment, and key are applied independently: a cell that differs from its English column (or all, with `-IncludeEnglish`) overwrites the locale TSV's `value` / `preceding_comment` / `key`; the `<loc>_key` cell feeds the synthesized `<file>.lang.yml` rename map and renames the key in that locale's YAML. Use `-UntranslatedOnly` to protect existing human translations from an old/partial changeset. Rows that have no row yet in a locale's TSV are **seeded automatically** (relpath, localized key, value/comment with English fallback) instead of being skipped, so the changeset import never silently drops a translation even if `reconcile` was not run in step 1.
 5. **Regenerate and verify** exactly as the primary pipeline (`locale-files-from-csv.ps1`, then `LocaleParityTest` + full build).
 
 The changeset never bypasses the TSVs - it is a focused editing surface that reads and writes them. `scripts/locale-changeset-common.ps1` holds the shared TSV/CSV/langmap helpers for both changeset scripts.
+
+**Encoding-safe translation (no inline-literal trap).** Edit non-ASCII translations directly in `scripts/out/changeset.csv` (it is UTF-8 no-BOM and the `Read-Csv`/`Write-Csv` helpers read/write UTF-8). **Never** paste CJK/Cyrillic/accented translations as inline string literals into a BOM-less `.ps1` helper: Windows PowerShell parses a BOM-less `.ps1` as cp1252 and silently corrupts those literals into C1 control characters (0x80-0x9F), which snakeyaml then rejects at load time with `special characters are not allowed` (a green `LocaleParityTest` will still fail). If you must script a bulk fill, keep the translations in a UTF-8 **data** file and read it with `[IO.File]::ReadAllText(<path>, [Text.Encoding]::UTF8)` - do not hardcode them in the script body. Do not leave throwaway helper scripts or staging files behind; the two changeset scripts are the only repeatable surface.
+
+**Localizing the key name is required for pattern maintenance.** The `<loc>_key` column localizes the config key itself (e.g. `maxHeapPercent` -> `maxHeapProzent`), and parity stays correct because it resolves through the `<file>.lang.yml` rename map. Translate the `<loc>_key` cell for every locale in the **same** changeset pass that translates the value and comment - do not leave it identity-mapped as an afterthought. Treating the key as a first-class translated field keeps the three-column triple (`<loc>` / `<loc>_comment` / `<loc>_key`) uniformly populated across the whole locale tree, which is what makes the changeset round-trip predictable and the per-locale TSVs self-consistent; a half-localized row (translated value/comment but identity key) is the drift this pipeline exists to prevent. The localized key still resolves through the rename map, so the English docs/support threads remain cross-referenceable via `base_key`. Apply the same encoding discipline and masking rules to the `<loc>_key` cell as to the value and comment.
 
 ---
 

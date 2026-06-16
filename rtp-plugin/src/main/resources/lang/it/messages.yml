@@ -26,9 +26,9 @@ giàTeletrasporto: "&7[P0] ⚡ ti stai già teletrasportando!"
 
 # se il plugin si sta attualmente ricaricando
 teletrasportoNegatoRicaricamento: "&7[P0] i teletrasporti sono temporaneamente disattivati mentre il plugin si ricarica. Riprova tra poco."
-messaggioRitardo: "&7[P0] ⚡ Teletrasporto in [delay]. Non muoverti"
+messaggioRitardo: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teletrasporto in [delay]. Non muoverti</gradient>"
 caricamentoChunk: "&7[P0] ⚙ Caricamento dei chunk! attendere..."
-messaggioTeletrasporto: "&7[P0] ⚡ Teletrasportato in [attempts] tentativi, in [processingTime]"
+messaggioTeletrasporto: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teletrasportato in [attempts] tentativi, in [processingTime]</gradient>"
 
 # se il teletrasporto viene annullato
 teletrasportoAnnullato: "&7[P0] ⚡ Teletrasporto annullato!"
@@ -197,10 +197,10 @@ infoIntestazioneDisclaimer: "&7--- Disclaimer diagnostico ---"
 infoDisclaimer: "&7Nota diagnostica: se il conteggio totale dei chunk orfani del server supera i caricamenti totali di questo plugin ([loads]), questo plugin non è l'unica fonte del leak di memoria."
 infoIntestazioneMondo: "#008080Mondi:"
 infoIntestazioneMondoConsole: "&7--- Mondi ---"
-infoMondo: "  #21ADA8[world]"
+infoMondo: "#21ADA8[world]"
 infoIntestazioneRegione: "#63C5DARegioni:"
 infoIntestazioneRegioneConsole: "&7--- Regioni ---"
-infoRegione: "  #52B2BF[region]"
+infoRegione: "#52B2BF[region]"
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
@@ -573,8 +573,8 @@ GIOCATORE_TELETRASPORTO: "&bTELETRASPORTO IN CORSO"
 # impostazioni del titolo
 # rimuovi o imposta title a "" per disattivare
 # PlaceholderAPI è consigliato per le coordinate
-titolo: "#FF6B6BT#FF8560e#FF9F55l#FFBA4Ae#FFD53Ft#E8E040r#BFED41a#96F542s#6DF543p#44F2A0o#3BEFC8r#38ECF0t#35E9FFa#32E6FFt#2FE3FFo#2CE0FF!"
-sottotitolo: "#A78BFAd#B47EF8i#C171F6v#CE64F4e#DB57F2r#E84AF0t#E855D8i#E860C0t#E86BA8i!#E876A0"
+titolo: "<rainbow>Teletrasportato!</rainbow>"
+sottotitolo: "<gradient:#A78BFA:#E876A0>divertiti!</gradient>"
 dissolvenzaEntrata: 20
 rimani: 20
 dissolvenzaUscita: 20

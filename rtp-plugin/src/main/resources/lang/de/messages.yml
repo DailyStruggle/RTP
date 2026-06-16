@@ -26,9 +26,9 @@ wirdBereitsTeleportiert: "&7[P0] ⚡ du wirst bereits teleportiert!"
 
 # wenn das Plugin gerade neu lädt
 teleportVerweigertNeuladen: "&7[P0] Teleports sind vorübergehend deaktiviert, während das Plugin neu lädt. Bitte versuche es gleich erneut."
-verzoegerungsNachricht: "&7[P0] ⚡ Teleportiere in [delay]. Nicht bewegen"
+verzoegerungsNachricht: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teleportiere in [delay]. Nicht bewegen</gradient>"
 chunksLaden: "&7[P0] ⚙ Lade Chunks! bitte warten..."
-teleportNachricht: "&7[P0] ⚡ Teleportiert in [attempts] Versuchen, in [processingTime]"
+teleportNachricht: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teleportiert in [attempts] Versuchen, in [processingTime]</gradient>"
 
 # wenn der Teleport abgebrochen wird
 teleportAbbruch: "&7[P0] ⚡ Teleport abgebrochen!"
@@ -192,15 +192,15 @@ infoSchwelleNetzwerkAlterGelb: 5.0
 infoFoliaRegionenKopf: "&7--- Folia-Regionen ---"
 # Zeilenvorlage für eine einzelne Folia-Region. Platzhalter: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
-infoFoliaRegion: "  #7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
+infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
 infoHinweisKopf: "&7--- Diagnose-Hinweis ---"
 infoHinweis: "&7Diagnose-Hinweis: Wenn die Gesamtzahl verwaister Chunks des Servers die gesamten Ladevorgänge dieses Plugins ([loads]) übersteigt, ist dieses Plugin nicht die alleinige Ursache des Speicherlecks."
 infoWeltKopf: "#008080Welten:"
 infoKonsoleWeltKopf: "&7--- Welten ---"
-infoWelt: "  #21ADA8[world]"
+infoWelt: "#21ADA8[world]"
 infoRegionKopf: "#63C5DARegionen:"
 infoKonsoleRegionKopf: "&7--- Regionen ---"
-infoRegion: "  #52B2BF[region]"
+infoRegion: "#52B2BF[region]"
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
@@ -572,8 +572,8 @@ SPIELER_TELEPORTIERT: "&bTELEPORTIERE"
 # Titeleinstellungen
 # entfernen oder Titel auf "" setzen, um zu deaktivieren
 # Für Koordinaten wird PlaceholderAPI empfohlen
-titel: "#FF6B6BT#FF8560e#FF9F55l#FFBA4Ae#FFD53Fp#E8E040o#BFED41r#96F542t#6DF543e#44F2A0d#3BEFC8!#38ECF0"
-untertitel: "#A78BFAh#B47EF8a#C171F6v#CE64F4e#DB57F2 #E84AF0f#E855D8u#E860C0n#E86BA8!#E876A0"
+titel: "<rainbow>Teleportiert!</rainbow>"
+untertitel: "<gradient:#A78BFA:#E876A0>Viel Spaß!</gradient>"
 einblenden: 20
 bleiben: 20
 ausblenden: 20

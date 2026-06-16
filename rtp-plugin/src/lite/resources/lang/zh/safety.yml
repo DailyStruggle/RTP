@@ -63,7 +63,7 @@ anvilPrefilterEnabled: true
 # @default: -1
 平台半径: -1
 
-# Depth (vertical thickness) of the emergency platform.
+# 紧急平台的深度（垂直厚度）。
 # @type: integer
 # @range: [1, null]
 # @unit: blocks
