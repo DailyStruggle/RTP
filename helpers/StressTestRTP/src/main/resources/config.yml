@@ -32,6 +32,17 @@
 # mode but kept for compatibility with admin-form entries.
 dispatch-as-player: true
 
+# Curated default set (2026-06): the three RTP plugins worth comparing
+# against on modern (1.21+ / 26.x) servers are HuskHomes, BetterRTP, and
+# EzRTP — all actively maintained and independent engines. The entries below
+# those three are intentionally commented out:
+#   - jakesrtp   : no Folia support (would only TIMEOUT on Folia campaigns).
+#   - essentialsx: `/tpr` is self-only and the plugin tends to crash under a
+#                  high call volume — not a usable head-to-head target.
+#   - asyrtp / sorekillrtp / advancedrtp: effectively unmaintained on modern
+#                  versions and collide on the `/rtp` command name.
+# Uncomment any of them for a one-off run, but verify it loads on the target
+# build first (a wrong/absent command shows up as a wall of TIMEOUTs).
 target-commands:
   # RTP / RTP-Pro (this project). The plugin.yml command name is `rtp`, so the
   # prefix-qualified form is `rtp:rtp`. Self-form when `dispatch-as-player`
@@ -52,7 +63,21 @@ target-commands:
   - label: "huskhomes"
     command: "huskhomes:rtp"
 
-  # JakesRTP (donvi-bz). plugin.yml registers `/rtp` and `/wild`, but on a
+  # EzRTP. plugin.yml: `forcertp <player> [world]` is the admin form that
+  # can target another player; `/rtp` itself is self-only. The world arg is
+  # required in practice — `/ezrtp:forcertp <player>` (no world) silently
+  # times out (see PRE_WRITEUP §5k). Edit `world` if your test server's
+  # overworld has a different name.
+  #
+  # Pre-run config: EzRTP `limits.yml` cooldown-seconds zeroed across all
+  # tiers; `queue.yml` `enabled: false`; `rtp.yml` countdown-seconds 0.
+  - label: "ezrtp"
+    command: "ezrtp:forcertp {player} world"
+
+  # --- demoted competitors (commented out; see note above target-commands) ---
+
+  # JakesRTP (donvi-bz) — DEMOTED: no Folia support. plugin.yml registers
+  # `/rtp` and `/wild`, but on a
   # server where another plugin (e.g. our RTP) also registers `/rtp`, the
   # bare `/rtp` resolves to whichever plugin registered first — and even
   # the namespaced `jakesrtp:rtp` form can defer to the other plugin's
@@ -66,8 +91,8 @@ target-commands:
   # default: op — players don't have it). The harness will fall back to
   # console for this one entry; this is the documented exception alongside
   # `essentialsx:sudo`.
-  - label: "jakesrtp"
-    command: "jakesrtp:forcertp {player} -c default-settings"
+  #- label: "jakesrtp"
+  #  command: "jakesrtp:forcertp {player} -c default-settings"
 
   # AsyRTP (asygames). plugin.yml: `rtp` registered with usage
   # `/rtp [help|gui|world <world> <player>]`. The only "rtp another player"
@@ -77,19 +102,8 @@ target-commands:
   # Pre-run config: AsyRTP `config.yml` `profiles.default.cooldown-seconds:
   # 0` (vip profile is 20 s but unprivileged test players fall into
   # default). Per-player queueing not exposed as a config knob.
-  - label: "asyrtp"
-    command: "asyrtp:rtp world world {player}"
-
-  # EzRTP. plugin.yml: `forcertp <player> [world]` is the admin form that
-  # can target another player; `/rtp` itself is self-only. The world arg is
-  # required in practice — `/ezrtp:forcertp <player>` (no world) silently
-  # times out (see PRE_WRITEUP §5k). Edit `world` if your test server's
-  # overworld has a different name.
-  #
-  # Pre-run config: EzRTP `limits.yml` cooldown-seconds zeroed across all
-  # tiers; `queue.yml` `enabled: false`; `rtp.yml` countdown-seconds 0.
-  - label: "ezrtp"
-    command: "ezrtp:forcertp {player} world"
+  #- label: "asyrtp"
+  #  command: "asyrtp:rtp world world {player}"
 
   # SorekillRTP. plugin.yml registers ONLY `/rtp` (with aliases
   # `randomtp`, `wild`) and the admin form is `/rtp <player> <server>
@@ -103,8 +117,8 @@ target-commands:
   #
   # Pre-run config: SorekillRTP `config.yml` cooldown-seconds 0,
   # countdown-seconds 0. Cross-server features default-disabled.
-  - label: "sorekillrtp"
-    command: "sorekillrtp:randomtp {player} local world"
+  #- label: "sorekillrtp"
+  #  command: "sorekillrtp:randomtp {player} local world"
 
   # AdvancedRTP. plugin.yml usage is `/rtp [world] or /rtp reload`, but the
   # plugin gates an `advancedrtp.admin.rtpother` permission, suggesting an
@@ -117,8 +131,8 @@ target-commands:
   #
   # Pre-run config: AdvancedRTP `config.yml` `attempt-delay: 0`,
   # `teleport-delay: 0`, `cooldown.duration: 0`.
-  - label: "advancedrtp"
-    command: "advancedrtp:rtp {player}"
+  #- label: "advancedrtp"
+  #  command: "advancedrtp:rtp {player}"
 
   # EssentialsX. `/tpr` itself has no <player> argument and is self-only,
   # so we drive it via `/sudo <player> tpr` — EssentialsX's `sudo` command
@@ -126,8 +140,8 @@ target-commands:
   # is the standard "rtp another player" workaround for EssentialsX.
   # Requires the console/runner to hold `essentials.sudo` (and the target
   # player to hold `essentials.tpr`).
-  - label: "essentialsx"
-    command: "essentials:tpr"
+  #- label: "essentialsx"
+  #  command: "essentials:tpr"
 
 # Legacy single-target form (still honoured if `target-commands` is absent).
 # target-command: "rtp player:{player}"
@@ -307,10 +321,18 @@ chunk-load-cost-us: 28221.0           # Spigot / default — mean of 5 runs on 1
 chunk-load-cost-us-paper: 0.0         # 0 = fall back to default
 chunk-load-cost-us-folia: 0.0         # 0 = fall back to default
 
-# Sampling cadence for TPS / MSPT / heap. Values are folded into rolling
-# percentiles for the run summary. 1000ms is sufficient resolution for the
-# table columns; lower values increase overhead without changing results.
-sample-period-ms: 1000
+# Sampling cadence (ms) for TPS / MSPT / heap. Values are folded into rolling
+# percentiles for the run summary and into the per-run <stamp>-heap.csv series.
+# /rtp completes in tens of milliseconds, so a 1000ms cadence aliases right
+# past the heap-growth and MSPT spikes a fast pipeline produces between
+# samples. The default is one server tick (50ms ≈ 20 Hz), the finest cadence
+# that still yields independent MSPT samples (Paper's getAverageTickTime is a
+# rolling average and TPS is recomputed at most once per tick, so going below
+# 50ms only oversamples those two — heap-used, read straight from the JVM, is
+# the column that genuinely benefits from the finer cadence). Raise toward
+# 1000ms only for very long runs where sample-list memory matters; the
+# resulting peak-heap / p95-MSPT figures will be correspondingly coarser.
+sample-period-ms: 50
 
 # Output directory (relative to the plugin's data folder) for per-run
 # artifacts: <timestamp>.csv (per-attempt) and <timestamp>-summary.txt.

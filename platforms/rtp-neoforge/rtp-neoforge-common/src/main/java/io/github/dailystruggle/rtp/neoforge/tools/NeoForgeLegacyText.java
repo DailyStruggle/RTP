@@ -248,6 +248,9 @@ public final class NeoForgeLegacyText {
     // --- helpers --------------------------------------------------------
 
     private static String normalise(String raw) {
+        // Expand MiniMessage <tag> color/format markup into legacy &-codes so
+        // Adventure-less NeoForge still honors MiniMessage colors.
+        raw = io.github.dailystruggle.rtp.common.tools.MiniMessageColorExpander.expand(raw);
         Matcher m = HEX_PATTERN.matcher(raw);
         StringBuilder sb = new StringBuilder(raw.length());
         int last = 0;

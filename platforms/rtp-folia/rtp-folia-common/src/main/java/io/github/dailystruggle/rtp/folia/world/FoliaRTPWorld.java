@@ -753,6 +753,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     // Reason-keyed metric + rate-limited log (ADR-016 §13.1 observability,
     // audit options A+C). Mirrors BukkitRTPWorld#getBiome.
     String reason;
+    Throwable thrown = null;
     int cx = x >> 4;
     int cz = z >> 4;
     try {
@@ -769,11 +770,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       } else {
         reason = io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.Reasons.NO_VIEW_CACHED;
       }
-    } catch (Throwable ignored) {
+    } catch (Throwable t) {
       reason = io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.Reasons.ANVIL_THROW;
+      thrown = t;
     }
     io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.record(reason);
-    logBiomeFallthrough(reason, cx, cz);
+    logBiomeFallthrough(reason, cx, cz, thrown);
     return getBiome.apply(new Location(world, x, y, z));
   }
 
@@ -786,19 +788,32 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       BIOME_FALLTHROUGH_COUNTERS = new java.util.concurrent.ConcurrentHashMap<>();
   private static final int BIOME_LOG_BUDGET_PER_REASON = 200;
 
-  private void logBiomeFallthrough(String reason, int cx, int cz) {
+  private void logBiomeFallthrough(String reason, int cx, int cz, Throwable thrown) {
     java.util.concurrent.atomic.AtomicInteger counter =
         BIOME_FALLTHROUGH_COUNTERS.computeIfAbsent(reason,
             k -> new java.util.concurrent.atomic.AtomicInteger());
     int n = counter.incrementAndGet();
-    java.util.logging.Level level = (n <= BIOME_LOG_BUDGET_PER_REASON)
+    // `no-view-cached` is the common, fully-benign path: no Anvil view was
+    // cached for this chunk, so the biome was read via the live getter. That is
+    // correct for vanilla worlds (a custom-generator world would instead want a
+    // load-to-check, handled elsewhere), carries no exception, and never gates
+    // safety. Keep it at FINE so it cannot be mistaken for an error; other
+    // reasons stay at INFO until the per-reason budget is exhausted.
+    boolean benign =
+        io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.Reasons.NO_VIEW_CACHED.equals(reason);
+    java.util.logging.Level level = (!benign && n <= BIOME_LOG_BUDGET_PER_REASON)
         ? java.util.logging.Level.INFO
         : java.util.logging.Level.FINE;
-    RTP.log(level,
-        "[RTP] Anvil biome fallthrough reason=" + reason + " world=" + name
-            + " chunk=(" + cx + "," + cz + ")"
-            + (n > BIOME_LOG_BUDGET_PER_REASON
-                ? " (further occurrences suppressed to FINE)" : ""));
+    String msg = "[RTP] Anvil biome fallthrough reason=" + reason + " world=" + name
+        + " chunk=(" + cx + "," + cz + ")"
+        + (thrown != null ? " thrown=" + thrown : "")
+        + (!benign && n > BIOME_LOG_BUDGET_PER_REASON
+            ? " (further occurrences suppressed to FINE)" : "");
+    if (thrown != null) {
+      RTP.log(level, msg, thrown);
+    } else {
+      RTP.log(level, msg);
+    }
   }
 
   /**

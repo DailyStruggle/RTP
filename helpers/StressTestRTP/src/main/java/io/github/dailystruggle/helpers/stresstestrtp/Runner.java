@@ -40,6 +40,20 @@ public final class Runner {
     private final SparkHook spark;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
+    /** Re-entrancy guard for {@link #tick()}. The async repeating task can run
+     *  re-entrantly: Folia's {@code AsyncScheduler#runAtFixedRate} (and a
+     *  BukkitScheduler async repeating task whose execution exceeds its
+     *  period) may dispatch successive repetitions on different pool threads
+     *  before the prior one returns. Two concurrent tick bodies both pass the
+     *  per-player {@code deadlines.containsKey} guard and dispatch the SAME
+     *  player, so {@code inFlight} is incremented twice while only one
+     *  per-player deadline exists — when the (fast) completion removes that
+     *  single deadline, only one decrement runs and the extra increment leaks.
+     *  The leak wedges {@code inFlight} at/above the concurrency cap with zero
+     *  live deadlines, which blocks all further dispatch and trips the
+     *  no-progress watchdog every {@code no-progress-kickstart-ms}. Making
+     *  tick() strictly non-overlapping removes the race at its source. */
+    private final AtomicBoolean ticking = new AtomicBoolean(false);
     private final AtomicInteger inFlight = new AtomicInteger(0);
     private final AtomicInteger targetCursor = new AtomicInteger(0);
     private final ConcurrentHashMap<UUID, Long> deadlines = new ConcurrentHashMap<>();
@@ -330,6 +344,14 @@ public final class Runner {
 
     /** Async tick: ~10 Hz. Reaps timeouts then dispatches up to the concurrency cap. */
     private void tick() {
+        // Strictly non-overlapping: if a prior tick body is still running on
+        // another pool thread (Folia fixed-rate, or a slow BukkitScheduler
+        // async repetition), skip this firing entirely. Two concurrent bodies
+        // would race past the per-player `deadlines.containsKey` guard and
+        // double-dispatch the same player, leaking `inFlight` (see field doc
+        // on `ticking`). Skipping is safe: the next repetition picks up the
+        // work, and the sampler/CSV are unaffected.
+        if (!ticking.compareAndSet(false, true)) return;
         try {
             long now = System.currentTimeMillis();
 
@@ -385,8 +407,16 @@ public final class Runner {
                     UUID id = entry.getKey();
                     MetricsRecorder.Attempt a = probe.forget(id);
                     if (a != null) recorder.onTimeout(a);
-                    deadlines.remove(id);
-                    inFlight.decrementAndGet();
+                    // Gate the decrement on the removal actually winning, exactly
+                    // like onAttemptCompleted / onConsoleFail. The reaper (tick
+                    // thread) can race onAttemptCompleted (main/region thread) for
+                    // the same id; ConcurrentHashMap#remove returns the value to
+                    // only one of them. Decrementing unconditionally here would
+                    // double-count when the completion callback already removed
+                    // the entry, driving inFlight negative (over-dispatch).
+                    if (deadlines.remove(id) != null) {
+                        inFlight.decrementAndGet();
+                    }
                 }
             }
 
@@ -668,6 +698,8 @@ public final class Runner {
             }
         } catch (Throwable t) {
             plugin.getLogger().log(Level.WARNING, "StressTestRTP runner tick failed", t);
+        } finally {
+            ticking.set(false);
         }
     }
 

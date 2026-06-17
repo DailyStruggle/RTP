@@ -87,6 +87,28 @@ public class ReqRtpFabricAnsiTextNoNetworkMinecraftTest {
                 "Expected truecolor escape in: " + hex);
     }
 
+    @Test
+    public void fabricAnsiText_expandsMiniMessageTags_noRawTagsReachConsole() {
+        // Regression for the scan-status / scanStart console lines, whose
+        // messages.yml [P0] prefix is "<rainbow>[RTP]</rainbow>". On the
+        // Adventure-less Fabric console these MiniMessage tags previously
+        // printed literally (e.g. "<rainbow>[RTP]</rainbow> scan task started
+        // for regions: default"). normalise() now runs MiniMessageColorExpander
+        // so the tags expand to legacy/ANSI color instead of surviving as text.
+        String prefixed = FabricAnsiText.toAnsiString("<rainbow>[RTP]</rainbow> scan task started");
+        assertFalse(prefixed.contains("<rainbow>"),
+                "rainbow tag must be expanded, not printed raw: " + prefixed);
+        assertFalse(prefixed.contains("</rainbow>"),
+                "closing rainbow tag must be consumed: " + prefixed);
+        assertTrue(prefixed.contains("\u001b["),
+                "Expected ANSI color escapes from the expanded rainbow: " + prefixed);
+
+        // Named color tags expand too and must not survive literally.
+        String named = FabricAnsiText.toAnsiString("<red>hi</red>");
+        assertFalse(named.contains("<red>"), "named color tag must be expanded: " + named);
+        assertTrue(named.contains("\u001b[91m"), "Expected red ANSI escape in: " + named);
+    }
+
     /** Locate {@code FabricAnsiText.class} on the test runtime classpath. */
     private static Path locateClassFile() throws Exception {
         String resource = FabricAnsiText.class.getName().replace('.', '/') + ".class";

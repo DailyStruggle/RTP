@@ -224,10 +224,86 @@ public class SendMessage {
    * {@code &}/hex configs keep rendering exactly as before.
    */
   public static BaseComponent[] toComponents(@Nullable OfflinePlayer player, @Nullable String text) {
-    if (text == null) return new BaseComponent[0];
+    return renderMarkup(player, text, new BaseComponent[0], mini -> mini, TextComponent::fromLegacyText);
+  }
+
+  /**
+   * Generic text-formatting entry point. Resolves all RTP / numeric / PlaceholderAPI
+   * placeholders and (optionally) translates legacy {@code &} and {@code #rrggbb} hex
+   * color codes into section-sign codes. This is the single engine the
+   * {@link #format}, {@link #formatDry}, and {@link #formatNoColor} convenience
+   * overloads delegate to.
+   *
+   * @param player the player whose UUID scopes placeholder resolution (console when null)
+   * @param text the raw text to resolve (returns {@code ""} when null)
+   * @param numericPlaceholders resolve numeric placeholders (requires the lang parser)
+   * @param translateColor translate legacy {@code &}/hex color codes
+   * @return the resolved text
+   */
+  public static String format(
+      @Nullable OfflinePlayer player,
+      @Nullable String text,
+      boolean numericPlaceholders,
+      boolean translateColor) {
+    if (text == null) return "";
+
+    // get uuid to be referenced by placeholder getters
+    UUID uuid = (player != null) ? player.getUniqueId() : RTPAPI.serverId;
+
+    text = PlaceholderProvider.fillPlaceholders(text, uuid);
+
+    if (numericPlaceholders && getLang() != null) {
+      text = PlaceholderProvider.fillNumericPlaceholders(text);
+    }
+
+    // check PAPI exists and scan remaining PAPI placeholders
+    // todo: if a null player doesn't work with another PAPI import, blame that import for not
+    // verifying its inputs.
+    text = PAPIChecker.fillPlaceholders(player, text);
+
+    if (translateColor) {
+      text = ChatColor.translateAlternateColorCodes('&', text);
+      text = Hex2Color(text);
+    }
+    return text;
+  }
+
+  public static String format(@Nullable OfflinePlayer player, @Nullable String text) {
+    return format(player, text, true, true);
+  }
+
+  public static String formatDry(@Nullable OfflinePlayer player, @Nullable String text) {
+    return format(player, text, false, true);
+  }
+
+  public static String formatNoColor(@Nullable OfflinePlayer player, @Nullable String text) {
+    return format(player, text, true, false);
+  }
+
+  /**
+   * Shared MiniMessage-aware rendering engine behind {@link #toComponents} and
+   * {@link #toLegacyText}. When Adventure is available and {@code text} carries
+   * MiniMessage {@code <tag>} markup, placeholders are resolved via
+   * {@link #formatNoColor} (no legacy translation) and the result is rendered
+   * through MiniMessage, then handed to {@code miniFinisher}. Otherwise the legacy
+   * pipeline ({@link GradientExpander#expand} + {@link #format}) is used and the
+   * resolved legacy string is handed to {@code legacyFinisher}, so existing
+   * {@code &}/hex configs keep rendering exactly as before.
+   *
+   * @param empty the value to return when {@code text} is null
+   * @param miniFinisher converts the MiniMessage-rendered components into the result
+   * @param legacyFinisher converts the resolved legacy section-code string into the result
+   */
+  private static <T> T renderMarkup(
+      @Nullable OfflinePlayer player,
+      @Nullable String text,
+      T empty,
+      Function<BaseComponent[], T> miniFinisher,
+      Function<String, T> legacyFinisher) {
+    if (text == null) return empty;
     if (MINIMESSAGE_AVAILABLE && miniMessageTagPattern.matcher(text).find()) {
       try {
-        return MiniMessageRenderer.render(formatNoColor(player, text));
+        return miniFinisher.apply(MiniMessageRenderer.render(formatNoColor(player, text)));
       } catch (Throwable t) {
         RTP.log(
             Level.FINE,
@@ -239,76 +315,7 @@ public class SendMessage {
     // so they render on servers that do not bundle Adventure (e.g. pure Spigot).
     // On Paper/Folia the MiniMessage path above already handled them; this only
     // fires when MINIMESSAGE_AVAILABLE is false or the MiniMessage render threw.
-    text = GradientExpander.expand(text);
-    return TextComponent.fromLegacyText(format(player, text));
-  }
-
-  public static String format(@Nullable OfflinePlayer player, @Nullable String text) {
-    if (text == null) return "";
-    // Bukkit.getLogger().info("[diag/format] entry player=" + (player == null ? "null" : player.getUniqueId()) + " raw=\"" + text + "\"");
-
-    // get uuid to be referenced by placeholder getters
-    UUID uuid = (player != null) ? player.getUniqueId() : RTPAPI.serverId;
-
-    text = PlaceholderProvider.fillPlaceholders(text, uuid);
-    // Bukkit.getLogger().info("[diag/format] after fillPlaceholders: \"" + text + "\"");
-
-    if (getLang() != null) {
-      text = PlaceholderProvider.fillNumericPlaceholders(text);
-      // Bukkit.getLogger().info("[diag/format] after fillNumericPlaceholders: \"" + text + "\"");
-    } else {
-      // Bukkit.getLogger().info("[diag/format] skipped fillNumericPlaceholders (getLang()==null)");
-    }
-
-    // check PAPI exists and scan remaining PAPI placeholders
-    // todo: if a null player doesn't work with another PAPI import, blame that import for not
-    // verifying its inputs.
-    text = PAPIChecker.fillPlaceholders(player, text);
-    // Bukkit.getLogger().info("[diag/format] after PAPIChecker.fillPlaceholders: \"" + text + "\"");
-
-    text = ChatColor.translateAlternateColorCodes('&', text);
-    // Bukkit.getLogger().info("[diag/format] after translateAlternateColorCodes('&'): \"" + text + "\"");
-    text = Hex2Color(text);
-    // Bukkit.getLogger().info("[diag/format] after Hex2Color: \"" + text + "\"");
-    return text;
-  }
-
-  public static String formatDry(@Nullable OfflinePlayer player, @Nullable String text) {
-    if (text == null) return "";
-
-    // get uuid to be referenced by placeholder getters
-    UUID uuid = (player != null) ? player.getUniqueId() : RTPAPI.serverId;
-
-    text = PlaceholderProvider.fillPlaceholders(text, uuid);
-
-    // check PAPI exists and scan remaining PAPI placeholders
-    // todo: if a null player doesn't work with another PAPI import, blame that import for not
-    // verifying its inputs.
-    text = PAPIChecker.fillPlaceholders(player, text);
-
-    text = ChatColor.translateAlternateColorCodes('&', text);
-    text = Hex2Color(text);
-    return text;
-  }
-
-  public static String formatNoColor(@Nullable OfflinePlayer player, @Nullable String text) {
-    if (text == null) return "";
-
-    // get uuid to be referenced by placeholder getters
-    UUID uuid = (player != null) ? player.getUniqueId() : RTPAPI.serverId;
-
-    text = PlaceholderProvider.fillPlaceholders(text, uuid);
-
-    if (getLang() != null) {
-      text = PlaceholderProvider.fillNumericPlaceholders(text);
-    }
-
-    // check PAPI exists and scan remaining PAPI placeholders
-    // todo: if a null player doesn't work with another PAPI import, blame that import for not
-    // verifying its inputs.
-    text = PAPIChecker.fillPlaceholders(player, text);
-
-    return text;
+    return legacyFinisher.apply(format(player, GradientExpander.expand(text)));
   }
 
   private static String Hex2Color(String text) {
@@ -507,11 +514,39 @@ public class SendMessage {
     for (String s : message.split("\n")) {
       String colored = color + s;
       if (modern) {
-        Bukkit.getConsoleSender().spigot().sendMessage(TextComponent.fromLegacyText(colored));
+        Bukkit.getConsoleSender().spigot().sendMessage(toConsoleComponents(colored));
       } else {
         Bukkit.getLogger().log(legacyLevel, colored);
       }
     }
+  }
+
+  /**
+   * Renders a console log line into bungee {@link BaseComponent}s. When Adventure is
+   * available and the line carries MiniMessage {@code <tag>} markup (e.g. the
+   * {@code <rainbow>[RTP]</rainbow>} prefix from {@code messages.yml}), it is rendered
+   * through MiniMessage so the tags are parsed rather than printed literally to the
+   * console. Legacy {@code §} color codes already present in the line survive as text
+   * content and are interpreted by the console renderer. Falls back to the plain
+   * legacy path when Adventure is absent or MiniMessage rendering fails.
+   */
+  private static BaseComponent[] toConsoleComponents(String legacyText) {
+    if (MINIMESSAGE_AVAILABLE && miniMessageTagPattern.matcher(legacyText).find()) {
+      try {
+        return MiniMessageRenderer.render(legacyText);
+      } catch (Throwable t) {
+        RTP.log(
+            Level.FINE,
+            "[RTP] MiniMessage console render failed; falling back to legacy color codes for: "
+                + legacyText,
+            t);
+      }
+    }
+    // Mirror renderMarkup's fallback: expand <gradient>/<rainbow>/<transition>
+    // to per-character legacy hex so a "<rainbow>[RTP]</rainbow>" prefix never
+    // prints literally to the console when Adventure is absent or
+    // MiniMessageRenderer.render threw above.
+    return TextComponent.fromLegacyText(GradientExpander.expand(legacyText));
   }
 
   public static void log(Level level, String message, Throwable throwable) {
@@ -531,7 +566,7 @@ public class SendMessage {
       CommandSender.Spigot spigot = Bukkit.getConsoleSender().spigot();
       // INFO keeps its historical "no color prefix" rendering in the throwable overload.
       String prefixed = level.equals(Level.INFO) ? formatted : color + formatted;
-      spigot.sendMessage(TextComponent.fromLegacyText(prefixed));
+      spigot.sendMessage(toConsoleComponents(prefixed));
     }
 
     if (throwable != null) {
@@ -547,19 +582,36 @@ public class SendMessage {
     if (noTitle && noSubtitle) return;
 
     if (title != null) {
-      title = format(player, title);
+      title = toLegacyText(player, title);
     }
     if (subtitle != null) {
-      subtitle = format(player, subtitle);
+      subtitle = toLegacyText(player, subtitle);
     }
 
     player.sendTitle(title, subtitle, in, stay, out);
   }
 
+  /**
+   * Resolves {@code text} into a legacy section-code string suitable for the
+   * string-based {@code Player.sendTitle} sink.
+   *
+   * <p>Mirrors {@link #toComponents}: when Adventure is available and the text
+   * carries MiniMessage {@code <tag>} markup, it is rendered through MiniMessage
+   * (placeholders resolved via {@link #formatNoColor}, no legacy translation) and
+   * then flattened back to a legacy section-code string via
+   * {@code TextComponent.toLegacyText}. Otherwise the legacy {@link #format}
+   * pipeline is used, so existing {@code &}/hex configs render exactly as before.
+   */
+  public static String toLegacyText(@Nullable OfflinePlayer player, @Nullable String text) {
+    return renderMarkup(player, text, "", TextComponent::toLegacyText, legacy -> legacy);
+  }
+
   public static void actionbar(Player player, String bar) {
     if (bar == null || bar.isEmpty()) return;
-    bar = Hex2Color(ChatColor.translateAlternateColorCodes('&', bar));
-    BaseComponent[] components = TextComponent.fromLegacyText(bar);
+    // Route through the MiniMessage-aware renderer so action-bar text honors
+    // <tag> markup (e.g. <rainbow>) on Paper/Folia, while &/hex legacy configs
+    // keep rendering via the legacy fallback inside toComponents.
+    BaseComponent[] components = toComponents(player, bar);
     player.spigot().sendMessage(ChatMessageType.ACTION_BAR, components);
   }
 }

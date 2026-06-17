@@ -1,15 +1,15 @@
 // rtp-fabric-ADR-001 - Fabric multiversion V26_2_R1 submodule.
 //
-// EARLY/EXPERIMENTAL adapter pinned to the MC 26.2 pre-release (26.2-rc-2).
+// Adapter pinned to the MC 26.2 final release (26.2).
 // The 26.2 line is deobfuscated (same regime as 26.1), so the build-script
 // shape matches the v26_1_R1 submodule: Loom 1.15 unobf plugin, JDK 25
 // toolchain, no `mappings` line, plain implementation/compileOnly. Cloned
 // from v26_1_R1; see rtp-fabric-ADR-014 for the 26.2 line rationale and the
 // pre-release-version-string dispatch caveat.
 //
-// WARNING: 26.2-rc-2 is a moving target. The pinned minecraftVersion,
+// NOTE: pinned to the 26.2 final release. The pinned minecraftVersion,
 // loaderVersion and fabricApiVersion below, plus the dispatch matcher in
-// RTPFabricMod#adapterFqnFor, must be re-verified when 26.2 reaches final.
+// RTPFabricMod#adapterFqnFor, must be re-verified on any 26.2.x point release.
 //
 // IMPORTANT: this module requires JDK 25 to build. Contributors without
 // JDK 25 installed will see this submodule fail toolchain provisioning;
@@ -26,7 +26,7 @@ plugins {
 }
 
 ext {
-    minecraftVersion       = '26.2-rc-2'
+    minecraftVersion       = '26.2'
     loaderVersion          = '0.19.2'
     fabricApiVersion       = '0.150.2+26.2'
     permissionsApiVersion  = '0.3.1'

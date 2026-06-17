@@ -307,6 +307,9 @@ public final class FabricLegacyText {
     // --- helpers --------------------------------------------------------
 
     private static String normalise(String raw) {
+        // 0) Expand MiniMessage <tag> color/format markup into legacy &-codes
+        //    so Adventure-less Fabric still honors MiniMessage colors.
+        raw = io.github.dailystruggle.rtp.common.tools.MiniMessageColorExpander.expand(raw);
         // 1) Convert "#RRGGBB" / "&#RRGGBB" to "§x§R§R§G§G§B§B" so the main
         //    scanner can treat hex uniformly with formatting codes.
         Matcher m = HEX_PATTERN.matcher(raw);

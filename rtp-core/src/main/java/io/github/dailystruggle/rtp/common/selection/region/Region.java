@@ -427,8 +427,13 @@ public class Region extends FactoryValue<RegionKeys> {
    * <p>A {@code null} cached chunk (chunk not retained through the verify
    * window) is a self-healing transient, not a drop: the caller re-queues the
    * location for a later retry, so this case is logged at {@code FINE} only to
-   * avoid flooding the console under burst promotion. The genuinely-unsafe
-   * {@code vert.adjust==null} drop stays at {@code INFO}.
+   * avoid flooding the console under burst promotion. The {@code
+   * vert.adjust==null} drop is also logged at {@code FINE}: it is the routine,
+   * correct rejection of a water/ocean/biome column that the L2 -> L1 load
+   * verification proves unsafe (nothing is broken in normal usage), so it must
+   * not masquerade as a potential error case on the console. Only the genuinely
+   * anomalous sub-cases (the {@code isAir} read threw, or the diagnostic itself
+   * failed) stay at a higher level.
    */
   private void logPromotionDropDiag(
       RTPLocation coldLoc,
@@ -475,7 +480,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 + " (block reads are broken on this platform chunk).");
         return;
       }
-      RTP.log(Level.INFO,
+      RTP.log(Level.FINE,
           "[RTP][PROMOTE_DIAG] region=" + name + " chunk=(" + cx + "," + cz
               + ") DROPPED vert.adjust=null"
               + " generated=" + rtpChunk.isGenerated()

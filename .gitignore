@@ -156,3 +156,6 @@ helpers/StressTestRTP/runs/
 *.log.gz
 # Agent / contributor scratch notes (per .junie/AGENTS.md, Checklist-Based State Tracking)
 docs/dev/scratch/
+
+# GitHub wiki working clone (separate RTP.wiki.git repo; edited alongside source, not part of this repo)
+/wiki/
