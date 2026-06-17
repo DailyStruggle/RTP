@@ -18,8 +18,8 @@ All configuration files live in `plugins/RTP/` after the first server start. Edi
 | `performance.yml` | Background task timing, cache behaviour, TPS thresholds | [PERFORMANCE.md](PERFORMANCE.md) |
 | `economy.yml` | Teleport costs and refund policy (requires Vault) | [ECONOMY.md](ECONOMY.md) |
 | `safety.yml` | Landing safety checks, invulnerability, biome filters | [SAFETY.md](SAFETY.md) |
-| `messages.yml` | All player-facing message strings | *(See below)* |
-| `logging.yml` | Console logging verbosity | *(See below)* |
+| `messages.yml` | All player-facing message strings | [MESSAGES.md](MESSAGES.md) |
+| `logging.yml` | Console logging verbosity | [LOGGING.md](LOGGING.md) |
 | `language.yml` | Locale selection (loaded before all other files) | [LANGUAGE.md](LANGUAGE.md) |
 | `integrations.yml` | Claim/region protection plugin reroll toggles | [INTEGRATIONS.md](INTEGRATIONS.md) |
 | `metrics.yml` | Runtime-health metrics SPI reporting knobs | [METRICS.md](METRICS.md) |
@@ -246,24 +246,13 @@ See [WORLDS.md](WORLDS.md) for a full breakdown of the world configuration.
 
 ## `logging.yml` — Console Logging Verbosity
 
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `detailed_reload` | Boolean | `false` | Log all files and sections reloaded during `/rtp reload`. |
-| `detailed_region_init` | Boolean | `false` | Log the initialization details for each region. |
-| `command` | Boolean | `false` | Log every player-executed RTP command. |
-| `teleport` | Boolean | `true` | Log successful teleportation events. |
-| `event_join` | Boolean | `true` | Log RTP triggered on join. |
-| `event_respawn` | Boolean | `true` | Log RTP triggered on respawn. |
-| `event_changeworld` | Boolean | `true` | Log RTP triggered by world changes. |
-| `selection_failure` | Boolean | `true` | Log detailed info when location selection fails (rates, parameters). |
-| `system_memory_tracker` | Boolean | `false` | Debug logs for memory allocator/tracker activity. |
-| `system_database` | Boolean | `false` | Debug logs for database queries and connection state. |
+Enables or disables individual console-log categories and sets the plugin's minimum log level. See [LOGGING.md](LOGGING.md) for the complete category list and the `min_level` filter.
 
 ---
 
 ## `messages.yml` — Message Customisation
 
-All player-facing strings are defined here. Supports colour codes using `&` (e.g., `&a` for green, `&c` for red). Edit any value to localise or rebrand messages.
+All player-facing strings are defined here. Supports `&` colour codes, hex codes, MiniMessage tags, and PlaceholderAPI placeholders. Edit any value to localise or rebrand messages. See [MESSAGES.md](MESSAGES.md) for the formatting rules, the `[Pn]` placeholder system, and the section-by-section layout.
 
 ---
 

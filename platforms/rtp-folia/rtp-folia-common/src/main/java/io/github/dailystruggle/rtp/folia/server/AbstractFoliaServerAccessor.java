@@ -121,6 +121,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
       else if (v.contains("1_20")) intVersion = 20;
       else if (v.contains("1_21")) intVersion = 21;
       else if (v.contains("26_1")) intVersion = 26;
+      else if (v.contains("26_2")) intVersion = 26;
       else intVersion = 13;
     }
     return intVersion;

@@ -14,9 +14,16 @@ command, listen for `PlayerTeleportEvent`, record latency.
 
 ## Why this exists
 
-The RTP front-page table compares RTP / RTP-Pro to BetterRTP, EzRTP,
-AsyRTP, SorekillRTP, AdvancedRTP, JakesRTP, EssentialsX `/rtp`, and
-HuskHomes RTP across five performance columns. (DonutRTP was reviewed
+The RTP front-page table compares RTP / RTP-Pro across five performance
+columns. The default `target-commands` set ships the three competitors
+worth measuring on modern (1.21+ / 26.x) servers: **HuskHomes**,
+**BetterRTP**, and **EzRTP**, all actively maintained, independent RTP
+engines. Older entries (AsyRTP, SorekillRTP, AdvancedRTP, JakesRTP,
+EssentialsX `/tpr`) ship commented-out in `config.yml`: JakesRTP has no
+Folia support, EssentialsX's `/tpr` is self-only and tends to crash
+under high call volume, and the rest are effectively unmaintained on
+modern versions. Uncomment any of them for a one-off run after verifying
+it loads on the target build. (DonutRTP was reviewed
 and excluded — it is a GUI front-end that dispatches BetterRTP commands,
 not an independent RTP implementation; see `PRE_WRITEUP.md` §6.)
 
@@ -37,7 +44,10 @@ and read the columns straight off the generated `summary.txt`.
 ## What it does
 
 1. Registers `/rtpstress` (permission `stresstestrtp.admin`, default OP).
-2. Samples TPS / MSPT / heap-used once per second on an async timer.
+2. Samples TPS / MSPT / heap-used on an async timer once per server tick
+   (50 ms, configurable via `sample-period-ms`). A `/rtp` completes in tens
+   of milliseconds, so a coarser 1000 ms cadence would alias past the
+   heap-growth and MSPT spikes the pipeline produces between samples.
 3. On `/rtpstress start [seconds] [concurrency]`:
    - Rolls a fresh CSV at `plugins/StressTestRTP/runs/<timestamp>.csv`.
    - Loops at ~10 Hz: while concurrency slots are open, picks a roster
@@ -254,6 +264,100 @@ are simply omitted — no breakage.
   swamp differences between RTP plugins.
 - **Disable other plugins** that hook `PlayerTeleportEvent` — they can
   add latency that the harness will attribute to the plugin under test.
+
+---
+
+## Test consistency protocol
+
+The numbers are only comparable if every plugin is measured under the
+**same** conditions. Aliasing, JIT warm-up, cache state, and machine
+noise can each swing a result by more than the difference between two
+plugins, so pin all of them down before you trust a column. Follow this
+checklist top-to-bottom for each comparison campaign.
+
+### 1. Pin the environment (set once, never change mid-campaign)
+
+- **Hardware**: one physical box, no other tenants. Disable CPU
+  frequency scaling / turbo where you can (a thermally throttled box
+  produces a downward MSPT/TPS drift that looks like a regression).
+- **Server JAR**: identical build (`paper-1.20.x-bNNN`) and identical
+  `server.properties` (`view-distance`, `simulation-distance`,
+  `max-tick-time`) for every plugin under test.
+- **JVM**: identical flags (`-Xms` == `-Xmx` so the heap never resizes
+  mid-run — a heap grow shows up as a false "memory footprint" spike),
+  identical Java version, identical GC. Pin `-Xms=-Xmx` even if you
+  normally don't; a resize event aliases straight into the heap series.
+- **Sampler cadence**: leave `sample-period-ms` at the `50` default
+  (one tick) for every plugin. Changing the cadence between plugins
+  makes the p95-MSPT and peak-heap columns incomparable.
+- **World**: pre-generated to a radius larger than the RTP max range,
+  and **byte-for-byte identical** between plugins (see §3).
+
+### 2. Pin the workload
+
+- Use `/rtpstress sequence <perTarget> <gap> <concurrency>` rather than
+  separate `start` runs: it exercises every `target-commands` entry
+  back-to-back with identical duration, concurrency, and roster, then
+  idles `gap` seconds so the box (and any pre-warmed queue) recovers
+  before the next plugin. One sequence run == one apples-to-apples
+  comparison.
+- Keep `concurrency` and `perTarget` identical across campaigns. A
+  longer phase warms more JIT and fills more cache, so a 60 s phase and
+  a 600 s phase are not comparable even for the same plugin.
+- Keep the **roster size constant**. RTP latency is per-player; driving
+  4 alts vs. 1 operator changes the contention profile.
+
+### 3. Reset state between plugins (the consistency killer)
+
+Cache and queue state leaks across runs and is the single biggest
+source of irreproducible numbers:
+
+- **Cold-start column**: only meaningful on a freshly restarted server
+  with an empty queue. Restart the server between plugins (or at least
+  before the run you read cold-start from) — there is intentionally no
+  `/rtpstress reload`, because re-running from a known-fresh state is
+  the only way to get a comparable cold-start.
+- **World reset**: if a plugin mutates the world (sets spawn, places
+  blocks), restore the pre-generated world directory from a backup
+  before the next plugin so chunk-load cost is identical.
+- **Cache reset**: configure `cache-reset-commands` for the plugin's
+  own queue/cache-clear command and run `/rtpstress reset-cold` between
+  phases when you cannot afford a full restart. A restart is always the
+  gold standard; `reset-cold` is the fast approximation.
+
+### 4. Warm up, then measure
+
+- The first successful attempt after a restart is your **cold-start**
+  number — record it, then discard the rest of that warm-up phase.
+- HotSpot needs a few hundred attempts to inline the hot path. Treat
+  the first warm-up phase as throwaway; read warm-queue / p95-MSPT /
+  peak-heap only from the measured phases that follow.
+
+### 5. Repeat and aggregate
+
+- Run the **whole `sequence`** at least three times, ideally across
+  three independent server restarts.
+- Report **median-of-medians** for latency and **worst-case** (min TPS,
+  p95 MSPT, peak heap) — averaging away a tick spike hides exactly the
+  pathology the table is meant to expose.
+- `plot_stress.py` re-derives attempt-weighted means across multiple
+  runs; point it at all the run CSVs from a campaign rather than
+  eyeballing a single `summary.txt`.
+
+### 6. Sanity-check before trusting a column
+
+- **Min TPS == 20.00 and p95 MSPT well under 50 ms** across the whole
+  run usually means the workload was too light to differentiate
+  plugins — raise `concurrency` until the box is actually under load.
+- **A flat heap series** (`mb_per_attempt ≈ 0`) means either the run
+  was too short to observe growth or the heap was reset mid-run (an
+  `-Xms != -Xmx` resize, or a forced GC). Re-check §1.
+- **`fail_reason=TIMEOUT` on a large fraction of attempts** means the
+  target command was rejected without firing `PlayerTeleportEvent`
+  (wrong syntax, cooldown, permission). Fix `target-commands` /
+  `ConsoleWatcher` patterns before reading any latency column — timed-out
+  attempts are not in the latency percentiles and silently bias the
+  comparison.
 
 ---
 

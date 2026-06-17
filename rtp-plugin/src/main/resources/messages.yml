@@ -589,7 +589,7 @@ PLAYER_TELEPORTING: "&bTELEPORTING"
 # title settings
 # remove or set title to "" to disable
 # PlaceholderAPI is recommended for coordinates
-title: "<rainbow>Teleporte!</rainbow>"
+title: "<rainbow>Teleported!</rainbow>"
 subtitle: "<gradient:#A78BFA:#E876A0>have fun!</gradient>"
 fadeIn: 20
 stay: 20

@@ -42,7 +42,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        long samplePeriod = getConfig().getLong("sample-period-ms", 1000L);
+        long samplePeriod = getConfig().getLong("sample-period-ms", 50L);
         sampler = new TpsMsptHeapSampler(this, samplePeriod);
         sampler.start();
 
