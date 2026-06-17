@@ -159,6 +159,31 @@ reproducible by readers".
   `database/regionData/debug/<region>.json` on every scan). `MemoryShape.learnedStateSummary()`
   feeds new `regionInfo` placeholders `[memCoveragePct]`, `[memBadPct]`, `[memBadCount]`,
   `[memTopCause]`, `[memTopCausePct]`; documented in `docs/admin/COMMANDS.md`.
+- [ ] **(v3.2) Region-sampled scan: region-major traversal + Hilbert-within-region.** Planned for
+  `3.2`. A full `/rtp scan` over a large world is expensive in both pregeneration cost and in the
+  storage/memory footprint of the persisted bad-location map. Two related changes, to be settled in
+  a D-005 ADR before implementation:
+  - **Region-major traversal.** Today the spiral index is the primary scan unit and `.mca` binning
+    (`ScanTask` PR-14, `key = (cursor.x >> 5) << 32 | (cursor.z >> 5)`) is a per-batch cache
+    optimization layered on top. Invert this so a whole `r.X.Z.mca` region is the primary unit (and
+    can be *sampled* - scan a representative subset of regions rather than all of them), bounding the
+    working-set memory to one region's bins at a time instead of the 6-10 files the spiral frontier
+    can straddle.
+  - **Hilbert curve within each region.** Walk the 32x32 chunks of a region along a Hilbert curve so
+    consecutive scan steps are spatially adjacent. The motivation is the storage/memory win: the
+    `MemoryShape` bad-location map is run-length / prefix-sum encoded over the traversal order, so a
+    locality-preserving walk clusters safe/unsafe runs and compresses far better than spiral order.
+  - **Constraints carried over from the design discussion.** The existing `spatialResolution` field
+    already drives a coarse-to-fine stride (`ScanTask` line ~442: `stride = max(1, spatialResolution)`
+    with the `currentOffset` / `range` multi-pass), so the cheap "scan less" lever exists today and
+    can ship first by surfacing resolution on the `/rtp scan` verb with no format change. The bigger
+    change must keep verdicts recorded under the spiral index the live selector draws (or it changes
+    the teleport distribution guaranteed by [ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md));
+    decide explicitly whether the bitmap *storage* becomes region-major (compression win, selector
+    contract in scope) or only the *traversal* order changes (selector untouched). The `.scan`
+    persistence format (`ScanTask.save`/`loadProgress`: `scanIter | spatialResolution | currentOffset
+    | isFine | scanPhase`) needs a versioned region-major cursor, and rim regions only partially
+    inside the shape/world border still need the existing per-position border math.
 - [ ] **Safety-list grammar expansion.** The token grammar shipped in `3.0.0-beta.1` is the
   foundation; follow-ups:
   - [ ] Tag-group composition with set subtraction (`#minecraft:slabs - OAK_SLAB`).
