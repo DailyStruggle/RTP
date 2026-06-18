@@ -139,6 +139,39 @@ public final class Sched {
                 Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, r, ticks, ticks).getTaskId());
     }
 
+    /**
+     * Schedule {@code r} on the global region (Folia) or main thread
+     * (Spigot/Paper) at a fixed period in <em>ticks</em>, starting after the
+     * same delay. Returns an opaque handle for {@link #cancel(Object)}: on
+     * Folia the {@code ScheduledTask} from
+     * {@code GlobalRegionScheduler#runAtFixedRate}; elsewhere the boxed
+     * BukkitScheduler task id.
+     *
+     * <p>Used for the wall-clock TPS / MSPT fallback, which must run on a tick
+     * thread to measure inter-tick wall deltas. Folia rejects
+     * {@code BukkitScheduler#runTaskTimer}, so the global region scheduler is
+     * the only tick-aligned timer available there.
+     */
+    public static Object runGlobalTimer(Plugin plugin, Runnable r, long periodTicks) {
+        long period = Math.max(1L, periodTicks);
+        if (isFolia()) {
+            try {
+                Object globalSched = Bukkit.getServer().getClass()
+                        .getMethod("getGlobalRegionScheduler").invoke(Bukkit.getServer());
+                Method m = globalSched.getClass().getMethod(
+                        "runAtFixedRate", Plugin.class, java.util.function.Consumer.class,
+                        long.class, long.class);
+                return m.invoke(globalSched, plugin,
+                        (java.util.function.Consumer<Object>) task -> r.run(),
+                        period, period);
+            } catch (ReflectiveOperationException e) {
+                // fall through to BukkitScheduler
+            }
+        }
+        return Integer.valueOf(
+                Bukkit.getScheduler().runTaskTimer(plugin, r, period, period).getTaskId());
+    }
+
     /** Cancel a handle previously returned by {@link #runAsyncTimer}. Null-safe. */
     public static void cancel(Object handle) {
         if (handle == null) return;

@@ -114,9 +114,14 @@ callbacks installed by `RegionQueueManager.installDatabaseCallbacks` are
 
 ### Lite assembly
 
-`rtp-lite` (ADR-024) **does not expose** `backlogCacheCap` in its packaged
-`regions/default.yml`. The runtime default in lite is `0` (disabled), so the
-trimmed assembly retains its smaller-memory profile.
+**Amendment (2026-06-18):** `rtp-lite` (ADR-024) now ships the **same**
+`regions/default.yml` as the full assembly and therefore **does expose**
+`backlogCacheCap` (default `1000`). The dedicated lite override that previously
+omitted the key has been removed so the lite jar inherits the full assembly's
+region config verbatim (the lite shadow jar's `DuplicatesStrategy.EXCLUDE`
+falls through to `src/main/resources/regions/default.yml`). L3 is therefore
+enabled by default in lite as well; an operator may still set
+`backlogCacheCap: 0` to disable it.
 
 ### Refill loop
 
@@ -156,7 +161,7 @@ linearly within `Region.execute()`; there is no producer/consumer split.
   chunk-load per candidate during the cheap rejection phase.
 - L1 / L2 semantics, persistence, and stale-chunk guards (ADR-015) are
   unchanged — the existing tested promotion path is bit-for-bit preserved.
-- Default-off in lite, gracefully disabled by `backlogCacheCap = 0`.
+- Gracefully disabled at any tier by `backlogCacheCap = 0`.
 - Anvil pre-filter is read-only and off the main thread by design
   (`AnvilIoPool`), preserving REQ-RTP-S-005.
 - Order preservation means downstream (`/rtp`, addons polling L2) sees no
@@ -187,8 +192,9 @@ linearly within `Region.execute()`; there is no producer/consumer split.
   buffer + refill are platform-agnostic; only the anvil-prefilter
   bridge needs platform support, and Fabric currently has none.
 - Configuration: existing region files continue to work without change;
-  absence of `backlogCacheCap` defaults to `1000` on the full assembly
-  and `0` on lite.
+  absence of `backlogCacheCap` defaults to `1000` on both the full and lite
+  assemblies (lite inherits the full `regions/default.yml` as of 2026-06-18).
+  The in-code runtime fallback when the key is absent remains `0`.
 
 ## Configuration
 
@@ -200,8 +206,9 @@ activeChunkCap: 10
 backlogCacheCap: 1000   # ADR-028 — L3 unverified backlog (set 0 to disable)
 ```
 
-Lite (`rtp-plugin/src/lite/resources/regions/default.yml`): key omitted;
-runtime default is `0`.
+Lite: ships the same `regions/default.yml` as the full assembly (no lite
+override as of 2026-06-18), so `backlogCacheCap: 1000` is exposed and L3 is
+enabled by default.
 
 ## Implementation map (forward-looking)
 

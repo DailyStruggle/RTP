@@ -53,6 +53,28 @@ public interface RTPCmd extends BaseRTPCmd {
   }
 
   /**
+   * Decides whether the world-override region mechanism applies for a given
+   * {@code /rtp} argument map.
+   *
+   * <p>The override (duplicate the base region and rebind it to the requested
+   * world) applies ONLY to the region sub-parameter grammar
+   * {@code rtp region:<r> world:<w>} - i.e. when BOTH a {@code region} and a
+   * {@code world} argument are present. Top-level {@code rtp world:<w>} resolves
+   * its region from world {@code w}'s own configuration ({@code WorldKeys.region})
+   * and is intentionally left unmodified, so a world configured to redirect to
+   * region {@code default} teleports to region {@code default} as configured
+   * rather than being forced to land inside world {@code w}.
+   *
+   * @param rtpArgs the flattened {@code /rtp} argument map
+   * @return {@code true} when the world-override region should be applied
+   */
+  static boolean shouldApplyWorldOverride(Map<String, List<String>> rtpArgs) {
+    return rtpArgs != null
+        && rtpArgs.containsKey("world")
+        && rtpArgs.containsKey("region");
+  }
+
+  /**
    * Resolves a vanilla {@code /spreadplayers}-style relative coordinate token against a base
    * coordinate. The Bukkit {@code CoordinateParameter} advertises {@code ~} / {@code -~} in its
    * tab-completion, so these tokens must resolve to an actual coordinate rather than fall through
@@ -625,14 +647,17 @@ public interface RTPCmd extends BaseRTPCmd {
         return true;
       }
 
-      // ADR-065: world-override region. When a world:<w> argument is present
-      // (top-level `rtp world:<w>` or the region sub-parameter
-      // `rtp region:<r> world:<w>`), rebind the resolved base region to the
-      // requested world so the teleport actually lands there instead of
-      // following the base region's configured world (e.g. world:nether would
-      // otherwise resolve back to the overworld via WorldKeys.region). CLI and
-      // menu share this path, so the menu emits the plain /rtp world:<w>.
-      if (rtpArgs.containsKey("world")) {
+      // World-override region. This applies ONLY to the region sub-parameter
+      // grammar `rtp region:<r> world:<w>`: duplicate base region <r> and rebind
+      // it to world <w> (re-resolving the shape for <w>), so the teleport uses
+      // region <r>'s settings adjusted for world <w>.
+      //
+      // Top-level `rtp world:<w>` is intentionally NOT overridden here: it
+      // resolves its region from world <w>'s own configuration (WorldKeys.region,
+      // see above), honoring that redirect. If world <w> is configured to use
+      // region `default`, `rtp world:<w>` teleports to region `default` as
+      // configured - it does not force a landing inside world <w>.
+      if (shouldApplyWorldOverride(rtpArgs)) {
         String worldOverride = pickOne(rtpArgs.get("world"), null);
         if (worldOverride != null && !worldOverride.isEmpty()) {
           Region worldRegion = selectionAPI.worldRegion(region.name, worldOverride);

@@ -19,7 +19,7 @@ No menu, however polished, can make `/rtp` fast - only the engine behind it can.
 
 **LeafRTP-Pro was built on one idea: a teleport should cost the server nothing the player can feel. No spike. No spinner. No quiet churn.**
 
-**Enterprise performance, proven not asserted.** 19.8 TP/s sustained at a 4 ms worst-case main-thread tick on Paper (next-best plugin: 70 ms), with audited safety invariants - no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures. Every number on this page is measured on a public harness, not a marketing claim - and bounded worst-case latency is the one axis a Paper-only, on-tick design cannot follow.
+**Enterprise performance, proven not asserted.** On Paper, 19.8 TP/s sustained at a 4 ms worst-case main-thread tick (next-best plugin: 70 ms). On Folia, 13.5 TP/s with zero region stalls - while the next plugin froze a region for over 20 seconds. Audited safety invariants throughout - no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures. Every number on this page is measured on a public harness, not a marketing claim - and bounded worst-case latency is the one axis a Paper-only, on-tick design cannot follow.
 
 <div align="center">
 
@@ -33,7 +33,7 @@ No menu, however polished, can make `/rtp` fast - only the engine behind it can.
 
 <div align="center">
 
-### 19.8 TP/s sustained at 4 ms worst-case tick. Next-best plugin: 70 ms.
+### 19.8 TP/s on Paper at 4 ms worst-case tick. 13.5 TP/s on Folia, zero region stalls.
 
 </div>
 
@@ -41,7 +41,7 @@ No menu, however polished, can make `/rtp` fast - only the engine behind it can.
 
 - **No lag spikes when players spam `/rtp`.** Worst-case main-thread tick stays at 4 ms (vs. 70-771 ms for the next plugins) - your TPS holds at 20.00 during a teleport burst.
 - **Instant teleports, no "Finding a safe location..." wait.** Pre-verified location queue serves `/rtp` in one tick instead of loading chunks on demand.
-- **The only LeafRTP plugin that runs natively on Folia without stalling regions.** The engine's per-teleport work stays well under a single region tick; the throughput we measured (9.87 TP/s @ 99.97 % success) was bounded by Region-Scheduler hops in the harness, *not* by computation - so that figure is a floor set by the test rig, not a ceiling on the engine. Every competitor stalls regions or fails to load.
+- **Runs natively on Folia without stalling regions.** Under an identical 3-client burst, LeafRTP-Pro sustained 13.5 TP/s at 100% success with zero Folia watchdog stalls and just 3.96 ms of main-thread cost per teleport, while EzRTP managed 5.3 TP/s and blocked region threads on synchronous chunk loads - tripping the Folia watchdog 7 times, one region frozen for over 20 seconds.
 - **Automatic performance the moment the jar drops in.** Pre-warmed location queue, persistent spatial memory, off-tick Anvil pre-filter and async chunk loading kick in on first start - no profiling, no tuning, no per-world hand-holding. Same `config.yml`, commands, and claim-plugin integrations (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect) as the free build, so the upgrade itself is risk-free.
 - **Audited safety**: no unsafe blocks, no force-loaded chunks, no claim-bypassing teleports, no silent failures.
 
@@ -198,15 +198,15 @@ LeafRTP-Pro splits configuration by concern under `plugins/RTP/`. Every file is 
 | BetterRTP    | 1.33     | 3 790         | 2.18    |
 | HuskHomes    | 0.93     | 4 939         | 2.59    |
 
-**Folia 1.21.11** - Region MSPT = per-region tick (a bad region doesn't stall the server).
+**Folia 26.1** - on Folia, throughput plus the server-emitted region watchdog are the discriminators (global MSPT is a single-region sample and not meaningful).
 
-| Plugin       | TP/s     | Region MSPT p99 (ms) | Success     | CPU / TP (ms) |
-|--------------|----------|----------------------|-------------|----------------|
-| **LeafRTP-Pro**  | **9.87** | **157**              | **99.97 %** | **18.0**       |
-| BetterRTP    | 3.82     | 1 200                | 100 %       | 34.8           |
-| HuskHomes    | 3.32     | 901                  | 100 %       | 28.4           |
+| Plugin       | TP/s     | CPU / TP (ms) | Watchdog stalls       | Success     |
+|--------------|----------|---------------|-----------------------|-------------|
+| **LeafRTP-Pro**  | **13.5** | **3.96**      | **0**                 | **~100 %**  |
+| LeafRTP (free)   | 12.5     | 4.15          | 0                     | 100 %       |
+| EzRTP        | 5.3      | 6.34          | 7 (one region 20.4 s) | 96.2 %      |
 
-*The LeafRTP-Pro Folia TP/s here is a harness floor, not an engine ceiling: at 18.0 ms compute per teleport the work is far from saturating a region tick, so throughput was bounded by Region-Scheduler hops in the 2-client rig rather than by computation. The competitors' lower TP/s come paired with second-scale region MSPT (compute/stall bound); ours does not.*
+*On Folia, LeafRTP's main-thread cost per teleport drops to ~4 ms as region threads parallelize work Paper serializes onto one tick thread. EzRTP's 7 watchdog stalls (one region unresponsive 20.4 s) are the server's own record of synchronous `World.loadChunk` calls on region threads; LeafRTP issued none. Note the free build cleared the same run at 12.5 TP/s with zero stalls - the shared `rtp-core` engine, not a Pro-only adapter, carries the Folia result, and Pro's tuned adapter is built to pull further ahead as per-region contention rises.*
 
 **Architecture support matrix:**
 
@@ -214,7 +214,7 @@ LeafRTP-Pro splits configuration by concern under `plugins/RTP/`. Every file is 
 |---------------------|-----------------------------------------------|----------------------------------|---------------------------------------------|
 | **LeafRTP-Pro**         | Off-tick Anvil pre-filter; rare bounded fallback | Fully async via `getChunkAtAsync` | Region Scheduler + off-tick pre-filter      |
 | BetterRTP           | Sync chunk load on miss                       | Paper async; no safety pre-filter | p99 ~1.2 s                                  |
-| EzRTP               | Paper-only API crashes on Spigot 1.20.1       | N/A                              | N/A                                         |
+| EzRTP               | Paper-only API crashes on Spigot 1.20.1       | Async; no off-tick pre-filter    | Sync `World.loadChunk` on region threads; 7 watchdog stalls, 20.4 s freeze |
 | AsyRTP              | Fails to enable on Spigot 1.20.1              | N/A                              | N/A                                         |
 | SorekillRTP         | Redis-cross-server focus                      | Same                             | N/A                                         |
 | AdvancedRTP         | Safety-first, sync chunk load                 | Same                             | N/A                                         |
@@ -224,9 +224,9 @@ LeafRTP-Pro splits configuration by concern under `plugins/RTP/`. Every file is 
 
 **Memory & TPS:** queue bounded (bounded by `cacheCap`); each entry is a small POJO. Server TPS held at **20.00** across every Paper and Folia run. On Spigot, every plugin saturates to the same chunk-gen ceiling; LeafRTP-Pro just spends those ticks doing fewer things.
 
-- Paper LeafRTP-Pro row reproduced n=2; other rows are n=1 on a single rig. - JakesRTP Spigot row ran in slot 4 of a 4-phase chain - Min TPS / CPU-per-TP confounded by carry-over; dispatch-time numbers (throughput, p99) remain valid.
+- Paper rows are 2-client runs (LeafRTP-Pro reproduced n=2; others n=1 on a single rig). The Folia run used 3 clients and its EzRTP failure is corroborated by the server's own watchdog log, independent of the harness. - JakesRTP Spigot row ran in slot 4 of a 4-phase chain - Min TPS / CPU-per-TP confounded by carry-over; dispatch-time numbers (throughput, p99) remain valid.
 
-**Caveats.** 2 clients only (the number is a floor, not a ceiling). Hardware, view distance, world state, and other plugins will move the numbers. Competitor plugins update frequently; corrections welcome via GitHub issue with a contradicting repro or doc link. Feature breadth, GUI, and claim-integration count are not benchmarked - several competitors trade speed for those, which is a legitimate choice.
+**Caveats.** Small client counts only (2 on Paper, 3 on Folia; the number is a floor, not a ceiling). Hardware, view distance, world state, and other plugins will move the numbers. Competitor plugins update frequently; corrections welcome via GitHub issue with a contradicting repro or doc link. This table measures performance only; feature breadth is not benchmarked here. LeafRTP ships the clickable GUI menu, Vault economy, the lifecycle effects engine, and eight bundled claim integrations alongside these numbers - it does not trade features for speed.
 
 Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP). Video benchmark of `/rtp` on a custom world generator: [youtu.be/V0NyNK9JydM](https://youtu.be/V0NyNK9JydM).
 
@@ -356,11 +356,11 @@ LeafRTP-Pro ships, in the core engine, a long list of capabilities that competin
 
 What's on deck, with direction:
 
-- **Spigot main-thread fallback diagnostics** - per-minute fallback counters and an optional strict mode that skips the fallback entirely.
-- **Folia scheduler-hop telemetry** - publish p50/p95 for un-pre-resolvable candidates and amortise across adjacent candidates where possible.
-- **Un-populated chunk attribution bucket** - distinguish first-touch live loads from other fallbacks in the reports.
 - **Fully-automatic self-warming** - background spatial-memory accumulation without the `/rtp scan` verb.
 - **Anonymous opt-in telemetry** - reference benchmark sourced from real deployments.
+- **Chunky-driven scan generation** - optionally let a bulk pre-generator (Chunky or similar) lay a region's chunks down first, then scan reads them cheaply through the Anvil pre-filter; one command surface instead of juggling two tools, with the current generate-as-you-go scan as the fallback.
+- **Leaner scan path** - measure how accurately the off-tick Anvil pre-filter alone trims candidates and, where it's accurate enough, skip the heavier full-load verification pass during scans.
+- **Accelerated scan compute (exploration)** - investigating offloading the bulk safety pre-filter sweep to a high-throughput compute backend (native SIMD, GPU/OpenCL, or an external accelerated generator), with a clean fallback to the current path when none is present.
 
 File a GitHub issue if you hit something not on the list.
 
@@ -376,13 +376,13 @@ A: Pre-warmed queue. In most cases a verified destination is ready before you ty
 A: See the admin guide. Resolution order: player's current world (or `world:` param) -> world's target region -> region's target world.
 
 **Q: Does LeafRTP work on Folia?**
-A: Yes, on both editions. The free build runs on Folia out of the box with a basic regionized scheduler (correctness-first: global/region/entity scheduling + async teleport). LeafRTP-Pro adds the tuned Folia adapter - the Region Scheduler with an off-tick pre-filter so no region stalls. Per-teleport work stays comfortably under one region tick; the 9.87 TP/s @ 99.97% success we measured was limited by Region-Scheduler hops in the test harness, not by the engine's computation, so treat it as a harness-imposed floor rather than a performance ceiling.
+A: Yes, on both editions. The free build runs on Folia out of the box with a basic regionized scheduler (correctness-first: global/region/entity scheduling + async teleport). LeafRTP-Pro adds the tuned Folia adapter - the Region Scheduler with an off-tick pre-filter so no region stalls. Measured on Folia 26.1 under a 3-client burst, LeafRTP-Pro sustained 13.5 TP/s at ~100% success with 3.96 ms of main-thread cost per teleport and zero region watchdog stalls; the free build cleared the same run at 12.5 TP/s. Pro's tuned adapter is built to pull further ahead as per-region contention rises.
 
 **Q: Do you support triangle / diamond region shapes?**
 A: Use the `Polygon` shape. A triangle is a 3-vertex polygon and a diamond is a rotated square, so both are already expressible without a dedicated shape type - define the vertices you want and the bounded spiral fills it.
 
 **Q: Do I need Chunky (or another pre-generator)?**
-A: No. `/rtp scan start|pause|resume|reset|cancel` is a built-in, off-tick generator that walks the region and builds persistent spatial memory. The philosophy is different from whole-world pre-generation: instead of loading every chunk up front, LeafRTP pre-*verifies* and remembers which sectors are unsafe, so it avoids loading bad ground at all. You can still run Chunky alongside it if you want a fully pre-generated map.
+A: No, but they work well together. `/rtp scan start|pause|resume|reset|cancel` walks a region off-tick, verifies safety, and generates any chunks it reaches that aren't on disk yet (via the server's own world generator) while recording which sectors are unsafe in persistent spatial memory. So a separate pre-generator stays optional: run Chunky (or any pre-generator) first if you want the whole map on disk up front, and scan will then read those chunks cheaply through the Anvil pre-filter instead of generating them as it goes.
 
 **Q: How does biome targeting behave on a pregenerated or upgraded world?**
 A: LeafRTP reads biome data from the populated `.mca` region files via the Anvil pre-filter, so `/rtp biome:<x>` reflects the biomes actually written to disk. Plugins that lean on the live generator/noise-map biome lookup can return the *wrong* biome on a world that was pregenerated elsewhere or migrated across a Minecraft version, where Mojang's seed-based assignment has drifted - the Anvil-first read stays authoritative in those cases.
@@ -403,8 +403,11 @@ A: Yes - same configuration, same data files, same commands. The free build stil
 
 
 <details>
-<summary><b>Support</b></summary>
+<summary><b>Support - it works, and it stays working</b></summary>
 
+**The whole point of Pro is that you stop thinking about `/rtp`.** It drops in, it works, and on the rare day it doesn't, a maintainer who actually owns the code answers you - not a community thread that goes quiet. That is the part the benchmark can't show: the other plugins' numbers (second-scale ticks, region stalls, sync chunk loads) are not a bad afternoon, they are the ceiling of how good your players' experience can get on that engine. With LeafRTP you are not giving anything up to get that - everything those plugins advertise (GUI, economy, effects, claim support, cross-server) is already in the box - you are just removing the lag and the unanswered ticket.
+
+- **Priority support.** Pro tickets jump the queue ahead of the free build - this is the support tier the early-access platforms and scaling backends are guaranteed on.
 - **Bug reports and configuration questions** are welcome - the admin guide answers most setup questions, and a clear repro (server version, plugin version, platform, relevant configs and log lines) gets a fast resolution.
 - **Response time:** 24-72 h on weekdays. Critical safety issues jump the queue.
 - **Feature requests** via GitHub issues. Priority follows the published roadmap.

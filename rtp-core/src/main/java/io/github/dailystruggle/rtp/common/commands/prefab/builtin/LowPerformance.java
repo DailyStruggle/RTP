@@ -7,7 +7,7 @@ import java.util.Map;
 /**
  * Underpowered hosts and shared-CPU VPSes. Longer pulse period, smaller
  * per-region cache, login cache off. Does not touch {@code backlogCacheCap}
- * (pro-vs-lite assembly-time knob; see {@link Prefab} class javadoc).
+ * (operator-owned L3 knob; see {@link Prefab} class javadoc).
  */
 public final class LowPerformance {
 

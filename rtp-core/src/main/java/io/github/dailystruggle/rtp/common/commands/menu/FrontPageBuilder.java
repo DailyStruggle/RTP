@@ -29,11 +29,13 @@ import java.util.function.Predicate;
  * See {@code docs/dev/scratch/CHECKLIST-menu-navigation.md} Stage B for the
  * approved row catalogue.
  *
- * <p>The builder selects between two row catalogues based on whether the
- * viewer has the {@code rtp.menu.admin} permission (the admin gate). Rows
- * are dropped silently when their underlying subtree or parameter is not
- * registered on the live {@code /rtp} tree, so the page stays clean rather
- * than rendering broken {@code OpenMenu} / {@code OpenParamPicker} actions.
+ * <p>Every viewer sees the player picker rows (region / world / biome); a
+ * viewer holding the {@code rtp.menu.admin} permission additionally gets a
+ * single {@code Admin panel} entry row that descends into the dedicated
+ * admin submenu. Rows are dropped silently when their underlying subtree or
+ * parameter is not registered on the live {@code /rtp} tree, so the page
+ * stays clean rather than rendering broken {@code OpenMenu} /
+ * {@code OpenParamPicker} actions.
  *
  * <p>Architecture notes:
  * <ul>
@@ -78,8 +80,9 @@ public final class FrontPageBuilder {
      * @param rtpRoot    the {@code /rtp} root {@link TreeCommand}; used to
      *                   probe for subcommand and parameter availability.
      * @param viewer     the calling player UUID.
-     * @param permission permission probe for {@code viewer}. The admin row
-     *                   set is selected when {@code permission.test("rtp.menu.admin")}
+     * @param permission permission probe for {@code viewer}. The admin entry
+     *                   row is appended in addition to the player picker rows
+     *                   when {@code permission.test("rtp.menu.admin")}
      *                   returns {@code true}.
      */
     public MenuModel build(TreeCommand rtpRoot, UUID viewer, Predicate<String> permission) {
@@ -117,10 +120,15 @@ public final class FrontPageBuilder {
                 null,
                 new MenuAction.RunRtpCommand(new String[0]));
 
+        // The player picker rows (region / world / biome) are shown to every
+        // viewer, including admins: the admin panel is a self-contained submenu
+        // reached via a single entry row, not an inline block that competes for
+        // the same space, so there is no reason to suppress the pickers for
+        // operators. The admin entry row is therefore additive: appended after
+        // the player rows when the viewer holds rtp.menu.admin.
+        appendPlayerRows(rtpRoot, viewer, permission, lines);
         if (adminView) {
             appendAdminRows(lines);
-        } else {
-            appendPlayerRows(rtpRoot, viewer, permission, lines);
         }
 
         // Help footer — always last, always visible.

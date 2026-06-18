@@ -38,7 +38,7 @@ import java.util.Map;
  * (mirroring {@link LowPerformance} / {@link MultiWorld}) plus the global
  * {@code safety.yml}; only the keys above are touched, everything else in
  * {@code regions/default.yml} and {@code safety.yml} is preserved. Does not
- * touch {@code backlogCacheCap} (pro-vs-lite assembly-time knob; see
+ * touch {@code backlogCacheCap} (operator-owned L3 knob; see
  * {@link Prefab} class javadoc).
  */
 public final class OneBlock {

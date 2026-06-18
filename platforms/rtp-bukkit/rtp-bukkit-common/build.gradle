@@ -19,6 +19,12 @@ dependencies {
     implementation project(':commands-api')
     testImplementation testFixtures(project(':rtp-core'))
     testImplementation 'com.github.seeseemelk:MockBukkit-v1.20:3.93.2'
+    // Adventure is compileOnly above (provided by Paper/Folia at runtime); the
+    // MiniMessageRenderer tests need it on the test classpath to exercise the
+    // legacy->MiniMessage segmentation and a real deserialize round-trip.
+    testImplementation 'net.kyori:adventure-api:4.17.0'
+    testImplementation 'net.kyori:adventure-text-minimessage:4.17.0'
+    testImplementation 'net.kyori:adventure-text-serializer-gson:4.17.0'
     // ArchUnit â€” bytecode-level architecture rule enforcement. Hosts the three
     // boundary rules that lock the Spigot-exclusive Anvil read-only pre-filter
     // package in place (see ADR-016 / ADR-016 Â§6).

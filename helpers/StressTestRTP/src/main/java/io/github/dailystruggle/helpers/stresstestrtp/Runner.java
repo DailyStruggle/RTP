@@ -56,6 +56,17 @@ public final class Runner {
     private final AtomicBoolean ticking = new AtomicBoolean(false);
     private final AtomicInteger inFlight = new AtomicInteger(0);
     private final AtomicInteger targetCursor = new AtomicInteger(0);
+    /** Cached round-robin target list for non-SEQUENCE modes (TIMED/BURST).
+     *  Loaded once at run start so {@link #dispatchOne} does not re-parse the
+     *  config and allocate a fresh {@code List<Targets.Entry>} on every single
+     *  dispatch — the dominant source of background object churn during a run.
+     *  SEQUENCE mode keeps using its own {@link #seqTargets} snapshot. */
+    private volatile List<Targets.Entry> roundRobinTargets = null;
+    /** Reusable roster buffer. {@link #roster()} clears and refills this rather
+     *  than allocating a new {@code ArrayList<Player>} on every 10 Hz tick.
+     *  Safe because {@link #tick()} is strictly non-overlapping (see
+     *  {@link #ticking}) and the buffer is only touched from the tick body. */
+    private final List<Player> rosterBuffer = new ArrayList<>();
     private final ConcurrentHashMap<UUID, Long> deadlines = new ConcurrentHashMap<>();
     /** Per-player earliest-next-dispatch timestamp (epoch ms). Prevents the
      *  "you're already teleporting!" flood when concurrency > 1 and the
@@ -176,6 +187,7 @@ public final class Runner {
         this.endEpochMs = System.currentTimeMillis() + seconds * 1000L;
         this.lastProgressEpochMs = System.currentTimeMillis();
         this.kickstartCount = 0;
+        this.roundRobinTargets = Targets.load(config, plugin.getLogger());
         this.taskId = Sched.runAsyncTimer(plugin, this::tick, 100L);
         spark.startPhase("timed");
         recorder.beginPhase("timed");
@@ -293,6 +305,7 @@ public final class Runner {
         this.burstRemaining = Math.max(1, n);
         this.endEpochMs = System.currentTimeMillis() + Math.max(30000L,
                 config.getLong("attempt-timeout-ms", 30000L) + 5000L);
+        this.roundRobinTargets = Targets.load(config, plugin.getLogger());
         this.taskId = Sched.runAsyncTimer(plugin, this::tick, 100L);
         spark.startPhase("burst");
         recorder.beginPhase("burst");
@@ -399,6 +412,15 @@ public final class Runner {
             //      the per-target call-stack samples.
             if (inMeasurementPhase) {
                 spark.rotateIfDue(now);
+                // Same crash-safety rationale as the spark rotation above: the
+                // per-attempt and heap-series CSVs flush per row, but the phase
+                // summary is only written by MetricsRecorder.endPhase at phase
+                // end. A mid-phase server crash (e.g. a competitor plugin
+                // stalling the main thread to death under unthrottled dispatch)
+                // would otherwise lose the running phase's summary entirely.
+                // flushPartialPhase is self-throttled and snapshots the
+                // in-flight phase to a <stamp>-phases-partial.csv sidecar.
+                recorder.flushPartialPhase();
             }
 
             // 1) Reap timeouts.
@@ -545,10 +567,20 @@ public final class Runner {
                         if (warmupLog != null) { warmupLog.close(); warmupLog = null; }
                         warmupActive = false;
                         recorder.setRecording(true);
-                        seqIndex = 0;
-                        seqGapEndMs = 0L;
+                        // Reuse the inter-target recovery gap before the FIRST
+                        // measurement phase. Warm-up hammered every target
+                        // (including plugins that depress TPS), so the server
+                        // needs the same settle time it gets between phases
+                        // before target 0 is measured — otherwise the first
+                        // plugin in the sequence is billed for warm-up's TPS
+                        // aftershock. Arm the gap and set seqIndex to -1; the
+                        // gap-phase branch below advances to target 0 and calls
+                        // beginPhase once the gap elapses, so no separate
+                        // wait/settle code path is needed.
                         long t = System.currentTimeMillis();
-                        seqPhaseEndMs = t + seqPerTargetMs;
+                        seqIndex = -1;
+                        seqPhaseEndMs = 0L; // set when the gap advances into phase 0
+                        seqGapEndMs = t + seqGapMs;
                         // Force-clear all per-player state carried over from
                         // warm-up. The dispatch loop's `deadlines.containsKey`
                         // and `nextDispatchAt` guards would otherwise skip
@@ -565,18 +597,16 @@ public final class Runner {
                         }
                         inFlight.set(0);
                         nextDispatchAt.clear();
-                        lastProgressEpochMs = System.currentTimeMillis();
-                        if (!seqTargets.isEmpty()) {
-                            spark.startPhase(seqTargets.get(0).label);
-                            recorder.beginPhase(seqTargets.get(0).label);
-                            plugin.getLogger().info(String.format(
-                                "[StressTestRTP] measurement sequence begin: target=%s, phase ends at +%ds, %d targets total",
-                                seqTargets.get(0).label, seqPerTargetMs / 1000L, seqTargets.size()));
-                        } else {
+                        lastProgressEpochMs = t;
+                        if (seqTargets.isEmpty()) {
                             plugin.getLogger().warning(
                                 "[StressTestRTP] warm-up complete but seqTargets is empty; nothing to dispatch");
+                        } else {
+                            plugin.getLogger().info(String.format(java.util.Locale.ROOT,
+                                "[StressTestRTP] warm-up complete; settling %ds (inter-phase gap) for TPS recovery before first measurement phase (%d target(s))",
+                                seqGapMs / 1000L, seqTargets.size()));
                         }
-                        return; // pick up measurement on the next tick
+                        return; // gap elapses on a later tick, then measurement begins at target 0
                     }
                     warmupSliceStartEpoch = System.currentTimeMillis();
                     warmupSliceStartTotal = recorder.totalAttempts();
@@ -584,6 +614,18 @@ public final class Runner {
                 }
                 pinned = seqTargets.get(warmupTargetIdx);
             } else if (mode == Mode.SEQUENCE) {
+                // If the sequence has already advanced past the final target,
+                // there is nothing left to dispatch — just wait for any
+                // remaining in-flight attempts to drain, then stop. Without
+                // this guard a gap that ends with seqIndex past the end while
+                // inFlight is still positive (see the seqGapEndMs branch below,
+                // which returns without resetting seqPhaseEndMs) would fall
+                // into the run-phase-end branch on the next tick and index
+                // seqTargets out of bounds (IndexOutOfBoundsException).
+                if (seqIndex >= seqTargets.size()) {
+                    if (inFlight.get() == 0) stop();
+                    return;
+                }
                 // Phase machine: run-phase → gap-phase → next target → ... → stop.
                 if (seqGapEndMs > 0L) {
                     // In gap: dispatch nothing, just wait it out.
@@ -713,7 +755,14 @@ public final class Runner {
         if (pinned != null) {
             chosen = pinned;
         } else {
-            List<Targets.Entry> targets = Targets.load(config, plugin.getLogger());
+            // Reuse the cached round-robin list rather than re-parsing the
+            // config on every dispatch. Lazily populate it if a run path
+            // somehow reached here without seeding it.
+            List<Targets.Entry> targets = roundRobinTargets;
+            if (targets == null) {
+                targets = Targets.load(config, plugin.getLogger());
+                roundRobinTargets = targets;
+            }
             chosen = targets.get(Math.floorMod(targetCursor.getAndIncrement(), targets.size()));
         }
         MetricsRecorder.Attempt attempt = new MetricsRecorder.Attempt(
@@ -797,7 +846,10 @@ public final class Runner {
 
     private List<Player> roster() {
         String mode = config.getString("roster", "all").toLowerCase(Locale.ROOT);
-        List<Player> out = new ArrayList<>();
+        // Reuse the per-runner buffer instead of allocating a fresh list every
+        // tick (10 Hz). Only ever touched from the non-overlapping tick body.
+        List<Player> out = rosterBuffer;
+        out.clear();
         if (mode.startsWith("permission:")) {
             String node = mode.substring("permission:".length()).trim();
             for (Player p : Bukkit.getOnlinePlayers()) {

@@ -45,18 +45,17 @@ air, or into a claimed region they cannot build in.
 1. Confirm which region the player was teleported from (`/rtp info <player>` or server log).
 2. Check `safety.yml` for that region: verify that the relevant unsafe block types are listed
    under `unsafeBlocks` and that the safety check is enabled (`safetyCheck: true`).
-3. If the issue is claimed-land: confirm the relevant protection addon
-   (GriefPrevention, WorldGuard, etc.) is installed, loaded **after** RTP in load order, and
-   that the corresponding RTP addon jar (`RTP_ClaimPluginIntegrations` or equivalent) is present
-   in the plugins folder.
+3. If the issue is claimed-land: confirm the relevant protection plugin
+   (GriefPrevention, WorldGuard, etc.) is installed and loaded. Claim-plugin support is bundled
+   directly into the RTP jar (see ADR-019) — there is no separate integration jar to install.
 4. Check if the region has been recently reconfigured or if `safety.yml` was edited manually,
    as a syntax error can silently disable safety checks.
 
 **Resolution:**
 - Add the offending block type to `unsafeBlocks` in the region's `safety.yml`.
-- If the protection addon check is not firing: ensure the addon jar is present and that RTP
-  declares it as a `softdepend` (or the addon declares RTP as a `depend`) so load order is
-  correct.
+- If the protection-plugin check is not firing: ensure the protection plugin is installed.
+  RTP declares the supported claim plugins as `softdepend`s, so load order is handled
+  automatically when the plugin is present.
 - After any `safety.yml` change, run `/rtp scan reset <region>` to discard spatial memory
   that was validated under the old rules, then `/rtp scan start <region>` to rebuild the map
   with the corrected safety checks. Note that this affects spatial memory (the map), not the
