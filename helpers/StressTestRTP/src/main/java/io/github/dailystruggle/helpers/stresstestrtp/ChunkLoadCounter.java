@@ -13,8 +13,10 @@ import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.Locale;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
@@ -77,11 +79,21 @@ public final class ChunkLoadCounter implements Listener {
     private final AtomicLong phaseBackgroundLoads = new AtomicLong();
     /** Sum of per-attempt attributions during the current phase (for reconciliation). */
     private final AtomicLong phaseAttributedLoads = new AtomicLong();
+    /** Sum of per-attempt <em>selection</em> loads (attributed minus the
+     *  post-teleport arrival ring) finalised during the current phase. */
+    private final AtomicLong phaseSelectionLoads = new AtomicLong();
 
     /** Snapshots at the start of the current phase, for {@link #phaseTotal()}. */
     private volatile long phaseBaselineTotal = 0L;
     private volatile long phaseBaselineBackground = 0L;
     private volatile long phaseBaselineAttributed = 0L;
+    private volatile long phaseBaselineSelection = 0L;
+
+    /** Effective render-distance (in chunks) used to size the post-teleport
+     *  arrival ring that {@link #endAttempt} subtracts from the raw attributed
+     *  count. {@code -1} means "read {@link Bukkit#getViewDistance()} live".
+     *  Set by the plugin from config when the server view distance is known. */
+    private volatile int configuredViewDistance = -1;
 
     /** Currently-in-flight attempts, in dispatch order (most recent at tail).
      *  Concurrent deque so the event handler can iterate it without locking;
@@ -90,9 +102,29 @@ public final class ChunkLoadCounter implements Listener {
      *  concurrency cap (typically 1–4). */
     private final Deque<MetricsRecorder.Attempt> inFlight = new ConcurrentLinkedDeque<>();
     /** Per-attempt load tally, keyed by attempt id. Removed by
-     *  {@link #endAttempt}, which copies the tally into
-     *  {@link MetricsRecorder.Attempt#attributedChunkLoads}. */
-    private final ConcurrentHashMap<java.util.UUID, AtomicLong> attemptCounts = new ConcurrentHashMap<>();
+     *  {@link #endAttempt}, which copies the raw count into
+     *  {@link MetricsRecorder.Attempt#attributedChunkLoads} and the
+     *  arrival-filtered count into
+     *  {@link MetricsRecorder.Attempt#selectionChunkLoads}. */
+    private final ConcurrentHashMap<java.util.UUID, Tally> attemptCounts = new ConcurrentHashMap<>();
+
+    /** Per-attempt accumulator: a raw load count plus the packed chunk
+     *  coordinates of each attributed load, so {@link #endAttempt} can
+     *  separate the single destination-selection load from the
+     *  {@code (2*viewDistance+1)^2} arrival ring the server loads when the
+     *  player materialises at the destination. */
+    private static final class Tally {
+        final AtomicLong count = new AtomicLong(0L);
+        final Queue<Long> chunks = new ConcurrentLinkedQueue<>();
+    }
+
+    private static long packKey(int x, int z) {
+        return (((long) x) << 32) | (z & 0xFFFFFFFFL);
+    }
+
+    private static int keyX(long k) { return (int) (k >> 32); }
+
+    private static int keyZ(long k) { return (int) k; }
 
     /** Cached reflective lookup of {@code Chunk#getPluginChunkTickets()}.
      *  Resolved once at register-time. {@code null} on Spigot. */
@@ -139,11 +171,14 @@ public final class ChunkLoadCounter implements Listener {
     public void onChunkLoad(ChunkLoadEvent event) {
         totalLoads.incrementAndGet();
 
+        final int cx = event.getChunk().getX();
+        final int cz = event.getChunk().getZ();
+
         // Step 1: plugin-ticket attribution (Paper only).
         if (pluginTicketsSupported) {
             MetricsRecorder.Attempt a = attributeByPluginTicket(event.getChunk());
             if (a != null) {
-                bump(a);
+                bump(a, cx, cz);
                 return;
             }
         }
@@ -152,7 +187,7 @@ public final class ChunkLoadCounter implements Listener {
         if (Bukkit.isPrimaryThread()) {
             MetricsRecorder.Attempt a = inFlight.peekLast();
             if (a != null) {
-                bump(a);
+                bump(a, cx, cz);
                 return;
             }
         }
@@ -201,16 +236,62 @@ public final class ChunkLoadCounter implements Listener {
         return null;
     }
 
-    private void bump(MetricsRecorder.Attempt a) {
-        AtomicLong c = attemptCounts.get(a.attemptId);
-        if (c == null) {
+    private void bump(MetricsRecorder.Attempt a, int chunkX, int chunkZ) {
+        Tally t = attemptCounts.get(a.attemptId);
+        if (t == null) {
             // Race: attempt ended between inFlight.peekLast() and this lookup.
             // Treat as background to keep totals reconciled.
             phaseBackgroundLoads.incrementAndGet();
             return;
         }
-        c.incrementAndGet();
+        t.count.incrementAndGet();
+        t.chunks.add(packKey(chunkX, chunkZ));
         phaseAttributedLoads.incrementAndGet();
+    }
+
+    /** Render distance (in chunks) used to size the arrival ring. */
+    private int viewDistanceChunks() {
+        int vd = configuredViewDistance;
+        if (vd <= 0) {
+            try {
+                vd = Bukkit.getViewDistance();
+            } catch (Throwable ignore) {
+                vd = 10;
+            }
+        }
+        return Math.max(1, vd);
+    }
+
+    /**
+     * Splits an attempt's raw attributed loads into selection cost (the chunks
+     * the plugin loaded to find/verify the destination) and arrival cost (the
+     * render-distance square the server loads around the player on teleport).
+     * A load is arrival when its chunk is within {@code viewDistance + 1}
+     * chunks (Chebyshev) of the destination chunk but is not the destination
+     * chunk itself. Returns the selection count (raw minus arrival). Falls back
+     * to the raw count when the destination is unknown (timeouts / failures).
+     */
+    private long computeSelection(MetricsRecorder.Attempt a, Tally t, long raw) {
+        if (!a.success) return raw;
+        if (a.toX == 0.0 && a.toZ == 0.0) return raw;
+        int destX = (int) Math.floor(a.toX / 16.0);
+        int destZ = (int) Math.floor(a.toZ / 16.0);
+        int r = viewDistanceChunks() + 1;
+        long arrival = 0L;
+        for (Long packed : t.chunks) {
+            int cheb = Math.max(Math.abs(keyX(packed) - destX), Math.abs(keyZ(packed) - destZ));
+            if (cheb == 0) continue;       // destination chunk itself = selection cost
+            if (cheb <= r) arrival++;      // within render distance of arrival = server cost
+        }
+        long sel = raw - arrival;
+        return sel < 0 ? 0 : sel;
+    }
+
+    /** Set the effective server render distance (chunks) for arrival-ring
+     *  sizing. A value &lt;= 0 restores the live {@link Bukkit#getViewDistance()}
+     *  lookup. */
+    public void setViewDistance(int viewDistance) {
+        this.configuredViewDistance = viewDistance;
     }
 
     /** Called by {@link MetricsRecorder#onDispatch} to register an attempt
@@ -218,7 +299,7 @@ public final class ChunkLoadCounter implements Listener {
      *  attempt is a no-op. */
     public void beginAttempt(MetricsRecorder.Attempt a) {
         if (a == null) return;
-        if (attemptCounts.putIfAbsent(a.attemptId, new AtomicLong(0L)) == null) {
+        if (attemptCounts.putIfAbsent(a.attemptId, new Tally()) == null) {
             inFlight.add(a);
         }
     }
@@ -229,9 +310,13 @@ public final class ChunkLoadCounter implements Listener {
      *  per-attempt accumulator. Safe to call multiple times. */
     public void endAttempt(MetricsRecorder.Attempt a) {
         if (a == null) return;
-        AtomicLong c = attemptCounts.remove(a.attemptId);
-        if (c != null) {
-            a.attributedChunkLoads = c.get();
+        Tally t = attemptCounts.remove(a.attemptId);
+        if (t != null) {
+            long raw = t.count.get();
+            a.attributedChunkLoads = raw;
+            long selection = computeSelection(a, t, raw);
+            a.selectionChunkLoads = selection;
+            phaseSelectionLoads.addAndGet(selection);
         }
         inFlight.remove(a);
     }
@@ -249,6 +334,7 @@ public final class ChunkLoadCounter implements Listener {
         phaseBaselineTotal = totalLoads.get();
         phaseBaselineBackground = phaseBackgroundLoads.get();
         phaseBaselineAttributed = phaseAttributedLoads.get();
+        phaseBaselineSelection = phaseSelectionLoads.get();
     }
 
     /** Number of chunk loads observed since the last {@link #resetPhase()}. */
@@ -269,5 +355,15 @@ public final class ChunkLoadCounter implements Listener {
      *  attempts that began before the phase reset. */
     public long phaseAttributed() {
         return Math.max(0L, phaseAttributedLoads.get() - phaseBaselineAttributed);
+    }
+
+    /** Selection loads (raw attributed minus the post-teleport arrival ring)
+     *  finalised since the last {@link #resetPhase()}. This is the
+     *  view-distance-corrected per-attempt chunk-load metric: it excludes the
+     *  server-caused render-distance square loaded when the player arrives, so
+     *  it reflects the plugin's destination-selection work rather than a
+     *  constant, plugin-independent arrival cost. */
+    public long phaseSelection() {
+        return Math.max(0L, phaseSelectionLoads.get() - phaseBaselineSelection);
     }
 }

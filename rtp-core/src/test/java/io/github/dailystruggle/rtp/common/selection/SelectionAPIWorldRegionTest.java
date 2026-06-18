@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.GenericVerticalAdjustorKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +55,9 @@ class SelectionAPIWorldRegionTest {
     RTP.selectionAPI.permRegionLookup.put("default", new Region("default", settings));
     // A distinct target world (e.g. the nether) the player wants to RTP into.
     accessor.addWorld(new MockRTPWorld("nether_world"));
+    // A dimension-suffixed world so the nether/end vert seeding kicks in.
+    accessor.addWorld(new MockRTPWorld("world_nether"));
+    accessor.addWorld(new MockRTPWorld("world_the_end"));
   }
 
   @AfterEach
@@ -94,6 +98,41 @@ class SelectionAPIWorldRegionTest {
     Region base = RTP.selectionAPI.getRegion("default");
     Region region = RTP.selectionAPI.worldRegion("default", "default_world");
     assertSame(base, region, "no synthetic region when base already targets the world");
+  }
+
+  @Test
+  @DisplayName("seeds a dimension-appropriate (LINEAR, downward, no-skylight) vert for _nether worlds")
+  void worldRegion_seedsNetherVert() {
+    Region region = RTP.selectionAPI.worldRegion("default", "world_nether");
+    assertNotNull(region);
+    var vert = (LinearAdjustor) region.getVert();
+    assertNotNull(vert);
+    assertEquals("linear", vert.name);
+    assertEquals(2, vert.getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue());
+    assertTrue(!vert.requiresSkyLight(), "nether vert must not require sky light");
+  }
+
+  @Test
+  @DisplayName("seeds a dimension-appropriate vert for _the_end worlds")
+  void worldRegion_seedsEndVert() {
+    Region region = RTP.selectionAPI.worldRegion("default", "world_the_end");
+    assertNotNull(region);
+    var vert = (LinearAdjustor) region.getVert();
+    assertNotNull(vert);
+    assertEquals("linear", vert.name);
+    assertEquals(2, vert.getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue());
+    assertTrue(!vert.requiresSkyLight(), "end vert must not require sky light");
+  }
+
+  @Test
+  @DisplayName("leaves the base vert unchanged for non-dimension worlds")
+  void worldRegion_keepsBaseVertForOverworld() {
+    Region region = RTP.selectionAPI.worldRegion("default", "nether_world");
+    assertNotNull(region);
+    var vert = (LinearAdjustor) region.getVert();
+    assertNotNull(vert);
+    // base LinearAdjustor default direction is 0 (not the seeded 2)
+    assertEquals(0, vert.getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue());
   }
 
   @Test

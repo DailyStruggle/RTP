@@ -760,7 +760,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
       io.github.dailystruggle.rtp.anvil.AnvilChunkView view = anvilProbeSupport.takeCached(key);
       if (view != null) {
-        String fromAnvil = view.getBiomeAt(x, y, z);
+        String fromAnvil = view.getBiomeAt(x & 0xF, y, z & 0xF);
         if (fromAnvil != null) {
           io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.record(
               io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.Reasons.ANVIL_HIT);

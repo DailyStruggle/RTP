@@ -123,6 +123,17 @@ public final class BacklogLocationBuffer {
 
   private final int capacity;
   private final Deque<BacklogEntry> entries;
+  /**
+   * Guards every access to {@link #entries}. {@code ArrayDeque} is not
+   * internally synchronized, and the backlog drain / refill / verification
+   * paths can run on different async scheduler threads. Without this lock a
+   * concurrent drain could leave {@code isEmpty()==false} while
+   * {@code peekFirst()==null} (observed as an NPE in
+   * {@link #pollContiguousValidatedHead(int)}), or corrupt the deque's
+   * internal state outright. All public methods that touch {@code entries}
+   * synchronize on this monitor.
+   */
+  private final Object lock = new Object();
 
   /**
    * Constructs a new buffer with the given maximum capacity.
@@ -156,10 +167,12 @@ public final class BacklogLocationBuffer {
    */
   public BacklogEntry offerUnverified(RTPLocation location) {
     Objects.requireNonNull(location, "location");
-    if (entries.size() >= capacity) return null;
-    BacklogEntry entry = new BacklogEntry(location);
-    entries.addLast(entry);
-    return entry;
+    synchronized (lock) {
+      if (entries.size() >= capacity) return null;
+      BacklogEntry entry = new BacklogEntry(location);
+      entries.addLast(entry);
+      return entry;
+    }
   }
 
   /**
@@ -176,17 +189,24 @@ public final class BacklogLocationBuffer {
   public List<BacklogEntry> pollContiguousValidatedHead(int maxN) {
     if (maxN < 0) throw new IllegalArgumentException("maxN must be non-negative: " + maxN);
     List<BacklogEntry> out = new ArrayList<>(Math.min(maxN, 16));
-    while (!entries.isEmpty()) {
-      BacklogEntry head = entries.peekFirst();
-      Validity v = head.validity();
-      if (v == Validity.INVALIDATED) {
-        entries.pollFirst();
-        continue;
+    synchronized (lock) {
+      while (!entries.isEmpty()) {
+        BacklogEntry head = entries.peekFirst();
+        // Defensive null guard: even under the lock this stays correct, and it
+        // documents that a null head means "nothing more to drain" rather than
+        // an NPE — the symptom seen on the lite assembly where the L3 backlog
+        // is unsupported but the drain path is still pulsed by Region.execute().
+        if (head == null) break;
+        Validity v = head.validity();
+        if (v == Validity.INVALIDATED) {
+          entries.pollFirst();
+          continue;
+        }
+        if (v == Validity.UNVERIFIED) break;
+        // VALIDATED
+        if (out.size() >= maxN) break;
+        out.add(entries.pollFirst());
       }
-      if (v == Validity.UNVERIFIED) break;
-      // VALIDATED
-      if (out.size() >= maxN) break;
-      out.add(entries.pollFirst());
     }
     return out;
   }
@@ -199,10 +219,12 @@ public final class BacklogLocationBuffer {
    * @return the oldest unverified entry, or {@code null} if none
    */
   public BacklogEntry peekOldestUnverified() {
-    for (BacklogEntry e : entries) {
-      if (e.validity() == Validity.UNVERIFIED) return e;
+    synchronized (lock) {
+      for (BacklogEntry e : entries) {
+        if (e.validity() == Validity.UNVERIFIED) return e;
+      }
+      return null;
     }
-    return null;
   }
 
   /**
@@ -211,7 +233,9 @@ public final class BacklogLocationBuffer {
    * @return current entry count
    */
   public int size() {
-    return entries.size();
+    synchronized (lock) {
+      return entries.size();
+    }
   }
 
   /**
@@ -220,11 +244,13 @@ public final class BacklogLocationBuffer {
    * @return number of validated entries
    */
   public int validatedSize() {
-    int n = 0;
-    for (BacklogEntry e : entries) {
-      if (e.validity() == Validity.VALIDATED) n++;
+    synchronized (lock) {
+      int n = 0;
+      for (BacklogEntry e : entries) {
+        if (e.validity() == Validity.VALIDATED) n++;
+      }
+      return n;
     }
-    return n;
   }
 
   /**
@@ -245,15 +271,17 @@ public final class BacklogLocationBuffer {
    * @return the number of entries removed
    */
   public int removeInvalidated() {
-    int removed = 0;
-    java.util.Iterator<BacklogEntry> it = entries.iterator();
-    while (it.hasNext()) {
-      if (it.next().validity() == Validity.INVALIDATED) {
-        it.remove();
-        removed++;
+    synchronized (lock) {
+      int removed = 0;
+      java.util.Iterator<BacklogEntry> it = entries.iterator();
+      while (it.hasNext()) {
+        if (it.next().validity() == Validity.INVALIDATED) {
+          it.remove();
+          removed++;
+        }
       }
+      return removed;
     }
-    return removed;
   }
 
   /**
@@ -262,11 +290,15 @@ public final class BacklogLocationBuffer {
    * @return {@code true} if the buffer is empty
    */
   public boolean isEmpty() {
-    return entries.isEmpty();
+    synchronized (lock) {
+      return entries.isEmpty();
+    }
   }
 
   /** Removes all entries. Validity tags on already-issued entries are unaffected. */
   public void clear() {
-    entries.clear();
+    synchronized (lock) {
+      entries.clear();
+    }
   }
 }

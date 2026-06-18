@@ -122,5 +122,5 @@ descriptor, classpath placement, and lifecycle). The decision behind it is
 
 ## Also Useful
 
-- [`addons/RTP_ClaimPluginIntegrations/`](../addons/RTP_ClaimPluginIntegrations/) — a working reference implementation of a claim-check hook addon.
+- [`addons/RTP_ExampleAddon/`](../addons/RTP_ExampleAddon/) — the canonical addon template; among other things it contributes a safety (claim/biome/distance) verifier via `RTPAPI.hooks()`, which is the same seam a claim-check hook uses. The claim-plugin integrations that once shipped as a standalone `RTP_ClaimPluginIntegrations` addon are now bundled directly into the plugin (see [ADR-019](adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)).
 - [CONTRIBUTING.md](../CONTRIBUTING.md) — if you want to upstream a change to `rtp-api` itself, follow the contribution workflow there.

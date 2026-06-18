@@ -96,14 +96,27 @@ public final class GradientExpander {
 
     switch (tagName) {
       case "gradient":
-        return expandGradient(argStr, inner, false);
+        return withReset(expandGradient(argStr, inner, false), inner);
       case "transition":
-        return expandTransition(argStr, inner);
+        return withReset(expandTransition(argStr, inner), inner);
       case "rainbow":
-        return expandRainbow(argStr, inner);
+        return withReset(expandRainbow(argStr, inner), inner);
       default:
         return inner;
     }
+  }
+
+  /**
+   * Appends a legacy color reset ({@code \u00a7r}) after a colorized expansion so
+   * the per-character hex from a gradient/rainbow/transition does not bleed into
+   * the text that follows the closing tag. Skips the reset when the expansion
+   * produced no color codes (e.g. empty inner text returned verbatim).
+   */
+  private static String withReset(String expanded, String inner) {
+    if (expanded.equals(inner) || expanded.indexOf('\u00a7') < 0) {
+      return expanded;
+    }
+    return expanded + "\u00a7r";
   }
 
   // gradient: N color stops + optional float phase at the end.

@@ -184,6 +184,70 @@ reproducible by readers".
     persistence format (`ScanTask.save`/`loadProgress`: `scanIter | spatialResolution | currentOffset
     | isFine | scanPhase`) needs a versioned region-major cursor, and rim regions only partially
     inside the shape/world border still need the existing per-position border math.
+- [ ] **Anvil PRESCAN accuracy measurement → conditional FULLSCAN retirement.** Instrument the
+  Anvil PRESCAN correct-rejection rate against the authoritative FULLSCAN verdict, then use the
+  measured rate to decide whether the FULLSCAN trimming pass can be dropped from the scan path.
+  Scan only *trims the selectable set* (`MemoryShape` bad-location map); it is **not** a placement
+  safety gate, because every teleport still loads and re-verifies the chunk in the L2→L1 flow
+  (S-001 is enforced there, on the real loaded chunk). A PRESCAN miss therefore only costs a later
+  placement-time rejection, never an unsafe landing, so the gate is purely an attempts-per-RTP
+  (yield) question, not a safety one.
+  - **The model.** At an Overworld acceptance rate `p = 1/3` (two thirds of ground unacceptable),
+    a PRESCAN correct-rejection rate `r` leaves a post-trim candidate pool of `1/3` acceptable +
+    `2/3 * (1 - r)` slipped-through, so expected attempts `= (1/3 + 2/3*(1-r)) / (1/3)`. That gives
+    `r = 95% → ~1.10` attempts/RTP (the floor) and `r = 98% → ~1.04` attempts/RTP.
+  - **Decision.** Drop FULLSCAN from the scan path once PRESCAN measures **≥ 98% correct-rejection**
+    (cleanly under 1.1 attempts/RTP). **95% is the minimum acceptable floor** (lands exactly on 1.1
+    at `p = 1/3`). Below 95%, keep FULLSCAN.
+  - **Per-world caveat.** `p` is per-world (ocean-heavy worlds have lower `p`, where the
+    slipped-through term dominates faster and `r` matters more; flat custom worlds have higher `p`).
+    The instrumentation must therefore track *realized* attempts/RTP per region rather than
+    inferring it from `r` alone, and the retirement decision should hold against the lowest-`p`
+    region in scope. Likely surfaced through the existing `/rtp test full` / `FailTypes` telemetry.
+- [ ] **Chunky-driven generation pass for `/rtp scan` (near-term focus, D-005 + ADR gated).** Today
+  the FULLSCAN sub-step of a scan forces generation on an Anvil miss one chunk at a time through the
+  server chunk manager (`ScanTask.runFullLoadPath` → `RTPWorld.getOrLoadChunk`). When Chunky (or any
+  bulk pre-generator) is present, drive/sequence *it* to lay the region's chunks down on disk first,
+  then let scan walk the already-written `.mca` through the cheap off-tick Anvil PRESCAN path instead
+  of paying per-chunk worldgen stalls. The throughput win comes entirely from the pre-generator's own
+  speed (a faster — incl. future GPU/CPU-accelerated — Chunky build makes it strictly better); the
+  RTP-side value is **UX/orchestration**, not raw generation speed. Design constraints:
+  - **Soft-depend only, no hard dependency.** Reuse the existing Chunky integration seam
+    (`ChunkyChecker` / `ChunkyRTPShape`) and route through `RTPHooks` per
+    [ADR-026](../adr/ADR-026-external-hook-api-surface.md); degrade cleanly to the current
+    generate-as-you-go FULLSCAN when Chunky is absent. Do not put inline pre-generator calls in the
+    scan pipeline.
+  - **One command surface.** Let an admin kick off + size a Chunky pregen for a region and then run
+    the scan consistently sized to it, instead of juggling `/chunky` and `/rtp scan` separately
+    (progress display, auto-sizing scan to the pregen radius).
+  - **Honest framing.** Advertise as a convenience/sequencing hook, never as "Chunky makes scan
+    faster" — the speedup is a property of the installed Chunky build, available with or without the
+    hook.
+  - **Gating.** Crosses the external-integration surface and module boundaries → D-005 proposal +
+    dedicated ADR (sibling to [ADR-026](../adr/ADR-026-external-hook-api-surface.md)) before
+    implementation.
+- [ ] **Accelerated Anvil verification compute (exploration, D-005 + ADR gated).** Offload the bulk
+  biome/material rejection sweep over *decoded* `.mca` tiles to a high-throughput compute backend.
+  The backend is deliberately **left open** — a native SIMD/vectorized pass, a GPU/OpenCL kernel,
+  or an external accelerated generator/verifier (e.g. a standalone Rust worldgen+verify engine, the
+  kind of project reportedly hitting ~17k cps on CPU alone) are all candidates; the headline is "go
+  faster", not "use a GPU". This does **not** require LeafRTP to write a chunk generator: worldgen
+  stays the server's / Chunky's job, and this only accelerates LeafRTP's own off-tick verification
+  pass over already-written region files. The accelerable workload is the wide, data-parallel
+  "score N columns against the `unsafeBlocks` / target-biome predicate sets" pass in `rtp-anvil`;
+  the output is the same bad-location bitmap the CPU PRESCAN already produces. Boundaries and
+  gating:
+  - The NBT/`.mca` decode stays on the CPU (branchy, I/O-bound; already parallelized across
+    `AnvilIoPool`); only the decoded arrays are handed to the accelerated backend.
+  - FULLSCAN / live-load paths cannot move (S-005 threading + server chunk manager).
+  - Any accelerated path is a new subsystem with its own pool/contract; a GPU or external-process
+    backend additionally introduces a hard external dependency surface (OpenCL runtime/driver, or
+    an out-of-process engine + IPC) that must degrade gracefully to the current CPU path when
+    absent — D-005 proposal + a dedicated ADR (sibling to
+    [ADR-016](../adr/ADR-016-anvil-subsystem.md)) required before any implementation.
+  - Profile first: only worthwhile if predicate evaluation (not NBT decode, not disk) is shown to
+    be the bottleneck on large scans. The backend choice should follow that profile (a native
+    vectorized pass may close the gap with none of the GPU/IPC dependency cost).
 - [ ] **Safety-list grammar expansion.** The token grammar shipped in `3.0.0-beta.1` is the
   foundation; follow-ups:
   - [ ] Tag-group composition with set subtraction (`#minecraft:slabs - OAK_SLAB`).

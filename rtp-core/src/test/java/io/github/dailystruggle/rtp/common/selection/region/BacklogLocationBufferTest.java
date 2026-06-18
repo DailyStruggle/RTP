@@ -206,4 +206,43 @@ class BacklogLocationBufferTest {
     assertFalse(b.isEmpty());
     assertSame(e1, b.pollContiguousValidatedHead(1).get(0));
   }
+
+  @Test
+  @DisplayName("pollContiguousValidatedHead does not NPE when drained concurrently (race guard)")
+  void concurrentDrainDoesNotThrow() throws InterruptedException {
+    // Regression guard: ArrayDeque is not internally synchronized, so a
+    // concurrent drain could leave isEmpty()==false while peekFirst()==null,
+    // which previously dereferenced null and threw an NPE (notably on lite,
+    // where the L3 backlog is unsupported but the drain path is still pulsed).
+    final java.util.concurrent.atomic.AtomicReference<Throwable> failure =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    for (int iter = 0; iter < 200 && failure.get() == null; iter++) {
+      BacklogLocationBuffer b = new BacklogLocationBuffer(64);
+      for (int i = 0; i < 64; i++) {
+        BacklogEntry e = b.offerUnverified(loc(i));
+        e.setValidity(Validity.VALIDATED);
+      }
+      java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+      Runnable drain = () -> {
+        try {
+          start.await();
+          while (!b.isEmpty()) {
+            b.pollContiguousValidatedHead(8);
+          }
+        } catch (Throwable t) {
+          failure.compareAndSet(null, t);
+        }
+      };
+      Thread t1 = new Thread(drain);
+      Thread t2 = new Thread(drain);
+      t1.start();
+      t2.start();
+      start.countDown();
+      t1.join();
+      t2.join();
+    }
+    if (failure.get() != null) {
+      throw new AssertionError("concurrent drain threw", failure.get());
+    }
+  }
 }

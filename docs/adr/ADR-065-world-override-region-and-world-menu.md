@@ -1,6 +1,6 @@
 # ADR-065 — World-Override Regions and the `/rtp` World Menu
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-06-18)
 **Date:** 2026-06-11
 
 ## Context
@@ -22,9 +22,9 @@ The infrastructure to fix this already exists:
 
 ## Decision
 
-*Accepted and implemented (2026-06-11).*
+*Accepted and implemented (2026-06-11); amended 2026-06-18 (see Amendment below).*
 
-1. **World-override regions.** When a `world:<w>` argument is present (from either grammar), `RTPCmd` resolves the base region as today, then replaces it with a **world-override region**: the base region's settings with `world` set to the requested `RTPWorld` and `shape` re-resolved for that world via `getShape(w)`. This is the single shared mechanism for both `rtp world:<w>` and `rtp region:<r> world:<w>`, keeping CLI and menu in parity (the menu emits the plain `/rtp world:<w>`).
+1. **World-override regions.** When a `world:<w>` argument is present **alongside an explicit `region:<r>`** (the region sub-parameter grammar `rtp region:<r> world:<w>`), `RTPCmd` resolves base region `<r>`, then replaces it with a **world-override region**: the base region's settings with `world` set to the requested `RTPWorld` and `shape` re-resolved for that world via `getShape(w)`. Top-level `rtp world:<w>` (no `region`) is **not** overridden: it resolves its region from world `<w>`'s own configuration (`WorldKeys.region`) and honors that redirect. See the Amendment section for the rationale of this split.
 
 2. **Stable per-world naming and caching.** World-override regions are named `"<baseRegion>_<world>"` (e.g. `default_nether`) and cached in the existing `SelectionAPI.tempRegions` map keyed by the target world's UUID (`RTPWorld.id()`), so repeated requests reuse the same region rather than minting a throwaway each call. Reusing `tempRegions` means they inherit the existing temp-region shutdown/flush/clear lifecycle (reload and server stop) and DB dump with no new bookkeeping or new map. The two key spaces in `tempRegions` (sender UUID for shape/vert overrides, world UUID for world overrides) do not collide in practice. When the base region already targets the requested world, the base region is returned unchanged (no synthetic region is created).
 
@@ -44,7 +44,7 @@ The infrastructure to fix this already exists:
 
 ## Consequences
 
-- **Positive:** `/rtp world:<x>` and `/rtp region:<r> world:<x>` finally teleport into world `x`. CLI and menu share one behavior, so the menu degrades to the plain command. World-override regions are cached per world (reused across requests) and cleaned up on reload/stop by the existing temp-region lifecycle. No new permissions, no new map, no platform code.
+- **Positive:** `/rtp region:<r> world:<x>` duplicates region `<r>` and adjusts it for world `<x>`. `/rtp world:<x>` follows world `<x>`'s configured region (`WorldKeys.region`). World-override regions are cached per world (reused across requests) and cleaned up on reload/stop by the existing temp-region lifecycle. No new permissions, no new map, no platform code.
 - **Negative / Trade-offs:** Each target world allocates a long-lived `Region` (queues, pipelines, scan-progress, async DB hydrate) the first time it is requested, bounded by the number of accessible worlds. World-override regions are stored in `tempRegions`, which the `AsyncTaskProcessing` background pulse does not tick (only `permRegionLookup` is pulsed), so they fill on demand via the teleport's own cold path rather than warming ahead of time - consistent with the existing shape-override temp-region behavior. Keying by world UUID means one region per world regardless of base region (acceptable: the player-facing flow only ever uses the default base). Changing a public command's region resolution requires a regression test (`/rtp world:nether` lands in the nether's region, not the default).
 
 ## References
@@ -54,5 +54,16 @@ The infrastructure to fix this already exists:
 - [ADR-050](ADR-050-concrete-menu-commands-supersede-tokens.md) - concrete `/rtp` menu commands.
 - [ADR-063](ADR-063-biome-first-menu-and-auto-region-by-biome.md) - biome-first menu, auto-region, `MenuColor` world coloring.
 - `rtp-core/.../selection/SelectionAPI.java` - `tempRegion`, `worldRegion`, `tempRegions` (world-UUID-keyed world overrides).
-- `rtp-core/.../commands/RTPCmd.java` - world-override application in the region-resolution path.
+- `rtp-core/.../commands/RTPCmd.java` - `shouldApplyWorldOverride(...)` gate + world-override application in the region-resolution path.
 - `rtp-core/.../commands/menu/FrontPageBuilder.java` - world picker row.
+
+## Amendment (2026-06-18) - top-level `world:<w>` honors the per-world `region` redirect
+
+The original decision forced **both** grammars to land inside world `w` by rebinding the resolved region's world. This was a poor design choice: it did not match the specified semantics for the top-level `world` parameter. `WorldKeys.region` is an intentional per-world redirect (a world commonly points its RTP at another world's region, e.g. so `/rtp` from the nether sends players to a safe overworld region), and forcing the teleport into `w` silently overrode that operator configuration.
+
+Corrected semantics:
+
+- **`rtp world:<w>`** (top-level, no `region`): resolve the region from world `w`'s own `WorldKeys.region` and use it **as configured**. If `w` redirects to region `default`, the player teleports to region `default` (wherever it lives), exactly as the operator configured - no forced rebind to `w`.
+- **`rtp region:<r> world:<w>`** (region sub-parameter): unchanged from the original decision - duplicate region `<r>` and rebind it to world `<w>` (shape re-resolved, dimension-correct vert for nether/end).
+
+Implemented as the `RTPCmd.shouldApplyWorldOverride(rtpArgs)` gate, which applies the override only when **both** a `region` and a `world` argument are present. Regression test: `RTPCmdWorldOverrideGateTest`.

@@ -183,7 +183,7 @@ If you need player-relative placement, such as landing within 500 blocks of a fr
 
 ### I want to add a custom claim plugin integration. Where do I start?
 
-Look at the `addons/RTP_ClaimPluginIntegrations/` directory for a working example. Your addon compiles against `rtp-api` only, implements the validation hook interface, and registers itself on plugin enable. See [../../addons/REQUIREMENTS.md](../../addons/REQUIREMENTS.md) for the addon API contract.
+RTP already bundles claim-plugin support for the common protection plugins (GriefPrevention, WorldGuard, Towny, etc.) directly in the plugin jar — there is no separate integration jar to install (see [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)). To add your *own* integration, look at the `addons/RTP_ExampleAddon/` directory for a working example: your addon compiles against `rtp-api` only, registers a safety verifier through `RTPAPI.hooks()` (the same seam the bundled claim checks use), and registers itself on plugin enable. See [../../addons/REQUIREMENTS.md](../../addons/REQUIREMENTS.md) for the addon API contract.
 
 ### I added a requirement to a `REQUIREMENTS.md` file and CI is failing.
 

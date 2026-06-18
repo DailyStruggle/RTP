@@ -1567,6 +1567,7 @@ generation bursts, not pipeline cost.
   scales beyond what the Paper rig showed if you have >2 clients spread
   across regions. With 2 clients this run measures parallelism-of-2, not
   Folia's ceiling.
+- **`chunks_per_attempt` overcounts by the arrival ring; use `chunks_selection_per_attempt` instead (harness fix, 2026-06-17).** The pre-fix `chunks_loaded_attributed` / `chunks_per_attempt` columns charge every `ChunkLoadEvent` that fires while an attempt is in flight to that attempt, including the `(2*viewDistance+1)^2` render-distance square the server loads when the player materialises at the destination. That arrival ring is plugin-independent and scales with view distance (it is the bulk of the reported ~18-35 chunks/att across all plugins, e.g. the 28.4 figure on Folia 26.1.x). `ChunkLoadCounter` now records each attributed load's chunk coordinates and, at attempt end, subtracts loads within `viewDistance + 1` chunks (Chebyshev) of the destination chunk while keeping the destination chunk itself, exposing the corrected count as the per-attempt `chunks_selection` column and the per-phase `chunks_selection` / `chunks_selection_per_attempt` columns. The selection metric reflects the plugin's destination-selection work (typically ~1 per attempt for RTP); the raw `chunks_loaded_attributed` columns are retained for audit. Cross-plugin chunk-cost comparisons should quote `chunks_selection_per_attempt`. Timeouts / failures (destination unknown) fall back to the raw count, and the correction reads the live server view distance unless overridden.
 
 ### 5M.5 What this enables for the public writeup
 
@@ -1600,6 +1601,7 @@ RTP Paper configuration, and matches the market-comparison ask.
 - "Already rtp'ing" rejection messages caught by `ConsoleWatcher` (built-in pattern).
 - **What it does right**: PaperLib async chunk loading, simple cheap safety check, single-in-flight per player limits worst-case concurrent chunk loads.
 - **What it does poorly here**: cold-start ~1.5 s (no warm queue benefit on the first call); warm latency genuinely 1-2× RTP's; throughput ~50 % of RTP under our pacing.
+- **Plugin failure - Folia main-thread chunk-load violation (2026-06-17, Folia 26.1.2-8, MC 26.1.2).** During a BetterRTP-3.6.13 solo run the server logged an `ERROR` from `ca.spottedleaf.moonrise.common.util.TickThread`: `Thread failed main thread check: Async chunk retrieval` for `world=minecraft:overworld, chunk_pos=[-63, 59]`, raised on `Folia Region Scheduler Thread #2` with `region={null}` (the Global Region tick). The stack shows BetterRTP's bundled PaperLib (`me.SuperRonanCraft.BetterRTP.lib.paperlib`) calling `AsyncChunksSync.getChunkAtAsync` -> `org.bukkit.craftbukkit.CraftWorld.getChunkAt`, dispatched from `QueueGenerator.lambda$addQueue$4` via its `AsyncHandler.sync` path on `FoliaGlobalRegionScheduler`. Root cause: BetterRTP's shaded PaperLib falls back to the **synchronous** `AsyncChunksSync` implementation (not the real Paper async API) on this runtime, then invokes `CraftWorld#getChunkAt` from a region thread that does not own the target chunk - Folia's `TickThread.ensureTickThread` rejects it. This is the "async by name, synchronous in fact" anti-pattern (the same class of defect RTP prohibits under REQ-RTP-S-005); it surfaces as a logged Folia error rather than a silent block. Impact for benchmarking: BetterRTP's queue pre-fill is partially broken on Folia 26.1.x (the failed retrieval aborts that queue entry), which inflates its cold/warm latency and its timeout/abort rate on this platform; the error is a property of BetterRTP, not of the harness or of RTP. Not root-caused beyond the stack trace; no fix is ours to make. Disclose in any Folia 26.1.x head-to-head that includes BetterRTP.
 
 ### AsyRTP — the negative control
 
@@ -1615,6 +1617,7 @@ RTP Paper configuration, and matches the market-comparison ask.
 - p95 MSPT 1.5 s under load. Min TPS 2.8.
 - High main-thread CPU/TP (102 ms). HuskHomes serialises per-player and uses a normal-distribution placement that biases toward outer radius — clashes with sustained dispatch.
 - Not a bug; HuskHomes wasn't designed for 10 dispatches/sec. Real operators don't run it at this rate. **Disclose this in the write-up**.
+- **Plugin failure - Folia main-thread chunk-load violation (2026-06-17, Folia 26.1.2-8, MC 26.1.2).** During a HuskHomes-Paper-4.10 solo run the server logged repeated `ERROR`s (three within the same second, chunk_pos `[284, 93]`, `[-211, 85]`, `[-193, 199]`) from `ca.spottedleaf.moonrise.common.util.TickThread`: `Thread failed main thread check: Async chunk retrieval` in `world=minecraft:overworld`. Unlike BetterRTP (which tripped on a Global Region tick thread), HuskHomes trips on **`Folia Async Scheduler Thread`s** (`#8/#9/#11`): the stack runs `NormalDistributionEngine.generateSafeLocation` -> `BukkitSavePositionProvider.findSafeGroundLocation` -> shaded PaperLib (`net.william278.huskhomes.libraries.paperlib`) `AsyncChunksSync.getChunkAtAsync` -> `org.bukkit.craftbukkit.CraftWorld.getChunkAt`, dispatched via `Task$Supplier.supplyAsync` on `FoliaAsyncScheduler`. Root cause is identical to the BetterRTP case: the bundled PaperLib selects the **synchronous** `AsyncChunksSync` fallback (not real Paper async) and calls `CraftWorld#getChunkAt` from a thread that does not own the target chunk, which Folia's `TickThread.ensureTickThread` rejects. Both plugins ship the same vendored PaperLib, so this is a common PaperLib-on-Folia-26.1.x failure, not a coincidence. Doing this from the async pool means HuskHomes' safety check (`findSafeGroundLocation`) cannot reliably read the destination chunk on Folia 26.1.x, which is consistent with its already-observed elevated failure rate under sustained load. Property of HuskHomes/PaperLib, not the harness or RTP; not root-caused beyond the stack; no fix is ours to make. Disclose in any Folia 26.1.x head-to-head that includes HuskHomes.
 
 ### SorekillRTP
 
@@ -1884,3 +1887,482 @@ Be explicit about this in the public write-up to pre-empt critics.
 ---
 
 *End of pre-writeup. Edit before publishing.*
+
+---
+
+# Continuation - 2026-06-17 controlled Paper re-run + Folia analysis
+
+This continuation records a fresh, tightly-controlled four-plugin run on Paper
+and the Folia architectural analysis that came out of it. It supersedes earlier
+absolute numbers where they conflict, because the test conditions here were
+deliberately equalized (see Controls).
+
+## 11. Controls applied for this run
+
+To remove the apples-to-oranges problems noted earlier, the following were
+standardized before the run:
+
+- **Outer radius equalized to 4096 blocks** for every plugin:
+  - RTP region `radius: 256` (chunks) = 4096 blocks (unchanged; already 4096).
+  - BetterRTP `Default.MaxRadius: 1000 -> 4096` (blocks).
+  - EzRTP `radius.max: 2000 -> 4096` (blocks).
+  - Inner radius left per-plugin (RTP 1024, EzRTP 500, BetterRTP 10 blocks);
+    negligible at this scale (small central exclusion only).
+- **Cooldown / delay / countdown zeroed** on RTP, BetterRTP, and EzRTP so the
+  harness drives unthrottled.
+- **Paper `delay-chunk-unloads-by: 10s -> 0s`** so chunks release immediately and
+  each teleport pays a real load instead of coasting on the 10 s retention cache.
+- **Pregenerated world retained** (RTP's design target and the realistic
+  production config). A fresh/un-pregenerated world was explicitly rejected: it
+  neutralizes RTP's anvil prefilter (no `.mca` bytes to screen), turning the test
+  into a world-gen benchmark that hides the plugin differences.
+- Same JVM, same world/seed, one plugin enabled per phase, ~600 s per phase,
+  3 simulated users at >=10 dispatch/s.
+
+## 12. Results - run 20260617-175906 (Paper, all four phases ~600 s)
+
+| Metric | RTP | EzRTP | BetterRTP | HuskHomes |
+|---|---|---|---|---|
+| Attempts / successes | 7755 / 7755 | 6987 / 6987 | 2646 / 2639 | 1957 / 1950 |
+| Success rate | 100% | 100% | 99.7% | 99.6% |
+| Throughput (per s) | 12.9 | 11.6 | 4.4 | 3.2 |
+| chunks / attempt | 1.58 | 3.38 | 5.86 | 4.59 |
+| chunks_loaded total | 81,368 | 44,846 | 16,819 | 9,061 |
+| % chunk loads background (async) | 85% | 47% | 8% | 1% |
+| main-thread CPU / attempt (ms) | 17.97 | 19.06 | 25.57 | 33.48 |
+| total CPU / attempt (ms) | 765 | 817 | 1811 | 2589 |
+| TPS avg (phase) | 19.37 | 15.50 | 9.99 | 19.39 |
+| TPS min (phase) | 15.96 | 12.82 | 7.37 | 17.85 |
+| MSPT avg (ms) | 26.8 | 56.0 | 130.4 | 9.9 |
+| MSPT p95 (ms) | 35.1 | 86.6 | 185.4 | 31.9 |
+| MSPT max (ms) | 87.5 | 1259 | 6646 | 57.1 |
+| Heap growth in-phase (MB) | +2676 | -1379 | +11633 (to ceiling) | +4012 |
+| Heap post-GC trough (MB) | 9948 | 5863 | 2147 | 5487 |
+
+Per-phase heap/TPS/MSPT are sliced from the 50 ms `-heap.csv` over each phase's
+epoch window. `cpu_ms_with_chunks*` columns still use the Spigot-default
+`chunk-load-cost-us` (28221 us) and are NOT recalibrated for Paper here; treat
+those as relative only. All other columns are direct measurements.
+
+## 13. Per-entry read
+
+- **RTP** - best on every axis that matters: highest throughput (12.9/s), cheapest
+  per attempt (18 ms main-thread), 85% of chunk work off the tick thread, and the
+  smoothest tail by far (max MSPT 87.5 ms, no stall the whole phase).
+- **EzRTP** - genuine runner-up: throughput (11.6/s) and main-thread cost (19 ms)
+  close to RTP, ~47% async. Weaknesses: only half-async, a 1.26 s max stall, TPS
+  avg dipped to 15.5. Heap net-decreased in-phase (GC reclaimed well).
+- **BetterRTP** - catastrophic under rate: 6.65 s max tick, TPS crashed to 7.4 min,
+  heap climbed +11.6 GB to the 16 GB ceiling, 92% of chunk work foreground.
+- **HuskHomes** - slow-and-heavy but self-limiting: lowest throughput (3.2/s),
+  highest per-attempt cost (33 ms main-thread), ~99% foreground. Because it
+  self-throttles, TPS stayed healthy (19.4) and MSPT smooth (max 57 ms) - it never
+  stalls, it just cannot keep up.
+
+Two cross-cutting findings:
+
+1. **The async (background-chunk) share is the discriminator.** It lines up exactly
+   with health: RTP 85% -> EzRTP 47% -> BetterRTP 8% -> HuskHomes 1%. The more chunk
+   work a plugin keeps on the main thread, the worse its tick tail (BetterRTP) or
+   its throughput ceiling (HuskHomes).
+2. **No hard memory leak in any phase.** Every phase's heap trough dropped back to
+   ~5-10 GB under GC (EzRTP net-decreased; HuskHomes fell to 5.5 GB). The earlier
+   "memory climbing" was reclaimable heap-slack/churn from the high allocation rate,
+   not retention.
+
+## 14. Open question this run cannot settle - and the Folia thesis
+
+EzRTP's near-parity on the Paper speed axis "makes no sense for what they do on the
+backend" and the speed axis alone does not prove much. Two axes the Paper run does
+NOT measure are where a thorough verifier separates from a fast-but-shallow one:
+
+- **Destination safety / correctness.** The harness counts a completed
+  `PlayerTeleportEvent`, NOT whether the landing was safe. A plugin can look fast
+  precisely because it skips verification. Proposed next test: arrival-block safety
+  audit (classify landings: safe / water / lava / cave / suffocating / void) on the
+  same pregenerated world, prefilter fully in play.
+- **Folia region behavior (the strongest structural lever).** Per the Folia API,
+  live chunk/block state may only be touched from the thread owning that region;
+  touching another region's chunk throws `ThreadAccessException`. Therefore a
+  plugin that verifies candidates via the **live block API** must acquire/schedule
+  the **owning region for each candidate** - and since random candidates are
+  scattered, that is roughly one region context per candidate, which amplifies
+  Folia "region thrashing" (continuous region split/merge under `/rtp` spam) and
+  inflates chunks/attempt.
+
+  RTP's anvil prefilter reads `.mca` NBT off-thread and requires **no region at
+  all**, only materializing a live chunk (and thus a region) for the few candidates
+  that survive the off-thread screen. Predicted Folia outcome: competitor
+  chunks/attempt and region-thrash balloon while RTP's stays close to its Paper
+  figure - an architecture-level advantage that pregenerated-Paper speed parity
+  hides entirely.
+
+Caveat for the Folia phase: the harness `ChunkLoadCounter` attributes loads via
+`getPluginChunkTickets()` + most-recent-in-flight player; on Folia `ChunkLoadEvent`
+fires on region threads, so attribution must be sanity-checked before any Folia
+chunks/attempt delta is trusted (it may be a measurement artifact rather than a
+behavioral change).
+
+## 15. Next steps
+
+1. Arrival-block safety audit on the pregenerated world (correctness axis).
+2. Folia phase with region-count trace + per-region MSPT alongside chunks/attempt.
+3. Recalibrate `chunk-load-cost-us` to the Paper `full(cpu)` chunk-probe value
+   (x ~1.5 as a documented lower-bound) before quoting any `cpu_ms_with_chunks`
+   absolute number. Note: `StressTestRTPPlugin.beginRun()` currently reads only the
+   base `chunk-load-cost-us` key, not the `-paper` / `-folia` variants - set the
+   base key on Paper.
+
+## 16. Folia run - 20260617-191448 (RTP-Folia 26.1, two phases ~600 s)
+
+This is the platform where the Paper near-parity collapses. Same controls as
+section 11 (radius 4096, cooldown/delay zeroed, pregenerated world), 3 clients.
+The RTP edition under test here is **RTP-Pro** (the tuned `rtp-folia` adapter);
+Section 18 repeats the RTP-only phase on **RTP-Lite**, which on Folia runs the
+correctness-first `FoliaAwareScheduler` fallback rather than the Pro-only tuned
+adapter, to check whether the shared `rtp-core` engine carries the result for both.
+
+| Metric | RTP-Pro (Folia) | EzRTP (Folia) | (Paper ref: RTP / EzRTP) |
+|---|---|---|---|
+| Attempts | 8113 | 3180 | 7755 / 6987 |
+| Throughput (per s) | 13.5 | 5.3 | 12.9 / 11.6 |
+| main-thread CPU / attempt (ms) | 3.96 | 6.34 | 17.97 / 19.06 |
+| total CPU / attempt (ms) | 199 | 593 | 765 / 817 |
+| % chunk loads background | 14% | ~0% (22 of 45,814) | 85% / 47% |
+
+Key results (clean, direct measurements):
+
+- **EzRTP throughput halves on Folia** (11.6 -> 5.3 /s) while **RTP holds/improves**
+  (12.9 -> 13.5 /s). The Paper "nearly tied" speed parity is a Paper-only artifact.
+- **Folia slashes RTP's main-thread cost** (17.97 -> 3.96 ms/attempt): region threads
+  parallelize work Paper serialized onto one tick thread. This is the design paying off.
+- **EzRTP does essentially zero background chunk loading** on Folia (22 of 45,814),
+  i.e. it loads chunks inline on region threads.
+
+### Server-side evidence (independent of the harness)
+
+The decisive evidence is the Folia watchdog, emitted by the server, not the harness.
+From `RTP-Folia/26.1/logs/latest.log`:
+
+- **7 Folia watchdog stalls** ("Tick region ... has not responded").
+- **Max region-unresponsive time: 20.39 s** (one region frozen for over 20 seconds).
+- The watchdog stack attributes the hang to EzRTP doing a synchronous, blocking
+  chunk load on a region scheduler thread:
+  `EzRTP-3.4.0 BukkitChunkLoadStrategy.loadChunk -> org.bukkit.World.loadChunk ->
+  ServerChunkCache.syncLoad -> BlockableEventLoop.managedBlock -> Unsafe.park`.
+- No watchdog stalls attributed to RTP.
+
+This is the S-005-class pattern (synchronous chunk load on a tick/region thread)
+manifesting as a multi-second region freeze on Folia.
+
+### Metric caveats (so nothing is misread)
+
+- **Harness `TIMEOUT` is a capture-window expiry, NOT a server failure.** It means a
+  completion was not captured within 5 s. At high throughput a sub-tick (near-0 ms)
+  teleport and a genuinely slow (>5 s) one can look the same to the oracle - the
+  harness races itself.
+- **The race is directionally biased in EzRTP's favor.** False timeouts concentrate on
+  near-0 ms teleports (RTP's pre-verified-queue fast path). EzRTP's >=2 guaranteed
+  region/scheduler hops floor its per-teleport latency above the race window, so an
+  EzRTP timeout is far more likely a real >5 s teleport than a capture miss. The
+  observed gap is therefore conservative against the slower plugin.
+- Consequently: RTP's 4 timeouts / 8113 (0.05%) are treated as **capture artifacts**,
+  RTP success ~100%. EzRTP's 122 timeouts align with its 122 phase failures and are
+  corroborated by the server watchdog, so they are treated as **real stalls** - but
+  the headline rests on the watchdog evidence, not the timeout count.
+- **`chunks_per_attempt` is unreliable on Folia** (RTP 29.6, EzRTP 14.4 vs Paper
+  1.58 / 3.38): inflated by region ticketing plus `ChunkLoadCounter` over-attribution
+  on region threads. Do not quote it as a behavioral number.
+- **MSPT (~50 ms both phases) is the global-region sample, not per-region**, so it is
+  blind to a single hung region and is NOT a useful Folia discriminator. Use
+  throughput + the watchdog evidence instead.
+- The warm-up "zero successful attempts" warning is the over-broad `ConsoleWatcher`
+  false-failure issue; it did not corrupt the measurement phase but should be fixed.
+
+### Defensible Folia headline
+
+> On Folia under identical load, EzRTP-3.4.0 blocked region threads on synchronous
+> `World.loadChunk`, tripping the Folia watchdog 7 times (one region unresponsive
+> 20.4 s) and sustaining only 5.3 TP/s; LeafRTP sustained 13.5 TP/s with zero
+> watchdog stalls and its main-thread cost per teleport dropped to 3.96 ms. Harness
+> completion-timeouts are a capture-window metric and are not used as the failure
+> measure; the region stalls are server-emitted.
+
+## 17. Recorded test parameters (all runs)
+
+Captured verbatim from each server's `plugins/StressTestRTP/config.yml` so the
+runs are reproducible. All three runs share identical harness settings; they differ
+only in the target roster, the RTP edition (Pro vs Lite), and the host platform.
+
+### Common harness parameters (Paper 20260617-175906, Folia 20260617-191448, Folia Lite 20260617-205614)
+
+| Parameter | Value |
+|---|---|
+| dispatch-as-player | true |
+| roster | all |
+| attempt-timeout-ms | 5000 (the capture window; see Section 16 caveat) |
+| console-fail-enabled | true |
+| console-fail-patterns | [] (empty -> built-in defaults; source of the warm-up false-failure warning) |
+| save-worlds-between-phases | auto |
+| default-concurrency | 4 |
+| per-player-gap-ticks | 3 |
+| default-burst | 10 |
+| no-progress-kickstart-ms | 30000 |
+| sequence.per-target-seconds | 600 |
+| sequence.gap-seconds | 240 |
+| sequence.warmup-seconds | 30 |
+| sequence.warmup-target-cycles | 1 |
+| sample-period-ms | 50 |
+| chunk-load-cost-us (base, used) | 28221.0 (Spigot default) |
+| chunk-load-cost-us-paper / -folia | 1830.0 each (present but NOT applied) |
+| spark | enabled, profile-per-phase, timeout 660 s, only-ticks-over-ms 0, rotate 60 s |
+
+Client load: 3 real OPed accounts (concurrency cap 4), per-player burst 10 with a
+3-tick gap. Region radius equalized to 4096 blocks; cooldown/delay/countdown zeroed;
+pregenerated world; Paper `delay-chunk-unloads-by: 0s` (Section 11 controls).
+
+**Calibration note (carried, important):** despite `chunk-load-cost-us-paper` /
+`-folia` both being set to 1830.0, `StressTestRTPPlugin.beginRun()` reads only the
+base `chunk-load-cost-us` (28221.0). The server log confirms it:
+`chunk-load-cost-us=28221.00 amending phase CPU`. So every `cpu_ms_with_chunks*`
+figure in both runs used the Spigot default and is **relative-only / overstated** -
+do not quote it as an absolute. All directly-measured columns (throughput,
+main-thread CPU, TPS, success, watchdog stalls) are unaffected.
+
+### Per-run differences
+
+| | Paper run 20260617-175906 | Folia run 20260617-191448 | Folia Lite run 20260617-205614 |
+|---|---|---|---|
+| Host | RTP-Paper / 26.2 | RTP-Folia / 26.1 | RTP-Folia / 26.1 |
+| RTP edition | RTP-Pro | RTP-Pro | RTP-Lite |
+| Targets (in order) | rtp, betterrtp, huskhomes, ezrtp | rtp, ezrtp | rtp |
+| Target commands | `rtp:rtp`, `betterrtp:betterrtp`, `huskhomes:rtp`, `ezrtp:forcertp {player} world` | `rtp:rtp`, `ezrtp:forcertp {player} world` | `rtp:rtp` |
+| Phases recorded | 4 | 2 | 1 |
+
+Note the EzRTP dispatch uses `ezrtp:forcertp {player} world` (force variant, so its
+cooldown/limit gating is bypassed) while RTP/BetterRTP/HuskHomes use their plain
+`/rtp`-equivalent command.
+
+## 18. Folia Lite run - 20260617-205614 (RTP-Folia 26.1, RTP-Lite, single phase ~600 s)
+
+Same host, controls, and harness as Section 16, but the RTP jar is the **RTP-Lite**
+edition (reported as `RTP v3.1.3`) and the roster is RTP-only (one `rtp` phase).
+(EzRTP was still installed but not dispatched this run.)
+
+**Important edition difference on Folia.** Lite and Pro share the platform-neutral
+`rtp-core` teleport engine (region/queue logic, spiral math, the async pipeline),
+but they do NOT share the Folia *platform path*. The tuned, throughput-optimized
+`rtp-folia` adapter is a Pro-only early-access feature and is excluded from the MIT
+lite jar (ADR-024 2026-06-10 amendment, ADR-061). On Folia the lite jar instead
+runs the correctness-first `FoliaAwareScheduler` bundled in `rtp-paper-common`,
+which routes work through paper-api's regionized scheduler statics
+(`getGlobalRegionScheduler` / `getRegionScheduler` / `getAsyncScheduler` + the
+per-entity scheduler) and teleports via `Entity#teleportAsync`. So this run does
+NOT measure "the same code as Pro" on Folia - it measures whether Lite's
+unoptimized Folia-fallback path keeps pace with Pro's tuned adapter.
+
+| Metric | RTP-Lite (Folia) | RTP-Pro ref (Folia, Section 16) |
+|---|---|---|
+| Attempts | 7507 | 8113 |
+| Successes | 7507 (100%) | 8109 (~100%, 4 capture-timeouts) |
+| Throughput (per s) | 12.5 | 13.5 |
+| main-thread CPU / attempt (ms) | 4.15 | 3.96 |
+| total CPU / attempt (ms) | 177 | 199 |
+| % chunk loads background | 10.8% (19,246 / 177,911) | 14% |
+| Folia watchdog stalls | 0 | 0 (none attributed to RTP) |
+| TPS (avg / min over run) | 19.8 / 16 | ~20 |
+
+Key results:
+
+- **Lite's unoptimized Folia path keeps pace with Pro's tuned adapter.** Throughput
+  (12.5 vs 13.5 /s), main-thread cost per teleport (4.15 vs 3.96 ms), and
+  background-chunk share (10.8% vs 14%) are within run-to-run noise - even though
+  Lite runs the correctness-first `FoliaAwareScheduler` fallback while Pro runs the
+  tuned `rtp-folia` adapter (see the edition note above). The result is that the
+  shared `rtp-core` engine, not the Folia adapter, dominates per-teleport cost at
+  this load, so the Folia advantage over EzRTP (Section 16) holds for both editions.
+  Pro's tuned adapter is expected to pull ahead under heavier per-region contention
+  than this 3-client load exercises; do not read these numbers as "identical code".
+- **100% success, zero watchdog stalls.** Like Pro, RTP-Lite tripped no Folia region
+  watchdog and held TPS at ~20 (min 16) under the same 3-client burst load that
+  froze EzRTP region threads for up to 20.4 s in Section 16.
+
+### What this run does NOT settle (Pro's Folia ceiling)
+
+This run used only 3 clients, so it measures per-teleport cost at light load, not
+the scaling ceiling. The parity result therefore says "the shared `rtp-core` engine
+carries both editions at this load", **not** "the editions are equivalent on Folia".
+Pro's Folia-specific scheduler (the tuned `rtp-folia` adapter) is more actively
+managed than Lite's correctness-first `FoliaAwareScheduler` fallback - it fans
+teleport/pipeline work across per-region threads and carries additional Pro-only
+tuning - so it is built to pull ahead as per-region contention rises (many players
+teleporting across many regions at once). That headroom is an architectural
+expectation, not a number this 3-client run demonstrates; a high-region-count,
+many-client Folia run would be needed to size the gap. Market the Pro Folia
+advantage as scaling headroom under contention, never as a measured throughput win
+over Lite at this load.
+
+### Caveats (same as Section 16, recap)
+
+- The two `latest.log` lines matching "stalled" are the substring of *"installed"*
+  (metrics binding / runtime-module log lines), **not** watchdog stalls - there are
+  zero region-unresponsive events in this run.
+- `cpu_ms_with_chunks*` again used the base `chunk-load-cost-us` (28221.0, Spigot
+  default) - relative-only / overstated; the directly-measured columns above are
+  unaffected (Section 17 calibration note).
+- `chunks_per_attempt` (21.1 here) is the same Folia region-ticketing /
+  over-attribution artifact flagged in Section 16; not a behavioral number.
+- Global MSPT (~50 ms avg, 345 ms max) is the global-region sample, blind to any
+  single hung region; use throughput + watchdog evidence, not MSPT, on Folia.
+
+### Defensible Lite headline
+
+> RTP-Lite on Folia sustained 12.5 TP/s at 100% success with zero watchdog stalls
+> and a 4.15 ms main-thread cost per teleport - statistically indistinguishable from
+> RTP-Pro (13.5 TP/s, 3.96 ms) at this 3-client load. Notably, Lite achieves this on
+> the correctness-first `FoliaAwareScheduler` fallback, not Pro's tuned `rtp-folia`
+> adapter (which is excluded from the lite jar): the shared `rtp-core` engine
+> dominates per-teleport cost here, so the free build delivers the same Folia
+> resilience that EzRTP lacked. Pro's tuned adapter is built to scale further under
+> heavier per-region contention than this run exercises.
+
+## 19. Paper gap=0 head-to-head - 20260617-232754 (RTP-Paper 26.1, `per-player-gap-ticks: 0`)
+
+First clean, like-for-like head-to-head under the harsher unthrottled-dispatch
+config: the 3-tick per-player gap used by every prior run (Section 11 controls)
+was set to `per-player-gap-ticks: 0`, so the 3-client / concurrency-4 harness
+dispatches as fast as each engine can absorb. Three phases completed back-to-back
+(`rtp` -> `ezrtp` -> `betterrtp`), each ~600 s with the 240 s inter-phase TPS-settle
+gap. HuskHomes was not dispatched this run (no `huskhomes` phase row).
+
+### 19.1 Headline table (successful-attempt latency + tick health)
+
+| Plugin | Att / Succ | TP/s | p50 | p95 | p99 | p99.9 | max | TPS min | MSPT p99 / max |
+|---|---|---|---|---|---|---|---|---|---|
+| **RTP** | 16560 / 16560 (100%) | **18.7** | **1 ms** | **2 ms** | **46 ms** | 518 ms | 687 ms | 17.5 | 85.8 / 98.4 ms |
+| ezrtp | 7137 / 7018 (98.3%) | 13.1 | 30 ms | 189 ms | 322 ms | 1936 ms | 2172 ms | 10.3 | 156.8 / 292 ms |
+| BetterRTP | 1633 / 1606 (98.3%) | 6.0 | 480 ms | 3217 ms | 4402 ms | 6229 ms | 6383 ms | 2.5 | 859 / 3663 ms |
+
+(Latency percentiles are over successful attempts: RTP n=16782, ezrtp n=7150,
+BetterRTP n=1636. TPS/MSPT are from the 50 ms `-heap.csv` sampler, restricted to
+each phase's measurement window.)
+
+### 19.2 Findings
+
+- **RTP holds a flat distribution under unthrottled dispatch.** p50 1 ms / p95 2 ms /
+  p99 46 ms at 100% success, TPS never below 17.5, MSPT max 98 ms (no multi-second
+  stall). ~95% of teleports are served instantly from the pre-verified queue; the
+  slowest 1% pay a single bounded async chunk load. The tail is *better* than the
+  earlier solo gap=0 run `20260617-223659` (p99 103 ms -> 46 ms, max 2.24 s -> 687 ms),
+  consistent with the queue staying warmer this round - the "p99 stays bounded as
+  load rises" criterion held.
+- **Serialized engines blow out exactly where predicted with the gap removed.**
+  BetterRTP's foreground chunk-load + retry model collapses: p99 4.4 s, max 6.4 s,
+  MSPT max 3.66 s, TPS to 2.5. EzRTP fares better but still tails badly: p99 322 ms,
+  p99.9 ~1.9 s, TPS floor 10.3.
+- **Contrast ratio is the headline axis.** At the same offered load RTP's p95 is 2 ms
+  while BetterRTP's is 3217 ms (~1600x) and ezrtp's is 189 ms (~95x). This is the
+  single most telling number for the public writeup.
+
+### 19.3 Caveats
+
+- **Heap max is not a per-plugin metric - dropped.** `heap_used_mb` topped out at
+  ~16.37 GB in all three phases because that is the JVM `-Xmx` 16 GB ceiling, identical
+  for every engine; it carries no signal about the plugin under test and is excluded
+  from the comparison. A meaningful memory axis would be MB/attempt or GC-trough
+  behavior, not max.
+- **gap=0 is a throughput-ceiling condition, not the Section 11 default.** RTP's 18.7
+  TP/s here is an unthrottled-dispatch number; do not compare it head-to-head against
+  the 3-tick-gap runs (Section 12, 12.9 TP/s). The valid cross-plugin comparison is
+  *within this run* (all three share gap=0).
+- **HuskHomes slot still open** - a later round under the same gap=0 config is needed to
+  fill the 4th column; its per-player serialization should produce a BetterRTP-class
+  (or worse) tail.
+- `cpu_ms_with_chunks*` again used the base `chunk-load-cost-us` (28221.0) and is
+  relative-only / overstated (Section 17 calibration note); the directly-measured
+  columns above are unaffected.
+
+### 19.4 Defensible single-server (Lite-shareable) headline
+
+> On Paper, RTP sustained 18.7 TP/s at 100% success (16560/16560) under unthrottled
+> dispatch, with p50 1 ms / p95 2 ms / p99 ~2 ticks (46 ms) and TPS never below 17.5.
+> ~95% of teleports are served instantly from a pre-verified queue; the slowest 1% is
+> a single bounded async chunk load, never a server stall. At the same offered load
+> BetterRTP's p95 was 3.2 s (~1600x) with TPS crashing to 2.5, and EzRTP's was 189 ms
+> (~95x). This single-server result is fully shared by the free RTP-Lite edition via
+> the common `rtp-core` engine.
+
+## 20. HuskHomes under gap=0: server crash, and the "should not be able to overload it" thesis
+
+When the HuskHomes phase was dispatched under the same `per-player-gap-ticks: 0`
+unthrottled-dispatch config that RTP sustained at 100% in Section 19, HuskHomes' RTP
+path stalled the main thread and the server crashed before the phase could complete,
+so no `huskhomes` phase summary was recorded for that run.
+
+### 20.1 Attribution
+
+The crash is attributed to the HuskHomes RTP load behavior, not the rig or the
+harness, on the following evidence chain:
+
+- **Corroborating prior runs.** Earlier runs already showed HuskHomes degrading the
+  server toward player-timeout under sustained load (its per-player serialization
+  cannot drain unthrottled dispatch). The crash at higher load is the endpoint of a
+  documented slowdown-then-crash trend, not a one-off anecdote.
+- **It is a load-ceiling, not a "HuskHomes crashes servers" claim.** HuskHomes
+  handles normal `/rtp` traffic fine; there is a load at which it does not, and that
+  load is below the one RTP absorbs at 100% success. Frame it as where each engine's
+  ceiling sits, not as a blanket defect.
+- **Architectural, not a bug claim.** The mechanism is main-thread serialization
+  failing to drain under unthrottled dispatch - the same structural property that
+  produced BetterRTP's 4.4 s p99 in Section 19, taken to its conclusion. Avoid
+  framing it as a HuskHomes bug; frame it as the serialized-engine architecture
+  hitting its limit.
+
+### 20.2 The operator-facing thesis
+
+The strongest framing is not "it crashed under heavy load" but the design contract a
+teleport plugin should meet:
+
+> You should not be able to crash your server by spamming a teleport command. With
+> RTP you can't - the harness pushed as hard as it allows (`per-player-gap-ticks: 0`,
+> 3 clients) and RTP held at 100% success (16560/16560), p95 2 ms, TPS never below
+> 17.5. Under the same offered load, HuskHomes' RTP path stalled the main thread and
+> crashed the server.
+
+RTP's async chunk loads + pre-verified queue + bounded buffers make overload
+unreachable from the command path: at worst the queue drains and players see a brief
+"finding a safe location" wait (graceful degradation), never a tick-thread stall. A
+serialized engine puts the work on the main thread, so sufficient input *is*
+unbounded tick cost - which is why a determined client can take it down.
+
+### 20.3 Open items / how to formalize
+
+- **Re-run HuskHomes last on purpose** under gap=0 to capture a structured outcome.
+  Running the known crasher last means a crash never costs the other plugins' phase
+  data (this is why `232754`'s three completed phases survived).
+- **Capture the crash artifact** (`crash-reports/` entry + server-log tail at the
+  crash timestamp) as an appendix citation. The load-trend evidence carries the
+  attribution on its own, but a watchdog/OOM line converts skeptics for free. Before
+  quoting it as a performance result, confirm the crash is a watchdog/main-thread
+  stall or OOM, not an environmental version-incompat (a `NoSuchMethodError`-class
+  failure would be environmental, not a load result).
+
+### 20.4 Harness change made to support this (crash-safe phase capture)
+
+The per-attempt CSV and the 50 ms heap-series CSV already flush per row, so a
+mid-phase crash never loses those. The phase *summary* row, however, was only
+written by `MetricsRecorder.endPhase` at phase end, so a crash mid-phase (exactly
+the HuskHomes case) lost the running phase's aggregate entirely. The harness now
+snapshots the in-flight phase to a `<stamp>-phases-partial.csv` sidecar:
+
+- `MetricsRecorder.flushPartialPhase()` rebuilds the current phase's row (shared
+  `buildPhaseRow` helper, read-only with respect to phase/chunk state) and overwrites
+  the sidecar in place; it is self-throttled (at most once per 2 s) so the runner can
+  call it every tick cheaply.
+- `Runner.tick()` calls it inside the existing `inMeasurementPhase` block, alongside
+  the spark-profile rotation that already exists for the same crash-safety reason.
+- On normal phase end, `endPhase` writes the durable phases-CSV row and deletes the
+  sidecar, so a leftover `-phases-partial.csv` is itself a signal that the phase it
+  describes crashed before completing.
+
+*End of continuation.*

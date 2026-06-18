@@ -774,11 +774,9 @@ public final class CommandTreeMenuBuilder {
 
         // Source of truth for visible keys is the loaded parser data, NOT the
         // raw enum declaration. The two diverge whenever a packaging variant
-        // omits a key from its shipped YAML on purpose (e.g. the lite jar
-        // intentionally drops `backlogCacheCap` from `regions/default.yml`
-        // per ADR-024 / ADR-028 — the in-code default still works at runtime,
-        // but admins are not meant to discover or edit the knob through the
-        // menu). Iterating `myClass.getEnumConstants()` would re-expose every
+        // omits a key from its shipped YAML on purpose — the in-code default
+        // still works at runtime, but admins are not meant to discover or edit
+        // an omitted knob through the menu. Iterating `myClass.getEnumConstants()` would re-expose every
         // such key just because it exists in the Java enum, which is the bug
         // this branch fixes. Enum declaration order is preserved by walking
         // the constants and gating on `data.containsKey`.

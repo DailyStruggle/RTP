@@ -42,19 +42,24 @@ public final class AsyncTaskProcessing extends RTPRunnable {
       io.github.dailystruggle.rtp.common.tools.MemoryTracker.updateTracking(trackingId);
     }
 
-    try {
-      futuresSemaphore.acquire();
-      List<CompletableFuture<?>> futures = new ArrayList<>(RTP.futures.size());
-      while (!RTP.futures.isEmpty()) {
-        CompletableFuture<?> future = RTP.futures.poll();
-        if (future != null && !future.isDone()) futures.add(future);
-      }
+    // Only allocate a scratch list when there is actually something to drain.
+    // This pulse runs every period; allocating an ArrayList on every idle tick
+    // (the common case, when no futures are pending) is pure GC churn.
+    if (!RTP.futures.isEmpty()) {
+      try {
+        futuresSemaphore.acquire();
+        List<CompletableFuture<?>> futures = new ArrayList<>(RTP.futures.size());
+        while (!RTP.futures.isEmpty()) {
+          CompletableFuture<?> future = RTP.futures.poll();
+          if (future != null && !future.isDone()) futures.add(future);
+        }
 
-      RTP.futures.addAll(futures);
-    } catch (InterruptedException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
-    } finally {
-      futuresSemaphore.release();
+        RTP.futures.addAll(futures);
+      } catch (InterruptedException e) {
+        RTP.log(Level.WARNING, e.getMessage(), e);
+      } finally {
+        futuresSemaphore.release();
+      }
     }
 
     if (isCancelled()) return;
@@ -85,8 +90,11 @@ public final class AsyncTaskProcessing extends RTPRunnable {
 //    RTP.log(Level.FINER, "[Pulse] selectionAPI.compute() invoked");
     RTP.selectionAPI.compute();
 
-    List<Region> regions = new ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
-    int size = regions.size();
+    // Avoid copying the whole region collection into a fresh ArrayList on every
+    // pulse: only one region (at index `step`) is ever used, and only when
+    // betweenStep == 0. Read the size directly and fetch the nth region by
+    // iteration when needed (below) so an idle pulse allocates nothing here.
+    int size = RTP.selectionAPI.permRegionLookup.size();
 
     if (size == 0) {
       RTP.log(Level.FINER, "[Pulse] no regions configured; skipping budget loop");
@@ -120,9 +128,17 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     // step computation according to period
     if (betweenStep == 0) {
       if (isCancelled()) return;
-      if (step >= regions.size()) return;
+      if (step >= size) return;
 
-      Region region = regions.get((int) step);
+      Region region = null;
+      long idx = 0;
+      for (Region r : RTP.selectionAPI.permRegionLookup.values()) {
+        if (idx++ == step) {
+          region = r;
+          break;
+        }
+      }
+      if (region == null) return;
       // Diagram 02 (CheckPeriod -> ExecuteRegion): this region's turn has come.
 //      RTP.log(Level.FINE,
 //          "[Pulse] executing region '" + region.name + "' (step=" + step

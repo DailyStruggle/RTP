@@ -2,7 +2,7 @@
 
 The Folia-native, region-aware random teleport plugin for production Minecraft servers. Pre-generated, pre-validated locations resolve in 0-2 ticks with no main-thread chunk I/O and no region thrashing under load.
 
-**Supported:** Spigot, Paper, Folia 1.20+, Fabric 1.20+/1.21+ (all stable).
+**Supported:** Spigot, Paper, Folia 1.20+, Fabric 1.20+/1.21+ (all stable), NeoForge 1.21.1+.
 
 🔗 **[Get RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** — supports continued development and unlocks the Pro feature set.
 
@@ -51,7 +51,8 @@ Legacy random-teleport plugins reroll random coordinates until one lands somewhe
 | Paper | 1.20 | Uses async chunk loading APIs |
 | Folia | 1.20 | Full regional-thread scheduling support |
 | Fabric | 1.20 | Native mod support - **first-class, stable**, tested regularly, at feature parity with the Bukkit family. Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x ([details](docs/dev/MULTI_PLATFORM_PLAN.md)) |
-| Forge / NeoForge | — | No native adapter planned. Use a Bukkit-compatibility launcher (e.g. **Arclight** or **Mohist**) and run the Spigot/Paper build. |
+| NeoForge | 1.21.1 | Native mod adapter, in-scope. Carriers for 1.21.1 and MC 26.x; the 26.x carrier loads and runs, with broader runtime testing ongoing ([details](docs/dev/NEOFORGE_NOTES.md)). |
+| Forge (legacy) | — | No native adapter. Use a Bukkit-compatibility launcher (e.g. **Arclight** or **Mohist**) and run the Spigot/Paper build. |
 
 **Runtime:** Java 21+
 
@@ -125,6 +126,7 @@ Custom shapes can be registered at runtime via the `rtp-api`. See the `addons/` 
 | `platforms/rtp-paper/` | Paper platform adapter (async chunk loading). |
 | `platforms/rtp-folia/` | Folia platform adapter (regional thread scheduling). |
 | `platforms/rtp-fabric/` | Fabric platform adapter and mod entry point. |
+| `platforms/rtp-neoforge/` | NeoForge platform adapter and mod entry point. |
 | `addons/` | Example addons: Iris integration, Glide. (Claim plugin integrations are folded into the core). |
 | `Python Test Scripts/` | Visualisation scripts for distribution math and geometry validation. |
 

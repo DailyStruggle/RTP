@@ -23,7 +23,7 @@ plugins {
     id 'com.gradleup.shadow'
 }
 group = 'io.github.dailystruggle'
-version = '1.0-SNAPSHOT'
+version = '1.0.0'
 
 // The MC 26.x carriers are compiled to Java 25 bytecode. To consume (shade) them
 // the assembly's runtime classpath must advertise the same JVM target, so when a

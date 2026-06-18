@@ -65,6 +65,16 @@ public class MetricsRecorder {
          *  pair, which double-counted concurrent attempts because the
          *  underlying counter was global. */
         public volatile long attributedChunkLoads = -1L;
+        /** Chunk loads attributed to this attempt after removing the
+         *  post-teleport arrival ring (the render-distance square the server
+         *  loads around the player on arrival, which is plugin-independent and
+         *  scales with view distance). Computed by {@link ChunkLoadCounter#endAttempt}
+         *  from the recorded load coordinates and the destination. Reflects the
+         *  plugin's destination-selection work (typically ~1). Falls back to
+         *  {@link #attributedChunkLoads} for timeouts / failures where the
+         *  destination is unknown, and remains {@code -1L} when no counter is
+         *  wired. */
+        public volatile long selectionChunkLoads = -1L;
 
         public Attempt(UUID id, String player, String world, String targetLabel, long dispatchEpochMs,
                        double fromX, double fromZ,
@@ -95,7 +105,7 @@ public class MetricsRecorder {
             "attempt_id,player,world,target_label,dispatch_epoch_ms,teleport_epoch_ms,latency_ms,"
                     + "success,fail_reason,from_x,from_z,to_x,to_z,distance,"
                     + "tps_at_dispatch,mspt_at_dispatch,heap_used_mb_at_dispatch,"
-                    + "chunks_loaded_during_attempt,chunk_load_cost_ms";
+                    + "chunks_loaded_during_attempt,chunk_load_cost_ms,chunks_selection";
 
     public static final String PHASES_CSV_HEADER =
             "phase_label,start_epoch_ms,end_epoch_ms,wall_ms,attempts,successes,"
@@ -103,10 +113,21 @@ public class MetricsRecorder {
                     + "cpu_ms_per_attempt_total,cpu_ms_per_attempt_main,"
                     + "chunks_loaded,chunks_loaded_attributed,chunks_loaded_background,"
                     + "chunks_per_attempt,"
-                    + "chunk_load_cost_ms,cpu_ms_with_chunks,cpu_ms_with_chunks_per_attempt";
+                    + "chunk_load_cost_ms,cpu_ms_with_chunks,cpu_ms_with_chunks_per_attempt,"
+                    + "chunks_selection,chunks_selection_per_attempt";
 
     private final Path csvPath;
     private final Path phasesCsvPath;
+    /** Sidecar holding a periodically-refreshed snapshot of the in-flight
+     *  phase, so a mid-phase server crash (e.g. a competitor plugin stalling
+     *  the main thread to death) still leaves the latest partial aggregate of
+     *  the phase that was running. Overwritten in place on each flush and
+     *  removed when the phase closes normally. */
+    private final Path partialPhaseCsvPath;
+    /** Wall-clock throttle so {@link #flushPartialPhase} can be called every
+     *  tick cheaply; the sidecar is only rewritten at most once per interval. */
+    private static final long PARTIAL_PHASE_FLUSH_MS = 2000L;
+    private volatile long lastPartialFlushMs = 0L;
     private final ConcurrentLinkedQueue<Attempt> finished = new ConcurrentLinkedQueue<>();
     private final AtomicInteger inFlight = new AtomicInteger(0);
     private final AtomicInteger total = new AtomicInteger(0);
@@ -136,6 +157,9 @@ public class MetricsRecorder {
         String phasesName = (dot > 0 ? name.substring(0, dot) : name) + "-phases"
                 + (dot > 0 ? name.substring(dot) : ".csv");
         this.phasesCsvPath = csvPath.resolveSibling(phasesName);
+        String partialName = (dot > 0 ? name.substring(0, dot) : name) + "-phases-partial"
+                + (dot > 0 ? name.substring(dot) : ".csv");
+        this.partialPhaseCsvPath = csvPath.resolveSibling(partialName);
         Files.createDirectories(csvPath.getParent());
         Files.writeString(csvPath, CSV_HEADER + System.lineSeparator(),
                 StandardCharsets.UTF_8,
@@ -299,7 +323,8 @@ public class MetricsRecorder {
                 fmt(a.msptAtDispatch),
                 Long.toString(a.heapUsedMbAtDispatch),
                 chunkDelta,
-                chunkCostMs);
+                chunkCostMs,
+                a.selectionChunkLoads >= 0 ? Long.toString(a.selectionChunkLoads) : "");
         try (BufferedWriter w = Files.newBufferedWriter(csvPath, StandardCharsets.UTF_8,
                 StandardOpenOption.APPEND)) {
             w.write(row);
@@ -346,6 +371,64 @@ public class MetricsRecorder {
         if (!recording) return;
         if (phaseLabel == null) return;
         long endEpoch = System.currentTimeMillis();
+        String row = buildPhaseRow(endEpoch);
+        try (BufferedWriter w = Files.newBufferedWriter(phasesCsvPath, StandardCharsets.UTF_8,
+                StandardOpenOption.APPEND)) {
+            w.write(row);
+            w.newLine();
+        } catch (IOException e) {
+            // Phases CSV write failures are diagnostic-only; the run continues.
+            throw new RuntimeException("phases CSV append failed: " + e.getMessage(), e);
+        }
+        // The phase closed normally; its summary is now in the durable phases
+        // CSV, so the partial sidecar is no longer needed.
+        try {
+            Files.deleteIfExists(partialPhaseCsvPath);
+        } catch (IOException ignored) { /* sidecar cleanup is best-effort */ }
+        lastPartialFlushMs = 0L;
+        // Clear phase state.
+        phaseLabel = null;
+        phaseStartEpochMs = -1L;
+        phaseStartProcessCpuNs = -1L;
+        phaseStartMainCpuNs = -1L;
+    }
+
+    /**
+     * Periodically snapshots the in-flight phase to {@link #partialPhaseCsvPath}
+     * so a mid-phase server crash still leaves the latest partial aggregate of
+     * the phase that was running (the per-attempt and heap-series CSVs already
+     * flush per row, but the phase summary is only written by {@link #endPhase}
+     * at phase end). Safe to call every tick: self-throttled to at most once
+     * per {@link #PARTIAL_PHASE_FLUSH_MS} and a no-op when no phase is active or
+     * recording is disabled. Read-only with respect to phase/chunk state.
+     */
+    public void flushPartialPhase() {
+        if (!recording) return;
+        if (phaseLabel == null) return;
+        long now = System.currentTimeMillis();
+        if (now - lastPartialFlushMs < PARTIAL_PHASE_FLUSH_MS) return;
+        lastPartialFlushMs = now;
+        String row = buildPhaseRow(now);
+        try (BufferedWriter w = Files.newBufferedWriter(partialPhaseCsvPath, StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+            w.write(PHASES_CSV_HEADER);
+            w.newLine();
+            w.write(row);
+            w.newLine();
+        } catch (IOException ignored) {
+            // Partial-phase sidecar failures are best-effort and intentionally
+            // quiet: the durable phases CSV is still written at phase end, and
+            // the per-attempt CSV is unaffected.
+        }
+    }
+
+    /**
+     * Builds one phases-CSV row for the currently-active phase, measured up to
+     * {@code endEpoch}. Read-only: does not clear phase state or reset the
+     * chunk counter, so it is reused for both the final {@link #endPhase} row
+     * and the periodic {@link #flushPartialPhase} snapshot.
+     */
+    private String buildPhaseRow(long endEpoch) {
         CpuSampler s = cpuSampler;
         long endProcessCpu = s != null ? s.processCpuTimeNs() : -1L;
         long endMainCpu = s != null ? s.mainThreadCpuTimeNs() : -1L;
@@ -368,6 +451,11 @@ public class MetricsRecorder {
         long chunksLoaded = cc != null ? cc.phaseTotal() : -1L;
         long chunksAttributed = cc != null ? cc.phaseAttributed() : -1L;
         long chunksBackground = cc != null ? cc.phaseBackground() : -1L;
+        // Selection loads: attributed minus the post-teleport arrival ring.
+        // This is the view-distance-corrected per-attempt chunk metric.
+        long chunksSelection = cc != null ? cc.phaseSelection() : -1L;
+        double chunksSelectionPerAtt = (chunksSelection >= 0 && attempts > 0)
+                ? (double) chunksSelection / attempts : -1.0;
         // chunks_per_attempt now reports attributed loads (i.e. loads charged
         // to a specific in-flight teleport via plugin-ticket / main-thread
         // attribution) rather than the global phase total. The total and
@@ -415,20 +503,10 @@ public class MetricsRecorder {
                 chunksPerAtt >= 0 ? fmt(chunksPerAtt) : "",
                 chunkLoadCostMs >= 0 ? fmt(chunkLoadCostMs) : "",
                 cpuMsWithChunks >= 0 ? Long.toString(cpuMsWithChunks) : "",
-                cpuWithChunksPerAtt >= 0 ? fmt(cpuWithChunksPerAtt) : "");
-        try (BufferedWriter w = Files.newBufferedWriter(phasesCsvPath, StandardCharsets.UTF_8,
-                StandardOpenOption.APPEND)) {
-            w.write(row);
-            w.newLine();
-        } catch (IOException e) {
-            // Phases CSV write failures are diagnostic-only; the run continues.
-            throw new RuntimeException("phases CSV append failed: " + e.getMessage(), e);
-        }
-        // Clear phase state.
-        phaseLabel = null;
-        phaseStartEpochMs = -1L;
-        phaseStartProcessCpuNs = -1L;
-        phaseStartMainCpuNs = -1L;
+                cpuWithChunksPerAtt >= 0 ? fmt(cpuWithChunksPerAtt) : "",
+                chunksSelection >= 0 ? Long.toString(chunksSelection) : "",
+                chunksSelectionPerAtt >= 0 ? fmt(chunksSelectionPerAtt) : "");
+        return row;
     }
 
     private static String csv(String s) {

@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.GenericVerticalAdjustorKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -280,7 +281,7 @@ public class SelectionAPI {
           name,
           worldFinal,
           shape,
-          base.vert(),
+          dimensionVert(worldFinal, base.vert()),
           base.worldBorderOverride(),
           base.requirePermission(),
           base.cacheCap(),
@@ -293,6 +294,53 @@ public class SelectionAPI {
           base.detailedRegionInit());
       return new Region(name, newSettings);
     });
+  }
+
+  /**
+   * Resolve a dimension-appropriate vertical adjustor for a synthesized
+   * world-override region. For overworld-style worlds the {@code baseVert} is
+   * returned unchanged; for worlds whose name ends with {@code _nether} or
+   * {@code _the_end} the vert is seeded to {@code LINEAR} searching downward
+   * (direction {@code 2}) with skylight not required and the vertical window
+   * clamped to the dimension - matching the seeding applied on every other
+   * region-creation path via {@code NetherEndConfigAmender} when the vert is
+   * unspecified.
+   *
+   * @param world    the target world the synthesized region will use.
+   * @param baseVert the base region's vert, used as the fallback and as the
+   *                 source of the initial {@code [minY, maxY]} window.
+   * @return a dimension-tuned vert for nether/end worlds, otherwise {@code baseVert}.
+   */
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private VerticalAdjustor<?> dimensionVert(RTPWorld<?> world, VerticalAdjustor<?> baseVert) {
+    String worldName = world.name();
+    boolean nether = worldName.endsWith("_nether");
+    boolean end = worldName.endsWith("_the_end");
+    if (!nether && !end) return baseVert;
+
+    Factory<VerticalAdjustor<?>> factory =
+        (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+    if (factory == null) return baseVert;
+    VerticalAdjustor<?> resolved = (VerticalAdjustor<?>) factory.get("linear");
+    if (resolved == null) return baseVert;
+
+    int maxY = baseVert != null ? baseVert.maxY() : world.getMaxHeight();
+    int minY = baseVert != null ? baseVert.minY() : world.getMinHeight();
+    if (nether) maxY = Math.min(maxY, 128);
+    maxY = Math.min(maxY, world.getMaxHeight());
+    if (maxY < minY) minY = world.getMinHeight();
+    else minY = Math.max(minY, world.getMinHeight());
+
+    try {
+      VerticalAdjustor raw = resolved;
+      raw.set(GenericVerticalAdjustorKeys.maxY, maxY);
+      raw.set(GenericVerticalAdjustorKeys.minY, minY);
+      raw.set(GenericVerticalAdjustorKeys.direction, 2);
+      raw.set(GenericVerticalAdjustorKeys.requireSkyLight, false);
+    } catch (IllegalArgumentException ignored) {
+      return baseVert;
+    }
+    return resolved;
   }
 
   /**

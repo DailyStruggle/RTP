@@ -301,9 +301,16 @@ public class SendMessage {
       Function<BaseComponent[], T> miniFinisher,
       Function<String, T> legacyFinisher) {
     if (text == null) return empty;
-    if (MINIMESSAGE_AVAILABLE && miniMessageTagPattern.matcher(text).find()) {
+    // Resolve placeholders first (no legacy color translation) so that any
+    // MiniMessage/gradient markup introduced *by* a placeholder is detected and
+    // rendered rather than printed literally. The recurring failure mode is a
+    // prefix placeholder (e.g. [P0] -> "<rainbow>[RTP]</rainbow>") whose tag is
+    // absent from the raw, unresolved text and so would otherwise be missed by
+    // both the MiniMessage detector and GradientExpander.
+    String resolved = formatNoColor(player, text);
+    if (MINIMESSAGE_AVAILABLE && miniMessageTagPattern.matcher(resolved).find()) {
       try {
-        return miniFinisher.apply(MiniMessageRenderer.render(formatNoColor(player, text)));
+        return miniFinisher.apply(MiniMessageRenderer.render(resolved));
       } catch (Throwable t) {
         RTP.log(
             Level.FINE,
@@ -315,7 +322,7 @@ public class SendMessage {
     // so they render on servers that do not bundle Adventure (e.g. pure Spigot).
     // On Paper/Folia the MiniMessage path above already handled them; this only
     // fires when MINIMESSAGE_AVAILABLE is false or the MiniMessage render threw.
-    return legacyFinisher.apply(format(player, GradientExpander.expand(text)));
+    return legacyFinisher.apply(format(player, GradientExpander.expand(resolved)));
   }
 
   private static String Hex2Color(String text) {

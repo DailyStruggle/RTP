@@ -22,9 +22,13 @@ import java.util.function.IntSupplier;
  * Periodic sampler for TPS, MSPT, and heap-used (MB).
  *
  * <p>Reads {@code Server#getTPS()} and {@code Server#getAverageTickTime()}
- * reflectively because they are Paper / Folia API additions absent from
- * pure Spigot. On Spigot, both metrics fall back to main-thread wall-clock
- * sampling:
+ * reflectively because they are Paper API additions absent from pure Spigot.
+ * On Folia both methods exist but throw (TPS/MSPT are per-region there, with
+ * no global aggregate), so the sampler probes them once at construction and,
+ * when they are absent (Spigot) <em>or</em> throw (Folia), falls back to
+ * tick-aligned wall-clock sampling. The fallback timers are scheduled via
+ * {@link Sched#runGlobalTimer} so they land on the global region scheduler on
+ * Folia and the main thread on Spigot/Paper:
  * <ul>
  *   <li><b>TPS</b>: a 20-tick timer measures wall delta and reports
  *       {@code min(20, 20 / secs)}.</li>
@@ -61,8 +65,8 @@ public final class TpsMsptHeapSampler {
     private final List<Long>   heapSamples = new ArrayList<>(1024);
 
     private Object taskId = null;
-    private int spigotTpsTaskId = -1;
-    private int spigotMsptTaskId = -1;
+    private Object spigotTpsTaskId = null;
+    private Object spigotMsptTaskId = null;
     private long spigotTpsLastTick = -1L;
     private long spigotTpsLastWallNs = -1L;
     private long spigotMsptLastWallNs = -1L;
@@ -72,6 +76,12 @@ public final class TpsMsptHeapSampler {
     // Reflective access — resolved once.
     private final Method getTpsMethod;
     private final Method getAvgTickTimeMethod;
+    // Whether the native methods actually return a usable value. They exist on
+    // Folia but throw UnsupportedOperationException (TPS/MSPT are per-region
+    // there, with no global aggregate), so method presence is not enough — we
+    // probe once and fall back to wall-clock tick sampling when they throw.
+    private final boolean tpsNativeWorks;
+    private final boolean msptNativeWorks;
 
     // Heap-pressure-over-time series. Optional per-run CSV that records one
     // row per sample so heap-used can be plotted against cumulative /rtp
@@ -95,6 +105,20 @@ public final class TpsMsptHeapSampler {
         this.periodMs = periodMs;
         this.getTpsMethod = lookup("getTPS");
         this.getAvgTickTimeMethod = lookup("getAverageTickTime");
+        this.tpsNativeWorks = probe(getTpsMethod, res -> res instanceof double[] arr && arr.length > 0);
+        this.msptNativeWorks = probe(getAvgTickTimeMethod, res -> res instanceof Number);
+    }
+
+    /** Invokes {@code m} once and returns true iff it yields a usable value
+     *  (no exception, and the result satisfies {@code ok}). Used to detect
+     *  Folia, where getTPS/getAverageTickTime exist but throw. */
+    private static boolean probe(Method m, java.util.function.Predicate<Object> ok) {
+        if (m == null) return false;
+        try {
+            return ok.test(m.invoke(Bukkit.getServer()));
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     private static Method lookup(String name) {
@@ -110,28 +134,28 @@ public final class TpsMsptHeapSampler {
         // Snapshot loop runs async — pure JMX + already-computed Bukkit values.
         taskId = Sched.runAsyncTimer(plugin, this::sample, periodMs);
 
-        // Spigot fallback: poll a tick counter on the main thread once per
-        // second to estimate TPS. On Folia this would throw if scheduled to
-        // the BukkitScheduler synchronously, so only enable when no native
-        // getTPS is available AND we're not on Folia.
-        if (getTpsMethod == null && !Sched.isFolia()) {
-            spigotTpsTaskId = Bukkit.getScheduler()
-                    .runTaskTimer(plugin, this::spigotTpsTick, 20L, 20L).getTaskId();
+        // Wall-clock TPS fallback: tick a counter on a tick-aligned timer once
+        // per second and report 20 / wall-seconds. Enabled whenever the native
+        // getTPS is unusable — including Folia, where getTPS exists but throws
+        // (no global TPS aggregate). Routed through Sched.runGlobalTimer so it
+        // lands on the global region scheduler on Folia and the main thread on
+        // Spigot/Paper, instead of the BukkitScheduler that Folia rejects.
+        if (!tpsNativeWorks) {
+            spigotTpsTaskId = Sched.runGlobalTimer(plugin, this::spigotTpsTick, 20L);
         }
-        // Spigot fallback for MSPT: poll on every tick and record the
-        // wall-time delta. Only active when Paper's getAverageTickTime
-        // is unavailable; on Folia the BukkitScheduler sync timer would
-        // throw, so it's restricted to non-Folia like the TPS fallback.
-        if (getAvgTickTimeMethod == null && !Sched.isFolia()) {
-            spigotMsptTaskId = Bukkit.getScheduler()
-                    .runTaskTimer(plugin, this::spigotMsptTick, 1L, 1L).getTaskId();
+        // Wall-clock MSPT fallback: measure the wall delta between consecutive
+        // ticks on a 1-tick timer. Enabled whenever native getAverageTickTime
+        // is unusable (Spigot, and Folia where it throws). Same global-timer
+        // routing as the TPS fallback.
+        if (!msptNativeWorks) {
+            spigotMsptTaskId = Sched.runGlobalTimer(plugin, this::spigotMsptTick, 1L);
         }
     }
 
     public void stop() {
         Sched.cancel(taskId); taskId = null;
-        if (spigotTpsTaskId > 0) { Bukkit.getScheduler().cancelTask(spigotTpsTaskId); spigotTpsTaskId = -1; }
-        if (spigotMsptTaskId > 0) { Bukkit.getScheduler().cancelTask(spigotMsptTaskId); spigotMsptTaskId = -1; }
+        Sched.cancel(spigotTpsTaskId); spigotTpsTaskId = null;
+        Sched.cancel(spigotMsptTaskId); spigotMsptTaskId = null;
     }
 
     /** Snapshot reads are concurrent; safe for the dispatch hot path. */
@@ -150,7 +174,7 @@ public final class TpsMsptHeapSampler {
             // resolution — pushing the polled value here would double-count
             // and bias the p95 toward whichever value happens to be cached
             // in spigotMspt at sample time.
-            if (mspt >= 0 && getAvgTickTimeMethod != null) msptSamples.add(mspt);
+            if (mspt >= 0 && msptNativeWorks) msptSamples.add(mspt);
             heapSamples.add(heapMb);
         }
         writeHeapSeriesRow(heap, heapMb, tps, mspt);
@@ -244,7 +268,7 @@ public final class TpsMsptHeapSampler {
     }
 
     private double readTps() {
-        if (getTpsMethod != null) {
+        if (tpsNativeWorks) {
             try {
                 Object res = getTpsMethod.invoke(Bukkit.getServer());
                 if (res instanceof double[] arr && arr.length > 0) return arr[0]; // 1m TPS
@@ -254,7 +278,7 @@ public final class TpsMsptHeapSampler {
     }
 
     private double readMspt() {
-        if (getAvgTickTimeMethod != null) {
+        if (msptNativeWorks) {
             try {
                 Object res = getAvgTickTimeMethod.invoke(Bukkit.getServer());
                 if (res instanceof Number n) return n.doubleValue();

@@ -22,7 +22,7 @@ Prefabs are **starting points**, not config-management substitutes. After applyi
 | `low-performance` | Shared-CPU VPS, low RAM, the host is also running your game world. | Longer pulse period, smaller cache caps, fewer concurrent chunk tickets, login cache off. |
 | `high-performance` | Dedicated hardware, large player counts, you want depth in the queue at all times. | Shorter period, larger sync/async tick budgets, larger cache caps, login cache on, post-teleport queueing on. |
 | `folia-tuned` | You are on Folia and want regions to pulse fast per-thread instead of competing for one global budget. | Period drops to 5 ticks, sync budget shrinks (regions pulse on their own thread), small `cacheCap` per region, `activeChunkCap: 4` so each region keeps its chunk-ticket count bounded. |
-| `lightweight` | Small server, you want RTP's footprint as small as the **pro** assembly allows. | Smaller region cache + chunk-ticket cap. *(If you also want L3 disabled, use the lite jar - the lite assembly ships with `backlogCacheCap: 0`. Prefabs do not change `backlogCacheCap`.)* |
+| `lightweight` | Small server, you want RTP's footprint as small as the assembly allows. | Smaller region cache + chunk-ticket cap. *(If you also want L3 disabled, set `backlogCacheCap: 0` in `regions/default.yml`. Prefabs do not change `backlogCacheCap`.)* |
 | `fast-paced` | Normal server, normal hardware, you want `/rtp` to feel snappier without going full `high-performance`. | Shorter period, larger sync budget, bigger region cache and chunk-ticket cap. |
 | `multi-world` | You want one RTP region per world on the server, instead of one default region covering one world. | At apply time, enumerates every loaded world and synthesises `regions/<worldName>.yml` cloning the current `regions/default.yml` with `world: "<worldName>"`. Existing per-world region files are left untouched. |
 
@@ -30,7 +30,7 @@ The exact set of knobs each prefab sets lives in `rtp-core` Java code under `io/
 
 ### What prefabs do **not** touch
 
-- `backlogCacheCap` (L3 backlog cache) - a pro-vs-lite assembly-time knob. The lite jar ships with it at `0`; the pro jar ships with it enabled. Runtime prefabs do not change it on either side.
+- `backlogCacheCap` (L3 backlog cache). Both the full and lite assemblies ship it at `1000` (enabled); set it to `0` in `regions/default.yml` to disable L3. Runtime prefabs do not change it on either side.
 - `config.yml`, `safety.yml`, `worlds/<world>.yml`, `economy.yml`, `effects.yml`, `logging.yml`. Prefabs are scoped to `performance.yml` + `regions/<id>.yml` by design. Hand-edit the rest.
 - Comments. The on-disk YAML loader does not round-trip comments, so a confirmed apply writes a fresh file using the prefab's overlay merged onto the loaded keys. **The `.bak.<timestamp>` sibling preserves your original file byte-for-byte**, including comments; copy it back or use `/rtp admin prefab rollback` if you want them.
 
@@ -89,7 +89,7 @@ A quick decision tree:
 - **Server feels sluggish after install?** Run `/rtp info` and check TPS/MSPT. If TPS is below 19 under normal load, try `low-performance`. If TPS is fine but `/rtp` itself feels slow to deliver a location, try `fast-paced`.
 - **On Folia?** Use `folia-tuned` after install. The other prefabs target the global scheduler model; Folia regions tick per-thread and want a different shape.
 - **Going from one world to many?** Apply `multi-world` once after your worlds are created. Re-apply it whenever you add another world.
-- **Want to fit on a small VPS?** `lightweight`. Pair with the lite jar if you also want L3 off.
+- **Want to fit on a small VPS?** `lightweight`. Set `backlogCacheCap: 0` in `regions/default.yml` if you also want L3 off.
 - **Dedicated host, lots of players?** `high-performance`. If that still isn't enough, hand-edit further; you are past the curated zone.
 - **Want defaults back?** `survival-default`. It is an identity overlay against the shipped defaults; applying it will revert any drift on the keys RTP cares about.
 
@@ -124,5 +124,5 @@ If you have players mid-teleport when the confirm runs, their in-flight pipeline
 - [PERFORMANCE.md](configuration/PERFORMANCE.md) - reference for every knob a prefab might set in `performance.yml`.
 - [REGIONS.md](configuration/REGIONS.md) - reference for every knob a prefab might set in `regions/<id>.yml`.
 - [RUNBOOK.md](RUNBOOK.md) - what to run when things go wrong after an apply (`/rtp info`, `/rtp test`, `/rtp scan reset`).
-- [`docs/adr/ADR-024-rtp-lite-assembly-variant.md`](../adr/ADR-024-rtp-lite-assembly-variant.md) - the `lightweight` prefab is the pro-portable subset of the lite assembly's `regions/default.yml`; `backlogCacheCap` stays a lite-assembly-only knob.
+- [`docs/adr/ADR-024-rtp-lite-assembly-variant.md`](../adr/ADR-024-rtp-lite-assembly-variant.md) - the `lightweight` prefab is the pro-portable subset of the lite assembly's `regions/default.yml`; as of 2026-06-18 lite inherits the full `regions/default.yml` (including `backlogCacheCap: 1000`).
 - [`docs/dev/scratch/PROPOSAL-admin-panel-prefabs.md`](../dev/scratch/PROPOSAL-admin-panel-prefabs.md) - design rationale.

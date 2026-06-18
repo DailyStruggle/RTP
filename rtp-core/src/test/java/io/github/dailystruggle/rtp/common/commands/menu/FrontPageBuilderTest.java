@@ -141,16 +141,19 @@ final class FrontPageBuilderTest {
     // ------------------------------------------------------------------------
 
     @Test
-    @DisplayName("Admin view: replaces player picker block with a single OpenAdminPanel entry row")
+    @DisplayName("Admin view: appends a single OpenAdminPanel entry row on top of the player picker rows")
     void adminView_emitsSingleAdminEntryRow() {
         TestableRoot root = new TestableRoot();
         // Subcommand registration is irrelevant for the front-page collapse:
         // the panel-entry row is unconditional in admin view.
         root.getCommandLookup().put("config", new LeafSub("config"));
         root.getCommandLookup().put("reload", new LeafSub("reload"));
-        // Even with region/biome params present, the admin view does NOT
-        // render the picker rows — admin viewers descend into the panel.
+        // With picker params present, the admin view renders them in addition
+        // to the admin entry row: the admin panel is a submenu reached via a
+        // single entry row, not an inline block that replaces the pickers.
         root.getParameterLookup().put("region", new FixedParam("", Set.of("default")));
+        root.getParameterLookup().put("world", new FixedParam("", Set.of("world")));
+        root.getParameterLookup().put("biome", new FixedParam("", Set.of("plains")));
 
         MenuModel model = new FrontPageBuilder()
                 .build(root, UUID.randomUUID(),
@@ -171,9 +174,13 @@ final class FrontPageBuilderTest {
         assertNull(findRunWithArgs(model, "reload"),
                 "Reload row must NOT appear inline on the front page (panel-owned)");
 
-        // Player picker rows must NOT appear (admin view replaces them).
-        assertNull(findOpenParamPicker(model, "region"),
-                "region picker must be absent in admin view");
+        // Player picker rows must ALSO appear (admin entry row is additive).
+        assertNotNull(findOpenParamPicker(model, "region"),
+                "region picker must still surface in admin view");
+        assertNotNull(findOpenParamPicker(model, "world"),
+                "world picker must still surface in admin view");
+        assertNotNull(findOpenParamPicker(model, "biome"),
+                "biome picker must still surface in admin view");
     }
 
     // ------------------------------------------------------------------------

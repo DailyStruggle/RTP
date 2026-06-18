@@ -17,10 +17,10 @@ import java.util.Objects;
  * wholesale (documented contract for {@code PrefabApplier} in session 2).
  *
  * <p>Per the locked design decision (2026-05-20), <strong>no</strong> prefab
- * overlay touches {@code backlogCacheCap}; that is a pro-vs-lite
- * assembly-time knob (the lite assembly hardcodes {@code backlogCacheCap: 0}
- * to disable the L3 backlog cache) and runtime prefabs must remain
- * assembly-agnostic. {@code PrefabRegistryTest} guards this invariant.
+ * overlay touches {@code backlogCacheCap}; the L3 backlog cache is governed by
+ * the shipped {@code regions/default.yml} (default {@code 1000} on both the
+ * full and lite assemblies; set {@code 0} to disable) and runtime prefabs must
+ * leave it to the operator. {@code PrefabRegistryTest} guards this invariant.
  *
  * @param id                 canonical id, e.g. {@code "low-performance"}; unique within {@link PrefabRegistry}.
  * @param displayKey         {@code MessagesKeys} entry for the panel row label.
