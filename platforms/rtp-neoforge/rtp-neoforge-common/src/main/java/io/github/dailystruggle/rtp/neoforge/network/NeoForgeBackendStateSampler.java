@@ -120,6 +120,12 @@ public final class NeoForgeBackendStateSampler implements BackendStateSampler {
         int networkReservedTotal = 0;
         Map<String, Integer> regionKeptCounts = new HashMap<>();
         Set<String> regionSet = new HashSet<>();
+        // Per-region descriptive attributes (icon / display hints) advertised
+        // to peers and addons. Keyed "<region>.<attribute>"; purely
+        // informational. Mirrors the Bukkit/Fabric sampler so a lobby/GUI can
+        // show a recognisable cross-server icon and the operator-configured
+        // display label (region displayName) for a NeoForge backend's regions.
+        Map<String, String> regionMetadata = new HashMap<>();
         if (lobbyMode) {
             accepting = false;
         } else {
@@ -145,6 +151,35 @@ public final class NeoForgeBackendStateSampler implements BackendStateSampler {
                         }
                         regionKeptCounts.put(region.name, per);
                         keptCountTotal += per;
+                        try {
+                            RTPWorld<?> rw = region.getWorld();
+                            String env = (rw == null) ? null : rw.environment();
+                            if (env != null && !env.isEmpty()) {
+                                regionMetadata.put(region.name + ".env", env);
+                                String block = representativeBlock(env);
+                                if (block != null) {
+                                    regionMetadata.put(region.name + ".block", block);
+                                }
+                            }
+                        } catch (Throwable ignored) {
+                            // Defensive: env enrichment is best-effort and must
+                            // never break the heartbeat sample.
+                        }
+                        try {
+                            // Advertise the operator-configured cosmetic display
+                            // label (region displayName) so a lobby shows the
+                            // backend's chosen words for this region. Only published
+                            // when it differs from the region name, to keep the
+                            // heartbeat compact. Sent raw; the consumer applies
+                            // color/gradient formatting.
+                            String label = region.displayName();
+                            if (label != null && !label.isEmpty()
+                                    && !label.equals(region.name)) {
+                                regionMetadata.put(region.name + ".label", label);
+                            }
+                        } catch (Throwable ignored) {
+                            // Defensive: label enrichment is best-effort.
+                        }
                     }
                 }
             } catch (Throwable ignored) {
@@ -170,6 +205,28 @@ public final class NeoForgeBackendStateSampler implements BackendStateSampler {
                 keptCountTotal,
                 networkReservedTotal,
                 regionSet,
-                regionKeptCounts);
+                regionKeptCounts,
+                regionMetadata);
+    }
+
+    /**
+     * Provider-side environment -> block hint for the common vanilla
+     * environments, advertised so a consuming menu can show a recognisable
+     * surface block for a cross-server destination. Returns {@code null} for an
+     * unrecognised (custom-dimension) environment, leaving the consumer to
+     * translate the advertised {@code env} string locally.
+     */
+    private static String representativeBlock(String env) {
+        if (env == null) return null;
+        switch (env) {
+            case "NORMAL":
+                return "GRASS_BLOCK";
+            case "NETHER":
+                return "NETHERRACK";
+            case "THE_END":
+                return "END_STONE";
+            default:
+                return null;
+        }
     }
 }

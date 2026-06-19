@@ -64,7 +64,7 @@ do synchronous chunk I/O on the main thread, S-005); what you skip is the per-pl
 
 A platform-specific module is required only when your addon reaches for a surface RTP deliberately
 does **not** abstract - typically a platform-native UI or API with no cross-platform equivalent. The
-bundled GUI addon ([`addons/RTP_GuiAddon/`](../addons/RTP_GuiAddon/)) is the worked example: it opens
+bundled GUI addon ([`addons/LeafRTPGuiAddon/`](../addons/LeafRTPGuiAddon/)) is the worked example: it opens
 a native Bukkit inventory, so it has a thin `rtp-gui-bukkit` module (a handful of files) sitting on
 top of a platform-neutral `rtp-gui-common` module that holds the menu model, actions, and renderer
 seam. Even then, the split is the point: the model and behavior stay in `common`, and only the

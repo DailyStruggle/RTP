@@ -8,13 +8,13 @@
   - [ADR-046](../../../docs/adr/ADR-046-maps-api-module.md) - umbrella `maps-api` module ADR (REQ-RTP-MAP-001..005).
   - [ADR-047](../../../docs/adr/ADR-047-declarative-chart-composition-bridge.md) - `ChartSpec` + `MapDispatch` composition bridge.
   - [ADR-039](../../../docs/adr/ADR-039-rtpadmin-diagnostic-surfaces.md) - biome map / bad-selection visualizations these renders reuse.
-  - `addons/RTP_GuiAddon/` - the destination-picker addon that motivates the GUI-slot use case (region icon rendered as a live biome map).
+  - `addons/LeafRTPGuiAddon/` - the destination-picker addon that motivates the GUI-slot use case (region icon rendered as a live biome map).
 
 ---
 
 ## Context
 
-The `RTP_GuiAddon` destination picker wants the per-region icon to be the region's biome render (the same chart `/rtp visualization biomes` produces), shown as a `FILLED_MAP` in a chest-GUI slot rather than dumped into the player's inventory. Investigating feasibility surfaced two gaps between what `maps-api` does today and what that use case needs:
+The `LeafRTPGuiAddon` destination picker wants the per-region icon to be the region's biome render (the same chart `/rtp visualization biomes` produces), shown as a `FILLED_MAP` in a chest-GUI slot rather than dumped into the player's inventory. Investigating feasibility surfaced two gaps between what `maps-api` does today and what that use case needs:
 
 1. **Delivery target.** The only delivery primitive on `MapBinding` is `deliverTo(handle, viewer)`, which on the Bukkit family drops a `FILLED_MAP` item at the viewer or into their inventory (see `BukkitMapBinding.deliverTo`). A GUI renderer needs the rendered `FILLED_MAP` **as an `ItemStack`** to place into a specific menu slot, not an inventory drop.
 

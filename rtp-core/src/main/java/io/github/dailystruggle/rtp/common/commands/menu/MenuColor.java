@@ -56,7 +56,33 @@ public final class MenuColor {
      * @param world world name (as returned by {@code RTPWorld.name()})
      */
     public static String worldColorPrefix(String world) {
-        Map<String, Long> weights = BiomeMenuSource.biomeWeightsForWorld(world);
+        return weightedBiomeColorPrefix(BiomeMenuSource.biomeWeightsForWorld(world));
+    }
+
+    /**
+     * Returns the legacy color prefix best representing a region, computed as
+     * the observation-count-weighted average of the {@link BiomeColorSource}
+     * map colors of the biomes observed in that region - i.e. the aggregate
+     * of the colors that would appear on that region's map. Uses the same
+     * parchment luminance clamp + nearest-dark-code match as
+     * {@link #biomeColorPrefix(String)} and {@link #worldColorPrefix(String)}.
+     * Falls back to {@code "&2"} when no biome has been observed in the region
+     * yet (cold-data state). Never {@code null}.
+     *
+     * @param region region name (as returned by region lookup keys)
+     */
+    public static String regionColorPrefix(String region) {
+        return weightedBiomeColorPrefix(BiomeMenuSource.biomeWeightsForRegion(region));
+    }
+
+    /**
+     * Shared weighted-average implementation behind {@link #worldColorPrefix}
+     * and {@link #regionColorPrefix}: averages the {@link BiomeColorSource}
+     * RGB of each biome by its observation count, then clamps + matches to the
+     * parchment-safe dark palette. Falls back to {@code "&2"} when the weight
+     * map is empty (cold-data state).
+     */
+    private static String weightedBiomeColorPrefix(Map<String, Long> weights) {
         if (weights == null || weights.isEmpty()) return "&2";
 
         double sumR = 0, sumG = 0, sumB = 0;

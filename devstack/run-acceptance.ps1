@@ -373,19 +373,14 @@ function Invoke-GradleBuild {
   $backendDsts = @(
     (Join-Path $PSScriptRoot 'backend-a\plugins'),
     (Join-Path $PSScriptRoot 'backend-b\plugins'),
+    (Join-Path $PSScriptRoot 'backend-c\plugins'),
     (Join-Path $PSScriptRoot 'lobby-a\plugins'),
     (Join-Path $PSScriptRoot 'lobby-b\plugins')
   )
-  # backend-c is Fabric: the SAME unified LeafRTP-Pro jar is also the Fabric
-  # mod (per ADR-022 the jar ships plugin.yml AND fabric.mod.json side by side,
-  # and Loom remaps the Fabric entry-point package), so it is dropped into
-  # /data/mods - NOT /data/plugins. Without this stage RTP never loads on the
-  # Fabric backend at all (the symptom: `/server backend-c` connects but RTP
-  # is absent). Kept in its own list because the mods dir must not receive the
-  # Paper-only .paper-remapped cache cleanup below.
-  $fabricModDsts = @(
-    (Join-Path $PSScriptRoot 'backend-c\mods')
-  )
+  # backend-c was previously a Fabric node (jar staged into /data/mods). It now
+  # runs Folia like backend-b, so its jar is staged into /data/plugins via
+  # $backendDsts above. No separate Fabric mod-dir staging is required.
+  $fabricModDsts = @()
   foreach ($d in @($pluginStage) + $backendDsts + $fabricModDsts) {
     if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
   }
@@ -415,9 +410,8 @@ function Invoke-GradleBuild {
     foreach ($dst in @($pluginStage) + $backendDsts + $fabricModDsts) {
       # Only clear the RTP jars we own here. Operator-dropped jars (e.g.
       # FastAsyncWorldEdit in lobby-a/plugins/ for the lobby-world bake
-      # workflow - see shared/lobby-world/README.md, or Fabric API /
-      # FabricProxy-Lite in backend-c/mods/ - see backend-c/mods/README.md)
-      # must survive a re-run of the harness. Filter matches LeafRTP-<ver>.jar
+      # workflow - see shared/lobby-world/README.md) must survive a re-run of
+      # the harness. Filter matches LeafRTP-<ver>.jar
       # and LeafRTP-Pro-<ver>.jar but leaves everything else in place.
       Get-ChildItem -Path $dst -Filter 'LeafRTP-*.jar' -File -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notmatch '-dev\.jar$|-sources\.jar$|-javadoc\.jar$' } |
@@ -426,7 +420,7 @@ function Invoke-GradleBuild {
         Copy-Item -Path $j.FullName -Destination (Join-Path $dst $j.Name) -Force
       }
     }
-    Write-Host "[build] staged $($pJars.Count) RTP plugin jar(s) [$variant] -> jars/plugin + backend-{a,b}/plugins + lobby-{a,b}/plugins + backend-c/mods (Fabric)" -ForegroundColor Cyan
+    Write-Host "[build] staged $($pJars.Count) RTP plugin jar(s) [$variant] -> jars/plugin + backend-{a,b,c}/plugins + lobby-{a,b}/plugins" -ForegroundColor Cyan
   }
   # See note above: backend's mc-image-helper AccessDeniedException on dotfiles.
   foreach ($dst in @($pluginStage) + $backendDsts) {
@@ -477,9 +471,8 @@ function Get-CrashedMcServices {
   # exited shortly after `up`. We check ~8s after the up call so first-boot
   # init scripts have had a chance to either start the JVM (Up <state>) or
   # bail out (Exited). Anything in 'exited' here is a crash, not a slow boot.
-  # backend-c (Fabric) is included so a crashed Fabric boot is detected and
-  # auto-recovered along with the Paper/Folia backends. rtp-fabric is explicitly
-  # unstable today; expect crashes here to be common until it stabilizes.
+  # backend-c (Folia) is included so a crashed boot is detected and
+  # auto-recovered along with the other backends.
   $services = @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b', 'proxy-a', 'proxy-b')
   $crashed = @()
   foreach ($svc in $services) {
@@ -610,9 +603,9 @@ function Invoke-ComposeDown {
     # explicitly wipe it. Run reset-rtp-config.ps1 so the next `up` lets the
     # freshly-built jar re-extract baseline. Pass -IncludeDatabase when the
     # operator asked for -Purge so the semantics match `down -v` (also nukes
-    # runtime SQLite). backend-c (Fabric) needs no host-side reset: its
-    # config lives inside the container's writable layer and is gone once
-    # the container is recreated by the next `up`.
+    # runtime SQLite). backend-c now runs Folia with a bind-mounted plugins/
+    # dir, so reset-rtp-config.ps1 wipes its plugins/RTP/ tree along with the
+    # other Paper/Folia instances.
     $resetScript = Join-Path $PSScriptRoot 'reset-rtp-config.ps1'
     if (Test-Path $resetScript) {
       # Always pass -IncludeDatabase: Clear-StaleWorldDirs above has already

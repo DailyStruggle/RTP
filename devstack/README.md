@@ -2,22 +2,19 @@
 
 First-class runtime verification fixture for the cross-server `/rtp` slice
 (CHECKLIST-cross-server-rtp.md L3). Boots 1 Redis + 2 Velocity proxies + 2
-Paper lobbies + 3 platform-asymmetric backends (Paper / Folia / Fabric) on a
+Paper lobbies + 3 backends (Paper / Folia / Folia) on a
 single docker-compose network and exercises the round-trip, kill-mid-flight,
 and kill-switch scenarios.
 
-The backend trio is deliberately heterogeneous: `backend-a` runs Paper,
-`backend-b` runs Folia, and `backend-c` runs Fabric. Matched-pair Paper
-backends would only exercise one scheduler family, so a Paper-compiles-but-
-Folia-blows-up (or `rtp-fabric`-adapter) regression would not surface until a
-user reported it. Asymmetric backends route every `/rtp` round-trip through
-the `BackendSelector` against three platform adapters at once.
+The backends are: `backend-a` runs Paper, while `backend-b` and `backend-c`
+run Folia. Mixing Paper and Folia exercises both scheduler families, so a
+Paper-compiles-but-Folia-blows-up regression surfaces here rather than in a
+user report. Every `/rtp` round-trip routes through the `BackendSelector`
+against these platform adapters at once.
 
-> `backend-c` (Fabric) intentionally exercises the `rtp-fabric` adapter while
-> it is still stabilizing (see `docs/dev/MULTI_PLATFORM_PLAN.md`). Expect
-> failures here to be common until the adapter lands its outstanding work;
-> that is the point of including it - stability cannot be verified without
-> testing.
+> `backend-c` previously ran Fabric to exercise the `rtp-fabric` adapter; it
+> has been switched to Folia for this run so the stack boots entirely on the
+> Bukkit/Paper-family platforms (no Fabric mod runtime required).
 
 ## Topology
 
@@ -29,7 +26,7 @@ client ---> | proxy-a   |---+--->| lobby-a   |---+--->| backend-a | (Paper)
                             |                    |    | backend-b | (Folia)
             +-----------+   +--->+-----------+   |    +-----------+
 client ---> | proxy-b   |------->| lobby-b   |---+--->+-----------+
-            +-----------+        +-----------+        | backend-c | (Fabric)
+            +-----------+        +-----------+        | backend-c | (Folia)
                                                       +-----------+
                                        \                  /
                                         +---> redis <----+
@@ -57,7 +54,7 @@ lobbies before backends), and exercises the lobby use case:
 - The cross-server pipeline dispatches the request: either to a named
   backend (`/rtp <region-on-backend-a>` style usage if the operator wires
   that up) or to whichever destination the `BackendSelector` load-balances
-  to across `backend-a` (Paper) / `backend-b` (Folia) / `backend-c` (Fabric).
+  to across `backend-a` (Paper) / `backend-b` (Folia) / `backend-c` (Folia).
 - After redeem, the player is transferred to the chosen backend by the
   proxy and teleported to the resolved coordinate.
 
@@ -238,7 +235,7 @@ next boot. See `shared/lobby-world/README.md` for the full contract.
 
 ## Multi-server / multi-world GUI demo
 
-The devstack ships pre-configured to showcase the `RTP_GuiAddon` (the
+The devstack ships pre-configured to showcase the `LeafRTPGuiAddon` (the
 "DonutSMP-style" `/rtp` destination picker) across **multiple servers**, with
 each backend's destination in a **different dimension** to demo per-server load
 distribution. Three pieces make the menu rich:
@@ -246,23 +243,21 @@ distribution. Three pieces make the menu rich:
 1. **One `default` region per backend, each in a distinct dimension, with a
    configurable `displayName`.** Committed under each backend's
    `rtp-config/regions/default.yml` and seed-copied into the running container
-   by the compose entrypoint shim (into `/data/plugins/RTP/regions/` on
-   Paper/Folia, `/data/config/rtp/regions/` on Fabric):
+   by the compose entrypoint shim (into `/data/plugins/RTP/regions/`):
 
    | Backend            | Dimension | `displayName`          |
    |--------------------|-----------|------------------------|
    | backend-a (Paper)  | Overworld | `&#55ff55Verdant Wilds`|
    | backend-b (Folia)  | Nether    | `&#ff5533Ashen Wastes` |
-   | backend-c (Fabric) | End       | `&#c77dffVoid Reaches` |
+   | backend-c (Folia)  | End       | `&#c77dffVoid Reaches` |
 
    The optional cosmetic `displayName` key (color/gradient supported) renames the
    region in `/rtp info` and the GUI menu without changing its identity (the
    region key stays `default`), and is advertised over the network so a lobby
    shows each backend's chosen words for its cross-server destination. All
    regions are centered on `(0,0)` with radii well inside +/-512 blocks so they
-   land in the pre-generated spawn-area chunks (below). backend-c (Fabric)
-   targets the dimension id `minecraft:the_end` because `FabricRTPWorld` names
-   worlds by dimension id, not by the Bukkit save-folder name.
+   land in the pre-generated spawn-area chunks (below). backend-c (Folia)
+   targets the End via the Bukkit world name `world_the_end`.
 
 2. **A supplied pre-generated world.** A freshly-booted world generates chunks
    on demand, and under load the async chunk loads can time out and surface as
@@ -272,10 +267,9 @@ distribution. Three pieces make the menu rich:
    world** (every `.mca`), which both eliminates the null-chunk timeouts and
    gives the L3 backlog cache (`backlogCacheCap`, set in the region files) real
    `.mca` files to anvil-prefilter - the backlog cache only does useful work
-   when there are on-disk `.mca` files to check. backend-a/backend-b also bind
-   their `world_nether` and `world_the_end` dirs (Paper keeps Nether/End as
-   separate top-level dirs); backend-c keeps them inside `world/` (`DIM-1` /
-   `DIM1`, vanilla layout). Pass `-RegionRadius <n>` (>= 0) to copy only a small
+   when there are on-disk `.mca` files to check. All three backends also bind
+   their `world_nether` and `world_the_end` dirs (Paper/Folia keep Nether/End
+   as separate top-level dirs). Pass `-RegionRadius <n>` (>= 0) to copy only a small
    spawn-area window instead (cheaper, but supplies too few `.mca` for the
    backlog cache to do meaningful prefiltering).
 

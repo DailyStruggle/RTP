@@ -1,0 +1,82 @@
+[CENTER]
+[SIZE=7][B][COLOR=#27AE60]Leaf[/COLOR][COLOR=#2C3E50]RTP[/COLOR] [COLOR=#16A085]GUI[/COLOR][/B][/SIZE]
+[SIZE=4][B][COLOR=#7F8C8D]a clickable /rtp destination picker for Paper, Spigot, Folia, Fabric & NeoForge[/COLOR][/B][/SIZE]
+[/CENTER]
+
+[B]This is an add-on for [URL='https://modrinth.com/plugin/leafrtp']LeafRTP[/URL], not a standalone plugin. Install LeafRTP first, then drop this jar in.[/B] once it loads, the bare [I]/rtp[/I] (and [I]/rtpgui[/I]) opens a clickable menu instead of teleporting straight away.
+
+every destination a player is allowed to use shows up as a slot, decorated with its live status straight from the engine: ready, on cooldown, its cost, or unavailable. click a slot and it teleports. the menu only draws things, every line of safety and validation still lives inside the LeafRTP engine.
+
+the default layout is a DonutSMP-style chest menu, so an admin gets a working ui with zero config. if you want to change it, [I]guimenu.yml[/I] is there.
+
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
+
+[SIZE=6][B][COLOR=#27AE60]What it does[/COLOR][/B][/SIZE]
+[LIST]
+[*]type [I]/rtp[/I] or [I]/rtpgui[/I] to open the menu. each slot is one destination the player has permission for: the default rtp, configured regions, and per-world targets.
+[*]icons are decorated from the engine, so players see ready / on-cooldown / the Vault cost / unavailable before they click.
+[*]clicking a slot submits the teleport through LeafRTP's own validated path. it always completes with a result, never a silent no-op.
+[*]a dashboard tile at the bottom shows live tps, mspt, and player count (toggleable).
+[*]one multi-loader jar runs everywhere: Bukkit/Paper/Folia render it as a chest inventory, Fabric and NeoForge render it as a native server-side container screen, all from the same menu model.
+[/LIST]
+
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
+
+[SIZE=6][B][COLOR=#16A085]Configuration (guimenu.yml)[/COLOR][/B][/SIZE]
+config registers with LeafRTP's own config system, so the file is created on first boot in the RTP data folder, reloads on [I]/rtp reload[/I], and never needs manual pasting. the defaults produce the DonutSMP-style layout; every key is optional and falls back to that default.
+
+you can tune:
+[LIST]
+[*][B]menuStyle[/B], which renderer opens (e.g. [I]chest[/I]); swap the gui without touching code.
+[*]title, row count, and filler material.
+[*]per-target-kind and per-availability icon materials (platform-neutral names; each renderer maps them to its own item type).
+[*]the server-health dashboard toggle.
+[*]all user-facing messages.
+[/LIST]
+
+[B]Region biome-map icons (opt-in):[/B] set [I]regionIconStyle: biome-map[/I] to draw each named-region row's icon as that region's live biome render, the same chart [I]/rtp visualization biomes[/I] produces, instead of a static icon material. it reuses LeafRTP's bundled map path, repaints lazily behind a staleness window, and falls back to the static icon if the map subsystem is unavailable or the region has no scanned data yet. the default is the static [I]material[/I] icon, so this is strictly opt-in.
+
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
+
+[SIZE=6][B][COLOR=#C0392B]Safety[/COLOR][/B][/SIZE]
+the engine owns safety, the menu just draws it.
+[LIST]
+[*]permission gating, cooldown and cost resolution, and the full safety pipeline all live behind the api. the only mutating call the addon makes is the teleport submit, which re-validates everything server-side and always returns a result.
+[*]the chest gui is [B]read-only[/B]: every click is cancelled, so there's no inventory-dupe or click-exploit surface, and the addon identifies its own inventory by a custom holder, never by a spoofable title.
+[/LIST]
+
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
+
+[SIZE=6][B][COLOR=#C0392B]Requirements[/COLOR][/B][/SIZE]
+[LIST]
+[*][B]LeafRTP installed[/B] (this is an add-on, not a standalone plugin).
+[*][B]Java 21+[/B] on Bukkit/Paper/Folia; the Fabric/NeoForge carriers target Minecraft 26.x.
+[*][B]No config required[/B], the menu works the instant the jar loads.
+[/LIST]
+
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
+
+[SIZE=6][B][COLOR=#16A085]Install[/COLOR][/B][/SIZE]
+[LIST=1]
+[*]install [URL='https://modrinth.com/plugin/leafrtp']LeafRTP[/URL].
+[*]drop [I]LeafRTPGuiAddon-x.y.z.jar[/I] into [I]plugins/[/I] (Bukkit/Paper/Folia) or [I]mods/[/I] (Fabric/NeoForge).
+[*]start the server.
+[*]type [B]/rtp[/B] (or [B]/rtpgui[/B]) and the picker opens.
+[/LIST]
+
+tune [I]plugins/RTP/guimenu.yml[/I] later if you want; [I]/rtp reload[/I] applies changes live, no restart.
+
+[CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
+
+[SIZE=6][B][COLOR=#27AE60]Platform support[/COLOR][/B][/SIZE]
+[LIST]
+[*][B]Paper[/B] (+ forks): chest-inventory renderer + click listener.
+[*][B]Spigot[/B] (+ Bukkit-family forks): same chest renderer.
+[*][B]Folia[/B]: opens on the correct thread via LeafRTP's scheduler.
+[*][B]Fabric[/B] (MC 26.x): native server-side container (chest) screen.
+[*][B]NeoForge[/B] (MC 26.x): native server-side container (chest) screen.
+[/LIST]
+
+the [I]chest[/I] style key is shared across every platform, so a single [I]guimenu.yml[/I] works everywhere, no per-platform config.
+
+[CENTER][I]built on the same platform model as LeafRTP itself: a platform-neutral core plus thin per-platform renderers. a renderer is just a small class registered under a style key, so a book gui could ship alongside the chest gui without a code change to the core.[/I][/CENTER]

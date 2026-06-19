@@ -53,7 +53,7 @@ public final class FabricEffectsInitializer {
         // ADR-004: per-platform leaf operations live in FabricValueCoercer.
         EffectFactory.setCoercer(new FabricValueCoercer());
 
-        EffectFactory.addEffect("SOUND",    new SoundEffect(BuiltInRegistries.SOUND_EVENT.get(ResourceLocation.withDefaultNamespace("entity.player.levelup"))));
+        EffectFactory.addEffect("SOUND",    new SoundEffect(FabricRegistryCompat.resolve(BuiltInRegistries.SOUND_EVENT, ResourceLocation.withDefaultNamespace("entity.player.levelup"))));
         EffectFactory.addEffect("PARTICLE", new ParticleEffect(ParticleTypes.EXPLOSION));
         EffectFactory.addEffect("TITLE",    new TitleEffect());
         EffectFactory.addEffect("POTION",   new PotionEffect(MobEffects.BLINDNESS.value()));

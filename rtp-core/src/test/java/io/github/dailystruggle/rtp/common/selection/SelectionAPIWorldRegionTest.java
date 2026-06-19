@@ -131,8 +131,8 @@ class SelectionAPIWorldRegionTest {
     assertNotNull(region);
     var vert = (LinearAdjustor) region.getVert();
     assertNotNull(vert);
-    // base LinearAdjustor default direction is 0 (not the seeded 2)
-    assertEquals(0, vert.getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue());
+    // base LinearAdjustor default direction is now 2 (middle-out, the global default)
+    assertEquals(2, vert.getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue());
   }
 
   @Test

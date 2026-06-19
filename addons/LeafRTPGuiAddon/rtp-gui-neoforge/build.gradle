@@ -1,0 +1,46 @@
+// RTP GUI addon - NeoForge renderer carrier.
+//
+// Compiles the NeoForge server-side chest-menu renderer against NeoForge for
+// Minecraft 26.1 (Mojmap), mirroring platforms/rtp-neoforge/rtp-neoforge-v26_1_R1.
+// MC 26.1/26.2 share the Mojmap surface this renderer uses; a single 26.1-compiled
+// carrier loads on both (forward bytecode compatibility).
+//
+// This module's compiled classes are bundled (not run standalone) into the single
+// multi-loader addon jar assembled by :addons:LeafRTPGuiAddon:rtp-gui. It requires
+// JDK 25 and is gated by -PexcludeJdk25 (and the whole NeoForge set by
+// -PexcludeNeoforge) in settings.gradle.
+plugins {
+    // ModDevGradle, version pinned centrally in settings.gradle pluginManagement.
+    id 'net.neoforged.moddev'
+}
+
+ext {
+    neoforgeVersion = '26.1.2.71'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+neoForge {
+    version = neoforgeVersion
+
+    mods {
+        rtp_gui {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    // The platform-neutral menu (model, config, render seam, teleport submit).
+    // Bundled into the assembly jar; compiled to Java 21 bytecode and loadable here.
+    implementation project(':addons:LeafRTPGuiAddon:rtp-gui-common')
+
+    // Stable SPI + engine are provided at runtime by the RTP mod (single jar).
+    compileOnly project(':rtp-api')
+    compileOnly project(':rtp-core')
+    compileOnly project(':metrics-api')
+}

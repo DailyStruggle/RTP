@@ -116,7 +116,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
   static {
     defaults.put(GenericVerticalAdjustorKeys.maxY, 127);
     defaults.put(GenericVerticalAdjustorKeys.minY, 32);
-    defaults.put(GenericVerticalAdjustorKeys.direction, 0);
+    defaults.put(GenericVerticalAdjustorKeys.direction, 2);
     defaults.put(GenericVerticalAdjustorKeys.requireSkyLight, false);
 
     // Curated tab-completion suggestions for /rtp vert:linear <TAB>.

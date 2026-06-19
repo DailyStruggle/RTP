@@ -32,8 +32,13 @@ public final class GradientExpander {
 
   // Matches <gradient:args>, <transition:args>, or <rainbow:args> with their
   // closing tag, capturing (1) tag-name, (2) raw args string, (3) inner text.
+  // The closing tag is a backreference to the opening tag name (\1) so a
+  // <rainbow> opener cannot be paired with a foreign </gradient> close. Without
+  // this, a "<gradient:...>[RTP-prefix]...</gradient>" message whose prefix is
+  // itself "<rainbow>[RTP]</rainbow>" would lazily match
+  // "<gradient...><rainbow>[RTP]</rainbow>" and leave a dangling </gradient>.
   private static final Pattern TAG_PATTERN = Pattern.compile(
-      "<(gradient|transition|rainbow)([^>]*)>(.*?)</(gradient|transition|rainbow)>",
+      "<(gradient|transition|rainbow)([^>]*)>(.*?)</\\1>",
       Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
   // Named Minecraft colors -> RGB int (0xRRGGBB).
@@ -94,16 +99,33 @@ public final class GradientExpander {
     // Strip leading ':' so we can split on ':'.
     String argStr = rawArgs.startsWith(":") ? rawArgs.substring(1) : rawArgs;
 
+    // Expand any nested gradient/rainbow/transition tags inside this one first,
+    // so an inner tag (e.g. a "<rainbow>[RTP]</rainbow>" prefix wrapped in an
+    // outer <gradient>) is emitted as legacy color codes rather than printed as
+    // raw markup. The coloring loops below leave those nested colors intact.
+    String expandedInner = expand(inner);
+
     switch (tagName) {
       case "gradient":
-        return withReset(expandGradient(argStr, inner, false), inner);
+        return withReset(expandGradient(argStr, expandedInner, false), expandedInner);
       case "transition":
-        return withReset(expandTransition(argStr, inner), inner);
+        return withReset(expandTransition(argStr, expandedInner), expandedInner);
       case "rainbow":
-        return withReset(expandRainbow(argStr, inner), inner);
+        return withReset(expandRainbow(argStr, expandedInner), expandedInner);
       default:
-        return inner;
+        return expandedInner;
     }
+  }
+
+  // True for a legacy color code (0-9, a-f) following the section sign.
+  private static boolean isLegacyColorCode(char code) {
+    return (code >= '0' && code <= '9') || (code >= 'a' && code <= 'f')
+        || (code >= 'A' && code <= 'F');
+  }
+
+  // True for the legacy reset code, which clears any nested color.
+  private static boolean isLegacyResetCode(char code) {
+    return code == 'r' || code == 'R';
   }
 
   /**
@@ -155,25 +177,30 @@ public final class GradientExpander {
     StringBuilder sb = new StringBuilder();
     int visIdx = 0;
     int i = 0;
+    boolean nestedColored = false;
     while (i < chars.length) {
       // Skip existing legacy color/format codes (X) - copy them verbatim.
       if (chars[i] == '\u00a7' && i + 1 < chars.length) {
         char code = chars[i + 1];
-        if ((code >= '0' && code <= '9') || (code >= 'a' && code <= 'f')
-            || (code >= 'A' && code <= 'F') || "klmnorKLMNOR".indexOf(code) >= 0) {
+        if (isLegacyColorCode(code) || "klmnoKLMNO".indexOf(code) >= 0
+            || isLegacyResetCode(code)) {
+          if (isLegacyColorCode(code)) nestedColored = true;
+          else if (isLegacyResetCode(code)) nestedColored = false;
           sb.append(chars[i]).append(chars[i + 1]);
           i += 2;
           continue;
         }
       }
-      // Colorize this visible character.
-      float t = (visibleLen == 1) ? 0f
-          : (float) visIdx / (visibleLen - 1);
-      // Apply phase: shift t by phase, wrapping in [0,1].
-      float shifted = (t + phase) % 1f;
-      if (shifted < 0) shifted += 1f;
-      int[] color = interpolateStops(stops, shifted);
-      sb.append(legacyHex(color[0], color[1], color[2]));
+      // Colorize this visible character, unless a nested tag already colored it.
+      if (!nestedColored) {
+        float t = (visibleLen == 1) ? 0f
+            : (float) visIdx / (visibleLen - 1);
+        // Apply phase: shift t by phase, wrapping in [0,1].
+        float shifted = (t + phase) % 1f;
+        if (shifted < 0) shifted += 1f;
+        int[] color = interpolateStops(stops, shifted);
+        sb.append(legacyHex(color[0], color[1], color[2]));
+      }
       sb.append(chars[i]);
       visIdx++;
       i++;
@@ -216,17 +243,21 @@ public final class GradientExpander {
     char[] chars = inner.toCharArray();
     StringBuilder sb = new StringBuilder();
     int i = 0;
+    boolean nestedColored = false;
     while (i < chars.length) {
       if (chars[i] == '\u00a7' && i + 1 < chars.length) {
         char code = chars[i + 1];
-        if ((code >= '0' && code <= '9') || (code >= 'a' && code <= 'f')
-            || (code >= 'A' && code <= 'F') || "klmnorKLMNOR".indexOf(code) >= 0) {
+        if (isLegacyColorCode(code) || "klmnoKLMNO".indexOf(code) >= 0
+            || isLegacyResetCode(code)) {
+          if (isLegacyColorCode(code)) nestedColored = true;
+          else if (isLegacyResetCode(code)) nestedColored = false;
           sb.append(chars[i]).append(chars[i + 1]);
           i += 2;
           continue;
         }
       }
-      sb.append(hex).append(chars[i]);
+      if (!nestedColored) sb.append(hex);
+      sb.append(chars[i]);
       i++;
     }
     return sb.toString();
@@ -259,21 +290,26 @@ public final class GradientExpander {
     StringBuilder sb = new StringBuilder();
     int visIdx = 0;
     int i = 0;
+    boolean nestedColored = false;
     while (i < chars.length) {
       if (chars[i] == '\u00a7' && i + 1 < chars.length) {
         char code = chars[i + 1];
-        if ((code >= '0' && code <= '9') || (code >= 'a' && code <= 'f')
-            || (code >= 'A' && code <= 'F') || "klmnorKLMNOR".indexOf(code) >= 0) {
+        if (isLegacyColorCode(code) || "klmnoKLMNO".indexOf(code) >= 0
+            || isLegacyResetCode(code)) {
+          if (isLegacyColorCode(code)) nestedColored = true;
+          else if (isLegacyResetCode(code)) nestedColored = false;
           sb.append(chars[i]).append(chars[i + 1]);
           i += 2;
           continue;
         }
       }
-      float t = (visibleLen == 1) ? 0f : (float) visIdx / visibleLen;
-      float hue = ((reverse ? (1f - t) : t) + phase / 360f) % 1f;
-      if (hue < 0) hue += 1f;
-      int[] rgb = hslToRgb(hue, 1f, 0.5f);
-      sb.append(legacyHex(rgb[0], rgb[1], rgb[2]));
+      if (!nestedColored) {
+        float t = (visibleLen == 1) ? 0f : (float) visIdx / visibleLen;
+        float hue = ((reverse ? (1f - t) : t) + phase / 360f) % 1f;
+        if (hue < 0) hue += 1f;
+        int[] rgb = hslToRgb(hue, 1f, 0.5f);
+        sb.append(legacyHex(rgb[0], rgb[1], rgb[2]));
+      }
       sb.append(chars[i]);
       visIdx++;
       i++;

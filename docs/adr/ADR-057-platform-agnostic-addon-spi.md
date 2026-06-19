@@ -5,7 +5,7 @@
 
 ## Context
 
-RTP's reference addons (`RTP_ExampleAddon`, `RTP_GuiAddon`) were authored as Bukkit
+RTP's reference addons (`RTP_ExampleAddon`, `LeafRTPGuiAddon`) were authored as Bukkit
 plugins: each `extends org.bukkit.plugin.java.JavaPlugin`, ships a `plugin.yml` with a
 hard `depend: RTP`, and is discovered and enabled by the Bukkit plugin manager. The
 Bukkit-family platforms (Bukkit/Paper/Folia) inherit this path for free, but Fabric and

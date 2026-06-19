@@ -28,11 +28,13 @@ shape:
   expand: false
 
 vert:
-  name: "JUMP"
+  name: "LINEAR"
   minY: 32
   maxY: 255
-  step: 16
-  requireSkyLight: false
+  # Scan order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in,
+  # any other value = random order.
+  direction: 2
+  requireSkyLight: true
 
 # If true, rtp.regions.<name> is required
 requirePermission: false

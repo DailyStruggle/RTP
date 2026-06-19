@@ -194,6 +194,58 @@ public class ReqApiF006RootActionTest {
     }
 
     @Test
+    @DisplayName("compute() path (Fabric/NeoForge) opens the bound action for a bare /rtp")
+    void computePath_invokesBoundAction_forBareRtp() {
+        // Fabric (RTPCmdFabricRoot) and NeoForge dispatch a bare /rtp straight
+        // through compute(...), not the Bukkit String[]-args onCommand. Before the
+        // fix, the rootAction hook lived only in the String[] path, so the GUI never
+        // opened on those platforms. This exercises compute() directly.
+        MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "test", null);
+        accessor.addPlayer(sender);
+        RTP.getInstance().processingPlayers.add(sender.uuid());
+
+        AtomicInteger invocations = new AtomicInteger();
+        RTPAPI.hooks().rootAction().bind((player, feedback) -> {
+            invocations.incrementAndGet();
+            feedback.accept("menu opened");
+            return true;
+        });
+
+        TestRTPCmd rtpCmd = new TestRTPCmd();
+        sender.sentMessages.clear();
+        boolean handled = rtpCmd.compute(sender.uuid(),
+                new java.util.HashMap<>(), null, sender::sendMessage);
+
+        assertTrue(handled, "compute() must report the bare /rtp as handled by the bound action");
+        assertEquals(1, invocations.get(), "bound action must run for a bare /rtp via compute()");
+        assertTrue(sender.sentMessages.stream().anyMatch(m -> m.contains("menu opened")),
+                "action feedback should reach the player. Sent: " + sender.sentMessages);
+        assertFalse(RTP.getInstance().processingPlayers.contains(sender.uuid()),
+                "a handled action must release the processingPlayers lock");
+    }
+
+    @Test
+    @DisplayName("compute() path skips the bound action for parameterised /rtp")
+    void computePath_skipsBoundAction_forParameterisedRtp() {
+        MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "test", null);
+        accessor.addPlayer(sender);
+
+        AtomicBoolean invoked = new AtomicBoolean(false);
+        RTPAPI.hooks().rootAction().bind((player, feedback) -> {
+            invoked.set(true);
+            return true;
+        });
+
+        TestRTPCmd rtpCmd = new TestRTPCmd();
+        Map<String, List<String>> args = new java.util.HashMap<>();
+        args.put("region", List.of("foo"));
+        rtpCmd.compute(sender.uuid(), args, null, sender::sendMessage);
+
+        assertFalse(invoked.get(),
+                "explicit teleport parameters must not be routed through the root action");
+    }
+
+    @Test
     @DisplayName("unbound (cleared) root action performs the classic teleport")
     void unboundAction_classicBehavior() {
         MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "test", null);

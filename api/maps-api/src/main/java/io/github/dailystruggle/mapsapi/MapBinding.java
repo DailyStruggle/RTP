@@ -96,7 +96,7 @@ public interface MapBinding {
     }
 
     // Future direction (maps-api-ADR-002, Proposed): a second delivery path is
-    // anticipated for GUI-slot consumers (e.g. RTP_GuiAddon rendering a region's
+    // anticipated for GUI-slot consumers (e.g. LeafRTPGuiAddon rendering a region's
     // biome chart as a FILLED_MAP icon in a chest slot) that returns the rendered
     // map as a platform item handle rather than dropping it into the viewer's
     // inventory, plus an off-main raw-packet render path that builds the palette

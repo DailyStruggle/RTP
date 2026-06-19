@@ -189,7 +189,7 @@ public final class ProxyDirectListener {
         } else {
             try {
                 onPush.accept(payload);
-                logger.info("RTP proxy-direct: received backend heartbeat from {} ({}).",
+                logger.debug("RTP proxy-direct: received backend heartbeat from {} ({}).",
                         remote, summarisePayload(payload));
                 // Also feed the proxy store so reservations/snapshot RPCs see it.
                 if (transport != null) {
@@ -203,7 +203,7 @@ public final class ProxyDirectListener {
         }
         List<String> rows = snapshotRows.get();
         ProxyDirectWire.writeList(out, rows, verifier, schemaVersion);
-        logger.info("RTP proxy-direct: replied snapshot of {} server row(s) to {}.",
+        logger.debug("RTP proxy-direct: replied snapshot of {} server row(s) to {}.",
                 rows.size(), remote);
     }
 

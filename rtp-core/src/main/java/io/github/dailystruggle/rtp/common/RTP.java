@@ -485,8 +485,27 @@ public class RTP {
       out.add(io.github.dailystruggle.rtp.api.RtpTarget.defaultRegion());
       try {
         RTPPlayer player = serverAccessor.getPlayer(uuid);
+
+        // The bare default target (added above) resolves, for this player, to a
+        // concrete named region. Listing that same region again in the loop
+        // below would surface it twice (e.g. the default region named
+        // "default" appearing as both the bare default row and a region row),
+        // so remember its name and skip it when enumerating named regions.
+        String defaultRegionName = null;
+        if (player != null) {
+          try {
+            Region defaultRegion = selectionAPI.getRegion(player);
+            if (defaultRegion != null) defaultRegionName = defaultRegion.name;
+          } catch (RuntimeException ignored) {
+            // Defensive: default-region resolution must not break enumeration.
+          }
+        }
+
         for (String name : selectionAPI.regionNames()) {
           if (name == null || name.trim().isEmpty()) continue;
+          if (defaultRegionName != null && defaultRegionName.equalsIgnoreCase(name)) {
+            continue; // already offered as the bare default target
+          }
           Region region = selectionAPI.getRegion(name);
           if (region == null) continue;
           boolean requirePerm = region.getSettings().requirePermission();

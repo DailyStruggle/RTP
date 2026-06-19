@@ -1,0 +1,13 @@
+name: LeafRTPGuiAddon
+version: '1.0.0'
+main: io.github.dailystruggle.rtp.guiaddon.bukkit.RTPGuiBukkitPlugin
+api-version: '1.21'
+folia-supported: true
+prefix: RTP-GUI
+authors: [ leaf26 ]
+description: 'DonutSMP-style chest destination picker - the Bukkit renderer for the platform-neutral rtp-gui-common menu'
+depend: [ RTP ]
+commands:
+  rtpgui:
+    description: open the RTP destination picker GUI
+    usage: /rtpgui

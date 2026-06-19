@@ -703,16 +703,22 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
         if (s == null) return Collections.emptySet();
         Set<String> out = new HashSet<>();
         try {
-            net.minecraft.core.Registry<net.minecraft.world.level.biome.Biome> biomeReg =
-                    s.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
-            for (Object loc : biomeReg.keySet()) {
-                if (loc == null) continue;
-                String raw = loc.toString();
+            net.minecraft.core.HolderLookup.RegistryLookup<net.minecraft.world.level.biome.Biome> biomeLookup =
+                    s.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.BIOME);
+            biomeLookup.listElementIds().forEach(rk -> {
+                if (rk == null) return;
+                // ResourceKey#location() was renamed to getValue() on the MC
+                // 1.21.11 / 26.x mappings (ResourceLocation -> Identifier rename),
+                // so calling location() directly throws NoSuchMethodError at
+                // runtime. Route through the reflective helper, which tries both
+                // accessor names.
+                String raw = io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds.locationString(rk);
+                if (raw == null) return;
                 String n = io.github.dailystruggle.rtp.api.configuration
                         .PaletteIdentifierNormalizer.normalize(raw);
                 if (n != null && !n.isEmpty()) out.add(n);
                 if (!raw.isEmpty()) out.add(raw);
-            }
+            });
         } catch (Throwable t) {
             log(Level.WARNING, "[RTP][NeoForge] defaultBiomesFor failed: " + t.getMessage());
         }

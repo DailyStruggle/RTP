@@ -7,6 +7,7 @@ import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.BossEvent;
 
+import java.lang.reflect.Constructor;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -66,7 +67,8 @@ final class NeoForgeProgressBars {
 
             ServerBossEvent bar = activeProgressBars.get(id);
             if (bar == null) {
-                bar = new ServerBossEvent(Component.literal(title), color, BossEvent.BossBarOverlay.PROGRESS);
+                bar = newServerBossEvent(Component.literal(title), color, BossEvent.BossBarOverlay.PROGRESS);
+                if (bar == null) continue;
                 activeProgressBars.put(id, bar);
             } else {
                 bar.setName(Component.literal(title));
@@ -88,6 +90,109 @@ final class NeoForgeProgressBars {
             for (ServerPlayer sp : current) {
                 if (!eligible.contains(sp)) bar.removePlayer(sp);
             }
+        }
+    }
+
+    /**
+     * Resolved {@link ServerBossEvent} constructor, cached after first lookup. The constructor
+     * signature drifts across MC revisions (the 1.21.x line the common module typechecks against
+     * exposes {@code (Component, BossBarColor, BossBarOverlay)}; later lines such as MC 26.1 differ),
+     * so the bytecode must not hard-link any single shape. {@code null} means "not yet resolved".
+     */
+    private static volatile Constructor<ServerBossEvent> resolvedCtor;
+    /** Pre-built argument template for {@link #resolvedCtor}; the {@code Component} slot is filled per call. */
+    private static volatile Object[] ctorArgTemplate;
+    /** Index of the {@link Component} parameter within {@link #resolvedCtor}, or -1 if none. */
+    private static volatile int ctorNameIndex = -1;
+    /** Set once a resolution attempt has run (so a confirmed failure is not retried every tick). */
+    private static volatile boolean ctorResolutionAttempted;
+
+    /**
+     * Constructs a {@link ServerBossEvent} tolerant of cross-version constructor drift. Resolves
+     * (and caches) a public constructor by reflection: it accepts any constructor that exposes a
+     * {@link Component}, a {@link BossEvent.BossBarColor} and a {@link BossEvent.BossBarOverlay}
+     * parameter, filling any remaining parameters with sensible defaults ({@link UUID#randomUUID()}
+     * for {@code UUID}, {@code 0f} for {@code float}, {@code false} for {@code boolean}, {@code null}
+     * otherwise). This covers both the {@code (Component, BossBarColor, BossBarOverlay)} shape
+     * (MC 1.21.x) and reordered / extended shapes on later lines such as MC 26.1. Returns
+     * {@code null} if no usable constructor exists, so the caller can skip the bar rather than
+     * crash the server tick.
+     */
+    @SuppressWarnings("unchecked")
+    private static ServerBossEvent newServerBossEvent(Component name,
+                                                      BossEvent.BossBarColor color,
+                                                      BossEvent.BossBarOverlay overlay) {
+        if (resolvedCtor == null && !ctorResolutionAttempted) {
+            synchronized (NeoForgeProgressBars.class) {
+                if (resolvedCtor == null && !ctorResolutionAttempted) {
+                    Constructor<?> best = null;
+                    Object[] bestArgs = null;
+                    int bestNameIndex = -1;
+                    int bestExtras = Integer.MAX_VALUE;
+                    for (Constructor<?> c : ServerBossEvent.class.getDeclaredConstructors()) {
+                        Class<?>[] p = c.getParameterTypes();
+                        boolean hasName = false, hasColor = false, hasOverlay = false;
+                        int nameIndex = -1;
+                        int extras = 0;
+                        Object[] args = new Object[p.length];
+                        for (int i = 0; i < p.length; i++) {
+                            Class<?> t = p[i];
+                            if (t == Component.class && !hasName) {
+                                hasName = true;
+                                nameIndex = i;
+                            } else if (t == BossEvent.BossBarColor.class && !hasColor) {
+                                hasColor = true;
+                                args[i] = color;
+                            } else if (t == BossEvent.BossBarOverlay.class && !hasOverlay) {
+                                hasOverlay = true;
+                                args[i] = overlay;
+                            } else if (t == UUID.class) {
+                                args[i] = UUID.randomUUID();
+                                extras++;
+                            } else if (t == float.class) {
+                                args[i] = 0f;
+                                extras++;
+                            } else if (t == boolean.class) {
+                                args[i] = false;
+                                extras++;
+                            } else if (t.isPrimitive()) {
+                                // Unsupported primitive (int/long/etc.) -- skip this constructor.
+                                extras = Integer.MAX_VALUE;
+                                break;
+                            } else {
+                                args[i] = null;
+                                extras++;
+                            }
+                        }
+                        if (hasName && hasColor && hasOverlay && extras < bestExtras) {
+                            best = c;
+                            bestArgs = args;
+                            bestNameIndex = nameIndex;
+                            bestExtras = extras;
+                        }
+                    }
+                    if (best != null) {
+                        best.setAccessible(true);
+                        resolvedCtor = (Constructor<ServerBossEvent>) best;
+                        ctorArgTemplate = bestArgs;
+                        ctorNameIndex = bestNameIndex;
+                    }
+                    ctorResolutionAttempted = true;
+                }
+            }
+        }
+        Constructor<ServerBossEvent> ctor = resolvedCtor;
+        if (ctor == null) return null;
+        try {
+            Object[] args = ctorArgTemplate.clone();
+            args[ctorNameIndex] = name;
+            // Give every bar a fresh UUID; boss bars are keyed by UUID on the client.
+            for (int i = 0; i < args.length; i++) {
+                if (args[i] instanceof UUID) args[i] = UUID.randomUUID();
+            }
+            return ctor.newInstance(args);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
         }
     }
 

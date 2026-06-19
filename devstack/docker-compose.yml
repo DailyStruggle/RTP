@@ -1,6 +1,6 @@
 # rtp-proxy devstack: 1 Redis + 2 Velocity proxies + 2 Paper lobbies + 3 backends
-# (backend-a Paper, backend-b Folia, backend-c Fabric). See README.md for the
-# rationale behind the heterogeneous backend trio.
+# (backend-a Paper, backend-b Folia, backend-c Folia). See README.md for the
+# rationale behind the backend trio.
 #
 # The two "lobby" Paper servers have an empty `regions/` directory: they are
 # valid network participants (role: backend, unique serverId) but cannot serve
@@ -383,26 +383,22 @@ services:
         condition: service_healthy
 
   backend-c:
-    # Fabric 1.21.11. Third backend that intentionally tests the rtp-fabric
-    # adapter under the same Velocity + Redis topology as the Paper / Folia
-    # backends. rtp-fabric is currently marked unstable in
-    # docs/dev/MULTI_PLATFORM_PLAN.md (known S-005 nuance in FabricWorld and a
-    # null stub in FabricServerAccessor.getLocationGenerator); the explicit
-    # purpose of this service is to surface and exercise those issues in
-    # acceptance instead of waiting for them to be reported by users.
-    # Stability cannot be verified without testing - this is the testing.
+    # Folia 1.21.11. Third backend, running Folia under the same Velocity +
+    # Redis topology as backend-a (Paper) and backend-b (Folia). This service
+    # was previously a Fabric node; it has been switched to Folia so the
+    # acceptance harness runs entirely on the stable Bukkit/Paper-family
+    # platforms (no Fabric mod runtime required for this run).
     #
-    # Same Java 25 image so the unobf-carrier (Java 25 toolchain, class file
-    # v69) loads cleanly. itzg's TYPE=FABRIC handles Fabric Loader install;
-    # the RTP-Pro Fabric mod jar must be dropped into ./backend-c/mods/
-    # (NOT plugins/) before `up` - see backend-c/mods/README.md.
+    # Same itzg image and Java 25 / 1.21.11 toolchain as backend-a/backend-b.
+    # Folia honors the same paper-global.yml velocity-forwarding patch, so
+    # PATCH_DEFINITIONS works unchanged. RTP-Pro ships rtp-folia shaded into the
+    # same plugin jar, so no jar swap is needed.
     image: itzg/minecraft-server:java25
     environment:
       EULA: "TRUE"
-      TYPE: FABRIC
+      TYPE: FOLIA
       VERSION: "1.21.11"
-      # Same 6G envelope as the Paper/Folia backends: Fabric world-gen plus
-      # RTP pre-fill have the same memory profile as Paper.
+      # Same 6G envelope as the other backends: world-gen plus RTP pre-fill.
       MEMORY: 6G
       ONLINE_MODE: "FALSE"
       OPS: ${OPS:-}
@@ -410,53 +406,40 @@ services:
       RUN_AS_UID: "0"
       RUN_AS_GID: "0"
       RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
-      # Fabric does NOT use Paper's velocity.enabled toggle - it relies on the
-      # FabricProxy-Lite mod (or equivalent) for modern forwarding. The shared
-      # paper-patches/ JSON is therefore not relevant here and is not mounted.
-      # The forwarding secret is exposed as a file (mounted at
-      # /data/forwarding.secret below); FabricProxy-Lite reads it via its own
-      # FABRIC_PROXY_SECRET_FILE env var. Without this the mod's secret stays
-      # empty and the modern-forwarding handshake fails with
-      # "Secret check failed ... Empty key" (the backend rejects every proxied
-      # login as "Unable to verify player details").
-      FABRIC_PROXY_SECRET_FILE: /data/forwarding.secret
+      # See backend-a: PATCH_DEFINITIONS makes velocity.enabled=true survive the
+      # mc-image-helper template re-download on every boot.
+      PATCH_DEFINITIONS: /paper-patches
+      REPLACE_ENV_VARIABLES: "TRUE"
+      ENV_VARIABLE_PREFIX: "CFG_"
+      CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET:?set CFG_VELOCITY_FORWARDING_SECRET (harness does this automatically)}
     user: "0:0"
-    # Fabric mods live in /data/mods, not /data/plugins. The entrypoint shim
-    # seeds network.yml under /data/config/rtp/ (lowercase): the Fabric build
-    # of rtp-fabric resolves its config dir via
-    # `FabricLoader.getConfigDir().resolve("rtp")` -> `<server>/config/rtp/`
-    # (see FabricDatabaseHandler#resolveConfigDirectory and
-    # rtp-fabric-ADR-013 `FabricNetworkModeBootstrap.ensureNetworkYml`).
-    # Note: the directory name is lowercase `rtp`, NOT `RTP` like the Bukkit
-    # `/data/plugins/RTP/` path - that asymmetry is on the runtime adapter
-    # side, not a typo here.
+    # See backend-a: copy-not-mount entrypoint shim.
     entrypoint:
       - /bin/bash
       - -c
-      # chown/chmod the WHOLE /data/config (not just the rtp subdir): the JVM
-      # runs as uid 1000 (itzg's minecraft user), and FabricProxy-Lite writes
-      # its merged config to /data/config/FabricProxy-Lite.toml on load. If the
-      # parent /data/config stays root-owned (created by this mkdir), the mod
-      # cannot create that file and crashes with
-      # "./config/FabricProxy-Lite.toml (Permission denied)".
-      - 'mkdir -p /data/config/rtp/regions && cp -f /seed/network.yml /data/config/rtp/network.yml && (cp -f /seed/regions/*.yml /data/config/rtp/regions/ 2>/dev/null || true) && chown -R 1000:1000 /data/config && chmod -R u+rwX /data/config && exec /start'
+      - 'mkdir -p /data/plugins/RTP/regions && cp -f /seed/network.yml /data/plugins/RTP/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/logging.yml && (cp -f /seed/regions/*.yml /data/plugins/RTP/regions/ 2>/dev/null || true) && chown -R 1000:1000 /data/plugins/RTP && exec /start'
     volumes:
-      # Fabric mods directory (NOT plugins).
-      - ./backend-c/mods:/data/mods
-      # Seed-only (read-only); copied into /data/config/rtp/network.yml at boot.
+      # See backend-a: per-backend plugins dir (shared host bind corrupts the
+      # .paper-remapped cache when both backends race on it).
+      - ./backend-c/plugins:/data/plugins
+      # Seed-only (read-only); copied into /data/plugins/RTP/network.yml at boot.
       - ./backend-c/rtp-config/network.yml:/seed/network.yml:ro
-      # Seed-only (read-only): the single default region (End). Copied into
-      # /data/config/rtp/regions/ by the entrypoint shim (Fabric config dir is
-      # lowercase `rtp`, not `RTP`). backend-c's default lands in the End to demo
-      # per-server load distribution + configurable displayName. Fabric keeps
-      # Nether/End inside /data/world (DIM-1 / DIM1), so no extra world binds are
-      # needed beyond the ./backend-c/world mount below.
+      # See backend-a: seed logging.yml (min_level: FINE).
+      - ./backend-c/rtp-config/logging.yml:/seed/logging.yml:ro
+      # Seed-only (read-only): the single default region (End). See backend-a
+      # for the seed-copy contract; backend-c's default lands in the End to demo
+      # per-server load distribution + configurable displayName.
       - ./backend-c/rtp-config/regions:/seed/regions:ro
+      - ./shared/paper-patches:/paper-patches:ro
       - ./shared/forwarding.secret:/data/forwarding.secret
       # See backend-a: shared mc-image-helper download cache.
       - mc-image-cache:/data/.cache
       # See backend-a: world dir as a host bind, not a named volume.
       - ./backend-c/world:/data/world
+      # Nether + End host binds for the pre-generated spawn-area chunks.
+      # backend-c's default region targets the End (world_the_end).
+      - ./backend-c/world_nether:/data/world_nether
+      - ./backend-c/world_the_end:/data/world_the_end
     depends_on:
       redis:
         condition: service_healthy

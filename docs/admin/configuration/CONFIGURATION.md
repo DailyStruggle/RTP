@@ -128,7 +128,7 @@ The `vert` block controls how the Y coordinate (height) is chosen once a horizon
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `direction` | Integer | `0` | Search direction: `0` = bottom-up (scan from `minY` to `maxY`), `1` = top-down (scan from `maxY` to `minY`), `2` = middle-out, `3` = edges-in, any other integer = randomized order. |
+| `direction` | Integer | `2` | Search direction: `0` = bottom-up (scan from `minY` to `maxY`), `1` = top-down (scan from `maxY` to `minY`), `2` = middle-out (default), `3` = edges-in, any other integer = randomized order. |
 
 ---
 

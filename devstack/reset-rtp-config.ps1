@@ -33,15 +33,11 @@ $ErrorActionPreference = 'Stop'
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# Paper/Folia instances wired into docker-compose.yml. backend-c (Fabric)
-# is intentionally excluded: its compose service binds only `mods/` and
-# `world/` from the host, and its RTP runtime config tree lives inside the
-# container at `/data/config/rtp/` (not bind-mounted). That tree is
-# discarded on `docker compose down` + recreate, so backend-c needs no
-# host-side reset to pick up a fresh `messages.yml` etc. - rebuild the
-# Fabric mod jar, drop it into `./backend-c/mods/`, and `docker compose
-# up --force-recreate backend-c` (or a plain `down -v` + `up`) is enough.
-$instances = @('backend-a', 'backend-b', 'lobby-a', 'lobby-b')
+# Paper/Folia instances wired into docker-compose.yml. All three backends and
+# both lobbies bind-mount `plugins/` from the host, so the plugin's runtime
+# config tree lives at `./<instance>/plugins/RTP/` and must be wiped here to
+# pick up a fresh baseline (messages.yml etc.) from a newly-built jar.
+$instances = @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b')
 
 foreach ($name in $instances) {
     $pluginRtp = Join-Path $scriptDir "$name\plugins\RTP"
