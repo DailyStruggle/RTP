@@ -831,6 +831,24 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   /**
+   * Returns the loaded YAML document root for this parser, or {@code null}
+   * when the file has not been cached yet. The root is a
+   * {@link RtpYamlSection} (concretely an {@code RtpYamlConfig}) that
+   * preserves block comments, so callers can resolve a key's documentation
+   * comment via {@link RtpYamlSection#getComment(String)} (dotted paths
+   * accepted). Used by the menu config-search hover resolver.
+   *
+   * @return the YAML root section, or {@code null} when unavailable
+   */
+  @Nullable
+  public RtpYamlSection getYamlRoot() {
+    if (cachedLookup == null) return null;
+    Map<String, RtpYamlConfig> lookup = cachedLookup.get();
+    if (lookup == null) return null;
+    return lookup.get(name);
+  }
+
+  /**
    * server function for saving a plugin config file from package
    *
    * @param name file name, e.g. "config.yml"

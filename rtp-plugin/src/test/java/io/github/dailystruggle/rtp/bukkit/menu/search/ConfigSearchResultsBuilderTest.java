@@ -3,8 +3,10 @@ package io.github.dailystruggle.rtp.bukkit.menu.search;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.menu.search.ConfigSearchResultsBuilder;
 import io.github.dailystruggle.rtp.common.menu.search.ConfigSearchResultsBuilder.Hit;
 import org.junit.jupiter.api.BeforeEach;
@@ -95,6 +97,62 @@ public class ConfigSearchResultsBuilderTest {
                 .findFirst().orElse(null);
         assertNotNull(keyHit, "expected a key-side hit on 'shape'");
         assertEquals("shape", keyHit.keyName());
+    }
+
+    @Test
+    void nestedSectionProducesDottedKeyHitsNotBlob() throws IOException {
+        // shape is a nested YAML section in a real region file. The search
+        // must surface each nested scalar as its own dotted-key hit
+        // (shape.radius) with a clean scalar rawValue, rather than matching
+        // inside a String.valueOf'd dump of the whole section.
+        seedRegion("default.yml",
+                "shape:\n" +
+                "  name: \"CIRCLE\"\n" +
+                "  radius: 256\n" +
+                "  centerRadius: 64\n" +
+                "version: \"1.0\"\n");
+        List<Hit> hits = ConfigSearchResultsBuilder.search("radius", RTP.configs);
+        Hit dotted = hits.stream()
+                .filter(h -> h.keyName().equalsIgnoreCase("shape.radius"))
+                .findFirst().orElse(null);
+        assertNotNull(dotted, "expected a hit keyed by dotted path 'shape.radius'");
+        assertEquals("256", dotted.rawValue(),
+                "rawValue must be the scalar leaf, not a section dump");
+        assertFalse(dotted.rawValue().contains("\n"),
+                "rawValue must not be a multi-line section blob");
+        // The nested value 256 is also matchable as a value hit on shape.radius.
+        Hit valueHit = ConfigSearchResultsBuilder.search("256", RTP.configs).stream()
+                .filter(h -> !h.keyMatched() && h.keyName().equalsIgnoreCase("shape.radius"))
+                .findFirst().orElse(null);
+        assertNotNull(valueHit, "expected a value-side hit on shape.radius=256");
+        assertEquals("256", valueHit.rawValue());
+    }
+
+    @Test
+    void factoryValueShapeFlattensToDottedKeysWithKindPrefixedFile() throws IOException {
+        // At runtime RegionConfigLoader replaces the raw YAML shape section
+        // with a deserialized Shape (a FactoryValue). The search must flatten
+        // that FactoryValue into dotted leaves (shape.radius) rather than
+        // String.valueOf'ing the whole object into one blob, and the hit's
+        // file name must be the dispatch-addressable "<kind>/<entry>" form so
+        // a row click resolves instead of failing as "menu command invalid".
+        MultiConfigParser<RegionKeys> mcp = seedRegion("default.yml",
+                "shape: SQUARE\n" +
+                "version: \"1.0\"\n");
+        ConfigParser<RegionKeys> sub = mcp.getParser("default");
+        Square square = new Square();
+        square.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams.radius, 384L);
+        sub.set(RegionKeys.shape, square);
+
+        List<Hit> hits = ConfigSearchResultsBuilder.search("radius", RTP.configs);
+        Hit dotted = hits.stream()
+                .filter(h -> h.keyName().equalsIgnoreCase("shape.radius"))
+                .findFirst().orElse(null);
+        assertNotNull(dotted, "expected a dotted 'shape.radius' hit from the FactoryValue shape");
+        assertEquals("regions/default", dotted.fileName(),
+                "multiconfig hit must carry the kind-prefixed, dispatch-addressable file name");
+        assertFalse(dotted.rawValue().contains("\n"),
+                "rawValue must be a scalar leaf, not a FactoryValue blob");
     }
 
     @Test

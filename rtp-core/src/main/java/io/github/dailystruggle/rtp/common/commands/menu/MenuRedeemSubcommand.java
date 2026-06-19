@@ -927,6 +927,16 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         // the existing args-form behaviour. Stage 2 will switch the renderer
         // to emit the args-form mirror commands directly for those branches.
         addSubCommand(new MenuConcreteCommandLeavesB.PickerCmd(this));
+        // Dedicated destination selectors. Each owns its display name and
+        // row color supplier and renders through the curated
+        // SelectionMenuBuilder (clean "pick a X" header, no command echo, no
+        // "type a custom value" row), instead of the generic command-
+        // navigation picker. The front page / admin panel rows run these as
+        // /rtp menu world|region|biome|prefab.
+        addSubCommand(new MenuConcreteCommandLeavesB.WorldCmd(this));
+        addSubCommand(new MenuConcreteCommandLeavesB.RegionCmd(this));
+        addSubCommand(new MenuConcreteCommandLeavesB.BiomeCmd(this));
+        addSubCommand(new MenuConcreteCommandLeavesB.PrefabCmd(this));
         addSubCommand(new MenuConcreteCommandLeavesB.PageCmd(this));
         addSubCommand(new MenuConcreteCommandLeavesB.StageCmd(this));
         addSubCommand(new MenuConcreteCommandLeavesB.UnstageCmd(this));
@@ -1288,6 +1298,121 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
     }
 
     /**
+     * Dispatch for a dedicated destination/selection leaf (e.g.
+     * {@code /rtp menu world|region|biome|prefab}). Walks {@code parentPath}
+     * against the live {@link TreeCommand} graph (same pattern as
+     * {@link #dispatchOpenParamPicker}), resolves the named parameter, takes
+     * its {@code relevantValues(senderId)} as the entry set, and renders the
+     * curated {@link SelectionMenuBuilder} page. The leaf supplies the
+     * {@code displayName} (for the {@code "pick a <displayName>"} header) and
+     * the {@code colorSupplier} that tints each row.
+     *
+     * <p>All failure paths log WARN and reject with {@code menuInvalid}
+     * (S-004): missing renderer, unknown path segment, unknown parameter,
+     * builder exception, null model, or renderer exception.
+     *
+     * @param senderId      viewing player
+     * @param parentPath    path from {@code /rtp} to the node owning the param
+     *                      (empty = root; staging appends onto this)
+     * @param paramName     parameter to enumerate and stage
+     * @param displayName   human label for the header
+     * @param colorSupplier per-entry color prefix supplier (may be {@code null})
+     * @param executeOnClick when {@code true} each entry runs the assembled
+     *                      {@code /rtp} command on click (teleport); when
+     *                      {@code false} it stages the choice for a later
+     *                      Execute row (prefab apply/confirm flow)
+     * @param messageMethod optional feedback sink
+     */
+    boolean dispatchSelectionMenu(UUID senderId,
+                                  String[] parentPath,
+                                  String paramName,
+                                  String displayName,
+                                  java.util.function.Function<String, String> colorSupplier,
+                                  boolean executeOnClick,
+                                  @Nullable Consumer<String> messageMethod) {
+        if (renderer == null) {
+            RTP.log(Level.WARNING,
+                    "menu selection received with menu disabled for " + senderId);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu selection rejected: menu disabled", messageMethod);
+            return false;
+        }
+        TreeCommand target = rtpRoot;
+        for (String segment : parentPath) {
+            if (segment != null && segment.indexOf('=') >= 0) {
+                continue;
+            }
+            CommandsAPICommand next = target.getCommandLookup()
+                    .get(segment.toUpperCase(java.util.Locale.ROOT));
+            if (!(next instanceof TreeCommand)) {
+                next = target.getCommandLookup()
+                        .get(segment.toUpperCase(java.util.Locale.ROOT) + ".YML");
+            }
+            if (!(next instanceof TreeCommand tc)) {
+                RTP.log(Level.WARNING,
+                        "menu selection path segment '" + segment
+                                + "' did not resolve to a TreeCommand under "
+                                + target.name() + " for " + senderId);
+                reject(senderId, MessagesKeys.menuInvalid,
+                        "menu selection rejected: unknown path segment '" + segment + "'",
+                        messageMethod);
+                return false;
+            }
+            target = tc;
+        }
+        Map<String, CommandParameter> paramLookup = target.getParameterLookup();
+        CommandParameter param = null;
+        if (paramLookup != null) {
+            param = paramLookup.get(paramName);
+            if (param == null) param = paramLookup.get(paramName.toLowerCase(java.util.Locale.ROOT));
+            if (param == null) param = paramLookup.get(paramName.toUpperCase(java.util.Locale.ROOT));
+        }
+        if (param == null) {
+            RTP.log(Level.WARNING,
+                    "menu selection unknown parameter '" + paramName
+                            + "' on " + target.name() + " for " + senderId);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu selection rejected: unknown parameter '" + paramName + "'",
+                    messageMethod);
+            return false;
+        }
+        Set<String> entries;
+        try {
+            Set<String> r = param.relevantValues(senderId);
+            entries = (r != null) ? r : param.values();
+        } catch (RuntimeException e) {
+            try {
+                entries = param.values();
+            } catch (RuntimeException ignored) {
+                entries = java.util.Collections.emptySet();
+            }
+        }
+        MenuModel model;
+        try {
+            model = new SelectionMenuBuilder().build(
+                    java.util.List.of(parentPath), paramName, displayName, entries,
+                    colorSupplier, executeOnClick);
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "menu selection failed for " + senderId
+                            + " node=" + target.name() + " param=" + paramName
+                            + ": " + e.getMessage(), e);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu selection rejected: builder failure", messageMethod);
+            return false;
+        }
+        if (model == null) {
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu selection rejected: builder returned null model",
+                    messageMethod);
+            return false;
+        }
+        return MenuDrawer.draw(renderer, senderId, model, messageMethod,
+                this::reject, "selection",
+                "node=" + target.name() + " param=" + paramName);
+    }
+
+    /**
      * ADR-045 dispatch for {@link MenuAction.PromptAnvilInput}. Walks
      * {@code parentPath} against the live {@link TreeCommand} graph to
      * confirm the parameter exists (defensive — the renderer should never
@@ -1590,16 +1715,70 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         } catch (RuntimeException ignored) {
             return "";
         }
+        return resolveDottedValueString(data, paramName);
+    }
+
+    /**
+     * Resolve a (possibly dotted) {@code paramName} against an enum-keyed
+     * config data map, formatted as a plain string. A bare name matches an
+     * enum constant directly; a dotted name (e.g. {@code shape.radius})
+     * resolves the leading segment to its enum constant and then descends
+     * into the stored {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection}
+     * or {@link java.util.Map} value via the remaining dotted path. Returns
+     * {@code ""} when nothing matches.
+     */
+    private static String resolveDottedValueString(
+            java.util.EnumMap<?, Object> data, String paramName) {
         if (data == null || data.isEmpty()) return "";
+        if (paramName == null || paramName.isEmpty()) return "";
+        int dot = paramName.indexOf('.');
+        String head = dot < 0 ? paramName : paramName.substring(0, dot);
+        String rest = dot < 0 ? null : paramName.substring(dot + 1);
         for (java.util.Map.Entry<?, Object> e : data.entrySet()) {
             Enum<?> k = (Enum<?>) e.getKey();
             if (k == null) continue;
-            if (k.name().equalsIgnoreCase(paramName)) {
+            if (k.name().equalsIgnoreCase(head)) {
                 Object v = e.getValue();
-                return v == null ? "" : String.valueOf(v);
+                if (rest == null) {
+                    return v == null ? "" : String.valueOf(v);
+                }
+                Object nested = descendDotted(v, rest);
+                return nested == null ? "" : String.valueOf(nested);
             }
         }
         return "";
+    }
+
+    /**
+     * Descend a dotted sub-path into a section/map value. Supports
+     * {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection}
+     * (which accepts dotted keys natively) and nested {@link java.util.Map}s.
+     * Returns {@code null} when the path cannot be resolved.
+     */
+    private static Object descendDotted(Object value, String dottedPath) {
+        if (value == null || dottedPath == null || dottedPath.isEmpty()) return null;
+        if (value instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection section) {
+            try {
+                return section.get(dottedPath);
+            } catch (RuntimeException ignored) {
+                return null;
+            }
+        }
+        if (value instanceof java.util.Map<?, ?> map) {
+            int dot = dottedPath.indexOf('.');
+            String head = dot < 0 ? dottedPath : dottedPath.substring(0, dot);
+            String rest = dot < 0 ? null : dottedPath.substring(dot + 1);
+            Object child = null;
+            for (java.util.Map.Entry<?, ?> e : map.entrySet()) {
+                if (e.getKey() != null && e.getKey().toString().equalsIgnoreCase(head)) {
+                    child = e.getValue();
+                    break;
+                }
+            }
+            if (rest == null) return child;
+            return descendDotted(child, rest);
+        }
+        return null;
     }
 
     /**
@@ -1630,16 +1809,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         } catch (RuntimeException ignored) {
             return "";
         }
-        if (data == null || data.isEmpty()) return "";
-        for (java.util.Map.Entry<?, Object> e : data.entrySet()) {
-            Enum<?> k = (Enum<?>) e.getKey();
-            if (k == null) continue;
-            if (k.name().equalsIgnoreCase(paramName)) {
-                Object v = e.getValue();
-                return v == null ? "" : String.valueOf(v);
-            }
-        }
-        return "";
+        return resolveDottedValueString(data, paramName);
     }
 
     // ADR-050 Stage 1b: package-private.
@@ -2547,16 +2717,15 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             }
         }
         boolean ok = dispatchRun(senderId, new MenuAction.RunRtpCommand(args), messageMethod);
-        // ADR-050 follow-up (2026-05-24): after a successful apply, re-open
-        // the curated file (or multi-config entry) page so the player lands
-        // back on the editor with the cart cleared, instead of being left
-        // with an empty/closed book. Mirrors stage / unstage / discard's
-        // reopen pattern. If the underlying dispatch failed, the user has
-        // already received the failure reject message; don't pile on a
-        // second navigation attempt.
-        if (ok) {
-            reopenAfterCartOp(senderId, apply.fileName(), messageMethod);
-        }
+        // Deliberately do NOT re-open the editor after a successful apply.
+        // The underlying config write/reload propagates asynchronously, so an
+        // immediate re-open would re-render the page from the pre-apply value
+        // and show the operator the old setting (a confusing stale read).
+        // Waiting for the reload before re-opening is clunky and racy from
+        // rtp-core, so apply instead leaves the book closed; the dispatched
+        // `/rtp config ...` command already emits its own success/feedback
+        // message. Stage / unstage / discard still re-open because they only
+        // mutate the in-memory cart, which is updated synchronously.
         return ok;
     }
 

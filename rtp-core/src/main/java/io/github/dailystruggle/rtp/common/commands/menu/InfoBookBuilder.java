@@ -211,7 +211,7 @@ public final class InfoBookBuilder {
         }
 
         // Refresh row.
-        String refreshLabel = lookupMsg(MessagesKeys.infoBookRefreshRow, "&a\u21bb Refresh");
+        String refreshLabel = lookupMsg(MessagesKeys.infoBookRefreshRow, "&2\u21bb Refresh");
         String refreshHover = lookupMsg(
                 MessagesKeys.infoBookRefreshHover,
                 "Re-render this page against a fresh metrics snapshot.");

@@ -264,7 +264,7 @@ menueHoverGrenzenFallback: "akzeptiert: [values]"
 menueZurueck: "&7« zurück"
 # Bezeichnungsvorlage für die Zeile "zusammengebauten Befehl ausführen", die jeder
 # ausführbaren Nicht-Wurzel-Menüseite vorangestellt wird. Platzhalter: [command] - der zusammengebaute /rtp ...-Aufruf.
-menueAusfuehren: "&a▶ [command] ausführen"
+menueAusfuehren: "&2▶ [command] ausführen"
 # Kopfzeile oben auf einer Unterseite zur Parameterwertauswahl (Stufe A.2).
 # Platzhalter: [param] - Parametername; [command] - zusammengebauter /rtp ...-Aufruf.
 menueWertWaehlen: "&7wähle einen Wert für [param] (führt aus: /rtp [command] [param]:<value>)"
@@ -290,11 +290,11 @@ menueSeiteVor: "&7nächste Seite ([page]) »"
 # Abschnittstrenner auf der Startseite über den Teleport-Zeilen (Spieleransicht).
 menueStartseiteAbschnittTeleport: "&8--- &7teleport &8---"
 # Startseitenzeilen. Keine Platzhalter.
-menueStartseiteZeileTeleport: "&a▶ /rtp &7- zu einem zufälligen Ort teleportieren"
-menueStartseiteZeileRegion: "&a▶ /rtp region:&7... &7- eine Region wählen"
-menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- eine Welt wählen"
-menueStartseiteZeileBiom: "&a▶ /rtp biome:&7... &7- ein Biom wählen"
-menueStartseiteZeileHilfe: "&a▶ /rtp help &7- Befehle auflisten"
+menueStartseiteZeileTeleport: "&2▶ /rtp &7- zu einem zufälligen Ort teleportieren"
+menueStartseiteZeileRegion: "&2▶ /rtp region:&7... &7- eine Region wählen"
+menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- eine Welt wählen"
+menueStartseiteZeileBiom: "&2▶ /rtp biome:&7... &7- ein Biom wählen"
+menueStartseiteZeileHilfe: "&2▶ /rtp help &7- Befehle auflisten"
 # Admin-Einstiegszeile der Startseite: die einzige inline
 # admin-sichtbare Zeile auf der Startseite; ein Klick steigt in das kuratierte Admin-
 # Panel ab, das vom AdminPanelBuilder erstellt wird. Ausgeblendet, wenn dem Betrachter rtp.menu.admin fehlt.
@@ -375,12 +375,12 @@ menueVorlageBestaetigenTitel: "#9D7CD8&l⚙ Vorlage bestätigen: #5FB3B3[prefab]
 # Nicht anklickbare Hinweiszeile des Bestätigungsmenüs unterhalb des Titels. Keine Platzhalter.
 menueVorlageBestaetigenHinweis: "&7prüfe die Änderungen unten, dann klicke auf Bestätigen oder Abbrechen"
 # Fußzeile des Bestätigungsmenüs: bestätigen und die Vorlage auf die Festplatte schreiben.
-menueVorlageBestaetigenZeile: "&a&l[confirm]"
+menueVorlageBestaetigenZeile: "&2&l[confirm]"
 # Fußzeile des Bestätigungsmenüs: abbrechen und zum Admin-Panel zurückkehren.
 menueVorlageAbbrechenZeile: "&c&l[cancel]"
 # Anklickbare Zeilenbezeichnung für die Aktualisieren-Schaltfläche unten im /rtp-info-
 # Buch. Rendert den aktuellen Bereich anhand einer frischen Metrik-Momentaufnahme neu.
-infoBuchAktualisierenZeile: "&a[Refresh]"
+infoBuchAktualisierenZeile: "&2[Refresh]"
 # Hover-Text für die Aktualisieren-Zeile des Info-Buchs.
 infoBuchAktualisierenHover: "&7Diese Seite mit einer frischen Metrik-Momentaufnahme neu rendern."
 # Anklickbare Zeilenbezeichnung für die Zum-Chat-wechseln-Schaltfläche unten im
@@ -436,7 +436,7 @@ konfigAusstehendZeilenFormat: "&9[key]&8 = &0[value]"
 konfigAusstehendZeileHover: "klicke, um zu verwerfen"
 # Anklickbare Bezeichnung der Zeile "vorgemerkte Änderungen übernehmen" auf einer Konfigurationsdateiseite.
 # Führt den zusammengebauten Befehl /rtp config <file> k1=v1 ... aus und leert den Warenkorb.
-konfigAnwendenZeile: "&a&l[apply]"
+konfigAnwendenZeile: "&2&l[apply]"
 # Anklickbare Bezeichnung der Zeile "vorgemerkte Änderungen verwerfen" auf einer Konfigurationsdateiseite.
 # Leert den Warenkorb, ohne zu übernehmen.
 konfigVerwerfenZeile: "&c&l[discard]"
@@ -524,7 +524,7 @@ multikonfigEntfernenModusAus: "&8[ ] Entfernen-Modus"
 # Umschaltzeilenbezeichnung, wenn der Entfernen-Modus AN ist. Klicks auf Eintragszeilen löschen.
 multikonfigEntfernenModusAn: "&c[x] Entfernen-Modus (klicke einen Eintrag zum Löschen)"
 # Auswahlzeilenbezeichnung für den Eintrag "+ neu hinzufügen...". Keine Platzhalter.
-multikonfigZeileHinzufuegen: "&a+ neu hinzufügen..."
+multikonfigZeileHinzufuegen: "&2+ neu hinzufügen..."
 # Hover-Text für die Hinzufügen-Zeile. Platzhalter: [name] - vorausgefüllter Standardname.
 multikonfigZeileHinzufuegenHover: "&7gib einen Namen im Amboss-Dialog ein; vorausgefüllt: &f[name]"
 # Hover-Text für eine Eintragszeile im Normalmodus. Platzhalter: [name].
@@ -536,7 +536,7 @@ multikonfigBestaetigenTitel: "&c&l[name] löschen?"
 # Ja-Zeilenbezeichnung der Löschbestätigungsseite. Keine Platzhalter.
 multikonfigBestaetigenJa: "&c&l[confirm delete]"
 # Abbrechen-Zeilenbezeichnung der Löschbestätigungsseite. Keine Platzhalter.
-multikonfigBestaetigenNein: "&a&l[cancel]"
+multikonfigBestaetigenNein: "&2&l[cancel]"
 # Hover-Text auf einer gesperrten (ausgegrauten) Standardregionszeile. Keine Platzhalter.
 multikonfigSperreRegionStandard: "&7die Standardregion kann nicht entfernt werden"
 # Hover-Text auf einer gesperrten (ausgegrauten) Weltzeile. Platzhalter: [name].

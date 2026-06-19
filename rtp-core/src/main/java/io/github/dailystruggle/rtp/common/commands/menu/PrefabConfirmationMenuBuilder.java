@@ -114,8 +114,10 @@ public final class PrefabConfirmationMenuBuilder {
                 int shown = Math.min(changes.size(), MAX_LINES_PER_FILE);
                 for (int i = 0; i < shown; i++) {
                     PrefabApplier.Change c = changes.get(i);
+                    // Key path in black (parchment-readable) instead of a wall
+                    // of dark-gray; only the structural arrow stays muted.
                     lines.add(MenuLine.of(new MenuFragment(
-                            "&8  " + c.keyPath()
+                            "&0  " + c.keyPath()
                                     + ": &c" + safe(c.oldValue())
                                     + " &8-> &2" + safe(c.newValue()),
                             null, null)));
@@ -132,7 +134,7 @@ public final class PrefabConfirmationMenuBuilder {
         lines.add(new MenuLine(List.of()));
         addRow(
                 lines,
-                "&a&l[confirm]",
+                "&2&l[confirm]",
                 null,
                 new MenuAction.RunRtpCommand(
                         new String[]{"admin", "prefab", "confirm", "id=" + prefab.id()}));

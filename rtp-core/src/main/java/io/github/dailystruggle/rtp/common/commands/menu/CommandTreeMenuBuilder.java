@@ -514,11 +514,18 @@ public final class CommandTreeMenuBuilder {
         // (the configured regions / worlds). A free-form "type a custom
         // value..." row only invites invalid input there and clutters what
         // should be a clean, colorized list of destinations, so it is omitted
-        // for those two pickers. Every other parameter (free-form numerics,
-        // config keys, etc.) keeps the chat/anvil prefill fallback.
+        // for those two pickers. The prefab selection picker (the `id`
+        // parameter under `admin prefab apply`) is likewise a closed set of
+        // bundled prefabs: a custom value can never resolve to a real prefab,
+        // so the row is just noise there too. Every other parameter (free-form
+        // numerics, config keys, etc.) keeps the chat/anvil prefill fallback.
+        boolean prefabIdPicker =
+                "id".equalsIgnoreCase(paramName)
+                        && parentPath.stream().anyMatch("prefab"::equalsIgnoreCase);
         boolean enumerableDestinationPicker =
                 "region".equalsIgnoreCase(paramName)
-                        || "world".equalsIgnoreCase(paramName);
+                        || "world".equalsIgnoreCase(paramName)
+                        || prefabIdPicker;
 
         // Build value rows — Stage A.3: clicking a suggested value *stages*
         // the assignment into the assembled path (re-opens the parent command
@@ -876,7 +883,7 @@ public final class CommandTreeMenuBuilder {
                         "&9[key]&8 = &0[value]");
                 String pendingRowHover = lookupMsg(MessagesKeys.configPendingRowHover,
                         "click to unstage");
-                String applyLabel = lookupMsg(MessagesKeys.configApplyRow, "&a&l[apply]");
+                String applyLabel = lookupMsg(MessagesKeys.configApplyRow, "&2&l[apply]");
                 // Discard row intentionally removed (2026-05-22 per user
                 // request): clicking any pending row already unstages that
                 // entry, and the Back row leaves the page without applying —
@@ -1064,7 +1071,7 @@ public final class CommandTreeMenuBuilder {
                 writeArgs[i] = writeCommandPath.get(i);
             }
             writeArgs[writeCommandPath.size()] = "name:" + typeName;
-            String marker = typeName.equalsIgnoreCase(currentTypeName) ? "&a* " : "&2";
+            String marker = typeName.equalsIgnoreCase(currentTypeName) ? "&2&l* " : "&2";
             lines.add(MenuLine.of(new MenuFragment(marker + typeName, null,
                     new MenuAction.OpenMenu(writeArgs))));
         }

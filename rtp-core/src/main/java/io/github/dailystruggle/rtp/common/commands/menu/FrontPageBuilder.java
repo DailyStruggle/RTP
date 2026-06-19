@@ -165,9 +165,10 @@ public final class FrontPageBuilder {
                 && parameterHasSuggestions(regionParam, viewer)) {
             addRow(
                     lines,
-                    lookupMsg(MessagesKeys.menuFrontPageRowRegion, "🌍 Pick a region"),
+                    cleanPickerRowLabel(
+                            lookupMsg(MessagesKeys.menuFrontPageRowRegion, "🌍 Pick a region")),
                     null,
-                    new MenuAction.OpenParamPicker(new String[0], "region"));
+                    new MenuAction.RunRtpCommand(new String[]{"menu", "region"}));
         }
         CommandParameter worldParam = findParameter(rtpRoot, "world");
         if (worldParam != null
@@ -175,9 +176,10 @@ public final class FrontPageBuilder {
                 && parameterHasSuggestions(worldParam, viewer)) {
             addRow(
                     lines,
-                    lookupMsg(MessagesKeys.menuFrontPageRowWorld, "🌐 Pick a world"),
+                    cleanPickerRowLabel(
+                            lookupMsg(MessagesKeys.menuFrontPageRowWorld, "🌐 Pick a world")),
                     null,
-                    new MenuAction.OpenParamPicker(new String[0], "world"));
+                    new MenuAction.RunRtpCommand(new String[]{"menu", "world"}));
         }
         CommandParameter biomeParam = findParameter(rtpRoot, "biome");
         if (biomeParam != null
@@ -185,9 +187,10 @@ public final class FrontPageBuilder {
                 && parameterHasSuggestions(biomeParam, viewer)) {
             addRow(
                     lines,
-                    lookupMsg(MessagesKeys.menuFrontPageRowBiome, "🌳 Pick a biome"),
+                    cleanPickerRowLabel(
+                            lookupMsg(MessagesKeys.menuFrontPageRowBiome, "🌳 Pick a biome")),
                     null,
-                    new MenuAction.OpenParamPicker(new String[0], "biome"));
+                    new MenuAction.RunRtpCommand(new String[]{"menu", "biome"}));
         }
     }
 
@@ -215,6 +218,30 @@ public final class FrontPageBuilder {
     }
 
     // ---- helpers ----------------------------------------------------------
+
+    /**
+     * Strips the embedded command echo from a destination picker row label.
+     * The shipped {@code menuFrontPageRow{Region,World,Biome}} messages are
+     * shaped like {@code "&a▶ /rtp region:&7... &7- pick a region"} - a relic of
+     * when these rows assembled a command. The rows now run a dedicated
+     * {@code /rtp menu region|world|biome} selection menu, so the mid-section
+     * {@code /rtp region:...} echo is misleading. This keeps the leading
+     * color/icon prefix (everything before {@code /rtp}) and the human
+     * description after the last {@code "- "}, dropping the command echo.
+     * Labels without a {@code /rtp} echo (cleaner translations) pass through
+     * unchanged.
+     */
+    static String cleanPickerRowLabel(String raw) {
+        if (raw == null) return null;
+        int rtpIdx = raw.indexOf("/rtp");
+        if (rtpIdx < 0) return raw;
+        int dashIdx = raw.lastIndexOf("- ");
+        if (dashIdx < 0 || dashIdx + 2 > raw.length()) return raw;
+        String prefix = raw.substring(0, rtpIdx).trim();
+        String description = raw.substring(dashIdx + 2).trim();
+        if (description.isEmpty()) return raw;
+        return prefix.isEmpty() ? description : prefix + " " + description;
+    }
 
     private static void addRow(List<MenuLine> lines, String label, String hover, MenuAction action) {
         if (label == null || label.isEmpty()) return;
