@@ -1,0 +1,45 @@
+// RTP GUI addon - Fabric renderer carrier.
+//
+// Compiles the Fabric server-side chest-menu renderer against deobfuscated
+// (Mojmap) Minecraft 26.x, exactly like the RTP Fabric carriers
+// (platforms/rtp-fabric/rtp-fabric-v26_1_R1). 26.1 and 26.2 are both
+// deobfuscated and share the Mojmap surface this renderer uses, so a single
+// 26.1-compiled carrier loads on both (forward bytecode compatibility).
+//
+// This module's compiled classes are bundled (not run standalone) into the
+// single multi-loader addon jar assembled by :addons:LeafRTPGuiAddon:rtp-gui; it
+// is gated by -PexcludeJdk25 in settings.gradle because MC 26.x requires JDK 25.
+plugins {
+    // Unobfuscated MC (26.1+) uses the net.fabricmc.fabric-loom plugin ID with no
+    // mappings step (version pinned centrally in settings.gradle pluginManagement).
+    id 'net.fabricmc.fabric-loom'
+}
+
+ext {
+    minecraftVersion = '26.1.2'
+    loaderVersion    = '0.18.4'
+    fabricApiVersion = '0.143.5+26.1'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraftVersion}"
+    // No `mappings` line - 26.1 ships deobfuscated.
+    implementation "net.fabricmc:fabric-loader:${loaderVersion}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
+
+    // The platform-neutral menu (model, config, render seam, teleport submit).
+    // Bundled into the assembly jar; compiled to Java 21 bytecode and loadable here.
+    implementation project(':addons:LeafRTPGuiAddon:rtp-gui-common')
+
+    // Stable SPI + engine are provided at runtime by the RTP mod (single jar),
+    // so compileOnly - never bundled by this carrier.
+    compileOnly project(':rtp-api')
+    compileOnly project(':rtp-core')
+    compileOnly project(':metrics-api')
+}

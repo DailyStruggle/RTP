@@ -5,7 +5,6 @@ import io.github.dailystruggle.effectsapi.common.effects.SoundEffect;
 import io.github.dailystruggle.effectsapi.common.effects.ParticleEffect;
 import io.github.dailystruggle.effectsapi.common.effects.PotionEffect;
 import io.github.dailystruggle.effectsapi.common.effects.TitleEffect;
-import io.github.dailystruggle.effectsapi.fabric.FabricHandles;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.core.particles.ParticleTypes;
@@ -48,7 +47,13 @@ public final class FabricEffectsInitializer {
     public static void registerAll() {
         if (!REGISTERED.compareAndSet(false, true)) return;
 
-        FabricHandles.register();
+        // Register the Mojmap-native handle provider. The shared
+        // effectsapi.fabric.FabricHandles is Loom intermediary-remapped
+        // (ServerPlayer -> class_3222) and does NOT link on the deobf MC 26.x
+        // runtime, so wrapPlayer there raised NoClassDefFoundError the moment a
+        // common effect (SOUND / PARTICLE / ...) fired. FabricHandlesUnobf is
+        // compiled with no mappings step and names Mojang types natively.
+        FabricHandlesUnobf.register();
 
         // ADR-004: per-platform leaf operations live in FabricValueCoercer.
         EffectFactory.setCoercer(new FabricValueCoercer());

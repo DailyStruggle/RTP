@@ -780,6 +780,17 @@ remapJar {
     def commonUnobfJar = project.configurations.fabricCommonUnobfBytecode
     def effectsUnobfJar = project.configurations.effectsApiFabricUnobfBytecode
     def mergeFn = project.ext.mergeFabricUnobfBytecodeIntoJar
+    // The post-remap carrier merge happens in this task's doLast, but the
+    // carrier jars are NOT part of remapJar's inputFile (shadowJar bundles the
+    // intermediary :effects-api / rtp-fabric-common; the Mojang-named unobf
+    // carriers are only ever appended here). Without declaring them as task
+    // inputs, a carrier-only source change (e.g. a fix inside
+    // effects-api-fabric-unobf) leaves shadowJar's output unchanged, so remapJar
+    // stays UP-TO-DATE, its doLast never re-runs, and the shipped jar keeps
+    // stale carrier bytecode. Declare the carrier configurations as inputs so
+    // any carrier change re-triggers the remap+merge.
+    inputs.files(v26Jar, v262Jar, commonUnobfJar, effectsUnobfJar)
+            .withPropertyName('fabricUnobfCarrierBytecode')
     // NeoForge merge (unified single-jar): resolve the NeoForge carrier jars and
     // the merge closure at configuration time. Present only when the NeoForge
     // modules are in the build graph (i.e. `-PexcludeNeoforge` was NOT passed).
@@ -1196,6 +1207,30 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     def commonUnobfJar = project.configurations.fabricCommonUnobfBytecode
     def effectsUnobfJar = project.configurations.effectsApiFabricUnobfBytecode
     def mergeFn = project.ext.mergeFabricUnobfBytecodeIntoJar
+    // Same caching gotcha as Pro's remapJar: the unobf carriers are appended in
+    // doLast and are not part of inputFile (shadowLiteJar). Declare them as
+    // inputs so a carrier-only change re-triggers the remap+merge instead of
+    // leaving stale carrier bytecode in an UP-TO-DATE lite jar.
+    inputs.files(v26Jar, v262Jar, commonUnobfJar, effectsUnobfJar)
+            .withPropertyName('fabricUnobfCarrierBytecode')
+    // NeoForge merge for the lite jar (same rationale as Pro's remapJar): the
+    // single LeafRTP jar must also carry META-INF/neoforge.mods.toml + the
+    // Mojmap NeoForge carrier bytecode so NeoForge recognises it as the `rtp`
+    // mod. Without this the lite jar ships only fabric.mod.json + plugin.yml
+    // and NeoForge reports "is a Fabric mod and cannot be loaded" (and any
+    // addon with a `required` dependency on `rtp` fails to load). Gated on the
+    // NeoForge modules being in the build graph (i.e. `-PexcludeNeoforge` /
+    // EXCLUDE_NEOFORGE not set).
+    def neoforgeIncluded = findProject(':rtp-neoforge:rtp-neoforge-common') != null
+    if (neoforgeIncluded) {
+        dependsOn ':rtp-neoforge:rtp-neoforge-common:jar'
+        dependsOn ':rtp-neoforge:rtp-neoforge-v1_21_R1:jar'
+        if (findProject(':rtp-neoforge:rtp-neoforge-v26_1_R1') != null) {
+            dependsOn ':rtp-neoforge:rtp-neoforge-v26_1_R1:jar'
+        }
+    }
+    def neoforgeCfg = neoforgeIncluded ? project.configurations.neoforgeBytecode : null
+    def mergeNeoForgeFn = project.ext.mergeNeoForgeBytecodeIntoJar
 
     doLast {
         mergeFn(remapLiteJar.archiveFile.get().asFile, 'lite',
@@ -1204,6 +1239,13 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
         // present from the first pass are skipped). See rtp-fabric-ADR-014.
         mergeFn(remapLiteJar.archiveFile.get().asFile, 'lite (26.2)',
                 v262Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
+        // Final pass merges the NeoForge platform carriers + neoforge.mods.toml
+        // so the same LeafRTP (lite) jar loads on NeoForge too. Skipped entirely
+        // when NeoForge was excluded from the build graph.
+        if (neoforgeCfg != null) {
+            mergeNeoForgeFn(remapLiteJar.archiveFile.get().asFile, 'lite',
+                    neoforgeCfg.files.toList())
+        }
     }
 }
 

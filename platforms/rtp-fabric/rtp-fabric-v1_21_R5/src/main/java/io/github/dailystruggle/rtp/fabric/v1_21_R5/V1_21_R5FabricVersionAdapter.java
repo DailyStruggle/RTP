@@ -413,6 +413,38 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     /**
+     * Typed cross-dimension teleport for MC 1.21.5+. Drives
+     * {@code ServerPlayer#teleport(TeleportTransition)} — Loom remaps the
+     * {@code TeleportTransition} constructor and {@code teleport} descriptors
+     * to the correct intermediary symbols at compile time. This single call
+     * handles both same-dimension and cross-dimension destinations and resets
+     * the server-side movement check, so it replaces the common module's
+     * reflective {@code teleportTo(6)} / packet-teleport fallback (which cannot
+     * change dimensions and trips the "moved too quickly" warning).
+     */
+    @Override
+    public boolean teleport(Object serverPlayer, Object serverLevel,
+                            double x, double y, double z, float yaw, float pitch) {
+        if (!(serverPlayer instanceof ServerPlayer sp)) return false;
+        if (!(serverLevel instanceof ServerLevel target)) return false;
+        try {
+            net.minecraft.world.level.portal.TeleportTransition transition =
+                    new net.minecraft.world.level.portal.TeleportTransition(
+                            target,
+                            new net.minecraft.world.phys.Vec3(x, y, z),
+                            net.minecraft.world.phys.Vec3.ZERO,
+                            yaw, pitch,
+                            net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING);
+            sp.teleport(transition);
+            return true;
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING, "[RTP][Fabric 1.21.5+] teleport failed: "
+                    + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Typed written-book modal for MC 1.21.5+ (rtp-fabric-ADR-012 §4
      * un-defer). Mirrors the v1_21_R1 implementation; see that class for the
      * transient-slot rationale.

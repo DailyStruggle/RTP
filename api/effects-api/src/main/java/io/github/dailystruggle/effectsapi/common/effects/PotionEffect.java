@@ -5,59 +5,22 @@ import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 
 import java.util.EnumMap;
-import java.util.function.Consumer;
 
 /**
  * Common potion effect implementation.
+ *
+ * <p>Platform-neutral: potion application is funneled through
+ * {@link PlayerHandle#applyPotionEffect} so this class links on every platform
+ * (Bukkit/Paper/Folia, Fabric, NeoForge). The Bukkit/Folia-specific
+ * entity-thread dispatch seam previously embedded here lived in a static lambda
+ * whose functional-interface descriptor named {@code org.bukkit.*} types; that
+ * forced eager linking of {@code org.bukkit.entity.Player} when this class was
+ * merely instantiated on Fabric (via {@code FabricEffectsInitializer}), raising
+ * {@link NoClassDefFoundError}. That seam now lives in
+ * {@code io.github.dailystruggle.effectsapi.bukkit.BukkitPotionDispatch}.
  */
 public class PotionEffect extends Effect<PotionEffect.PotionKeys> {
     public enum PotionKeys { TYPE, DURATION, AMPLIFIER, AMBIENT, PARTICLES, ICON }
-
-    @FunctionalInterface
-    public interface EntityDispatcher {
-        boolean dispatch(org.bukkit.entity.Player player, org.bukkit.plugin.Plugin caller, Runnable task);
-    }
-
-    public static volatile EntityDispatcher entityDispatcher = (player, caller, task) -> {
-        if (!isFolia()) return false;
-        try {
-            Object scheduler = player.getClass().getMethod("getScheduler").invoke(player);
-            scheduler.getClass()
-                    .getMethod("run", org.bukkit.plugin.Plugin.class, Consumer.class, Runnable.class)
-                    .invoke(scheduler, caller, null, task);
-            return true;
-        } catch (Throwable ignored) {
-            return false;
-        }
-    };
-
-    private static boolean isFolia() {
-        try {
-            Class.forName("io.papermc.paper.threadedregionscheduling.RegionScheduler");
-            return true;
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
-    }
-
-    public static void applyOnEntityThread(org.bukkit.entity.Player player, org.bukkit.potion.PotionEffect pe) {
-        org.bukkit.plugin.Plugin caller;
-        try {
-            caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
-        } catch (IllegalStateException pre) {
-            caller = null;
-        }
-
-        if (entityDispatcher.dispatch(player, caller, () -> player.addPotionEffect(pe))) {
-            return;
-        }
-
-        if (!org.bukkit.Bukkit.isPrimaryThread()) {
-            org.bukkit.Bukkit.getScheduler().runTask(caller, () -> player.addPotionEffect(pe));
-            return;
-        }
-        player.addPotionEffect(pe);
-    }
 
     public PotionEffect(Object defaultPotion) {
         super(new EnumMap<>(PotionKeys.class));

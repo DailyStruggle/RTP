@@ -510,6 +510,16 @@ public final class CommandTreeMenuBuilder {
         MenuLine typeLine = MenuLine.of(new MenuFragment(typeLabel, null,
                 new MenuAction.PromptAnvilInput(parentPathArr, paramName, "", promptMode)));
 
+        // The region / world pickers enumerate a closed set of destinations
+        // (the configured regions / worlds). A free-form "type a custom
+        // value..." row only invites invalid input there and clutters what
+        // should be a clean, colorized list of destinations, so it is omitted
+        // for those two pickers. Every other parameter (free-form numerics,
+        // config keys, etc.) keeps the chat/anvil prefill fallback.
+        boolean enumerableDestinationPicker =
+                "region".equalsIgnoreCase(paramName)
+                        || "world".equalsIgnoreCase(paramName);
+
         // Build value rows — Stage A.3: clicking a suggested value *stages*
         // the assignment into the assembled path (re-opens the parent command
         // page with `paramName=value` appended) rather than executing
@@ -544,6 +554,8 @@ public final class CommandTreeMenuBuilder {
                         colorPrefix = MenuColor.biomeColorPrefix(value);
                     } else if ("world".equalsIgnoreCase(paramName)) {
                         colorPrefix = MenuColor.worldColorPrefix(value);
+                    } else if ("region".equalsIgnoreCase(paramName)) {
+                        colorPrefix = MenuColor.regionColorPrefix(value);
                     } else {
                         colorPrefix = "&2";
                     }
@@ -573,7 +585,9 @@ public final class CommandTreeMenuBuilder {
             List<MenuLine> pageLines = new ArrayList<>();
             pageLines.add(backLine);
             pageLines.add(headerLine);
-            pageLines.add(typeLine);
+            if (!enumerableDestinationPicker) {
+                pageLines.add(typeLine);
+            }
             int from = p * valuesPerPage;
             int to = Math.min(from + valuesPerPage, valueLines.size());
             for (int i = from; i < to; i++) {

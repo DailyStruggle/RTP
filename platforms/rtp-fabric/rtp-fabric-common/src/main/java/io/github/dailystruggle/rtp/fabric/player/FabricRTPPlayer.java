@@ -31,7 +31,8 @@ import java.util.concurrent.CompletableFuture;
  *
  * <p>No {@code org.bukkit.*} imports — ADR-022 §4 invariant.
  */
-public final class FabricRTPPlayer implements RTPPlayer, FabricBookOpener, FabricMapSink {
+public final class FabricRTPPlayer
+        implements RTPPlayer, FabricBookOpener, FabricMapSink, FabricInteractiveMessageSink {
 
     private final UUID uuid;
     private final String name;
@@ -324,6 +325,25 @@ public final class FabricRTPPlayer implements RTPPlayer, FabricBookOpener, Fabri
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * <p>Builds the interactive {@link Component} (hover + click) on this obf-runtime
+     * player's own bytecode via {@link FabricLegacyText#parseInteractive}, then delivers it
+     * through {@link #sendComponent(Component)}. {@code FabricServerAccessor} routes <em>all</em>
+     * rich-text sends through this sink so the {@code net.minecraft.network.chat.*}
+     * (intermediary {@code class_2561}) types never appear in the accessor's bytecode -
+     * keeping the accessor loadable on the deobf MC 26.x runtime (where the per-version
+     * sink, e.g. {@code V26_x_R1FabricRTPPlayer}, handles this instead).
+     */
+    @Override
+    public void sendInteractive(String message, String hover, String click, boolean run) {
+        if (message == null) return;
+        FabricLegacyText.ClickKind kind =
+                run ? FabricLegacyText.ClickKind.RUN : FabricLegacyText.ClickKind.SUGGEST;
+        sendComponent(FabricLegacyText.parseInteractive(message, hover, click, kind));
+    }
+
+    /**
      * Send a title / subtitle pair with explicit fade/stay timings (ticks).
      *
      * <p>Mirrors Bukkit's {@code Player.sendTitle} / Spigot {@code SendMessage.title} sink so
@@ -587,6 +607,26 @@ public final class FabricRTPPlayer implements RTPPlayer, FabricBookOpener, Fabri
     private static boolean performTeleport(ServerPlayer cur, ServerLevel target,
                                            double x, double y, double z,
                                            float yaw, float pitch) {
+        // Attempt 0: per-version typed teleport. This is the only path that can
+        // perform a cross-dimension teleport on a remapped Fabric runtime — the
+        // reflective Mojmap-name lookups below never resolve against intermediary
+        // runtime names, so without this a cross-dim RTP (e.g. overworld -> End)
+        // falls all the way through to the in-place setPos fallback, which moves
+        // the player in their current dimension and trips the "moved too quickly"
+        // server check. A typed teleportTo(TeleportTransition) also resets that
+        // move check, so it fixes same-dim teleports' warning spam too.
+        FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
+        if (adapter != null) {
+            try {
+                if (adapter.teleport(cur, target, x, y, z, yaw, pitch)) {
+                    return true;
+                }
+            } catch (Throwable t) {
+                RTP.log(java.util.logging.Level.FINE,
+                        "[RTP][trace] FabricRTPPlayer adapter.teleport failed: " + t);
+            }
+        }
+
         // Attempt 1: reflective ServerPlayer#teleportTo(ServerLevel,double,double,double,float,float).
         // Present on most 1.20.x / 1.21.x builds; absent on 1.21.11.
         try {

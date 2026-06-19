@@ -141,19 +141,27 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             if (cached != null) return cached;
             // The 4-arg (int,int,ChunkStatus,boolean)->CompletableFuture signature
             // is NOT unique on ServerChunkCache: vanilla declares BOTH the public
-            // entry point getChunkFuture(...) AND the private
-            // getChunkFutureMainThread(...). On 26.1.2 only getChunkFuture exists
-            // with this signature; getChunkFutureMainThread is absent. We prefer
-            // getChunkFuture (the public entry point) and pair it with an explicit
-            // temporary load-ticket (addTicketWithRadius, applied just before the
-            // call in requestFullChunkAsync) so the chunk holder reaches FULL
-            // status. Without the ticket, getChunkFuture(create=true) resolves
-            // immediately to ChunkResult.error("Unloaded chunk") on the 26.1
-            // NeoForge chunk system - the L1 kept cache stays at 0 and /rtp never
-            // lands. Fall back to a structural scan for runtimes where the public
-            // method was renamed.
+            // entry point getChunkFuture(...) AND the inner
+            // getChunkFutureMainThread(...). We MUST prefer the PUBLIC
+            // getChunkFuture, and requestFullChunkAsync invokes it OFF the server
+            // tick thread (see that method). Off-thread, the public entry point
+            // takes vanilla's non-blocking branch:
+            //   supplyAsync(() -> getChunkFutureMainThread(...), mainThreadProcessor)
+            //     .thenCompose(f -> f)
+            // which enqueues the scheduling call on the chunk source's main-thread
+            // processor and lets the normal server tick pump generation to
+            // completion incrementally. Calling the inner getChunkFutureMainThread
+            // directly on the tick thread (the previous approach) returned a future
+            // that the tick loop never drove to completion on this runtime - every
+            // attempt hung until the 30s live-load deadline (logs 2026-06-18
+            // 19:45). Routing the public entry point ON the tick thread instead
+            // parks on mainThreadProcessor.managedBlock(...) until generation
+            // finishes; with many concurrent requests that serially starves the
+            // tick loop and trips the 60s ServerWatchdog (crash 2026-06-18). Fall
+            // back to getChunkFutureMainThread and then a structural scan for
+            // runtimes where the public method was renamed.
             Method found = null;
-            String[] preferredNames = { "getChunkFuture" };
+            String[] preferredNames = { "getChunkFuture", "getChunkFutureMainThread" };
             for (String name : preferredNames) {
                 for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
                     for (Method m : c.getDeclaredMethods()) {
@@ -196,9 +204,9 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             RTP.log(Level.INFO,
                     "[RTP][NeoForge 26.1] resolved chunk-future method '" + found.getName()
                             + "' on " + found.getDeclaringClass().getName()
-                            + " (preferring the public getChunkFuture entry point so create=true"
-                            + " self-issues the generation ticket; a temporary load-ticket is"
-                            + " applied before the call so the holder reaches FULL status).");
+                            + " (preferring the public getChunkFuture, invoked OFF the tick thread so"
+                            + " vanilla takes its non-blocking supplyAsync(mainThreadProcessor) branch"
+                            + " and the normal server tick pumps generation to completion).");
             GET_CHUNK_FUTURE_METHOD = found;
             return found;
         }
@@ -209,22 +217,52 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         if (level == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("null ServerLevel"));
         }
+        MinecraftServer server = level.getServer();
+        // The public getChunkFuture must run OFF the server tick thread. Off-thread
+        // vanilla takes its non-blocking branch:
+        //   supplyAsync(() -> getChunkFutureMainThread(...), mainThreadProcessor)
+        //     .thenCompose(f -> f)
+        // which enqueues the scheduling call on the chunk source's main-thread
+        // processor and lets the normal server tick pump generation to completion
+        // incrementally - no managedBlock, so the tick loop is never starved.
+        // Calling the inner getChunkFutureMainThread directly on the tick thread
+        // (the previous approach) returned a future the tick loop never drove to
+        // completion on this runtime - every attempt hung until the 30s live-load
+        // deadline (logs 2026-06-18 19:45). Routing the public entry point ON the
+        // tick thread instead parks on mainThreadProcessor.managedBlock(...); with
+        // up to activeCap concurrent requests that serially starves the tick loop
+        // and trips the 60s ServerWatchdog (crash 2026-06-18). loadLiveChunk
+        // dispatches us via MinecraftServer#execute (tick thread), so hop to an RTP
+        // async worker before invoking vanilla. The persistent kept-cache ticket is
+        // still applied separately via applyTicket(...) after cold->hot promotion,
+        // so the promoted chunk stays pinned (S-002 unaffected).
+        if (server != null && server.isSameThread()) {
+            CompletableFuture<ChunkAccess> out = new CompletableFuture<>();
+            RTP.scheduler.runTaskAsynchronously(() ->
+                    invokeGetChunkFuture(level, cx, cz).whenComplete((ca, ex) -> {
+                        if (ex != null) out.completeExceptionally(ex);
+                        else out.complete(ca);
+                    }));
+            return out;
+        }
+        return invokeGetChunkFuture(level, cx, cz);
+    }
+
+    /**
+     * Invoke vanilla's public {@code getChunkFuture(cx, cz, FULL, true)} and adapt
+     * the result to a {@code CompletableFuture<ChunkAccess>}. MUST be called OFF
+     * the server tick thread (see {@link #requestFullChunkAsync}); off-thread the
+     * public entry point is non-blocking and self-pumping (it self-issues the
+     * transient generation ticket via create=true and routes through the chunk
+     * source's main-thread processor, which the normal server tick drains). On a
+     * resolution/invocation failure the returned future completes exceptionally so
+     * the caller attributes it through the standard FailTypes.nullChunk path (S-004
+     * - no silent discard).
+     */
+    private CompletableFuture<ChunkAccess> invokeGetChunkFuture(ServerLevel level, int cx, int cz) {
         try {
             ServerChunkCache cache = level.getChunkSource();
             Method getter = resolveGetChunkFutureMethod(cache);
-
-            // No temporary load-ticket here. create=true makes vanilla
-            // self-issue the transient generation ticket that drives the holder
-            // to FULL status, exactly as the proven Fabric 26.1 carrier
-            // (V26_1_R1FabricRTPWorld#requestChunkFuture) does. The earlier
-            // explicit addTicketWithRadius(...)/removeTicketWithRadius(...) wrapper
-            // pinned the holder but left generation never settling: the FULL
-            // future hung indefinitely, so the L2->L1 in-flight counter
-            // saturated at the deficit cap ("gets all the way to 10 in flight")
-            // and the kept cache never filled - loads only ever cleared on the
-            // 30s deadline. The persistent kept-cache ticket is still applied
-            // separately via applyTicket(...) after cold->hot promotion, so the
-            // promoted chunk stays pinned (S-002 unaffected).
             RTP.log(Level.FINER,
                     "[RTP][NeoForge 26.1] invoking getChunkFuture('" + getter.getName()
                             + "', cx=" + cx + ", cz=" + cz + ", FULL, create=true) on "
@@ -245,18 +283,11 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
                 ChunkAccess unwrapped = (either == null) ? null : unwrapEitherLeft(either);
                 if (unwrapped != null) return unwrapped;
 
-                // The generation future resolved with no ChunkAccess. We do NOT
-                // fall back to a blocking ServerChunkCache#getChunk(...) here: this
-                // callback runs inside the MinecraftServer#execute task that
-                // dispatched the request (on the tick thread), so a blocking
-                // getChunk would re-drive the main-thread task queue from inside
-                // one of its own tasks and deadlock the chunk-generation
-                // dependency graph - the exact failure mode documented in
-                // rtp-fabric-ADR-008. Emit the S-004 diagnostic instead so a
-                // genuine failure is never silently discarded; log the concrete
-                // result shape + (for a ChunkResult) its error text so a
-                // generation refusal ("Unloaded chunk ...") is distinguishable
-                // from an unrecognised unwrap shape.
+                // The generation future resolved with no ChunkAccess. Emit the
+                // S-004 diagnostic so a genuine failure is never silently
+                // discarded; log the concrete result shape + (for a ChunkResult)
+                // its error text so a generation refusal ("Unloaded chunk ...") is
+                // distinguishable from an unrecognised unwrap shape.
                 if (either == null) {
                     RTP.log(Level.FINE,
                             "[RTP][NeoForge 26.1] requestFullChunkAsync: chunk-future (create=true) future "

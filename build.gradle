@@ -5,8 +5,8 @@ plugins {
 }
 
 group = 'io.github.dailystruggle'
-version = '3.1.3'
-ext.liteVersion = '3.1.3'
+version = '3.1.4'
+ext.liteVersion = '3.1.4'
 
 spotless {
     java {
@@ -20,10 +20,10 @@ spotless {
 
 allprojects {
     group = 'io.github.dailystruggle'
-    version = '3.1.3'
+    version = '3.1.4'
 
     // RTP-lite ships a separate version line from Pro. Pro tracks the
-    // root `version` above (currently 3.1.3); lite is pinned via
+    // root `version` above (currently 3.1.4); lite is pinned via
     // `ext.liteVersion` and applied to the lite shadow/remap tasks and
     // `processLiteResources` token expansion in `rtp-plugin/build.gradle`.
     // Lite is brought up to parity with Pro at 3.1.3 alongside the free
@@ -48,8 +48,10 @@ subprojects {
         toolchain {
             languageVersion = JavaLanguageVersion.of(21)
         }
-        withJavadocJar()
-        withSourcesJar()
+        // `-sources` / `-javadoc` jars are intentionally NOT produced: the build
+        // only ships the executable artifacts. The addon-API publish closure
+        // below publishes `from components.java`, which simply carries no
+        // sources/javadoc variant as a result.
     }
 
     tasks.withType(JavaCompile) {
@@ -158,17 +160,36 @@ def publishedModulePaths = [
 // `-PexcludeJdk25` JitPack publish run). Only wire the aggregation task when
 // the module is actually part of this build, otherwise `project(':rtp-plugin')`
 // fails configuration with "Project with path ':rtp-plugin' could not be found".
+// Only the executable, shippable jars are mirrored into the root `build/libs`.
+// The intermediate `-dev` jars (Loom/Shadow pre-remap inputs) and the
+// `-sources` / `-javadoc` jars are deliberately excluded - the root build
+// collects executables only.
+def executableJarsOnly = { spec ->
+    spec.exclude '*-dev.jar'
+    spec.exclude '*-sources.jar'
+    spec.exclude '*-javadoc.jar'
+}
+
 if (findProject(':rtp-plugin') != null) {
     tasks.register('copyPluginJars', Copy) {
         group = 'build'
         description = 'Copies the shippable :rtp-plugin jars into the root build/libs.'
-        from(project(':rtp-plugin').layout.buildDirectory.dir('libs'))
+        from(project(':rtp-plugin').layout.buildDirectory.dir('libs')) {
+            executableJarsOnly(it)
+        }
         into layout.buildDirectory.dir('libs')
         // The root `jar` task drops an empty RTP-<version>.jar here; remove it so
-        // build/libs only contains the real plugin artifacts.
+        // build/libs only contains the real plugin artifacts. Also sweep any
+        // stale non-executable jars left by earlier builds (the intermediate
+        // `-dev` jars and historical `-sources` / `-javadoc` jars), since a
+        // `Copy` task never prunes its destination - build/libs holds
+        // executables only.
         doFirst {
             delete fileTree(layout.buildDirectory.dir('libs')) {
                 include "${rootProject.name}-${project.version}.jar"
+                include '*-dev.jar'
+                include '*-sources.jar'
+                include '*-javadoc.jar'
             }
         }
     }
@@ -177,6 +198,42 @@ if (findProject(':rtp-plugin') != null) {
     // build so `.\gradlew build` leaves the real artifacts in build/libs.
     copyPluginJars.dependsOn ':rtp-plugin:assemble'
     tasks.named('assemble').configure { finalizedBy copyPluginJars }
+}
+
+// ---------------------------------------------------------------------------
+// Root `build/libs` aggregation of the executable addon / helper jars.
+//
+// Mirroring the `:rtp-plugin` mirroring above, the user-installable jars from
+// the standalone addons (LeafRTPGuiAddon assembly, RTP_ExampleAddon) and the
+// helper plugins (PeriodicWorldSaver, StressTestRTP) are copied into the root
+// `build/libs` so a single `.\gradlew build` leaves every shippable jar in one
+// place. Only executables are copied (no `-dev` / `-sources` / `-javadoc`).
+// Each module is wired only when it is part of the build graph (the JDK-25 /
+// NeoForge carriers can be excluded via settings.gradle, but the executable
+// modules listed here are always present).
+def executableAddonHelperPaths = [
+        ':addons:LeafRTPGuiAddon:rtp-gui',
+        ':addons:RTP_ExampleAddon',
+        ':helpers:PeriodicWorldSaver',
+        ':helpers:StressTestRTP',
+].findAll { findProject(it) != null }
+
+if (!executableAddonHelperPaths.isEmpty()) {
+    tasks.register('copyAddonAndHelperJars', Copy) {
+        group = 'build'
+        description = 'Copies the shippable addon / helper executable jars into the root build/libs.'
+        executableAddonHelperPaths.each { path ->
+            from(project(path).layout.buildDirectory.dir('libs')) {
+                executableJarsOnly(it)
+            }
+        }
+        into layout.buildDirectory.dir('libs')
+    }
+
+    executableAddonHelperPaths.each { path ->
+        copyAddonAndHelperJars.dependsOn "${path}:assemble"
+    }
+    tasks.named('assemble').configure { finalizedBy 'copyAddonAndHelperJars' }
 }
 
 configure(publishedModulePaths.collect { project(it) }) {

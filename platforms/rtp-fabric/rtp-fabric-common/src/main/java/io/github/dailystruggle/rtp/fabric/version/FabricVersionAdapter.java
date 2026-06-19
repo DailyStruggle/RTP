@@ -292,6 +292,29 @@ public interface FabricVersionAdapter {
         // no-op — adapters that own a custom RTPPlayer impl override this.
     }
 
+    /**
+     * Teleport a platform-typed {@code ServerPlayer} to a coordinate in a
+     * platform-typed {@code ServerLevel}, compiled against the runtime's actual
+     * mappings. Unlike the common {@code FabricRTPPlayer} fallback — which can
+     * only drive a same-dimension packet teleport, because the Mojmap-named
+     * reflective {@code teleportTo} lookup never resolves against intermediary
+     * runtime names — a per-version implementation can issue the typed
+     * cross-dimension teleport (e.g. {@code ServerPlayer#teleportTo(
+     * TeleportTransition)} on 1.21.5+), which Loom remaps to the correct
+     * runtime descriptor and which also resets the server-side move check
+     * (avoiding the "moved too quickly" warning).
+     *
+     * <p>Both {@code serverPlayer} and {@code serverLevel} are the raw NM
+     * objects. Must be invoked on the server tick thread (S-005). Returns
+     * {@code true} only when the teleport was issued successfully; the default
+     * returns {@code false} so the caller falls back to its built-in
+     * same-dimension path.
+     */
+    default boolean teleport(Object serverPlayer, Object serverLevel,
+                             double x, double y, double z, float yaw, float pitch) {
+        return false;
+    }
+
     // -------------------------------------------------------------------------
     // World factory — same rationale as createPlayer above. The default
     // FabricRTPWorld in rtp-fabric-common is Loom-remapped to intermediary

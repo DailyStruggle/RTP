@@ -2,7 +2,7 @@
 <#
 .SYNOPSIS
     One-shot pre-configuration of the devstack for the multi-server / multi-world
-    RTP_GuiAddon demo.
+    LeafRTPGuiAddon demo.
 
 .DESCRIPTION
     Wires up everything the "DonutSMP-style" GUI menu needs to show a rich,
@@ -13,7 +13,7 @@
          never hit null-chunk timeouts and the backlog cache has real `.mca`
          files to prefilter (delegates to seed-pregen-worlds.ps1, full copy by
          default).
-      2. Installs the RTP_GuiAddon into the Bukkit-family instances so a bare
+      2. Installs the LeafRTPGuiAddon into the Bukkit-family instances so a bare
          /rtp opens the chest menu (delegates to add-gui-addon.ps1). Opt out
          with -NoGuiAddon.
 
@@ -24,7 +24,7 @@
 
       backend-a (Paper)  : Overworld  ->  Verdant Wilds
       backend-b (Folia)  : Nether     ->  Ashen Wastes
-      backend-c (Fabric) : End        ->  Void Reaches
+      backend-c (Folia)  : End        ->  Void Reaches
 
     On a lobby (lobby-a / lobby-b) the menu shows the cross-server peer regions
     advertised by all three backends (each labelled by its displayName), so /rtp
@@ -75,7 +75,7 @@ if (-not $SkipPregen) {
 }
 
 if (-not $NoGuiAddon) {
-    Write-Host "`n[2/2] Installing RTP_GuiAddon into Bukkit-family instances ..." -ForegroundColor Cyan
+    Write-Host "`n[2/2] Installing LeafRTPGuiAddon into Bukkit-family instances ..." -ForegroundColor Cyan
     $guiArgs = @{}
     if ($SkipBuild) { $guiArgs['SkipBuild'] = $true }
     & (Join-Path $devstack 'add-gui-addon.ps1') @guiArgs

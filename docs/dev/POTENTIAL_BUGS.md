@@ -37,6 +37,14 @@ Append to the *Open* section below using the template. Keep entries short — on
 
 ## Open
 
+### 2026-06-18 - NeoForge 1.21 carrier (`V1_21_R1NeoForgeVersionAdapter`) shares the blocking `getChunkFuture` defect just fixed on 26.1
+
+- **Discovered during:** fixing the NeoForge 26.1.2 ServerWatchdog crash (this session). Only the `v26_1_R1` carrier was changed; the sibling 1.21 carrier was left untouched as it is outside the reported crash's runtime.
+- **Location:** `platforms/rtp-neoforge/rtp-neoforge-v1_21_R1/src/main/java/io/github/dailystruggle/rtp/neoforge/v1_21_R1/V1_21_R1NeoForgeVersionAdapter.java` `resolveGetChunkFutureMethod` (prefers public `getChunkFuture` by name, line ~146) and `requestFullChunkAsync` (line ~207).
+- **Symptom / hypothesis:** Same shape as the 26.1 crash: `requestFullChunkAsync` is dispatched on the server tick thread (`NeoForgeRTPWorld#loadLiveChunk` -> `MinecraftServer#execute`), and vanilla's public `getChunkFuture`, when called on the main thread, parks the tick thread on `mainThreadProcessor.managedBlock(...)` until generation finishes. On a cache-miss this can trip the 60s ServerWatchdog (S-005).
+- **Impact:** Potential tick-thread stall / watchdog crash on NeoForge 1.21.x during `/rtp` live chunk loads, same as the 26.1.2 crash report 2026-06-18. Not yet reproduced on 1.21.
+- **Suggested next step:** Mirror the 26.1 fix: prefer the non-blocking inner `getChunkFutureMainThread` in `resolveGetChunkFutureMethod` (it returns the pending future without `managedBlock`), keeping the existing tick-thread dispatch. Verify whether the 1.21 carrier's temporary load-ticket is still needed once the non-blocking entry point is used.
+
 ### 2026-06-14 - claim-integration `integrations.yml` reroll toggles are startup-only; `/rtp reload` does not (un)register verifiers
 
 - **Discovered during:** claim-plugin audit follow-up (this session). High-severity items (WorldGuard inversion, legacy Factions removal) and the sync-verifier fail-safe (#4) were fixed; this reload-toggle finding was reported and deliberately left for a separate pass.

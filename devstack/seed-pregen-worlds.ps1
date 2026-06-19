@@ -11,13 +11,14 @@
     under load the async chunk loads can time out and surface as null-chunk
     pipeline failures. All three dimensions are still pre-generated per backend
     so the supplied world is complete regardless of which dimension a default
-    region targets.
+    region targets (backend-a -> Overworld, backend-b -> Nether,
+    backend-c -> End).
 
     This script copies the pre-generated single-server world into each backend's
     GITIGNORED, bind-mounted world dirs, so the chunks the demo regions land in
     are already on disk. By default it copies the FULL world (every `.mca`), so
     there are plenty of `.mca` files for the L3 backlog cache (backlogCacheCap)
-    to anvil-prefilter and for Fabric to stop surfacing null-chunk timeouts.
+    to anvil-prefilter and to stop surfacing null-chunk timeouts.
 
     The world dirs (`world/`, `world_nether/`, `world_the_end/`) are already
     gitignored, so the supplied pre-generated world is never committed; it is
@@ -28,11 +29,9 @@
     source overworld is ~14 GB; the window is cheaper but supplies too few
     `.mca` files for the backlog cache to do meaningful prefiltering.
 
-    World-layout differences are handled per platform:
-      - backend-a (Paper) / backend-b (Folia): overworld -> world/, Nether ->
-        world_nether/, End -> world_the_end/ (separate top-level dirs).
-      - backend-c (Fabric): single-folder layout -> overworld world/region,
-        Nether world/DIM-1/region, End world/DIM1/region.
+    World layout (all backends run the Bukkit/Paper-family layout): overworld
+    -> world/, Nether -> world_nether/, End -> world_the_end/ (separate
+    top-level dirs).
 
     Run while the stack is DOWN (the world dirs are host binds). Idempotent.
 
@@ -136,24 +135,13 @@ foreach ($b in $Backends) {
     Write-Host "===== $b ====="
     $root = Join-Path $devstack $b
 
-    if ($b -eq 'backend-c') {
-        # Fabric single-folder layout.
-        Write-Host "  overworld -> world/"
-        Copy-RegionSubset -SrcWorld $srcOver   -DstWorld (Join-Path $root 'world')          -Radius $RegionRadius
-        Write-Host "  nether    -> world/DIM-1/"
-        Copy-RegionSubset -SrcWorld $srcNether -DstWorld (Join-Path $root 'world\DIM-1')     -Radius $RegionRadius
-        Write-Host "  end       -> world/DIM1/"
-        Copy-RegionSubset -SrcWorld $srcEnd    -DstWorld (Join-Path $root 'world\DIM1')      -Radius $RegionRadius
-    }
-    else {
-        # Paper / Folia: separate top-level dirs.
-        Write-Host "  overworld -> world/"
-        Copy-RegionSubset -SrcWorld $srcOver   -DstWorld (Join-Path $root 'world')           -Radius $RegionRadius
-        Write-Host "  nether    -> world_nether/"
-        Copy-RegionSubset -SrcWorld $srcNether -DstWorld (Join-Path $root 'world_nether')     -Radius $RegionRadius
-        Write-Host "  end       -> world_the_end/"
-        Copy-RegionSubset -SrcWorld $srcEnd    -DstWorld (Join-Path $root 'world_the_end')    -Radius $RegionRadius
-    }
+    # Paper / Folia: separate top-level dirs.
+    Write-Host "  overworld -> world/"
+    Copy-RegionSubset -SrcWorld $srcOver   -DstWorld (Join-Path $root 'world')           -Radius $RegionRadius
+    Write-Host "  nether    -> world_nether/"
+    Copy-RegionSubset -SrcWorld $srcNether -DstWorld (Join-Path $root 'world_nether')     -Radius $RegionRadius
+    Write-Host "  end       -> world_the_end/"
+    Copy-RegionSubset -SrcWorld $srcEnd    -DstWorld (Join-Path $root 'world_the_end')    -Radius $RegionRadius
 }
 
 Write-Host ""

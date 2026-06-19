@@ -1,13 +1,13 @@
 # --- RTP Region Configuration (devstack demo) ---
-# backend-c (Fabric) default region -> End. Demonstrates per-server load
+# backend-c (Folia) default region -> End. Demonstrates per-server load
 # distribution: each backend's default lands in a distinct dimension.
-# Fabric dimension id for the End is "minecraft:the_end". Tight band around the
-# central End island; skylight not required.
+# Bukkit/Paper/Folia world name for the End is "world_the_end". Tight band
+# around the central End island; skylight not required.
 
 # Cosmetic display name (color/gradient supported); advertised to lobbies.
 displayName: "&#c77dffVoid Reaches"
-# Target world (Fabric dimension id).
-world: "minecraft:the_end"
+# Target world (Bukkit world name).
+world: "world_the_end"
 worldBorderOverride: false
 
 shape:

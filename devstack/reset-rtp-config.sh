@@ -26,10 +26,10 @@ done
 
 scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Paper/Folia instances wired into docker-compose.yml. backend-c (Fabric) is
-# intentionally excluded: its RTP runtime config lives inside the container at
-# /data/config/rtp/ (not bind-mounted) and is discarded on recreate.
-instances=(backend-a backend-b lobby-a lobby-b)
+# Paper/Folia instances wired into docker-compose.yml. All three backends and
+# both lobbies bind-mount plugins/, so their RTP runtime config lives at
+# ./<instance>/plugins/RTP/ and is wiped here for a fresh baseline.
+instances=(backend-a backend-b backend-c lobby-a lobby-b)
 
 for name in "${instances[@]}"; do
   pluginRtp="$scriptDir/$name/plugins/RTP"

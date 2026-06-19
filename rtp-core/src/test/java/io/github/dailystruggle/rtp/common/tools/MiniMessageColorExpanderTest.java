@@ -61,6 +61,21 @@ class MiniMessageColorExpanderTest {
   }
 
   @Test
+  void nestedRainbowPrefixInsideGradientLeavesNoRawTags() {
+    // Regression: a "<rainbow>[RTP]</rainbow>" prefix wrapped inside an outer
+    // <gradient> (e.g. messages.yml "<gradient:...>[P0] ...</gradient>") must
+    // not pair the inner <rainbow> opener with the outer </gradient> close, nor
+    // print raw tag markup. The close tag is now matched by backreference.
+    String out = MiniMessageColorExpander.expand(
+        "<gradient:#9D7CD8:#5FB3B3><rainbow>[RTP]</rainbow> Teleporting</gradient>");
+    assertFalse(out.contains("<rainbow>"), "inner rainbow tag must be consumed: " + out);
+    assertFalse(out.contains("</rainbow>"), "inner rainbow close must be consumed: " + out);
+    assertFalse(out.contains("<gradient"), "outer gradient tag must be consumed: " + out);
+    assertFalse(out.contains("</gradient>"), "dangling gradient close must not survive: " + out);
+    assertTrue(out.indexOf('\u00a7') >= 0, "expected legacy hex section codes: " + out);
+  }
+
+  @Test
   void nullAndEmptyAreSafe() {
     assertEquals(null, MiniMessageColorExpander.expand(null));
     assertEquals("", MiniMessageColorExpander.expand(""));

@@ -73,7 +73,7 @@ Scans vertically using fixed steps. Efficient for finding the first safe surface
 
 #### `LINEAR`
 A thorough scan of every Y level in a specific order.
-- `direction`: Integer scan strategy (default `0`):
+- `direction`: Integer scan strategy (default `2`):
   - `0`: **Bottom-up** — Start at `minY` and scan up to `maxY`. Best for underground/cave landings.
   - `1`: **Top-down** — Start at `maxY` and scan down to `minY`. Best for surface landings.
   - `2`: **Middle-out** — Start at the middle of the range and scan outward toward both ends.

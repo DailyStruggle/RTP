@@ -1,0 +1,45 @@
+// RTP GUI addon - Bukkit/Paper/Folia chest-inventory renderer carrier.
+//
+// Like the Fabric and NeoForge carriers, this is a plain library module: it
+// compiles the Bukkit chest renderer + click listener against spigot-api and is
+// BUNDLED (not run standalone) into the single multi-loader addon jar assembled
+// by :addons:LeafRTPGuiAddon:rtp-gui. The assembly owns all shading (it shades
+// rtp-gui-common once plus every platform renderer), so this module must NOT
+// apply the shadow plugin: doing so makes its shadowJar overwrite the thin `jar`
+// output path, which the assembly then consumes without a declared task
+// dependency, tripping Gradle's implicit-dependency validation and failing
+// :rtp-gui:shadowJar.
+plugins {
+    id 'java'
+}
+group = 'io.github.dailystruggle'
+version = '1.0.0'
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+repositories {
+    mavenCentral()
+    maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+}
+dependencies {
+    compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    // The platform-neutral menu (model, config, render seam, teleport submit).
+    // The assembly jar shades rtp-gui-common directly; here it is a plain runtime
+    // dependency so the renderer compiles and the assembly resolves it once.
+    implementation project(':addons:LeafRTPGuiAddon:rtp-gui-common')
+    // Stable SPI + metrics + engine are provided at runtime by the RTP plugin, so
+    // compileOnly (never bundled by this carrier).
+    compileOnly project(':rtp-api')
+    compileOnly project(':rtp-core')
+    compileOnly project(':metrics-api')
+}
+// NOTE: plugin.yml carries its `version:` literally (1.0.0), NOT a `${version}`
+// token. The GUI addon ships on its own version line, independent of RTP core
+// (3.1.3); the root `subprojects {}` resource expansion captures the core
+// version before this module's `version = '1.0.0'` applies, so a token would be
+// stamped 3.1.3. A literal value is order-independent and always matches the
+// LeafRTPGuiAddon-1.0.0.jar artifact name.
+test {
+    useJUnitPlatform()
+}

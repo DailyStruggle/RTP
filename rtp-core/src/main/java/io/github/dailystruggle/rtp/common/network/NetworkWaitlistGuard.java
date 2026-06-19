@@ -61,10 +61,10 @@ public final class NetworkWaitlistGuard implements Predicate<RTPCommandSender> {
         UUID uuid = player.uuid();
         Optional<NetworkStatusCache.QueueStatus> snap = statusCache.get(uuid);
         if (snap.isEmpty()) {
-            // Phase B trace (2026-05-23): the post-arrival /rtp lands here
-            // after JoinTriggerSource.onRedeemed evicts the lobby-seeded
-            // row. Logged at INFO so devstack repros can confirm the
-            // guard did NOT short-circuit the dispatched /rtp.
+            // The post-arrival /rtp lands here after JoinTriggerSource.onRedeemed
+            // evicts the lobby-seeded row. Logged at FINE so devstack repros can
+            // confirm the guard did NOT short-circuit the dispatched /rtp without
+            // spamming the console at INFO on every invocation.
             RTP.log(Level.FINE,
                     "[NETWORK][trace] NetworkWaitlistGuard.test: no cached status for "
                             + uuid + "; allowing /rtp to proceed");

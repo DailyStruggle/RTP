@@ -105,6 +105,68 @@ public interface RTPCmd extends BaseRTPCmd {
     return resolved;
   }
 
+  /**
+   * Consults the pluggable bare-{@code /rtp} root action (ADR-056). A third-party
+   * addon may bind an action (e.g. {@code LeafRTPGuiAddon} opening a GUI) that
+   * replaces the classic teleport for a bare {@code /rtp}. Shared by the Bukkit
+   * {@code String[]}-args {@code onCommand} path and the {@code compute(...)} path
+   * that Fabric / NeoForge / the proxy backend dispatch through, so the bound GUI
+   * opens uniformly on every platform (single source of truth, no duplicated block).
+   *
+   * <p>A bound action that returns {@code false} (no renderer / offline) or throws
+   * (logged per REQ-RTP-S-004) is treated as not-handled, so the classic teleport
+   * still runs. The console sender (zero UUID) is never routed through the action.
+   *
+   * @param senderId              the command sender
+   * @param messageMethod         feedback sink; when {@code null} feedback is routed
+   *                              through {@link RTP#serverAccessor}
+   * @param releaseProcessingLock release the {@code processingPlayers} lock when the
+   *                              action handles the command (the {@code compute(...)}
+   *                              path enters with the lock already acquired; the
+   *                              {@code String[]} path has not acquired it yet)
+   * @return {@code true} when the bound action handled the command
+   */
+  private boolean tryRootAction(
+          UUID senderId,
+          java.util.function.Consumer<String> messageMethod,
+          boolean releaseProcessingLock) {
+    if (senderId.equals(new java.util.UUID(0, 0))) return false;
+    io.github.dailystruggle.rtp.api.hooks.RootActionRegistry.Action rootAction = null;
+    try {
+      io.github.dailystruggle.rtp.api.hooks.RootActionRegistry rootActionRegistry =
+              io.github.dailystruggle.rtp.api.RTPAPI.hooks().rootAction();
+      if (rootActionRegistry != null) rootAction = rootActionRegistry.current();
+    } catch (IllegalStateException coreNotLoaded) {
+      // hooks facade not published yet (REQ-RTP-S-006); fall through to classic teleport.
+      RTP.log(Level.FINE, "[RTP-GUI] bare /rtp: hooks facade not published yet; "
+              + "falling back to classic teleport for " + senderId);
+      return false;
+    }
+    if (rootAction == null) {
+      RTP.log(Level.FINE,
+              "[RTP-GUI] bare /rtp: no root action bound; classic teleport for " + senderId);
+      return false;
+    }
+    java.util.function.Consumer<String> feedback =
+            messageMethod != null ? messageMethod : (m -> RTP.serverAccessor.sendMessage(senderId, m));
+    RTP.log(Level.FINE, "[RTP-GUI] bare /rtp: invoking bound root action for " + senderId);
+    boolean handled = false;
+    try {
+      handled = rootAction.run(senderId, feedback);
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+              "[RTP] bound /rtp root action threw; falling back to classic teleport", t);
+    }
+    RTP.log(Level.FINE,
+            "[RTP-GUI] bare /rtp: root action handled=" + handled + " for " + senderId);
+    if (handled && releaseProcessingLock && !senderId.equals(CommandsAPI.serverId)) {
+      // Release the processingPlayers lock the outer onCommand acquired, so the
+      // GUI-handled bare /rtp does not leave the player flagged "busy".
+      RTP.getInstance().processingPlayers.remove(senderId);
+    }
+    return handled;
+  }
+
   default void init() {}
 
     default boolean onCommand(
@@ -149,40 +211,15 @@ public interface RTPCmd extends BaseRTPCmd {
     }
 
     // --------------------------------------------------------------------------------------------------------------
-    // Pluggable bare-/rtp root action (ADR-056). A third-party addon may bind an
-    // action (e.g. open a GUI) that replaces the classic teleport for a bare
-    // `/rtp`. Subcommands (`hasSubCommand`) are never affected. When no action is
-    // bound, current() is null and we fall through to the classic teleport path.
-    // A bound action that returns true has handled the command and bypasses the
-    // teleport-specific guards (cooldown / processingPlayers), exactly as a
-    // subcommand does. An action that throws is logged (REQ-RTP-S-004) and treated
-    // as not-handled, so the classic teleport still runs.
-    //
-    // The action fires only for a *bare* `/rtp` (no arguments at all). When the
-    // player supplies teleport parameters (e.g. `region=foo`, `world=bar`,
-    // coordinates), they have expressed an explicit destination, so the GUI/menu
-    // override is skipped and the classic parameterised teleport runs directly.
+    // Pluggable bare-/rtp root action (ADR-056); shared with the compute() path via
+    // tryRootAction() so the logic lives in exactly one place. Subcommands
+    // (`hasSubCommand`) are never affected, and the action fires only for a *bare*
+    // `/rtp` (no arguments at all): explicit teleport parameters express a concrete
+    // destination and skip the GUI/menu override. This path has not yet acquired the
+    // processingPlayers lock, so no release is requested.
     boolean bareInvocation = (args == null || args.length == 0);
-    if (!hasSubCommand && bareInvocation) {
-      io.github.dailystruggle.rtp.api.hooks.RootActionRegistry.Action rootAction = null;
-      try {
-        io.github.dailystruggle.rtp.api.hooks.RootActionRegistry rootActionRegistry =
-                io.github.dailystruggle.rtp.api.RTPAPI.hooks().rootAction();
-        if (rootActionRegistry != null) rootAction = rootActionRegistry.current();
-      } catch (IllegalStateException coreNotLoaded) {
-        // hooks facade not published yet (REQ-RTP-S-006); fall through to classic teleport.
-        rootAction = null;
-      }
-      if (rootAction != null) {
-        boolean handled = false;
-        try {
-          handled = rootAction.run(senderId, messageMethod);
-        } catch (Throwable t) {
-          RTP.log(Level.WARNING,
-                  "[RTP] bound /rtp root action threw; falling back to classic teleport", t);
-        }
-        if (handled) return true;
-      }
+    if (!hasSubCommand && bareInvocation && tryRootAction(senderId, messageMethod, false)) {
+      return true;
     }
 
     long dt = -1;
@@ -301,6 +338,23 @@ public interface RTPCmd extends BaseRTPCmd {
     if (nextCommand != null) {
       return true;
     }
+
+    // --------------------------------------------------------------------------------------------------------------
+    // Pluggable bare-/rtp root action (ADR-056); shared with the Bukkit String[]-args
+    // onCommand path via tryRootAction() so the logic lives in exactly one place.
+    // Reached by the platforms that dispatch straight through compute() (Fabric,
+    // NeoForge, the proxy backend path) rather than the Bukkit String[] overload, so
+    // without it the bound GUI never opens on those platforms. Fires only for a
+    // *bare* `/rtp` (empty args); explicit teleport parameters skip the GUI override.
+    // The Bukkit String[] path consults the same hook and short-circuits before
+    // reaching compute() when it handles the command, so this never double-fires.
+    // This path enters with the processingPlayers lock acquired, so release it on a
+    // handled action.
+    boolean bareInvocation = (rtpArgs == null || rtpArgs.isEmpty());
+    if (bareInvocation && tryRootAction(senderId, messageMethod, true)) {
+      return true;
+    }
+
     if (senderId.equals(new java.util.UUID(0, 0)) && !rtpArgs.containsKey("player")) {
       if(messageMethod != null) {
         ConfigParser<MessagesKeys> langParser =

@@ -15,7 +15,7 @@ Marketplace listing metadata (current, for SEO reference):
 
 </div>
 
-**Setup is the easy part: drop the jar in, start the server, type `/rtp`.** That's the whole install. A ready-to-go `default` region is already there. It just works, zero config.
+**Setup is the easy part: drop the jar in, start the server, type `/rtp`.** That's the whole install. A ready-to-go `default` region is already there, so the command works on first boot with nothing to configure.
 
 Want to change something? You never leave the game. `/rtp menu` opens a clickable menu. Browse worlds, pick regions, tune settings live. No YAML to edit. No restart. Nothing to memorize.
 
@@ -23,7 +23,7 @@ Make it yours, no code needed. Square, circle, rectangle, or polygon regions. Pe
 
 Outgrown the defaults? LeafRTP is an engine you can build on - the same public `rtp-api` the plugin itself runs on. One addon jar works on every platform: Spigot, Paper, Folia, Fabric, NeoForge. Add your own claim or biome check in a line. Code a whole new region shape and register it. Hook any stage of a teleport. Schedule your own work and it lands on the right thread for you. It's a starting point, not a dead end.
 
-And it stays smooth, no matter how hard your players hit it. A teleport should cost the server nothing the player can feel. No lag spike. No "Finding a safe location..." spinner. No stutter when things get busy. LeafRTP does the hard work early, off the tick loop, long before anyone types the command. So every `/rtp` lands fast.
+And it stays smooth, no matter how hard your players hit it. The expensive part of a teleport - loading chunks, running the safety checks - happens off the tick loop, long before anyone types the command, so serving `/rtp` is mostly just handing back a coordinate that's already verified. No lag spike. No "Finding a safe location..." spinner. No stutter when things get busy.
 
 It runs the same on a four-friend box or a packed network. Don't take our word on speed: every claim on this page comes from a public benchmark you can rerun yourself. Safety is audited too: no unsafe blocks, no force-loaded chunks, no claim bypass, no silent failures.
 

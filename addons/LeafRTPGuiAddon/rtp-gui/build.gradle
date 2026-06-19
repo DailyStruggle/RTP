@@ -1,0 +1,97 @@
+// RTP GUI addon - single multi-loader assembly jar.
+//
+// This is the one distributable the user installs. Like RTP's own unified jar
+// (rtp-plugin), it bundles the platform-neutral menu (rtp-gui-common) plus every
+// platform renderer (Bukkit chest, Fabric chest, NeoForge chest) and carries all
+// three loader descriptors at the jar root:
+//   - plugin.yml                       (Bukkit/Spigot/Paper/Folia)   from rtp-gui-bukkit
+//   - fabric.mod.json                  (Fabric)                      from rtp-gui-fabric
+//   - META-INF/neoforge.mods.toml      (NeoForge)                    from rtp-gui-neoforge
+// Each loader reads only its own descriptor and starts the matching entry point,
+// which registers that platform's MenuRenderer (and the common RTPAddon) at runtime
+// (the "register the implementation for the current platform" model). Renderers are
+// registered programmatically by each entry point and NOT via a MenuRenderer SPI
+// service file: every platform's chest renderer shares the "chest" style key, so a
+// merged SPI file would let the wrong-platform renderer clobber the live one in the
+// shared GuiRenderers map (an unavailable renderer shadowing the real one).
+//
+// The Fabric / NeoForge carriers require JDK 25 (MC 26.x) and resolve their
+// toolchains from the network; on a constrained host drop them with -PexcludeJdk25
+// (and the whole NeoForge set with -PexcludeNeoforge). When a carrier is excluded,
+// this assembly simply omits its classes + descriptor and still produces a working
+// Bukkit (and, if present, Fabric) jar.
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow'
+}
+group = 'io.github.dailystruggle'
+// The GUI addon carries its OWN version line, independent of the RTP core
+// version (3.1.3): it ships and updates on its own cadence. The root
+// `allprojects { version = '3.1.3' }` would otherwise force core's version onto
+// this module, so pin the addon version explicitly here.
+version = '1.0.0'
+
+// The single installable artifact carries the addon's brand name (not the
+// internal `rtp-gui` module name). The empty container project
+// `:addons:LeafRTPGuiAddon` has its `jar` disabled, so this is the only
+// `LeafRTPGuiAddon-<version>.jar` the build produces.
+base {
+    archivesName = 'LeafRTPGuiAddon'
+}
+
+// The MC 26.x carriers are compiled to Java 25 bytecode. To consume (shade) them
+// the assembly's runtime classpath must advertise the same JVM target, so when a
+// carrier is on the build graph this module pins a Java 25 toolchain. When the
+// carriers are excluded (-PexcludeJdk25), it stays on Java 21 so a JDK-21-only host
+// can still assemble the Bukkit jar.
+def hasJdk25Carriers = findProject(':addons:LeafRTPGuiAddon:rtp-gui-fabric') != null ||
+        findProject(':addons:LeafRTPGuiAddon:rtp-gui-neoforge') != null
+
+java {
+    if (hasJdk25Carriers) {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(25)
+        }
+    } else {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Always present: the platform-neutral menu and the Bukkit-family renderer.
+    implementation project(':addons:LeafRTPGuiAddon:rtp-gui-common')
+    implementation project(':addons:LeafRTPGuiAddon:rtp-gui-bukkit')
+
+    // The MC 26.x carriers are only on the settings include list when not excluded.
+    // transitive=false: we shade ONLY the carrier's own renderer classes, never its
+    // Minecraft / fabric-loader / fabric-api / NeoForge dependencies (those are
+    // provided by the host at runtime). rtp-gui-common is added directly above.
+    if (findProject(':addons:LeafRTPGuiAddon:rtp-gui-fabric') != null) {
+        implementation(project(':addons:LeafRTPGuiAddon:rtp-gui-fabric')) { transitive = false }
+    }
+    if (findProject(':addons:LeafRTPGuiAddon:rtp-gui-neoforge') != null) {
+        implementation(project(':addons:LeafRTPGuiAddon:rtp-gui-neoforge')) { transitive = false }
+    }
+}
+
+shadowJar {
+    archiveBaseName.set('LeafRTPGuiAddon')
+    archiveClassifier.set('')
+    // Merge any duplicate META-INF/services files across the shaded carriers (e.g.
+    // the RTPAddon service). Platform MenuRenderers are registered programmatically
+    // by each entry point, not via a MenuRenderer service file (shared "chest" key),
+    // so there is intentionally no MenuRenderer service file to merge.
+    mergeServiceFiles()
+    // Minecraft / Bukkit / fabric-loader / NeoForge are all provided by the host at
+    // runtime (compileOnly in the carriers), so nothing platform-specific is shaded
+    // except the addon's own renderer classes and descriptors.
+}
+// Wire the shaded jar into `assemble` (not just `build`) so the root
+// `copyAddonAndHelperJars` aggregation, which depends on `:...:rtp-gui:assemble`,
+// produces and mirrors the shaded executable rather than the thin jar.
+assemble.dependsOn shadowJar

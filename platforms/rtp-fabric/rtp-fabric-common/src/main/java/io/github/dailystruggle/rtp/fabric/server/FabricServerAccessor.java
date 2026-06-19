@@ -19,7 +19,6 @@ import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer;
 import io.github.dailystruggle.rtp.fabric.scheduling.FabricScheduler;
 import io.github.dailystruggle.rtp.fabric.tools.FabricAnsiText;
-import io.github.dailystruggle.rtp.fabric.tools.FabricLegacyText;
 import io.github.dailystruggle.rtp.fabric.world.FabricRTPWorld;
 import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
 import io.github.dailystruggle.rtp.api.RTPAPI;
@@ -650,20 +649,14 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     String formattedMsg = format(target, message);
     try {
       RTPPlayer player = getPlayer(target);
-      if (player instanceof FabricRTPPlayer fp && fp.isOnline()) {
-        net.minecraft.network.chat.Component component =
-            FabricLegacyText.parseInteractive(formattedMsg, null, suggestion);
-        fp.sendComponent(component);
-        return;
-      }
-      // Online player on a per-version sink (e.g. the deobf 26.x carrier's
-      // V26_1_R1FabricRTPPlayer, which lives in a per-version module and parses
-      // its own legacy text). If that sink advertises interactive capability,
-      // route the click-to-suggest through it so the chat menu / prompts stay
-      // clickable on 26.x; otherwise deliver plain exactly once - DO NOT append
-      // the suggestion inline, which produced the "over-printing" regression on
-      // 26.1 (the click-to-suggest target would render as a second visible
-      // token after every prompt).
+      // Online player that can render interactive text builds the click-to-suggest
+      // Component on its own runtime bytecode (the obf FabricRTPPlayer and every
+      // per-version deobf sink, e.g. V26_1_R1FabricRTPPlayer, implement
+      // FabricInteractiveMessageSink). Routing through the sink keeps the
+      // net.minecraft.network.chat.* (intermediary class_2561) types out of this
+      // accessor's bytecode so it links on the deobf MC 26.x runtime. Deliver
+      // plain exactly once otherwise - DO NOT append the suggestion inline, which
+      // produced the "over-printing" regression on 26.1.
       if (player instanceof io.github.dailystruggle.rtp.fabric.player.FabricInteractiveMessageSink sink
           && player.isOnline()) {
         sink.sendInteractive(formattedMsg, null, suggestion, false);
@@ -698,7 +691,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   @Override
   public void sendMessage(RTPCommandSender target, String message, String hover, String click,
                           String tag) {
-    sendInteractiveMessage(target, message, hover, click, FabricLegacyText.ClickKind.SUGGEST);
+    sendInteractiveMessage(target, message, hover, click, false);
   }
 
   /**
@@ -711,7 +704,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   @Override
   public void sendMessageWithRunCommand(RTPCommandSender target, String message,
                                         String hover, String runCommand, String tag) {
-    sendInteractiveMessage(target, message, hover, runCommand, FabricLegacyText.ClickKind.RUN);
+    sendInteractiveMessage(target, message, hover, runCommand, true);
   }
 
   /**
@@ -728,7 +721,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    */
   private void sendInteractiveMessage(RTPCommandSender target, String message,
                                       String hover, String click,
-                                      FabricLegacyText.ClickKind clickKind) {
+                                      boolean run) {
     if (target == null || message == null) return;
     String formattedMsg   = format(target.uuid(), message);
     String formattedHover = (hover == null) ? null : format(target.uuid(), hover);
@@ -742,20 +735,14 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     // chat menu renderer.
     try {
       RTPPlayer player = getPlayer(target.uuid());
-      if (player instanceof FabricRTPPlayer fp && fp.isOnline()) {
-        net.minecraft.network.chat.Component component =
-            FabricLegacyText.parseInteractive(formattedMsg, formattedHover, payload, clickKind);
-        fp.sendComponent(component);
-        return;
-      }
-      // Online player on a per-version sink (e.g. the deobf 26.x carrier).
-      // If the sink advertises interactive capability it builds the hover/
-      // click Component on its own runtime (mojmap-typed legacy parser), so
-      // the chat menu renderer's RUN clicks and /rtp info hovers survive on
-      // 26.x. Otherwise deliver the plain formatted message exactly once;
-      // appending the click target inline would produce visible
-      // "over-printing" noise (regression observed on Fabric 26.1, 2026-05-10).
-      boolean run = clickKind == FabricLegacyText.ClickKind.RUN;
+      // Any online player that can render interactive text builds the hover/click
+      // Component on its own runtime bytecode (the obf FabricRTPPlayer and every
+      // per-version deobf sink implement FabricInteractiveMessageSink). Routing
+      // through the sink keeps net.minecraft.network.chat.* (intermediary
+      // class_2561) out of this accessor's bytecode so it links on the deobf MC
+      // 26.x runtime. Otherwise deliver the plain formatted message exactly once;
+      // appending the click target inline would produce visible "over-printing"
+      // noise (regression observed on Fabric 26.1).
       if (player instanceof io.github.dailystruggle.rtp.fabric.player.FabricInteractiveMessageSink sink
           && player.isOnline()) {
         sink.sendInteractive(formattedMsg, formattedHover, payload, run);
@@ -2030,9 +2017,24 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   // not a teleport outcome).
   // ---------------------------------------------------------------------------
 
-  /** Active boss-bars keyed by caller-chosen id. Accessed only on the server thread. */
-  private final Map<String, net.minecraft.server.level.ServerBossEvent> activeProgressBars =
-      new java.util.HashMap<>();
+  /**
+   * Obf-runtime ({@code 1.20.x} / {@code 1.21.x}) boss-bar renderer. Lazily created the first
+   * time the obf fallback path runs so its {@code net.minecraft.*} (intermediary-remapped)
+   * bytecode is never loaded on the deobf MC 26.x runtime, where the per-version adapter owns
+   * the boss-bar surface instead. Keeping the typed boss-bar/chat calls out of
+   * {@code FabricServerAccessor} itself is what lets the accessor link on the deobf runtime
+   * (where {@code net/minecraft/class_2561} does not exist).
+   */
+  private FabricProgressBars obfProgressBars;
+
+  private FabricProgressBars obfProgressBars() {
+    FabricProgressBars bars = obfProgressBars;
+    if (bars == null) {
+      bars = new FabricProgressBars();
+      obfProgressBars = bars;
+    }
+    return bars;
+  }
 
   @Override
   public void updateProgressBars(Map<String, io.github.dailystruggle.rtp.api.server.ProgressBar> bars) {
@@ -2043,10 +2045,10 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     MinecraftServer s = server;
     if (s == null) return;
 
-    // Deobf MC 26.x carrier: the typed ServerBossEvent calls below are Loom-remapped
-    // to intermediary descriptors that don't resolve on the deobf runtime, so they
-    // silently no-op there. When the active per-version adapter ships an unobf
-    // boss-bar renderer (mojmap-typed), route through it instead to preserve parity.
+    // Deobf MC 26.x carrier: the typed ServerBossEvent calls live in FabricProgressBars,
+    // whose intermediary-remapped descriptors don't resolve on the deobf runtime. When the
+    // active per-version adapter ships an unobf boss-bar renderer (mojmap-typed), route
+    // through it instead to preserve parity.
     io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
         io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
     if (adapter != null && adapter.supportsProgressBars()) {
@@ -2059,60 +2061,10 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       return;
     }
 
+    // Obf 1.20.x / 1.21.x fallback. FabricProgressBars is loaded lazily here so the deobf
+    // runtime (which returns above) never links its intermediary-remapped NM bytecode.
     try {
-      // Hide bars that are no longer requested.
-      Set<String> stale = new HashSet<>();
-      for (String id : activeProgressBars.keySet()) {
-        if (!bars.containsKey(id)) stale.add(id);
-      }
-      for (String id : stale) {
-        net.minecraft.server.level.ServerBossEvent bar = activeProgressBars.remove(id);
-        if (bar != null) bar.removeAllPlayers();
-      }
-
-      for (Map.Entry<String, io.github.dailystruggle.rtp.api.server.ProgressBar> entry : bars.entrySet()) {
-        String id = entry.getKey();
-        io.github.dailystruggle.rtp.api.server.ProgressBar spec = entry.getValue();
-        if (spec == null) continue;
-
-        net.minecraft.world.BossEvent.BossBarColor color = barColorFromTemplate(spec.title());
-        String title = sanitizeBarTitle(spec.title());
-        float progress = (float) Math.max(0.0, Math.min(1.0, spec.progress()));
-
-        net.minecraft.server.level.ServerBossEvent bar = activeProgressBars.get(id);
-        if (bar == null) {
-          bar = new net.minecraft.server.level.ServerBossEvent(
-              net.minecraft.network.chat.Component.literal(title),
-              color,
-              net.minecraft.world.BossEvent.BossBarOverlay.PROGRESS);
-          activeProgressBars.put(id, bar);
-        } else {
-          bar.setName(net.minecraft.network.chat.Component.literal(title));
-          bar.setColor(color);
-        }
-        bar.setProgress(progress);
-
-        // Reconcile visible players against the bar's viewer permission.
-        String permission = spec.viewerPermission();
-        Set<UUID> eligibleIds = new HashSet<>();
-        for (RTPPlayer p : playersById.values()) {
-          if (permission == null || permission.isEmpty() || p.hasPermission(permission)) {
-            eligibleIds.add(p.uuid());
-          }
-        }
-        Set<net.minecraft.server.level.ServerPlayer> eligible = new HashSet<>();
-        for (UUID uuid : eligibleIds) {
-          Object sp = lookupOnlineServerPlayerByUuid(uuid);
-          if (sp instanceof net.minecraft.server.level.ServerPlayer typed) eligible.add(typed);
-        }
-        Set<net.minecraft.server.level.ServerPlayer> current = new HashSet<>(bar.getPlayers());
-        for (net.minecraft.server.level.ServerPlayer sp : eligible) {
-          if (!current.contains(sp)) bar.addPlayer(sp);
-        }
-        for (net.minecraft.server.level.ServerPlayer sp : current) {
-          if (!eligible.contains(sp)) bar.removePlayer(sp);
-        }
-      }
+      obfProgressBars().update(s, this::eligibleViewerIds, bars);
     } catch (Throwable t) {
       // Boss-bar feedback is non-essential; never let a UI/mapping failure escape.
       log(Level.FINER, "[RTP][Fabric] scan progress bar update skipped: "
@@ -2133,13 +2085,10 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       return;
     }
     try {
-      for (net.minecraft.server.level.ServerBossEvent bar : activeProgressBars.values()) {
-        bar.removeAllPlayers();
-      }
+      obfProgressBars().clear();
     } catch (Throwable ignored) {
       // best-effort hide
     }
-    activeProgressBars.clear();
   }
 
   /** Collects the uuids of online players who hold {@code permission} (or all if blank). */
@@ -2153,55 +2102,6 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     return out;
   }
 
-  /**
-   * Strips legacy {@code &x} color codes and {@code #RRGGBB} hex codes from a bar title
-   * (boss-bar titles render as plain text) and truncates to a sane length.
-   */
-  private static String sanitizeBarTitle(String title) {
-    if (title == null) return "";
-    String out = title.replaceAll("&[0-9a-fA-FklmnorKLMNOR]", "").replaceAll("#[0-9a-fA-F]{6}", "");
-    return out.length() > 64 ? out.substring(0, 64) : out;
-  }
-
-  /**
-   * Maps the first legacy color code ({@code &x}) found in {@code template} to a vanilla
-   * {@link net.minecraft.world.BossEvent.BossBarColor}. Returns {@code GREEN} when none is found.
-   */
-  private static net.minecraft.world.BossEvent.BossBarColor barColorFromTemplate(String template) {
-    if (template == null) return net.minecraft.world.BossEvent.BossBarColor.GREEN;
-    for (int i = 0; i + 1 < template.length(); i++) {
-      if (template.charAt(i) != '&') continue;
-      char c = Character.toLowerCase(template.charAt(i + 1));
-      switch (c) {
-        case '4':
-        case 'c':
-          return net.minecraft.world.BossEvent.BossBarColor.RED;
-        case '6':
-        case 'e':
-          return net.minecraft.world.BossEvent.BossBarColor.YELLOW;
-        case '2':
-        case 'a':
-          return net.minecraft.world.BossEvent.BossBarColor.GREEN;
-        case '1':
-        case '3':
-        case '9':
-        case 'b':
-          return net.minecraft.world.BossEvent.BossBarColor.BLUE;
-        case '5':
-          return net.minecraft.world.BossEvent.BossBarColor.PURPLE;
-        case 'd':
-          return net.minecraft.world.BossEvent.BossBarColor.PINK;
-        case 'f':
-        case '7':
-        case '8':
-        case '0':
-          return net.minecraft.world.BossEvent.BossBarColor.WHITE;
-        default:
-          break;
-      }
-    }
-    return net.minecraft.world.BossEvent.BossBarColor.GREEN;
-  }
 
   // ---------------------------------------------------------------------------
   // Menu platform surface (ADR-048)

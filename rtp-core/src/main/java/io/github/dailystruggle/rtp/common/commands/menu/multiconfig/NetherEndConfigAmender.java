@@ -24,7 +24,9 @@ import java.util.Map;
  * <p>Rules (matching the previous inline block):
  * <ul>
  *   <li>If the target world ends with {@code _nether} or {@code _the_end},
- *       seed the vert name to {@code LINEAR} and direction to {@code 2}.</li>
+ *       seed the vert name to {@code LINEAR}. (The middle-out search
+ *       direction is now the global default, so it is no longer seeded
+ *       here.)</li>
  *   <li>Resolve {@code vert.name}, {@code vert.maxY}, {@code vert.minY}
  *       from {@code parameterValues} first, then from the region parser's
  *       existing {@code vert} section / {@link VerticalAdjustor}.</li>
@@ -64,7 +66,6 @@ public final class NetherEndConfigAmender {
         String name = "JUMP";
         if (rtpWorld.name().endsWith("_nether") || rtpWorld.name().endsWith("_the_end")) {
             name = "LINEAR";
-            parameterValues.putIfAbsent("direction", Collections.singletonList(String.valueOf(2)));
         }
         int maxY = 255;
         int minY = 0;

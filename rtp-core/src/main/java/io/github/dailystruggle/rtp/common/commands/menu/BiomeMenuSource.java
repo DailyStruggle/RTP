@@ -186,6 +186,42 @@ public final class BiomeMenuSource {
         return weights;
     }
 
+    /**
+     * Per-biome observation counts for a single region, used to compute a
+     * representative "average biome color" for a region row in the menu
+     * (the colors that would appear on that region's map). Chunk-I/O-free:
+     * reads only persisted spatial memory. Empty before the background
+     * sampler has observed any biome in the region (cold-data state), in
+     * which case the caller falls back to a neutral row color.
+     *
+     * @param regionName region name (as returned by {@code Region} keys)
+     * @return map of canonical biome name to total observation count, possibly
+     *         empty; never {@code null}
+     */
+    public static Map<String, Long> biomeWeightsForRegion(String regionName) {
+        Map<String, Long> weights = new TreeMap<>();
+        if (regionName == null || RTP.selectionAPI == null) return weights;
+
+        Region region = RTP.selectionAPI.getRegion(regionName);
+        if (region == null || !(region.shape instanceof MemoryShape<?> memoryShape)) {
+            return weights;
+        }
+
+        Set<String> observed;
+        try {
+            observed = memoryShape.getObservedBiomes();
+        } catch (RuntimeException ignored) {
+            return weights;
+        }
+        if (observed == null) return weights;
+
+        for (String biome : observed) {
+            if (biome == null) continue;
+            weights.merge(biome, observationCount(memoryShape, biome), Long::sum);
+        }
+        return weights;
+    }
+
     private static boolean isAccessible(Region region, String regionName, RTPPlayer player) {
         try {
             if (region.getSettings().requirePermission()) {

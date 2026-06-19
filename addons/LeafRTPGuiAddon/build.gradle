@@ -1,0 +1,17 @@
+// LeafRTPGuiAddon - container (aggregator) project only.
+//
+// This project has no `src/` of its own: it merely groups the platform-neutral
+// menu (rtp-gui-common), the per-platform renderer carriers (rtp-gui-bukkit,
+// rtp-gui-fabric, rtp-gui-neoforge), and the single distributable assembly
+// (rtp-gui). The root `subprojects { apply plugin: 'java-library' }` block still
+// gives this empty container a `jar` task, which would otherwise emit a ~1 KB
+// EMPTY `LeafRTPGuiAddon-<version>.jar` into this module's `build/libs`.
+//
+// That empty jar is a trap: its name matches the addon's brand, so it is the
+// jar a user naturally grabs and installs - but it contains no plugin.yml, no
+// renderer, and no addon entry point, so the GUI silently does nothing. The
+// real, installable artifact is produced by `:addons:LeafRTPGuiAddon:rtp-gui`
+// and is now named `LeafRTPGuiAddon-<version>.jar` (see rtp-gui/build.gradle).
+// Disable the empty container jar so only the real assembly carries the brand
+// name.
+jar.enabled = false
