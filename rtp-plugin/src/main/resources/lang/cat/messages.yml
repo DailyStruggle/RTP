@@ -267,7 +267,7 @@ menuHoverFallbackBounds: "accepted flavours: [values]"
 menuBack: "&7Â« scamper back"
 # Label template for the "execute the assembled command" row prepended to every
 # runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
-menuExecute: "&aâ–¶ pounce [command]"
+menuExecute: "&2â–¶ pounce [command]"
 # Header row at the top of a parameter-value picker sub-page (Stage A.2).
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
 pick_a_flavour: "&7pick a flavour for [param] (will pounce: /rtp [command] [param]:<value>)"
@@ -293,11 +293,11 @@ menuPageNext: "&7next page ([page]) »"
 # Section divider on the front page above teleport rows (player view).
 menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
 # Front-page rows. No placeholders.
-menuFrontPageRowTeleport: "&aâ–¶ /rtp &7- pounce to a random warm spot"
-menuFrontPageRowRegion: "&aâ–¶ /rtp region:&7... &7- sniff a territory"
-menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- sniff a box"
-menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- sniff a flavour of land"
-menuFrontPageRowHelp: "&aâ–¶ /rtp help &7- list meows"
+menuFrontPageRowTeleport: "&2â–¶ /rtp &7- pounce to a random warm spot"
+menuFrontPageRowRegion: "&2â–¶ /rtp region:&7... &7- sniff a territory"
+menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- sniff a box"
+menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- sniff a flavour of land"
+menuFrontPageRowHelp: "&2â–¶ /rtp help &7- list meows"
 # Front-page admin entry row: the only inline
 # admin-visible row on the front page; click descends into the curated admin
 # panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
@@ -378,12 +378,12 @@ menuPrefabConfirmTitle: "#9D7CD8&lâš™ confirm flavour: #5FB3B3[prefab]"
 # Confirmation menu non-clickable hint row below the title. No placeholders.
 menuPrefabConfirmHint: "&7sniff the changes below, then paw confirm or cancel"
 # Confirmation menu footer row: confirm and write the prefab to disk.
-menuPrefabConfirmRow: "&a&l[paw to confirm]"
+menuPrefabConfirmRow: "&2&l[paw to confirm]"
 # Confirmation menu footer row: cancel and return to the admin panel.
 menuPrefabCancelRow: "&c&l[paw to cancel]"
 # Clickable row label for the Refresh affordance at the bottom of the /rtp info
 # book. Re-renders the current scope against a fresh metrics snapshot.
-infoBookRefreshRow: "&a[Refresh]"
+infoBookRefreshRow: "&2[Refresh]"
 # Hover text for the info-book refresh row.
 infoBookRefreshHover: "&7Re-sniff this page against a fresh hairball snapshot."
 # Clickable row label for the Switch-to-chat affordance at the bottom of the
@@ -439,7 +439,7 @@ configPendingRowFormat: "&9[key]&8 = &0[value]"
 configPendingRowHover: "paw to unstage"
 # Clickable label for the "apply staged changes" row on a config-file page.
 # Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
-configApplyRow: "&a&l[apply]"
+configApplyRow: "&2&l[apply]"
 # Clickable label for the "discard staged changes" row on a config-file page.
 # Clears the cart without applying.
 configDiscardRow: "&c&l[discard]"
@@ -527,7 +527,7 @@ multiconfigToggleRemoveModeOff: "&8[ ] chompy mode"
 # Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
 multiconfigToggleRemoveModeOn: "&c[x] chompy mode (paw an entry to chomp it)"
 # Selector row label for the "+ Add new..." entry. No placeholders.
-multiconfigRowAdd: "&a+ sniff out a new one..."
+multiconfigRowAdd: "&2+ sniff out a new one..."
 # Hover text for the Add row. Placeholder: [name] - prefilled default name.
 multiconfigRowAddHover: "&7type a name in the scratching prompt; prefilled: &f[name]"
 # Hover text for an entry row in normal mode. Placeholder: [name].
@@ -539,7 +539,7 @@ multiconfigConfirmTitle: "&c&lchomp [name]?"
 # Confirm-delete page Yes-row label. No placeholders.
 multiconfigConfirmYes: "&c&l[paw to chomp]"
 # Confirm-delete page Cancel-row label. No placeholders.
-multiconfigConfirmNo: "&a&l[scamper away]"
+multiconfigConfirmNo: "&2&l[scamper away]"
 # Hover text on a locked (grayed) default-region row. No placeholders.
 multiconfigLockRegionDefault: "&7the default territory cannot be chomped"
 # Hover text on a locked (grayed) world row. Placeholder: [name].

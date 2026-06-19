@@ -125,6 +125,93 @@ final class MenuConcreteCommandLeavesB {
         }
     }
 
+    // -- /rtp menu world|region|biome|prefab (curated selection menus) -----
+
+    /**
+     * Shared base for the dedicated destination / prefab selection leaves.
+     * Each subclass supplies its own wire name, the parent path the selection
+     * stages onto (and Back returns to), the parameter to enumerate, the human
+     * display name for the {@code "pick a <name>"} header, and the per-entry
+     * row color supplier. The entries themselves are the resolved parameter's
+     * {@code relevantValues} (the menu never computes suggestions itself);
+     * the rendering is delegated to {@code SelectionMenuBuilder} via
+     * {@link MenuRedeemSubcommand#dispatchSelectionMenu}.
+     */
+    abstract static class SelectionLeaf extends BaseRTPCmdImpl {
+        private final MenuRedeemSubcommand owner;
+        private final String[] parentPath;
+        private final String paramName;
+        private final String displayName;
+        private final java.util.function.Function<String, String> colorSupplier;
+        private final boolean executeOnClick;
+
+        SelectionLeaf(MenuRedeemSubcommand owner,
+                      String[] parentPath,
+                      String paramName,
+                      String displayName,
+                      java.util.function.Function<String, String> colorSupplier,
+                      boolean executeOnClick) {
+            super(owner);
+            this.owner = owner;
+            this.parentPath = parentPath;
+            this.paramName = paramName;
+            this.displayName = displayName;
+            this.colorSupplier = colorSupplier;
+            this.executeOnClick = executeOnClick;
+        }
+
+        @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
+        @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
+                                           @Nullable CommandsAPICommand n) { return run(c, null); }
+        @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
+                                           @Nullable CommandsAPICommand n,
+                                           Consumer<String> m) { return run(c, m); }
+
+        private boolean run(UUID c, @Nullable Consumer<String> m) {
+            return owner.dispatchSelectionMenu(c, parentPath, paramName,
+                    displayName, colorSupplier, executeOnClick, m);
+        }
+    }
+
+    /** {@code /rtp menu world} - pick a world, tinted by its resolved region. */
+    static final class WorldCmd extends SelectionLeaf {
+        WorldCmd(MenuRedeemSubcommand owner) {
+            super(owner, new String[0], "world", "world",
+                    MenuColor::worldRegionColorPrefix, true);
+        }
+        @Override public String name() { return "world"; }
+    }
+
+    /** {@code /rtp menu region} - pick a region, tinted by its biome mix. */
+    static final class RegionCmd extends SelectionLeaf {
+        RegionCmd(MenuRedeemSubcommand owner) {
+            super(owner, new String[0], "region", "region",
+                    MenuColor::regionColorPrefix, true);
+        }
+        @Override public String name() { return "region"; }
+    }
+
+    /** {@code /rtp menu biome} - pick a biome, tinted by its map color. */
+    static final class BiomeCmd extends SelectionLeaf {
+        BiomeCmd(MenuRedeemSubcommand owner) {
+            super(owner, new String[0], "biome", "biome",
+                    MenuColor::biomeColorPrefix, true);
+        }
+        @Override public String name() { return "biome"; }
+    }
+
+    /**
+     * {@code /rtp menu prefab} - pick a bundled prefab id. Stages onto the
+     * admin prefab-apply path and uses a uniform parchment-safe color (prefabs
+     * carry no biome/map semantics).
+     */
+    static final class PrefabCmd extends SelectionLeaf {
+        PrefabCmd(MenuRedeemSubcommand owner) {
+            super(owner, new String[]{"admin", "prefab", "apply"}, "id", "prefab", null, false);
+        }
+        @Override public String name() { return "prefab"; }
+    }
+
     // -- /rtp menu page n=<n> ---------------------------------------------
 
     static final class PageCmd extends BaseRTPCmdImpl {

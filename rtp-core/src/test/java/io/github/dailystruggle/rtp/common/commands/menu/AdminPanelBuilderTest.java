@@ -528,21 +528,18 @@ final class AdminPanelBuilderTest {
         return null;
     }
 
+    /**
+     * The Setup prefab row now runs the dedicated prefab selection leaf
+     * ({@code /rtp menu prefab}) via {@code RunRtpCommand(["menu","prefab"])}
+     * instead of emitting a generic {@code OpenParamPicker}. The leaf itself
+     * stages onto {@code admin prefab apply}'s {@code id} parameter, so the
+     * {@code paramName} / {@code parentPath} arguments are retained for call-
+     * site readability but matched via the prefab leaf command.
+     */
     private static MenuAction findOpenParamPicker(MenuModel model,
                                                   String paramName,
                                                   String... parentPath) {
-        for (io.github.dailystruggle.rtp.api.menu.MenuPage page : model.pages()) {
-            for (MenuLine line : page.lines()) {
-                for (MenuFragment frag : line.fragments()) {
-                    if (frag.action() instanceof MenuAction.OpenParamPicker picker
-                            && paramName.equals(picker.paramName())
-                            && argsMatch(picker.parentPath(), parentPath)) {
-                        return picker;
-                    }
-                }
-            }
-        }
-        return null;
+        return findRunWithArgs(model, "menu", "prefab");
     }
 
     private static MenuAction findOpenMenuEmpty(MenuModel model) {

@@ -15,6 +15,9 @@ import io.github.dailystruggle.rtp.common.commands.menu.multiconfig.DefaultMulti
 import io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigMenuBuilder;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabCommand;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.Configs;
+import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.menu.search.ConfigSearchResultsBuilder;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.jetbrains.annotations.Nullable;
@@ -23,6 +26,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -89,6 +93,12 @@ final class MenuWiringSupportInstaller {
 
         // Stage A.2: wire the param-picker builder so OpenParamPicker redeems
         // resolve to a value-picker sub-page (see dispatchOpenParamPicker).
+        // The curated destination selectors (region / world / biome / prefab)
+        // no longer flow through here - they are dedicated /rtp menu
+        // world|region|biome|prefab leaves that render via SelectionMenuBuilder
+        // (see MenuConcreteCommandLeavesB + MenuRedeemSubcommand#dispatchSelectionMenu).
+        // This generic picker remains for command-navigation, config-key, and
+        // shape/vert sub-parameter pages.
         final MenuRedeemSubcommand.MenuParamPickerBuilder menuParamPickerBuilder =
                 (parent, viewer, parentPath, paramName) ->
                         new CommandTreeMenuBuilder()
@@ -286,6 +296,14 @@ final class MenuWiringSupportInstaller {
         // ConfigSearchResultsBuilder, renders a paginated MenuModel where each
         // hit row is a gray-base line with an off-blue highlight overlay at the
         // raw-offset match ranges. Each row click resolves to OpenConfigKey.
+        // Hover text for each result row resolves through the same YAML
+        // block-comment lookup the curated config menu uses
+        // (ConfigMenuConsumerProfile), so a row's tooltip shows the operator
+        // the configured comment for that key (dotted sub-paths like
+        // "shape.radius" included). The section resolver maps a hit's file
+        // name back to its loaded YAML root via ConfigParser#getYamlRoot.
+        final ConfigMenuConsumerProfile searchProfile =
+                new ConfigMenuConsumerProfile(MenuWiringSupportInstaller::resolveYamlRoot);
         return (UUID viewer, String query, int page) -> {
             if (query == null) query = "";
             String safeQuery = query;
@@ -319,30 +337,31 @@ final class MenuWiringSupportInstaller {
                 for (var hit : hits) {
                     MenuAction click = new MenuAction.OpenConfigKey(
                             hit.fileName(), hit.keyName());
+                    String hover = resolveHitHover(searchProfile, hit);
                     List<MenuFragment> frags = new ArrayList<>();
                     String prefix = "&8" + hit.fileName() + "&7/&2" + hit.keyName() + "&7: ";
                     String raw = hit.rawValue();
                     List<int[]> ranges = hit.matchRanges();
                     if (ranges == null || ranges.isEmpty()) {
-                        frags.add(new MenuFragment(prefix + "&7" + raw, null, click));
+                        frags.add(new MenuFragment(prefix + "&7" + raw, hover, click));
                     } else {
                         int cursor = 0;
                         StringBuilder head = new StringBuilder(prefix).append("&7");
                         int[] first = ranges.get(0);
                         if (first[0] > 0) head.append(raw, 0, first[0]);
-                        frags.add(new MenuFragment(head.toString(), null, click));
+                        frags.add(new MenuFragment(head.toString(), hover, click));
                         cursor = first[0];
                         for (int i = 0; i < ranges.size(); i++) {
                             int[] r = ranges.get(i);
                             frags.add(new MenuFragment(
-                                    "&9&l" + raw.substring(r[0], r[1]) + "&r&7", null, click));
+                                    "&9&l" + raw.substring(r[0], r[1]) + "&r&7", hover, click));
                             cursor = r[1];
                             int nextStart = (i + 1 < ranges.size())
                                     ? ranges.get(i + 1)[0]
                                     : raw.length();
                             if (nextStart > cursor) {
                                 frags.add(new MenuFragment(
-                                        raw.substring(cursor, nextStart), null, click));
+                                        raw.substring(cursor, nextStart), hover, click));
                             }
                         }
                     }
@@ -365,6 +384,63 @@ final class MenuWiringSupportInstaller {
             if (pages.isEmpty()) return null;
             return new MenuModel("config:search:" + safeQuery, pages);
         };
+    }
+
+    /**
+     * Resolve the hover/tooltip text for a single search hit: the configured
+     * YAML block comment for the hit's key, or {@code null} when none exists.
+     * Reuses {@link ConfigMenuConsumerProfile}'s comment lookup (which strips
+     * leading {@code #} markers); the key may be a dotted sub-path.
+     */
+    @Nullable
+    private static String resolveHitHover(ConfigMenuConsumerProfile profile,
+                                          ConfigSearchResultsBuilder.Hit hit) {
+        try {
+            Optional<String> comment = profile.commentLookup()
+                    .commentFor(hit.fileName(), hit.keyName());
+            if (comment.isPresent() && !comment.get().isBlank()) {
+                return comment.get();
+            }
+        } catch (RuntimeException ignored) {
+            // fall through to no hover
+        }
+        return null;
+    }
+
+    /**
+     * Section resolver for the config-search hover lookup: maps a hit's file
+     * name (a {@link ConfigParser#name}, e.g. {@code "messages.yml"} or a
+     * multiconfig entry's {@code "default.yml"}) to its loaded YAML root.
+     * Matches single parsers first, then every multiconfig sub-parser; the
+     * comparison tolerates the {@code .yml} suffix. Returns {@code null} when
+     * no parser matches or configs are not loaded.
+     */
+    @Nullable
+    private static RtpYamlSection resolveYamlRoot(String fileName) {
+        // Single (non-multiconfig) parsers: reuse the existing file-name
+        // resolver instead of duplicating its loop.
+        ConfigParser<?> single = resolveParserByFileName(fileName);
+        if (single != null) return single.getYamlRoot();
+        // Multiconfig sub-parsers (e.g. per-region entries like default.yml),
+        // which resolveParserByFileName does not cover.
+        Configs configs = RTP.configs;
+        if (configs == null || fileName == null || fileName.isEmpty()) return null;
+        String target = stripYml(fileName).toLowerCase(Locale.ROOT);
+        try {
+            for (MultiConfigParser<?> mcp : configs.multiConfigParserMap.values()) {
+                if (mcp == null) continue;
+                for (String name : mcp.listParsers()) {
+                    ConfigParser<?> sub = mcp.getParser(name);
+                    if (sub == null || sub.name == null) continue;
+                    if (stripYml(sub.name).equalsIgnoreCase(target)) {
+                        return sub.getYamlRoot();
+                    }
+                }
+            }
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+        return null;
     }
 
     // ---- Admin verb + deferred /rtp config search handler ----------------

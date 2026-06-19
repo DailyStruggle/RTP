@@ -10,7 +10,9 @@ Answers to the most common questions from server administrators and contributors
 
 ### Does RTP work on Paper / Folia, or only Spigot?
 
-All three are supported. Download the same jar; RTP auto-detects the platform at startup and loads the correct adapter (Spigot, Paper, or Folia). No separate jar is needed per platform.
+The Bukkit family is all supported by one jar: download the same jar for Spigot, Paper, Paper forks, and Folia, and RTP auto-detects the platform at startup and loads the correct adapter. No separate jar is needed across the Bukkit family.
+
+Fabric and NeoForge are also supported as first-class platforms (Minecraft 1.21.x / 26.1.x); those run as a mod, so you download the Fabric or NeoForge artifact rather than the Bukkit jar. Legacy Forge has no native build: run the Bukkit jar under Arclight or Mohist.
 
 ### Do I need to restart the server after changing config files?
 
@@ -22,7 +24,9 @@ Yes. RTP does not interfere with other teleport plugins. It only acts on `/rtp` 
 
 ### Does RTP support BungeeCord / Velocity cross-server teleportation?
 
-No. RTP operates within a single server instance only. Cross-server teleportation is out of scope and not planned.
+Velocity is supported. The `proxy-direct` transport lets a Velocity proxy send a player to a random region on a backend server over a lightweight TCP socket, with no Redis or SQL database required. Configure it in `network.yml`.
+
+BungeeCord is not supported yet. A single backend server still works fully on its own with no proxy configuration.
 
 ---
 

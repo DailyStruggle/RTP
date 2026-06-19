@@ -238,7 +238,7 @@ rtp_说明: "传送到一个随机位置"
 菜单_返回: "&7« 返回"
 # 每个可运行非根菜单页面前置的「执行已组装命令」行的标签模板。
 # 占位符: [command] - 组装好的 /rtp ... 调用。
-菜单_执行: "&a» 执行 [command]"
+菜单_执行: "&2» 执行 [command]"
 # 参数值选择子页面顶部的标题行。
 # 占位符: [param] - 参数名称; [command] - 组装好的 /rtp ... 调用。
 菜单_选择值: "&7为 [param] 选择一个值 (将执行: /rtp [command] [param]:<value>)"
@@ -261,11 +261,11 @@ rtp_说明: "传送到一个随机位置"
 # 首页传送行上方的分区分隔符（玩家视图）。
 菜单_首页_传送分区: "&8--- &7teleport &8---"
 # 首页行。无占位符。
-菜单_首页_传送行: "&a» /rtp &7- 随机传送到一个位置"
-菜单_首页_区域行: "&a» /rtp region:&7... &7- 选择区域"
-menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- 选择世界"
-菜单_首页_生物群系行: "&a▶ /rtp biome:&7... &7- 选择生物群系"
-菜单_首页_帮助行: "&a» /rtp help &7- 列出命令"
+菜单_首页_传送行: "&2» /rtp &7- 随机传送到一个位置"
+菜单_首页_区域行: "&2» /rtp region:&7... &7- 选择区域"
+menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- 选择世界"
+菜单_首页_生物群系行: "&2▶ /rtp biome:&7... &7- 选择生物群系"
+菜单_首页_帮助行: "&2» /rtp help &7- 列出命令"
 # 首页管理员入口行: 首页上唯一的内联管理员可见行；
 # 点击后进入由 AdminPanelBuilder 构建的精选管理面板。
 # 当查看者缺少 rtp.menu.admin 权限时隐藏。
@@ -346,12 +346,12 @@ menuPrefabConfirmTitle: "#9D7CD8&l» 确认预设: #5FB3B3[prefab]"
 # 确认菜单标题下方的不可点击提示行。无占位符。
 menuPrefabConfirmHint: "&7查看以下更改，然后点击确认或取消"
 # 确认菜单底部行: 确认并将预设写入磁盘。
-menuPrefabConfirmRow: "&a&l[confirm]"
+menuPrefabConfirmRow: "&2&l[confirm]"
 # 确认菜单底部行: 取消并返回管理面板。
 menuPrefabCancelRow: "&c&l[cancel]"
 # /rtp info 书本底部刷新按钮的可点击行标签。
 # 根据最新指标快照重新渲染当前范围。
-infoBookRefreshRow: "&a[Refresh]"
+infoBookRefreshRow: "&2[Refresh]"
 # info 书本刷新行的悬停文字。
 infoBookRefreshHover: "&7根据最新指标快照重新渲染此页面。"
 # /rtp info 书本底部切换到聊天按钮的可点击行标签。
@@ -405,7 +405,7 @@ configPendingRowFormat: "&9[key]&8 = &0[value]"
 configPendingRowHover: "点击取消暂存"
 # 配置文件页面上「应用暂存更改」行的可点击标签。
 # 运行组装好的 /rtp config <file> k1=v1 ... 命令并清空购物车。
-configApplyRow: "&a&l[apply]"
+configApplyRow: "&2&l[apply]"
 # 配置文件页面上「放弃暂存更改」行的可点击标签。
 # 清空购物车但不应用更改。
 configDiscardRow: "&c&l[discard]"
@@ -467,7 +467,7 @@ multiconfigToggleRemoveModeOff: "&8[ ] 删除模式"
 # 删除模式开启时的切换行标签。点击条目行将删除。
 multiconfigToggleRemoveModeOn: "&c[x] 删除模式 (点击条目以删除)"
 # 「+ 添加新...」条目的选择器行标签。无占位符。
-multiconfigRowAdd: "&a+ 新增..."
+multiconfigRowAdd: "&2+ 新增..."
 # 添加行的悬停文字。占位符: [name] - 预填的默认名称。
 multiconfigRowAddHover: "&7在铁砧提示中输入名称; 预填: &f[name]"
 # 普通模式下条目行的悬停文字。占位符: [name]。
@@ -479,7 +479,7 @@ multiconfigConfirmTitle: "&c&l删除 [name]?"
 # 确认删除页面「是」行标签。无占位符。
 multiconfigConfirmYes: "&c&l[confirm delete]"
 # 确认删除页面「取消」行标签。无占位符。
-multiconfigConfirmNo: "&a&l[cancel]"
+multiconfigConfirmNo: "&2&l[cancel]"
 # 锁定（灰色）默认区域行的悬停文字。无占位符。
 multiconfigLockRegionDefault: "&7默认区域不能被删除"
 # 锁定（灰色）世界行的悬停文字。占位符: [name]。

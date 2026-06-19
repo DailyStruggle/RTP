@@ -71,11 +71,13 @@ def write_bytes_utf8(path: str | os.PathLike, text: str) -> None:
 
 def _tsv_encode_cell(v: str) -> str:
     v = "" if v is None else str(v)
-    # NOTE: mirrors PowerShell `-replace '\\', '\\\\'`, whose .NET replacement
-    # string emits 4 literal backslashes per match (1 backslash -> 4). The decode
-    # side collapses each 2-backslash run, so this asymmetry is preserved exactly
-    # to keep generated TSVs byte-identical to the historical pipeline.
-    v = v.replace("\\", "\\\\\\\\")
+    # Escape a single literal backslash as a 2-backslash run; the decode side
+    # collapses each 2-backslash run back to one. This keeps to-csv/from-csv a
+    # byte-idempotent round-trip (1 backslash -> 2 in TSV -> 1 in YAML). The
+    # former PowerShell pipeline emitted 4 backslashes here while decoding only
+    # 2-runs, which doubled every backslash on each pass and corrupted locale
+    # comments/values containing literal backslashes (e.g. zh @options lists).
+    v = v.replace("\\", "\\\\")
     v = v.replace("\r\n", "\n")
     v = v.replace("\n", "\\n")
     v = v.replace("\t", "\\t")
@@ -123,8 +125,9 @@ def to_comment_cell(s: str) -> str:
     if s is None:
         return ""
     v = s
-    # Same 1-backslash -> 4-backslash quirk as _tsv_encode_cell (see note there).
-    v = v.replace("\\", "\\\\\\\\")
+    # Idempotent 1-backslash -> 2-backslash escape, matching _tsv_encode_cell
+    # (see note there). The decode side collapses each 2-backslash run to one.
+    v = v.replace("\\", "\\\\")
     v = v.replace("\r\n", "\n")
     v = v.replace("\n", "\\n")
     v = v.replace("\t", "\\t")
@@ -232,6 +235,17 @@ def find_mojibake(text: str) -> list[str]:
 
 
 # --- Relpath / langmap helpers ----------------------------------------------
+
+def list_locales() -> list[str]:
+    """Shipped locale codes (subdirs of resources/lang, excluding shape/vert)."""
+    lang_root = resources_root() / "lang"
+    if not lang_root.is_dir():
+        return []
+    return sorted(
+        p.name for p in lang_root.iterdir()
+        if p.is_dir() and p.name not in ("shape", "vert")
+    )
+
 
 def get_locale_relpath(baseline_relpath: str, loc: str) -> str:
     if baseline_relpath.startswith("lang/"):

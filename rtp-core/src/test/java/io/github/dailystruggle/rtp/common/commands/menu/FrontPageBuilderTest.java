@@ -130,7 +130,7 @@ final class FrontPageBuilderTest {
 
         MenuAction regionAction = findOpenParamPicker(model, "region");
         assertNotNull(regionAction, "region picker row must surface");
-        assertInstanceOf(MenuAction.OpenParamPicker.class, regionAction);
+        assertInstanceOf(MenuAction.RunRtpCommand.class, regionAction);
 
         MenuAction biomeAction = findOpenParamPicker(model, "biome");
         assertNotNull(biomeAction, "biome picker row must surface");
@@ -263,16 +263,14 @@ final class FrontPageBuilderTest {
         return null;
     }
 
+    /**
+     * The destination picker rows now run the dedicated selection leaves
+     * ({@code /rtp menu region|world|biome}) via
+     * {@code RunRtpCommand(["menu", <paramName>])} instead of emitting a
+     * generic {@code OpenParamPicker}. This helper finds that row.
+     */
     private static MenuAction findOpenParamPicker(MenuModel model, String paramName) {
-        for (MenuLine line : model.pages().get(0).lines()) {
-            for (MenuFragment frag : line.fragments()) {
-                MenuAction a = frag.action();
-                if (a instanceof MenuAction.OpenParamPicker pick) {
-                    if (paramName.equals(pick.paramName())) return a;
-                }
-            }
-        }
-        return null;
+        return findRunWithArgs(model, "menu", paramName);
     }
 
     private static boolean argsMatch(String[] actual, String[] expected) {

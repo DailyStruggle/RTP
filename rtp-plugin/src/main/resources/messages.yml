@@ -279,7 +279,7 @@ menuHoverFallbackBounds: "accepted: [values]"
 menuBack: "&7« back"
 # Label template for the "execute the assembled command" row prepended to every
 # runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
-menuExecute: "&a▶ run [command]"
+menuExecute: "&2▶ run [command]"
 # Header row at the top of a parameter-value picker sub-page (Stage A.2).
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
 menuPickValue: "&7pick a value for [param] (will run: /rtp [command] [param]:<value>)"
@@ -305,11 +305,11 @@ menuPageNext: "&7next page ([page]) »"
 # Section divider on the front page above teleport rows (player view).
 menuFrontPageSectionTeleport: "&8» &7teleport"
 # Front-page rows. No placeholders.
-menuFrontPageRowTeleport: "&a▶ /rtp &7- teleport to a random location"
-menuFrontPageRowRegion: "&a▶ /rtp region:&7... &7- pick a region"
-menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- pick a world"
-menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- pick a biome"
-menuFrontPageRowHelp: "&a▶ /rtp help &7- list commands"
+menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
+menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- pick a world"
+menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- pick a biome"
+menuFrontPageRowHelp: "&2▶ /rtp help &7- list commands"
 # Front-page admin entry row: the only inline
 # admin-visible row on the front page; click descends into the curated admin
 # panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
@@ -390,12 +390,12 @@ menuPrefabConfirmTitle: "#9D7CD8&l⚙ confirm prefab: #5FB3B3[prefab]"
 # Confirmation menu non-clickable hint row below the title. No placeholders.
 menuPrefabConfirmHint: "&7review the changes below, then click confirm or cancel"
 # Confirmation menu footer row: confirm and write the prefab to disk.
-menuPrefabConfirmRow: "&a&l[confirm]"
+menuPrefabConfirmRow: "&2&l[confirm]"
 # Confirmation menu footer row: cancel and return to the admin panel.
 menuPrefabCancelRow: "&c&l[cancel]"
 # Clickable row label for the Refresh affordance at the bottom of the /rtp info
 # book. Re-renders the current scope against a fresh metrics snapshot.
-infoBookRefreshRow: "&a[Refresh]"
+infoBookRefreshRow: "&2[Refresh]"
 # Hover text for the info-book refresh row.
 infoBookRefreshHover: "&7Re-render this page against a fresh metrics snapshot."
 # Clickable row label for the Switch-to-chat affordance at the bottom of the
@@ -453,7 +453,7 @@ configPendingRowFormat: "&9[key]&8 = &0[value]"
 configPendingRowHover: "click to unstage"
 # Clickable label for the "apply staged changes" row on a config-file page.
 # Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
-configApplyRow: "&a&l[apply]"
+configApplyRow: "&2&l[apply]"
 # Clickable label for the "discard staged changes" row on a config-file page.
 # Clears the cart without applying.
 configDiscardRow: "&c&l[discard]"
@@ -541,7 +541,7 @@ multiconfigToggleRemoveModeOff: "&8[ ] remove mode"
 # Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
 multiconfigToggleRemoveModeOn: "&c[x] remove mode (click an entry to delete)"
 # Selector row label for the "+ Add new..." entry. No placeholders.
-multiconfigRowAdd: "&a+ add new..."
+multiconfigRowAdd: "&2+ add new..."
 # Hover text for the Add row. Placeholder: [name] - prefilled default name.
 multiconfigRowAddHover: "&7type a name in the anvil prompt; prefilled: &f[name]"
 # Hover text for an entry row in normal mode. Placeholder: [name].
@@ -553,7 +553,7 @@ multiconfigConfirmTitle: "&c&ldelete [name]?"
 # Confirm-delete page Yes-row label. No placeholders.
 multiconfigConfirmYes: "&c&l[confirm delete]"
 # Confirm-delete page Cancel-row label. No placeholders.
-multiconfigConfirmNo: "&a&l[cancel]"
+multiconfigConfirmNo: "&2&l[cancel]"
 # Hover text on a locked (grayed) default-region row. No placeholders.
 multiconfigLockRegionDefault: "&7the default region cannot be removed"
 # Hover text on a locked (grayed) world row. Placeholder: [name].

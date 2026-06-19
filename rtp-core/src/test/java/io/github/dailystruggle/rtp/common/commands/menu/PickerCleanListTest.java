@@ -49,6 +49,25 @@ class PickerCleanListTest {
     }
 
     @Test
+    void prefabIdPickerOmitsTypeValueRow() {
+        TestRoot root = new TestRoot();
+        root.getParameterLookup().put("id", enumParam("survival-default", "low-performance"));
+
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
+        MenuConsumerProfile profile = MenuConsumerProfile.defaultProfile();
+
+        assertFalse(hasTypeValueRow(builder.buildParamPicker(
+                root, UUID.randomUUID(), p -> true, profile,
+                List.of("admin", "prefab", "apply"), "id")),
+                "prefab id picker is a closed set and must not show the 'type a custom value' row");
+
+        // A generic `id` parameter outside the prefab context keeps the row.
+        assertTrue(hasTypeValueRow(builder.buildParamPicker(
+                root, UUID.randomUUID(), p -> true, profile, List.of(), "id")),
+                "a non-prefab 'id' parameter keeps the 'type a custom value' fallback row");
+    }
+
+    @Test
     void regionValueRowsAreColorPrefixed() {
         TestRoot root = new TestRoot();
         root.getParameterLookup().put("region", enumParam("alpha", "beta"));

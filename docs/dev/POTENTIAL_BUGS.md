@@ -37,6 +37,7 @@ Append to the *Open* section below using the template. Keep entries short — on
 
 ## Open
 
+
 ### 2026-06-18 - NeoForge 1.21 carrier (`V1_21_R1NeoForgeVersionAdapter`) shares the blocking `getChunkFuture` defect just fixed on 26.1
 
 - **Discovered during:** fixing the NeoForge 26.1.2 ServerWatchdog crash (this session). Only the `v26_1_R1` carrier was changed; the sibling 1.21 carrier was left untouched as it is outside the reported crash's runtime.

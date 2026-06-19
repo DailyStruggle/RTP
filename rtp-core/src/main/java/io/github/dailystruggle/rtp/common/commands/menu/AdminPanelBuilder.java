@@ -128,27 +128,25 @@ public final class AdminPanelBuilder {
         lines.add(new MenuLine(List.of()));
 
         // --- Setup (quick start) section ---
-        // Single entry-point row that opens the prefab `id` parameter
-        // picker directly, skipping the apply/confirm/rollback/list
+        // Single entry-point row that opens the curated prefab selection
+        // menu (`/rtp menu prefab`), skipping the apply/confirm/rollback/list
         // subcommand-list page that an OpenMenu({admin,prefab}) would
-        // produce. CommandTreeMenuBuilder's MenuAction.OpenParamPicker
-        // arm (resolved server-side by MenuRedeemSubcommand) renders
-        // one clickable row per value returned by
-        // PrefabIdParameter.values() (live PrefabRegistry); clicking a
-        // row dispatches `/rtp admin prefab apply id=<id>`. This gives
-        // the operator the clickable prefab-selection book menu without
-        // flooding the admin panel page itself with per-prefab rows.
-        // Suppressed wholesale when the viewer lacks `rtp.admin.prefab`
-        // so a partial admin never sees the Setup divider with no row
-        // under it.
+        // produce. The PrefabCmd leaf renders one clickable row per bundled
+        // prefab id (the live PrefabRegistry, via the apply node's `id`
+        // parameter relevantValues); clicking a row stages
+        // `id=<id>` onto `admin prefab apply` so the subsequent Execute row
+        // dispatches `/rtp admin prefab apply id=<id>`. This gives the
+        // operator the clickable prefab-selection book menu without flooding
+        // the admin panel page itself with per-prefab rows. Suppressed
+        // wholesale when the viewer lacks `rtp.admin.prefab` so a partial
+        // admin never sees the Setup divider with no row under it.
         List<MenuLine> setupRows = new ArrayList<>();
         if (safeTest(permission, PREFAB_PERMISSION)) {
             addRow(
                     setupRows,
                     "&b\u2728 Setup prefabs",
                     "Pick a bundled prefab to apply.",
-                    new MenuAction.OpenParamPicker(
-                            new String[]{"admin", "prefab", "apply"}, "id"));
+                    new MenuAction.RunRtpCommand(new String[]{"menu", "prefab"}));
         }
         appendSetupSection(lines, setupRows);
 

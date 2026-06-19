@@ -265,7 +265,7 @@ menuHoverFallbackBounds: "accettati: [values]"
 menuBack: "&7« indietro"
 # Modello di etichetta della riga "esegui il comando assemblato" anteposta a ogni
 # pagina di menù eseguibile non radice. Segnaposto: [command] - l'invocazione /rtp ... assemblata.
-menuExecute: "&a▶ esegui [command]"
+menuExecute: "&2▶ esegui [command]"
 # Riga di intestazione in cima a una sotto-pagina selettore di valore di parametro (Fase A.2).
 # Segnaposto: [param] - nome del parametro; [command] - invocazione /rtp ... assemblata.
 menuPickValue: "&7scegli un valore per [param] (eseguirà: /rtp [command] [param]:<valore>)"
@@ -291,11 +291,11 @@ menuPageNext: "&7pagina successiva ([page]) »"
 # Divisore di sezione nella pagina iniziale sopra le righe di teletrasporto (vista giocatore).
 menuFrontPageSectionTeleport: "&8--- &7teletrasporto &8---"
 # Righe della pagina iniziale. Nessun segnaposto.
-menuFrontPageRowTeleport: "&a▶ /rtp &7- teletrasportati in una posizione casuale"
-menuFrontPageRowRegion: "&a▶ /rtp region:&7... &7- scegli una regione"
-menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- scegli un mondo"
-menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- scegli un bioma"
-menuFrontPageRowHelp: "&a▶ /rtp help &7- elenca i comandi"
+menuFrontPageRowTeleport: "&2▶ /rtp &7- teletrasportati in una posizione casuale"
+menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- scegli una regione"
+menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- scegli un mondo"
+menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- scegli un bioma"
+menuFrontPageRowHelp: "&2▶ /rtp help &7- elenca i comandi"
 # Front-page admin entry row: the only inline
 # admin-visible row on the front page; click descends into the curated admin
 # panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
@@ -376,12 +376,12 @@ menuPrefabConfirmTitle: "#9D7CD8&l⚙ confirm prefab: #5FB3B3[prefab]"
 # Confirmation menu non-clickable hint row below the title. No placeholders.
 menuPrefabConfirmHint: "&7review the changes below, then click confirm or cancel"
 # Confirmation menu footer row: confirm and write the prefab to disk.
-menuPrefabConfirmRow: "&a&l[confirm]"
+menuPrefabConfirmRow: "&2&l[confirm]"
 # Confirmation menu footer row: cancel and return to the admin panel.
 menuPrefabCancelRow: "&c&l[cancel]"
 # Clickable row label for the Refresh affordance at the bottom of the /rtp info
 # book. Re-renders the current scope against a fresh metrics snapshot.
-infoBookRefreshRow: "&a[Refresh]"
+infoBookRefreshRow: "&2[Refresh]"
 # Hover text for the info-book refresh row.
 infoBookRefreshHover: "&7Re-render this page against a fresh metrics snapshot."
 # Clickable row label for the Switch-to-chat affordance at the bottom of the
@@ -437,7 +437,7 @@ configPendingRowFormat: "&9[key]&8 = &0[value]"
 configPendingRowHover: "click to unstage"
 # Clickable label for the "apply staged changes" row on a config-file page.
 # Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
-configApplyRow: "&a&l[apply]"
+configApplyRow: "&2&l[apply]"
 # Clickable label for the "discard staged changes" row on a config-file page.
 # Clears the cart without applying.
 configDiscardRow: "&c&l[discard]"
@@ -525,7 +525,7 @@ multiconfigToggleRemoveModeOff: "&8[ ] remove mode"
 # Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
 multiconfigToggleRemoveModeOn: "&c[x] remove mode (click an entry to delete)"
 # Selector row label for the "+ Add new..." entry. No placeholders.
-multiconfigRowAdd: "&a+ add new..."
+multiconfigRowAdd: "&2+ add new..."
 # Hover text for the Add row. Placeholder: [name] - prefilled default name.
 multiconfigRowAddHover: "&7type a name in the anvil prompt; prefilled: &f[name]"
 # Hover text for an entry row in normal mode. Placeholder: [name].
@@ -537,7 +537,7 @@ multiconfigConfirmTitle: "&c&ldelete [name]?"
 # Confirm-delete page Yes-row label. No placeholders.
 multiconfigConfirmYes: "&c&l[confirm delete]"
 # Confirm-delete page Cancel-row label. No placeholders.
-multiconfigConfirmNo: "&a&l[cancel]"
+multiconfigConfirmNo: "&2&l[cancel]"
 # Hover text on a locked (grayed) default-region row. No placeholders.
 multiconfigLockRegionDefault: "&7the default region cannot be removed"
 # Hover text on a locked (grayed) world row. Placeholder: [name].

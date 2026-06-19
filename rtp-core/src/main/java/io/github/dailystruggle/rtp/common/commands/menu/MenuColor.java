@@ -1,6 +1,9 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
 import io.github.dailystruggle.mapsapi.BiomeColorSource;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 
 import java.util.Map;
 
@@ -73,6 +76,44 @@ public final class MenuColor {
      */
     public static String regionColorPrefix(String region) {
         return weightedBiomeColorPrefix(BiomeMenuSource.biomeWeightsForRegion(region));
+    }
+
+    /**
+     * Returns the legacy color prefix for a <em>world destination row</em>,
+     * colored by the region that a {@code /rtp world:<world>} would actually
+     * teleport into rather than by the world's own biome average. A top-level
+     * {@code world:<w>} resolves its region from world {@code w}'s configured
+     * {@link WorldKeys#region} redirect (ADR-065 amendment), so the menu row
+     * is tinted to match the region the player will land in. This keeps the
+     * world picker consistent with the region picker (selecting a world and
+     * selecting the region it points at read as the same color) and avoids the
+     * cold-data "world reads black while region reads green" mismatch, since an
+     * unobserved resolved region falls back to {@code "&2"} via
+     * {@link #regionColorPrefix(String)}. Never {@code null}.
+     *
+     * <p>If the world points at a region that itself targets a different world
+     * (a temporary world-override region a careless admin may have wired up),
+     * the color still follows the resolved region by name, so it reflects where
+     * the teleport lands.
+     *
+     * @param world world name (as returned by {@code RTPWorld.name()})
+     */
+    public static String worldRegionColorPrefix(String world) {
+        String regionName = "default";
+        try {
+            ConfigParser<WorldKeys> worldParser =
+                    RTP.configs == null ? null : RTP.configs.getWorldParser(world);
+            if (worldParser != null) {
+                Object r = worldParser.getConfigValue(WorldKeys.region, "default");
+                if (r != null && !r.toString().isEmpty()) {
+                    regionName = r.toString();
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // Cold or mid-reload config state: fall back to the default region,
+            // which regionColorPrefix renders as a parchment-safe green.
+        }
+        return regionColorPrefix(regionName);
     }
 
     /**

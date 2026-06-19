@@ -270,7 +270,7 @@ menuHoverGraniceZastepcze: "akceptowane: [values]"
 menuWstecz: "&7« back"
 # Szablon etykiety wiersza "wykonaj zlozona komende" dodawanego na poczatku kazdej
 # uruchamialnej, nie-glownej strony menu. Zmienna: [command] - zlozone wywolanie /rtp ...
-menuWykonaj: "&a▶ run [command]"
+menuWykonaj: "&2▶ run [command]"
 # Wiersz naglowka na gorze podstrony wyboru wartosci parametru (Etap A.2).
 # Zmienne: [param] - nazwa parametru; [command] - zlozone wywolanie /rtp ...
 menuWybierzWartosc: "&7wybierz wartość dla [param] (uruchomi: /rtp [command] [param]:<value>)"
@@ -296,11 +296,11 @@ menuStronaNastepna: "&7next page ([page]) »"
 # Separator sekcji na stronie glownej nad wierszami teleportacji (widok gracza).
 menuStronaGlownaSekcjaTeleport: "&8--- &7teleport &8---"
 # Front-page rows. No placeholders.
-menuStronaGlownaWierszTeleport: "&a▶ /rtp &7- teleport to a random location"
-menuStronaGlownaWierszRegion: "&a▶ /rtp region:&7... &7- pick a region"
-menuFrontPageRowWorld: "&a▶ /rtp world:&7... &7- wybierz świat"
-menuStronaGlownaWierszBiom: "&a▶ /rtp biome:&7... &7- wybierz biom"
-menuStronaGlownaWierszPomoc: "&a▶ /rtp help &7- list commands"
+menuStronaGlownaWierszTeleport: "&2▶ /rtp &7- teleport to a random location"
+menuStronaGlownaWierszRegion: "&2▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- wybierz świat"
+menuStronaGlownaWierszBiom: "&2▶ /rtp biome:&7... &7- wybierz biom"
+menuStronaGlownaWierszPomoc: "&2▶ /rtp help &7- list commands"
 # Front-page admin entry row: the only inline
 # admin-visible row on the front page; click descends into the curated admin
 # panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
@@ -381,12 +381,12 @@ menuPrefabPotwierdzTytul: "#9D7CD8&l⚙ confirm prefab: #5FB3B3[prefab]"
 # Nieklikalny wiersz podpowiedzi menu potwierdzenia pod tytulem. Brak zmiennych.
 menuPrefabPotwierdzWskazowka: "&7przejrzyj zmiany poniżej, a następnie kliknij potwierdź lub anuluj"
 # Wiersz stopki menu potwierdzenia: potwierdz i zapisz prefab na dysk.
-menuPrefabPotwierdzWiersz: "&a&l[confirm]"
+menuPrefabPotwierdzWiersz: "&2&l[confirm]"
 # Wiersz stopki menu potwierdzenia: anuluj i wroc do panelu admina.
 menuPrefabAnulujWiersz: "&c&l[cancel]"
 # Etykieta klikalnego wiersza opcji Odswiez na dole ksiazki /rtp info.
 # Renderuje ponownie biezacy zakres na podstawie swiezego zrzutu metryk.
-infoKsiazkaOdswiezWiersz: "&a[Refresh]"
+infoKsiazkaOdswiezWiersz: "&2[Refresh]"
 # Tekst podpowiedzi dla wiersza odswiezania ksiazki info.
 infoKsiazkaOdswiezHover: "&7Ponownie wyrenderuj tę stronę na podstawie świeżej migawki metryk."
 # Etykieta klikalnego wiersza opcji Przelacz na czat na dole ksiazki
@@ -444,7 +444,7 @@ konfigOczekujaceWierszFormat: "&9[key]&8 = &0[value]"
 konfigOczekujaceWierszHover: "kliknij, aby wycofać"
 # Klikalna etykieta wiersza "zastosuj przygotowane zmiany" na stronie konfiguracji.
 # Uruchamia zlozona komende /rtp config <file> k1=v1 ... i czysci koszyk.
-konfigZastosujWiersz: "&a&l[apply]"
+konfigZastosujWiersz: "&2&l[apply]"
 # Klikalna etykieta wiersza "odrzuc przygotowane zmiany" na stronie konfiguracji.
 # Czysci koszyk bez zastosowania.
 konfigOdrzucWiersz: "&c&l[discard]"
@@ -531,7 +531,7 @@ multikonfigTrybUsuwaniaWyl: "&8[ ] tryb usuwania"
 # Etykieta wiersza przelacznika, gdy tryb usuwania jest WLACZONY. Klikniecia w wiersze wpisow usuwaja.
 multikonfigTrybUsuwaniaWl: "&c[x] tryb usuwania (kliknij wpis, aby usunąć)"
 # Etykieta wiersza wyboru dla wpisu "+ Dodaj nowy...". Brak zmiennych.
-multikonfigWierszDodaj: "&a+ dodaj nowy..."
+multikonfigWierszDodaj: "&2+ dodaj nowy..."
 # Tekst podpowiedzi dla wiersza Dodaj. Zmienna: [name] - wstepnie wypelniona domyslna nazwa.
 multikonfigWierszDodajHover: "&7wpisz nazwę w oknie kowadła; wstępnie wypełnione: &f[name]"
 # Tekst podpowiedzi dla wiersza wpisu w trybie normalnym. Zmienna: [name].
@@ -543,7 +543,7 @@ multikonfigPotwierdzTytul: "&c&lusunąć [name]?"
 # Etykieta wiersza Tak na stronie potwierdzenia usuniecia. Brak zmiennych.
 multikonfigPotwierdzTak: "&c&l[confirm delete]"
 # Etykieta wiersza Anuluj na stronie potwierdzenia usuniecia. Brak zmiennych.
-multikonfigPotwierdzNie: "&a&l[cancel]"
+multikonfigPotwierdzNie: "&2&l[cancel]"
 # Tekst podpowiedzi na zablokowanym (wyszarzonym) wierszu regionu domyslnego. Brak zmiennych.
 multikonfigBlokadaRegionDomyslny: "&7domyślnego regionu nie można usunąć"
 # Tekst podpowiedzi na zablokowanym (wyszarzonym) wierszu swiata. Zmienna: [name].
