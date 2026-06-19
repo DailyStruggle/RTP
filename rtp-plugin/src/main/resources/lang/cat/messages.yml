@@ -141,7 +141,7 @@ sniff_bar: "Sniffing [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_lan
 # Section 7: Info (Meow) Command
 # ###############################################################################
 # info command output
-meow_title: "&a&l/rtp info"
+meow_title: "&2&l/rtp info"
 paw_tickets: "&7Global active kibble tickets: #7E9CC8[tickets]"
 pounces: "&7Active pounce state machines: #7E9CC8[teleports]"
 meows_per_tick: "&7Current plugin meows-per-tick: #7E9CC8[mspt]"

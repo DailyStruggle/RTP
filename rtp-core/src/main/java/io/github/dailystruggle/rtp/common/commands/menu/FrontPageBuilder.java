@@ -114,10 +114,9 @@ public final class FrontPageBuilder {
 
         // Row 1 — instant teleport (always visible; /rtp itself decides
         // whether the caller can teleport).
-        addRow(
+        addParsedRow(
                 lines,
                 lookupMsg(MessagesKeys.menuFrontPageRowTeleport, "🎲 Teleport me now"),
-                null,
                 new MenuAction.RunRtpCommand(new String[0]));
 
         // The player picker rows (region / world / biome) are shown to every
@@ -132,10 +131,9 @@ public final class FrontPageBuilder {
         }
 
         // Help footer — always last, always visible.
-        addRow(
+        addParsedRow(
                 lines,
                 lookupMsg(MessagesKeys.menuFrontPageRowHelp, "❓ Help"),
-                null,
                 new MenuAction.RunRtpCommand(new String[]{"help"}));
 
         MenuPage page = new MenuPage(lines);
@@ -163,33 +161,27 @@ public final class FrontPageBuilder {
         if (regionParam != null
                 && parameterPermissionOk(regionParam, permission)
                 && parameterHasSuggestions(regionParam, viewer)) {
-            addRow(
+            addParsedRow(
                     lines,
-                    cleanPickerRowLabel(
-                            lookupMsg(MessagesKeys.menuFrontPageRowRegion, "🌍 Pick a region")),
-                    null,
+                    lookupMsg(MessagesKeys.menuFrontPageRowRegion, "🌍 Pick a region"),
                     new MenuAction.RunRtpCommand(new String[]{"menu", "region"}));
         }
         CommandParameter worldParam = findParameter(rtpRoot, "world");
         if (worldParam != null
                 && parameterPermissionOk(worldParam, permission)
                 && parameterHasSuggestions(worldParam, viewer)) {
-            addRow(
+            addParsedRow(
                     lines,
-                    cleanPickerRowLabel(
-                            lookupMsg(MessagesKeys.menuFrontPageRowWorld, "🌐 Pick a world")),
-                    null,
+                    lookupMsg(MessagesKeys.menuFrontPageRowWorld, "🌐 Pick a world"),
                     new MenuAction.RunRtpCommand(new String[]{"menu", "world"}));
         }
         CommandParameter biomeParam = findParameter(rtpRoot, "biome");
         if (biomeParam != null
                 && parameterPermissionOk(biomeParam, permission)
                 && parameterHasSuggestions(biomeParam, viewer)) {
-            addRow(
+            addParsedRow(
                     lines,
-                    cleanPickerRowLabel(
-                            lookupMsg(MessagesKeys.menuFrontPageRowBiome, "🌳 Pick a biome")),
-                    null,
+                    lookupMsg(MessagesKeys.menuFrontPageRowBiome, "🌳 Pick a biome"),
                     new MenuAction.RunRtpCommand(new String[]{"menu", "biome"}));
         }
     }
@@ -208,39 +200,86 @@ public final class FrontPageBuilder {
      * keeps the front page uniform between admin and non-admin viewers.
      */
     private void appendAdminRows(List<MenuLine> lines) {
-        addRow(
-                lines,
-                lookupMsg(MessagesKeys.menuFrontPageRowAdmin, "&6⚙ Admin panel"),
-                lookupMsg(
-                        MessagesKeys.menuFrontPageHoverAdmin,
-                        "Operator tools: config, scans, diagnostics, reload."),
-                new MenuAction.OpenAdminPanel());
+        String[] labelHover = splitRowLabel(
+                lookupMsg(MessagesKeys.menuFrontPageRowAdmin, "&6⚙ Admin panel"));
+        // Prefer the dedicated admin hover message; fall back to the
+        // description parsed out of the row label.
+        String hover = lookupMsg(
+                MessagesKeys.menuFrontPageHoverAdmin,
+                "Operator tools: config, scans, diagnostics, reload.");
+        if (hover == null || hover.isEmpty()) hover = labelHover[1];
+        addRow(lines, labelHover[0], hover, new MenuAction.OpenAdminPanel());
     }
 
     // ---- helpers ----------------------------------------------------------
 
     /**
-     * Strips the embedded command echo from a destination picker row label.
-     * The shipped {@code menuFrontPageRow{Region,World,Biome}} messages are
-     * shaped like {@code "&a▶ /rtp region:&7... &7- pick a region"} - a relic of
-     * when these rows assembled a command. The rows now run a dedicated
-     * {@code /rtp menu region|world|biome} selection menu, so the mid-section
-     * {@code /rtp region:...} echo is misleading. This keeps the leading
-     * color/icon prefix (everything before {@code /rtp}) and the human
-     * description after the last {@code "- "}, dropping the command echo.
-     * Labels without a {@code /rtp} echo (cleaner translations) pass through
-     * unchanged.
+     * Splits a curated front-page row message into a clean clickable label
+     * and a hover tooltip. The shipped {@code menuFrontPageRow*} messages
+     * embed the human explanation as a trailing gray {@code "- <description>"}
+     * run and, for the picker rows, a {@code "command:&7..."} placeholder echo
+     * (e.g. {@code "&2▶ /rtp region:&7... &7- pick a region"}). Rendering both
+     * inline turns the row text into gray clutter; the explanation belongs in
+     * the hover tooltip instead. Returns {@code {label, hover}}; {@code hover}
+     * is {@code null} when the message carries no {@code "- "} description
+     * separator (cleaner translations pass through with the whole message as
+     * the label).
      */
-    static String cleanPickerRowLabel(String raw) {
-        if (raw == null) return null;
-        int rtpIdx = raw.indexOf("/rtp");
-        if (rtpIdx < 0) return raw;
+    static String[] splitRowLabel(String raw) {
+        if (raw == null) return new String[]{null, null};
+        String label = raw;
+        String hover = null;
         int dashIdx = raw.lastIndexOf("- ");
-        if (dashIdx < 0 || dashIdx + 2 > raw.length()) return raw;
-        String prefix = raw.substring(0, rtpIdx).trim();
-        String description = raw.substring(dashIdx + 2).trim();
-        if (description.isEmpty()) return raw;
-        return prefix.isEmpty() ? description : prefix + " " + description;
+        if (dashIdx >= 0 && dashIdx + 2 <= raw.length()) {
+            String desc = raw.substring(dashIdx + 2).trim();
+            if (!desc.isEmpty()) {
+                hover = desc;
+                label = raw.substring(0, dashIdx);
+            }
+        }
+        // Drop the "command:&7..." placeholder echo from the picker labels.
+        label = label.replaceAll(":(?:&[0-9A-Fa-fK-Ok-or]|#[0-9A-Fa-f]{6})*\\.\\.\\.", "");
+        // Strip any color code / whitespace left dangling at the end by the split.
+        label = stripTrailingFormatting(label);
+        if (label.isEmpty()) label = raw;
+        return new String[]{label, hover};
+    }
+
+    /**
+     * Removes trailing whitespace and any trailing legacy ({@code &x}) or hex
+     * ({@code #rrggbb}) color codes from {@code s}, repeating until neither is
+     * present. Used to tidy a label after its description suffix is split off.
+     */
+    private static String stripTrailingFormatting(String s) {
+        String t = s == null ? "" : s;
+        while (true) {
+            String trimmed = t.stripTrailing();
+            if (trimmed.length() >= 2
+                    && trimmed.charAt(trimmed.length() - 2) == '&') {
+                t = trimmed.substring(0, trimmed.length() - 2);
+                continue;
+            }
+            if (trimmed.length() >= 7
+                    && trimmed.charAt(trimmed.length() - 7) == '#') {
+                String tail = trimmed.substring(trimmed.length() - 6);
+                boolean hex = tail.chars().allMatch(c -> Character.digit(c, 16) >= 0);
+                if (hex) {
+                    t = trimmed.substring(0, trimmed.length() - 7);
+                    continue;
+                }
+            }
+            return trimmed;
+        }
+    }
+
+    /**
+     * Adds a row whose {@code raw} message may embed a trailing gray
+     * description; the description is parsed out via {@link #splitRowLabel}
+     * and attached as the fragment's hover instead of being rendered inline.
+     */
+    private static void addParsedRow(List<MenuLine> lines, String raw, MenuAction action) {
+        String[] labelHover = splitRowLabel(raw);
+        addRow(lines, labelHover[0], labelHover[1], action);
     }
 
     private static void addRow(List<MenuLine> lines, String label, String hover, MenuAction action) {

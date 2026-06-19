@@ -132,7 +132,7 @@ scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_l
 # Section 7: Info Command
 # ###############################################################################
 # messages related to the info command
-заголовокИнфо: "&a&l/rtp info"
+заголовокИнфо: "&2&l/rtp info"
 инфоТикеты: "&7Активные тикеты чанков (глобально): #7E9CC8[tickets]"
 инфоТелепорты: ""
 инфоMSPT: ""

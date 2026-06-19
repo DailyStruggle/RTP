@@ -77,6 +77,40 @@ public final class UsageCapTracker {
     if (id != null) windows.remove(id);
   }
 
+  /**
+   * Snapshot the player's current rolling window for persistence.
+   *
+   * @param id player id
+   * @return a {@code {count, start}} pair, or {@code null} when the player has no
+   *     open window
+   */
+  public synchronized long[] snapshot(UUID id) {
+    if (id == null) return null;
+    Window w = windows.get(id);
+    if (w == null) return null;
+    return new long[] {w.count, w.start};
+  }
+
+  /**
+   * Restore a previously-persisted rolling window for the player. A
+   * non-positive {@code count} is treated as "no window" and clears any existing
+   * entry, so a persisted cleared marker round-trips cleanly.
+   *
+   * @param id    player id
+   * @param count the persisted use count within the window
+   * @param start the persisted window-start epoch milliseconds
+   */
+  public synchronized void restore(UUID id, long count, long start) {
+    if (id == null) return;
+    if (count <= 0) {
+      windows.remove(id);
+      return;
+    }
+    Window w = windows.computeIfAbsent(id, k -> new Window());
+    w.count = count;
+    w.start = start;
+  }
+
   /** Clear all recorded usage (e.g. on plugin reload/shutdown). */
   public synchronized void clear() {
     windows.clear();

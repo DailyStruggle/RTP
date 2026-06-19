@@ -309,7 +309,7 @@ public class RTP {
             if (cap > 0) {
               long resetMillis =
                   cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
-              if (getInstance().usageCaps.isLocked(
+              if (getInstance().teleportLimitStore.isLocked(
                   uuid, cap, resetMillis, System.currentTimeMillis())) {
                 future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
                     io.github.dailystruggle.rtp.api.RTPResult.Reason.LOCKED,
@@ -795,6 +795,14 @@ public class RTP {
    */
   public final io.github.dailystruggle.rtp.common.playerData.UsageCapTracker usageCaps =
       new io.github.dailystruggle.rtp.common.playerData.UsageCapTracker();
+  /**
+   * Teleport-limit guard seam (ADR-068). Fronts the usage cap above and adds
+   * best-effort local persistence of the rolling window so it survives a
+   * restart (parity with the already-persisted cooldown). The cross-server
+   * durable/proxy layers of ADR-068 slot in behind this same field.
+   */
+  public final io.github.dailystruggle.rtp.common.playerData.TeleportLimitStore teleportLimitStore =
+      new io.github.dailystruggle.rtp.common.playerData.LocalTeleportLimitStore(usageCaps, true);
   public final ConcurrentSkipListSet<UUID> processingPlayers = new ConcurrentSkipListSet<>();
   public RTPTaskPipe miscSyncTasks;
   public RTPTaskPipe miscAsyncTasks;

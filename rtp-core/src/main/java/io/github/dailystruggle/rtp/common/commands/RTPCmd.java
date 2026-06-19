@@ -262,7 +262,7 @@ public interface RTPCmd extends BaseRTPCmd {
         if (cap > 0) {
           long resetMillis =
                   cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
-          if (RTP.getInstance().usageCaps.isLocked(
+          if (RTP.getInstance().teleportLimitStore.isLocked(
                   senderId, cap, resetMillis, System.currentTimeMillis())) {
             ConfigParser<MessagesKeys> langParser =
                     (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);

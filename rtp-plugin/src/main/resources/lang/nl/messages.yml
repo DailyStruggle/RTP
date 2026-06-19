@@ -125,7 +125,7 @@ scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_l
 # ###############################################################################
 # Sectie 7: Info-opdracht
 # ###############################################################################
-titelInfo: "&a&l/rtp info"
+titelInfo: "&2&l/rtp info"
 infoTickets: "&7Actieve globale chunk-tickets: #7E9CC8[tickets]"
 infoTeletransports: "&7Actieve teletransport-toestandsmachines: #7E9CC8[teleports]"
 infoMSPT: "&7Huidige plugin MSPT: #7E9CC8[mspt]"
