@@ -139,7 +139,7 @@ scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_l
 # Section 7: Info Command
 # ###############################################################################
 # messages related to the info command
-infoTitle: "&a&l/rtp info"
+infoTitle: "&2&l/rtp info"
 infoTickets: "&7Tickets de chunks actifs globaux : #7E9CC8[tickets]"
 infoTeleports: "&7Active Teleport State Machines: #7E9CC8[teleports]"
 infoMSPT: "&7MSPT actuel du plugin : #7E9CC8[mspt]"

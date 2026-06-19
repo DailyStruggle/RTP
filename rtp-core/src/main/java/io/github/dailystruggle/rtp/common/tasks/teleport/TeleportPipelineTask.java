@@ -782,7 +782,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
                 // BetterRTP LockAfter parity: count this successful use toward the
                 // per-player cap. No-op while lockAfterUses <= 0.
                 if (ConfigCache.lockAfterUses > 0) {
-                  RTP.getInstance().usageCaps.recordSuccess(playerId,
+                  RTP.getInstance().teleportLimitStore.recordSuccess(playerId,
                       ConfigCache.lockAfterUses, ConfigCache.lockAfterResetMillis,
                       System.currentTimeMillis());
                 }

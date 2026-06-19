@@ -228,6 +228,37 @@ final class FrontPageBuilderTest {
     }
 
     // ------------------------------------------------------------------------
+    // Label / hover split (gray explanation belongs in hover, not row text)
+    // ------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("splitRowLabel: trailing gray '- description' moves to hover, label cleaned")
+    void splitRowLabel_movesDescriptionToHover() {
+        String[] lh = FrontPageBuilder.splitRowLabel(
+                "&2▶ /rtp &7- teleport to a random location");
+        org.junit.jupiter.api.Assertions.assertEquals("&2▶ /rtp", lh[0]);
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "teleport to a random location", lh[1]);
+    }
+
+    @Test
+    @DisplayName("splitRowLabel: picker row drops the 'command:&7...' echo and hovers the description")
+    void splitRowLabel_stripsPickerEcho() {
+        String[] lh = FrontPageBuilder.splitRowLabel(
+                "&2▶ /rtp region:&7... &7- pick a region");
+        org.junit.jupiter.api.Assertions.assertEquals("&2▶ /rtp region", lh[0]);
+        org.junit.jupiter.api.Assertions.assertEquals("pick a region", lh[1]);
+    }
+
+    @Test
+    @DisplayName("splitRowLabel: clean label with no '- ' separator passes through, hover null")
+    void splitRowLabel_passThroughWhenNoSeparator() {
+        String[] lh = FrontPageBuilder.splitRowLabel("🎲 Teleport me now");
+        org.junit.jupiter.api.Assertions.assertEquals("🎲 Teleport me now", lh[0]);
+        assertNull(lh[1]);
+    }
+
+    // ------------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------------
 

@@ -126,7 +126,7 @@ scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_l
 # ###############################################################################
 # Seção 7: Comando Info
 # ###############################################################################
-tituloInfo: "&a&l/rtp info"
+tituloInfo: "&2&l/rtp info"
 infoTickets: "&7Tickets de chunk ativos globais: #7E9CC8[tickets]"
 # infoTeletransportes: deduplicado com infoPendingTeleports no bloco Health (esvaziado por compatibilidade com sobrescritas de locale).
 infoTeletransportes: ""
