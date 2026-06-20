@@ -45,7 +45,7 @@ niebezpieczny: "&7[P0] ⌖ nie udało się znaleźć bezpiecznego miejsca w cią
 wiadomoscOdnowienia: "&7[P0] ⚡ Nie możesz teleportować się ponownie przez [remainingCooldown]"
 
 # when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
-lockedAfterUses: "&7[P0] ⌖ Osiągnąłeś limit losowych teleportacji. Spróbuj ponownie później."
+lockedAfterUses: "&7[P0] ⌖ Osiągnąłeś limit losowych teleportacji. Spróbuj ponownie za [remainingLockTime]."
 
 # gdy region nie ma żadnych lokalizacji w kolejce, a gracz nie posiada uprawnienia rtp.unqueued
 brakLokalizacjiWKolejce: "#f5eb73[P0] ⌖ brak gotowych lokalizacji w tej chwili"

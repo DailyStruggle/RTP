@@ -273,6 +273,46 @@ public class PlaceholderProvider {
                     return "C";
                 });
         placeholders.put(
+                "remainingLockTime",
+                uuid -> {
+                    if (RTP.getInstance() == null) return "";
+                    ConfigParser<ConfigKeys> cfg =
+                            (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+                    if (cfg == null) return "";
+                    long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
+                    long resetMillis =
+                            cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
+                    long remainingTime = RTP.getInstance().teleportLimitStore.millisUntilReset(
+                            uuid, cap, resetMillis, System.currentTimeMillis());
+                    if (remainingTime <= 0) return "";
+
+                    ConfigParser<MessagesKeys> langParser =
+                            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+                    long days = TimeUnit.MILLISECONDS.toDays(remainingTime);
+                    long hours = TimeUnit.MILLISECONDS.toHours(remainingTime) % 24;
+                    long minutes = TimeUnit.MILLISECONDS.toMinutes(remainingTime) % 60;
+                    long seconds = TimeUnit.MILLISECONDS.toSeconds(remainingTime) % 60;
+
+                    String replacement = "";
+                    if (days > 0)
+                        replacement +=
+                                days + langParser.getConfigValue(MessagesKeys.days, "").toString() + " ";
+                    if (hours > 0)
+                        replacement +=
+                                hours + langParser.getConfigValue(MessagesKeys.hours, "").toString() + " ";
+                    if (minutes > 0)
+                        replacement +=
+                                minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
+                    if (seconds > 0)
+                        replacement +=
+                                seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
+                    // Sub-second remainder: show at least "1s" so the clock is never blank
+                    // while the player is still locked.
+                    if (replacement.isEmpty())
+                        replacement = "1" + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
+                    return replacement.trim();
+                });
+        placeholders.put(
                 "queueLocation",
                 uuid -> {
                     if (RTP.getInstance() == null) return "0";

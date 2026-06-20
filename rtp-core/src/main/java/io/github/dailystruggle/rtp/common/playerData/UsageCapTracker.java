@@ -72,6 +72,26 @@ public final class UsageCapTracker {
     w.count++;
   }
 
+  /**
+   * Milliseconds remaining until the player's current rolling window resets.
+   *
+   * @param id          player id
+   * @param cap         the configured usage cap ({@code <= 0} disables the feature)
+   * @param resetMillis the rolling window length in milliseconds ({@code <= 0}
+   *                    means the window never resets)
+   * @param now         current epoch milliseconds
+   * @return the milliseconds left on the clock, or {@code 0} when the feature is
+   *     disabled, the window never resets, the player has no open window, or the
+   *     window has already elapsed
+   */
+  public synchronized long millisUntilReset(UUID id, long cap, long resetMillis, long now) {
+    if (cap <= 0 || resetMillis <= 0 || id == null) return 0L;
+    Window w = windows.get(id);
+    if (w == null) return 0L;
+    long remaining = (w.start + resetMillis) - now;
+    return remaining > 0 ? remaining : 0L;
+  }
+
   /** Clear the recorded usage for a single player (e.g. on an admin reset). */
   public synchronized void reset(UUID id) {
     if (id != null) windows.remove(id);

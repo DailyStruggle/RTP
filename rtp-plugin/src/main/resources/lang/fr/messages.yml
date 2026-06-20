@@ -42,7 +42,7 @@ unsafe: "&7[P0] ⌖ impossible de trouver un emplacement sûr en [attempts] tent
 cooldownMessage: "&7[P0] ⚡ Vous ne pouvez pas vous téléporter avant [remainingCooldown]"
 
 # when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
-lockedAfterUses: "&7[P0] ⌖ Vous avez atteint votre limite de téléportation aléatoire. Réessayez plus tard."
+lockedAfterUses: "&7[P0] ⌖ Vous avez atteint votre limite de téléportation aléatoire. Réessayez dans [remainingLockTime]."
 
 # si la région n'a aucun emplacement en file et que le joueur n'a pas la permission rtp.unqueued
 noLocationsQueued: "#f5eb73[P0] ⌖ aucun emplacement prêt pour le moment"

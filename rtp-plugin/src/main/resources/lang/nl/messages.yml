@@ -37,7 +37,7 @@ onveilig: "&7[P0] ⌖ geen veilige locatie gevonden in [attempts] pogingen"
 wachttijdBericht: "&7[P0] ⚡ Je kunt pas weer teletransporteren over [remainingCooldown]"
 
 # when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
-lockedAfterUses: "&7[P0] ⌖ Je hebt je limiet voor willekeurige teleportatie bereikt. Probeer het later opnieuw."
+lockedAfterUses: "&7[P0] ⌖ Je hebt je limiet voor willekeurige teleportatie bereikt. Probeer het over [remainingLockTime] opnieuw."
 
 # als de regio geen locaties in de wachtrij heeft en de speler geen rtp.unqueued-permissie heeft
 geenLocatiesInWachtrij: "#f5eb73[P0] ⌖ er zijn momenteel geen locaties beschikbaar"
@@ -130,41 +130,41 @@ infoTickets: "&7Actieve globale chunk-tickets: #7E9CC8[tickets]"
 infoTeletransports: "&7Actieve teletransport-toestandsmachines: #7E9CC8[teleports]"
 infoMSPT: "&7Huidige plugin MSPT: #7E9CC8[mspt]"
 infoTotaalLadingen: "&7Levenslange geladen chunks: #7E9CC8[loads]"
-infoLoadsByOrigin: "&7Loads by Origin: #7E9CC8[loadsByOrigin]"
+infoLoadsByOrigin: "&7Laadbeurten per oorsprong: #7E9CC8[loadsByOrigin]"
 infoLekSnelheid: "&7Huidige chunk-leksnelheid: #7E9CC8[leakRate]"
 # --- Metrics SPI health block ---
-infoQueueDepth: "&7Players Waiting In Region Queues: #7E9CC8[queueDepth]"
-infoPendingTeleports: "&7Pending Teleport Pipelines: #7E9CC8[pendingTeleports]"
-infoAvgPipelineMs: "&7Avg Pipeline Latency: #7E9CC8[avgPipelineMs] ms"
+infoQueueDepth: "&7Spelers in wachtrij van regio's: #7E9CC8[queueDepth]"
+infoPendingTeleports: "&7Wachtende teleportpijplijnen: #7E9CC8[pendingTeleports]"
+infoAvgPipelineMs: "&7Gemiddelde pijplijnlatentie: #7E9CC8[avgPipelineMs] ms"
 # Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
-infoPipelinePercentiles: "&7Pipeline Latency (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
+infoPipelinePercentiles: "&7Pijplijnlatentie (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
 # Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
-infoSlowPipeline: "&7Slow Teleports (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
+infoSlowPipeline: "&7Trage teleports (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
 # Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
-infoQueueGrowth: "&7Queue-Growth Warnings (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
-infoHeap: "&7JVM Heap: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
+infoQueueGrowth: "&7Waarschuwingen wachtrijgroei (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
+infoHeap: "&7JVM-heap: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # Koptekstregel voor het Health-pipeline-blok in /rtp info.
-infoHealthPipelineHeader: "&7--- Health: pipeline ---"
+infoHealthPipelineHeader: "&7--- Status: pijplijn ---"
 # TPS-uitlezing voor de 1m / 5m / 15m-vensters. Placeholders: [tps1m] [tps5m] [tps15m].
 infoTps: "&7TPS (1m/5m/15m): #7E9CC8[tps1m] / [tps5m] / [tps15m]"
 # Live server-MSPT en tick-budgetbenutting. Placeholders: [mspt] [tickBudgetUtilisation].
-infoMSPTLive: "&7Server MSPT: #7E9CC8[mspt] ms (&7tick budget: #7E9CC8[tickBudgetUtilisation]&7)"
+infoMSPTLive: "&7Server-MSPT: #7E9CC8[mspt] ms (&7tickbudget: #7E9CC8[tickBudgetUtilisation]&7)"
 # Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
-infoSoftCap: "&7Players: #7E9CC8[playerCount] / [softCap]"
+infoSoftCap: "&7Spelers: #7E9CC8[playerCount] / [softCap]"
 # Meest recente database round-trip-latentie in ms. Placeholder: [databaseLatencyMs].
-infoDatabaseLatencyMs: "&7Database Latency: #7E9CC8[databaseLatencyMs] ms"
+infoDatabaseLatencyMs: "&7Databaselatentie: #7E9CC8[databaseLatencyMs] ms"
 # Generation outcome metrics (ADR-052), sourced from the process-global RtpOutcomeStats.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
-infoFailureRate: "&7Generation Success: #7E9CC8[genSuccessRate]&7 (fail #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
+infoFailureRate: "&7Generatiesucces: #7E9CC8[genSuccessRate]&7 (mislukt #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
 # Single most common rejection cause and its share of all failures. Placeholders:
 # [genTopRejectionCause] [genTopRejectionShare].
-infoTopRejectionCause: "&7Top Rejection Cause: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
+infoTopRejectionCause: "&7Voornaamste afwijzingsoorzaak: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
 # Per-cause rejection breakdown (the analogue of a competitor's /rtp unsafe-stats).
 # Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
-infoFailureBreakdown: "&7Rejections by Cause: #7E9CC8[genFailureBreakdown]"
+infoFailureBreakdown: "&7Afwijzingen per oorzaak: #7E9CC8[genFailureBreakdown]"
 # Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
 # to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&7/&c.
 infoThresholdTpsGreen: 19.5
@@ -175,7 +175,7 @@ infoThresholdCacheFillGreen: 0.5
 infoThresholdCacheFillYellow: 0.25
 infoThresholdNetworkAgeYellow: 5.0
 # Header line introducing the per-Folia-region table (Folia runtime only).
-infoFoliaRegionsHeader: "&7--- Folia regions ---"
+infoFoliaRegionsHeader: "&7--- Folia-regio's ---"
 # Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
 infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
@@ -190,33 +190,33 @@ infoRegio: "#52B2BF[region]"
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
-infoBiomeActivityHeader: "&8--- &3Biome occupancy &8(&3[biomeTotalSamples]&8 samples, &3[biomeDistinctCount]&8 biomes) ---"
+infoBiomeActivityHeader: "&8--- &3Bioombezetting &8(&3[biomeTotalSamples]&8 monsters, &3[biomeDistinctCount]&8 biomen) ---"
 # Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
 infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
 # Shown when no occupancy has been sampled yet.
-infoBiomeActivityEmpty: "&8--- &7no biome occupancy sampled yet &8---"
+infoBiomeActivityEmpty: "&8--- &7nog geen bioombezetting bemonsterd &8---"
 
 # sub-info listings
 # placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
 wereldGegevens:
   - "#21ADA8[world]:"
   - "#99EEBB  - regio: [region]"
-  - "#99EEBB  - toestemmingVereist: [requirePermission]"
+  - "#99EEBB  - vereiste toestemming: [requirePermission]"
   - "#99EEBB  - overschrijven: [override]"
 
 regioGegevens:
   - "#52B2BF[region]:"
   - "#58CCED  - wereld: [world]"
   - "#58CCED  - vorm: [shape]"
-  - "#58CCED  - toestemmingVereist: [requirePermission]"
-  - "#58CCED  - wereldgrensOverschrijving: [worldBorderOverride]"
-  - "#58CCED  - cacheCapaciteit: [cacheCap]"
-  - "#58CCED  - behoudCache (L1): [keptCache]"
-  - "#58CCED  - vrijgegevenCache (L2): [unkeptCache]"
-  - "#58CCED  - achterstandCache (L3): [backlogCache] / [backlogCacheCap]"
-  - "#58CCED  - inCache: [cached]"
-  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
-  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
+  - "#58CCED  - vereiste toestemming: [requirePermission]"
+  - "#58CCED  - wereldgrens overschrijven: [worldBorderOverride]"
+  - "#58CCED  - cachelimiet: [cacheCap]"
+  - "#58CCED  - behouden cache (L1): [keptCache]"
+  - "#58CCED  - vrijgegeven cache (L2): [unkeptCache]"
+  - "#58CCED  - backlog-cache (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - in cache: [cached]"
+  - "#58CCED  - geleerde dekking: [memCoveragePct] (slecht: [memBadPct], [memBadCount] cellen)"
+  - "#58CCED  - voornaamste afwijzingsoorzaak: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # Sectie 8: Opdrachtbeschrijvingen
@@ -245,34 +245,34 @@ menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
 menuHoverFallbackType: "type: [type]"
 # Hover-fallback template used by the menu reflector when a parameter exposes a
 # small curated value set. Placeholder: [values] - comma-joined accepted values.
-menuHoverFallbackBounds: "accepted: [values]"
+menuHoverFallbackBounds: "geaccepteerd: [values]"
 # Label for the "go back one level" navigation row prepended to every non-root menu page.
-menuBack: "&7« back"
+menuBack: "&7« terug"
 # Label template for the "execute the assembled command" row prepended to every
 # runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
-menuExecute: "&2▶ run [command]"
+menuExecute: "&2▶ voer [command] uit"
 # Header row at the top of a parameter-value picker sub-page (Stage A.2).
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
-menuPickValue: "&7pick a value for [param] (will run: /rtp [command] [param]:<value>)"
+menuPickValue: "&7kies een waarde voor [param] (voert uit: /rtp [command] [param]:<value>)"
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list.
-menuTypeValue: "&7✎ type a custom value..."
+menuTypeValue: "&7✎ typ een aangepaste waarde..."
 # Non-clickable header row at the top of every non-root menu page (Stage A.4).
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
-menuConstructed: "&7building: #7E9CC8/rtp [command]"
+menuConstructed: "&7bezig met bouwen: #7E9CC8/rtp [command]"
 # Non-clickable title row prepended to the root /rtp menu page (Stage A.5).
 # Provides a welcoming header before the player descends into any subcommand.
-menuRootTitle: "#5FB3B3&l⚡ RTP menu"
+menuRootTitle: "#5FB3B3&l⚡ RTP-menu"
 # Non-clickable subtitle/hint row prepended to the root /rtp menu page below
 # menuRootTitle (Stage A.5). Short orientation text for first-time users.
-menuRootHint: "&7click an option below to begin"
+menuRootHint: "&7klik hieronder op een optie om te beginnen"
 # Navigation rows appended to paginated menu pages (Stage A.6) — clicking
 # them moves to the previous/next page of the same model. Placeholder:
 # [page] - the 1-based human-readable target page number.
-menuPagePrev: "&7« previous page ([page])"
-menuPageNext: "&7next page ([page]) »"
+menuPagePrev: "&7« vorige pagina ([page])"
+menuPageNext: "&7volgende pagina ([page]) »"
 # Section divider on the front page above teleport rows (player view).
 menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
 # Front-page rows. No placeholders.
@@ -280,13 +280,13 @@ menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- kies een wereld"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- kies een biome"
-menuFrontPageRowHelp: "&2▶ /rtp help &7- list commands"
+menuFrontPageRowHelp: "#7A4FB8❓ commando's tonen &7- /rtp help"
 # Front-page admin entry row: the only inline
 # admin-visible row on the front page; click descends into the curated admin
 # panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
-menuFrontPageRowAdmin: "#9D7CD8▶ admin panel &7- operator tools"
+menuFrontPageRowAdmin: "#9D7CD8▶ beheerderspaneel &7- operatorgereedschap"
 # Hover text for the admin-panel entry row. No placeholders.
-menuFrontPageHoverAdmin: "&7operator tools: config, scans, diagnostics, reload"
+menuFrontPageHoverAdmin: "&7operatorgereedschap: config, scans, diagnostiek, herladen"
 # --- Admin panel book page ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
 menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
@@ -299,67 +299,67 @@ menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
 menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
 # Admin-panel rows + hovers. No placeholders.
 menuAdminPanelRowConfig: "&b▶ config editor"
-menuAdminPanelHoverConfig: "&7open the curated config selector"
-menuAdminPanelRowRegions: "#5FB3B3▶ regions"
-menuAdminPanelHoverRegions: "&7add, remove, or edit per-region configs"
+menuAdminPanelHoverConfig: "&7open de samengestelde configuratiekiezer"
+menuAdminPanelRowRegions: "#5FB3B3▶ regio's"
+menuAdminPanelHoverRegions: "&7voeg toe, verwijder of bewerk configuraties per regio"
 menuAdminPanelRowWorlds: "#5FB3B3▶ werelden"
-menuAdminPanelHoverWorlds: "&7add, remove, or edit per-world configs"
-menuAdminPanelRowEffects: "#5FB3B3▶ effects"
-menuAdminPanelHoverEffects: "&7add, remove, or edit per-group teleport effects"
+menuAdminPanelHoverWorlds: "&7voeg toe, verwijder of bewerk configuraties per wereld"
+menuAdminPanelRowEffects: "#5FB3B3▶ effecten"
+menuAdminPanelHoverEffects: "&7voeg toe, verwijder of bewerk teleporteffecten per groep"
 menuAdminPanelRowInfo: "&b▶ server info"
-menuAdminPanelHoverInfo: "&7show plugin version, region counts, and queue state"
-menuAdminPanelRowDiagnostics: "&c▶ full diagnostics"
-menuAdminPanelHoverDiagnostics: "&7runs the full diagnostic suite; may be expensive"
+menuAdminPanelHoverInfo: "&7toon de pluginversie, regio-aantallen en wachtrijstatus"
+menuAdminPanelRowDiagnostics: "&c▶ volledige diagnostiek"
+menuAdminPanelHoverDiagnostics: "&7voert de volledige diagnostische suite uit; kan zwaar zijn"
 menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
-menuAdminPanelHoverMemory: "&7dump active chunk-ticket and pipeline allocations"
+menuAdminPanelHoverMemory: "&7dump actieve chunk-ticket- en pijplijntoewijzingen"
 menuAdminPanelRowScan: "&b▶ scan control"
-menuAdminPanelHoverScan: "&7open the scan submenu (start / pause / cancel)"
-menuAdminPanelRowReload: "&c▶ reload"
-menuAdminPanelHoverReload: "&7reloads all config files; in-flight teleports may be affected"
+menuAdminPanelHoverScan: "&7open het scansubmenu (start / pauzeer / annuleer)"
+menuAdminPanelRowReload: "&c▶ herladen"
+menuAdminPanelHoverReload: "&7herlaadt alle configuratiebestanden; lopende teleports kunnen worden beïnvloed"
 menuAdminPanelRowBrowse: "&b▶ browse all commands"
-menuAdminPanelHoverBrowse: "&7open the reflected /rtp command tree"
-menuAdminPanelRowBack: "&7« back"
+menuAdminPanelHoverBrowse: "&7open de gespiegelde /rtp-commandoboom"
+menuAdminPanelRowBack: "&7« terug"
 # --- Visualizations submenu (admin map of bad locations per region) ---
 # Admin-panel row: open the Visualizations submenu. No placeholders.
-menuAdminPanelRowVisualizations: "#5FB3B3▶ visualizations"
+menuAdminPanelRowVisualizations: "#5FB3B3▶ visualisaties"
 # Hover text for the admin-panel Visualizations row. No placeholders.
-menuAdminPanelHoverVisualizations: "&7open maps and other operator-facing visualizations"
+menuAdminPanelHoverVisualizations: "&7open kaarten en andere visualisaties voor de operator"
 # Section divider above the Visualizations block on the admin panel.
-menuAdminPanelSectionVisualizations: "&8» &7visualizations"
+menuAdminPanelSectionVisualizations: "&8» &7visualisaties"
 # Non-clickable title row at the top of the Visualizations submenu.
-menuVisualizationsTitle: "#9D7CD8&l⌖ visualizations"
+menuVisualizationsTitle: "#9D7CD8&l⌖ visualisaties"
 # Non-clickable hint row below the title.
-menuVisualizationsHint: "&7pick a region to view its bad-locations map"
+menuVisualizationsHint: "&7kies een regio om de kaart met onveilige locaties te bekijken"
 # Visualizations row template; [region] - region name.
-menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- region shape map"
+menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- vormkaart van regio"
 # Hover text for a Visualizations region row; [region] - region name.
-menuVisualizationsHoverRegion: "&7open a map showing bad locations in &b[region]"
+menuVisualizationsHoverRegion: "&7open een kaart met onveilige locaties in &b[region]"
 # Non-clickable hint row shown when no regions are configured.
-menuVisualizationsEmpty: "&7(no regions configured)"
+menuVisualizationsEmpty: "&7(geen regio's geconfigureerd)"
 # Visualizations submenu back row (returns to the admin panel).
-menuVisualizationsRowBack: "&7« back"
+menuVisualizationsRowBack: "&7« terug"
 # --- Admin panel Setup section: curated prefabs ---
 # Section divider above the Setup (quick start) block on the admin panel.
-menuAdminPanelSectionSetup: "&8» &7setup (quick start)"
+menuAdminPanelSectionSetup: "&8» &7installatie (snelstart)"
 # Setup row + hover: survival-default identity overlay (reset to shipped defaults).
 menuPrefabSurvivalDefaultRow: "#5FB3B3▶ survival-default"
-menuPrefabSurvivalDefaultHover: "&7reset to the shipped defaults (identity overlay)"
+menuPrefabSurvivalDefaultHover: "&7zet terug naar de meegeleverde standaardwaarden (identiteitsoverlay)"
 # Setup row + hover: low-performance (longer pulse, smaller caches, login cache off).
 menuPrefabLowPerformanceRow: "#5FB3B3▶ low-performance"
-menuPrefabLowPerformanceHover: "&7underpowered hosts / shared-CPU VPSes: longer pulse, smaller caches, login cache off"
+menuPrefabLowPerformanceHover: "&7zwakke hosts / VPS met gedeelde CPU: langere puls, kleinere caches, login-cache uit"
 # Setup row + hover: high-performance (short pulse, large caches, login cache on).
 menuPrefabHighPerformanceRow: "#5FB3B3▶ high-performance"
-menuPrefabHighPerformanceHover: "&7dedicated hardware / large player counts: short pulse, large caches, login cache on"
+menuPrefabHighPerformanceHover: "&7dedicated hardware / grote spelersaantallen: korte puls, grote caches, login-cache aan"
 # Setup row + hover: folia-tuned (regional scheduler tuning).
 menuPrefabFoliaTunedRow: "#5FB3B3▶ folia-tuned"
-menuPrefabFoliaTunedHover: "&7folia regional scheduler: faster per-region pulses, fewer concurrent chunk tickets"
+menuPrefabFoliaTunedHover: "&7folia regionale planner: snellere pulsen per regio, minder gelijktijdige chunk-tickets"
 # Setup row + hover: multi-world (one region per world from current default).
 menuPrefabMultiWorldRow: "#5FB3B3▶ multi-world"
-menuPrefabMultiWorldHover: "&7synthesise one region per world from the current default"
+menuPrefabMultiWorldHover: "&7synthetiseert één regio per wereld vanuit de huidige standaard"
 # Confirmation menu title. Placeholder: [prefab] - prefab id or display name.
-menuPrefabConfirmTitle: "#9D7CD8&l⚙ confirm prefab: #5FB3B3[prefab]"
+menuPrefabConfirmTitle: "#9D7CD8&l⚙ preset bevestigen: #5FB3B3[prefab]"
 # Confirmation menu non-clickable hint row below the title. No placeholders.
-menuPrefabConfirmHint: "&7review the changes below, then click confirm or cancel"
+menuPrefabConfirmHint: "&7bekijk de wijzigingen hieronder en klik dan op bevestigen of annuleren"
 # Confirmation menu footer row: confirm and write the prefab to disk.
 menuPrefabConfirmRow: "&2&l[confirm]"
 # Confirmation menu footer row: cancel and return to the admin panel.
@@ -368,31 +368,31 @@ menuPrefabCancelRow: "&c&l[cancel]"
 # book. Re-renders the current scope against a fresh metrics snapshot.
 infoBookRefreshRow: "&2[Refresh]"
 # Hover text for the info-book refresh row.
-infoBookRefreshHover: "&7Re-render this page against a fresh metrics snapshot."
+infoBookRefreshHover: "&7Geef deze pagina opnieuw weer met een verse metriekmomentopname."
 # Clickable row label for the Switch-to-chat affordance at the bottom of the
 # /rtp info book. Re-runs the same scope through the legacy chat path.
 infoBookSwitchToTextRow: "&7[Switch to chat]"
 # Hover text for the info-book switch-to-chat row.
-infoBookSwitchToTextHover: "&7Re-run /rtp info in chat instead of the book."
+infoBookSwitchToTextHover: "&7Voer /rtp info opnieuw uit in chat in plaats van het boek."
 # Footer row rendered when the /rtp info book content exceeds the book page
 # cap. Clicking re-runs the same scope in chat mode so no data is lost.
-infoBookOverflowFooter: "&7(content truncated - click to view full output in chat)"
+infoBookOverflowFooter: "&7(inhoud afgekapt - klik om de volledige uitvoer in chat te bekijken)"
 # Non-clickable note row indicating that periodic auto-refresh for the info
 # book is not currently supported on this build (deferred to a later
 # milestone). Users may click the Refresh row to refresh manually.
-infoBookAutoRefreshDeferredNote: "&8(auto-refresh not yet supported; click Refresh to update)"
+infoBookAutoRefreshDeferredNote: "&8(automatisch verversen nog niet ondersteund; klik op Verversen)"
 # Non-clickable title row at the top of the config-file selector page (Stage C.1).
 # Shown when an admin clicks "/rtp config" from the front page.
-configSelectorTitle: "#5FB3B3&l⚙ config files"
+configSelectorTitle: "#5FB3B3&l⚙ configuratiebestanden"
 # Label for the "back to /rtp menu root" navigation row on the config selector page.
-configSelectorBackRow: "&7« back to menu"
+configSelectorBackRow: "&7« terug naar menu"
 # Non-clickable title row at the top of a single config-file page (Stage C.2).
 # Placeholder: [file] - the config file name (e.g. "performance", "safety").
 configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
 # Label for the "back to config selector" navigation row on a single config-file page.
-configFileBackRow: "&7« back to config files"
+configFileBackRow: "&7« terug naar configuratiebestanden"
 # Non-clickable hint row shown when a config file has no editable keys.
-configFileEmptyHint: "&7(no editable keys in this file)"
+configFileEmptyHint: "&7(geen bewerkbare sleutels in dit bestand)"
 # Per-key row label on a config-file page. Placeholders:
 #   [key]   - the config key name; [value] - the currently-stored value.
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
@@ -407,9 +407,9 @@ configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7
 configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
-configViewRawHint: "&7[P0] book view unavailable; falling back to raw dump."
+configViewRawHint: "&7[P0] boekweergave niet beschikbaar; terugvallen op ruwe dump."
 # Placeholder text rendered in place of a config value that has not been set.
-configValueUnsetPlaceholder: "&8(unset)"
+configValueUnsetPlaceholder: "&8(niet ingesteld)"
 # Non-clickable header row separating the "Changeable" list from the "Pending"
 # staging-cart list on a config-file page when the viewer has staged one or
 # more uncommitted edits. No placeholders.
@@ -419,7 +419,7 @@ configPendingHeader: "&6&l-- pending changes --"
 configPendingRowFormat: "&9[key]&8 = &0[value]"
 # Hover text shown when the viewer hovers a pending (staged) row on a
 # config-file page. No placeholders.
-configPendingRowHover: "click to unstage"
+configPendingRowHover: "klik om te annuleren"
 # Clickable label for the "apply staged changes" row on a config-file page.
 # Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
 configApplyRow: "&2&l[apply]"
@@ -431,24 +431,24 @@ configDiscardRow: "&c&l[discard]"
 # Sent to the viewer when an OPEN_MAP menu action fires but no concrete
 # MapBinding is registered (NoopMapBinding is still active, e.g. on the
 # Lite assembly or before RTPHooks wires the platform binding).
-mapBindingMissing: "&c[P0] map rendering is not available on this server."
+mapBindingMissing: "&c[P0] kaartweergave is niet beschikbaar op deze server."
 # Sent when MapDispatch receives a ChartSpec whose Kind has no registered
 # ChartSpecResolver (e.g. Stage 1 viewer clicks a Stage 3 sparkline before
 # the resolver lands).
-mapResolverMissing: "&c[P0] no chart resolver registered for this request."
+mapResolverMissing: "&c[P0] geen grafiekresolver geregistreerd voor dit verzoek."
 # Sent when a resolver runs but the underlying data source is unavailable
 # for the requested target (unknown region, no data yet, world unloaded).
 # Placeholder: [region] - the requested region name (may be empty).
-mapUnavailable: "&e[P1] chart data is not available right now."
+mapUnavailable: "&e[P1] grafiekgegevens zijn op dit moment niet beschikbaar."
 # Sent when the active MapBinding cannot allocate a map handle right now
 # (binding-defined back-pressure, e.g. per-viewer cap reached).
-mapBusy: "&e[P1] the map service is busy; please try again shortly."
+mapBusy: "&e[P1] de kaartdienst is bezig; probeer het zo dadelijk opnieuw."
 # Label for the clickable "/rtp info" menu row that, on click, mints a
 # ChartSpec(BAD_POINTS_HEATMAP, ...) token and asks the active MapBinding
 # to render a 128x128 heatmap of the current region's known bad-point
 # spiral indices. The row is omitted at render time when NoopMapBinding
 # is the installed binding (REQ-RTP-MAP-006 / ADR-047).
-menuInfoBadPointsLabel: "#9D7CD8&l# bad-points map"
+menuInfoBadPointsLabel: "#9D7CD8&l# kaart met onveilige punten"
 
 # --- Cross-server network mode messages ---
 # Sent only when `network.enabled: true` and the player's `/rtp` is routed
@@ -502,45 +502,45 @@ networkRegionAmbiguous: "&c[P0] regio '[region]' is dubbelzinnig over backends; 
 # Placeholder: [parserKind] - the raw multi-config kind name.
 multiconfigHeaderDefault: "#5FB3B3&l[parserKind]"
 # Header row label for the regions multi-config selector page. No placeholders.
-multiconfigHeaderRegions: "#5FB3B3&l regions"
+multiconfigHeaderRegions: "#5FB3B3&l regio's"
 # Header row label for the worlds multi-config selector page. No placeholders.
-multiconfigHeaderWorlds: "#5FB3B3&l worlds"
+multiconfigHeaderWorlds: "#5FB3B3&l werelden"
 # Toggle-row label when remove-mode is OFF. No placeholders.
-multiconfigToggleRemoveModeOff: "&8[ ] remove mode"
+multiconfigToggleRemoveModeOff: "&8[ ] verwijdermodus"
 # Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
-multiconfigToggleRemoveModeOn: "&c[x] remove mode (click an entry to delete)"
+multiconfigToggleRemoveModeOn: "&c[x] verwijdermodus (klik op een item om te verwijderen)"
 # Selector row label for the "+ Add new..." entry. No placeholders.
-multiconfigRowAdd: "&2+ add new..."
+multiconfigRowAdd: "&2+ nieuw toevoegen..."
 # Hover text for the Add row. Placeholder: [name] - prefilled default name.
-multiconfigRowAddHover: "&7type a name in the anvil prompt; prefilled: &f[name]"
+multiconfigRowAddHover: "&7typ een naam in de aambeeldprompt; vooringevuld: &f[name]"
 # Hover text for an entry row in normal mode. Placeholder: [name].
-multiconfigRowEditHover: "&7edit &f[name]"
+multiconfigRowEditHover: "&7bewerk &f[name]"
 # Hover text for an entry row in remove-mode. Placeholder: [name].
-multiconfigRowRemoveHover: "&cdelete &f[name]"
+multiconfigRowRemoveHover: "&cverwijder &f[name]"
 # Confirm-delete page title row. Placeholder: [name].
-multiconfigConfirmTitle: "&c&ldelete [name]?"
+multiconfigConfirmTitle: "&c&l[name] verwijderen?"
 # Confirm-delete page Yes-row label. No placeholders.
 multiconfigConfirmYes: "&c&l[confirm delete]"
 # Confirm-delete page Cancel-row label. No placeholders.
 multiconfigConfirmNo: "&2&l[cancel]"
 # Hover text on a locked (grayed) default-region row. No placeholders.
-multiconfigLockRegionDefault: "&7the default region cannot be removed"
+multiconfigLockRegionDefault: "&7de standaardregio kan niet worden verwijderd"
 # Hover text on a locked (grayed) world row. Placeholder: [name].
-multiconfigLockWorldLoaded: "&7world '[name]' is loaded on the server; unload it before removing its config"
+multiconfigLockWorldLoaded: "&7wereld '[name]' is geladen op de server; ontlaad deze voordat je de configuratie verwijdert"
 # Result message after a successful ADD. Placeholder: [name].
-multiconfigResultAdded: "&aadded '[name]'."
+multiconfigResultAdded: "&a'[name]' toegevoegd."
 # Result message after a successful REMOVE. Placeholder: [name].
-multiconfigResultRemoved: "&aremoved '[name]'."
+multiconfigResultRemoved: "&a'[name]' verwijderd."
 # Result message when ADD failed. Placeholders: [name], [reason].
-multiconfigResultAddFailed: "&ccould not add '[name]': [reason]"
+multiconfigResultAddFailed: "&ckon '[name]' niet toevoegen: [reason]"
 # Result message when REMOVE failed. Placeholders: [name], [reason].
-multiconfigResultRemoveFailed: "&ccould not remove '[name]': [reason]"
+multiconfigResultRemoveFailed: "&ckon '[name]' niet verwijderen: [reason]"
 # Result message when the proposed entry name is rejected by the sanitiser.
 # Placeholder: [name].
-multiconfigResultNameInvalid: "&cname '[name]' is not allowed; use letters, digits, '_', '-', '.'"
+multiconfigResultNameInvalid: "&cnaam '[name]' is niet toegestaan; gebruik letters, cijfers, '_', '-', '.'"
 # Result message when an ADD collides with an existing entry name.
 # Placeholder: [name].
-multiconfigResultNameTaken: "&can entry named '[name]' already exists."
+multiconfigResultNameTaken: "&cer bestaat al een item met de naam '[name]'."
 
 # ###############################################################################
 # Sectie 9: PlaceholderAPI-ondersteuning

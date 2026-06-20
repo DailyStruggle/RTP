@@ -26,7 +26,7 @@
 冷却消息: "&7[P0] ⚡ 你必须等待 [remainingCooldown] 才能再次传送"
 
 # 玩家达到 lockAfterUses 上限被锁定时（BetterRTP LockAfter 兼容）
-lockedAfterUses: "&7[P0] ⌖ 你已达到随机传送次数上限，请稍后再试。"
+lockedAfterUses: "&7[P0] ⌖ 你已达到随机传送次数上限，请在 [remainingLockTime] 后再试。"
 
 # 当区域没有排队的位置且玩家没有 rtp.unqueued 权限时
 队列中无可用位置: "#f5eb73[P0] ⌖ 当前没有可用的位置"

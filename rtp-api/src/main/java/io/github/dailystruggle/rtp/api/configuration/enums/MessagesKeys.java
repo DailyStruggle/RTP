@@ -36,7 +36,10 @@ public enum MessagesKeys {
    * Sent when the player has reached the configured usage cap
    * ({@code lockAfterUses}) and is locked out until the reset window elapses
    * (BetterRTP {@code LockAfter} parity). Configurable per REQ-RTP-F-013.
-   * No placeholders.
+   * Placeholder: {@code [remainingLockTime]} - the formatted time left until
+   * the rolling {@code lockAfterResetSeconds} window resets; resolves to an
+   * empty string when no reset window is configured (an absolute cap), in
+   * which case the operator should phrase the message without the placeholder.
    */
   lockedAfterUses,
   /** Sent when the pre-generation queue is empty and no location is immediately available. */
