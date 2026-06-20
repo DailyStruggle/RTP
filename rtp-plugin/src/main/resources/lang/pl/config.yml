@@ -53,7 +53,7 @@ setRespawnOnTeleport: false
 # target player's name. Empty string entries are ignored.
 # @type: list<string>
 consoleCommands:
-  - "say [player] has just randomly teleported!"
+  - "say [player] właśnie losowo się teleportował!"
 
 # Polecenia wykonywane jako teleportowany gracz po udanej teleportacji.
 # Użyj [player] dla nazwy gracza. Puste wpisy są ignorowane.
