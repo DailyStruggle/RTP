@@ -77,8 +77,8 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
   @Override
   public void onLoad() {
     // Lite intentionally does NOT probe org.sqlite.JDBC. SQL drivers are not shipped.
-    RTP.log(Level.FINE, "[LIFECYCLE-LITE] onLoad ENTER");
-    RTP.log(Level.FINE, "[LIFECYCLE-LITE] onLoad EXIT (no SQL probe; ADR-024)");
+    RTP.log(Level.FINE, "[RTP] onLoad ENTER");
+    RTP.log(Level.FINE, "[RTP] onLoad EXIT (no SQL probe; ADR-024)");
   }
 
   @Override
@@ -100,7 +100,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     // Step 2: bStats with a distinct pluginId so lite installs are tracked separately.
     // ADR-024: lite uses the v2-branch bStats id (12277) to keep historical continuity
     // for the lite-style install base; full uses 30865.
-    RTP.log(Level.FINE, "[LIFECYCLE-LITE] onEnable initializing bStats id=12277");
+    RTP.log(Level.FINE, "[RTP] onEnable initializing bStats id=12277");
     metrics = new Metrics(this, 12277);
     // Same cost-metrics chart catalogue as the full assembly, with the
     // assembly_variant pie reporting "lite" so dashboards can split.
@@ -133,14 +133,14 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
         RTP.lobbyMode = NetworkModeBootstrap.readLobbyModeEarly(earlyNetworkYml);
         if (RTP.lobbyMode) {
           RTP.log(Level.INFO,
-              "[LIFECYCLE-LITE] onEnable routing.lobbyMode=true -- local region"
+              "[RTP] onEnable routing.lobbyMode=true -- local region"
                   + " processing skipped; this backend acts as a pure cross-server"
                   + " dispatcher.");
         }
       } catch (Throwable t) {
         RTP.lobbyMode = false;
         RTP.log(Level.FINE,
-            "[LIFECYCLE-LITE] onEnable lobbyMode early-read failed; defaulting to false: "
+            "[RTP] onEnable lobbyMode early-read failed; defaulting to false: "
                 + t.getMessage());
       }
 
@@ -168,7 +168,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
             io.github.dailystruggle.rtp.common.platform.PlatformRestoreManager::startGlobal, 2);
       } catch (Exception e) {
         RTP.log(Level.WARNING,
-            "[LIFECYCLE-LITE] yaml-only persistence wiring failed", e);
+            "[RTP] yaml-only persistence wiring failed", e);
       }
 
       // Boot backend-side network mode (ADR-036). No-op when network.yml is
@@ -181,7 +181,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
         networkBootstrap.boot(networkYml);
       } catch (Throwable t) {
         RTP.log(Level.WARNING,
-            "[LIFECYCLE-LITE] onEnable network-mode boot failed; continuing without it: "
+            "[RTP] onEnable network-mode boot failed; continuing without it: "
                 + t.getMessage(), t);
       }
     }
@@ -215,7 +215,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       networkBootstrap.registerJoinTriggerSource();
     } catch (Throwable t) {
       RTP.log(Level.WARNING,
-          "[LIFECYCLE-LITE] JoinTriggerSource registration failed; continuing: "
+          "[RTP] JoinTriggerSource registration failed; continuing: "
               + t.getMessage(), t);
     }
     try {
@@ -233,7 +233,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       }
     } catch (Throwable t) {
       RTP.log(Level.WARNING,
-          "[LIFECYCLE-LITE] waitlist wiring failed; continuing: " + t.getMessage(), t);
+          "[RTP] waitlist wiring failed; continuing: " + t.getMessage(), t);
     }
 
     // Step 6: chunk-unload processor (Spigot/Paper only -- safe in lite, no Folia branch).
@@ -265,11 +265,11 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
           new io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding();
       io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(binding);
       RTP.log(Level.FINE,
-          "[LIFECYCLE-LITE] onEnable installed " + binding.getClass().getSimpleName()
+          "[RTP] onEnable installed " + binding.getClass().getSimpleName()
               + " (MapDispatch active binding)");
     } catch (Throwable t) {
       RTP.log(Level.WARNING,
-          "[LIFECYCLE-LITE] onEnable MapBinding install failed; MapDispatch will fall back to NoopMapBinding",
+          "[RTP] onEnable MapBinding install failed; MapDispatch will fall back to NoopMapBinding",
           t);
     }
     // Install the Bukkit-family BiomeColorSource so the biomes visualisation
@@ -279,10 +279,10 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       io.github.dailystruggle.mapsapi.BiomeColorSource.install(
           new io.github.dailystruggle.rtp.bukkit.maps.BukkitBiomeColorSource());
       RTP.log(Level.FINE,
-          "[LIFECYCLE-LITE] onEnable installed BukkitBiomeColorSource");
+          "[RTP] onEnable installed BukkitBiomeColorSource");
     } catch (Throwable t) {
       RTP.log(Level.WARNING,
-          "[LIFECYCLE-LITE] onEnable BiomeColorSource install failed;"
+          "[RTP] onEnable BiomeColorSource install failed;"
               + " biomes viz will use the built-in categorical palette",
           t);
     }
@@ -291,10 +291,10 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     // full bootstrap. Lite ships effects-api shaded so per-permission effects
     // (e.g. rtp.effects.<name>) must fire identically to the full edition.
     RTP.log(Level.FINE,
-        "[LIFECYCLE-LITE] onEnable scheduling deferred BukkitEffectsHandler.setupEffects (tick+1)");
+        "[RTP] onEnable scheduling deferred BukkitEffectsHandler.setupEffects (tick+1)");
     RTP.scheduler.runTaskLater(() -> {
       RTP.log(Level.FINER,
-          "[LIFECYCLE-LITE] deferred BukkitEffectsHandler.setupEffects firing");
+          "[RTP] deferred BukkitEffectsHandler.setupEffects firing");
       // The `plugin` parameter is unused inside setupEffects (event dispatch
       // goes through Bukkit.getPluginManager()), so passing null is safe and
       // avoids touching the full-edition singleton from the lite bootstrap.
@@ -322,14 +322,14 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
         }
       } catch (Throwable t) {
         RTP.log(Level.WARNING,
-            "[LIFECYCLE-LITE] Failed to initialize Vault economy; continuing without it.",
+            "[RTP] Failed to initialize Vault economy; continuing without it.",
             t);
       }
       try {
         ClaimIntegrations.setup(this);
       } catch (Throwable t) {
         RTP.log(Level.WARNING,
-            "[LIFECYCLE-LITE] Failed to initialize claim-plugin integrations; continuing without them.",
+            "[RTP] Failed to initialize claim-plugin integrations; continuing without them.",
             t);
       }
       // Bundled combat-tag plugin integrations for the optional PvP gate (ADR-055).
@@ -339,7 +339,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
         io.github.dailystruggle.rtp.bukkit.tools.softdepends.pvp.PvPIntegrations.setup(this);
       } catch (Throwable t) {
         RTP.log(Level.WARNING,
-            "[LIFECYCLE-LITE] Failed to initialize combat-tag integrations; continuing with the native PvP tracker.",
+            "[RTP] Failed to initialize combat-tag integrations; continuing with the native PvP tracker.",
             t);
       }
     }, 1);
@@ -359,7 +359,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     // material, not operator-edited config.
     extractBundledLiteDocs();
     RTP.log(Level.INFO,
-        "[RTP-lite] Documentation extracted to "
+        "[RTP] Documentation extracted to "
             + new java.io.File(getDataFolder(), "lite-docs").getAbsolutePath());
   }
 
@@ -392,7 +392,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       try (java.io.InputStream in = getResource(resource)) {
         if (in == null) {
           RTP.log(Level.WARNING,
-              "[RTP-lite] Missing bundled doc resource: " + resource);
+              "[RTP] Missing bundled doc resource: " + resource);
           continue;
         }
         try (java.io.OutputStream out = new java.io.FileOutputStream(target)) {
@@ -404,14 +404,14 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
         }
       } catch (java.io.IOException e) {
         RTP.log(Level.WARNING,
-            "[RTP-lite] Failed to extract bundled doc " + resource, e);
+            "[RTP] Failed to extract bundled doc " + resource, e);
       }
     }
   }
 
   @Override
   public void onDisable() {
-    RTP.log(Level.FINE, "[LIFECYCLE-LITE] onDisable ENTER");
+    RTP.log(Level.FINE, "[RTP] onDisable ENTER");
     // Stop the backend heartbeat publisher + close the network transport
     // first (reverse-order teardown). Idempotent; safe if network mode was
     // never enabled this lifecycle.
@@ -419,7 +419,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       networkBootstrap.shutdown();
     } catch (Throwable t) {
       RTP.log(Level.WARNING,
-          "[LIFECYCLE-LITE] onDisable network-mode shutdown failed (continuing): "
+          "[RTP] onDisable network-mode shutdown failed (continuing): "
               + t.getMessage(), t);
     }
     // CHECKLIST-metrics-and-multiserver.md row B9: mirror the full bootstrap
@@ -435,7 +435,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.fireDisable();
     } catch (Throwable t) {
       RTP.log(Level.WARNING,
-          "[LIFECYCLE-LITE] onDisable MapDispatch.fireDisable failed (continuing): "
+          "[RTP] onDisable MapDispatch.fireDisable failed (continuing): "
               + t.getMessage(), t);
     }
     // Lite has no shutdown-flush phase (no SQL/Redis backend to drain).
@@ -458,6 +458,6 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       // yaml flush is synchronous; no shutdown-flush race to manage
     }
     instance = null;
-    RTP.log(Level.FINE, "[LIFECYCLE-LITE] onDisable EXIT");
+    RTP.log(Level.FINE, "[RTP] onDisable EXIT");
   }
 }

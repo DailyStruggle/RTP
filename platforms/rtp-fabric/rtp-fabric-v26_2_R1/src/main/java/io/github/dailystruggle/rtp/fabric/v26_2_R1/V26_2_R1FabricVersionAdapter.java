@@ -14,6 +14,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
@@ -59,6 +61,15 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
     private static final TicketType RTP_TICKET_TYPE =
             new TicketType(TicketType.NO_TIMEOUT, RTP_TICKET_FLAGS);
 
+    // Transient generation load-ticket applied around requestFullChunkAsync so the
+    // chunk holder reaches FULL status (without it the public getChunkFuture(create=true)
+    // resolves null on this runtime). A dedicated instance (NOT RTP_TICKET_TYPE) so its
+    // add/remove never collides with a kept-cache ticket on the same chunk, and a
+    // positive timeout (~30s = 600 ticks) self-heals a missed release. S-002:
+    // FLAG_PERSIST omitted, so it is never written to level.dat.
+    private static final TicketType RTP_TEMP_LOAD_TICKET_TYPE =
+            new TicketType(600L, RTP_TICKET_FLAGS);
+
     @Override
     public String mcVersion() {
         return "26.1.2";
@@ -73,6 +84,184 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
                 new UnsupportedOperationException("V26_2_R1 adapter not yet implemented (rtp-fabric-ADR-001)"));
     }
 
+
+    // ---- Async full-chunk generation (rtp-fabric-ADR-008, ported from the
+    // NeoForge 26.1 carrier; same deobf MC 26.x runtime) --------------------
+    // FabricRTPWorldUnobf dispatches requestFullChunkAsync via MinecraftServer#execute
+    // (the server tick thread). On deobf MC 26.x the public
+    // ServerChunkCache#getChunkFuture(...,create=true) (a) resolves with NO
+    // ChunkAccess unless a load-ticket is held (which floods ScanTask with
+    // "INSTANT BYPASS: Chunk manager returned a null chunk" and starves the kept
+    // cache), and (b) parks the tick thread on mainThreadProcessor.managedBlock(...)
+    // when invoked on the tick thread (60s ServerWatchdog risk). So we apply a
+    // transient, non-persistent (S-002), self-expiring load-ticket and then invoke
+    // the public getChunkFuture OFF the tick thread, where vanilla takes its
+    // non-blocking supplyAsync(mainThreadProcessor) branch and the normal server
+    // tick pumps generation to completion.
+
+    private static final Object GET_CHUNK_FUTURE_MONITOR = new Object();
+    private static volatile java.lang.reflect.Method GET_CHUNK_FUTURE_METHOD;
+
+    private static java.lang.reflect.Method resolveGetChunkFutureMethod(ServerChunkCache cache)
+            throws ReflectiveOperationException {
+        java.lang.reflect.Method cached = GET_CHUNK_FUTURE_METHOD;
+        if (cached != null) return cached;
+        synchronized (GET_CHUNK_FUTURE_MONITOR) {
+            cached = GET_CHUNK_FUTURE_METHOD;
+            if (cached != null) return cached;
+            java.lang.reflect.Method found = null;
+            String[] preferredNames = { "getChunkFuture", "getChunkFutureMainThread" };
+            for (String name : preferredNames) {
+                for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
+                    for (java.lang.reflect.Method m : c.getDeclaredMethods()) {
+                        if (!name.equals(m.getName())) continue;
+                        if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
+                        Class<?>[] p = m.getParameterTypes();
+                        if (p.length != 4) continue;
+                        if (p[0] != int.class || p[1] != int.class) continue;
+                        if (p[2] != ChunkStatus.class) continue;
+                        if (p[3] != boolean.class) continue;
+                        m.setAccessible(true);
+                        found = m;
+                        break;
+                    }
+                }
+                if (found != null) break;
+            }
+            if (found == null) {
+                for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
+                    for (java.lang.reflect.Method m : c.getDeclaredMethods()) {
+                        if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
+                        Class<?>[] p = m.getParameterTypes();
+                        if (p.length != 4) continue;
+                        if (p[0] != int.class || p[1] != int.class) continue;
+                        if (p[2] != ChunkStatus.class) continue;
+                        if (p[3] != boolean.class) continue;
+                        m.setAccessible(true);
+                        found = m;
+                        break;
+                    }
+                }
+            }
+            if (found == null) {
+                throw new NoSuchMethodException(
+                        "ServerChunkCache#getChunkFuture(int,int,ChunkStatus,boolean) not found on "
+                                + cache.getClass().getName());
+            }
+            GET_CHUNK_FUTURE_METHOD = found;
+            return found;
+        }
+    }
+
+    @Override
+    public CompletableFuture<RTPChunkHandle> requestFullChunkAsync(RTPLevelHandle level, int cx, int cz) {
+        if (level == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("null ServerLevel"));
+        }
+        final ServerLevel sl;
+        try {
+            sl = level.as(ServerLevel.class);
+        } catch (Throwable t) {
+            return CompletableFuture.failedFuture(t);
+        }
+        MinecraftServer server = sl.getServer();
+        final ChunkPos ticketPos = new ChunkPos(cx, cz);
+        final boolean ticketAdded = tryAddTempLoadTicket(sl, ticketPos);
+        if (server != null && server.isSameThread()) {
+            CompletableFuture<RTPChunkHandle> out = new CompletableFuture<>();
+            RTP.scheduler.runTaskAsynchronously(() ->
+                    invokeGetChunkFuture(sl, cx, cz).whenComplete((handle, ex) -> {
+                        if (ticketAdded) scheduleTempLoadTicketRemoval(sl, ticketPos);
+                        if (ex != null) out.completeExceptionally(ex);
+                        else out.complete(handle);
+                    }));
+            return out;
+        }
+        return invokeGetChunkFuture(sl, cx, cz).whenComplete((handle, ex) -> {
+            if (ticketAdded) scheduleTempLoadTicketRemoval(sl, ticketPos);
+        });
+    }
+
+    private CompletableFuture<RTPChunkHandle> invokeGetChunkFuture(ServerLevel level, int cx, int cz) {
+        try {
+            ServerChunkCache cache = level.getChunkSource();
+            java.lang.reflect.Method getter = resolveGetChunkFutureMethod(cache);
+            Object raw = getter.invoke(cache, cx, cz, ChunkStatus.FULL, /*create=*/ true);
+            if (!(raw instanceof CompletableFuture<?> cf)) {
+                return CompletableFuture.failedFuture(new IllegalStateException(
+                        "getChunkFuture returned non-CompletableFuture: "
+                                + (raw == null ? "null" : raw.getClass())));
+            }
+            return cf.thenApply(either -> {
+                ChunkAccess chunk = (either == null) ? null : unwrapEitherLeft(either);
+                return chunk == null ? null : RTPChunkHandle.of(chunk);
+            });
+        } catch (Throwable t) {
+            return CompletableFuture.failedFuture(t);
+        }
+    }
+
+    private static ChunkAccess unwrapEitherLeft(Object either) {
+        try {
+            if (either instanceof ChunkAccess ca) return ca;
+            try {
+                java.lang.reflect.Method orElse = either.getClass().getMethod("orElse", Object.class);
+                Object value = orElse.invoke(either, (Object) null);
+                if (value instanceof ChunkAccess ca2) return ca2;
+            } catch (NoSuchMethodException ignored) {
+                // fall through to Either#left()
+            }
+            java.lang.reflect.Method leftMethod = either.getClass().getMethod("left");
+            Object opt = leftMethod.invoke(either);
+            if (opt == null) return null;
+            java.lang.reflect.Method orElse = opt.getClass().getMethod("orElse", Object.class);
+            Object value = orElse.invoke(opt, (Object) null);
+            return (value instanceof ChunkAccess ca) ? ca : null;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * Apply the transient generation load-ticket for {@code cp}. Best-effort:
+     * a failure is logged at FINE and reported via the return value so the
+     * caller skips the matching removal. Invoked on the server tick thread.
+     */
+    private boolean tryAddTempLoadTicket(ServerLevel level, ChunkPos cp) {
+        try {
+            level.getChunkSource().addTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, RTP_TICKET_RADIUS);
+            return true;
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][Fabric 26.1.2] temp load-ticket apply failed for chunk="
+                            + cp + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Release the transient generation load-ticket for {@code cp} on the server
+     * tick thread (hops via {@link MinecraftServer#execute} when called
+     * off-thread, e.g. from the chunk-future completion). The ticket type also
+     * carries a timeout, so a dropped removal self-heals.
+     */
+    private void scheduleTempLoadTicketRemoval(ServerLevel level, ChunkPos cp) {
+        MinecraftServer server = level.getServer();
+        Runnable remove = () -> {
+            try {
+                level.getChunkSource().removeTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, RTP_TICKET_RADIUS);
+            } catch (Throwable t) {
+                RTP.log(Level.FINE,
+                        "[RTP][Fabric 26.1.2] temp load-ticket release failed for chunk="
+                                + cp + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            }
+        };
+        if (server != null && !server.isSameThread()) {
+            server.execute(remove);
+        } else {
+            remove.run();
+        }
+    }
 
     @Override
     public void installEffectsDispatchers() {

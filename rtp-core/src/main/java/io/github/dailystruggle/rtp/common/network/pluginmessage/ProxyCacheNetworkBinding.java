@@ -96,7 +96,7 @@ public final class ProxyCacheNetworkBinding implements NetworkTransport {
             // logged, not swallowed silently and not propagated - the next
             // heartbeat tick retries.
             LOG.log(Level.FINE,
-                    "[NETWORK] proxy-cache heartbeat push skipped: " + t.getMessage());
+                    "[RTP] proxy-cache heartbeat push skipped: " + t.getMessage());
         }
         try {
             // Refresh this server's view of the network from the companion on
@@ -104,7 +104,7 @@ public final class ProxyCacheNetworkBinding implements NetworkTransport {
             bridge.requestSnapshot();
         } catch (Throwable t) {
             LOG.log(Level.FINE,
-                    "[NETWORK] proxy-cache snapshot request skipped: " + t.getMessage());
+                    "[RTP] proxy-cache snapshot request skipped: " + t.getMessage());
         }
         return CompletableFuture.completedFuture(null);
     }
@@ -115,7 +115,7 @@ public final class ProxyCacheNetworkBinding implements NetworkTransport {
         try {
             hb = BackendHeartbeatCodec.decode(new String(payload, StandardCharsets.UTF_8));
         } catch (Throwable t) {
-            LOG.log(Level.FINE, "[NETWORK] dropping malformed inbound heartbeat: " + t.getMessage());
+            LOG.log(Level.FINE, "[RTP] dropping malformed inbound heartbeat: " + t.getMessage());
             return;
         }
         if (hb == null) return;

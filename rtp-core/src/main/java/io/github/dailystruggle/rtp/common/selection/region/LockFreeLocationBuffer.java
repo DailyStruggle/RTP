@@ -53,6 +53,29 @@ public class LockFreeLocationBuffer {
      * @return {@code true} if the location was added successfully, {@code false} if the buffer is full.
      */
     public boolean offer(RTPLocation location) {
+        return offer0(location, true);
+    }
+
+    /**
+     * Tries to add a location to the buffer without firing the {@code onAdd}
+     * callback.
+     *
+     * <p>Mirror of {@link #pollSilently()} for the destination side of an
+     * internal buffer-to-buffer move (e.g. shedding {@code keptLocations} back
+     * into {@code unkeptLocations} under heap pressure). The location persists
+     * under an identical DB composite key in both buffers, so firing the
+     * {@code onAdd} save here would be redundant write churn against a row that
+     * already exists. Pairing a {@link #pollSilently()} on the source with this
+     * silent offer keeps the DB row untouched while the chunk ticket is freed.
+     *
+     * @param location the location to add.
+     * @return {@code true} if the location was added, {@code false} if full.
+     */
+    public boolean offerSilently(RTPLocation location) {
+        return offer0(location, false);
+    }
+
+    private boolean offer0(RTPLocation location, boolean fireCallback) {
         if (location == null) return false;
         long currentTail;
         long currentHead;
@@ -65,7 +88,7 @@ public class LockFreeLocationBuffer {
         } while (!tail.compareAndSet(currentTail, currentTail + 1));
 
         buffer.set((int) (currentTail & mask), location);
-        if (onAdd != null) onAdd.accept(location);
+        if (fireCallback && onAdd != null) onAdd.accept(location);
         return true;
     }
 

@@ -86,7 +86,7 @@ public final class AddonRegistry {
         register(addon);
       }
     } catch (ServiceConfigurationError e) {
-      RTP.log(Level.WARNING, "[ADDONS] failed to enumerate RTPAddon services", e);
+      RTP.log(Level.WARNING, "[RTP] failed to enumerate RTPAddon services", e);
     }
   }
 
@@ -118,7 +118,7 @@ public final class AddonRegistry {
       try {
         urls.add(jar.toURI().toURL());
       } catch (MalformedURLException e) {
-        RTP.log(Level.WARNING, "[ADDONS] skipping unreadable addon jar: " + jar.getName(), e);
+        RTP.log(Level.WARNING, "[RTP] skipping unreadable addon jar: " + jar.getName(), e);
       }
     }
     if (urls.isEmpty()) return;
@@ -127,8 +127,77 @@ public final class AddonRegistry {
     URLClassLoader addonClassLoader =
         new URLClassLoader(urls.toArray(new URL[0]), parent);
     RTP.log(Level.INFO,
-        "[ADDONS] scanning " + jars.length + " jar(s) in " + directory.getAbsolutePath());
+        "[RTP] scanning " + jars.length + " jar(s) in " + directory.getAbsolutePath());
     discover(addonClassLoader);
+  }
+
+  /**
+   * Extracts addon jars bundled inside the running RTP jar into {@code directory}.
+   *
+   * <p>RTP ships demo/companion addons (e.g. the GUI destination picker) as ordinary
+   * jars embedded on its own classpath under {@code bundled-addons/}. On first run -
+   * detected by the caller as the {@code addons/} folder not yet existing - these are
+   * unpacked here so the operator gets the showcase out of the box without a second
+   * download, while still being able to opt out simply by deleting the extracted jar
+   * (the folder then exists, so it is never re-extracted) or by deleting the addon.
+   *
+   * <p>The set of bundled jars is listed, one resource name per line, in the
+   * classpath resource {@code bundled-addons/index}. A missing index, a missing jar
+   * resource, or an unwritable target is logged and skipped; extraction never aborts
+   * startup. Re-extraction is avoided per-file: a jar already present in
+   * {@code directory} is left untouched.
+   *
+   * @param directory the {@code addons/} folder to populate (created by the caller)
+   */
+  public void extractBundledAddons(File directory) {
+    extractBundledAddons(directory, AddonRegistry.class.getClassLoader());
+  }
+
+  /**
+   * {@link #extractBundledAddons(File)} variant that reads the bundle resources from
+   * an explicit {@code loader}. Exposed for testing; production callers use the
+   * single-argument form bound to {@code rtp-core}'s own classloader.
+   *
+   * @param directory the {@code addons/} folder to populate
+   * @param loader    the classloader to read {@code bundled-addons/*} resources from
+   */
+  public void extractBundledAddons(File directory, ClassLoader loader) {
+    if (directory == null) return;
+    if (loader == null) loader = AddonRegistry.class.getClassLoader();
+    java.io.InputStream indexStream = loader.getResourceAsStream("bundled-addons/index");
+    if (indexStream == null) return; // no bundled addons in this build
+    List<String> names = new ArrayList<>();
+    try (java.io.BufferedReader reader =
+        new java.io.BufferedReader(
+            new java.io.InputStreamReader(indexStream, java.nio.charset.StandardCharsets.UTF_8))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        String name = line.trim();
+        if (!name.isEmpty() && !name.startsWith("#")) names.add(name);
+      }
+    } catch (java.io.IOException e) {
+      RTP.log(Level.WARNING, "[RTP] failed to read bundled-addons index", e);
+      return;
+    }
+    if (!directory.isDirectory() && !directory.mkdirs()) {
+      RTP.log(Level.WARNING,
+          "[RTP] could not create addons folder for bundled addons: " + directory.getAbsolutePath());
+      return;
+    }
+    for (String name : names) {
+      File target = new File(directory, name);
+      if (target.exists()) continue; // never overwrite an operator's copy
+      try (java.io.InputStream in = loader.getResourceAsStream("bundled-addons/" + name)) {
+        if (in == null) {
+          RTP.log(Level.WARNING, "[RTP] bundled addon resource missing: " + name);
+          continue;
+        }
+        java.nio.file.Files.copy(in, target.toPath());
+        RTP.log(Level.INFO, "[RTP] extracted bundled addon: " + name);
+      } catch (java.io.IOException e) {
+        RTP.log(Level.WARNING, "[RTP] failed to extract bundled addon: " + name, e);
+      }
+    }
   }
 
   /**
@@ -146,9 +215,9 @@ public final class AddonRegistry {
   private void load(RTPAddon addon) {
     try {
       addon.onLoad();
-      RTP.log(Level.INFO, "[ADDONS] loaded addon: " + addon.name());
+      RTP.log(Level.INFO, "[RTP] loaded addon: " + addon.name());
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "[ADDONS] addon failed to load: " + addon.name(), t);
+      RTP.log(Level.WARNING, "[RTP] addon failed to load: " + addon.name(), t);
     }
   }
 
@@ -161,7 +230,7 @@ public final class AddonRegistry {
       try {
         addon.onUnload();
       } catch (Throwable t) {
-        RTP.log(Level.WARNING, "[ADDONS] addon failed to unload: " + addon.name(), t);
+        RTP.log(Level.WARNING, "[RTP] addon failed to unload: " + addon.name(), t);
       }
     }
     addons.clear();

@@ -211,8 +211,8 @@ pesosBioma:
 # Busca localizações seguras dentro de todos os chunks carregados no alcance de uma região.
 # Impacto: ALTO - pode aumentar significativamente a carga do servidor em eventos de carregamento de chunks.
 # @type: boolean
-# @default: false
-verificarNoCarregamentoChunk: false
+# @default: true
+verificarNoCarregamentoChunk: true
 
 # Modo de preenchimento de cache por observação (Region Data Visitor)
 # Quando o cache de pré-geração está cheio, uma única RegionCacheTask de

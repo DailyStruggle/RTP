@@ -100,14 +100,18 @@ public final class FrontPageBuilder {
         if (title != null && !title.isEmpty()) {
             lines.add(MenuLine.of(new MenuFragment(title, null, null)));
         }
-        String hint = lookupMsg(MessagesKeys.menuRootHint, "&7click an option below to begin");
-        if (hint != null && !hint.isEmpty()) {
-            lines.add(MenuLine.of(new MenuFragment(hint, null, null)));
-        }
+        // The orientation hint ("click an option below") is intentionally
+        // omitted from the curated front page: the per-row labels and the
+        // section dividers already make the page self-explanatory, and the
+        // extra line only adds clutter. Spacer lines below provide the
+        // visual separation it used to imply.
+
+        // Blank spacer between the title and the first section.
+        addSpacer(lines);
 
         // Section divider before the teleport block (always present).
         String teleportSection =
-                lookupMsg(MessagesKeys.menuFrontPageSectionTeleport, "── Teleport ──");
+                lookupMsg(MessagesKeys.menuFrontPageSectionTeleport, "&8» #3E6B45 teleport");
         if (teleportSection != null && !teleportSection.isEmpty()) {
             lines.add(MenuLine.of(new MenuFragment(teleportSection, null, null)));
         }
@@ -116,8 +120,11 @@ public final class FrontPageBuilder {
         // whether the caller can teleport).
         addParsedRow(
                 lines,
-                lookupMsg(MessagesKeys.menuFrontPageRowTeleport, "🎲 Teleport me now"),
+                lookupMsg(MessagesKeys.menuFrontPageRowTeleport, "#1B7A33🎲 teleport &7- /rtp"),
                 new MenuAction.RunRtpCommand(new String[0]));
+
+        // Blank spacer separating the teleport action from the pickers.
+        addSpacer(lines);
 
         // The player picker rows (region / world / biome) are shown to every
         // viewer, including admins: the admin panel is a self-contained submenu
@@ -127,13 +134,16 @@ public final class FrontPageBuilder {
         // the player rows when the viewer holds rtp.menu.admin.
         appendPlayerRows(rtpRoot, viewer, permission, lines);
         if (adminView) {
+            addSpacer(lines);
             appendAdminRows(lines);
         }
 
+        // Blank spacer before the always-on help footer.
+        addSpacer(lines);
         // Help footer — always last, always visible.
         addParsedRow(
                 lines,
-                lookupMsg(MessagesKeys.menuFrontPageRowHelp, "❓ Help"),
+                lookupMsg(MessagesKeys.menuFrontPageRowHelp, "#7A4FB8❓ list commands &7- /rtp help"),
                 new MenuAction.RunRtpCommand(new String[]{"help"}));
 
         MenuPage page = new MenuPage(lines);
@@ -163,7 +173,7 @@ public final class FrontPageBuilder {
                 && parameterHasSuggestions(regionParam, viewer)) {
             addParsedRow(
                     lines,
-                    lookupMsg(MessagesKeys.menuFrontPageRowRegion, "🌍 Pick a region"),
+                    lookupMsg(MessagesKeys.menuFrontPageRowRegion, "#1F6FB2🌍 pick a region &7- /rtp region:..."),
                     new MenuAction.RunRtpCommand(new String[]{"menu", "region"}));
         }
         CommandParameter worldParam = findParameter(rtpRoot, "world");
@@ -172,7 +182,7 @@ public final class FrontPageBuilder {
                 && parameterHasSuggestions(worldParam, viewer)) {
             addParsedRow(
                     lines,
-                    lookupMsg(MessagesKeys.menuFrontPageRowWorld, "🌐 Pick a world"),
+                    lookupMsg(MessagesKeys.menuFrontPageRowWorld, "#1F6FB2🌐 pick a world &7- /rtp world:..."),
                     new MenuAction.RunRtpCommand(new String[]{"menu", "world"}));
         }
         CommandParameter biomeParam = findParameter(rtpRoot, "biome");
@@ -181,7 +191,7 @@ public final class FrontPageBuilder {
                 && parameterHasSuggestions(biomeParam, viewer)) {
             addParsedRow(
                     lines,
-                    lookupMsg(MessagesKeys.menuFrontPageRowBiome, "🌳 Pick a biome"),
+                    lookupMsg(MessagesKeys.menuFrontPageRowBiome, "#1F8A40🌳 pick a biome &7- /rtp biome:..."),
                     new MenuAction.RunRtpCommand(new String[]{"menu", "biome"}));
         }
     }
@@ -273,9 +283,13 @@ public final class FrontPageBuilder {
     }
 
     /**
-     * Adds a row whose {@code raw} message may embed a trailing gray
-     * description; the description is parsed out via {@link #splitRowLabel}
-     * and attached as the fragment's hover instead of being rendered inline.
+     * Adds a curated front-page row whose {@code raw} message carries the
+     * visible label (topical emoji + human description) first and the
+     * {@code /rtp ...} command after a trailing {@code "- "} separator. The
+     * label is rendered as the clickable text and the command becomes the
+     * hover tooltip, via {@link #splitRowLabel}. When a translation carries no
+     * {@code "- "} separator, the whole message becomes the label and there is
+     * no command hover.
      */
     private static void addParsedRow(List<MenuLine> lines, String raw, MenuAction action) {
         String[] labelHover = splitRowLabel(raw);
@@ -285,6 +299,18 @@ public final class FrontPageBuilder {
     private static void addRow(List<MenuLine> lines, String label, String hover, MenuAction action) {
         if (label == null || label.isEmpty()) return;
         lines.add(MenuLine.of(new MenuFragment(label, hover, action)));
+    }
+
+    /**
+     * Appends a blank spacer line (a {@link MenuLine} with no fragments) used
+     * by renderers to introduce vertical separation between logical groups of
+     * rows. Skipped when {@code lines} is empty or already ends with a blank
+     * spacer, so consecutive calls never stack into double gaps.
+     */
+    private static void addSpacer(List<MenuLine> lines) {
+        if (lines.isEmpty()) return;
+        if (lines.get(lines.size() - 1).fragments().isEmpty()) return;
+        lines.add(new MenuLine(List.of()));
     }
 
     private static boolean safeTest(Predicate<String> permission, String perm) {

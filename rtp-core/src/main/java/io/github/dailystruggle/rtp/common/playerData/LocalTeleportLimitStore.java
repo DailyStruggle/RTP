@@ -109,12 +109,19 @@ public final class LocalTeleportLimitStore implements TeleportLimitStore {
     return v;
   }
 
+  /** Sentinel distinguishing a completed-but-null future result from "absent". */
+  private static final Object ABSENT = new Object();
+
   private static Object unwrap(Optional<?> opt) {
     if (opt == null || opt.isEmpty()) return null;
     Object inner = opt.get();
-    if (inner instanceof java.util.concurrent.CompletableFuture<?> future) {
+    if (inner instanceof java.util.concurrent.CompletableFuture<?> rawFuture) {
+      @SuppressWarnings("unchecked")
+      java.util.concurrent.CompletableFuture<Object> future =
+          (java.util.concurrent.CompletableFuture<Object>) rawFuture;
       if (!future.isDone() || future.isCompletedExceptionally()) return null;
-      Object res = future.join();
+      Object res = future.getNow(ABSENT);
+      if (res == ABSENT) return null;
       if (res instanceof Optional<?> o) return o.orElse(null);
       return res;
     }

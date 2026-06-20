@@ -69,7 +69,7 @@ public class ClearCacheCmd extends BaseRTPCmdImpl {
     }
 
     String msg = "cleared L1/L2/L3 caches for " + cleared + " region(s)";
-    RTP.log(Level.INFO, "[clearcache] " + msg + " (by " + callerId + ")");
+    RTP.log(Level.INFO, "[RTP] clearcache: " + msg + " (by " + callerId + ")");
     if (callerId != null && RTP.serverAccessor != null) {
       try {
         RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, "RTP: " + msg);

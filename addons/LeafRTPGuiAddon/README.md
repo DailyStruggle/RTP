@@ -56,7 +56,7 @@ uses (`RTP.scheduler`, `RTP.serverAccessor`, and `ConfigParser`).
 
 ## What it does
 
-Type `/rtp` (or `/rtpgui`) to open the menu. Each slot is one destination the player is
+Type `/rtp` (or `/rtp gui`) to open the menu. Each slot is one destination the player is
 allowed to use (default RTP, configured regions, per-world targets), decorated with the
 player's live status (ready / on-cooldown / cost / unavailable). Clicking a slot submits a
 teleport. A tile at the bottom shows server health (TPS / MSPT / player count).

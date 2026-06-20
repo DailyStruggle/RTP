@@ -68,7 +68,7 @@ public final class NetworkRegionCollisionWarner {
             String servers = new java.util.TreeSet<>(e.getValue()).toString();
             RTP.log(Level.WARNING,
                     String.format(Locale.ROOT,
-                            "[NETWORK] region collision: region '%s' is advertised by %d backends %s. "
+                            "[RTP] region collision: region '%s' is advertised by %d backends %s. "
                                     + "policy=%s: serving locally first when this backend is one of them.",
                             e.getKey(), e.getValue().size(), servers, policy));
         }

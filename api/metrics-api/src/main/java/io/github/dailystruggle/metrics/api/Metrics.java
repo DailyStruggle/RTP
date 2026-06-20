@@ -54,22 +54,25 @@ public interface Metrics {
     // Cross-plugin static registry (monorepo reuse).
     //
     // Semantics:
-    //  - Last-writer-wins on registerBinding; the prior binding is logged at WARNING.
+    //  - Last-writer-wins on registerBinding; displacing one non-NOOP binding with
+    //    another is logged at WARNING. Clearing back to NOOP (teardown) is silent.
     //  - registerExtension is additive; extensions compose.
     //  - currentBinding() returns MetricsBinding.NOOP when nothing is registered.
     // ---------------------------------------------------------------------
 
     /**
      * Registers (or replaces) the active {@link MetricsBinding}. Last-writer-wins with a
-     * WARNING log when an existing non-NOOP binding is displaced. Pass {@code null} to
-     * clear back to {@link MetricsBinding#NOOP}. Safe to call from any thread.
+     * WARNING log when an existing non-NOOP binding is displaced by another non-NOOP
+     * binding. Pass {@code null} (or {@link MetricsBinding#NOOP}) to clear back to
+     * {@link MetricsBinding#NOOP}; clearing at teardown is silent. Safe to call from any
+     * thread.
      *
      * @return the previously installed binding (never {@code null}).
      */
     static MetricsBinding registerBinding(MetricsBinding binding) {
         MetricsBinding next = (binding == null) ? MetricsBinding.NOOP : binding;
         MetricsBinding prev = Registry.BINDING.getAndSet(next);
-        if (prev != MetricsBinding.NOOP && prev != next) {
+        if (prev != MetricsBinding.NOOP && next != MetricsBinding.NOOP && prev != next) {
             Logger.getLogger("Metrics-API").log(Level.WARNING,
                     "MetricsBinding replaced: {0} -> {1}. Last-writer-wins; prior binding will no longer be sampled.",
                     new Object[]{prev.getClass().getName(), next.getClass().getName()});

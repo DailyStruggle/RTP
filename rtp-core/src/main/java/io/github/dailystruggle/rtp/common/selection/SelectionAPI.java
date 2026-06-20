@@ -6,11 +6,13 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.GenericVerticalAdjustorKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -136,6 +138,73 @@ public class SelectionAPI {
    */
   public Set<String> regionNames() {
     return permRegionLookup.keySet();
+  }
+
+  /**
+   * Opportunistic on-load biome harvest. Invoked by the platform chunk-load
+   * notification when a chunk has just been loaded by the server for its own
+   * reasons. When {@code PerformanceKeys.checkOnChunkLoads} is enabled, the
+   * already-resident chunk's center-column biome is recorded into the
+   * {@link MemoryShape} of every configured region whose shape range contains
+   * that column, feeding the biome-recall / biome-weighted selection bias
+   * without any extra chunk I/O.
+   *
+   * <p>S-005 safe: the chunk is already loaded (nothing is force-loaded or
+   * generated) and {@link RTPWorld#getBiome(int, int, int)} reads only resident
+   * / cached data. The work is O(regions) per load event, gated O(1) by the
+   * config flag, and out-of-range regions are clipped by a cheap range test
+   * before any biome read. No-op when the flag is off, when no region targets
+   * the world, or when the column falls outside every region's shape.
+   *
+   * @param world the world the chunk belongs to
+   * @param cx    the chunk x coordinate
+   * @param cz    the chunk z coordinate
+   */
+  public void observeChunkLoad(@Nullable RTPWorld<?> world, int cx, int cz) {
+    if (world == null) return;
+    if (permRegionLookup.isEmpty()) return;
+
+    @SuppressWarnings("unchecked")
+    ConfigParser<PerformanceKeys> perf =
+        (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+    if (perf == null) return;
+    if (!Boolean.parseBoolean(
+        perf.getConfigValue(PerformanceKeys.checkOnChunkLoads, false).toString())) {
+      return;
+    }
+
+    UUID worldId = world.id();
+    if (worldId == null) return;
+
+    // Representative column: chunk center, sampled mid-height. Biome data is
+    // stored per-(x,z) run, so the exact Y only matters for 3D-biome worlds;
+    // the world vertical midpoint is a cheap, stable choice.
+    int bx = (cx << 4) + 8;
+    int bz = (cz << 4) + 8;
+    int y = (world.getMinHeight() + world.getMaxHeight()) / 2;
+
+    for (Region region : permRegionLookup.values()) {
+      RTPWorld<?> regionWorld = region.getWorld();
+      if (regionWorld == null || !worldId.equals(regionWorld.id())) continue;
+
+      Shape<?> shape = region.getShape();
+      if (!(shape instanceof MemoryShape<?> memoryShape)) continue;
+      if (!memoryShape.contains(bx, bz)) continue;
+
+      long location = memoryShape.xzToLocation(bx, bz);
+      if (location < 0L) continue;
+
+      String biome;
+      try {
+        biome = world.getBiome(bx, y, bz);
+      } catch (Throwable t) {
+        // Biome reads never gate anything; a failure here is a quiet no-op.
+        continue;
+      }
+      if (biome == null || biome.isEmpty()) continue;
+
+      memoryShape.addBiomeLocation(location, memoryShape.spatialResolution, biome);
+    }
   }
 
   /**

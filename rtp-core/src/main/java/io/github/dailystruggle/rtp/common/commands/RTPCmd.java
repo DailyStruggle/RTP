@@ -155,7 +155,9 @@ public interface RTPCmd extends BaseRTPCmd {
       handled = rootAction.run(senderId, feedback);
     } catch (Throwable t) {
       RTP.log(Level.WARNING,
-              "[RTP] bound /rtp root action threw; falling back to classic teleport", t);
+              "[RTP] bound /rtp root action threw; unbinding it and resetting to the"
+                      + " classic teleport so future invocations are not affected", t);
+      clearFailedRootAction();
     }
     RTP.log(Level.FINE,
             "[RTP-GUI] bare /rtp: root action handled=" + handled + " for " + senderId);
@@ -165,6 +167,32 @@ public interface RTPCmd extends BaseRTPCmd {
       RTP.getInstance().processingPlayers.remove(senderId);
     }
     return handled;
+  }
+
+  /**
+   * Unbinds the currently bound bare-{@code /rtp} root action after it has failed,
+   * resetting the command to its default (classic teleport) behaviour. A bound action
+   * that throws is almost always permanently broken on this runtime (e.g. a GUI menu
+   * whose backend cannot load on a too-old modded server), so leaving it bound would
+   * make every subsequent bare {@code /rtp} pay the same exception and log spam. By
+   * clearing it the first failure both falls back (the caller treats the throw as
+   * not-handled) and self-heals: later invocations skip the broken action entirely and
+   * run the classic teleport directly. The clear itself is guarded so a failure to
+   * reach the hooks facade can never escalate.
+   */
+  private static void clearFailedRootAction() {
+    try {
+      io.github.dailystruggle.rtp.api.hooks.RootActionRegistry registry =
+              io.github.dailystruggle.rtp.api.RTPAPI.hooks().rootAction();
+      if (registry != null) {
+        registry.clear();
+        RTP.log(Level.INFO,
+                "[RTP] unbound failing /rtp root action; bare /rtp reset to the classic teleport");
+      }
+    } catch (Throwable clearError) {
+      RTP.log(Level.FINE,
+              "[RTP] could not unbind the failing /rtp root action", clearError);
+    }
   }
 
   default void init() {}
@@ -381,7 +409,7 @@ public interface RTPCmd extends BaseRTPCmd {
           decision = hook.route(senderId, rtpArgs);
         } catch (Throwable t) {
           RTP.log(Level.WARNING,
-                  "[NETWORK] command hook threw; falling back to local pipeline: " + t.getMessage(), t);
+                  "[RTP] command hook threw; falling back to local pipeline: " + t.getMessage(), t);
           decision = io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.local();
         }
         if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.CrossServer cross) {

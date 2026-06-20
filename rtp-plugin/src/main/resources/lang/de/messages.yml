@@ -204,19 +204,19 @@ infoRegion: "#52B2BF[region]"
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
-infoBiomeActivityHeader: "&8--- &3Biome occupancy &8(&3[biomeTotalSamples]&8 samples, &3[biomeDistinctCount]&8 biomes) ---"
+infoBiomeActivityHeader: "&8--- &3Biom-Belegung &8(&3[biomeTotalSamples]&8 Proben, &3[biomeDistinctCount]&8 Biome) ---"
 # Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
 infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
 # Shown when no occupancy has been sampled yet.
-infoBiomeActivityEmpty: "&8--- &7no biome occupancy sampled yet &8---"
+infoBiomeActivityEmpty: "&8--- &7noch keine Biom-Belegung erfasst &8---"
 
 # Unter-Info-Auflistungen
 # Platzhalter: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
 weltInfo:
   - "#21ADA8[world]:"
-  - "#99EEBB  - region: [region]"
-  - "#99EEBB  - requirePermission: [requirePermission]"
-  - "#99EEBB  - override: [override]"
+  - "#99EEBB  - Region: [region]"
+  - "#99EEBB  - Berechtigung erforderlich: [requirePermission]"
+  - "#99EEBB  - Überschreiben: [override]"
 
 regionInfo:
   - "#52B2BF[region]:"
@@ -229,8 +229,8 @@ regionInfo:
   - "#58CCED  - UngehaltenerCache (L2): [unkeptCache]"
   - "#58CCED  - RueckstauCache (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - ImCache: [cached]"
-  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
-  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
+  - "#58CCED  - erlernte Abdeckung: [memCoveragePct] (schlecht: [memBadPct], [memBadCount] Zellen)"
+  - "#58CCED  - häufigste Ablehnungsursache: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # Abschnitt 8: Befehlsbeschreibungen
@@ -278,7 +278,7 @@ menueWertEingeben: "&7✎ eigenen Wert eingeben..."
 menueZusammengebaut: "&7baue zusammen: #7E9CC8/rtp [command]"
 # Nicht anklickbare Titelzeile, die der Wurzel-/rtp-Menüseite vorangestellt wird (Stufe A.5).
 # Bietet eine einladende Kopfzeile, bevor der Spieler in einen Unterbefehl absteigt.
-menueHauptTitel: "#5FB3B3&l⚡ RTP menu"
+menueHauptTitel: "#5FB3B3&l⚡ RTP-Menü"
 # Nicht anklickbare Untertitel-/Hinweiszeile, die der Wurzel-/rtp-Menüseite unterhalb von
 # menuRootTitle vorangestellt wird (Stufe A.5). Kurzer Orientierungstext für Erstnutzer.
 menueHauptHinweis: "&7klicke unten auf eine Option, um zu beginnen"

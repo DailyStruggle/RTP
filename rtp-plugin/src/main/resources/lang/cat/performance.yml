@@ -184,8 +184,8 @@ biome_favor_amounts:
 
 # Check for warm-spots in every loaded kibble (chunk)
 # @type: boolean
-# @default: false
-check_when_kibble_arrives: false
+# @default: true
+check_when_kibble_arrives: true
 
 # Enable background data gathering by visiting kitties
 # @type: boolean

@@ -179,8 +179,8 @@ biome_favor_amounts:
 
 # Check for warm-spots in every loaded kibble (chunk)
 # @type: boolean
-# @default: false
-check_when_kibble_arrives: false
+# @default: true
+check_when_kibble_arrives: true
 
 # Do not bite the version number, sacred catnip
 meowsion: 1.0

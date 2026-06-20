@@ -164,7 +164,7 @@ public final class JoinTriggerSource {
     private void handleLookup(UUID id, Optional<ReservationToken> opt, Throwable err) {
         if (err != null) {
             RTP.log(Level.WARNING,
-                    "[NETWORK] JoinTriggerSource: findReservation failed for " + id
+                    "[RTP] JoinTriggerSource: findReservation failed for " + id
                             + ": " + err.getMessage(), err);
             return;
         }
@@ -173,7 +173,7 @@ public final class JoinTriggerSource {
             // overwhelming majority of joins land here; logged at INFO
             // because it is the diagnostic anchor for "why did /rtp not run".
             RTP.log(Level.FINE,
-                    "[NETWORK][trace] JoinTriggerSource.handleLookup: no reservation found for " + id
+                    "[RTP][trace] JoinTriggerSource.handleLookup: no reservation found for " + id
                             + " (standard join; no cross-server /rtp will be dispatched)");
             return;
         }
@@ -183,13 +183,13 @@ public final class JoinTriggerSource {
             // routed by player count and the player landed here via a
             // hub override). Silent: no S-004 attribution warranted.
             RTP.log(Level.FINE,
-                    "[NETWORK][trace] JoinTriggerSource.handleLookup: reservation token.serverId="
+                    "[RTP][trace] JoinTriggerSource.handleLookup: reservation token.serverId="
                             + token.serverId() + " does not match this backend serverId=" + serverId
                             + " for " + id + " (token=" + token.tokenId() + "); not redeeming on this backend");
             return;
         }
         RTP.log(Level.FINE,
-                "[NETWORK][trace] JoinTriggerSource.handleLookup: matched reservation for " + id
+                "[RTP][trace] JoinTriggerSource.handleLookup: matched reservation for " + id
                         + " token=" + token.tokenId() + " serverId=" + serverId
                         + "; calling transport.redeem(...)");
         transport.redeem(token.tokenId(), id, serverId)
@@ -199,13 +199,13 @@ public final class JoinTriggerSource {
     private void handleRedeem(UUID id, ReservationToken token, RedeemOutcome outcome, Throwable err) {
         if (err != null) {
             RTP.log(Level.WARNING,
-                    "[NETWORK] JoinTriggerSource: redeem dispatch failed for " + id
+                    "[RTP] JoinTriggerSource: redeem dispatch failed for " + id
                             + " token=" + token.tokenId() + ": " + err.getMessage(), err);
             return;
         }
         if (outcome == null) return;
         RTP.log(Level.FINE,
-                "[NETWORK][trace] JoinTriggerSource.handleRedeem: outcome=" + outcome
+                "[RTP][trace] JoinTriggerSource.handleRedeem: outcome=" + outcome
                         + " for " + id + " token=" + token.tokenId());
         switch (outcome) {
             case REDEEMED:
@@ -218,7 +218,7 @@ public final class JoinTriggerSource {
             case NOT_FOUND:
             case EXPIRED:
                 RTP.log(Level.WARNING,
-                        "[NETWORK] JoinTriggerSource: redeem outcome=" + outcome
+                        "[RTP] JoinTriggerSource: redeem outcome=" + outcome
                                 + " for " + id + " token=" + token.tokenId()
                                 + " (race vs TTL reaper or proxy release; no /rtp dispatched)");
                 return;
@@ -229,7 +229,7 @@ public final class JoinTriggerSource {
                 // REQ-RTP-S-004: any defective state or transport failure
                 // must surface as WARNING so operators can audit.
                 RTP.log(Level.WARNING,
-                        "[NETWORK] JoinTriggerSource: redeem outcome=" + outcome
+                        "[RTP] JoinTriggerSource: redeem outcome=" + outcome
                                 + " for " + id + " token=" + token.tokenId()
                                 + " (REQ-RTP-S-004)");
         }
@@ -263,21 +263,21 @@ public final class JoinTriggerSource {
             RTPPlayer player = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPlayer(id) : null;
             if (player == null || !player.isOnline()) {
                 RTP.log(Level.FINE,
-                        "[NETWORK][trace] JoinTriggerSource.dispatchRtp: player offline at hop time for " + id
+                        "[RTP][trace] JoinTriggerSource.dispatchRtp: player offline at hop time for " + id
                                 + "; /rtp NOT dispatched");
                 return; // disconnected between join and hop
             }
             RTP.log(Level.FINE,
-                    "[NETWORK][trace] JoinTriggerSource.dispatchRtp: invoking performCommand(player, \""
+                    "[RTP][trace] JoinTriggerSource.dispatchRtp: invoking performCommand(player, \""
                             + command + "\") for " + id);
             try {
                 player.performCommand(player, command);
                 RTP.log(Level.FINE,
-                        "[NETWORK][trace] JoinTriggerSource.dispatchRtp: performCommand dispatched"
+                        "[RTP][trace] JoinTriggerSource.dispatchRtp: performCommand dispatched"
                                 + " for " + id);
             } catch (Throwable t) {
                 RTP.log(Level.WARNING,
-                        "[NETWORK] JoinTriggerSource: /rtp dispatch threw for " + id
+                        "[RTP] JoinTriggerSource: /rtp dispatch threw for " + id
                                 + ": " + t.getMessage(), t);
             }
         };
@@ -310,7 +310,7 @@ public final class JoinTriggerSource {
         } catch (Throwable t) {
             // Scheduler unavailable (shutdown race): best-effort direct call.
             RTP.log(Level.WARNING,
-                    "[NETWORK] JoinTriggerSource: scheduler unavailable for /rtp hop ("
+                    "[RTP] JoinTriggerSource: scheduler unavailable for /rtp hop ("
                             + t.getMessage() + "); attempting inline dispatch");
             hop.run();
         }
@@ -341,16 +341,16 @@ public final class JoinTriggerSource {
         // evictLocal is a local-state correction only (does not fire the
         // terminal listener). Null-tolerant for older test fixtures.
         RTP.log(Level.FINE,
-                "[NETWORK][trace] JoinTriggerSource.onRedeemed: entered for " + id
+                "[RTP][trace] JoinTriggerSource.onRedeemed: entered for " + id
                         + " token=" + token.tokenId() + " statusCache=" + (statusCache != null));
         if (statusCache != null) {
             try {
                 statusCache.evictLocal(id);
                 RTP.log(Level.FINE,
-                        "[NETWORK][trace] JoinTriggerSource.onRedeemed: statusCache.evictLocal succeeded for " + id);
+                        "[RTP][trace] JoinTriggerSource.onRedeemed: statusCache.evictLocal succeeded for " + id);
             } catch (Throwable t) {
                 RTP.log(Level.WARNING,
-                        "[NETWORK] JoinTriggerSource: statusCache.evictLocal threw for "
+                        "[RTP] JoinTriggerSource: statusCache.evictLocal threw for "
                                 + id + ": " + t.getMessage(), t);
             }
         }
@@ -360,7 +360,7 @@ public final class JoinTriggerSource {
             redeemed = redeemAcrossRegions(networkTokenId);
         }
         RTP.log(Level.FINE,
-                "[NETWORK][trace] JoinTriggerSource.onRedeemed: networkTokenId=" + networkTokenId
+                "[RTP][trace] JoinTriggerSource.onRedeemed: networkTokenId=" + networkTokenId
                         + " redeemedCoord=" + (redeemed != null ? "present" : "null")
                         + " for " + id);
         if (redeemed != null && networkTokenId != null) {
@@ -374,12 +374,12 @@ public final class JoinTriggerSource {
                     accepted = region.queueManager.acceptRedeemedReservation(id, redeemed);
                 } catch (Throwable t) {
                     RTP.log(Level.WARNING,
-                            "[NETWORK] JoinTriggerSource: acceptRedeemedReservation threw for "
+                            "[RTP] JoinTriggerSource: acceptRedeemedReservation threw for "
                                     + id + " token=" + token.tokenId() + ": " + t.getMessage(), t);
                 }
             }
             RTP.log(Level.FINE,
-                    "[NETWORK][trace] JoinTriggerSource.onRedeemed: acceptRedeemedReservation accepted="
+                    "[RTP][trace] JoinTriggerSource.onRedeemed: acceptRedeemedReservation accepted="
                             + accepted + " for " + id + " token=" + token.tokenId());
             if (!accepted) {
                 // The coord could not be pinned (region disappeared mid-redeem
@@ -399,7 +399,7 @@ public final class JoinTriggerSource {
         // Whether or not the coord was pinned, the local /rtp dispatch is
         // the L2 baseline behaviour and must always run on a REDEEMED outcome.
         RTP.log(Level.FINE,
-                "[NETWORK][trace] JoinTriggerSource.onRedeemed: dispatching /rtp for " + id
+                "[RTP][trace] JoinTriggerSource.onRedeemed: dispatching /rtp for " + id
                         + (token.regionKey().isPresent()
                                 ? " region=" + token.regionKey().get() : ""));
         dispatchRtp(id, token.regionKey());
@@ -424,7 +424,7 @@ public final class JoinTriggerSource {
                 region.queueManager.releaseToNetworkKept(networkTokenId);
             } catch (Throwable t) {
                 RTP.log(Level.WARNING,
-                        "[NETWORK] JoinTriggerSource: releaseToNetworkKept threw for " + id
+                        "[RTP] JoinTriggerSource: releaseToNetworkKept threw for " + id
                                 + " token=" + networkTokenId + ": " + t.getMessage(), t);
             }
         }
@@ -435,14 +435,14 @@ public final class JoinTriggerSource {
                     .whenComplete((v, err) -> {
                         if (err != null) {
                             RTP.log(Level.WARNING,
-                                    "[NETWORK] JoinTriggerSource: transport.release failed for "
+                                    "[RTP] JoinTriggerSource: transport.release failed for "
                                             + id + " token=" + networkTokenId + ": "
                                             + err.getMessage(), err);
                         }
                     });
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
-                    "[NETWORK] JoinTriggerSource: transport.release dispatch threw for "
+                    "[RTP] JoinTriggerSource: transport.release dispatch threw for "
                             + id + " token=" + networkTokenId + ": " + t.getMessage(), t);
         }
     }
@@ -490,7 +490,7 @@ public final class JoinTriggerSource {
             }
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
-                    "[NETWORK] JoinTriggerSource: redeem sweep threw: " + t.getMessage(), t);
+                    "[RTP] JoinTriggerSource: redeem sweep threw: " + t.getMessage(), t);
         }
         return null;
     }

@@ -161,11 +161,11 @@ public final class LobbyDispatchRetryQueue {
         Entry existing = parked.putIfAbsent(playerId, entry);
         if (existing != null) {
             RTP.log(Level.FINER,
-                    "[NETWORK][lobbyRetry] duplicate enqueue ignored: playerId=" + playerId);
+                    "[RTP][lobbyRetry] duplicate enqueue ignored: playerId=" + playerId);
             return;
         }
         RTP.log(Level.FINE,
-                "[NETWORK][state] lobbyRetry parked: playerId=" + playerId
+                "[RTP][state] lobbyRetry parked: playerId=" + playerId
                         + " firstReason=" + firstReason
                         + " maxAttempts=" + maxAttempts
                         + " maxTotalMs=" + maxTotalMs);
@@ -196,7 +196,7 @@ public final class LobbyDispatchRetryQueue {
         boolean firstRecord = enrolled.put(playerId, new Entry(playerId, args, now, messageMethod)) == null;
         if (firstRecord) {
             RTP.log(Level.FINE,
-                    "[NETWORK][state] lobbyRetry recorded enrolment: playerId=" + playerId);
+                    "[RTP][state] lobbyRetry recorded enrolment: playerId=" + playerId);
         }
     }
 
@@ -220,7 +220,7 @@ public final class LobbyDispatchRetryQueue {
         // re-enrolled them and a stale terminal listener race fired).
         if (parked.containsKey(playerId)) {
             RTP.log(Level.FINER,
-                    "[NETWORK][lobbyRetry] onTerminalFailure: already parked, skip re-park: playerId="
+                    "[RTP][lobbyRetry] onTerminalFailure: already parked, skip re-park: playerId="
                             + playerId);
             return true;
         }
@@ -228,7 +228,7 @@ public final class LobbyDispatchRetryQueue {
         Entry entry = new Entry(playerId, prev.args, now, prev.messageMethod);
         parked.put(playerId, entry);
         RTP.log(Level.FINE,
-                "[NETWORK][state] lobbyRetry re-parked after enrolment timeout: playerId="
+                "[RTP][state] lobbyRetry re-parked after enrolment timeout: playerId="
                         + playerId);
         return true;
     }
@@ -265,7 +265,7 @@ public final class LobbyDispatchRetryQueue {
         if (timerHandle != null) return;
         if (RTP.scheduler == null) {
             RTP.log(Level.WARNING,
-                    "[NETWORK][lobbyRetry] start called before scheduler available; "
+                    "[RTP][lobbyRetry] start called before scheduler available; "
                             + "retry pulse not started.");
             return;
         }
@@ -306,7 +306,7 @@ public final class LobbyDispatchRetryQueue {
                 // also throws past the TTL, the TTL check in advance()
                 // will eventually time it out and release the lock.
                 RTP.log(Level.WARNING,
-                        "[NETWORK][lobbyRetry] advance threw for playerId="
+                        "[RTP][lobbyRetry] advance threw for playerId="
                                 + entry.playerId + ": " + t.getMessage(), t);
             }
         }
@@ -364,7 +364,7 @@ public final class LobbyDispatchRetryQueue {
                     now));
             parked.remove(entry.playerId);
             RTP.log(Level.FINE,
-                    "[NETWORK][state] lobbyRetry enrolled after " + entry.attempts
+                    "[RTP][state] lobbyRetry enrolled after " + entry.attempts
                             + " attempts: playerId=" + entry.playerId
                             + " correlationId=" + correlationId
                             + " region=" + cs.regionKey().orElse("")
@@ -386,7 +386,7 @@ public final class LobbyDispatchRetryQueue {
             // Transient gate still tripped. Leave the entry parked; the
             // next pulse will retry. attempts++ already happened above.
             RTP.log(Level.FINEST,
-                    "[NETWORK][lobbyRetry] still transient (" + reason
+                    "[RTP][lobbyRetry] still transient (" + reason
                             + ") for playerId=" + entry.playerId
                             + " attempt=" + entry.attempts);
             return;
@@ -409,7 +409,7 @@ public final class LobbyDispatchRetryQueue {
         sendLocalized(entry, key, reasonDetail);
         releaseLock(entry.playerId);
         RTP.log(Level.FINE,
-                "[NETWORK][state] lobbyRetry terminated: playerId=" + entry.playerId
+                "[RTP][state] lobbyRetry terminated: playerId=" + entry.playerId
                         + " reason=" + reasonDetail
                         + " attempts=" + entry.attempts);
     }

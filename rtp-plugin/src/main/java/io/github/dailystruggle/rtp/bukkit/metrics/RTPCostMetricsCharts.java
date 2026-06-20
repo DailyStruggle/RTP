@@ -61,7 +61,7 @@ public final class RTPCostMetricsCharts {
    */
   public static void register(Metrics metrics, String assemblyVariant) {
     if (metrics == null) {
-      RTP.log(Level.WARNING, "[bStats] register called with null Metrics; charts not registered");
+      RTP.log(Level.WARNING, "[RTP] register called with null Metrics; charts not registered");
       return;
     }
     final String variant = (assemblyVariant == null || assemblyVariant.isBlank()) ? "unknown" : assemblyVariant;
@@ -748,7 +748,7 @@ public final class RTPCostMetricsCharts {
         }
       }, 1200L, 1200L);
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "[bStats] failed to start rtp-cost sampler", t);
+      RTP.log(Level.WARNING, "[RTP] failed to start rtp-cost sampler", t);
     }
   }
 

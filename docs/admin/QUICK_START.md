@@ -304,5 +304,6 @@ Once Steps 0–10 are green, the recurring loop is small:
 - [ECONOMY.md](configuration/ECONOMY.md) — pricing and refunds
 - [RUNBOOK.md](RUNBOOK.md) — incident response and operational procedures
 - [FAQ.md](FAQ.md) — common questions and gotchas
+- [ADDONS.md](ADDONS.md) — how RTP loads addons, the bundled GUI demo, and how to turn addons off
 - [CONTRIBUTING.md](../../CONTRIBUTING.md) — how to build and extend the plugin
 - [../addons/](../addons/) — example addons for claim plugin integration, Iris, and more

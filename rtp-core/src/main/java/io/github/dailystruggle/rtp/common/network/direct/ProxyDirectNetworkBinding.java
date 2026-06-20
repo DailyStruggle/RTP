@@ -113,17 +113,17 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
             try {
                 List<String> rows = exchange(addr, payload);
                 anyOk = true;
-                LOG.log(Level.FINE, "[NETWORK] proxy-direct: pushed heartbeat (server='"
+                LOG.log(Level.FINE, "[RTP] proxy-direct: pushed heartbeat (server='"
                         + row.serverId() + "', regions=" + row.regions() + ") to " + addr
                         + "; received snapshot of " + rows.size() + " row(s).");
                 ingest(rows);
             } catch (Throwable t) {
-                LOG.log(Level.FINE, "[NETWORK] proxy-direct exchange with " + addr
+                LOG.log(Level.FINE, "[RTP] proxy-direct exchange with " + addr
                         + " failed: " + t.getMessage());
             }
         }
         if (!anyOk) {
-            LOG.log(Level.FINE, "[NETWORK] proxy-direct: no proxy reachable this tick ("
+            LOG.log(Level.FINE, "[RTP] proxy-direct: no proxy reachable this tick ("
                     + proxies.size() + " configured).");
         }
         return CompletableFuture.completedFuture(null);
@@ -176,7 +176,7 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
                 String resp = ProxyDirectWire.readSignedPayload(in, verifier);
                 if (resp != null) return resp;
             } catch (Throwable t) {
-                LOG.log(Level.FINE, "[NETWORK] proxy-direct rpc op=" + op + " to " + addr
+                LOG.log(Level.FINE, "[RTP] proxy-direct rpc op=" + op + " to " + addr
                         + " failed: " + t.getMessage());
             }
         }
@@ -202,7 +202,7 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
                 String resp = ProxyDirectWire.readSignedPayload(in, verifier);
                 if (resp != null) return resp;
             } catch (Throwable t) {
-                LOG.log(Level.FINE, "[NETWORK] proxy-direct rpc(list) op=" + op + " to " + addr
+                LOG.log(Level.FINE, "[RTP] proxy-direct rpc(list) op=" + op + " to " + addr
                         + " failed: " + t.getMessage());
             }
         }
@@ -225,7 +225,7 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
                 DataInputStream in = new DataInputStream(socket.getInputStream());
                 return ProxyDirectWire.readList(in, verifier);
             } catch (Throwable t) {
-                LOG.log(Level.FINE, "[NETWORK] proxy-direct rpc(list2) op=" + op + " to " + addr
+                LOG.log(Level.FINE, "[RTP] proxy-direct rpc(list2) op=" + op + " to " + addr
                         + " failed: " + t.getMessage());
             }
         }
@@ -249,7 +249,7 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
                 DataInputStream in = new DataInputStream(socket.getInputStream());
                 return ProxyDirectWire.readList(in, verifier);
             } catch (Throwable t) {
-                LOG.log(Level.FINE, "[NETWORK] proxy-direct rpc(resp-list) op=" + op + " to " + addr
+                LOG.log(Level.FINE, "[RTP] proxy-direct rpc(resp-list) op=" + op + " to " + addr
                         + " failed: " + t.getMessage());
             }
         }
@@ -279,12 +279,12 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
             try {
                 hb = BackendHeartbeatCodec.decode(encoded);
             } catch (Throwable t) {
-                LOG.log(Level.FINE, "[NETWORK] proxy-direct dropping malformed row: " + t.getMessage());
+                LOG.log(Level.FINE, "[RTP] proxy-direct dropping malformed row: " + t.getMessage());
                 continue;
             }
             if (hb == null || hb.serverId() == null || hb.serverId().isEmpty()) continue;
             Entry prev = lastSeen.put(hb.serverId(), new Entry(hb, now));
-            // Log at INFO only when the network view actually changes (a new
+            // Log at FINE only when the network view actually changes (a new
             // peer appears or its region list differs) so the interaction is
             // visible during testing without per-tick spam. Report the regions
             // actually carried on the wire, preferring the typed regions() Set
@@ -294,11 +294,11 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
             boolean changed = prev == null
                     || !java.util.Objects.equals(advertisedRegions(prev.heartbeat()), advertised);
             if (changed) {
-                LOG.log(Level.INFO, "[NETWORK] proxy-direct: snapshot updated peer '"
+                LOG.log(Level.FINE, "[RTP] proxy-direct: snapshot updated peer '"
                         + hb.serverId() + "' regions=" + advertised
                         + (prev == null ? " (new peer)." : " (changed)."));
             } else {
-                LOG.log(Level.FINE, "[NETWORK] proxy-direct: snapshot row for '"
+                LOG.log(Level.FINE, "[RTP] proxy-direct: snapshot row for '"
                         + hb.serverId() + "' unchanged.");
             }
             for (Sub s : subscribers) {
@@ -436,7 +436,7 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
                 try {
                     port = Integer.parseInt(entry.substring(colon + 1).trim());
                 } catch (NumberFormatException nfe) {
-                    LOG.log(Level.WARNING, "[NETWORK] proxy-direct: bad port in '" + entry
+                    LOG.log(Level.WARNING, "[RTP] proxy-direct: bad port in '" + entry
                             + "', using default " + defaultPort + ".");
                     port = defaultPort;
                 }
@@ -446,7 +446,7 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
             try {
                 out.add(InetSocketAddress.createUnresolved(host, port));
             } catch (RuntimeException ex) {
-                LOG.log(Level.WARNING, "[NETWORK] proxy-direct: skipping malformed proxy address '"
+                LOG.log(Level.WARNING, "[RTP] proxy-direct: skipping malformed proxy address '"
                         + entry + "' (" + ex.getMessage() + ").");
             }
         }

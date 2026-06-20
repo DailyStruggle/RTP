@@ -131,6 +131,25 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     private static volatile java.lang.reflect.Method GET_CHUNK_FUTURE_METHOD;
 
     /**
+     * Executor that hops RTP's chunk-future continuations OFF vanilla's
+     * completing thread. On the 26.x chunk system vanilla completes a
+     * {@code ChunkHolder}'s full-chunk future <i>inline on the server tick
+     * thread</i> from inside {@code DistanceManager.runAllUpdates}
+     * ({@code ChunkHolder.updateFutures} -> {@code CompletableFuture.complete}).
+     * If RTP chains its pipeline directly (via {@code thenApply}/{@code thenCompose})
+     * onto that future, the whole RTP pipeline runs re-entrantly mid-iteration
+     * and mutates the {@code DistanceManager}'s {@code chunksToUpdateFutures}
+     * set while it is being iterated -- the fastutil
+     * {@code ReferenceOpenHashSet$SetIterator} {@code wrapped == null} crash
+     * (NPE in {@code runAllUpdates}). Routing the first continuation through
+     * the async scheduler guarantees RTP work never executes inline during a
+     * chunk-system pulse (mirrors the rtp-fabric-ADR-008 off-thread
+     * self-dispatch rule the unobf carrier already follows).
+     */
+    private static final java.util.concurrent.Executor RTP_CONTINUATION_EXECUTOR =
+            r -> RTP.scheduler.runTaskAsynchronously(r);
+
+    /**
      * Invoke vanilla's non-blocking {@code getChunkFuture(cx, cz, FULL, true)}
      * and adapt the result to a {@code CompletableFuture<ChunkAccess>}. MUST be
      * called on the server tick thread. The vanilla return type drifted
@@ -152,7 +171,13 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                                 + cx + "," + cz + "): " + (raw == null ? "null" : raw.getClass()));
                 return null;
             }
-            return ((CompletableFuture<Object>) cf).thenApply(V26_2_R1FabricRTPWorld::unwrapChunk);
+            // thenApplyAsync (not thenApply): vanilla may complete `cf` inline on
+            // the server thread inside DistanceManager.runAllUpdates; hop the
+            // unwrap and every downstream RTP continuation onto the async
+            // scheduler so the pipeline never re-enters the chunk-ticket system
+            // mid-iteration (chunksToUpdateFutures CME). See RTP_CONTINUATION_EXECUTOR.
+            return ((CompletableFuture<Object>) cf)
+                    .thenApplyAsync(V26_2_R1FabricRTPWorld::unwrapChunk, RTP_CONTINUATION_EXECUTOR);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP][V26_2_R1] requestChunkFuture(" + cx + "," + cz + ") failed for "

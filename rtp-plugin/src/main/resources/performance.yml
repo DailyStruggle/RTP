@@ -195,10 +195,12 @@ biomeWeights:
   the_void: 1.0
 
 # Scan for safe landing spots in all loaded chunks (opportunistic
-# pre-fill).
+# pre-fill). Visited chunks register their biome into the spatial memory
+# of every region whose range contains them, feeding biome recall /
+# weighting. Uses already-resident chunk data only (no extra chunk I/O).
 # @type: boolean
-# @default: false
-checkOnChunkLoads: false
+# @default: true
+checkOnChunkLoads: true
 
 # Enable background data gathering for visitor analytics.
 # @type: boolean

@@ -210,6 +210,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
             (sender, s) -> sender.hasPermission("rtp.params") && (s.equalsIgnoreCase("true") || s.equalsIgnoreCase("false"))));
 
     addSubCommand(new ReloadCmd(this));
+    addSubCommand(new io.github.dailystruggle.rtp.common.commands.gui.GuiCmd(this));
     // /rtp help intentionally NOT registered as a subcommand: when no HELP
     // subcommand exists, commands-api's TreeCommand auto-dispatches the
     // built-in help() listing (see TreeCommand line 231), which covers

@@ -185,6 +185,10 @@ If you need player-relative placement, such as landing within 500 blocks of a fr
 
 ## Development & Addons
 
+### How does RTP load addons, and how do I turn the bundled ones off?
+
+Addons can arrive three ways - as a standalone plugin/mod, dropped into `plugins/RTP/addons/`, or bundled inside the RTP jar and auto-extracted to that folder on first run (this is how the on-by-default GUI picker ships). To turn a bundled addon off, delete its individual jar from `plugins/RTP/addons/` (do **not** delete the whole folder - a missing folder is treated as a fresh install and re-extracts the bundled jars) or set its config knob. Full details, including the `/rtp gui` behavior and a troubleshooting table, are in [ADDONS.md](ADDONS.md).
+
 ### I want to add a custom claim plugin integration. Where do I start?
 
 RTP already bundles claim-plugin support for the common protection plugins (GriefPrevention, WorldGuard, Towny, etc.) directly in the plugin jar — there is no separate integration jar to install (see [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)). To add your *own* integration, look at the `addons/RTP_ExampleAddon/` directory for a working example: your addon compiles against `rtp-api` only, registers a safety verifier through `RTPAPI.hooks()` (the same seam the bundled claim checks use), and registers itself on plugin enable. See [../../addons/REQUIREMENTS.md](../../addons/REQUIREMENTS.md) for the addon API contract.

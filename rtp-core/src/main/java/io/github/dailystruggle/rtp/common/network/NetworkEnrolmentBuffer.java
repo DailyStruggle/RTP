@@ -100,7 +100,7 @@ public final class NetworkEnrolmentBuffer {
         if (timerTaskHandle != null) return;
         if (RTP.scheduler == null) {
             RTP.log(Level.WARNING,
-                    "[NETWORK] NetworkEnrolmentBuffer.start called before scheduler available; "
+                    "[RTP] NetworkEnrolmentBuffer.start called before scheduler available; "
                             + "flush timer not started.");
             return;
         }
@@ -130,7 +130,7 @@ public final class NetworkEnrolmentBuffer {
                 deque.addFirst(batch.get(i));
             }
             RTP.log(Level.WARNING,
-                    "[NETWORK] enrolment flush failed (" + batch.size()
+                    "[RTP] enrolment flush failed (" + batch.size()
                             + " records re-queued): " + t.getMessage(), t);
         }
     }

@@ -190,8 +190,8 @@ pesiBioma:
 # Scansiona punti di atterraggio sicuri in tutti i chunk caricati (pre-riempimento
 # opportunistico).
 # @type: boolean
-# @default: false
-controlloCaricamentoChunk: false
+# @default: true
+controlloCaricamentoChunk: true
 
 # Attiva la raccolta dati in background per l'analisi dei visitatori.
 # @type: boolean

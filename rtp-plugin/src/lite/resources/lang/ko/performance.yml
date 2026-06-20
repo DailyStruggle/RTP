@@ -209,8 +209,8 @@ maxHeap백분율: 85.0
 # 리전 범위 내에서 로드된 모든 청크에서 안전한 위치를 찾습니다.
 # 영향: 높음 — 청크 로드 이벤트에서 서버 부하를 크게 증가시킬 수 있습니다.
 # @type: boolean
-# @default: false
-청크로드시검사: false
+# @default: true
+청크로드시검사: true
 
 # 관찰 모드 캐시 보충 (Region Data Visitor)
 # 사전 생성된 캐시가 가득 찬 경우, 동일한 `period` 주기로 각 리전에

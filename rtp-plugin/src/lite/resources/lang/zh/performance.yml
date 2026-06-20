@@ -207,8 +207,8 @@ maxHeap百分比: 85.0
 # 在区域范围内的所有已加载区块中查找安全位置。
 # 影响: 高 — 可能在区块加载事件中显著增加服务器负担。
 # @type: boolean
-# @default: false
-区块加载时检查: false
+# @default: true
+区块加载时检查: true
 
 # 观察者模式缓存填充（Region Data Visitor）
 # 当预生成缓存已满时，按相同的 `period` 周期为每个区域调度一个观察类型的

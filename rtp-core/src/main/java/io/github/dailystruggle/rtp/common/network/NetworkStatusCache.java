@@ -145,7 +145,7 @@ public final class NetworkStatusCache {
         // bootstrap banner in NetworkModeBootstrap; per-player traces
         // live here at FINE.
         RTP.log(Level.FINE,
-                "[NETWORK][state] " + (firstSeed ? "seeded" : "re-seeded")
+                "[RTP][state] " + (firstSeed ? "seeded" : "re-seeded")
                         + " local QUEUED row: playerId=" + playerId
                         + " ttlMs=" + seededTimeoutMs);
     }
@@ -190,7 +190,7 @@ public final class NetworkStatusCache {
         QueueStatus prev = byPlayer.remove(playerId);
         if (prev != null) {
             RTP.log(Level.FINE,
-                    "[NETWORK][state] evictLocal: playerId=" + playerId
+                    "[RTP][state] evictLocal: playerId=" + playerId
                             + " priorState=" + prev.state().name());
         }
     }
@@ -211,7 +211,7 @@ public final class NetworkStatusCache {
         if (timerTaskHandle != null) return;
         if (RTP.scheduler == null) {
             RTP.log(Level.WARNING,
-                    "[NETWORK] NetworkStatusCache.start called before scheduler available; "
+                    "[RTP] NetworkStatusCache.start called before scheduler available; "
                             + "poll timer not started.");
             return;
         }
@@ -232,7 +232,7 @@ public final class NetworkStatusCache {
             // S-004: never silently swallow. We keep the previous cache so
             // readers still see the last-known state until the next pulse.
             RTP.log(Level.WARNING,
-                    "[NETWORK] status poll failed: " + t.getMessage(), t);
+                    "[RTP] status poll failed: " + t.getMessage(), t);
             return;
         }
         // Snapshot prior non-terminal entries before we mutate the map so
@@ -266,7 +266,7 @@ public final class NetworkStatusCache {
                 int prevPos = (prev == null) ? -1 : prev.positionInQueue();
                 if (prevState != s.state() || prevPos != s.positionInQueue()) {
                     RTP.log(Level.FINE,
-                            "[NETWORK][state] supplier: playerId=" + s.playerId()
+                            "[RTP][state] supplier: playerId=" + s.playerId()
                                     + " " + (prevState == null ? "NEW" : prevState.name())
                                     + "(pos=" + prevPos + ") -> "
                                     + s.state().name() + "(pos=" + s.positionInQueue() + ")");
@@ -327,14 +327,14 @@ public final class NetworkStatusCache {
         // eviction when newState==null, sticky-TTL FAILED, etc.). One
         // line per UUID per transition; bounded by exactly-once firing.
         RTP.log(Level.FINE,
-                "[NETWORK][state] terminal: playerId=" + playerId
+                "[RTP][state] terminal: playerId=" + playerId
                         + " newState=" + (newState == null ? "EVICTED" : newState.name()));
         try {
             terminalListener.accept(playerId, newState);
         } catch (Throwable t) {
             // S-004: log, never swallow.
             RTP.log(Level.WARNING,
-                    "[NETWORK] terminal listener threw for " + playerId
+                    "[RTP] terminal listener threw for " + playerId
                             + " (state=" + newState + "): " + t.getMessage(), t);
         }
     }

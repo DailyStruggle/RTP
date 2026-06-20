@@ -185,8 +185,8 @@ poidsBiome:
 
 # Check for safe spots in all loaded chunks
 # @type: boolean
-# @default: false
-verifierAuChargementChunk: false
+# @default: true
+verifierAuChargementChunk: true
 
 # Enable background data gathering
 # @type: boolean
