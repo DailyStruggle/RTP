@@ -93,7 +93,7 @@ public final class PluginMessageNetworkBinding implements NetworkTransport {
             // logged, not swallowed silently and not propagated as a fatal
             // error - the next heartbeat tick retries.
             LOG.log(Level.FINE,
-                    "[NETWORK] plugin-message heartbeat broadcast skipped: " + t.getMessage());
+                    "[RTP] plugin-message heartbeat broadcast skipped: " + t.getMessage());
         }
         return CompletableFuture.completedFuture(null);
     }
@@ -104,7 +104,7 @@ public final class PluginMessageNetworkBinding implements NetworkTransport {
         try {
             hb = BackendHeartbeatCodec.decode(new String(payload, StandardCharsets.UTF_8));
         } catch (Throwable t) {
-            LOG.log(Level.FINE, "[NETWORK] dropping malformed inbound heartbeat: " + t.getMessage());
+            LOG.log(Level.FINE, "[RTP] dropping malformed inbound heartbeat: " + t.getMessage());
             return;
         }
         if (hb == null) return;

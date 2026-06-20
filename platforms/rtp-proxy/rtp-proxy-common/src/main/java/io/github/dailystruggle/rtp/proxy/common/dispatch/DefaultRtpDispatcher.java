@@ -205,7 +205,7 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
         // WAITLISTED -> ROUTING -> RESERVED -> TRANSFERRING -> COMPLETED /
         // FAILED). One line per transition; the sink itself is the
         // transport-side mirror that the lobby's NetworkStatusCache reads.
-        LOG.log(Level.INFO,
+        LOG.log(Level.FINE,
                 "[NETWORK][state][proxy] emit: playerId=" + playerId
                         + " state=" + state
                         + (reason != null && reason.isPresent() ? " reason=" + reason.get() : ""));
@@ -404,12 +404,11 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
 
         // Phase B trace (2026-05-23): claim succeeded, player still
         // connected, about to ask the proxy adapter (Velocity / BungeeCord)
-        // to actually transfer the player. Logged at INFO so devstack
+        // to actually transfer the player. Logged at FINE so devstack
         // repros can confirm the dispatcher reached the transfer step
         // (vs. returning early on sender.isConnected, claim failure, or
-        // never being entered at all). Remove or downgrade once root cause
-        // is identified.
-        LOG.log(Level.INFO,
+        // never being entered at all) without spamming production consoles.
+        LOG.log(Level.FINE,
                 "[NETWORK][trace] DefaultRtpDispatcher.sendAfterClaim: invoking sender.sendTo(player={0}, serverId={1}, token={2}) correlationId={3}",
                 new Object[]{request.playerId(), token.serverId(), token.tokenId(), request.correlationId()});
         return sender.sendTo(request.playerId(), token.serverId(), token)

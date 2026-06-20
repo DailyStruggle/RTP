@@ -191,8 +191,8 @@ wagiBiomu:
 # Skanuj w poszukiwaniu bezpiecznych miejsc lądowania we wszystkich załadowanych
 # chunkach (oportunistyczne wstępne wypełnianie).
 # @type: boolean
-# @default: false
-sprawdzPrzyZaladowaniuChunka: false
+# @default: true
+sprawdzPrzyZaladowaniuChunka: true
 
 # Włącz gromadzenie danych w tle na potrzeby analityki odwiedzających.
 # @type: boolean

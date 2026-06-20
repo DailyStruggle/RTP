@@ -969,7 +969,15 @@ public class RTP {
       if (serverAccessor != null) {
         File pluginDir = serverAccessor.getPluginDirectory();
         if (pluginDir != null) {
-          addons.discoverFromDirectory(new File(pluginDir, "addons"));
+          File addonsDir = new File(pluginDir, "addons");
+          // First run only: unpack any addon jars bundled inside the RTP jar (e.g. the
+          // GUI destination-picker demo) so the showcase works out of the box. Keyed on
+          // the folder not yet existing, so deleting the extracted jar (or the folder)
+          // is a permanent opt-out - it is never re-extracted.
+          if (!addonsDir.exists()) {
+            addons.extractBundledAddons(addonsDir);
+          }
+          addons.discoverFromDirectory(addonsDir);
         }
       }
       addons.loadAll();
@@ -993,10 +1001,10 @@ public class RTP {
           redisManagerClass.getDeclaredConstructor(String.class, int.class, String.class)
               .newInstance(host, port, password);
     } catch (ClassNotFoundException | NoClassDefFoundError missing) {
-      log(Level.WARNING, "[NETWORK] redis enabled in config but RedisManager/Jedis is not on the classpath; skipping network bus init");
+      log(Level.WARNING, "[RTP] redis enabled in config but RedisManager/Jedis is not on the classpath; skipping network bus init");
       return null;
     } catch (ReflectiveOperationException e) {
-      log(Level.WARNING, "[NETWORK] failed to construct RedisManager", e);
+      log(Level.WARNING, "[RTP] failed to construct RedisManager", e);
       return null;
     }
   }

@@ -187,8 +187,8 @@ biomGewichte:
 # In allen geladenen Chunks nach sicheren Landeplätzen suchen (opportunistische
 # Vorbefüllung).
 # @type: boolean
-# @default: false
-beiChunkLadenPruefen: false
+# @default: true
+beiChunkLadenPruefen: true
 
 # ÄNDERE NICHT DIE VERSIONSNUMMER
 version: 1.0

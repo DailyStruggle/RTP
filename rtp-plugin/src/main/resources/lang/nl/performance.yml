@@ -212,8 +212,8 @@ bioomGewichten:
 # Zoekt naar veilige locaties in alle geladen chunks binnen het bereik van een regio.
 # Impact: HOOG — kan de serverbelasting bij chunklaadgebeurtenissen aanzienlijk verhogen.
 # @type: boolean
-# @default: false
-controleer_bijChunkLaden: false
+# @default: true
+controleer_bijChunkLaden: true
 
 # Achtergrondgegevensverzameling (Region Data Visitor)
 # Wanneer de voorgenereercache vol is, wordt per regio één observerende

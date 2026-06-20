@@ -7,7 +7,3 @@ prefix: RTP-GUI
 authors: [ leaf26 ]
 description: 'DonutSMP-style chest destination picker - the Bukkit renderer for the platform-neutral rtp-gui-common menu'
 depend: [ RTP ]
-commands:
-  rtpgui:
-    description: open the RTP destination picker GUI
-    usage: /rtpgui

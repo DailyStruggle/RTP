@@ -175,6 +175,29 @@ class LockFreeLocationBufferTest {
         assertSame(b, removed.get(0));
     }
 
+    /**
+     * Mirror of {@link #pollSilently_doesNotFireOnRemoveButReturnsHead()} for the
+     * destination side of an internal buffer-to-buffer move (heap-pressure shed of
+     * {@code keptLocations} back into {@code unkeptLocations}). The candidate
+     * persists under the same DB composite key in both buffers, so the silent offer
+     * must suppress the {@code onAdd} save to avoid redundant write churn.
+     */
+    @Test
+    void offerSilently_doesNotFireOnAddButStores() {
+        List<RTPLocation> added = new ArrayList<>();
+        buffer.setCallbacks(added::add, null);
+        RTPLocation a = loc(1);
+        assertTrue(buffer.offerSilently(a));
+        assertTrue(added.isEmpty(), "offerSilently must not fire onAdd");
+        assertEquals(1, buffer.size());
+        assertSame(a, buffer.get(0));
+        // Subsequent regular offer still fires the callback.
+        RTPLocation b = loc(2);
+        assertTrue(buffer.offer(b));
+        assertEquals(1, added.size());
+        assertSame(b, added.get(0));
+    }
+
     @Test
     void pollSilently_emptyBuffer_returnsNull() {
         List<RTPLocation> removed = new ArrayList<>();

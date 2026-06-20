@@ -41,7 +41,7 @@ import java.util.logging.Level;
 public final class MetricsBindingDispatcher {
 
     /** Tag used to disambiguate the Paper / Spigot path in startup logs. */
-    private static final String LOG_TAG = "[METRICS]";
+    private static final String LOG_TAG = "[RTP]";
 
     /** Paper-only static method probe; presence implies Paper-flavoured runtime. */
     private static final String PAPER_PROBE_METHOD = "getTPS";
@@ -107,7 +107,7 @@ public final class MetricsBindingDispatcher {
                     // true MSPT statistic that is consistent on Folia. The
                     // SparkMetricsBinding delegates foliaRegions() to the Folia
                     // binding, so per-region samples are preserved.
-                    RTP.log(Level.INFO, LOG_TAG
+                    RTP.log(Level.FINE, LOG_TAG
                             + " installed FoliaMetricsBinding (threaded-regions detected)");
                     RTP.metrics.setBinding(wrapWithSparkIfPresent(folia));
                     installed = true;
@@ -118,7 +118,7 @@ public final class MetricsBindingDispatcher {
                 MetricsBinding paper = instantiateBinding(
                         PAPER_BINDING_FQN, "PaperMetricsBinding (Bukkit#getTPS detected)");
                 if (paper != null) {
-                    RTP.log(Level.INFO, LOG_TAG
+                    RTP.log(Level.FINE, LOG_TAG
                             + " installed PaperMetricsBinding (Bukkit#getTPS detected)");
                     // Per-field merge: prefer spark's TPS/MSPT over the native
                     // Paper values when spark is present (Folia is handled above
@@ -152,7 +152,7 @@ public final class MetricsBindingDispatcher {
                                 LOG_TAG + " BukkitTpsSampler.tick() invocation failed", t);
                     }
                 }, 1L, 1L);
-                RTP.log(Level.INFO,
+                RTP.log(Level.FINE,
                         LOG_TAG + " installed BukkitTpsSampler (raw Spigot fallback, 1-tick sampler)");
             }
             installed = true;
@@ -211,7 +211,7 @@ public final class MetricsBindingDispatcher {
                     .getDeclaredConstructor()
                     .newInstance();
             RTP.metrics.setBinding(binding);
-            RTP.log(Level.INFO, LOG_TAG + " installed " + description);
+            RTP.log(Level.FINE, LOG_TAG + " installed " + description);
             return true;
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
             RTP.log(Level.FINE, LOG_TAG + " binding " + bindingFqn
@@ -269,7 +269,7 @@ public final class MetricsBindingDispatcher {
             MetricsBinding wrapped = (MetricsBinding) Class.forName(SPARK_BINDING_FQN)
                     .getConstructor(MetricsBinding.class)
                     .newInstance(delegate);
-            RTP.log(Level.INFO, LOG_TAG
+            RTP.log(Level.FINE, LOG_TAG
                     + " spark detected; merging spark TPS/MSPT over native binding");
             return wrapped;
         } catch (ClassNotFoundException | NoClassDefFoundError e) {

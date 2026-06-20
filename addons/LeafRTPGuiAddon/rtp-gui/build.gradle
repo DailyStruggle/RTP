@@ -82,15 +82,24 @@ dependencies {
 shadowJar {
     archiveBaseName.set('LeafRTPGuiAddon')
     archiveClassifier.set('')
-    // Merge any duplicate META-INF/services files across the shaded carriers (e.g.
-    // the RTPAddon service). Platform MenuRenderers are registered programmatically
-    // by each entry point, not via a MenuRenderer service file (shared "chest" key),
-    // so there is intentionally no MenuRenderer service file to merge.
+    // Merge duplicate META-INF/services files across the shaded carriers - both the
+    // RTPAddon service and the MenuRenderer service. A platform module may publish its
+    // renderer via the MenuRenderer SPI (the Bukkit renderer does) so the common addon
+    // can register it on the ServiceLoader load path (plugins/RTP/addons/ or the bundled
+    // RTP jar), where the platform entry point never runs. The shared "chest" key is safe
+    // because RTPGuiCommonAddon skips any renderer that is not isAvailable() on this runtime.
     mergeServiceFiles()
     // Minecraft / Bukkit / fabric-loader / NeoForge are all provided by the host at
     // runtime (compileOnly in the carriers), so nothing platform-specific is shaded
     // except the addon's own renderer classes and descriptors.
 }
+// The thin `jar` task would emit the same `LeafRTPGuiAddon-<version>.jar` path as
+// `shadowJar` (both use archivesName 'LeafRTPGuiAddon' + classifier ''), making the
+// file a dual-producer output - ambiguous for any consumer (e.g. rtp-plugin bundling
+// it) and nondeterministic on disk. The assembly's only shippable artifact is the
+// shaded jar, so disable the thin jar entirely.
+tasks.named('jar') { enabled = false }
+
 // Wire the shaded jar into `assemble` (not just `build`) so the root
 // `copyAddonAndHelperJars` aggregation, which depends on `:...:rtp-gui:assemble`,
 // produces and mirrors the shaded executable rather than the thin jar.

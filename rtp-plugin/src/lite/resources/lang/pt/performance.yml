@@ -204,8 +204,8 @@ pesosBioma:
 # Busca localizações seguras dentro de todos os chunks carregados no alcance de uma região.
 # Impacto: ALTO - pode aumentar significativamente a carga do servidor em eventos de carregamento de chunks.
 # @type: boolean
-# @default: false
-verificarNoCarregamentoChunk: false
+# @default: true
+verificarNoCarregamentoChunk: true
 
 # NÃO ALTERE O NÚMERO DA VERSÃO
 version: 1.0

@@ -357,6 +357,69 @@ processResources {
 processResources.dependsOn copyDocs
 shadowJar.dependsOn processResources
 
+// Bundle the LeafRTPGuiAddon multi-loader jar inside the RTP jar as a plain
+// nested jar under `bundled-addons/`. On first run RTP extracts it into
+// `<pluginDir>/addons/` (AddonRegistry#extractBundledAddons), so the GUI demo
+// works out of the box without a second download. The jar is carried opaque (a
+// nested .jar, NOT shaded/relocated), so its bytecode is untouched by shadowJar's
+// commands-api relocation - the addon couples to RTP only through the
+// un-relocated rtp-core / rtp-api packages.
+//
+// Injection point: the FINAL (post-remap) jar, NOT shadowJar and NOT
+// processResources. ShadowJar treats any jar in its inputs (a `from` file OR a
+// loose .jar resource in sourceSets.main.output) as an archive to merge/explode,
+// so it never survives shadow as a whole nested jar. Loom's `remapJar`, by
+// contrast, copies non-class resources verbatim, so we append the nested jar in
+// remapJar's / remapLiteJar's doLast (after the carrier merges) via the
+// `injectBundledAddonJar` closure below. The companion `bundled-addons/index`
+// text file ships normally through `src/main/resources` (it is not a jar, so
+// shadow keeps it). `guiAddonJarProvider` is null on a build graph without the
+// addon (e.g. a constrained publish run), in which case injection is skipped.
+def guiAddonAssembly = findProject(':addons:LeafRTPGuiAddon:rtp-gui')
+def guiAddonShadowTask = null
+def guiAddonJarProvider = null
+if (guiAddonAssembly != null) {
+    // Force the addon assembly to configure first so its `shadowJar` task (registered
+    // by the shadow plugin during that project's evaluation) exists when referenced.
+    evaluationDependsOn(':addons:LeafRTPGuiAddon:rtp-gui')
+    guiAddonShadowTask = guiAddonAssembly.tasks.named('shadowJar')
+    guiAddonJarProvider = guiAddonShadowTask.flatMap { it.archiveFile }
+}
+
+// Appends `srcJar` into `out` (a built RTP jar) as `bundled-addons/<destName>`,
+// keeping it whole. Idempotent: skips if the entry already exists. Used from the
+// remap doLasts so the nested jar lands in the final artifact (shadow strips it).
+ext.injectBundledAddonJar = { File out, File srcJar, String destName ->
+    def entryName = 'bundled-addons/' + destName
+    def tmp = new File(out.parentFile, out.name + '.addoninject.tmp')
+    boolean exists = false
+    new java.util.zip.ZipFile(out).withCloseable { zf -> exists = zf.getEntry(entryName) != null }
+    if (exists) return
+    new java.util.zip.ZipFile(out).withCloseable { src ->
+        new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(tmp)).withCloseable { zos ->
+            def es = src.entries()
+            while (es.hasMoreElements()) {
+                def e = es.nextElement()
+                def ne = new java.util.zip.ZipEntry(e.name)
+                ne.time = e.time
+                zos.putNextEntry(ne)
+                if (!e.isDirectory()) src.getInputStream(e).withCloseable { ins -> ins.transferTo(zos) }
+                zos.closeEntry()
+            }
+            zos.putNextEntry(new java.util.zip.ZipEntry(entryName))
+            srcJar.withInputStream { ins -> ins.transferTo(zos) }
+            zos.closeEntry()
+        }
+    }
+    if (!out.delete()) throw new GradleException("Failed to delete jar for addon injection: " + out)
+    if (!tmp.renameTo(out)) {
+        java.nio.file.Files.copy(tmp.toPath(), out.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        tmp.delete()
+    }
+    logger.lifecycle("[rtp-plugin] injected bundled addon ${destName} into ${out.name}")
+}
+
 
 // ADR-024: the existing shadowJar produces the FULL/Pro edition (LeafRTP-Pro).
 // A sibling `shadowLiteJar` task below produces the lite edition under the
@@ -808,6 +871,12 @@ remapJar {
     }
     def neoforgeCfg = neoforgeIncluded ? project.configurations.neoforgeBytecode : null
     def mergeNeoForgeFn = project.ext.mergeNeoForgeBytecodeIntoJar
+    // Bundled GUI addon jar (resolved at config time; null when the addon is not
+    // on the build graph). Appended whole AFTER the carrier merges.
+    if (guiAddonShadowTask != null) dependsOn guiAddonShadowTask
+    def injectAddonFn = project.ext.injectBundledAddonJar
+    def addonJarFile = guiAddonJarProvider == null ? null : guiAddonJarProvider.get().asFile
+    if (addonJarFile != null) inputs.file(addonJarFile).withPropertyName('bundledGuiAddonJar')
     doLast {
         mergeFn(remapJar.archiveFile.get().asFile, 'Pro',
                 v26Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
@@ -822,6 +891,11 @@ remapJar {
         if (neoforgeCfg != null) {
             mergeNeoForgeFn(remapJar.archiveFile.get().asFile, 'Pro',
                     neoforgeCfg.files.toList())
+        }
+        // Append the bundled GUI demo addon jar whole (kept un-exploded) so RTP
+        // can self-extract it into <pluginDir>/addons/ on first run.
+        if (addonJarFile != null) {
+            injectAddonFn(remapJar.archiveFile.get().asFile, addonJarFile, 'LeafRTPGuiAddon.jar')
         }
     }
 }
@@ -1231,6 +1305,12 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     }
     def neoforgeCfg = neoforgeIncluded ? project.configurations.neoforgeBytecode : null
     def mergeNeoForgeFn = project.ext.mergeNeoForgeBytecodeIntoJar
+    // Bundled GUI addon jar (resolved at config time; null when the addon is not on
+    // the build graph). Appended whole AFTER the carrier merges - parity with Pro.
+    if (guiAddonShadowTask != null) dependsOn guiAddonShadowTask
+    def injectAddonFn = project.ext.injectBundledAddonJar
+    def addonJarFile = guiAddonJarProvider == null ? null : guiAddonJarProvider.get().asFile
+    if (addonJarFile != null) inputs.file(addonJarFile).withPropertyName('bundledGuiAddonJar')
 
     doLast {
         mergeFn(remapLiteJar.archiveFile.get().asFile, 'lite',
@@ -1245,6 +1325,11 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
         if (neoforgeCfg != null) {
             mergeNeoForgeFn(remapLiteJar.archiveFile.get().asFile, 'lite',
                     neoforgeCfg.files.toList())
+        }
+        // Append the bundled GUI demo addon jar whole (kept un-exploded) so RTP
+        // can self-extract it into <pluginDir>/addons/ on first run.
+        if (addonJarFile != null) {
+            injectAddonFn(remapLiteJar.archiveFile.get().asFile, addonJarFile, 'LeafRTPGuiAddon.jar')
         }
     }
 }

@@ -66,19 +66,19 @@ public final class NetworkWaitlistGuard implements Predicate<RTPCommandSender> {
             // confirm the guard did NOT short-circuit the dispatched /rtp without
             // spamming the console at INFO on every invocation.
             RTP.log(Level.FINE,
-                    "[NETWORK][trace] NetworkWaitlistGuard.test: no cached status for "
+                    "[RTP][trace] NetworkWaitlistGuard.test: no cached status for "
                             + uuid + "; allowing /rtp to proceed");
             return true;
         }
         NetworkStatusCache.QueueStatus status = snap.get();
         if (!status.nonTerminal()) {
             RTP.log(Level.FINE,
-                    "[NETWORK][trace] NetworkWaitlistGuard.test: cached status=" + status.state()
+                    "[RTP][trace] NetworkWaitlistGuard.test: cached status=" + status.state()
                             + " is terminal for " + uuid + "; allowing /rtp to proceed");
             return true;
         }
         RTP.log(Level.FINE,
-                "[NETWORK][trace] NetworkWaitlistGuard.test: REJECTING /rtp for " + uuid
+                "[RTP][trace] NetworkWaitlistGuard.test: REJECTING /rtp for " + uuid
                         + " (cached status=" + status.state() + " is non-terminal, position="
                         + status.positionInQueue() + ")");
 
@@ -91,7 +91,7 @@ public final class NetworkWaitlistGuard implements Predicate<RTPCommandSender> {
             // the predicate result is what gates the command, and we still
             // return false below to keep the lock honest.
             RTP.log(Level.WARNING,
-                    "[NETWORK] NetworkWaitlistGuard message dispatch failed for "
+                    "[RTP] NetworkWaitlistGuard message dispatch failed for "
                             + uuid + ": " + t.getMessage(), t);
         }
         return false;

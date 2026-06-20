@@ -77,7 +77,7 @@ public final class BackendStatePublisher {
             // wires the publisher before RTP.scheduler is assigned). Caller
             // can drive tick() manually; do not silently no-op forever.
             RTP.log(java.util.logging.Level.WARNING,
-                    "[NETWORK] BackendStatePublisher.start(): RTP.scheduler is null; "
+                    "[RTP] BackendStatePublisher.start(): RTP.scheduler is null; "
                             + "periodic tick disabled for server=" + serverId);
             return;
         }
@@ -119,7 +119,7 @@ public final class BackendStatePublisher {
         } catch (RuntimeException e) {
             // RTP.log routes through the canonical accessor; safe to call here.
             io.github.dailystruggle.rtp.common.RTP.log(java.util.logging.Level.WARNING,
-                    "[NETWORK] BackendStatePublisher tick failed: " + e.getMessage(), e);
+                    "[RTP] BackendStatePublisher tick failed: " + e.getMessage(), e);
         }
     }
 

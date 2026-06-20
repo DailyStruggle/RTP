@@ -114,7 +114,7 @@ public final class ProxyAutoDetector {
         try {
             probe = bridge.passiveProbe();
         } catch (Throwable t) {
-            LOG.log(Level.FINE, "[NETWORK] passive proxy probe failed: " + t.getMessage());
+            LOG.log(Level.FINE, "[RTP] passive proxy probe failed: " + t.getMessage());
             probe = NetworkBridge.ProxyProbe.DISARMED;
         }
         state.set(probe != null && probe.armed() ? State.ARMED : State.DISABLED);
@@ -150,7 +150,7 @@ public final class ProxyAutoDetector {
         try {
             bridge.requestTopology();
         } catch (Throwable t) {
-            LOG.log(Level.FINE, "[NETWORK] topology handshake request skipped: " + t.getMessage());
+            LOG.log(Level.FINE, "[RTP] topology handshake request skipped: " + t.getMessage());
         }
     }
 

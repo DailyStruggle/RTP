@@ -175,6 +175,7 @@ public final class RTPCmdNeoForgeRoot extends BaseRTPCmdImpl implements RTPCmd {
         // auto-emits a complete built-in help listing when no HELP subcommand
         // exists. TestCmd is deferred (Bukkit-coupled); menu is N2.6.
         addSubCommand(new ReloadCmd(this));
+        addSubCommand(new io.github.dailystruggle.rtp.common.commands.gui.GuiCmd(this));
         addSubCommand(new ConfigCmd(this));
         addSubCommand(new ScanCmd(this));
         addSubCommand(new InfoCmd(this));

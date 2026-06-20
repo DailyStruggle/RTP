@@ -20,12 +20,16 @@ import java.util.UUID;
  * screen on the server thread for the resolved {@link ServerPlayer}.
  *
  * <p>Registered under the same {@code "chest"} style key as the Bukkit renderer, so
- * the {@code menuStyle} config value selects it uniformly across platforms. Because
- * every platform's renderer shares that key, this one is registered programmatically
- * by {@code RTPGuiFabricInitializer} (Fabric-only entry point) rather than via a
- * {@code MenuRenderer} SPI service file: a cross-platform SPI loop would let this
- * renderer and the Bukkit/NeoForge ones overwrite each other in the shared
- * {@code GuiRenderers} map.
+ * the {@code menuStyle} config value selects it uniformly across platforms. It is
+ * published via a {@code MenuRenderer} SPI service file so {@code RTPGuiCommonAddon}
+ * can register it on the {@link java.util.ServiceLoader} load path (the
+ * {@code plugins/RTP/addons/} folder or the bundled-in-jar demo), where the Fabric
+ * mod entry point never runs. The shared {@code "chest"} key is safe across platforms
+ * because {@link #isAvailable()} is gated on the Fabric loader being present, so on a
+ * Bukkit or NeoForge runtime this renderer reports unavailable and is skipped rather
+ * than clobbering the live one. When the addon IS installed as a standalone Fabric
+ * mod, {@code RTPGuiFabricInitializer} also registers the same renderer
+ * programmatically - harmless, since {@code GuiRenderers} keys by style.
  */
 public final class FabricMenuRenderer implements MenuRenderer {
 
@@ -39,7 +43,103 @@ public final class FabricMenuRenderer implements MenuRenderer {
 
   @Override
   public boolean isAvailable() {
-    return RTPGuiFabricInitializer.server() != null;
+    // Gate on the Fabric loader being present rather than on a bound server: the
+    // SPI registration may run before SERVER_STARTED, and a player can only run
+    // /rtp once the server is up, so open() resolves the live server defensively.
+    // The marker also disambiguates this renderer from the NeoForge one (both only
+    // reference net.minecraft types, so both load on either modded runtime).
+    return isFabricRuntime();
+  }
+
+  /** @return true when the Fabric loader is on the classpath (i.e. a Fabric runtime). */
+  private static boolean isFabricRuntime() {
+    try {
+      Class.forName("net.fabricmc.loader.api.FabricLoader");
+      return true;
+    } catch (Throwable notFabric) {
+      return false;
+    }
+  }
+
+  /**
+   * Resolves the live {@link MinecraftServer}: the Fabric mod entry point's captured
+   * reference when running standalone, otherwise RTP's own bound server (via the
+   * platform accessor's {@code getServer()}), which is the only source on the
+   * ServiceLoader / bundled-in-jar load path where the mod entry point never runs.
+   */
+  private static MinecraftServer currentServer() {
+    MinecraftServer s = RTPGuiFabricInitializer.server();
+    if (s != null) {
+      return s;
+    }
+    Object accessor = RTP.serverAccessor;
+    if (accessor == null) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP-GUI] Fabric renderer: RTP.serverAccessor is null; cannot resolve server");
+      return null;
+    }
+    Object result;
+    try {
+      result = accessor.getClass().getMethod("getServer").invoke(accessor);
+    } catch (Throwable noServer) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP-GUI] Fabric renderer: reflective getServer() on "
+              + accessor.getClass().getName() + " threw", noServer);
+      return null;
+    }
+    if (result == null) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP-GUI] Fabric renderer: " + accessor.getClass().getName()
+              + ".getServer() returned null (server not yet bound?)");
+      return null;
+    }
+    if (result instanceof MinecraftServer) {
+      return (MinecraftServer) result;
+    }
+    // The accessor handed back a server object whose class is not assignable to the
+    // MinecraftServer type this renderer was compiled against - a classloader /
+    // mappings mismatch between the addon jar and the platform carrier. Fall back to
+    // reflective use of that object instead of dropping to the classic teleport.
+    RTP.log(java.util.logging.Level.WARNING,
+        "[RTP-GUI] Fabric renderer: getServer() returned a "
+            + result.getClass().getName()
+            + " not assignable to this renderer's MinecraftServer ("
+            + MinecraftServer.class.getClassLoader() + " vs "
+            + result.getClass().getClassLoader() + ")");
+    return null;
+  }
+
+  /**
+   * Resolves the live {@link ServerPlayer} for {@code playerId}. Primary path: RTP's own
+   * player registry ({@code RTP.serverAccessor.getPlayer(uuid).handle()}), which holds the
+   * {@code ServerPlayer} directly and does not depend on the accessor's typed
+   * {@code getServer()} resolving cleanly across the addon's classloader. Fallback: the
+   * resolved {@link MinecraftServer}'s player list. The {@code handle()} method is invoked
+   * reflectively because the addon does not depend on {@code rtp-fabric-common}.
+   */
+  private static ServerPlayer resolvePlayer(UUID playerId) {
+    try {
+      Object accessor = RTP.serverAccessor;
+      if (accessor != null) {
+        Object rtpPlayer = accessor.getClass().getMethod("getPlayer", UUID.class)
+            .invoke(accessor, playerId);
+        if (rtpPlayer != null) {
+          Object handle = rtpPlayer.getClass().getMethod("handle").invoke(rtpPlayer);
+          if (handle instanceof ServerPlayer) {
+            return (ServerPlayer) handle;
+          }
+        }
+      }
+    } catch (Throwable viaRegistry) {
+      RTP.log(java.util.logging.Level.FINE,
+          "[RTP-GUI] Fabric renderer: player registry resolution failed for " + playerId
+              + "; falling back to server player list", viaRegistry);
+    }
+    MinecraftServer server = currentServer();
+    if (server == null) {
+      return null;
+    }
+    return server.getPlayerList().getPlayer(playerId);
   }
 
   @Override
@@ -51,17 +151,12 @@ public final class FabricMenuRenderer implements MenuRenderer {
     RTP.log(java.util.logging.Level.INFO,
         "[RTP-GUI] Fabric renderer scheduling chest open for " + playerId);
     RTP.scheduler.runTask(() -> {
-      MinecraftServer server = RTPGuiFabricInitializer.server();
-      if (server == null) {
-        RTP.log(java.util.logging.Level.INFO,
-            "[RTP-GUI] Fabric renderer: server null at open time for " + playerId);
-        return;
-      }
-      ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+      ServerPlayer player = resolvePlayer(playerId);
       if (player == null) {
         RTP.log(java.util.logging.Level.INFO,
-            "[RTP-GUI] Fabric renderer: player not online at open time for " + playerId);
-        return; // logged off between build and open
+            "[RTP-GUI] Fabric renderer: could not resolve player at open time for " + playerId
+                + " (offline, or neither the player registry nor a bound server was available)");
+        return;
       }
       RTP.log(java.util.logging.Level.INFO,
           "[RTP-GUI] Fabric renderer opening chest menu for " + playerId);

@@ -91,7 +91,7 @@ public final class BukkitNetworkBridge implements NetworkBridge {
             ok = true;
         } catch (Throwable t) {
             LOG.log(Level.WARNING,
-                    "[NETWORK] failed to register the '" + CHANNEL + "' plugin-messaging channel; "
+                    "[RTP] failed to register the '" + CHANNEL + "' plugin-messaging channel; "
                             + "plugin-message network tier unavailable: " + t.getMessage());
         }
         this.registered = ok;
@@ -115,7 +115,7 @@ public final class BukkitNetworkBridge implements NetworkBridge {
     public void broadcastHeartbeat(byte[] payload) {
         Optional<UUID> carrier = anyOnlinePlayer();
         if (carrier.isEmpty()) {
-            LOG.log(Level.FINE, "[NETWORK] no carrier player online; heartbeat gossip skipped this tick.");
+            LOG.log(Level.FINE, "[RTP] no carrier player online; heartbeat gossip skipped this tick.");
             return;
         }
         ByteArrayDataOutput out = ByteStreams.newDataOutput();
@@ -148,14 +148,14 @@ public final class BukkitNetworkBridge implements NetworkBridge {
         if (payload == null) return;
         Optional<UUID> carrier = anyOnlinePlayer();
         if (carrier.isEmpty()) {
-            LOG.log(Level.FINE, "[NETWORK] no carrier player online; heartbeat push to proxy skipped.");
+            LOG.log(Level.FINE, "[RTP] no carrier player online; heartbeat push to proxy skipped.");
             return;
         }
         ByteArrayDataOutput out = ByteStreams.newDataOutput();
         out.writeByte(PROXY_PUSH);
         out.writeShort(payload.length);
         out.write(payload);
-        LOG.log(Level.FINE, "[NETWORK] pushing heartbeat (" + payload.length
+        LOG.log(Level.FINE, "[RTP] pushing heartbeat (" + payload.length
                 + " bytes) to proxy via carrier " + carrier.get() + ".");
         dispatch(carrier.get(), PROXY_CHANNEL, out.toByteArray(), "proxy-cache push");
     }
@@ -164,12 +164,12 @@ public final class BukkitNetworkBridge implements NetworkBridge {
     public void requestSnapshot() {
         Optional<UUID> carrier = anyOnlinePlayer();
         if (carrier.isEmpty()) {
-            LOG.log(Level.FINE, "[NETWORK] no carrier player online; proxy-cache snapshot request skipped.");
+            LOG.log(Level.FINE, "[RTP] no carrier player online; proxy-cache snapshot request skipped.");
             return;
         }
         ByteArrayDataOutput out = ByteStreams.newDataOutput();
         out.writeByte(PROXY_SNAPSHOT_REQ);
-        LOG.log(Level.FINE, "[NETWORK] requesting proxy-cache snapshot via carrier " + carrier.get() + ".");
+        LOG.log(Level.FINE, "[RTP] requesting proxy-cache snapshot via carrier " + carrier.get() + ".");
         dispatch(carrier.get(), PROXY_CHANNEL, out.toByteArray(), "proxy-cache snapshot request");
     }
 
@@ -177,7 +177,7 @@ public final class BukkitNetworkBridge implements NetworkBridge {
     public void requestTopology() {
         Optional<UUID> carrier = anyOnlinePlayer();
         if (carrier.isEmpty()) {
-            LOG.log(Level.FINE, "[NETWORK] no carrier player online; topology handshake deferred.");
+            LOG.log(Level.FINE, "[RTP] no carrier player online; topology handshake deferred.");
             return;
         }
         ByteArrayDataOutput getServer = ByteStreams.newDataOutput();
@@ -215,7 +215,7 @@ public final class BukkitNetworkBridge implements NetworkBridge {
                 }
             }
         } catch (Throwable t) {
-            LOG.log(Level.FINE, "[NETWORK] passive proxy probe failed: " + t.getMessage());
+            LOG.log(Level.FINE, "[RTP] passive proxy probe failed: " + t.getMessage());
         }
         return ProxyProbe.DISARMED;
     }
@@ -247,12 +247,12 @@ public final class BukkitNetworkBridge implements NetworkBridge {
         try {
             Player p = Bukkit.getPlayer(carrier);
             if (p == null || !p.isOnline()) {
-                LOG.log(Level.FINE, "[NETWORK] carrier player gone; " + what + " dropped.");
+                LOG.log(Level.FINE, "[RTP] carrier player gone; " + what + " dropped.");
                 return;
             }
             p.sendPluginMessage(plugin, channel, frame);
         } catch (Throwable t) {
-            LOG.log(Level.FINE, "[NETWORK] " + what + " send failed: " + t.getMessage());
+            LOG.log(Level.FINE, "[RTP] " + what + " send failed: " + t.getMessage());
         }
     }
 
@@ -294,7 +294,7 @@ public final class BukkitNetworkBridge implements NetworkBridge {
                     }
                 }
             } catch (Throwable t) {
-                LOG.log(Level.FINE, "[NETWORK] dropping malformed proxy plugin message: " + t.getMessage());
+                LOG.log(Level.FINE, "[RTP] dropping malformed proxy plugin message: " + t.getMessage());
             }
         }
 
@@ -313,14 +313,14 @@ public final class BukkitNetworkBridge implements NetworkBridge {
                     byte[] payload = new byte[Math.max(0, (int) len)];
                     in.readFully(payload);
                     Consumer<byte[]> sink = heartbeatSink;
-                    LOG.log(Level.FINE, "[NETWORK] received proxy-cache snapshot row (" + payload.length
+                    LOG.log(Level.FINE, "[RTP] received proxy-cache snapshot row (" + payload.length
                             + " bytes); sink " + (sink != null ? "present" : "absent") + ".");
                     if (sink != null) sink.accept(payload);
                 }
                 // PROXY_PUSH / PROXY_SNAPSHOT_REQ are companion-bound; a backend
                 // never receives them and ignores them if echoed.
             } catch (Throwable t) {
-                LOG.log(Level.FINE, "[NETWORK] dropping malformed proxy-cache message: " + t.getMessage());
+                LOG.log(Level.FINE, "[RTP] dropping malformed proxy-cache message: " + t.getMessage());
             }
         }
     }

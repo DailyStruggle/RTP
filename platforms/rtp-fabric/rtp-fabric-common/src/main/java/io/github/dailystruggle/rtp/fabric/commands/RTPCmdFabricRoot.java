@@ -211,6 +211,7 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
         // rtp-plugin/.../bukkit/commands/test/TestCmd.java and depends on
         // Bukkit-only types. A platform-neutral lift is tracked in MULTI_PLATFORM_PLAN.md.
         addSubCommand(new ReloadCmd(this));
+        addSubCommand(new io.github.dailystruggle.rtp.common.commands.gui.GuiCmd(this));
         // /rtp help intentionally NOT registered: commands-api's TreeCommand
         // auto-emits a complete built-in help listing when no HELP
         // subcommand exists (TreeCommand line 231), which lists every

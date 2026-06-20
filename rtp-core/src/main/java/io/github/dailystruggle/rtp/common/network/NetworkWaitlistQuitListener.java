@@ -84,7 +84,7 @@ public final class NetworkWaitlistQuitListener {
                 lobbyRetryQueue.cancel(uuid, null);
             } catch (Throwable t) {
                 RTP.log(Level.WARNING,
-                        "[NETWORK] lobby retry cancel-on-quit threw for "
+                        "[RTP] lobby retry cancel-on-quit threw for "
                                 + uuid + ": " + t.getMessage(), t);
             }
         }
@@ -92,7 +92,7 @@ public final class NetworkWaitlistQuitListener {
             requestQueue.cancel(uuid, NetworkRequestQueue.CancelReason.PLAYER_DISCONNECT)
                     .exceptionally(t -> {
                         RTP.log(Level.WARNING,
-                                "[NETWORK] waitlist cancel-on-quit failed for "
+                                "[RTP] waitlist cancel-on-quit failed for "
                                         + uuid + ": " + t.getMessage(), t);
                         return null;
                     });
@@ -100,7 +100,7 @@ public final class NetworkWaitlistQuitListener {
             // S-004: never silently swallow, but never let a quit handler
             // throw out of Bukkit's event dispatch.
             RTP.log(Level.WARNING,
-                    "[NETWORK] waitlist cancel-on-quit threw synchronously for "
+                    "[RTP] waitlist cancel-on-quit threw synchronously for "
                             + uuid + ": " + t.getMessage(), t);
         }
     }

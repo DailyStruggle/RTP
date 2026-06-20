@@ -258,7 +258,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
 
         if (decision instanceof RoutingDecision.Local) {
             RTP.log(Level.FINE,
-                    "[NETWORK][state] route: playerId=" + playerId
+                    "[RTP][state] route: playerId=" + playerId
                             + " regionArg=" + regionArg + " -> LOCAL");
             return RoutingResult.local();
         }
@@ -319,7 +319,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
             // resolved, NOT the raw player input (so e.g. mode=auto's
             // resolved hint shows up; in v1 these are usually equal).
             RTP.log(Level.FINE,
-                    "[NETWORK][state] route: playerId=" + playerId
+                    "[RTP][state] route: playerId=" + playerId
                             + " -> CROSS_SERVER correlationId=" + correlationId
                             + " region=" + cs.regionKey().orElse("")
                             + " server=" + cs.serverHint().orElse(""));
@@ -337,7 +337,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
             if (fallback.reason() == RoutingDecision.FallbackReason.REGION_UNAVAILABLE) {
                 String placeholder = formatPlaceholder(serverHint, regionKey, regionArg);
                 RTP.log(Level.FINE,
-                        "[NETWORK][state] route: playerId=" + playerId
+                        "[RTP][state] route: playerId=" + playerId
                                 + " regionArg=" + regionArg
                                 + " -> REJECT(REGION_UNAVAILABLE)");
                 return RoutingResult.reject(
@@ -364,7 +364,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
             // the queue allocates a real one on success.
             if (lobbyMode && lobbyRetryQueue != null) {
                 RTP.log(Level.FINE,
-                        "[NETWORK][state] route: playerId=" + playerId
+                        "[RTP][state] route: playerId=" + playerId
                                 + " regionArg=" + regionArg
                                 + " -> SYNTHETIC_CROSS_SERVER(parked, reason=" + fallback.reason() + ")");
                 lobbyRetryQueue.enqueue(playerId, args, fallback.reason(), null);
@@ -377,7 +377,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
             // graceful silent local fall-through is correct because the
             // local pipeline genuinely can serve /rtp.
             RTP.log(Level.FINE,
-                    "[NETWORK][state] route: playerId=" + playerId
+                    "[RTP][state] route: playerId=" + playerId
                             + " regionArg=" + regionArg
                             + " -> LOCAL_FALLBACK(reason=" + fallback.reason() + ")");
             return RoutingResult.local();

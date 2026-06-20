@@ -97,7 +97,7 @@ biomeWeights:
   end_barrens: 1.0
   # --- Misc / technical ---
   the_void: 1.0
-checkOnChunkLoads: false  # Check for safe spots in all loaded chunks
+checkOnChunkLoads: true   # Register biome of loaded chunks for in-range regions
 
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

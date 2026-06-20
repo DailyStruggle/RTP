@@ -342,7 +342,7 @@ public final class PeerRegionRegistry {
                 if (r != null && !r.isEmpty()) out.add(peer + ":" + r);
             }
         }
-        RTP.log(Level.FINE, "[NETWORK] peerEntries: snapshot="
+        RTP.log(Level.FINE, "[RTP] peerEntries: snapshot="
                 + (snap == null ? "null" : snap.all().size() + " backend(s)")
                 + ", heartbeatServers=" + heartbeatServers
                 + ", topologyPeers=" + topology

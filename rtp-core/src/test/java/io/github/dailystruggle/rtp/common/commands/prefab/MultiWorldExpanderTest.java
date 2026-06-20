@@ -61,7 +61,7 @@ class MultiWorldExpanderTest {
     }
 
     @Test
-    @DisplayName("expansion: one synthesised overlay per non-default world, cloned from default with world set")
+    @DisplayName("expansion: one synthesised overlay per world not already mapped by an existing region")
     void expandsAcrossWorlds() {
         Map<String, Map<String, Object>> regions = currentRegionsWithDefault();
         Map<String, Map<String, Object>> out = MultiWorldExpander.expand(
@@ -69,8 +69,12 @@ class MultiWorldExpanderTest {
                 regions,
                 List.of("world", "world_nether", "world_the_end")
         );
-        assertEquals(3, out.size(), "one synthesised overlay per world");
-        for (String world : List.of("world", "world_nether", "world_the_end")) {
+        // The default template already maps to "world" (the overworld), so that
+        // world is left alone rather than cloned into a duplicate regions/world.
+        assertEquals(2, out.size(), "one synthesised overlay per unmapped world");
+        assertFalse(out.containsKey("world"),
+                "world already targeted by the default region must not be duplicated");
+        for (String world : List.of("world_nether", "world_the_end")) {
             Map<String, Object> overlay = out.get(world);
             assertEquals(world, overlay.get("world"), "world key rewritten to " + world);
             assertEquals("CIRCLE", ((Map<?, ?>) overlay.get("shape")).get("name"));
@@ -95,7 +99,9 @@ class MultiWorldExpanderTest {
         );
         assertFalse(out.containsKey("world_nether"),
                 "existing per-world region must not appear in synthesised overlays");
-        assertTrue(out.containsKey("world"));
+        // The default region already maps to "world", so it is left alone too.
+        assertFalse(out.containsKey("world"),
+                "world already targeted by the default region must not be duplicated");
         assertTrue(out.containsKey("world_the_end"));
         // The original regions map is untouched; the existing entry remains.
         assertSame(existing, regions.get("world_nether"));
@@ -130,9 +136,9 @@ class MultiWorldExpanderTest {
         Map<String, Map<String, Object>> out = MultiWorldExpander.expand(
                 MultiWorld.INSTANCE,
                 regions,
-                List.of("world")
+                List.of("world_custom")
         );
-        Map<String, Object> synthesised = out.get("world");
+        Map<String, Object> synthesised = out.get("world_custom");
         assertNotSame(regions.get("default"), synthesised);
         assertNotSame(regions.get("default").get("shape"), synthesised.get("shape"));
         // Mutate the clone; default must stay pristine.
@@ -188,15 +194,14 @@ class MultiWorldExpanderTest {
                 MultiWorld.INSTANCE,
                 List.of("world", "world_nether")
         );
-        assertTrue(result.newTrees().containsKey("regions/world"));
+        // The default region already maps to "world", so no duplicate is made.
+        assertFalse(result.newTrees().containsKey("regions/world"));
         assertTrue(result.newTrees().containsKey("regions/world_nether"));
-        assertEquals("world", result.newTrees().get("regions/world").get("world"));
         assertEquals("world_nether", result.newTrees().get("regions/world_nether").get("world"));
         // Diff lists every key the synthesis introduced for each new file.
-        assertTrue(result.perFileDiff().containsKey("regions/world"));
         assertTrue(result.perFileDiff().containsKey("regions/world_nether"));
         // Source trees untouched.
-        assertNull(trees.get("regions/world"));
+        assertNull(trees.get("regions/world_nether"));
     }
 
     @Test

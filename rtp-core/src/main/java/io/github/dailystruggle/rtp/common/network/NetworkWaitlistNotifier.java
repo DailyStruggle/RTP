@@ -72,7 +72,7 @@ public class NetworkWaitlistNotifier {
         if (timerTaskHandle != null) return;
         if (RTP.scheduler == null) {
             RTP.log(Level.WARNING,
-                    "[NETWORK] NetworkWaitlistNotifier.start called before scheduler available; "
+                    "[RTP] NetworkWaitlistNotifier.start called before scheduler available; "
                             + "notifier not started.");
             return;
         }
@@ -91,7 +91,7 @@ public class NetworkWaitlistNotifier {
         } catch (Throwable t) {
             // S-004: never silently swallow.
             RTP.log(Level.WARNING,
-                    "[NETWORK] NetworkWaitlistNotifier pulse failed: " + t.getMessage(), t);
+                    "[RTP] NetworkWaitlistNotifier pulse failed: " + t.getMessage(), t);
         }
     }
 
@@ -168,7 +168,7 @@ public class NetworkWaitlistNotifier {
         } catch (Throwable t) {
             // S-004: never silently swallow.
             RTP.log(Level.WARNING,
-                    "[NETWORK] NetworkWaitlistNotifier emit failed for "
+                    "[RTP] NetworkWaitlistNotifier emit failed for "
                             + uuid + ": " + t.getMessage(), t);
             return false;
         }

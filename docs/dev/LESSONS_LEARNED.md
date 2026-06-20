@@ -183,6 +183,25 @@ This mirrors the original Folia fix shape (`getChunkAtAsync` → `.thenAccept` l
 
 `continueInline(...)` is still safe for *fall-through within a single attempt* (bounded depth, e.g. probe-fast-path falling back to full path) — the multiplicative growth requires re-entry into the *outer* loop. If you reach for `continueInline(this::rescheduleNextAttempt)` (or any equivalent) from inside a CF callback, that's the bug.
 
+### Never chain RTP continuations inline on a vanilla chunk-holder future (26.x DistanceManager CME) (2026-06-20)
+
+`V26_1_R1FabricRTPWorld` / `V26_2_R1FabricRTPWorld` crashed every tick (and again at shutdown) on a deterministic, single-thread NPE inside vanilla code:
+
+```
+NullPointerException: Cannot invoke "...ReferenceArrayList.get(int)" because "this.wrapped" is null
+    at it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet$SetIterator.next(...)
+    at net.minecraft.server.level.DistanceManager.runAllUpdates(DistanceManager.java:85)
+    at net.minecraft.server.level.ServerChunkCache.runDistanceManagerUpdates(...)
+```
+
+`wrapped == null` in a fastutil `ReferenceOpenHashSet$SetIterator` is the signature of the set being *structurally modified while being iterated*. `runAllUpdates` iterates `DistanceManager.chunksToUpdateFutures` twice (calling `ChunkHolder.updateHighestAllowedStatus` then `updateFutures`) and then `clear()`s it. The `DistanceManager`/`ServerChunkCache`/`TicketStorage`/`TicketType` classes are byte-identical between 26.1.2 and 26.2 (verified via `javap` on the loom-cached deobf jars), so this was never a vanilla-version diff — it was RTP re-entering the chunk system mid-iteration on the **server thread**.
+
+Mechanism: the `V26_x_R1FabricRTPWorld.getChunkAt` chain attached RTP continuations directly (`thenApply` / `thenCompose`) onto the `CompletableFuture` returned by vanilla `ServerChunkCache#getChunkFuture(..., FULL, create=true)`. The 26.x chunk system completes a `ChunkHolder`'s full-chunk future **inline on the server thread** from inside `runAllUpdates` (`ChunkHolder.updateFutures` -> `CompletableFuture.complete`). So RTP's whole pipeline ran inline mid-iteration; when the rtp-core neighbour-grid step then called `world.getChunkAt(neighbour)` -> `MinecraftServer.submit(...)`, `submit` runs the supplier **inline when already on the server thread** (`BlockableEventLoop` same-thread fast path), so `getChunkFuture(create=true)` added a generation ticket and mutated `chunksToUpdateFutures` while it was being iterated -> CME.
+
+Fix: hop RTP's first continuation off the completing thread. `requestChunkFuture` now uses `thenApplyAsync(unwrapChunk, RTP_CONTINUATION_EXECUTOR)` (the executor routes to `RTP.scheduler.runTaskAsynchronously`), so the unwrap and every downstream RTP continuation run on the async pool, and the downstream `submit` queues to a safe between-tick point instead of running inline. This is the same off-thread self-dispatch rule rtp-fabric-ADR-008 established for the unobf carrier's `loadLiveChunk`; the per-version 26.x `RTPWorld`s had reintroduced the inline pattern.
+
+Rule for any non-Bukkit adapter that talks to the chunk system directly: never let RTP's own pipeline run as an *inline* dependent of a vanilla chunk future. Always force the first continuation onto an RTP-owned executor (`*Async` with `RTP.scheduler`), because vanilla may complete that future synchronously from inside `DistanceManager.runAllUpdates` where any further ticket/`getChunkFuture` call (including an inline same-thread `MinecraftServer.submit`) corrupts the live iteration.
+
 ### Paper 26.1 scan throughput parity with Spigot/Folia (2026-04-21)
 
 Paper 26.1 with the non-blocking `LocationGenerator` state machine (ADR-015 post-refactor) achieves roughly **300 cps effective scan throughput**, on parity with the Spigot/Folia Anvil-based scan path. This confirms that ADR-016 §1.1 (the adapter-internal `[RTP] Anvil gate skipped reason=chunk-already-loaded` gate firing on essentially every candidate on Paper chunk-system-v2) is **not** a performance regression relative to the pure-Anvil path — Paper's live-chunk `getBiome` on an already-loaded chunk is cheap enough to close the gap.

@@ -1,0 +1,7 @@
+# Addon jars bundled inside the RTP jar, one resource name per line.
+# AddonRegistry#extractBundledAddons copies each listed jar from the
+# classpath resource bundled-addons/<name> into <pluginDir>/addons/ on
+# first run (when the addons/ folder does not yet exist), so the demo
+# works out of the box. Deleting the extracted jar (or the folder) is a
+# permanent opt-out. Lines starting with '#' and blank lines are ignored.
+LeafRTPGuiAddon.jar

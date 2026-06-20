@@ -205,4 +205,55 @@ class AddonRegistryTest {
       addonsDir.delete();
     }
   }
+
+  @Test
+  @DisplayName("extractBundledAddons copies indexed jars from the classpath and never overwrites")
+  void extractBundledAddons_copies_indexed_jars(@TempDir File tempDir) throws Exception {
+    // Stage a fake "RTP jar" classpath root holding the bundled-addons index + payload.
+    File classpathRoot = new File(tempDir, "cp");
+    File bundleDir = new File(classpathRoot, "bundled-addons");
+    assertTrue(bundleDir.mkdirs());
+    Files.writeString(
+        new File(bundleDir, "index").toPath(),
+        "# comment line\n\nDemoAddon.jar\nMissing.jar\n",
+        StandardCharsets.UTF_8);
+    byte[] payload = "demo-jar-bytes".getBytes(StandardCharsets.UTF_8);
+    Files.write(new File(bundleDir, "DemoAddon.jar").toPath(), payload);
+
+    File addonsDir = new File(tempDir, "addons");
+    try (java.net.URLClassLoader loader =
+        new java.net.URLClassLoader(new java.net.URL[] {classpathRoot.toURI().toURL()}, null)) {
+      AddonRegistry registry = new AddonRegistry();
+      registry.extractBundledAddons(addonsDir, loader);
+
+      File extracted = new File(addonsDir, "DemoAddon.jar");
+      assertTrue(extracted.isFile(), "indexed jar present on the classpath must be extracted");
+      assertEquals(
+          new String(payload, StandardCharsets.UTF_8),
+          Files.readString(extracted.toPath()),
+          "extracted bytes must match the bundled resource");
+      assertFalse(
+          new File(addonsDir, "Missing.jar").exists(),
+          "an indexed-but-absent resource is skipped, not created");
+
+      // Re-extraction never clobbers an operator's edited copy.
+      Files.writeString(extracted.toPath(), "edited-by-operator", StandardCharsets.UTF_8);
+      registry.extractBundledAddons(addonsDir, loader);
+      assertEquals(
+          "edited-by-operator",
+          Files.readString(extracted.toPath()),
+          "an already-present jar must be left untouched on a second pass");
+    }
+  }
+
+  @Test
+  @DisplayName("extractBundledAddons is a no-op when no bundle index is on the classpath")
+  void extractBundledAddons_noop_without_index(@TempDir File tempDir) throws Exception {
+    File addonsDir = new File(tempDir, "addons");
+    try (java.net.URLClassLoader empty =
+        new java.net.URLClassLoader(new java.net.URL[0], null)) {
+      new AddonRegistry().extractBundledAddons(addonsDir, empty);
+    }
+    assertFalse(addonsDir.exists(), "no index => nothing created");
+  }
 }

@@ -499,6 +499,50 @@ public class Region extends FactoryValue<RegionKeys> {
     }
   }
 
+  /**
+   * Releases retained hot-cache chunk tickets while the JVM heap is under
+   * pressure, letting the garbage collector actually reclaim memory.
+   *
+   * <p>The heap gate in {@link #execute(long)} pauses cold-&gt;hot promotion so the
+   * retained set stops growing, but each kept {@link RTPLocation} pins a chunk via
+   * its {@link io.github.dailystruggle.rtp.api.world.ChunkReservation}; without
+   * shedding, usage stays parked above the threshold and the "pausing background
+   * cache generation" warning repeats forever. This drains a bounded number of
+   * kept locations per pulse, closing each reservation (freeing the chunk) and
+   * returning the bare coordinates to the ticketless {@code unkeptLocations}
+   * buffer <em>silently</em> - both buffers key the same DB row, so the move
+   * issues no writes. A small reserve of hot locations is left untouched so
+   * waiting players keep being served while the heap recovers.
+   */
+  private void shedHotCacheUnderPressure() {
+    final int reserve = 8;
+    final int maxPerPulse = 32;
+    int surplus = queueManager.keptLocations.size() - reserve;
+    if (surplus <= 0) return;
+    int budget = Math.min(surplus, maxPerPulse);
+    int shed = 0;
+    for (int i = 0; i < budget; i++) {
+      RTPLocation hot = queueManager.keptLocations.pollSilently();
+      if (hot == null) break;
+      RTPLocation cold = hot;
+      if (hot.reservation() != null) {
+        hot.reservation().close();
+        // Strip the now-closed reservation so the cold buffer holds a ticketless
+        // candidate (RTPLocation is an immutable record).
+        cold = new RTPLocation(hot.coords(), hot.attempts());
+      }
+      // Drop silently if the cold buffer is already full - the candidate is lost,
+      // which is acceptable when shedding to avoid an OutOfMemoryError.
+      queueManager.unkeptLocations.offerSilently(cold);
+      shed++;
+    }
+    if (shed > 0) {
+      RTP.log(Level.FINE,
+          "[Region:" + name + "] shed " + shed + " hot chunk ticket(s) under heap pressure; kept="
+              + queueManager.keptLocations.size());
+    }
+  }
+
   public void execute(long availableTime) {
     io.github.dailystruggle.rtp.common.tools.CfDiag.regionExecute.increment();
     // Lobby backends advertise regions=[]/acceptingRequests=false
@@ -557,6 +601,21 @@ public class Region extends FactoryValue<RegionKeys> {
     if (heapUnderPressure && deficit > 0) {
       RTP.log(Level.FINE,
           "[Region:" + name + "] hot-cache fill paused (heap pressure); deficit=" + deficit);
+    }
+
+    // Active shed: pausing the fill above stops the retained set from *growing*,
+    // but it never *shrinks* it - each kept location pins a chunk via its
+    // ChunkReservation, so on a small heap the usage stays parked above the
+    // threshold indefinitely (the symptom: a repeating "pausing background cache
+    // generation" warning that never clears). While under pressure, release a
+    // bounded number of kept chunk tickets per pulse so the JVM can actually
+    // reclaim memory. The coordinates are returned to the ticketless cold buffer
+    // (unkeptLocations) silently - both buffers persist the same DB composite
+    // key, so this moves zero rows and issues zero writes; only the in-memory
+    // chunk ticket is freed. Waiting players keep being served from whatever hot
+    // locations remain.
+    if (heapUnderPressure) {
+      shedHotCacheUnderPressure();
     }
 
     for (int i = 0; i < fillDeficit; i++) {

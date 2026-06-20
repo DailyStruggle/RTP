@@ -125,7 +125,7 @@ public final class BukkitRTPPlayer implements RTPPlayer {
           async.whenComplete(
               (success, throwable) -> {
                 if (throwable != null) {
-                  RTP.log(Level.WARNING, "[FOLIA] teleportAsync failed", throwable);
+                  RTP.log(Level.WARNING, "[RTP] teleportAsync failed", throwable);
                   future.complete(false);
                 } else {
                   future.complete(Boolean.TRUE.equals(success));
@@ -136,7 +136,7 @@ public final class BukkitRTPPlayer implements RTPPlayer {
       } catch (ReflectiveOperationException | RuntimeException e) {
         // teleportAsync unavailable/failed unexpectedly; fall through to the sync path below so
         // the teleport failure is never silently swallowed (REQ-RTP-S-004).
-        RTP.log(Level.WARNING, "[FOLIA] teleportAsync unavailable, falling back to sync teleport", e);
+        RTP.log(Level.WARNING, "[RTP] teleportAsync unavailable, falling back to sync teleport", e);
       }
     }
 

@@ -236,16 +236,74 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         // async worker before invoking vanilla. The persistent kept-cache ticket is
         // still applied separately via applyTicket(...) after cold->hot promotion,
         // so the promoted chunk stays pinned (S-002 unaffected).
+        // Temporary load-ticket so the chunk holder actually reaches FULL-status
+        // generation. Without it, the public getChunkFuture(create=true) resolves
+        // with no ChunkAccess on this runtime (a loading failure -> null), which
+        // floods ScanTask with "[ScanTask] INSTANT BYPASS: Chunk manager returned
+        // a null chunk" warnings and starves the kept cache (every full-load scan
+        // of an ungenerated chunk bypasses instead of generating). Mirrors the
+        // 1.21.1 carrier, which already applies this ticket. The ticket is added
+        // here while still on the tick thread (loadLiveChunk dispatches us via
+        // MinecraftServer#execute) and released on the tick thread once the
+        // generation future resolves. It uses a dedicated, non-persistent (S-002),
+        // self-expiring ticket type so it never collides with (and evicts) a
+        // kept-cache ticket on the same chunk, and a missed release still self-heals.
+        final ChunkPos ticketPos = new ChunkPos(cx, cz);
+        final boolean ticketAdded = tryAddTempLoadTicket(level, ticketPos);
         if (server != null && server.isSameThread()) {
             CompletableFuture<ChunkAccess> out = new CompletableFuture<>();
             RTP.scheduler.runTaskAsynchronously(() ->
                     invokeGetChunkFuture(level, cx, cz).whenComplete((ca, ex) -> {
+                        if (ticketAdded) scheduleTempLoadTicketRemoval(level, ticketPos);
                         if (ex != null) out.completeExceptionally(ex);
                         else out.complete(ca);
                     }));
             return out;
         }
-        return invokeGetChunkFuture(level, cx, cz);
+        return invokeGetChunkFuture(level, cx, cz).whenComplete((ca, ex) -> {
+            if (ticketAdded) scheduleTempLoadTicketRemoval(level, ticketPos);
+        });
+    }
+
+    /**
+     * Apply the transient generation load-ticket for {@code cp}. Best-effort: a
+     * failure is logged at FINE and reported via the return value so the caller
+     * skips the matching removal. Must be invoked on the server tick thread.
+     */
+    private boolean tryAddTempLoadTicket(ServerLevel level, ChunkPos cp) {
+        try {
+            level.getChunkSource().addTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, RTP_TICKET_DISTANCE);
+            return true;
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][NeoForge 26.1] temp load-ticket apply failed for chunk="
+                            + cp + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Release the transient generation load-ticket for {@code cp} on the server
+     * tick thread (hops via {@link MinecraftServer#execute} when called off-thread,
+     * e.g. from the chunk-future completion). The ticket type also carries a
+     * timeout, so a dropped removal self-heals.
+     */
+    private void scheduleTempLoadTicketRemoval(ServerLevel level, ChunkPos cp) {
+        MinecraftServer server = level.getServer();
+        Runnable remove = () -> {
+            try {
+                level.getChunkSource().removeTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, RTP_TICKET_DISTANCE);
+            } catch (Throwable t) {
+                RTP.log(Level.FINE,
+                        "[RTP][NeoForge 26.1] temp load-ticket release failed for chunk="
+                                + cp + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            }
+        };
+        if (server != null && !server.isSameThread()) {
+            server.execute(remove);
+        } else {
+            remove.run();
+        }
     }
 
     /**
@@ -374,6 +432,15 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION;
     private static final TicketType RTP_TICKET_TYPE =
             new TicketType(TicketType.NO_TIMEOUT, RTP_TICKET_FLAGS);
+
+    // Transient generation load-ticket applied around requestFullChunkAsync so the
+    // chunk holder reaches FULL status (without it getChunkFuture(create=true)
+    // resolves null on this runtime). A dedicated instance (NOT RTP_TICKET_TYPE) so
+    // its add/remove never collides with a kept-cache ticket on the same chunk, and
+    // a positive timeout (~30s = 600 ticks) self-heals a missed release. S-002:
+    // FLAG_PERSIST omitted, so it is never written to level.dat.
+    private static final TicketType RTP_TEMP_LOAD_TICKET_TYPE =
+            new TicketType(600L, RTP_TICKET_FLAGS);
 
     @Override
     public CompletableFuture<Void> applyTicket(ServerLevel level, int cx, int cz) {

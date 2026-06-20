@@ -27,10 +27,56 @@ public final class BukkitMenuRenderer implements MenuRenderer {
   /** Style key under which this renderer registers; the {@code menuStyle} default. */
   public static final String STYLE = "chest";
 
+  /**
+   * Guards against registering the {@link DestinationPickerListener} more than once
+   * (e.g. SPI path then a {@code /rtp reload}, or both load paths in one JVM). The
+   * click/drag listener is process-global, so a single registration is enough no
+   * matter how many renderer instances exist.
+   */
+  private static final java.util.concurrent.atomic.AtomicBoolean LISTENER_REGISTERED =
+      new java.util.concurrent.atomic.AtomicBoolean(false);
+
   private final Plugin plugin;
+
+  /**
+   * SPI / no-arg constructor. Resolves the host RTP plugin from the server's plugin
+   * manager so the renderer works when it is discovered via
+   * {@code META-INF/services} (the addons-folder / bundled load path, where the
+   * Bukkit {@code JavaPlugin} entry point never runs) rather than registered by
+   * {@code RTPGuiBukkitPlugin}. The {@code RTP} plugin is only needed for the
+   * non-Folia main-thread fallback scheduler; the primary open path uses the
+   * player's entity scheduler and tolerates a {@code null} plugin.
+   *
+   * <p>On this load path the {@code JavaPlugin} entry point that would normally
+   * register the {@link DestinationPickerListener} never runs, so the listener is
+   * registered here against the host RTP plugin. Without it the menu opens but
+   * clicks are never translated into a teleport.
+   */
+  public BukkitMenuRenderer() {
+    this(Bukkit.getPluginManager().getPlugin("RTP"));
+    registerClickListener(this.plugin);
+  }
 
   public BukkitMenuRenderer(Plugin plugin) {
     this.plugin = plugin;
+  }
+
+  /**
+   * Registers the {@link DestinationPickerListener} once per JVM against the given
+   * host plugin. Used by the SPI / no-arg load path, where no {@code JavaPlugin}
+   * {@code onEnable} runs to register it.
+   */
+  static void registerClickListener(Plugin host) {
+    if (host == null) {
+      RTP.log(java.util.logging.Level.WARNING, "[RTP-GUI] no host plugin available to"
+          + " register the menu click listener; menu clicks will not respond");
+      return;
+    }
+    if (LISTENER_REGISTERED.compareAndSet(false, true)) {
+      Bukkit.getPluginManager().registerEvents(new DestinationPickerListener(), host);
+      RTP.log(java.util.logging.Level.FINE,
+          "[RTP-GUI] registered destination picker click listener via SPI load path");
+    }
   }
 
   @Override
@@ -72,8 +118,11 @@ public final class BukkitMenuRenderer implements MenuRenderer {
     // open directly on the main thread.
     if (Bukkit.isPrimaryThread()) {
       openTask.run();
-    } else {
+    } else if (plugin != null) {
       Bukkit.getScheduler().runTask(plugin, openTask);
+    } else {
+      RTP.log(java.util.logging.Level.WARNING, "[RTP-GUI] open: no host plugin available to"
+          + " schedule the main-thread menu open for " + playerId);
     }
   }
 }

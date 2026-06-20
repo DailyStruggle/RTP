@@ -303,13 +303,13 @@ menuRootHint: "&7click an option below to begin"
 menuPagePrev: "&7« previous page ([page])"
 menuPageNext: "&7next page ([page]) »"
 # Section divider on the front page above teleport rows (player view).
-menuFrontPageSectionTeleport: "&8» &7teleport"
+menuFrontPageSectionTeleport: "&8» #3E6B45 teleport"
 # Front-page rows. No placeholders.
-menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
-menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
-menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- pick a world"
-menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- pick a biome"
-menuFrontPageRowHelp: "&2▶ /rtp help &7- list commands"
+menuFrontPageRowTeleport: "#1B7A33🎲 teleport &7- /rtp"
+menuFrontPageRowRegion: "#1F6FB2🌍 pick a region &7- /rtp region:..."
+menuFrontPageRowWorld: "#1F6FB2🌐 pick a world &7- /rtp world:..."
+menuFrontPageRowBiome: "#1F8A40🌳 pick a biome &7- /rtp biome:..."
+menuFrontPageRowHelp: "#7A4FB8❓ list commands &7- /rtp help"
 # Front-page admin entry row: the only inline
 # admin-visible row on the front page; click descends into the curated admin
 # panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.

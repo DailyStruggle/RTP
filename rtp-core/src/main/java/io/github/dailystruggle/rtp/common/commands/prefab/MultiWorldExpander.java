@@ -17,10 +17,14 @@ import java.util.Objects;
  * into {@link PrefabApplier#apply(Map, Prefab)}.
  *
  * <p><strong>Idempotency contract</strong>: a world that already has a
- * region entry in {@code currentRegions} is left untouched; only worlds
- * without an existing region get a synthesised entry. Re-running the
- * expander after a previous apply is therefore a no-op for the worlds it
- * has already covered (checklist session 3, item 3.2).
+ * region - either keyed by the world name in {@code currentRegions} or
+ * targeted by an existing region's {@code world} field (including the
+ * {@code default} template's own world) - is left untouched; only worlds
+ * without an existing region get a synthesised entry. Because the default
+ * template usually maps to the overworld, that world is left alone rather
+ * than cloned into a redundant {@code regions/world} duplicate. Re-running
+ * the expander after a previous apply is therefore a no-op for the worlds
+ * it has already covered.
  *
  * <p>Pure function: does not mutate any input. The cloned template is a
  * deep copy so callers can safely mutate the returned overlays.
@@ -82,6 +86,23 @@ public final class MultiWorldExpander {
             );
         }
 
+        // Collect every world already targeted by an existing region's "world"
+        // field (including the default template's own world). A world that
+        // already has a region mapped within it must not get a duplicate
+        // synthesised overlay - e.g. the default region usually maps to the
+        // overworld, so "world" is left alone rather than cloned into a
+        // redundant regions/world entry.
+        Map<String, Boolean> mappedWorlds = new LinkedHashMap<>();
+        for (Map<String, Object> region : currentRegions.values()) {
+            if (region == null) {
+                continue;
+            }
+            Object mappedWorld = region.get("world");
+            if (mappedWorld instanceof String s && !s.isEmpty()) {
+                mappedWorlds.put(s, Boolean.TRUE);
+            }
+        }
+
         for (String world : worldNames) {
             Objects.requireNonNull(world, "worldName");
             if (world.isEmpty()) {
@@ -89,6 +110,10 @@ public final class MultiWorldExpander {
             }
             if (currentRegions.containsKey(world)) {
                 // Idempotent: an existing per-world region wins; do not overwrite.
+                continue;
+            }
+            if (mappedWorlds.containsKey(world)) {
+                // An existing region already targets this world; leave it alone.
                 continue;
             }
             if (out.containsKey(world)) {
