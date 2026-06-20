@@ -141,37 +141,37 @@ scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_l
 инфоЧастотаУтечек: "&7Текущая частота утечек чанков: #7E9CC8[leakRate]"
 # --- Metrics SPI health block ---
 infoQueueDepth: "&7Игроков в очередях регионов: #7E9CC8[queueDepth]"
-infoPendingTeleports: "&7Ожидающих конвейеров телепорта: #7E9CC8[pendingTeleports]"
-infoAvgPipelineMs: "&7Avg Pipeline Latency: #7E9CC8[avgPipelineMs] ms"
+infoPendingTeleports: "&7Ожидающие конвейеры телепортации: #7E9CC8[pendingTeleports]"
+infoAvgPipelineMs: "&7Средняя задержка конвейера: #7E9CC8[avgPipelineMs] ms"
 # Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
-infoPipelinePercentiles: "&7Pipeline Latency (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
+infoPipelinePercentiles: "&7Задержка конвейера (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
 # Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
-infoSlowPipeline: "&7Slow Teleports (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
+infoSlowPipeline: "&7Медленные телепортации (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
 # Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
-infoQueueGrowth: "&7Queue-Growth Warnings (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
-infoHeap: "&7Heap JVM: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
+infoQueueGrowth: "&7Предупреждения о росте очереди (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
+infoHeap: "&7Куча JVM: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # Строка заголовка блока Health pipeline в /rtp info.
-infoHealthPipelineHeader: "&7--- Health: pipeline ---"
+infoHealthPipelineHeader: "&7--- Состояние: конвейер ---"
 # Показания TPS для окон 1m / 5m / 15m. Подстановки: [tps1m] [tps5m] [tps15m].
 infoTps: "&7TPS (1m/5m/15m): #7E9CC8[tps1m] / [tps5m] / [tps15m]"
 # Текущий MSPT сервера и загрузка бюджета тика. Подстановки: [mspt] [tickBudgetUtilisation].
-infoMSPTLive: "&7Server MSPT: #7E9CC8[mspt] ms (&7tick budget: #7E9CC8[tickBudgetUtilisation]&7)"
+infoMSPTLive: "&7MSPT сервера: #7E9CC8[mspt] ms (&7бюджет тика: #7E9CC8[tickBudgetUtilisation]&7)"
 # Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
-infoSoftCap: "&7Players: #7E9CC8[playerCount] / [softCap]"
+infoSoftCap: "&7Игроки: #7E9CC8[playerCount] / [softCap]"
 # Последняя задержка обращения к базе данных в мс. Подстановка: [databaseLatencyMs].
-infoDatabaseLatencyMs: "&7Database Latency: #7E9CC8[databaseLatencyMs] ms"
+infoDatabaseLatencyMs: "&7Задержка базы данных: #7E9CC8[databaseLatencyMs] ms"
 # Generation outcome metrics (ADR-052), sourced from the process-global RtpOutcomeStats.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
-infoFailureRate: "&7Generation Success: #7E9CC8[genSuccessRate]&7 (fail #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
+infoFailureRate: "&7Успех генерации: #7E9CC8[genSuccessRate]&7 (сбои #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
 # Single most common rejection cause and its share of all failures. Placeholders:
 # [genTopRejectionCause] [genTopRejectionShare].
-infoTopRejectionCause: "&7Top Rejection Cause: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
+infoTopRejectionCause: "&7Основная причина отказа: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
 # Per-cause rejection breakdown (the analogue of a competitor's /rtp unsafe-stats).
 # Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
-infoFailureBreakdown: "&7Rejections by Cause: #7E9CC8[genFailureBreakdown]"
+infoFailureBreakdown: "&7Отказы по причинам: #7E9CC8[genFailureBreakdown]"
 # Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
 # to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&7/&c.
 infoThresholdTpsGreen: 19.5
@@ -182,7 +182,7 @@ infoThresholdCacheFillGreen: 0.5
 infoThresholdCacheFillYellow: 0.25
 infoThresholdNetworkAgeYellow: 5.0
 # Header line introducing the per-Folia-region table (Folia runtime only).
-infoFoliaRegionsHeader: "&7--- Folia regions ---"
+infoFoliaRegionsHeader: "&7--- Регионы Folia ---"
 # Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
 # [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
 infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
@@ -197,33 +197,33 @@ infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7
 # Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
 # players spend their time in, sampled over the server's uptime.
 # Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
-infoBiomeActivityHeader: "&8--- &3Biome occupancy &8(&3[biomeTotalSamples]&8 samples, &3[biomeDistinctCount]&8 biomes) ---"
+infoBiomeActivityHeader: "&8--- &3Заполнение биомов &8(&3[biomeTotalSamples]&8 образцов, &3[biomeDistinctCount]&8 биомов) ---"
 # Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
 infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
 # Shown when no occupancy has been sampled yet.
-infoBiomeActivityEmpty: "&8--- &7no biome occupancy sampled yet &8---"
+infoBiomeActivityEmpty: "&8--- &7заполнение биомов ещё не измерено &8---"
 
 # sub-info listings
 # placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
 данныеМира:
   - "#21ADA8[world]:"
   - "#99EEBB  - регион: [region]"
-  - "#99EEBB  - требуетсяПраво: [requirePermission]"
+  - "#99EEBB  - требуемое право: [requirePermission]"
   - "#99EEBB  - переопределение: [override]"
 
 данныеРегиона:
   - "#52B2BF[region]:"
   - "#58CCED  - мир: [world]"
   - "#58CCED  - форма: [shape]"
-  - "#58CCED  - требуетсяПраво: [requirePermission]"
-  - "#58CCED  - переопределениеГраницы: [worldBorderOverride]"
-  - "#58CCED  - размерКэша: [cacheCap]"
-  - "#58CCED  - удержанныйКэш (L1): [keptCache]"
-  - "#58CCED  - освобождённыйКэш (L2): [unkeptCache]"
-  - "#58CCED  - накопленныйКэш (L3): [backlogCache] / [backlogCacheCap]"
-  - "#58CCED  - вКэше: [cached]"
-  - "#58CCED  - learned coverage: [memCoveragePct] (bad: [memBadPct], [memBadCount] cells)"
-  - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
+  - "#58CCED  - требуемое право: [requirePermission]"
+  - "#58CCED  - переопределение границы мира: [worldBorderOverride]"
+  - "#58CCED  - лимит кэша: [cacheCap]"
+  - "#58CCED  - удерживаемый кэш (L1): [keptCache]"
+  - "#58CCED  - освобождённый кэш (L2): [unkeptCache]"
+  - "#58CCED  - кэш очереди (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - в кэше: [cached]"
+  - "#58CCED  - изученное покрытие: [memCoveragePct] (плохих: [memBadPct], [memBadCount] ячеек)"
+  - "#58CCED  - основная причина отказа: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
 # Section 8: Command Descriptions
@@ -253,34 +253,34 @@ menuUnknownPlayer: "&c[P0] ссылки меню могут использова
 menuHoverFallbackType: "тип: [type]"
 # Hover-fallback template used by the menu reflector when a parameter exposes a
 # small curated value set. Placeholder: [values] - comma-joined accepted values.
-menuHoverFallbackBounds: "принимаются: [values]"
+menuHoverFallbackBounds: "принято: [values]"
 # Label for the "go back one level" navigation row prepended to every non-root menu page.
-menuBack: "&7<< назад"
+menuBack: "&7« назад"
 # Label template for the "execute the assembled command" row prepended to every
 # runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
-menuExecute: "&2> выполнить [command]"
+menuExecute: "&2▶ выполнить [command]"
 # Header row at the top of a parameter-value picker sub-page (Stage A.2).
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
-menuPickValue: "&7выберите значение для [param] (будет выполнено: /rtp [command] [param]:<значение>)"
+menuPickValue: "&7выберите значение для [param] (выполнит: /rtp [command] [param]:<value>)"
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list.
-menuTypeValue: "&7ввести пользовательское значение..."
+menuTypeValue: "&7✎ введите своё значение..."
 # Non-clickable header row at the top of every non-root menu page (Stage A.4).
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
-menuConstructed: "&7создание: #7E9CC8/rtp [command]"
+menuConstructed: "&7построение: #7E9CC8/rtp [command]"
 # Non-clickable title row prepended to the root /rtp menu page (Stage A.5).
 # Provides a welcoming header before the player descends into any subcommand.
-menuRootTitle: "#5FB3B3&l меню RTP"
+menuRootTitle: "#5FB3B3&l⚡ меню RTP"
 # Non-clickable subtitle/hint row prepended to the root /rtp menu page below
 # menuRootTitle (Stage A.5). Short orientation text for first-time users.
-menuRootHint: "&7щёлкните по опции, чтобы начать"
+menuRootHint: "&7нажмите на опцию ниже, чтобы начать"
 # Navigation rows appended to paginated menu pages (Stage A.6) — clicking
 # them moves to the previous/next page of the same model. Placeholder:
 # [page] - the 1-based human-readable target page number.
-menuPagePrev: "&7<< предыдущая страница ([page])"
-menuPageNext: "&7следующая страница ([page]) >>"
+menuPagePrev: "&7« предыдущая страница ([page])"
+menuPageNext: "&7следующая страница ([page]) »"
 # Section divider on the front page above teleport rows (player view).
 menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
 # Front-page rows. No placeholders.
@@ -288,13 +288,13 @@ menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- выберите мир"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- выберите биом"
-menuFrontPageRowHelp: "&2▶ /rtp help &7- list commands"
+menuFrontPageRowHelp: "#7A4FB8❓ список команд &7- /rtp help"
 # Front-page admin entry row: the only inline
 # admin-visible row on the front page; click descends into the curated admin
 # panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
-menuFrontPageRowAdmin: "#9D7CD8▶ admin panel &7- operator tools"
+menuFrontPageRowAdmin: "#9D7CD8▶ панель администратора &7- инструменты оператора"
 # Hover text for the admin-panel entry row. No placeholders.
-menuFrontPageHoverAdmin: "&7operator tools: config, scans, diagnostics, reload"
+menuFrontPageHoverAdmin: "&7инструменты оператора: настройки, сканы, диагностика, перезагрузка"
 # --- Admin panel book page ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
 menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
@@ -307,67 +307,67 @@ menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
 menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
 # Admin-panel rows + hovers. No placeholders.
 menuAdminPanelRowConfig: "&b▶ config editor"
-menuAdminPanelHoverConfig: "&7open the curated config selector"
-menuAdminPanelRowRegions: "#5FB3B3▶ regions"
-menuAdminPanelHoverRegions: "&7add, remove, or edit per-region configs"
+menuAdminPanelHoverConfig: "&7открыть подобранный селектор настроек"
+menuAdminPanelRowRegions: "#5FB3B3▶ регионы"
+menuAdminPanelHoverRegions: "&7добавить, удалить или изменить настройки по регионам"
 menuAdminPanelRowWorlds: "#5FB3B3▶ миры"
-menuAdminPanelHoverWorlds: "&7add, remove, or edit per-world configs"
-menuAdminPanelRowEffects: "#5FB3B3▶ effects"
-menuAdminPanelHoverEffects: "&7add, remove, or edit per-group teleport effects"
+menuAdminPanelHoverWorlds: "&7добавить, удалить или изменить настройки по мирам"
+menuAdminPanelRowEffects: "#5FB3B3▶ эффекты"
+menuAdminPanelHoverEffects: "&7добавить, удалить или изменить эффекты телепортации по группам"
 menuAdminPanelRowInfo: "&b▶ server info"
-menuAdminPanelHoverInfo: "&7show plugin version, region counts, and queue state"
-menuAdminPanelRowDiagnostics: "&c▶ full diagnostics"
-menuAdminPanelHoverDiagnostics: "&7runs the full diagnostic suite; may be expensive"
+menuAdminPanelHoverInfo: "&7показать версию плагина, число регионов и состояние очередей"
+menuAdminPanelRowDiagnostics: "&c▶ полная диагностика"
+menuAdminPanelHoverDiagnostics: "&7запускает полный набор диагностики; может быть затратной"
 menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
-menuAdminPanelHoverMemory: "&7dump active chunk-ticket and pipeline allocations"
+menuAdminPanelHoverMemory: "&7вывести активные тикеты чанков и выделения конвейера"
 menuAdminPanelRowScan: "&b▶ scan control"
-menuAdminPanelHoverScan: "&7open the scan submenu (start / pause / cancel)"
-menuAdminPanelRowReload: "&c▶ reload"
-menuAdminPanelHoverReload: "&7reloads all config files; in-flight teleports may be affected"
+menuAdminPanelHoverScan: "&7открыть подменю сканирования (старт / пауза / отмена)"
+menuAdminPanelRowReload: "&c▶ перезагрузка"
+menuAdminPanelHoverReload: "&7перезагружает все файлы настроек; текущие телепортации могут пострадать"
 menuAdminPanelRowBrowse: "&b▶ browse all commands"
-menuAdminPanelHoverBrowse: "&7open the reflected /rtp command tree"
-menuAdminPanelRowBack: "&7« back"
+menuAdminPanelHoverBrowse: "&7открыть отражённое дерево команд /rtp"
+menuAdminPanelRowBack: "&7« назад"
 # --- Visualizations submenu (admin map of bad locations per region) ---
 # Admin-panel row: open the Visualizations submenu. No placeholders.
-menuAdminPanelRowVisualizations: "#5FB3B3▶ visualizations"
+menuAdminPanelRowVisualizations: "#5FB3B3▶ визуализации"
 # Hover text for the admin-panel Visualizations row. No placeholders.
-menuAdminPanelHoverVisualizations: "&7open maps and other operator-facing visualizations"
+menuAdminPanelHoverVisualizations: "&7открыть карты и другие визуализации для оператора"
 # Section divider above the Visualizations block on the admin panel.
-menuAdminPanelSectionVisualizations: "&8» &7visualizations"
+menuAdminPanelSectionVisualizations: "&8» &7визуализации"
 # Non-clickable title row at the top of the Visualizations submenu.
-menuVisualizationsTitle: "#9D7CD8&l⌖ visualizations"
+menuVisualizationsTitle: "#9D7CD8&l⌖ визуализации"
 # Non-clickable hint row below the title.
-menuVisualizationsHint: "&7pick a region to view its bad-locations map"
+menuVisualizationsHint: "&7выберите регион, чтобы увидеть карту небезопасных мест"
 # Visualizations row template; [region] - region name.
-menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- region shape map"
+menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- карта формы региона"
 # Hover text for a Visualizations region row; [region] - region name.
-menuVisualizationsHoverRegion: "&7open a map showing bad locations in &b[region]"
+menuVisualizationsHoverRegion: "&7открыть карту с небезопасными местами в &b[region]"
 # Non-clickable hint row shown when no regions are configured.
-menuVisualizationsEmpty: "&7(no regions configured)"
+menuVisualizationsEmpty: "&7(регионы не настроены)"
 # Visualizations submenu back row (returns to the admin panel).
-menuVisualizationsRowBack: "&7« back"
+menuVisualizationsRowBack: "&7« назад"
 # --- Admin panel Setup section: curated prefabs ---
 # Section divider above the Setup (quick start) block on the admin panel.
-menuAdminPanelSectionSetup: "&8» &7setup (quick start)"
+menuAdminPanelSectionSetup: "&8» &7настройка (быстрый старт)"
 # Setup row + hover: survival-default identity overlay (reset to shipped defaults).
 menuPrefabSurvivalDefaultRow: "#5FB3B3▶ survival-default"
-menuPrefabSurvivalDefaultHover: "&7reset to the shipped defaults (identity overlay)"
+menuPrefabSurvivalDefaultHover: "&7сбросить к поставляемым значениям по умолчанию (тождественное наложение)"
 # Setup row + hover: low-performance (longer pulse, smaller caches, login cache off).
 menuPrefabLowPerformanceRow: "#5FB3B3▶ low-performance"
-menuPrefabLowPerformanceHover: "&7underpowered hosts / shared-CPU VPSes: longer pulse, smaller caches, login cache off"
+menuPrefabLowPerformanceHover: "&7слабые хосты / VPS с общим CPU: длиннее пульс, меньше кэши, кэш входа выключен"
 # Setup row + hover: high-performance (short pulse, large caches, login cache on).
 menuPrefabHighPerformanceRow: "#5FB3B3▶ high-performance"
-menuPrefabHighPerformanceHover: "&7dedicated hardware / large player counts: short pulse, large caches, login cache on"
+menuPrefabHighPerformanceHover: "&7выделенное оборудование / много игроков: короткий пульс, большие кэши, кэш входа включён"
 # Setup row + hover: folia-tuned (regional scheduler tuning).
 menuPrefabFoliaTunedRow: "#5FB3B3▶ folia-tuned"
-menuPrefabFoliaTunedHover: "&7folia regional scheduler: faster per-region pulses, fewer concurrent chunk tickets"
+menuPrefabFoliaTunedHover: "&7региональный планировщик folia: быстрее пульсы по регионам, меньше одновременных тикетов чанков"
 # Setup row + hover: multi-world (one region per world from current default).
 menuPrefabMultiWorldRow: "#5FB3B3▶ multi-world"
-menuPrefabMultiWorldHover: "&7synthesise one region per world from the current default"
+menuPrefabMultiWorldHover: "&7синтезировать по одному региону на мир из текущего значения по умолчанию"
 # Confirmation menu title. Placeholder: [prefab] - prefab id or display name.
-menuPrefabConfirmTitle: "#9D7CD8&l⚙ confirm prefab: #5FB3B3[prefab]"
+menuPrefabConfirmTitle: "#9D7CD8&l⚙ подтвердить пресет: #5FB3B3[prefab]"
 # Confirmation menu non-clickable hint row below the title. No placeholders.
-menuPrefabConfirmHint: "&7review the changes below, then click confirm or cancel"
+menuPrefabConfirmHint: "&7просмотрите изменения ниже, затем нажмите подтвердить или отменить"
 # Confirmation menu footer row: confirm and write the prefab to disk.
 menuPrefabConfirmRow: "&2&l[confirm]"
 # Confirmation menu footer row: cancel and return to the admin panel.
@@ -376,31 +376,31 @@ menuPrefabCancelRow: "&c&l[cancel]"
 # book. Re-renders the current scope against a fresh metrics snapshot.
 infoBookRefreshRow: "&2[Refresh]"
 # Hover text for the info-book refresh row.
-infoBookRefreshHover: "&7Re-render this page against a fresh metrics snapshot."
+infoBookRefreshHover: "&7Перерисовать эту страницу по свежему снимку метрик."
 # Clickable row label for the Switch-to-chat affordance at the bottom of the
 # /rtp info book. Re-runs the same scope through the legacy chat path.
 infoBookSwitchToTextRow: "&7[Switch to chat]"
 # Hover text for the info-book switch-to-chat row.
-infoBookSwitchToTextHover: "&7Re-run /rtp info in chat instead of the book."
+infoBookSwitchToTextHover: "&7Выполнить /rtp info в чате вместо книги."
 # Footer row rendered when the /rtp info book content exceeds the book page
 # cap. Clicking re-runs the same scope in chat mode so no data is lost.
-infoBookOverflowFooter: "&7(content truncated - click to view full output in chat)"
+infoBookOverflowFooter: "&7(содержимое обрезано - нажмите, чтобы увидеть полный вывод в чате)"
 # Non-clickable note row indicating that periodic auto-refresh for the info
 # book is not currently supported on this build (deferred to a later
 # milestone). Users may click the Refresh row to refresh manually.
-infoBookAutoRefreshDeferredNote: "&8(auto-refresh not yet supported; click Refresh to update)"
+infoBookAutoRefreshDeferredNote: "&8(автообновление пока не поддерживается; нажмите Обновить)"
 # Non-clickable title row at the top of the config-file selector page (Stage C.1).
 # Shown when an admin clicks "/rtp config" from the front page.
-configSelectorTitle: "#5FB3B3&l⚙ config files"
+configSelectorTitle: "#5FB3B3&l⚙ файлы настроек"
 # Label for the "back to /rtp menu root" navigation row on the config selector page.
-configSelectorBackRow: "&7« back to menu"
+configSelectorBackRow: "&7« назад в меню"
 # Non-clickable title row at the top of a single config-file page (Stage C.2).
 # Placeholder: [file] - the config file name (e.g. "performance", "safety").
 configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
 # Label for the "back to config selector" navigation row on a single config-file page.
-configFileBackRow: "&7« back to config files"
+configFileBackRow: "&7« назад к файлам настроек"
 # Non-clickable hint row shown when a config file has no editable keys.
-configFileEmptyHint: "&7(no editable keys in this file)"
+configFileEmptyHint: "&7(в этом файле нет редактируемых ключей)"
 # Per-key row label on a config-file page. Placeholders:
 #   [key]   - the config key name; [value] - the currently-stored value.
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
@@ -415,9 +415,9 @@ configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7
 configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
-configViewRawHint: "&7[P0] book view unavailable; falling back to raw dump."
+configViewRawHint: "&7[P0] просмотр в книге недоступен; откат к сырому дампу."
 # Placeholder text rendered in place of a config value that has not been set.
-configValueUnsetPlaceholder: "&8(unset)"
+configValueUnsetPlaceholder: "&8(не задано)"
 # Non-clickable header row separating the "Changeable" list from the "Pending"
 # staging-cart list on a config-file page when the viewer has staged one or
 # more uncommitted edits. No placeholders.
@@ -427,7 +427,7 @@ configPendingHeader: "&6&l-- pending changes --"
 configPendingRowFormat: "&9[key]&8 = &0[value]"
 # Hover text shown when the viewer hovers a pending (staged) row on a
 # config-file page. No placeholders.
-configPendingRowHover: "click to unstage"
+configPendingRowHover: "нажмите, чтобы отменить"
 # Clickable label for the "apply staged changes" row on a config-file page.
 # Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
 configApplyRow: "&2&l[apply]"
@@ -439,24 +439,24 @@ configDiscardRow: "&c&l[discard]"
 # Sent to the viewer when an OPEN_MAP menu action fires but no concrete
 # MapBinding is registered (NoopMapBinding is still active, e.g. on the
 # Lite assembly or before RTPHooks wires the platform binding).
-mapBindingMissing: "&c[P0] map rendering is not available on this server."
+mapBindingMissing: "&c[P0] отрисовка карт недоступна на этом сервере."
 # Sent when MapDispatch receives a ChartSpec whose Kind has no registered
 # ChartSpecResolver (e.g. Stage 1 viewer clicks a Stage 3 sparkline before
 # the resolver lands).
-mapResolverMissing: "&c[P0] no chart resolver registered for this request."
+mapResolverMissing: "&c[P0] для этого запроса не зарегистрирован резолвер графиков."
 # Sent when a resolver runs but the underlying data source is unavailable
 # for the requested target (unknown region, no data yet, world unloaded).
 # Placeholder: [region] - the requested region name (may be empty).
-mapUnavailable: "&e[P1] chart data is not available right now."
+mapUnavailable: "&e[P1] данные графика сейчас недоступны."
 # Sent when the active MapBinding cannot allocate a map handle right now
 # (binding-defined back-pressure, e.g. per-viewer cap reached).
-mapBusy: "&e[P1] the map service is busy; please try again shortly."
+mapBusy: "&e[P1] служба карт занята; повторите попытку чуть позже."
 # Label for the clickable "/rtp info" menu row that, on click, mints a
 # ChartSpec(BAD_POINTS_HEATMAP, ...) token and asks the active MapBinding
 # to render a 128x128 heatmap of the current region's known bad-point
 # spiral indices. The row is omitted at render time when NoopMapBinding
 # is the installed binding (REQ-RTP-MAP-006 / ADR-047).
-menuInfoBadPointsLabel: "#9D7CD8&l# bad-points map"
+menuInfoBadPointsLabel: "#9D7CD8&l# карта небезопасных точек"
 
 # --- Cross-server network mode messages ---
 # Sent only when `network.enabled: true` and the player's `/rtp` is routed
@@ -510,45 +510,45 @@ networkRegionAmbiguous: "&c[P0] регион '[region]' неоднозначен
 # Placeholder: [parserKind] - the raw multi-config kind name.
 multiconfigHeaderDefault: "#5FB3B3&l[parserKind]"
 # Header row label for the regions multi-config selector page. No placeholders.
-multiconfigHeaderRegions: "#5FB3B3&l regions"
+multiconfigHeaderRegions: "#5FB3B3&l регионы"
 # Header row label for the worlds multi-config selector page. No placeholders.
-multiconfigHeaderWorlds: "#5FB3B3&l worlds"
+multiconfigHeaderWorlds: "#5FB3B3&l миры"
 # Toggle-row label when remove-mode is OFF. No placeholders.
-multiconfigToggleRemoveModeOff: "&8[ ] remove mode"
+multiconfigToggleRemoveModeOff: "&8[ ] режим удаления"
 # Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
-multiconfigToggleRemoveModeOn: "&c[x] remove mode (click an entry to delete)"
+multiconfigToggleRemoveModeOn: "&c[x] режим удаления (нажмите на запись для удаления)"
 # Selector row label for the "+ Add new..." entry. No placeholders.
-multiconfigRowAdd: "&2+ add new..."
+multiconfigRowAdd: "&2+ добавить новый..."
 # Hover text for the Add row. Placeholder: [name] - prefilled default name.
-multiconfigRowAddHover: "&7type a name in the anvil prompt; prefilled: &f[name]"
+multiconfigRowAddHover: "&7введите имя в окне наковальни; предзаполнено: &f[name]"
 # Hover text for an entry row in normal mode. Placeholder: [name].
-multiconfigRowEditHover: "&7edit &f[name]"
+multiconfigRowEditHover: "&7изменить &f[name]"
 # Hover text for an entry row in remove-mode. Placeholder: [name].
-multiconfigRowRemoveHover: "&cdelete &f[name]"
+multiconfigRowRemoveHover: "&cудалить &f[name]"
 # Confirm-delete page title row. Placeholder: [name].
-multiconfigConfirmTitle: "&c&ldelete [name]?"
+multiconfigConfirmTitle: "&c&lудалить [name]?"
 # Confirm-delete page Yes-row label. No placeholders.
 multiconfigConfirmYes: "&c&l[confirm delete]"
 # Confirm-delete page Cancel-row label. No placeholders.
 multiconfigConfirmNo: "&2&l[cancel]"
 # Hover text on a locked (grayed) default-region row. No placeholders.
-multiconfigLockRegionDefault: "&7the default region cannot be removed"
+multiconfigLockRegionDefault: "&7регион по умолчанию нельзя удалить"
 # Hover text on a locked (grayed) world row. Placeholder: [name].
-multiconfigLockWorldLoaded: "&7world '[name]' is loaded on the server; unload it before removing its config"
+multiconfigLockWorldLoaded: "&7мир '[name]' загружен на сервере; выгрузите его перед удалением его настроек"
 # Result message after a successful ADD. Placeholder: [name].
-multiconfigResultAdded: "&aadded '[name]'."
+multiconfigResultAdded: "&aдобавлено '[name]'."
 # Result message after a successful REMOVE. Placeholder: [name].
-multiconfigResultRemoved: "&aremoved '[name]'."
+multiconfigResultRemoved: "&aудалено '[name]'."
 # Result message when ADD failed. Placeholders: [name], [reason].
-multiconfigResultAddFailed: "&ccould not add '[name]': [reason]"
+multiconfigResultAddFailed: "&cне удалось добавить '[name]': [reason]"
 # Result message when REMOVE failed. Placeholders: [name], [reason].
-multiconfigResultRemoveFailed: "&ccould not remove '[name]': [reason]"
+multiconfigResultRemoveFailed: "&cне удалось удалить '[name]': [reason]"
 # Result message when the proposed entry name is rejected by the sanitiser.
 # Placeholder: [name].
-multiconfigResultNameInvalid: "&cname '[name]' is not allowed; use letters, digits, '_', '-', '.'"
+multiconfigResultNameInvalid: "&cимя '[name]' не разрешено; используйте буквы, цифры, '_', '-', '.'"
 # Result message when an ADD collides with an existing entry name.
 # Placeholder: [name].
-multiconfigResultNameTaken: "&can entry named '[name]' already exists."
+multiconfigResultNameTaken: "&cзапись с именем '[name]' уже существует."
 
 # ###############################################################################
 # Section 9: PlaceholderAPI Support
