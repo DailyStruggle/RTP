@@ -35,7 +35,7 @@
 сообщениеПерезарядки: "&7[P0] ⚡ Вы не можете телепортироваться снова в течение [remainingCooldown]"
 
 # when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
-lockedAfterUses: "&7[P0] ⌖ Вы достигли лимита случайных телепортаций. Попробуйте позже."
+lockedAfterUses: "&7[P0] ⌖ Вы достигли лимита случайных телепортаций. Попробуйте снова через [remainingLockTime]."
 
 # если у региона нет ожидающих локаций, а у игрока нет права rtp.unqueued
 нетЛокацийВОчереди: "#f5eb73[P0] ⌖ сейчас нет готовых локаций"

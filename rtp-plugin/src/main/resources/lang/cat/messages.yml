@@ -44,7 +44,7 @@ spooky: "&7[P0] ⌖ could not find a safe paw-spot within [attempts] attempts"
 nap_message: "&7[P0] ⚡ you can't pounce again for [remainingCooldown]. nap first."
 
 # when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
-lockedAfterUses: "&7[P0] ⌖ You're all out of zoomies for now. Nap a bit and pounce again later."
+lockedAfterUses: "&7[P0] ⌖ Out of zoomies! Nap [remainingLockTime] and pounce again."
 
 # no warm spots ready
 no_warm_spots_left: "#f5eb73[P0] ⌖ no warm spots ready at this time"

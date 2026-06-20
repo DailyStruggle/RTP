@@ -37,7 +37,7 @@
 クールダウンメッセージ: "&7[P0] ⚡ 再びテレポートするには [remainingCooldown] 待つ必要があります"
 
 # when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
-lockedAfterUses: "&7[P0] ⌖ ランダムテレポートの上限に達しました。後でもう一度お試しください。"
+lockedAfterUses: "&7[P0] ⌖ ランダムテレポートの上限に達しました。[remainingLockTime] 後にもう一度お試しください。"
 
 # リージョンに位置のキューがなく、プレイヤーが rtp.unqueued 権限を持っていないとき
 利用可能な位置なし: "#f5eb73[P0] ⌖ 現在利用可能な位置がありません"

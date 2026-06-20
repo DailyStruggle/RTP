@@ -38,7 +38,7 @@ inseguro: "&7[P0] ⌖ no se encontró una ubicación segura en [attempts] intent
 mensajeEnfriamiento: "&7[P0] ⚡ No puedes teletransportarte otra vez hasta dentro de [remainingCooldown]"
 
 # when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
-lockedAfterUses: "&7[P0] ⌖ Has alcanzado tu límite de teletransporte aleatorio. Inténtalo de nuevo más tarde."
+lockedAfterUses: "&7[P0] ⌖ Has alcanzado tu límite de teletransporte aleatorio. Inténtalo de nuevo en [remainingLockTime]."
 
 # si la región no tiene ubicaciones en cola y el jugador no tiene el permiso rtp.unqueued
 sinUbicacionesEnCola: "#f5eb73[P0] ⌖ no hay ubicaciones listas en este momento"

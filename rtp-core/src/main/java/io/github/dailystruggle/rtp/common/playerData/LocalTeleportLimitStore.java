@@ -71,6 +71,13 @@ public final class LocalTeleportLimitStore implements TeleportLimitStore {
   }
 
   @Override
+  public long millisUntilReset(UUID id, long cap, long resetMillis, long now) {
+    if (cap <= 0 || resetMillis <= 0 || id == null) return 0L;
+    ensureLoaded(id);
+    return tracker.millisUntilReset(id, cap, resetMillis, now);
+  }
+
+  @Override
   public void reset(UUID id) {
     if (id == null) return;
     tracker.reset(id);

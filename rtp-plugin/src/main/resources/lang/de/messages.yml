@@ -42,7 +42,7 @@ unsicher: "&7[P0] ⌖ konnte innerhalb von [attempts] Versuchen keinen sicheren 
 abklingzeitNachricht: "&7[P0] ⚡ Du kannst erst in [remainingCooldown] wieder teleportieren"
 
 # when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
-lockedAfterUses: "&7[P0] ⌖ Du hast dein Zufallsteleport-Limit erreicht. Bitte versuche es später erneut."
+lockedAfterUses: "&7[P0] ⌖ Du hast dein Zufallsteleport-Limit erreicht. Versuche es in [remainingLockTime] erneut."
 
 # wenn die Region keine Standorte in der Warteschlange hat und der Spieler keine rtp.unqueued-Berechtigung besitzt
 keineOrteInWarteschlange: "#f5eb73[P0] ⌖ derzeit keine Orte bereit"

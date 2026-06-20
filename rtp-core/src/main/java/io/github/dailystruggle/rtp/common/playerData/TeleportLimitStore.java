@@ -41,6 +41,20 @@ public interface TeleportLimitStore {
    */
   void recordSuccess(UUID id, long cap, long resetMillis, long now);
 
+  /**
+   * Milliseconds remaining until the player's current rolling usage-cap window
+   * resets, for display in the lockout message.
+   *
+   * @param id          player id
+   * @param cap         the configured usage cap ({@code <= 0} disables the feature)
+   * @param resetMillis the rolling window length in milliseconds ({@code <= 0}
+   *                    means the window never resets)
+   * @param now         current epoch milliseconds
+   * @return the milliseconds left on the clock, or {@code 0} when the feature is
+   *     disabled, the window never resets, or the player is not currently locked
+   */
+  long millisUntilReset(UUID id, long cap, long resetMillis, long now);
+
   /** Clear the recorded usage for a single player (e.g. on an admin reset). */
   void reset(UUID id);
 }
