@@ -179,6 +179,23 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     if (value != null) configParserFactory.add(safe, value);
   }
 
+  /**
+   * Register a new parser named {@code name}, seeded from the already-registered
+   * parser {@code fromName} instead of the bundled {@code default.yml}. Mirrors
+   * the {@code /rtp config regions add} region-creation flow but lets the caller
+   * choose the originating file. Falls back to default-seeding when
+   * {@code fromName} is absent.
+   *
+   * @param name     the new parser/file name
+   * @param fromName the originating parser/file name to clone from
+   */
+  public void addParser(String name, String fromName) {
+    String safe = ConfigParser.sanitizeName(name);
+    String from = (fromName == null) ? null : ConfigParser.sanitizeName(fromName);
+    ConfigParser<E> value = (ConfigParser<E>) configParserFactory.construct(safe, from);
+    if (value != null) configParserFactory.add(safe, value);
+  }
+
   public void addParser(ConfigParser<?> parser) {
     if (!parser.myClass.equals(myClass)) throw new IllegalStateException("mismatched parser class");
     ConfigParser<E> eConfigParser = (ConfigParser<E>) parser;

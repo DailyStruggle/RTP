@@ -3,6 +3,8 @@ package io.github.dailystruggle.rtp.api;
 import io.github.dailystruggle.metrics.api.FoliaRegionSample;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+import io.github.dailystruggle.rtp.api.event.PrefabAppliedEvent;
+import io.github.dailystruggle.rtp.api.event.PrefabEventDispatcher;
 import io.github.dailystruggle.rtp.api.hooks.RTPHooks;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -127,6 +129,16 @@ public class RTPAPI {
    */
   public static volatile Supplier<MetricsSnapshot> metricsSnapshotDelegate = null;
 
+  /**
+   * Eagerly-created dispatcher for {@link PrefabAppliedEvent} notifications.
+   * Unlike the core-populated delegates above, this is always available so
+   * addons may register a subscriber at any point in their lifecycle, including
+   * before {@code rtp-core} has finished loading. {@code rtp-core} fires events
+   * through it after a prefab is applied. Use {@link #onPrefabApplied} to
+   * register rather than reading this field directly.
+   */
+  public static final PrefabEventDispatcher prefabEvents = new PrefabEventDispatcher();
+
 
   /**
    * Sets the platform-specific server accessor.
@@ -194,6 +206,34 @@ public class RTPAPI {
           "[RTP API] Cannot access hooks: Core implementation is not loaded.");
     }
     return h;
+  }
+
+  /**
+   * Registers a subscriber to be notified after an admin-panel prefab has been
+   * applied (written to disk and the affected configs reloaded).
+   *
+   * <p>This is a fire-and-forget, post-apply notification: the subscriber
+   * cannot veto or mutate the apply, which has already completed by the time
+   * the {@link PrefabAppliedEvent} is delivered. Use it to react from an addon -
+   * e.g. to refresh cached config, rebuild a menu, or emit your own audit line.
+   *
+   * <p>Unlike most {@code RTPAPI} entry points, this is safe to call before
+   * {@code rtp-core} has loaded; the dispatcher is created eagerly so an addon
+   * may subscribe during its own {@code onEnable}.
+   *
+   * <p><b>Threading:</b> the subscriber is invoked on whatever thread executes
+   * the prefab confirm command. A subscriber that touches the world must
+   * re-schedule onto the RTP scheduler itself. Exceptions thrown by a
+   * subscriber are isolated so a single faulty addon cannot break delivery to
+   * the others.
+   *
+   * @param subscriber the consumer to notify; must not be {@code null}.
+   * @return an {@link AutoCloseable} that unregisters the subscriber when closed.
+   * @throws IllegalArgumentException if {@code subscriber} is {@code null}.
+   */
+  @PublicApi
+  public static AutoCloseable onPrefabApplied(java.util.function.Consumer<PrefabAppliedEvent> subscriber) {
+    return prefabEvents.subscribe(subscriber);
   }
 
   /**

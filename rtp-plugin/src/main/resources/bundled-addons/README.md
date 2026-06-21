@@ -10,7 +10,6 @@ download. This README was unpacked alongside them for reference.
 - `LeafRTPGuiAddon.jar` - the in-game GUI destination picker / menu.
 - `LeafRTPClaimAddon.jar` - claim-plugin integrations (keeps teleports out of
   protected land for the claim plugins it supports).
-- `LeafRTPRiftAddon.jar` - the "Virtual Rift" teleport-effect demo.
 - `LeafRTPCountdownAddon.jar` - the reference event-hook / countdown addon.
 - `README.md` - this file.
 

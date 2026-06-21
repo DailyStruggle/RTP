@@ -83,6 +83,102 @@ class MultiWorldExpanderTest {
         }
     }
 
+    private static Map<String, Object> defaultRegionWithOverworldVert() {
+        Map<String, Object> region = defaultRegion();
+        Map<String, Object> vert = new LinkedHashMap<>();
+        vert.put("name", "LINEAR");
+        vert.put("minY", 32);
+        vert.put("maxY", 255);
+        vert.put("direction", 2);
+        vert.put("requireSkyLight", true);
+        region.put("vert", vert);
+        return region;
+    }
+
+    @Test
+    @DisplayName("injection: the RegionOverlayAmender is invoked on each synthesised overlay and its mutations are reflected")
+    void amenderInvokedPerSynthesisedWorld() {
+        Map<String, Map<String, Object>> regions = new LinkedHashMap<>();
+        regions.put("default", defaultRegionWithOverworldVert());
+
+        java.util.List<String> seen = new java.util.ArrayList<>();
+        MultiWorldExpander.RegionOverlayAmender amender = (world, overlay) -> {
+            seen.add(world);
+            // Stand-in for the canonical NetherEndConfigAmender: drop the
+            // sky-light requirement on nether worlds so the test can assert
+            // the mutation lands in the returned overlay.
+            if (world.endsWith("_nether")) {
+                ((Map<String, Object>) overlay.get("vert")).put("requireSkyLight", false);
+            }
+        };
+
+        Map<String, Map<String, Object>> out = MultiWorldExpander.expand(
+                MultiWorld.INSTANCE,
+                regions,
+                List.of("world", "world_nether", "world_the_end"),
+                amender
+        );
+
+        // Invoked once per synthesised (unmapped) world; the default already
+        // maps "world", so the overworld is not visited.
+        assertEquals(List.of("world_nether", "world_the_end"), seen,
+                "amender runs on every synthesised overlay, in world order");
+        assertEquals(false,
+                ((Map<?, ?>) out.get("world_nether").get("vert")).get("requireSkyLight"),
+                "amender's in-place mutation must be reflected in the returned overlay");
+        // The end overlay was visited but the test amender left it alone.
+        assertEquals(true,
+                ((Map<?, ?>) out.get("world_the_end").get("vert")).get("requireSkyLight"));
+        // The default template stays pristine (deep-copy isolation).
+        assertEquals(true,
+                ((Map<?, ?>) regions.get("default").get("vert")).get("requireSkyLight"));
+    }
+
+    @Test
+    @DisplayName("injection: the pure 3-arg expand applies no repair (overlays cloned verbatim)")
+    void nullAmenderLeavesCloneUntouched() {
+        Map<String, Map<String, Object>> regions = new LinkedHashMap<>();
+        regions.put("default", defaultRegionWithOverworldVert());
+
+        Map<String, Map<String, Object>> out = MultiWorldExpander.expand(
+                MultiWorld.INSTANCE,
+                regions,
+                List.of("world", "world_nether")
+        );
+        Map<?, ?> vert = (Map<?, ?>) out.get("world_nether").get("vert");
+        assertEquals(true, vert.get("requireSkyLight"),
+                "with no injected amender the cloned overworld vert is returned verbatim");
+        assertEquals(255, vert.get("maxY"));
+    }
+
+    @Test
+    @DisplayName("placeholder: default region with world '[0]' is recognised as mapping the main world, no duplicate")
+    void indexPlaceholderResolvesMainWorld() {
+        Map<String, Map<String, Object>> regions = new LinkedHashMap<>();
+        Map<String, Object> shape = new LinkedHashMap<>();
+        shape.put("name", "CIRCLE");
+        shape.put("radius", 256);
+        Map<String, Object> region = new LinkedHashMap<>();
+        // The shipped default region targets the main world via the "[0]"
+        // index placeholder rather than a literal name.
+        region.put("world", "[0]");
+        region.put("shape", shape);
+        regions.put("default", region);
+
+        Map<String, Map<String, Object>> out = MultiWorldExpander.expand(
+                MultiWorld.INSTANCE,
+                regions,
+                List.of("world", "world_nether", "world_the_end")
+        );
+        // "[0]" resolves to the first loaded world ("world"), so it must not be
+        // cloned into a redundant regions/world overlay.
+        assertEquals(2, out.size(), "one synthesised overlay per unmapped world");
+        assertFalse(out.containsKey("world"),
+                "world targeted by the '[0]' placeholder must not be duplicated");
+        assertTrue(out.containsKey("world_nether"));
+        assertTrue(out.containsKey("world_the_end"));
+    }
+
     @Test
     @DisplayName("idempotency: existing per-world region in currentRegions is not overwritten")
     void existingWorldRegionPreserved() {
@@ -202,6 +298,38 @@ class MultiWorldExpanderTest {
         assertTrue(result.perFileDiff().containsKey("regions/world_nether"));
         // Source trees untouched.
         assertNull(trees.get("regions/world_nether"));
+    }
+
+    @Test
+    @DisplayName("PrefabApplier 3-arg overload repoints worlds/<world>.yml region at each synthesised region")
+    void applierOverloadRepointsWorldFiles() {
+        Map<String, Map<String, Object>> trees = new LinkedHashMap<>();
+        trees.put("regions/default", defaultRegion());
+        // Existing world file pointing at the shared default region.
+        Map<String, Object> netherWorld = new LinkedHashMap<>();
+        netherWorld.put("region", "default");
+        netherWorld.put("requirePermission", false);
+        trees.put("worlds/world_nether", netherWorld);
+
+        PrefabApplier.Result result = PrefabApplier.apply(
+                trees,
+                MultiWorld.INSTANCE,
+                List.of("world", "world_nether", "world_the_end")
+        );
+        // Each synthesised world's worlds/<world>.yml points at its own region.
+        assertEquals("world_nether",
+                result.newTrees().get("worlds/world_nether").get("region"));
+        assertEquals("world_the_end",
+                result.newTrees().get("worlds/world_the_end").get("region"));
+        // Existing unrelated key survives the sparse merge.
+        assertEquals(false,
+                result.newTrees().get("worlds/world_nether").get("requirePermission"));
+        // The default-mapped overworld is not synthesised, so its world file is untouched.
+        assertFalse(result.newTrees().containsKey("worlds/world"));
+        // Diff records the repoint.
+        assertTrue(result.perFileDiff().containsKey("worlds/world_nether"));
+        // Source trees untouched.
+        assertEquals("default", trees.get("worlds/world_nether").get("region"));
     }
 
     @Test

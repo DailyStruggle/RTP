@@ -141,4 +141,48 @@ public interface RTPPlayer extends RTPCommandSender {
       sendClientBlockChange(entry.getKey(), entry.getValue());
     }
   }
+
+  /**
+   * Shows or updates a personal, on-screen progress bar (e.g. a boss-bar) for this player only,
+   * keyed by a stable, caller-chosen {@code id}.
+   *
+   * <p>Unlike the server-wide, permission-scoped
+   * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#updateProgressBars(Map)}
+   * surface, this targets a single player, so it is suited to per-player feedback such as a
+   * teleport-warmup or queue-position countdown. Calling again with the same {@code id} updates
+   * the existing bar in place; distinct ids show distinct bars.
+   *
+   * <p>The {@code title} may contain legacy {@code &x} / {@code #RRGGBB} color codes; the platform
+   * decides how (or whether) to render them. {@code progress} is a fill fraction in {@code [0, 1]}
+   * (clamped by the implementation).
+   *
+   * <p>The default implementation is a no-op so existing {@link RTPPlayer} implementations (and
+   * addon test doubles) remain source- and binary-compatible; platform adapters override it.
+   *
+   * <p>Must be called from the thread that owns the player (the main server thread, or the owning
+   * region thread on Folia).
+   *
+   * @param id       a stable, caller-chosen bar id; must not be {@code null}
+   * @param title    the bar title, possibly containing color codes; {@code null} is treated as empty
+   * @param progress fill fraction in {@code [0, 1]}
+   */
+  default void showProgressBar(String id, String title, double progress) {
+    // no-op by default; platform adapters override with the native per-player progress bar
+  }
+
+  /**
+   * Hides and discards a personal progress bar previously shown to this player via
+   * {@link #showProgressBar(String, String, double)} under the same {@code id}. Unknown ids are
+   * ignored.
+   *
+   * <p>The default implementation is a no-op; platform adapters override it.
+   *
+   * <p>Must be called from the thread that owns the player (the main server thread, or the owning
+   * region thread on Folia).
+   *
+   * @param id the bar id to clear; must not be {@code null}
+   */
+  default void clearProgressBar(String id) {
+    // no-op by default; platform adapters override with the native per-player progress bar
+  }
 }

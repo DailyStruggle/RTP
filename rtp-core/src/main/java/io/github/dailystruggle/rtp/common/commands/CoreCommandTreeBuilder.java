@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.admin.ClearCacheCmd;
+import io.github.dailystruggle.rtp.common.commands.admin.ClearCmd;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
 import io.github.dailystruggle.rtp.common.commands.gui.GuiCmd;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
@@ -61,7 +61,7 @@ public final class CoreCommandTreeBuilder {
    * Registers the platform-neutral subcommands onto {@code root}, in the same
    * set the platform roots previously registered by hand:
    * {@code reload, gui, config, scan, info, version} (plus the
-   * {@link VersionCmd#ALIAS} lookup alias) and {@code clearcache}.
+   * {@link VersionCmd#ALIAS} lookup alias) and {@code clear}.
    *
    * <p>{@code help} is intentionally not registered: commands-api's
    * {@code TreeCommand} auto-emits a built-in help listing covering every
@@ -78,7 +78,7 @@ public final class CoreCommandTreeBuilder {
     VersionCmd versionCmd = new VersionCmd(root);
     root.addSubCommand(versionCmd);
     root.getCommandLookup().put(VersionCmd.ALIAS.toUpperCase(Locale.ROOT), versionCmd);
-    root.addSubCommand(new ClearCacheCmd(root));
+    root.addSubCommand(new ClearCmd(root));
   }
 
   /**

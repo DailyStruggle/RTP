@@ -2,13 +2,21 @@ package io.github.dailystruggle.rtp.common.commands.prefab;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.event.PrefabAppliedEvent;
+import io.github.dailystruggle.rtp.api.event.PrefabChange;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.ConfigBackups;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -111,6 +119,15 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         }
 
         int retention = resolveBakRetention();
+        // expandPerWorld prefabs synthesise a brand-new regions/<world>.yml per
+        // loaded world. These are created through the same region-creation path
+        // the /rtp config command uses (MultiConfigParser.addParser, which
+        // clones regions/default.yml), so no separate comment-template seeding
+        // is needed. defaultRegionFileId is retained only for the no-RTP.configs
+        // fallback in writeFile().
+        boolean expandPerWorld = PrefabRegistry.byId(entry.prefabId())
+                .map(Prefab::expandPerWorld).orElse(false);
+        String defaultRegionFileId = "regions/" + MultiWorldExpander.DEFAULT_REGION_ID;
         List<String> writtenFiles = new ArrayList<>();
         List<String> writtenBaks = new ArrayList<>();
         for (Map.Entry<String, List<PrefabApplier.Change>> fe : entry.perFileDiff().entrySet()) {
@@ -119,7 +136,8 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
             if (changes.isEmpty()) continue;
             Map<String, Object> newTree = entry.newTrees().getOrDefault(fileId, java.util.Collections.emptyMap());
             try {
-                Path bak = PrefabDiskIO.writeWithBackup(pluginDir, fileId, newTree, changes, retention);
+                Path bak = writeFile(pluginDir, fileId, newTree, changes, retention,
+                        expandPerWorld, defaultRegionFileId);
                 writtenFiles.add(fileId);
                 if (bak != null) writtenBaks.add(bak.getFileName().toString());
             } catch (IOException ioe) {
@@ -220,7 +238,133 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
             send(callerId, "&7Config reload skipped; run &f/rtp reload&7 to pick up changes.");
         }
         send(callerId, "&7Rollback with: &f/rtp admin prefab rollback " + entry.prefabId());
+
+        // Notify addon subscribers that a prefab has been applied. This is a
+        // fire-and-forget, post-apply notification (the write and reload have
+        // already happened); the dispatcher isolates faulty subscribers so a
+        // single misbehaving addon cannot break the others or this command.
+        firePrefabApplied(entry.prefabId(), callerId, writtenFiles, entry.perFileDiff(), reloaded);
         return true;
+    }
+
+    /**
+     * Build a {@link PrefabAppliedEvent} from the applied diff and dispatch it
+     * to addon subscribers via {@link RTPAPI#prefabEvents}. Only files that
+     * were actually written (i.e. carried at least one change) are surfaced.
+     */
+    private static void firePrefabApplied(String prefabId,
+                                          UUID callerId,
+                                          List<String> writtenFiles,
+                                          Map<String, List<PrefabApplier.Change>> perFileDiff,
+                                          boolean reloaded) {
+        Map<String, List<PrefabChange>> changes = new LinkedHashMap<>();
+        for (String fileId : writtenFiles) {
+            List<PrefabApplier.Change> fileDiff = perFileDiff.get(fileId);
+            if (fileDiff == null || fileDiff.isEmpty()) continue;
+            List<PrefabChange> mapped = new ArrayList<>(fileDiff.size());
+            for (PrefabApplier.Change c : fileDiff) {
+                mapped.add(new PrefabChange(c.keyPath(), c.oldValue(), c.newValue()));
+            }
+            changes.put(fileId, mapped);
+        }
+        RTPAPI.prefabEvents.fire(new PrefabAppliedEvent(
+                prefabId, callerId, writtenFiles, changes, reloaded));
+    }
+
+    /**
+     * Write one prefab file's changes to disk. Preferred path: route the write
+     * through the live config system ({@code rtp.configs}) so the prefab uses
+     * the exact same set+save-with-comments+backup machinery as
+     * {@code /rtp config ... set}. Brand-new per-world region files are created
+     * via the region-creation method {@link MultiConfigParser#addParser(String)}
+     * (which clones {@code regions/default.yml}).
+     *
+     * <p>Falls back to the tree-level {@link PrefabDiskIO#writeWithBackup} only
+     * when {@code RTP.configs} is unavailable (test scaffolds / pre-core) or the
+     * target file's live config cannot be resolved.
+     *
+     * @return the freshly-written {@code .bak.<ts>} backup path, or {@code null}
+     *         when no prior revision existed to back up.
+     */
+    @Nullable
+    private static Path writeFile(File pluginDir,
+                                  String fileId,
+                                  Map<String, Object> newTree,
+                                  List<PrefabApplier.Change> changes,
+                                  int retention,
+                                  boolean expandPerWorld,
+                                  String defaultRegionFileId) throws IOException {
+        ConfigParser<?> parser = (RTP.configs == null) ? null : resolveParser(fileId);
+        if (parser != null) {
+            RtpYamlConfig live = parser.fileDatabase.cachedLookup.get().get(parser.name);
+            if (live != null) {
+                File target = live.getConfigurationFile();
+                for (PrefabApplier.Change c : changes) {
+                    live.set(c.keyPath(), c.newValue());
+                }
+                int prev = ConfigParser.bakRetention;
+                ConfigParser.bakRetention = retention;
+                try {
+                    parser.save();
+                } finally {
+                    ConfigParser.bakRetention = prev;
+                }
+                if (target == null) return null;
+                List<Path> baks = ConfigBackups.listBaks(target);
+                return baks.isEmpty() ? null : baks.get(0);
+            }
+        }
+        // Fallback: no live config system. Seed brand-new per-world regions from
+        // the reference default so structural comments still survive.
+        String templateFileId = (expandPerWorld
+                && fileId.startsWith("regions/")
+                && !fileId.equals(defaultRegionFileId))
+                ? defaultRegionFileId : null;
+        return PrefabDiskIO.writeWithBackup(pluginDir, fileId, newTree, changes, retention, templateFileId);
+    }
+
+    /**
+     * Resolve the live {@link ConfigParser} backing a prefab file id, creating a
+     * brand-new region parser (and its on-disk {@code regions/<id>.yml} cloned
+     * from {@code default.yml}) via {@link MultiConfigParser#addParser(String)}
+     * when needed. Returns {@code null} when no parser can be resolved (the
+     * caller then falls back to the tree-level writer).
+     */
+    @Nullable
+    @SuppressWarnings("unchecked")
+    private static ConfigParser<?> resolveParser(String fileId) {
+        try {
+            if (fileId.startsWith("regions/")) {
+                String entry = fileId.substring("regions/".length());
+                MultiConfigParser<RegionKeys> regions =
+                        (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+                if (regions == null) return null;
+                if (!regions.listParsers().contains(entry)) {
+                    // Region-creation method (same as /rtp config regions add),
+                    // but seeded explicitly from the synthesised prefab's
+                    // originating region (regions/default) rather than relying on
+                    // the implicit default fallback. This clones the originating
+                    // file's structure and comments onto regions/<entry>.yml.
+                    regions.addParser(entry, MultiWorldExpander.DEFAULT_REGION_ID);
+                }
+                return regions.getParser(entry);
+            }
+            if (fileId.startsWith("worlds/")) {
+                String world = fileId.substring("worlds/".length());
+                return RTP.configs.getWorldParser(world);
+            }
+            // Top-level config file (performance, safety, etc.).
+            String wantName = fileId.endsWith(".yml") ? fileId : fileId + ".yml";
+            for (ConfigParser<?> cp : RTP.configs.configParserMap.values()) {
+                if (cp.name != null && cp.name.equalsIgnoreCase(wantName)) return cp;
+            }
+            return null;
+        } catch (RuntimeException re) {
+            RTP.log(Level.WARNING,
+                    "[prefab] resolveParser failed for " + fileId + " - using fallback writer: "
+                            + re.getMessage());
+            return null;
+        }
     }
 
     /**

@@ -1822,13 +1822,6 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
     boolean dispatchOpenConfigKey(UUID senderId,
                                           MenuAction.OpenConfigKey open,
                                           @Nullable Consumer<String> messageMethod) {
-        // [diag-staging-cart] Trace OpenConfigKey dispatch so the operator
-        // log shows whether the click reached the anvil-prompt entry point.
-        RTP.log(Level.INFO,
-                "[diag-staging-cart] dispatchOpenConfigKey entry viewer=" + senderId
-                        + " file=" + open.fileName()
-                        + " key=" + open.paramName()
-                        + " anvilOpener=" + (anvilInputOpener != null ? "set" : "null"));
         if (anvilInputOpener == null) {
             RTP.log(Level.WARNING,
                     "menu config-key received with anvil-input disabled for " + senderId);

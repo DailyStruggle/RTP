@@ -636,7 +636,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     // ADR-015 / REQ-RTP-NET-015: register the cross-server
     // waitlist PlayerQuitEvent hook + install the command-lock sender
-    // check on the live RTPCmdBukkit. Both are no-ops when network mode
+    // check on the live command root. Both are no-ops when network mode
     // is disabled (waitlistQuitListener / waitlistCommandGuard() are
     // null on the disabled-mode path) and idempotent on re-register.
     try {
@@ -644,16 +644,13 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       java.util.function.Predicate<io.github.dailystruggle.rtp.api.entity.RTPCommandSender> guard =
           networkBootstrap.waitlistCommandGuard();
       if (guard != null
-          && RTP.baseCommand instanceof io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit cmd) {
-        // ADR-049: the guard is now platform-neutral (Predicate<RTPCommandSender>).
-        // Adapt at the Bukkit boundary: non-player senders always pass; players
-        // are wrapped via the RTPCommandSender adapter before the predicate runs.
-        cmd.addSenderCheck(s -> {
-          if (!(s instanceof org.bukkit.entity.Player p)) return true;
-          io.github.dailystruggle.rtp.api.entity.RTPCommandSender rs =
-              RTP.serverAccessor.getSender(p.getUniqueId());
-          return rs == null || guard.test(rs);
-        });
+          && RTP.baseCommand instanceof io.github.dailystruggle.rtp.common.commands.CoreRtpRoot cmd) {
+        // ADR-049: the guard is platform-neutral (Predicate<RTPCommandSender>).
+        // commands-api-ADR-003 lifted the sender-check list to the same neutral
+        // type, so the guard is registered directly; non-player senders (console)
+        // always pass, matching the prior Bukkit-boundary adapter.
+        cmd.addSenderCheck(rs ->
+            !(rs instanceof io.github.dailystruggle.rtp.api.entity.RTPPlayer) || guard.test(rs));
       }
     } catch (Throwable t) {
       RTP.log(java.util.logging.Level.WARNING,

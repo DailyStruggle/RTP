@@ -384,19 +384,6 @@ if (claimAddonProject != null) {
     claimAddonJarProvider = claimAddonJarTask.flatMap { it.archiveFile }
 }
 
-// Bundled effect-registration demo addon (LeafRTPRiftAddon). Single
-// platform-neutral module, plain `jar` (no shaded deps - it couples to RTP only
-// through the compile-only rtp-api / rtp-core / effects-api surfaces). Bundled
-// and self-extracted exactly like the GUI and claim addons so the "Virtual Rift"
-// effect demo ships in the jar and works out of the box.
-def riftAddonProject = findProject(':addons:LeafRTPRiftAddon')
-def riftAddonJarTask = null
-def riftAddonJarProvider = null
-if (riftAddonProject != null) {
-    evaluationDependsOn(':addons:LeafRTPRiftAddon')
-    riftAddonJarTask = riftAddonProject.tasks.named('jar')
-    riftAddonJarProvider = riftAddonJarTask.flatMap { it.archiveFile }
-}
 
 // Bundled reference/event-hook demo addon (LeafRTPCountdownAddon). Single
 // platform-neutral module, plain `jar` (no shaded deps - it couples to RTP only
@@ -457,6 +444,19 @@ shadowJar {
     // released artifact). See remapJar block below.
     archiveClassifier.set('dev')
     archiveVersion.set(project.version.toString())
+
+    // Concatenate duplicate META-INF/services entries instead of letting one
+    // shaded module's copy overwrite another's. rtp-paper-common and
+    // rtp-fabric-common both ship a
+    // META-INF/services/io.github.dailystruggle.rtp.api.menu.MenuRendererProvider
+    // (and ...AnvilInputOpenerProvider); without this merge only the last-seen
+    // copy survives, so the menu-binding ServiceLoader could find only one
+    // platform's provider. With the platform gate in MenuBindingSupport, losing
+    // the Paper entry on a Paper runtime disabled /rtp menu entirely
+    // ("menu.renderer 'book' has no provider on this platform"). mergeServiceFiles
+    // keeps every platform's provider line. (NeoForge's entries are merged
+    // post-remap by mergeNeoForgeBytecodeIntoJar, which concatenates services too.)
+    mergeServiceFiles()
 
     // Strip Loom's `minecraft` configuration (and its transitive deps:
     // MC server+client bytecode, MC assets/data, mappings.tiny, fastutil,
@@ -797,6 +797,34 @@ ext.mergeNeoForgeBytecodeIntoJar = { File out, String editionLabel, List<File> c
     def existing = new HashSet<String>()
     def added = 0
     def strippedHost = 0
+    // Collect META-INF/services registrations from the NeoForge carriers so they
+    // are CONCATENATED into the host jar's service files rather than dropped.
+    // (The carrier class loop skips META-INF/services via skipPatterns above to
+    // avoid an overwrite; we merge them explicitly here instead.) Without this
+    // the NeoForge MenuRendererProvider / AnvilInputOpenerProvider registrations
+    // never reach the unified jar, so /rtp menu discovery finds no provider on a
+    // NeoForge runtime - the NeoForge analogue of the Paper regression that
+    // mergeServiceFiles() fixes for the shaded Paper/Fabric entries.
+    def carrierServices = new LinkedHashMap<String, LinkedHashSet<String>>()
+    def servicePattern = ~'^META-INF/services/.*$'
+    for (carrier in carrierJars) {
+        new java.util.zip.ZipFile(carrier).withCloseable { cz ->
+            def es = cz.entries()
+            while (es.hasMoreElements()) {
+                def e = es.nextElement()
+                if (e.isDirectory()) continue
+                if (!(e.name ==~ servicePattern)) continue
+                def text = cz.getInputStream(e).withCloseable { ins ->
+                    new String(ins.readAllBytes(), 'UTF-8')
+                }
+                def bucket = carrierServices.computeIfAbsent(e.name, { new LinkedHashSet<String>() })
+                text.readLines().each { line ->
+                    def t = line.trim()
+                    if (!t.isEmpty() && !t.startsWith('#')) bucket.add(t)
+                }
+            }
+        }
+    }
     new java.util.zip.ZipFile(out).withCloseable { src ->
         new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(tmp)).withCloseable { zos ->
             def srcEntries = src.entries()
@@ -815,9 +843,36 @@ ext.mergeNeoForgeBytecodeIntoJar = { File out, String editionLabel, List<File> c
                 newEntry.time = e.time
                 zos.putNextEntry(newEntry)
                 if (!e.isDirectory()) {
-                    src.getInputStream(e).withCloseable { ins -> ins.transferTo(zos) }
+                    // For a service file that the carriers also register under,
+                    // concatenate the host lines with the carrier lines (dedup,
+                    // host order first) so NeoForge's provider survives alongside
+                    // the shaded Paper/Fabric ones. Other entries copy verbatim.
+                    if (carrierServices.containsKey(e.name)) {
+                        byte[] hostBytes = src.getInputStream(e).withCloseable { ins -> ins.readAllBytes() }
+                        def merged = new LinkedHashSet<String>()
+                        new String(hostBytes, 'UTF-8').readLines().each { line ->
+                            def t = line.trim()
+                            if (!t.isEmpty() && !t.startsWith('#')) merged.add(t)
+                        }
+                        merged.addAll(carrierServices.get(e.name))
+                        zos.write((merged.join('\n') + '\n').getBytes('UTF-8'))
+                    } else {
+                        src.getInputStream(e).withCloseable { ins -> ins.transferTo(zos) }
+                    }
                 }
                 zos.closeEntry()
+            }
+            // Emit any carrier service file that the host jar did not already
+            // contain (a service the NeoForge carrier registers but Paper/Fabric
+            // do not). Service files the host already had were merged in-place above.
+            carrierServices.each { name, lines ->
+                if (existing.contains(name)) return
+                existing.add(name)
+                def newEntry = new java.util.zip.ZipEntry(name)
+                zos.putNextEntry(newEntry)
+                zos.write((lines.join('\n') + '\n').getBytes('UTF-8'))
+                zos.closeEntry()
+                added++
             }
             for (carrier in carrierJars) {
                 new java.util.zip.ZipFile(carrier).withCloseable { cz ->
@@ -910,11 +965,7 @@ remapJar {
     if (claimAddonJarTask != null) dependsOn claimAddonJarTask
     def claimAddonJarFile = claimAddonJarProvider == null ? null : claimAddonJarProvider.get().asFile
     if (claimAddonJarFile != null) inputs.file(claimAddonJarFile).withPropertyName('bundledClaimAddonJar')
-    // Bundled effect-registration demo addon jar (parity with the GUI/claim addons above).
-    if (riftAddonJarTask != null) dependsOn riftAddonJarTask
-    def riftAddonJarFile = riftAddonJarProvider == null ? null : riftAddonJarProvider.get().asFile
-    if (riftAddonJarFile != null) inputs.file(riftAddonJarFile).withPropertyName('bundledRiftAddonJar')
-    // Bundled reference/event-hook demo addon jar (parity with the GUI/claim/rift addons above).
+    // Bundled reference/event-hook demo addon jar (parity with the GUI/claim addons above).
     if (countdownAddonJarTask != null) dependsOn countdownAddonJarTask
     def countdownAddonJarFile = countdownAddonJarProvider == null ? null : countdownAddonJarProvider.get().asFile
     if (countdownAddonJarFile != null) inputs.file(countdownAddonJarFile).withPropertyName('bundledCountdownAddonJar')
@@ -941,10 +992,6 @@ remapJar {
         // Append the bundled claim-integrations addon jar the same way.
         if (claimAddonJarFile != null) {
             injectAddonFn(remapJar.archiveFile.get().asFile, claimAddonJarFile, 'LeafRTPClaimAddon.jar')
-        }
-        // Append the bundled effect-registration demo addon jar the same way.
-        if (riftAddonJarFile != null) {
-            injectAddonFn(remapJar.archiveFile.get().asFile, riftAddonJarFile, 'LeafRTPRiftAddon.jar')
         }
         // Append the bundled reference/event-hook demo addon jar the same way.
         if (countdownAddonJarFile != null) {
@@ -1074,6 +1121,13 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     archiveBaseName.set('LeafRTP')
     archiveClassifier.set('dev')
     archiveVersion.set(project.ext.liteVersion.toString())
+
+    // Concatenate duplicate META-INF/services entries (e.g. the Paper + Fabric
+    // MenuRendererProvider / AnvilInputOpenerProvider registrations) so every
+    // shaded platform's provider survives rather than the last-seen copy
+    // overwriting the rest. Mirrors the full shadowJar above. See the comment
+    // there for the /rtp-menu-disabled regression this prevents.
+    mergeServiceFiles()
 
     // Lite source set first so its plugin.yml/config.yml/etc. are the lite
     // overlay copies. The conflicting main copies are excluded explicitly from
@@ -1394,10 +1448,6 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     if (claimAddonJarTask != null) dependsOn claimAddonJarTask
     def claimAddonJarFile = claimAddonJarProvider == null ? null : claimAddonJarProvider.get().asFile
     if (claimAddonJarFile != null) inputs.file(claimAddonJarFile).withPropertyName('bundledClaimAddonJar')
-    // Bundled effect-registration demo addon jar (parity with Pro's remapJar).
-    if (riftAddonJarTask != null) dependsOn riftAddonJarTask
-    def riftAddonJarFile = riftAddonJarProvider == null ? null : riftAddonJarProvider.get().asFile
-    if (riftAddonJarFile != null) inputs.file(riftAddonJarFile).withPropertyName('bundledRiftAddonJar')
     // Bundled reference/event-hook demo addon jar (parity with Pro's remapJar).
     if (countdownAddonJarTask != null) dependsOn countdownAddonJarTask
     def countdownAddonJarFile = countdownAddonJarProvider == null ? null : countdownAddonJarProvider.get().asFile
@@ -1425,10 +1475,6 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
         // Append the bundled claim-integrations addon jar the same way.
         if (claimAddonJarFile != null) {
             injectAddonFn(remapLiteJar.archiveFile.get().asFile, claimAddonJarFile, 'LeafRTPClaimAddon.jar')
-        }
-        // Append the bundled effect-registration demo addon jar the same way.
-        if (riftAddonJarFile != null) {
-            injectAddonFn(remapLiteJar.archiveFile.get().asFile, riftAddonJarFile, 'LeafRTPRiftAddon.jar')
         }
         // Append the bundled reference/event-hook demo addon jar the same way.
         if (countdownAddonJarFile != null) {

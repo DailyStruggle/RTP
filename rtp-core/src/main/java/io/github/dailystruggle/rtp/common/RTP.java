@@ -501,7 +501,14 @@ public class RTP {
           }
         }
 
-        for (String name : selectionAPI.regionNames()) {
+        // regionNames() is backed by a ConcurrentHashMap keySet, whose
+        // iteration order is unspecified and unstable across reloads/JVMs.
+        // Sort case-insensitively so the GUI (and any other consumer) renders
+        // a deterministic, consistent region order.
+        java.util.List<String> sortedNames =
+            new ArrayList<>(selectionAPI.regionNames());
+        sortedNames.sort(String.CASE_INSENSITIVE_ORDER);
+        for (String name : sortedNames) {
           if (name == null || name.trim().isEmpty()) continue;
           if (defaultRegionName != null && defaultRegionName.equalsIgnoreCase(name)) {
             continue; // already offered as the bare default target
@@ -530,7 +537,12 @@ public class RTP {
                 live.peerRegionRegistry();
             if (registry != null) {
               String localServerId = registry.localServerId();
-              for (String entry : registry.peerEntries()) {
+              // Sort the peer entries too so cross-server rows render in a
+              // stable, consistent order alongside the local regions.
+              java.util.List<String> peerEntries =
+                  new ArrayList<>(registry.peerEntries());
+              peerEntries.sort(String.CASE_INSENSITIVE_ORDER);
+              for (String entry : peerEntries) {
                 if (entry == null) continue;
                 int colon = entry.indexOf(':');
                 if (colon <= 0 || colon >= entry.length() - 1) continue;

@@ -206,6 +206,40 @@ class PrefabDiskIOTest {
         assertTrue(target.exists());
     }
 
+    @Test
+    void writeWithBackup_templateSeedsCommentsForNewPerWorldRegion() throws IOException {
+        File regionsDir = new File(pluginDir(), "regions");
+        assertTrue(regionsDir.mkdirs() || regionsDir.isDirectory());
+        // Reference regions/default.yml carries structural comments.
+        String defaultYml = ""
+                + "# Region template for the default world\n"
+                + "world: world\n"
+                + "# Radius of the region\n"
+                + "radius: 5000\n";
+        Files.write(new File(regionsDir, "default.yml").toPath(),
+                defaultYml.getBytes(StandardCharsets.UTF_8));
+
+        // Synthesised per-world region (regions/world_nether) is brand-new on
+        // disk; seed its comments from regions/default.
+        List<PrefabApplier.Change> ch = new ArrayList<>();
+        ch.add(new PrefabApplier.Change("world", "world", "world_nether"));
+        Path bak = PrefabDiskIO.writeWithBackup(
+                pluginDir(), "regions/world_nether",
+                Map.of("world", "world_nether", "radius", 5000),
+                ch, 3, "regions/default");
+        assertNull(bak, "new-file write returns null bakPath");
+
+        File target = new File(regionsDir, "world_nether.yml");
+        assertTrue(target.exists());
+        String written = new String(Files.readAllBytes(target.toPath()), StandardCharsets.UTF_8);
+        assertTrue(written.contains("# Region template for the default world"),
+                "template comments must be carried into the synthesised per-world region");
+        assertTrue(written.contains("# Radius of the region"),
+                "all template comments must survive");
+        assertTrue(written.contains("world_nether"),
+                "the world field must be repointed to the synthesised world");
+    }
+
     // --- retention -----------------------------------------------------------
 
     @Test

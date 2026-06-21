@@ -1,7 +1,7 @@
 # RTP-lite — Bundled Admin Docs
 
 This folder is extracted from the lite jar on first start to
-`plugins/RTP/lite-docs/`. It is a **stripped** subset of the full RTP admin
+`plugins/RTP/docs/`. It is a **stripped** subset of the full RTP admin
 documentation, scoped to features that ship in the lite assembly (ADR-024).
 
 For the full documentation set (SQL persistence, Folia, login reserve cache,

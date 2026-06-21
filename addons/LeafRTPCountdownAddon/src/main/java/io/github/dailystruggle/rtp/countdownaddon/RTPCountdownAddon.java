@@ -5,16 +5,14 @@ import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
-import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
-import java.util.logging.Level;
 
 /**
  * LeafRTP countdown addon for RTP.
  *
  * <p>Ships two live, per-second teleport countdowns - a delay countdown for immediate teleports and
  * a queue-position countdown for players waiting in the public wait queue - and doubles as the
- * canonical reference addon (it also demonstrates config registration, an async safety verifier
- * hook, and a post-teleport observer).
+ * canonical reference addon (it also demonstrates config registration and an async safety verifier
+ * hook).
  *
  * <p>Platform-agnostic: implements {@link RTPAddon} and is discovered by
  * {@code rtp-core} through {@link java.util.ServiceLoader} (see
@@ -26,9 +24,6 @@ import java.util.logging.Level;
  * <ul>
  *   <li><b>Config</b>: Registers {@link ConfigParser} with {@link CountdownKeys} for {@code /rtp reload}.</li>
  *   <li><b>Safety</b>: Registers an async verifier predicate via {@link RTPAPI#hooks()}. (See ADR-026).</li>
- *   <li><b>Events</b>: Registers a post-teleport callback on
- *       {@link TeleportPipelineTask#teleportPostActions} - the platform-agnostic
- *       replacement for the Bukkit {@code PostTeleportEvent}.</li>
  *   <li><b>Reload</b>: Uses {@link Configs#onReload(Runnable)} for live config updates.</li>
  * </ul>
  *
@@ -67,28 +62,8 @@ public final class RTPCountdownAddon implements RTPAddon {
           return true;
         });
 
-    // 3. Observe RTP's lifecycle via the platform-agnostic post-teleport runnable list.
-    //    This fires at the end of the TELEPORT phase on every platform, replacing the
-    //    Bukkit-only PostTeleportEvent listener.
-    TeleportPipelineTask.teleportPostActions.add(this::onPostTeleport);
-
-    // 5. Register the two example countdowns (delay + queue), also platform-agnostic.
+    // 3. Register the two example countdowns (delay + queue), also platform-agnostic.
     countdownHooks.register();
-  }
-
-  /** Logs a line whenever the {@code announceTeleport} flag is enabled in {@code countdown.yml}. */
-  @SuppressWarnings("unchecked")
-  private void onPostTeleport(TeleportPipelineTask task) {
-    ConfigParser<CountdownKeys> parser =
-        (ConfigParser<CountdownKeys>) RTP.configs.getParser(CountdownKeys.class);
-    if (parser == null) return;
-
-    Object flag = parser.getConfigValue(CountdownKeys.announceTeleport, false);
-    boolean enabled =
-        (flag instanceof Boolean) ? (Boolean) flag : Boolean.parseBoolean(String.valueOf(flag));
-    if (!enabled) return;
-
-    RTP.log(Level.INFO, "[LeafRTPCountdownAddon] post-teleport observed");
   }
 
   /**

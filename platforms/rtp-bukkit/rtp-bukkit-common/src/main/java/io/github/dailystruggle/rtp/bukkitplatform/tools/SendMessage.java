@@ -182,7 +182,7 @@ public class SendMessage {
     if (RTP.serverAccessor.getServerIntVersion() > 12) {
       BaseComponent[] textComponents = toComponents(player, message);
 
-      if (!hover.isEmpty()) {
+      if (hover != null && !hover.isEmpty()) {
         BaseComponent[] hoverComponents = toComponents(player, hover);
         HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(hoverComponents));
         for (BaseComponent component : textComponents) {
@@ -190,7 +190,7 @@ public class SendMessage {
         }
       }
 
-      if (!click.isEmpty()) {
+      if (click != null && !click.isEmpty()) {
         ClickEvent clickEvent = new ClickEvent(clickAction, click);
         for (BaseComponent component : textComponents) {
           component.setClickEvent(clickEvent);

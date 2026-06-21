@@ -177,6 +177,25 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     return true;
   }
 
+  /**
+   * Live-chunk analogue of {@link #computeColumnSkyFloor(ChunkColumnProbe, int, int)}:
+   * the highest non-air Y on chunk-local column {@code (x, z)} derived purely
+   * from block data. Any {@code y+1} strictly above this floor has unobstructed
+   * sky access by construction. Stored sky-light nibbles ({@code getSkyLight})
+   * are unreliable on freshly-generated / unticked chunks (the server may report
+   * a stale full 15 before relighting), which let cave candidates pass the legacy
+   * {@code skyLight > 7} gate; walking the palette is deterministic and always
+   * available. Returns {@link Integer#MIN_VALUE} for a fully-air column.
+   */
+  private static int computeColumnSkyFloor(RTPChunk chunk, int x, int z) {
+    int top = chunk.getWorld().getMaxHeight() - 1;
+    int bottom = chunk.getWorld().getMinHeight();
+    for (int y = top; y >= bottom; y--) {
+      if (!chunk.isAir(x, y, z)) return y;
+    }
+    return Integer.MIN_VALUE;
+  }
+
   @Override
   public boolean adjust(@NotNull RTPChunk chunk, @NotNull MutableRTPCoords output) {
     if (chunk == null) throw new NullPointerException("Chunk cannot be null");
@@ -209,6 +228,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
       int z = xz.get(1);
       int globalX = (chunk.x() << 4) + x;
       int globalZ = (chunk.z() << 4) + z;
+      int columnSkyFloor = requireSkyLight ? computeColumnSkyFloor(chunk, x, z) : Integer.MIN_VALUE;
 
       for (int i = minY; i < maxY; i++) {
         if (chunk.isAir(x, i, z)) continue;
@@ -220,8 +240,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
 
       for (int it_len = step; it_len > 2; it_len = it_len / 2) {
         for (int i = minY; i < maxY; i += it_len) {
-          int skylight = 15;
-          if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
+          int skylight = (!requireSkyLight || (i + 1) > columnSkyFloor) ? 15 : 0;
           if (chunk.isAir(x, i, z)
               && chunk.isAir(x, i + 1, z)
               && skylight > 7
@@ -245,8 +264,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
       // reads past getMaxHeight().
       int scanTop = Math.min(maxY, chunk.getWorld().getMaxHeight() - 2);
       for (int i = minY; i <= scanTop; i++) {
-        int skylight = 15;
-        if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
+        int skylight = (!requireSkyLight || (i + 1) > columnSkyFloor) ? 15 : 0;
         if (!chunk.isAir(x, i - 1, z)
             && chunk.isAir(x, i, z)
             && chunk.isAir(x, i + 1, z)
@@ -295,12 +313,12 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     int z = localZ & 15;
     int globalX = (chunk.x() << 4) + x;
     int globalZ = (chunk.z() << 4) + z;
+    int columnSkyFloor = requireSkyLight ? computeColumnSkyFloor(chunk, x, z) : Integer.MIN_VALUE;
 
     // Inclusive scan to maxY with a one-cell headroom cap (mirrors Phase 3).
     int scanTop = Math.min(maxY, chunk.getWorld().getMaxHeight() - 2);
     for (int i = minY; i <= scanTop; i++) {
-      int skylight = 15;
-      if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
+      int skylight = (!requireSkyLight || (i + 1) > columnSkyFloor) ? 15 : 0;
       if (!chunk.isAir(x, i - 1, z)
           && chunk.isAir(x, i, z)
           && chunk.isAir(x, i + 1, z)

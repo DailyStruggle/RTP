@@ -93,6 +93,42 @@ public class Factory<T extends FactoryValue<?>> {
   }
 
   /**
+   * Like {@link #construct(String)}, but clones the entry registered under
+   * {@code fromName} as the template instead of always falling back to
+   * {@code DEFAULT.YML}. Used to create a new file (e.g. a new region) seeded
+   * from an arbitrary originating file rather than the bundled default.
+   *
+   * <p>When {@code fromName} resolves to an already-registered name the new
+   * value reuses that entry as a template; when it does not exist the call
+   * degrades to {@link #construct(String)} (default-seeded), so callers never
+   * need to special-case a missing template.
+   *
+   * @param name     the name of the item to construct
+   * @param fromName the originating template name to clone from
+   * @return mutable copy of the item seeded from {@code fromName}, or
+   *         {@code null} when the map is empty
+   */
+  @Nullable
+  public FactoryValue<?> construct(String name, String fromName) {
+    if (fromName == null) return construct(name);
+    String fromKey = fromName.toUpperCase();
+    if (!fromKey.endsWith(".YML")) fromKey = fromKey + ".YML";
+    T template = map.get(fromKey);
+    if (template == null) {
+      // Unknown originating file: fall back to the default-seeded behaviour
+      // rather than failing, so callers don't have to pre-check existence.
+      return construct(name);
+    }
+    T clone = (T) template.clone();
+    clone.name = (name.endsWith(".yml")) ? name : name + ".yml";
+    if (clone instanceof ConfigParser) {
+      ConfigParser<?> configParser = (ConfigParser<?>) clone;
+      configParser.check(configParser.version, configParser.pluginDirectory, null);
+    }
+    return clone.clone();
+  }
+
+  /**
    * Returns a clone of the value registered under the given name, or {@code null} if absent.
    *
    * @param name the name to look up

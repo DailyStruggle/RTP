@@ -128,8 +128,28 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     return description.getVersion();
   }
 
+  /**
+   * Canonical platform brand ("Folia", "Paper", or "Spigot") as resolved by the
+   * entrypoint ({@code BukkitServerProvider.resolveServerModel}) and published via
+   * {@link #setPlatform(String)} at wire time. When set, it is the authoritative
+   * answer and is returned verbatim; the class-probe path below is only a fallback
+   * for contexts that instantiate the accessor without going through the entrypoint
+   * (e.g. unit tests).
+   */
+  private String resolvedPlatform = null;
+
+  /**
+   * Publish the server type decided at the entrypoint. The entrypoint already
+   * performs the Paper/Folia probing to select the accessor/scheduler pair, so the
+   * accessor adopts that decision rather than independently re-detecting it.
+   */
+  public void setPlatform(String platform) {
+    this.resolvedPlatform = platform;
+  }
+
   @Override
   public @NotNull String getPlatform() {
+    if (resolvedPlatform != null) return resolvedPlatform;
     if (isFolia()) return "Folia";
     if (isPaper()) return "Paper";
     return "Spigot";
@@ -423,6 +443,15 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   private String tagMessage(String message, @Nullable String tag) {
     return MessageTagger.tagMessage(message, tag);
+  }
+
+  @Override
+  public @NotNull Set<String> getOnlinePlayerNames() {
+    Set<String> names = new HashSet<>();
+    for (Player player : Bukkit.getOnlinePlayers()) {
+      names.add(player.getName());
+    }
+    return names;
   }
 
   @Override

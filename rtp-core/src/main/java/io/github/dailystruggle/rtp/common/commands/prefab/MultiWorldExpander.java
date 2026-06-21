@@ -28,12 +28,42 @@ import java.util.Objects;
  *
  * <p>Pure function: does not mutate any input. The cloned template is a
  * deep copy so callers can safely mutate the returned overlays.
+ *
+ * <p><strong>Per-dimension vert repair (injected)</strong>: the
+ * {@code regions/default} template is authored for the overworld. Cloning its
+ * {@code vert} block verbatim into the nether or the end yields an invalid
+ * configuration - those dimensions never report sky light, and the nether has
+ * a solid bedrock ceiling - so every vertical probe fails
+ * {@code vert/no-stand-y}. The dimension rules themselves are not duplicated
+ * here: the caller may supply a {@link RegionOverlayAmender} that is invoked
+ * on each freshly-synthesised overlay, letting the impure shell route the
+ * repair through the canonical {@code NetherEndConfigAmender} (the same helper
+ * {@code /rtp config region} and the MultiConfig menu use). When no amender is
+ * supplied (e.g. unit tests of the pure transform) the overlays are returned
+ * as cloned, unrepaired.
  */
 public final class MultiWorldExpander {
 
     public static final String DEFAULT_REGION_ID = "default";
 
     private MultiWorldExpander() {
+    }
+
+    /**
+     * Hook invoked on each freshly-synthesised per-world region overlay so the
+     * caller can repair it for the destination world's dimension without the
+     * expander knowing the dimension rules. The implementation is expected to
+     * mutate {@code regionOverlay} in place (e.g. drop the sky-light
+     * requirement and clamp {@code maxY} for a nether world). Never called for
+     * worlds that already have a region.
+     */
+    @FunctionalInterface
+    public interface RegionOverlayAmender {
+        /**
+         * @param world         the destination world name
+         * @param regionOverlay the mutable cloned region overlay for that world
+         */
+        void amend(String world, Map<String, Object> regionOverlay);
     }
 
     /**
@@ -65,6 +95,22 @@ public final class MultiWorldExpander {
             Map<String, Map<String, Object>> currentRegions,
             List<String> worldNames
     ) {
+        return expand(prefab, currentRegions, worldNames, null);
+    }
+
+    /**
+     * Variant of {@link #expand(Prefab, Map, List)} that invokes
+     * {@code amender} on each freshly-synthesised per-world overlay so the
+     * caller can repair it for the destination world's dimension (see
+     * {@link RegionOverlayAmender}). A {@code null} amender leaves the cloned
+     * overlays untouched.
+     */
+    public static Map<String, Map<String, Object>> expand(
+            Prefab prefab,
+            Map<String, Map<String, Object>> currentRegions,
+            List<String> worldNames,
+            RegionOverlayAmender amender
+    ) {
         Objects.requireNonNull(prefab, "prefab");
         Objects.requireNonNull(currentRegions, "currentRegions");
         Objects.requireNonNull(worldNames, "worldNames");
@@ -92,6 +138,13 @@ public final class MultiWorldExpander {
         // synthesised overlay - e.g. the default region usually maps to the
         // overworld, so "world" is left alone rather than cloned into a
         // redundant regions/world entry.
+        //
+        // The "world" field may be an index placeholder such as "[0]" (main
+        // world), "[1]" (second loaded world), etc. - the same notation
+        // RegionConfigLoader resolves against the live world list. Resolve it
+        // against worldNames (which is in the same load order) so the
+        // placeholder-targeted world is recognised as mapped and not
+        // duplicated.
         Map<String, Boolean> mappedWorlds = new LinkedHashMap<>();
         for (Map<String, Object> region : currentRegions.values()) {
             if (region == null) {
@@ -99,7 +152,10 @@ public final class MultiWorldExpander {
             }
             Object mappedWorld = region.get("world");
             if (mappedWorld instanceof String s && !s.isEmpty()) {
-                mappedWorlds.put(s, Boolean.TRUE);
+                String resolved = resolveWorldRef(s, worldNames);
+                if (resolved != null && !resolved.isEmpty()) {
+                    mappedWorlds.put(resolved, Boolean.TRUE);
+                }
             }
         }
 
@@ -121,9 +177,34 @@ public final class MultiWorldExpander {
             }
             Map<String, Object> overlay = deepCopy(template);
             overlay.put("world", world);
+            if (amender != null) {
+                amender.amend(world, overlay);
+            }
             out.put(world, overlay);
         }
         return out;
+    }
+
+    /**
+     * Resolve a region "world" reference to a concrete world name. An index
+     * placeholder of the form {@code "[N]"} resolves to {@code worldNames.get(N)}
+     * (matching {@code RegionConfigLoader}'s index-based world selection against
+     * the live world list). A literal name is returned verbatim. Returns
+     * {@code null} when an index placeholder is out of range.
+     */
+    private static String resolveWorldRef(String ref, List<String> worldNames) {
+        if (ref.length() > 2 && ref.charAt(0) == '[' && ref.charAt(ref.length() - 1) == ']') {
+            try {
+                int num = Integer.parseInt(ref.substring(1, ref.length() - 1).trim());
+                if (num >= 0 && num < worldNames.size()) {
+                    return worldNames.get(num);
+                }
+                return null;
+            } catch (NumberFormatException ignored) {
+                // Not a numeric index placeholder; treat as a literal name.
+            }
+        }
+        return ref;
     }
 
     @SuppressWarnings("unchecked")

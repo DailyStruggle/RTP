@@ -2,9 +2,11 @@
 
 A shippable addon that adds two live, per-second teleport **countdowns** to RTP - a delay countdown
 for immediate teleports ("Teleporting in N...") and a queue-position countdown for players waiting in
-the public wait queue ("you are #N in the queue" -> "you're up!"). It also doubles as the **canonical
-reference addon**, demonstrating the four API touch-points most addons need (config + reload, an
-async safety verifier, and a post-teleport observer).
+the public wait queue ("you are #N in the queue" -> "you're up!"). Both render as a personal on-screen
+**boss-bar** (not chat spam) via the per-player `RTPPlayer.showProgressBar` / `clearProgressBar` API,
+so the per-second updates replace one bar in place. It also doubles as the **canonical reference
+addon**, demonstrating the four API touch-points most addons need (config + reload, an async safety
+verifier, and a post-teleport observer).
 
 It is **platform-agnostic**: it implements the `RTPAddon` SPI and is discovered via `ServiceLoader`,
 so the same jar runs on Bukkit / Spigot / Paper / Folia and Fabric (and proxy JVMs, for the
@@ -27,7 +29,7 @@ so the same jar runs on Bukkit / Spigot / Paper / Folia and Fabric (and proxy JV
  `src/main/resources/countdown.yml` | YAML config the addon ships with. Keys must match the enum constants in `CountdownKeys`.
  `src/main/java/.../CountdownKeys.java` | Typed enum of the YAML keys. RTP's `ConfigParser<E>` is generic over this enum.
  `src/main/java/.../RTPCountdownAddon.java` | The `RTPAddon` implementation. Wires everything up in `onLoad()`.
- `src/main/java/.../CountdownHooks.java` | Two platform-agnostic teleport countdowns (immediate-teleport delay countdown via `TeleportPipelineTask.setupPreActions`; queue-position countdown via `Region.onPlayerQueuePush` / `onPlayerQueuePop`). Uses `RTP.scheduler` / `RTP.serverAccessor`, no `org.bukkit.*`.
+ `src/main/java/.../CountdownHooks.java` | Two platform-agnostic teleport countdowns (immediate-teleport delay countdown via `TeleportPipelineTask.setupPreActions`; queue-position countdown via `Region.onPlayerQueuePush` / `onPlayerQueuePop`), rendered as per-player boss-bars through `RTPPlayer.showProgressBar` / `clearProgressBar`. Uses `RTP.scheduler` / `RTP.serverAccessor`, no `org.bukkit.*`.
 
 ---
 

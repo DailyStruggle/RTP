@@ -44,8 +44,18 @@ import java.util.function.Consumer;
  * <p><b>Threading:</b> the RTP hook lists and pipeline pre-actions may fire off the main thread, so
  * every player-facing action (scheduling, messaging) is routed through {@code RTP.scheduler} and
  * {@code RTP.serverAccessor}, which dispatch onto the correct thread per platform.
+ *
+ * <p><b>Presentation:</b> both countdowns render as a personal boss-bar via
+ * {@link RTPPlayer#showProgressBar(String, String, double)} / {@link RTPPlayer#clearProgressBar(String)}
+ * rather than chat spam, so the per-second updates replace one on-screen bar in place instead of
+ * flooding the chat log.
  */
 public final class CountdownHooks {
+
+  /** Stable boss-bar ids (one per countdown kind), so the two bars never collide. */
+  private static final String DELAY_BAR = "rtp-delay-countdown";
+
+  private static final String QUEUE_BAR = "rtp-queue-countdown";
 
   /** Active per-player countdown tasks, keyed by player UUID. */
   private final Map<UUID, Object> delayTasks = new ConcurrentHashMap<>();
@@ -72,9 +82,19 @@ public final class CountdownHooks {
     Region.onPlayerQueuePush.remove(pushHook);
     Region.onPlayerQueuePop.remove(popHook);
     delayTasks.values().forEach(RTP.scheduler::cancelTask);
-    delayTasks.clear();
     queueTasks.values().forEach(RTP.scheduler::cancelTask);
+    // Clear any boss-bars still showing for players with an in-flight countdown.
+    clearBars(delayTasks.keySet(), DELAY_BAR);
+    clearBars(queueTasks.keySet(), QUEUE_BAR);
+    delayTasks.clear();
     queueTasks.clear();
+  }
+
+  private void clearBars(Iterable<UUID> ids, String barId) {
+    for (UUID id : ids) {
+      RTPPlayer p = RTP.serverAccessor.getPlayer(id);
+      if (p != null) p.clearProgressBar(barId);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -101,17 +121,20 @@ public final class CountdownHooks {
     Object previous = delayTasks.remove(id);
     if (previous != null) RTP.scheduler.cancelTask(previous);
 
+    int total = seconds;
     int[] remaining = {seconds};
     Object task =
         RTP.scheduler.runTaskTimer(
             () -> {
               RTPPlayer p = RTP.serverAccessor.getPlayer(id);
               if (p == null || remaining[0] <= 0) {
+                if (p != null) p.clearProgressBar(DELAY_BAR);
                 Object self = delayTasks.remove(id);
                 if (self != null) RTP.scheduler.cancelTask(self);
                 return;
               }
-              RTP.serverAccessor.sendMessage(id, "[RTP] Teleporting in " + remaining[0] + "...");
+              double progress = total <= 0 ? 0.0 : (double) remaining[0] / total;
+              p.showProgressBar(DELAY_BAR, "&aTeleporting in " + remaining[0] + "...", progress);
               remaining[0]--;
             },
             0L,
@@ -134,8 +157,16 @@ public final class CountdownHooks {
         () -> {
           Object task = queueTasks.remove(id);
           if (task != null) RTP.scheduler.cancelTask(task);
-          if (RTP.serverAccessor.getPlayer(id) != null) {
-            RTP.serverAccessor.sendMessage(id, "[RTP] You're up! Teleporting now...");
+          RTPPlayer p = RTP.serverAccessor.getPlayer(id);
+          if (p != null) {
+            // Flash a full bar, then clear it shortly after so it doesn't linger on screen.
+            p.showProgressBar(QUEUE_BAR, "&aYou're up! Teleporting now...", 1.0);
+            RTP.scheduler.runTaskLater(
+                () -> {
+                  RTPPlayer later = RTP.serverAccessor.getPlayer(id);
+                  if (later != null) later.clearProgressBar(QUEUE_BAR);
+                },
+                40L);
           }
         });
   }
@@ -157,13 +188,18 @@ public final class CountdownHooks {
               }
               TeleportData data = RTP.getInstance().latestTeleportData.get(id);
               // No longer queued (popped, cancelled, or completed): stop. The pop hook
-              // delivers the "you're up!" message on the normal path.
+              // delivers the "you're up!" bar on the normal path.
               if (data == null || data.completed || data.queueLocation <= 0) {
+                p.clearProgressBar(QUEUE_BAR);
                 Object self = queueTasks.remove(id);
                 if (self != null) RTP.scheduler.cancelTask(self);
                 return;
               }
-              RTP.serverAccessor.sendMessage(id, "[RTP] You are #" + data.queueLocation + " in the queue...");
+              // No fixed total for a wait queue, so approximate fill from the position:
+              // #1 fills the bar, further-back positions show progressively less.
+              double progress = 1.0 / data.queueLocation;
+              p.showProgressBar(
+                  QUEUE_BAR, "&eYou are #" + data.queueLocation + " in the queue...", progress);
             },
             0L,
             20L);

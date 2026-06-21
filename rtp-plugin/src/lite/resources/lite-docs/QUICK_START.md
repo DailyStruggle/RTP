@@ -23,7 +23,7 @@
 3. After first start the data folder is `plugins/RTP/`, containing
    `regions/default.yml`, `worlds/<world>.yml` per loaded world, plus
    `safety.yml`, `performance.yml`, `messages.yml`, `config.yml`, and this
-   `lite-docs/` folder.
+   `docs/` folder.
 
 ## 2. Verify
 

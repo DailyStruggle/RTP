@@ -299,6 +299,31 @@ public class LinearAdjustorTest {
         assertNotNull(result, "requireSkyLight adjustor should find a landing via per-Y scan");
     }
 
+    /**
+     * Regression: {@code requireSkyLight=true} must reject a roofed cave candidate even
+     * when the mock chunk reports a stale full sky-light of 15 at the foothold (the
+     * real-world failure mode on freshly-generated / unticked chunks). A safe floor at
+     * 64 with air at 65-66 sits under a solid roof at 70-80; the block-data sky-floor
+     * binds at 80, so every candidate at {@code y+1 <= 80} fails the gate and the
+     * scan returns null instead of placing the player inside the cave.
+     */
+    @Test
+    void requireSkyLight_roofedCave_rejectsDespiteStaleFullSkyLight() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        chunk.setSolidSafe(64); // cave floor (foothold at y=65)
+        for (int y = 70; y <= 80; y++) chunk.setSolid(y); // cave roof / overhead terrain
+
+        LinearAdjustor adj = new LinearAdjustor(new ArrayList<>());
+        adj.set(GenericVerticalAdjustorKeys.direction, 0);
+        adj.set(GenericVerticalAdjustorKeys.minY, 60L);
+        adj.set(GenericVerticalAdjustorKeys.maxY, 80L);
+        adj.set(GenericVerticalAdjustorKeys.requireSkyLight, true);
+
+        RTPCoords result = adj.adjust(chunk);
+        assertNull(result,
+                "requireSkyLight must reject a roofed cave even when stored sky-light is a stale 15");
+    }
+
     // -----------------------------------------------------------------------
     // adjust(chunk, output) overload
     // -----------------------------------------------------------------------
