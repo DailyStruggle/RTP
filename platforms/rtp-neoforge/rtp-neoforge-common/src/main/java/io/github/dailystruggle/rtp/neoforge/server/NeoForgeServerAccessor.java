@@ -183,6 +183,11 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     }
 
     @Override
+    public io.github.dailystruggle.rtp.api.server.PlatformFamily getPlatformFamily() {
+        return io.github.dailystruggle.rtp.api.server.PlatformFamily.NEOFORGE;
+    }
+
+    @Override
     public Integer getServerIntVersion() {
         String v = getServerVersion();
         String[] parts = v.split("\\.");

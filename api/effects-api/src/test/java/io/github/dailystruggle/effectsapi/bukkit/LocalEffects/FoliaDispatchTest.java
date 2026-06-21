@@ -14,7 +14,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -40,7 +43,7 @@ class FoliaDispatchTest {
 
     private BukkitPotionDispatch.EntityDispatcher savedEntityDispatcher;
     private BukkitHandles.RegionDispatcher savedRegionDispatcher;
-    private Plugin savedEffectsApiInstance;
+    private final Map<Plugin, Object> savedStates = new HashMap<>();
 
     @BeforeEach
     void saveDefaults() {
@@ -48,40 +51,57 @@ class FoliaDispatchTest {
         savedEntityDispatcher = BukkitPotionDispatch.entityDispatcher;
         savedRegionDispatcher = BukkitHandles.regionDispatcher;
         // EffectsAPI.getInstance() now throws IllegalStateException (S-006)
-        // when uninitialized. The production code under test calls it before
-        // consulting the dispatcher seam, so seed a mock Plugin for the test
-        // lifecycle and restore it in @AfterEach.
-        savedEffectsApiInstance = readEffectsApiInstance();
-        // Don't call EffectsAPI.init() — it registers Bukkit listeners which
-        // NPE without an initialized server. Just seed the static field.
-        writeEffectsApiInstance(mock(Plugin.class));
+        // when no plugin is registered. The production code under test calls it
+        // before consulting the dispatcher seam, so seed the per-plugin STATES
+        // registry with a single mock Plugin for the test lifecycle and restore
+        // it in @AfterEach. We seed the map directly (with null listeners)
+        // rather than calling EffectsAPI.init() because init() registers Bukkit
+        // listeners which NPE without an initialized server.
+        savedStates.clear();
+        savedStates.putAll(readStates());
+        seedSingleState(mock(Plugin.class));
     }
 
     @AfterEach
     void restoreDefaults() {
         BukkitPotionDispatch.entityDispatcher = savedEntityDispatcher;
         BukkitHandles.regionDispatcher = savedRegionDispatcher;
-        writeEffectsApiInstance(savedEffectsApiInstance);
+        restoreStates(savedStates);
     }
 
-    private static Plugin readEffectsApiInstance() {
+    @SuppressWarnings("unchecked")
+    private static Map<Plugin, Object> statesMap() {
         try {
-            Field f = EffectsAPI.class.getDeclaredField("instance");
+            Field f = EffectsAPI.class.getDeclaredField("STATES");
             f.setAccessible(true);
-            return (Plugin) f.get(null);
+            return (Map<Plugin, Object>) f.get(null);
         } catch (ReflectiveOperationException e) {
             throw new AssertionError(e);
         }
     }
 
-    private static void writeEffectsApiInstance(Plugin value) {
+    private static Map<Plugin, Object> readStates() {
+        return new HashMap<>(statesMap());
+    }
+
+    private static void seedSingleState(Plugin plugin) {
         try {
-            Field f = EffectsAPI.class.getDeclaredField("instance");
-            f.setAccessible(true);
-            f.set(null, value);
+            Map<Plugin, Object> states = statesMap();
+            states.clear();
+            Class<?> stateClass =
+                    Class.forName("io.github.dailystruggle.effectsapi.EffectsAPI$PluginState");
+            Constructor<?> ctor = stateClass.getDeclaredConstructors()[0];
+            ctor.setAccessible(true);
+            states.put(plugin, ctor.newInstance(null, null));
         } catch (ReflectiveOperationException e) {
             throw new AssertionError(e);
         }
+    }
+
+    private static void restoreStates(Map<Plugin, Object> saved) {
+        Map<Plugin, Object> states = statesMap();
+        states.clear();
+        states.putAll(saved);
     }
 
     @Test

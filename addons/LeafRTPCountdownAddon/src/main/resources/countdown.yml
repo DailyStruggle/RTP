@@ -1,0 +1,11 @@
+# LeafRTPCountdownAddon configuration. Edit values here; RTP's ConfigParser will
+# pick up changes on /rtp reload through the Configs.onReload hook.
+rejectInClaim: true
+announceTeleport: true
+# Show a per-second "teleporting in N..." countdown during the teleportDelay wait
+# (immediate/unqueued teleports only; queued teleports run immediately on pop).
+delayCountdown: true
+# Show a recurring "you are #N in the queue" countdown while waiting in the wait
+# queue, and a "you're up!" message when the player is popped.
+queueCountdown: true
+version: "1.0"

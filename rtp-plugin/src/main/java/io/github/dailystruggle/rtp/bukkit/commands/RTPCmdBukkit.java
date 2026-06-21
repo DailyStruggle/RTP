@@ -1,6 +1,8 @@
 package io.github.dailystruggle.rtp.bukkit.commands;
 
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.*;
+import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
+import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
@@ -10,15 +12,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.common.commands.RTPCmd;
 import io.github.dailystruggle.rtp.common.commands.menu.MenuRedeemSubcommand;
-import io.github.dailystruggle.rtp.common.commands.scan.ScanCmd;
 import io.github.dailystruggle.rtp.bukkit.commands.test.BukkitTestCmd;
-import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
-import io.github.dailystruggle.rtp.common.commands.version.VersionCmd;
-import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
-import io.github.dailystruggle.rtp.common.commands.parameters.ShapeParameter;
-import io.github.dailystruggle.rtp.common.commands.parameters.VertParameter;
-import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
-import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import java.util.Locale;
@@ -35,7 +29,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
-public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
+public class RTPCmdBukkit extends BukkitTreeCommand implements RTPCmd {
   // for optimizing parameters,
 
   private final Semaphore senderChecksGuard = new Semaphore(1);
@@ -44,186 +38,26 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
   public RTPCmdBukkit(Plugin plugin) {
     super(plugin, null);
 
-    // Route reply messages through SendMessage so raw templates (placeholders,
-    // '&' colour codes, hex tokens, PAPI) are formatted at the platform
-    // boundary instead of leaking to console as e.g. "&c[P0] ...".
-    // The default in BukkitTreeCommand is sender::sendMessage which bypasses
-    // formatting entirely.
-    this.messageMethodFactory =
-        sender -> msg -> io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(sender, msg);
+    // Install the Bukkit MessageSink once. Command reply delivery (normal
+    // replies plus the BaseRTPCmd msgInvalidCommand / msgBadParameter
+    // defaults) routes raw templates through SendMessage so placeholders,
+    // '&' / hex colour codes, and PAPI are resolved at the platform boundary
+    // instead of leaking to console as e.g. "&c[P0] ...". This replaces the
+    // former per-command messageMethodFactory and the BukkitBaseRTPCmd
+    // msg overrides.
+    CommandsAPI.setMessageSink(new BukkitMessageSink());
 
-    // region name parameter
-    // filter by region exists and sender permission. Validator
-    // also accepts qualified `server:region` syntax when the named peer is
-    // reachable per the live PeerRegionRegistry (looked up dynamically via
-    // NetworkModeBootstrap.LIVE so this code path works whether network
-    // mode boots before or after command registration). Extras supplier
-    // surfaces peer-qualified entries in tab-completion.
-    RegionParameter regionParameter =
-        new RegionParameter(
-            "rtp.region",
-            "select a region to teleport to",
-            (uuid, s) -> {
-              if (s == null) return false;
-              RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
-              // Path 1: bare local region name (pre-H2 behaviour).
-              if (RTP.selectionAPI.regionNames().contains(s)) {
-                return sender.hasPermission("rtp.regions." + s);
-              }
-              // Path 2: qualified `server:region` (H2). Parse strictly; on
-              // any malformed input fall through to reject.
-              io.github.dailystruggle.rtp.common.network.NetworkRouter.ParsedRegion parsed;
-              try {
-                parsed = io.github.dailystruggle.rtp.common.network.NetworkRouter.parseRegionArgQualified(s);
-              } catch (IllegalArgumentException malformed) {
-                return false;
-              }
-              if (parsed == null || parsed.serverHint() == null) return false;
-              io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap live =
-                  io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE;
-              if (live == null) return false;
-              io.github.dailystruggle.rtp.common.network.PeerRegionRegistry registry =
-                  live.peerRegionRegistry();
-              if (registry == null) return false;
-              if (!registry.isReachableHardPin(parsed.serverHint(), parsed.regionKey())) {
-                return false;
-              }
-              // Two independent gates for a qualified `server:region` target:
-              //   - `rtp.servers.<server>` allows/denies the destination
-              //     backend (new; mirrors `rtp.regions.x` but keyed on the
-              //     server hint), and
-              //   - `rtp.regions.<region>` allows/denies the region.
-              // Region permission is keyed on the bare region name, not the
-              // qualified form, so an operator's existing
-              // `rtp.regions.default` grant covers `backend-a:default`.
-              return sender.hasPermission("rtp.servers." + parsed.serverHint())
-                  && sender.hasPermission("rtp.regions." + parsed.regionKey());
-            },
-            () -> {
-              io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap live =
-                  io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE;
-              if (live == null) return java.util.Set.of();
-              io.github.dailystruggle.rtp.common.network.PeerRegionRegistry registry =
-                  live.peerRegionRegistry();
-              return registry == null ? java.util.Set.<String>of() : registry.peerEntries();
-            });
-    regionParameter.put(
-        "world",
-        new io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter(
-            "rtp.params",
-            "modify xz selection",
-            (uuid, s) ->
-                (Bukkit.getWorld(s) != null)
-                    & RTP.serverAccessor.getSender(uuid).hasPermission("rtp.worlds." + s)));
-    regionParameter.put(
-        "price",
-        new FloatParameter(
-            "rtp.params",
-            "modify xz selection",
-            (uuid, s) -> {
-              try {
-                Double.parseDouble(s);
-                return true;
-              } catch (NumberFormatException exception) {
-                return false;
-              }
-            }));
-    regionParameter.put(
-        "worldborderoverride",
-        new BooleanParameter(
-            "rtp.params",
-            "modify xz selection",
-            (uuid, s) -> (s.equalsIgnoreCase("true") || s.equalsIgnoreCase("false"))));
-    regionParameter.put(
-        "shape",
-        new ShapeParameter(
-            "rtp.params",
-            "modify xz selection",
-            (uuid, s) -> RTP.factoryMap.get(RTP.factoryNames.shape).contains(s)));
-    regionParameter.put(
-        "vert",
-        new VertParameter(
-            "rtp.params",
-            "modify y selection",
-            (uuid, s) -> RTP.factoryMap.get(RTP.factoryNames.vert).contains(s)));
-
-    addParameter("region", regionParameter);
-
-    addParameter(
-        "biome",
-        new io.github.dailystruggle.rtp.common.commands.parameters.BiomeParameter(
-            "rtp.biome",
-            "select a biome to teleport to",
-            (uuid, s) -> {
-              RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
-              // Accept namespaced biome ids (e.g. `minecraft:badlands`) as well as bare
-              // enum names (`BADLANDS`). `ServerAccessor#getBiomes()` now emits both
-              // forms, so a single membership probe covers both grammars; the user-typed
-              // string is checked verbatim and (for the bare-name grammar) up-cased
-              // with the root locale to avoid Turkish-i case folding.
-              if (s == null) return false;
-              int colon = s.indexOf(':');
-              String bareKey = (colon >= 0) ? s.substring(colon + 1) : s;
-              String upper = bareKey.toUpperCase(java.util.Locale.ROOT);
-              java.util.Set<String> biomes = RTP.serverAccessor.getBiomes();
-              boolean known = biomes.contains(s)
-                      || biomes.contains(upper)
-                      || biomes.contains(bareKey.toLowerCase(java.util.Locale.ROOT))
-                      || biomes.contains("minecraft:" + bareKey.toLowerCase(java.util.Locale.ROOT));
-              return known
-                      && (sender.hasPermission("rtp.biome.*")
-                              || sender.hasPermission("rtp.biome." + bareKey)
-                              || sender.hasPermission("rtp.biome." + s));
-            }));
-
-    // target player parameter
-    // filter by player exists and player permission
-    addParameter(
-        "player",
-        new OnlinePlayerParameter(
-            "rtp.other",
-            "teleport someone else",
-            (sender, s) -> {
-              if (!sender.hasPermission("rtp.other")) return false;
-              Player player = Bukkit.getPlayer(s);
-              return player != null && player.getName().equalsIgnoreCase(s)
-                  && (!(sender instanceof Player) || !player.hasPermission("rtp.notme"));
-            }));
-
-    // world name parameter
-    // filter by world exists and sender permission
-    addParameter(
-        "world",
-        new WorldParameter(
-            "rtp.world",
-            "select a world to teleport to",
-            (sender, s) -> {
-                org.bukkit.World world = Bukkit.getWorld(s);
-                return world != null && world.getName().equalsIgnoreCase(s) && sender.hasPermission("rtp.worlds." + s);
-            }));
-
-    addParameter(
-        "toggletargetperms",
-        new BooleanParameter(
-            "rtp.params",
-            "check player's perms when running this command",
-            (sender, s) -> sender.hasPermission("rtp.params") && (s.equalsIgnoreCase("true") || s.equalsIgnoreCase("false"))));
-
-    addSubCommand(new ReloadCmd(this));
-    addSubCommand(new io.github.dailystruggle.rtp.common.commands.gui.GuiCmd(this));
-    // /rtp help intentionally NOT registered as a subcommand: when no HELP
-    // subcommand exists, commands-api's TreeCommand auto-dispatches the
-    // built-in help() listing (see TreeCommand line 231), which covers
-    // every registered subcommand instead of only those that happen to
-    // have a MessagesKeys enum value. Clickable suggestions are restored
-    // by the help-line wrapping in the messageMethod consumer below.
-    addSubCommand(new ConfigCmd(this));
-    addSubCommand(new ScanCmd(this));
-    addSubCommand(new InfoCmd(this));
-    VersionCmd versionCmd = new VersionCmd(this);
-    addSubCommand(versionCmd);
-    getCommandLookup().put(VersionCmd.ALIAS.toUpperCase(), versionCmd);
-    addSubCommand(new io.github.dailystruggle.rtp.common.commands.admin.ClearCacheCmd(this));
+    // Platform-neutral parameters (region / biome / toggletargetperms) and
+    // every common subcommand are assembled once by rtp-core's
+    // CoreCommandTreeBuilder. Only the genuinely platform-bound `player` and
+    // `world` parameters are supplied here through the
+    // PlatformCommandParameters seam (BukkitCommandParameters), which keeps
+    // the Bukkit OnlinePlayerParameter / WorldParameter (CommandSender-typed
+    // validators + Bukkit.getPlayer/getWorld tab-completion). BukkitTestCmd is
+    // Bukkit-only and stays registered here.
+    io.github.dailystruggle.rtp.common.commands.CoreCommandTreeBuilder.attachCommonParameters(
+        this, new BukkitCommandParameters());
+    io.github.dailystruggle.rtp.common.commands.CoreCommandTreeBuilder.attachCommonSubcommands(this);
     addSubCommand(new BukkitTestCmd(this));
 
     // /rtp menu — full ADR-035 / ADR-044 / ADR-050 menu surface, installed
@@ -521,5 +355,45 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
   public void failEvent(RTPCommandSender sender, String msg) {
     TeleportCommandFailEvent event = new TeleportCommandFailEvent(sender, msg);
     Bukkit.getPluginManager().callEvent(event);
+  }
+
+  /**
+   * Bukkit source for the two platform-bound parameters. Uses the commands-api
+   * Bukkit {@code OnlinePlayerParameter} / {@code WorldParameter}
+   * (CommandSender-typed validators backed by {@code Bukkit.getPlayer} /
+   * {@code Bukkit.getWorld}), preserving the exact tab-completion and
+   * permission gating the Bukkit root used before the common builder was
+   * introduced.
+   */
+  private static final class BukkitCommandParameters
+      implements io.github.dailystruggle.rtp.common.commands.PlatformCommandParameters {
+
+    @Override
+    public io.github.dailystruggle.commandsapi.common.CommandParameter playerParameter() {
+      // target player parameter — filter by player exists and player permission
+      return new OnlinePlayerParameter(
+          "rtp.other",
+          "teleport someone else",
+          (sender, s) -> {
+            if (!sender.hasPermission("rtp.other")) return false;
+            Player player = Bukkit.getPlayer(s);
+            return player != null && player.getName().equalsIgnoreCase(s)
+                && (!(sender instanceof Player) || !player.hasPermission("rtp.notme"));
+          });
+    }
+
+    @Override
+    public io.github.dailystruggle.commandsapi.common.CommandParameter worldParameter() {
+      // world name parameter — filter by world exists and sender permission
+      return new WorldParameter(
+          "rtp.world",
+          "select a world to teleport to",
+          (sender, s) -> {
+            org.bukkit.World world = Bukkit.getWorld(s);
+            return world != null
+                && world.getName().equalsIgnoreCase(s)
+                && sender.hasPermission("rtp.worlds." + s);
+          });
+    }
   }
 }

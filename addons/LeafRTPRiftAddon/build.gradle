@@ -1,0 +1,38 @@
+plugins {
+    id 'java'
+}
+group = 'io.github.dailystruggle'
+// LeafRTPRiftAddon carries its OWN version line, independent of the RTP core
+// version: it ships and updates on its own cadence (mirroring the other addons).
+version = '1.0.0'
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+// Installable artifact carries the brand name, so the build produces
+// LeafRTPRiftAddon-<version>.jar - the jar a user drops into plugins/RTP/addons/.
+base {
+    archivesName = 'LeafRTPRiftAddon'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // RTP SPI + core scheduler/server-accessor surface the addon registers through.
+    compileOnly project(':rtp-api')
+    compileOnly project(':rtp-core')
+    // Effect registry + platform-neutral target handles the demo builds against.
+    compileOnly project(':effects-api')
+    // NOTE: no platform (spigot/paper/fabric) dependency. The RIFT effect is fully
+    // platform-neutral - it drives the dissolve through the rtp-api client block-change
+    // SPI (RTPPlayer#getClientBlock / #sendClientBlockChanges) and effects-api's
+    // HandleRegistry, so the same class runs on any platform whose adapter implements
+    // that SPI (Bukkit/Paper/Folia today) and is a harmless no-op elsewhere.
+}
+
+test {
+    useJUnitPlatform()
+}

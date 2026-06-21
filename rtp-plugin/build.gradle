@@ -12,14 +12,10 @@ plugins {
     id 'fabric-loom'
 }
 repositories {
-    // Soft-dep repos for bundled claim-plugin integrations (see ADR-019).
-    maven { url = 'https://maven.enginehub.org/repo/' }
+    // jitpack hosts several soft-dep APIs RTP compiles against (VaultAPI, MockBukkit,
+    // CombatLogX). The claim-plugin integrations and their dedicated soft-dep repos
+    // moved out to the LeafRTPClaimAddon module (superseding ADR-019).
     maven { url = 'https://jitpack.io' }
-    maven { url = 'https://repo.glaremasters.me/repository/bloodshot/' }
-    maven { url = 'https://raw.githubusercontent.com/FabioZumbi12/RedProtect/mvn-repo/' }
-    maven { url = 'https://repo.spongepowered.org/maven/' }
-    maven { url = 'https://ci.ender.zone/plugin/repository/everything/' }
-    maven { url = 'https://repo.dmulloy2.net/repository/public/' }
     // Soft-dep repos for the bundled PvP / combat-tag integrations (ADR-055).
     // CombatLogX API (SirBlobman public Nexus) and PvPManager API (CodeMC).
     maven { url = 'https://nexus.sirblobman.xyz/public/' }
@@ -268,21 +264,9 @@ dependencies {
     compileOnly 'org.popcraft:chunkyborder-common:1.0.70'
     compileOnly 'org.popcraft:chunky-common:1.2.217'
 
-    // Bundled claim-plugin integrations (compile-only; runtime via Bukkit soft-depends).
-    compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.12'
-    compileOnly 'com.sk89q.worldedit:worldedit-bukkit:7.2.15'
-    compileOnly 'com.github.TechFortress:GriefPrevention:16.18.1'
-    compileOnly 'com.github.LlmDl:Towny:0.102.0.13'
-    compileOnly 'com.griefdefender:api:2.1.0-SNAPSHOT'
-    compileOnly 'com.github.IncrediblePlugins:LandsAPI:7.19.1'
-    compileOnly 'br.net.fabiozumbi12.RedProtect:RedProtect-Core:7.7.3'
-    compileOnly('br.net.fabiozumbi12.RedProtect:RedProtect-Spigot:7.7.3') {
-        exclude group: 'com.destroystokyo.paper', module: 'paper-api'
-        exclude group: 'com.sk89q.worldedit'
-        exclude group: 'com.sk89q.worldguard'
-        exclude group: 'de.keyle', module: 'mypet'
-        exclude group: 'net.ess3', module: 'EssentialsX'
-    }
+    // Claim-plugin integrations moved out to the LeafRTPClaimAddon module
+    // (superseding ADR-019); their compile-only APIs now live in that module's
+    // build.gradle, not here.
 
     // Bundled PvP / combat-tag integrations (ADR-055; compile-only, runtime via Bukkit soft-depends).
     // Both plugins ship stable, published developer APIs, so the adapters compile against the
@@ -384,6 +368,48 @@ if (guiAddonAssembly != null) {
     evaluationDependsOn(':addons:LeafRTPGuiAddon:rtp-gui')
     guiAddonShadowTask = guiAddonAssembly.tasks.named('shadowJar')
     guiAddonJarProvider = guiAddonShadowTask.flatMap { it.archiveFile }
+}
+
+// Bundled claim-integrations addon (LeafRTPClaimAddon). Single Bukkit-only
+// module, plain `jar` (no shaded deps - the claim-plugin APIs are compile-only
+// and supplied by the installed plugin at runtime). Bundled and self-extracted
+// exactly like the GUI addon so claim support ships in the jar (the ADR-019
+// "out of the box" intent) without the checkers living in rtp-plugin core.
+def claimAddonProject = findProject(':addons:LeafRTPClaimAddon')
+def claimAddonJarTask = null
+def claimAddonJarProvider = null
+if (claimAddonProject != null) {
+    evaluationDependsOn(':addons:LeafRTPClaimAddon')
+    claimAddonJarTask = claimAddonProject.tasks.named('jar')
+    claimAddonJarProvider = claimAddonJarTask.flatMap { it.archiveFile }
+}
+
+// Bundled effect-registration demo addon (LeafRTPRiftAddon). Single
+// platform-neutral module, plain `jar` (no shaded deps - it couples to RTP only
+// through the compile-only rtp-api / rtp-core / effects-api surfaces). Bundled
+// and self-extracted exactly like the GUI and claim addons so the "Virtual Rift"
+// effect demo ships in the jar and works out of the box.
+def riftAddonProject = findProject(':addons:LeafRTPRiftAddon')
+def riftAddonJarTask = null
+def riftAddonJarProvider = null
+if (riftAddonProject != null) {
+    evaluationDependsOn(':addons:LeafRTPRiftAddon')
+    riftAddonJarTask = riftAddonProject.tasks.named('jar')
+    riftAddonJarProvider = riftAddonJarTask.flatMap { it.archiveFile }
+}
+
+// Bundled reference/event-hook demo addon (LeafRTPCountdownAddon). Single
+// platform-neutral module, plain `jar` (no shaded deps - it couples to RTP only
+// through the compile-only rtp-api / rtp-core surfaces). Bundled and
+// self-extracted exactly like the GUI/claim/rift addons so the canonical
+// reference addon ships in the jar and works out of the box.
+def countdownAddonProject = findProject(':addons:LeafRTPCountdownAddon')
+def countdownAddonJarTask = null
+def countdownAddonJarProvider = null
+if (countdownAddonProject != null) {
+    evaluationDependsOn(':addons:LeafRTPCountdownAddon')
+    countdownAddonJarTask = countdownAddonProject.tasks.named('jar')
+    countdownAddonJarProvider = countdownAddonJarTask.flatMap { it.archiveFile }
 }
 
 // Appends `srcJar` into `out` (a built RTP jar) as `bundled-addons/<destName>`,
@@ -502,8 +528,12 @@ shadowJar {
     exclude 'docs/architecture/**'
 
     relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
-    relocate 'io.github.dailystruggle.commandsapi', 'io.github.dailystruggle.rtp.commandsapi'
-    relocate 'io.github.dailystruggle.effectsapi', 'io.github.dailystruggle.rtp.effectsapi'
+    // commands-api and effects-api are RTP's public addon SPIs and ship
+    // UNRELOCATED: addons depend on them `compileOnly` and resolve
+    // io.github.dailystruggle.{commandsapi,effectsapi}.* from the plugin jar at
+    // runtime (e.g. AddonRegistry's ServiceLoader, and the reflective
+    // Class.forName("io.github.dailystruggle.effectsapi.common.EffectFactory")
+    // permission probe). Relocating them broke that link.
     relocate 'com.zaxxer.hikari', 'io.github.dailystruggle.rtp.hikari'
     // org.lz4:lz4-java exposes its API under net.jpountz.* (legacy package).
     // Required at runtime by rtp-anvil for LZ4-compressed chunk decode.
@@ -592,10 +622,10 @@ ext.mergeFabricUnobfBytecodeIntoJar = { File out, String editionLabel, File v26,
     def addedFromCommonUnobf = 0
     def addedFromEffectsUnobf = 0
     def existing = new HashSet<String>()
-    def pkgRemap = [
-        'io/github/dailystruggle/effectsapi/'  : 'io/github/dailystruggle/rtp/effectsapi/',
-        'io/github/dailystruggle/commandsapi/' : 'io/github/dailystruggle/rtp/commandsapi/'
-    ]
+    // commands-api and effects-api ship unrelocated (public addon SPIs), so the
+    // unobf carrier keeps its io/github/dailystruggle/{commandsapi,effectsapi}/**
+    // names verbatim - no package rewrite is applied during the merge.
+    def pkgRemap = [:]
     def remapClassBytes = { byte[] input ->
         def cr = new org.objectweb.asm.ClassReader(input)
         def cw = new org.objectweb.asm.ClassWriter(0)
@@ -736,10 +766,9 @@ ext.mergeNeoForgeBytecodeIntoJar = { File out, String editionLabel, List<File> c
         for (p in hostStripPatterns) { if (name ==~ p) return true }
         return false
     }
-    def pkgRemap = [
-        'io/github/dailystruggle/effectsapi/'  : 'io/github/dailystruggle/rtp/effectsapi/',
-        'io/github/dailystruggle/commandsapi/' : 'io/github/dailystruggle/rtp/commandsapi/'
-    ]
+    // commands-api and effects-api ship unrelocated (public addon SPIs); the
+    // carrier keeps their package names verbatim - no rewrite during the merge.
+    def pkgRemap = [:]
     def remapEntryName = { String name ->
         for (entry in pkgRemap.entrySet()) {
             if (name.startsWith(entry.key)) {
@@ -877,6 +906,18 @@ remapJar {
     def injectAddonFn = project.ext.injectBundledAddonJar
     def addonJarFile = guiAddonJarProvider == null ? null : guiAddonJarProvider.get().asFile
     if (addonJarFile != null) inputs.file(addonJarFile).withPropertyName('bundledGuiAddonJar')
+    // Bundled claim-integrations addon jar (parity with the GUI addon above).
+    if (claimAddonJarTask != null) dependsOn claimAddonJarTask
+    def claimAddonJarFile = claimAddonJarProvider == null ? null : claimAddonJarProvider.get().asFile
+    if (claimAddonJarFile != null) inputs.file(claimAddonJarFile).withPropertyName('bundledClaimAddonJar')
+    // Bundled effect-registration demo addon jar (parity with the GUI/claim addons above).
+    if (riftAddonJarTask != null) dependsOn riftAddonJarTask
+    def riftAddonJarFile = riftAddonJarProvider == null ? null : riftAddonJarProvider.get().asFile
+    if (riftAddonJarFile != null) inputs.file(riftAddonJarFile).withPropertyName('bundledRiftAddonJar')
+    // Bundled reference/event-hook demo addon jar (parity with the GUI/claim/rift addons above).
+    if (countdownAddonJarTask != null) dependsOn countdownAddonJarTask
+    def countdownAddonJarFile = countdownAddonJarProvider == null ? null : countdownAddonJarProvider.get().asFile
+    if (countdownAddonJarFile != null) inputs.file(countdownAddonJarFile).withPropertyName('bundledCountdownAddonJar')
     doLast {
         mergeFn(remapJar.archiveFile.get().asFile, 'Pro',
                 v26Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
@@ -896,6 +937,18 @@ remapJar {
         // can self-extract it into <pluginDir>/addons/ on first run.
         if (addonJarFile != null) {
             injectAddonFn(remapJar.archiveFile.get().asFile, addonJarFile, 'LeafRTPGuiAddon.jar')
+        }
+        // Append the bundled claim-integrations addon jar the same way.
+        if (claimAddonJarFile != null) {
+            injectAddonFn(remapJar.archiveFile.get().asFile, claimAddonJarFile, 'LeafRTPClaimAddon.jar')
+        }
+        // Append the bundled effect-registration demo addon jar the same way.
+        if (riftAddonJarFile != null) {
+            injectAddonFn(remapJar.archiveFile.get().asFile, riftAddonJarFile, 'LeafRTPRiftAddon.jar')
+        }
+        // Append the bundled reference/event-hook demo addon jar the same way.
+        if (countdownAddonJarFile != null) {
+            injectAddonFn(remapJar.archiveFile.get().asFile, countdownAddonJarFile, 'LeafRTPCountdownAddon.jar')
         }
     }
 }
@@ -933,14 +986,18 @@ tasks.named('compileLiteJava') {
 }
 
 // ADR-024 locale parity: lite ships reduced English baselines for
-// config.yml / performance.yml / safety.yml / logging.yml / regions/default.yml
-// (Pro baselines minus lite-irrelevant keys). The Pro lang/ tree under
+// config.yml / performance.yml / logging.yml / regions/default.yml
+// (Pro baselines minus lite-irrelevant keys). safety.yml is no longer a
+// reduced lite baseline: as of the 2026-06-20 ADR-024 amendment lite
+// inherits the full base safety.yml (block tags and state predicates are
+// in scope for lite), so it is not pruned and has no lite-specific locale
+// tree. The Pro lang/ tree under
 // `rtp-plugin/src/main/resources/lang/<loc>/` still carries the full Pro
 // key set, so without trimming, every lite install would ship locale
 // translations for keys (`visitorEnabled`, `loginCacheEnabled`,
 // `loginCacheCap`, `onEventParsing`, `pregeneratedPreference`,
-// `backlogRefillThreshold`, `prefab`, block-tag / state-predicate `safety.yml`
-// sections, ...) that have no counterpart in lite's English baseline.
+// `backlogRefillThreshold`, `prefab`, ...) that have no counterpart in
+// lite's English baseline.
 //
 // `repackLiteLocales` regenerates `src/lite/resources/lang/` from the Pro
 // lang tree, dropping any locale row whose base_key is not present in the
@@ -1018,15 +1075,36 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     archiveClassifier.set('dev')
     archiveVersion.set(project.ext.liteVersion.toString())
 
-    // Lite source set first so its plugin.yml/config.yml/etc. win over main's
-    // when DuplicatesStrategy.EXCLUDE is applied (Shadow honours first-seen).
+    // Lite source set first so its plugin.yml/config.yml/etc. are the lite
+    // overlay copies. The conflicting main copies are excluded explicitly from
+    // the main source-set contribution below (do not rely on
+    // DuplicatesStrategy first-seen ordering -- it is not stable here).
     from sourceSets.lite.output
     // Include main source set output (bukkit bootstrap helpers, listeners, server
     // provider, command classes). A freshly-registered ShadowJar task does NOT
     // default to sourceSets.main.output -- only the auto-created `shadowJar` task
     // does. Without this line, the lite JAR ships only RTPBukkitLitePlugin.class
     // and crashes on enable with NoClassDefFoundError for BukkitServerProvider.
-    from sourceSets.main.output
+    //
+    // Explicitly drop the resources that the lite source set overlays (above).
+    // Relying on `from` order + DuplicatesStrategy.EXCLUDE to make the lite
+    // copy win is fragile: Shadow's duplicate handling is not a stable
+    // first-seen across separate source-set outputs, so main's plugin.yml /
+    // config.yml / etc. can intermittently shadow the lite overlay -- which is
+    // exactly what liteJarStructureCheck (plugin.yml -> RTPBukkitLitePlugin)
+    // guards against. Excluding them here makes the lite overlay the only
+    // candidate for these paths, so the result is deterministic regardless of
+    // visit order.
+    from(sourceSets.main.output) {
+        exclude 'plugin.yml'
+        exclude 'config.yml'
+        exclude 'performance.yml'
+        // safety.yml is intentionally NOT excluded: lite inherits the full
+        // base safety.yml (ADR-024 2026-06-20 amendment -- block tags and
+        // state predicates are in scope for lite), so the main copy is bundled.
+        exclude 'logging.yml'
+        exclude 'lang/**'
+    }
     // The lite binary is MIT-licensed (ADR-061): ship the MIT text as the
     // in-jar LICENSE, not the repo-root PolyForm Noncommercial LICENSE (which
     // governs the Pro-only source). Renamed in-jar to `LICENSE` so existing
@@ -1202,10 +1280,10 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // economy amendment): optional Vault per-region teleport charging is wired
     // in the lite bootstrap (RTPBukkitLitePlugin.onEnable) identically to the
     // full edition, so the lite jar ships economy.yml for it to read.
-    // integrations.yml is INTENTIONALLY KEPT in lite as of 2026-05-11 (ADR-024
-    // claim-plugin amendment): the bundled claim-plugin integrations (ADR-019)
-    // are wired in lite as well, and ClaimIntegrations#buildParser loads its
-    // defaults from integrations.yml on the classpath.
+    // integrations.yml no longer ships in the plugin jar: the claim-plugin
+    // integrations moved out to the bundled LeafRTPClaimAddon (superseding
+    // ADR-019), which carries its own integrations.yml and is self-extracted
+    // into <pluginDir>/addons/ on first run for both Pro and lite.
     // logging.yml is INTENTIONALLY KEPT in lite (src/lite/resources/logging.yml
     // overrides the full version via duplicatesStrategy = EXCLUDE). Without it,
     // no min_level filter loads and every FINE/FINER/FINEST log call prints.
@@ -1239,8 +1317,9 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
 
     // Same relocations as full, minus H2 (not shaded).
     relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
-    relocate 'io.github.dailystruggle.commandsapi', 'io.github.dailystruggle.rtp.commandsapi'
-    relocate 'io.github.dailystruggle.effectsapi', 'io.github.dailystruggle.rtp.effectsapi'
+    // commands-api and effects-api are RTP's public addon SPIs and ship
+    // unrelocated so addons (compileOnly against them) link at runtime. See the
+    // matching note in the Pro shadowJar relocate block above.
     // org.lz4:lz4-java exposes its API under net.jpountz.* (legacy package).
     // Relocate to avoid clashing with any other plugin shading the same lib.
     relocate 'net.jpountz', 'io.github.dailystruggle.rtp.lz4'
@@ -1311,6 +1390,18 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     def injectAddonFn = project.ext.injectBundledAddonJar
     def addonJarFile = guiAddonJarProvider == null ? null : guiAddonJarProvider.get().asFile
     if (addonJarFile != null) inputs.file(addonJarFile).withPropertyName('bundledGuiAddonJar')
+    // Bundled claim-integrations addon jar (parity with Pro's remapJar).
+    if (claimAddonJarTask != null) dependsOn claimAddonJarTask
+    def claimAddonJarFile = claimAddonJarProvider == null ? null : claimAddonJarProvider.get().asFile
+    if (claimAddonJarFile != null) inputs.file(claimAddonJarFile).withPropertyName('bundledClaimAddonJar')
+    // Bundled effect-registration demo addon jar (parity with Pro's remapJar).
+    if (riftAddonJarTask != null) dependsOn riftAddonJarTask
+    def riftAddonJarFile = riftAddonJarProvider == null ? null : riftAddonJarProvider.get().asFile
+    if (riftAddonJarFile != null) inputs.file(riftAddonJarFile).withPropertyName('bundledRiftAddonJar')
+    // Bundled reference/event-hook demo addon jar (parity with Pro's remapJar).
+    if (countdownAddonJarTask != null) dependsOn countdownAddonJarTask
+    def countdownAddonJarFile = countdownAddonJarProvider == null ? null : countdownAddonJarProvider.get().asFile
+    if (countdownAddonJarFile != null) inputs.file(countdownAddonJarFile).withPropertyName('bundledCountdownAddonJar')
 
     doLast {
         mergeFn(remapLiteJar.archiveFile.get().asFile, 'lite',
@@ -1330,6 +1421,18 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
         // can self-extract it into <pluginDir>/addons/ on first run.
         if (addonJarFile != null) {
             injectAddonFn(remapLiteJar.archiveFile.get().asFile, addonJarFile, 'LeafRTPGuiAddon.jar')
+        }
+        // Append the bundled claim-integrations addon jar the same way.
+        if (claimAddonJarFile != null) {
+            injectAddonFn(remapLiteJar.archiveFile.get().asFile, claimAddonJarFile, 'LeafRTPClaimAddon.jar')
+        }
+        // Append the bundled effect-registration demo addon jar the same way.
+        if (riftAddonJarFile != null) {
+            injectAddonFn(remapLiteJar.archiveFile.get().asFile, riftAddonJarFile, 'LeafRTPRiftAddon.jar')
+        }
+        // Append the bundled reference/event-hook demo addon jar the same way.
+        if (countdownAddonJarFile != null) {
+            injectAddonFn(remapLiteJar.archiveFile.get().asFile, countdownAddonJarFile, 'LeafRTPCountdownAddon.jar')
         }
     }
 }

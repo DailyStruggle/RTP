@@ -80,13 +80,22 @@ public final class AddonRegistry {
    */
   public void discover(ClassLoader classLoader) {
     if (classLoader == null) classLoader = AddonRegistry.class.getClassLoader();
-    try {
-      ServiceLoader<RTPAddon> loader = ServiceLoader.load(RTPAddon.class, classLoader);
-      for (RTPAddon addon : loader) {
-        register(addon);
+    ServiceLoader<RTPAddon> loader = ServiceLoader.load(RTPAddon.class, classLoader);
+    java.util.Iterator<RTPAddon> it = loader.iterator();
+    while (true) {
+      RTPAddon addon;
+      try {
+        if (!it.hasNext()) break;
+        addon = it.next();
+      } catch (ServiceConfigurationError | LinkageError e) {
+        // An addon whose implementation (or a type it references, e.g. an
+        // effects-api class absent from the rtp-lite assembly) cannot be linked
+        // must not abort discovery of the remaining addons or plugin startup.
+        RTP.log(Level.WARNING,
+            "[RTP] skipping an addon that could not be loaded (missing dependency?)", e);
+        break;
       }
-    } catch (ServiceConfigurationError e) {
-      RTP.log(Level.WARNING, "[RTP] failed to enumerate RTPAddon services", e);
+      register(addon);
     }
   }
 
@@ -134,12 +143,13 @@ public final class AddonRegistry {
   /**
    * Extracts addon jars bundled inside the running RTP jar into {@code directory}.
    *
-   * <p>RTP ships demo/companion addons (e.g. the GUI destination picker) as ordinary
-   * jars embedded on its own classpath under {@code bundled-addons/}. On first run -
-   * detected by the caller as the {@code addons/} folder not yet existing - these are
-   * unpacked here so the operator gets the showcase out of the box without a second
-   * download, while still being able to opt out simply by deleting the extracted jar
-   * (the folder then exists, so it is never re-extracted) or by deleting the addon.
+   * <p>RTP ships demo/companion addons (e.g. the GUI destination picker and the
+   * claim-plugin integrations) as ordinary jars embedded on its own classpath under
+   * {@code bundled-addons/}. On first run - detected by the caller as the
+   * {@code addons/} folder not yet existing - these are unpacked here so the operator
+   * gets them out of the box without a second download, while still being able to opt
+   * out simply by deleting the extracted jar (the folder then exists, so it is never
+   * re-extracted) or by deleting the addon.
    *
    * <p>The set of bundled jars is listed, one resource name per line, in the
    * classpath resource {@code bundled-addons/index}. A missing index, a missing jar
@@ -193,9 +203,9 @@ public final class AddonRegistry {
           continue;
         }
         java.nio.file.Files.copy(in, target.toPath());
-        RTP.log(Level.INFO, "[RTP] extracted bundled addon: " + name);
+        RTP.log(Level.INFO, "[RTP] extracted bundled resource: " + name);
       } catch (java.io.IOException e) {
-        RTP.log(Level.WARNING, "[RTP] failed to extract bundled addon: " + name, e);
+        RTP.log(Level.WARNING, "[RTP] failed to extract bundled resource: " + name, e);
       }
     }
   }

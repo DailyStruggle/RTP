@@ -1083,13 +1083,19 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         // now that the consume path is gone; the token parameter is
         // ignored.
         if (renderer != null && pageBuilder != null) {
-            // If the parser is about to descend into a mirror child
-            // (e.g. `/rtp menu config regions default.yml size:500`),
-            // returning `true` here lets the commands-api walker continue
-            // through the mirror tree (TreeCommand.java:267-273). The
-            // leaf mirror's onCommand will fire renderAt() with the full
-            // assembled path.
-            if (nextCommand instanceof MenuMirrorSubcommand) {
+            // The commands-api walker invokes this node's onCommand as
+            // "independent functionality" on its way down to a matched
+            // child (TreeCommand.java:244-273). When the parser is about
+            // to descend into ANY child command (a mirror child such as
+            // `/rtp menu config regions default.yml size:500`, or a
+            // concrete leaf such as `/rtp menu apply file=...`,
+            // `/rtp menu stage ...`, `/rtp menu page n=2`, etc.), this
+            // node must NOT open a page itself: the child is responsible
+            // for its own rendering (or, like apply, for deliberately
+            // leaving the book closed). Opening the root page here would
+            // pop a stray, do-nothing book in front of the child's effect.
+            // Returning `true` lets the walker continue to the child.
+            if (nextCommand != null) {
                 return true;
             }
             int pageIndex = extractPageIndex(parameterValues);

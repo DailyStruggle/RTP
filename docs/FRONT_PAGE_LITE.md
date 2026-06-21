@@ -122,6 +122,15 @@ A few hard requirements. If any are a **no**, EssentialsX `/rtp` or HuskHomes ar
 
 Tune `plugins/RTP/config.yml` and `plugins/RTP/regions/*.yml` later - via `/rtp menu` or by editing the YAML directly. Full admin guide is auto-unpacked into `plugins/RTP/docs/` on first run, and lives online at the [**admin guide**](https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md).
 
+**Bundled addons unpack themselves on first run.** Four addon jars ride inside the LeafRTP jar and self-extract into `plugins/RTP/addons/` the first time the plugin starts - no second download. Delete one from that folder to turn it off (the folder then exists, so it is never re-extracted):
+
+- **LeafRTPGuiAddon** (GUI demo) - a clickable chest destination-picker. It binds the bare `/rtp` root action, so with a GUI renderer present typing `/rtp` opens the picker instead of teleporting immediately (instant teleport stays reachable from the menu and as a fallback), and adds `/rtp gui` (`rtp.gui`).
+- **LeafRTPClaimAddon** (claim integrations) - the 12 claim/protection checkers, so claim-aware teleport works out of the box on the Bukkit family.
+- **LeafRTPRiftAddon** (effect demo) - registers a "Virtual Rift" teleport effect that tears the terrain open into a void during warmup (presentation-only client-side blocks, so it can never compromise safety), usable by name in `effects/*.yml`.
+- **LeafRTPCountdownAddon** (addon-system reference demo) - live teleport and queue-position countdowns, and the canonical copy-paste reference addon.
+
+For those interested in writing their own: every one of these is shipped as a worked coding example. Their full source lives under `addons/` in the repo, and the Rift and Countdown demos are pure `rtp-api` / `effects-api` (zero platform imports), so they double as copy-paste starting points for your own addon.
+
 ---
 
 <details>
@@ -144,7 +153,7 @@ A lot of what people install companion plugins for is already in the free engine
 | Built-in operator diagnostics in `/rtp info`         | Live queue depth and growth, pipeline latency percentiles, chunk-ticket leak rate, TPS/MSPT, plus generation success/failure rate and the top coordinate-rejection cause (biome, unsafe block, claim, ...). No separate metrics add-on.                                |
 | Command-block & console ready                        | The unified command framework parses player, console, and command-block callers with equal safety - drive `/rtp` from redstone, datapacks, or scripts.                                                                                                                 |
 | Self-scheduling API tasks                            | `RTPRunnable` routes work onto the correct region / async thread automatically via `schedule()` - addon authors get correct scheduling for free.                                                                                                                       |
-| Platform-agnostic addons (one module, every platform) | Addons compile against `rtp-api` only and load via the `RTPAddon` `ServiceLoader` SPI, so the same addon jar runs on Spigot, Paper, Folia, Fabric, and NeoForge - config, safety hooks, and teleport-pipeline callbacks are all platform-neutral. A platform module is needed only when the addon opens a platform-native UI (see the bundled `RTP_ExampleAddon`). |
+| Platform-agnostic addons (one module, every platform) | Addons compile against `rtp-api` only and load via the `RTPAddon` `ServiceLoader` SPI, so the same addon jar runs on Spigot, Paper, Folia, Fabric, and NeoForge - config, safety hooks, and teleport-pipeline callbacks are all platform-neutral. A platform module is needed only when the addon opens a platform-native UI (see the bundled `LeafRTPRiftAddon` / `LeafRTPCountdownAddon` demos). Four demo addons (GUI, claim, effect, reference) self-extract into `plugins/RTP/addons/` on first run. |
 | Live config reload (no restart)                      | Retune regions/safety/effects without a restart: `/rtp reload` (all) or `/rtp reload <file>` (one file); `/rtp config <file> set k=v` saves and reloads automatically.                                                                                                 |
 
 </details>

@@ -38,8 +38,53 @@ public class CommandsAPI {
 
     public static final ConcurrentLinkedQueue<CommandExecutor> commandPipeline = new ConcurrentLinkedQueue<>();
 
+    /**
+     * Platform-supplied delivery seam for command reply messages. Installed once
+     * per plugin so dispatch and command {@code msgInvalidCommand} /
+     * {@code msgBadParameter} defaults can route reply text through the platform
+     * formatter / auditor without each command carrying a platform-specific
+     * {@code messageMethodFactory} or subclassing a platform command type.
+     * {@code null} until installed, in which case callers fall back to their
+     * default delivery (typically {@code sender::sendMessage}).
+     */
+    private static volatile MessageSink messageSink = null;
+
     public CommandsAPI() {
 
+    }
+
+    /**
+     * Installs the platform {@link MessageSink}. Idempotent; the most recent
+     * installation wins.
+     *
+     * @param sink the platform message sink, or {@code null} to clear
+     */
+    public static void setMessageSink(MessageSink sink) {
+        messageSink = sink;
+    }
+
+    /**
+     * @return the installed {@link MessageSink}, or {@code null} if none is set
+     */
+    public static MessageSink getMessageSink() {
+        return messageSink;
+    }
+
+    /**
+     * Resolves the reply {@link java.util.function.Consumer} for {@code callerId}.
+     * When a {@link MessageSink} is installed, returns a consumer that routes raw
+     * templates through it; otherwise returns {@code fallback} so existing
+     * default delivery is preserved.
+     *
+     * @param callerId the command sender's UUID
+     * @param fallback the consumer to use when no sink is installed
+     * @return a non-null reply consumer
+     */
+    public static java.util.function.Consumer<String> messageMethodFor(
+            UUID callerId, java.util.function.Consumer<String> fallback) {
+        MessageSink sink = messageSink;
+        if (sink == null) return fallback;
+        return raw -> sink.send(callerId, raw);
     }
 
     /**

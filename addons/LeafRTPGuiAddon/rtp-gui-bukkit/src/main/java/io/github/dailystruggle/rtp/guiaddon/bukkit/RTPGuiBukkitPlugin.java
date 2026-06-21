@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.guiaddon.bukkit;
 
+import io.github.dailystruggle.rtp.api.server.PlatformFamily;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.guiaddon.common.GuiRenderers;
 import io.github.dailystruggle.rtp.guiaddon.common.RTPGuiCommonAddon;
@@ -34,7 +35,11 @@ public final class RTPGuiBukkitPlugin extends JavaPlugin {
     // Register the chest renderer first so the common addon's bare-/rtp binding has
     // a style to resolve the moment it loads. Other modules may register additional
     // styles (e.g. "book"); the menuStyle config value picks which one opens.
-    GuiRenderers.register(new BukkitMenuRenderer(this));
+    // Self-registration is gated on platform + version through the general RTP API
+    // (no addon-local platform/version probing): the Bukkit chest renderer registers
+    // only on a Bukkit-family runtime, and never below the inventory-API floor.
+    GuiRenderers.registerIfCompatible(
+        new BukkitMenuRenderer(this), PlatformFamily.BUKKIT, 8, Integer.MAX_VALUE);
     // Register the click/drag listener through the shared, once-per-JVM guard so the
     // SPI load path (which also instantiates the renderer and registers the listener)
     // cannot double-register it when the addon is installed as a standalone plugin.

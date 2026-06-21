@@ -417,6 +417,11 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  public io.github.dailystruggle.rtp.api.server.PlatformFamily getPlatformFamily() {
+    return io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC;
+  }
+
+  @Override
   public Integer getServerIntVersion() {
     // Mojang server version string is e.g. "1.21.1". Extract the minor as the
     // integer version Bukkit-family code uses (e.g. 21). Defensive parse.

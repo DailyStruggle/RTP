@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.guiaddon.neoforge;
 
+import io.github.dailystruggle.rtp.api.server.PlatformFamily;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.guiaddon.common.GuiRenderers;
 import io.github.dailystruggle.rtp.guiaddon.common.RTPGuiCommonAddon;
@@ -43,7 +44,11 @@ public final class RTPGuiNeoForgeMod {
   @SubscribeEvent
   public void onServerStarted(ServerStartedEvent event) {
     server = event.getServer();
-    GuiRenderers.register(new NeoForgeMenuRenderer());
+    // Gate self-registration on platform + version via the general RTP API
+    // (no addon-local probing): the NeoForge chest renderer registers only on a
+    // NeoForge runtime at or above the server-side container-menu floor.
+    GuiRenderers.registerIfCompatible(
+        new NeoForgeMenuRenderer(), PlatformFamily.NEOFORGE, 20, Integer.MAX_VALUE);
     RTP.addons.register(new RTPGuiCommonAddon());
   }
 

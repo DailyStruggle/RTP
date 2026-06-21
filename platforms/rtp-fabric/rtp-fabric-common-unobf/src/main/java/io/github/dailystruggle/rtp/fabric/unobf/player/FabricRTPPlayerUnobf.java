@@ -585,6 +585,75 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         return p != null && !p.isRemoved();
     }
 
+    // ---------------------------------------------------------------------------
+    // Client-side ("fake") block changes (RTPPlayer SPI). Purely visual: the real
+    // world is never mutated (S-001..S-007), only already-loaded blocks are touched
+    // (S-005, isChunkLoaded guard), and a malformed token is logged not swallowed
+    // (S-004). The block id round-trips through the block registry, so it stays
+    // platform-internally compatible with whatever getClientBlock produced.
+    // ---------------------------------------------------------------------------
+
+    @Override
+    public String getClientBlock(RTPLocation location) {
+        if (location == null || handle == null) return null;
+        if (!(location.world() instanceof FabricRTPWorldUnobf fw)) return null;
+        ServerLevel level = fw.level();
+        if (level == null) return null;
+        int x = location.x(), y = location.y(), z = location.z();
+        if (!fw.isChunkLoaded(x >> 4, z >> 4)) return null;
+        try {
+            net.minecraft.world.level.block.state.BlockState state =
+                    level.getBlockState(new net.minecraft.core.BlockPos(x, y, z));
+            net.minecraft.resources.Identifier id = level.registryAccess()
+                    .lookupOrThrow(net.minecraft.core.registries.Registries.BLOCK)
+                    .getKey(state.getBlock());
+            return id == null ? null : id.toString();
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.FINE,
+                    "[RTP][Fabric] getClientBlock failed at (" + x + "," + y + "," + z + "): " + t);
+            return null;
+        }
+    }
+
+    @Override
+    public void sendClientBlockChange(RTPLocation location, String blockData) {
+        if (location == null || blockData == null) return;
+        ServerPlayer p = handle;
+        if (p == null || p.connection == null) return;
+        if (!(location.world() instanceof FabricRTPWorldUnobf fw)) return;
+        ServerLevel level = fw.level();
+        if (level == null) return;
+        int x = location.x(), y = location.y(), z = location.z();
+        if (!fw.isChunkLoaded(x >> 4, z >> 4)) return;
+        net.minecraft.world.level.block.state.BlockState state = parseBlockData(level, blockData);
+        if (state == null) return;
+        try {
+            p.connection.send(new net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket(
+                    new net.minecraft.core.BlockPos(x, y, z), state));
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP][Fabric] sendClientBlockChange failed for " + name + ": " + t.getMessage());
+        }
+    }
+
+    /** Resolve a block id to its default {@code BlockState} via the block registry (S-004 on failure). */
+    private net.minecraft.world.level.block.state.@Nullable BlockState parseBlockData(
+            ServerLevel level, String blockData) {
+        try {
+            net.minecraft.resources.Identifier id =
+                    net.minecraft.resources.Identifier.parse(blockData);
+            net.minecraft.world.level.block.Block block = level.registryAccess()
+                    .lookupOrThrow(net.minecraft.core.registries.Registries.BLOCK)
+                    .getValue(id);
+            return block == null ? null : block.defaultBlockState();
+        } catch (Throwable e) {
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP][Fabric] ignoring malformed client block id: " + blockData
+                            + " (" + e.getClass().getSimpleName() + ")");
+            return null;
+        }
+    }
+
     /** Minimal detached sender for clone() when the handle has been released. */
     private static final class DetachedClone implements RTPPlayer {
         private final UUID uuid;

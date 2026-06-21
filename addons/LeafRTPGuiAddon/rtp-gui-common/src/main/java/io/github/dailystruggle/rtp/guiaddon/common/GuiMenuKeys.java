@@ -5,7 +5,7 @@ package io.github.dailystruggle.rtp.guiaddon.common;
  *
  * <p>Enum constants are matched against YAML keys in {@code guimenu.yml} by RTP's
  * {@link io.github.dailystruggle.rtp.common.configuration.ConfigParser}, exactly like
- * the reference {@code RTP_ExampleAddon}. Registering the parser with
+ * the reference {@code LeafRTPCountdownAddon}. Registering the parser with
  * {@code RTP.configs} gives first-boot default-file creation, {@code /rtp reload}
  * integration, and save/reload for free, on every platform, with no Bukkit config
  * API. The values are deliberately platform-neutral strings (material <em>names</em>,

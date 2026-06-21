@@ -18,7 +18,7 @@ the jar is dropped in, while every line of safety/validation stays inside the RT
 The split exists because only one thing is genuinely platform-specific: *drawing* the menu.
 Everything else - listing the player's destinations, decorating them with live status,
 config, the teleport submit, and result feedback - is identical on every platform and lives
-in `rtp-gui-common`, built on the same engine abstractions the reference `RTP_ExampleAddon`
+in `rtp-gui-common`, built on the same engine abstractions the reference `LeafRTPCountdownAddon`
 uses (`RTP.scheduler`, `RTP.serverAccessor`, and `ConfigParser`).
 
 ### How the pieces connect

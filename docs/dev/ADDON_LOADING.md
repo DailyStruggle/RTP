@@ -1,7 +1,7 @@
 # Loading an Addon
 
 How RTP discovers, loads, and unloads a platform-agnostic addon. This is the deployment
-counterpart to the authoring guide in [`addons/RTP_ExampleAddon/README.md`](../../addons/RTP_ExampleAddon/README.md).
+counterpart to the authoring guide in [`addons/LeafRTPCountdownAddon/README.md`](../../addons/LeafRTPCountdownAddon/README.md).
 The mechanism is defined by [ADR-057](../adr/ADR-057-platform-agnostic-addon-spi.md).
 
 Since ADR-057, an addon is no longer a Bukkit `JavaPlugin` with a `plugin.yml`. It is a plain
@@ -54,7 +54,7 @@ com.example.myaddon.MyAddon
 In a Gradle/Maven project this file lives at
 `src/main/resources/META-INF/services/io.github.dailystruggle.rtp.api.addon.RTPAddon` and is
 packaged into the jar automatically. See the reference addon's descriptor at
-[`addons/RTP_ExampleAddon/src/main/resources/META-INF/services/io.github.dailystruggle.rtp.api.addon.RTPAddon`](../../addons/RTP_ExampleAddon/src/main/resources/META-INF/services/io.github.dailystruggle.rtp.api.addon.RTPAddon).
+[`addons/LeafRTPCountdownAddon/src/main/resources/META-INF/services/io.github.dailystruggle.rtp.api.addon.RTPAddon`](../../addons/LeafRTPCountdownAddon/src/main/resources/META-INF/services/io.github.dailystruggle.rtp.api.addon.RTPAddon).
 
 ---
 
@@ -138,7 +138,7 @@ the jar is not on RTP's classpath or the `META-INF/services` descriptor is missi
 
 ## See also
 
-- [`addons/RTP_ExampleAddon/README.md`](../../addons/RTP_ExampleAddon/README.md): authoring guide (the four interfaces an addon uses).
+- [`addons/LeafRTPCountdownAddon/README.md`](../../addons/LeafRTPCountdownAddon/README.md): authoring guide (the four interfaces an addon uses).
 - [ADR-057](../adr/ADR-057-platform-agnostic-addon-spi.md): the platform-agnostic addon SPI decision.
 - [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md): safety verifier / economy / placeholder hooks (ADR-026).
 - [`FOR_ADDON_DEVELOPERS.md`](../FOR_ADDON_DEVELOPERS.md): addon-developer entry point.

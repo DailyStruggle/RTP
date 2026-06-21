@@ -13,7 +13,7 @@ repositories {
 dependencies {
     // Platform-neutral menu: the model, config, render seam, and teleport submit.
     // It links rtp-api (stable SPI) and rtp-core (RTP.scheduler / serverAccessor /
-    // ConfigParser - the same engine abstractions the reference RTP_ExampleAddon
+    // ConfigParser - the same engine abstractions the reference LeafRTPCountdownAddon
     // uses), but NO org.bukkit.* / spigot-api, so the jar runs on every platform.
     compileOnly project(':rtp-api')
     compileOnly project(':rtp-core')

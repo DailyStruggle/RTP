@@ -84,6 +84,16 @@ Hard requirements. If any are a [B]no[/B], EssentialsX [I]/rtp[/I] or HuskHomes 
 
 Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/I] later, via [I]/rtp menu[/I] or by editing the YAML directly. Full admin guide is auto-unpacked into [I]plugins/RTP/docs/[/I] on first run, and lives online at the [URL='https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md'][B]admin guide[/B][/URL].
 
+[B]Bundled addons unpack themselves on first run.[/B] Four addon jars ride inside the LeafRTP jar and self-extract into [I]plugins/RTP/addons/[/I] the first time the plugin starts - no second download. Delete one from that folder to turn it off (the folder then exists, so it is never re-extracted):
+[LIST]
+[*][B]LeafRTPGuiAddon[/B] (GUI demo) - a clickable chest destination-picker. It binds the bare [I]/rtp[/I] root action, so with a GUI renderer present typing [I]/rtp[/I] opens the picker instead of teleporting immediately (instant teleport stays reachable from the menu and as a fallback), and adds [I]/rtp gui[/I] ([I]rtp.gui[/I]).
+[*][B]LeafRTPClaimAddon[/B] (claim integrations) - the 12 claim/protection checkers, so claim-aware teleport works out of the box on the Bukkit family.
+[*][B]LeafRTPRiftAddon[/B] (effect demo) - registers a "Virtual Rift" teleport effect that tears the terrain open into a void during warmup (presentation-only client-side blocks, so it can never compromise safety), usable by name in [I]effects/*.yml[/I].
+[*][B]LeafRTPCountdownAddon[/B] (addon-system reference demo) - live teleport and queue-position countdowns, and the canonical copy-paste reference addon.
+[/LIST]
+
+For those interested in writing their own: every one of these is shipped as a worked coding example. Their full source lives under [I]addons/[/I] in the repo, and the Rift and Countdown demos are pure [I]rtp-api[/I] / [I]effects-api[/I] (zero platform imports), so they double as copy-paste starting points for your own addon.
+
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SPOILER='Full free feature list (click to expand)']
@@ -100,7 +110,7 @@ Tune [I]plugins/RTP/config.yml[/I] and [I]plugins/RTP/regions/*.yml[/I] later, v
 [*]🧩 Iris, Terra, and custom datapack generators work out of the box, with modded biome IDs preserved. [B]PlaceholderAPI[/B] and [B]ProtocolLib[/B] are supported as optional soft-deps.
 [*]💰 [B]Optional Vault economy:[/B] charge players per [I]/rtp[/I] with per-region price, [I]priceOther[/I], params/biome surcharges, and a balance floor ([I]economy.yml[/I]); cost refunded automatically on cancel or pipeline failure ([I]refundOnCancel: true[/I] default); dormant when Vault is not installed.
 [*]🛠️ [B]Public [I]rtp-api[/I][/B]: same surface as Pro. Trigger LeafRTP from a GUI, NPC, or quest; build your own UX without forking.
-[*]🧩 [B]Platform-agnostic addons:[/B] addons compile against [I]rtp-api[/I] only and load through the [I]RTPAddon[/I] ServiceLoader SPI, so one addon module runs unchanged on Spigot, Paper, Folia, Fabric, and NeoForge. Config, safety hooks, teleport-pipeline callbacks, and scheduling are reached through platform-neutral APIs; you only add a platform module when the addon opens a platform-native UI. See the bundled RTP_ExampleAddon.
+[*]🧩 [B]Platform-agnostic addons:[/B] addons compile against [I]rtp-api[/I] only and load through the [I]RTPAddon[/I] ServiceLoader SPI, so one addon module runs unchanged on Spigot, Paper, Folia, Fabric, and NeoForge. Config, safety hooks, teleport-pipeline callbacks, and scheduling are reached through platform-neutral APIs; you only add a platform module when the addon opens a platform-native UI. Four demo addons (GUI, claim, effect, reference) self-extract into [I]plugins/RTP/addons/[/I] on first run - see the bundled LeafRTPRiftAddon and LeafRTPCountdownAddon demos.
 [*]🗺️ [B]Live map / heatmap visualizations:[/B] [I]/rtp scan[/I] paints region safety state (green safe / red unsafe) onto a real held map item while the chat readout streams cps, land %, and ETA. Free on Paper, Spigot, Fabric, and NeoForge.
 [*]📊 [B]Built-in runtime observability:[/B] [I]/rtp info[/I] reports TPS/MSPT (spark-enhanced when spark is installed), JVM heap, pipeline latency percentiles, generation success/failure breakdown, and a [I]/rtp info biomes[/I] player-occupancy leaderboard, no metrics add-on needed.
 [*]🌐 [B]12 locales, parity-enforced:[/B] shipped locales are CI-verified so a translated server never silently falls back to English on a new key.

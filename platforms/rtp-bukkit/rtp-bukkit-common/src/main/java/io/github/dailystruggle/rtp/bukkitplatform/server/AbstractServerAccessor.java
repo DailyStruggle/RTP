@@ -135,6 +135,13 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     return "Spigot";
   }
 
+  @Override
+  public @NotNull io.github.dailystruggle.rtp.api.server.PlatformFamily getPlatformFamily() {
+    // Bukkit/Spigot and every Bukkit-derived fork (Paper, Folia, Purpur, ...) share the
+    // org.bukkit API surface, so they all classify as the BUKKIT family.
+    return io.github.dailystruggle.rtp.api.server.PlatformFamily.BUKKIT;
+  }
+
   private boolean isPaper() {
     try {
       Class.forName("com.destroystokyo.paper.PaperConfig");

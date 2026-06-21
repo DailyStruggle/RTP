@@ -23,7 +23,9 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 ---
 
-## [3.1.4] - Unreleased
+## [3.2.0] - Unreleased
+
+> **Upgrade note (default behavior change).** This release bundles and self-extracts the `LeafRTPGuiAddon` on first run, and that addon binds the bare `/rtp` (no arguments) root action ([ADR-056](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-056-bare-rtp-root-action.md)). On servers that have a GUI renderer available, a player typing bare `/rtp` now opens the destination-picker menu instead of teleporting immediately; the classic instant teleport is still reachable via the menu and as a fallback when no renderer is installed or the player is offline. To restore the old behavior, delete the extracted `addons/LeafRTPGuiAddon.jar` (the `addons/` folder then exists, so it is never re-extracted) or unbind the root action. The minor version bump (`3.1.x` -> `3.2.0`) reflects this operator-visible default change to the headline command; the public `rtp-api`/SPI surface is unchanged.
 
 ### Added
 
@@ -33,11 +35,15 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 - **The `lockAfterUses` usage cap now survives a restart, reaching parity with the already-persisted cooldown** ([ADR-068](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-068-cross-server-persisted-teleport-limits.md)). The BetterRTP `LockAfter` rolling-window counter previously lived only in memory and was lost on every reload/restart, so a player at their cap got a fresh allowance whenever the server bounced. A new `TeleportLimitStore` seam (`rtp-core`) now fronts the usage-cap guards (`/rtp` command and the addon-facing `RTPAPI.teleport`) and the success counter; its `LocalTeleportLimitStore` write-through-persists each player's `{count, start}` window to the configured database (the file-backed `YamlFileDatabase` in the lite assembly, so no driver dependency) and lazily reloads it on first use, hydrating the window on restart. The cooldown anchor is unchanged (it already persists). This is the local-durability axis of ADR-068; the cross-server (proxy/transport) axes are tracked as follow-up work. Covered by `TeleportLimitStoreTest` (4 cases).
 
+- **The RTP-lite assembly variant now ships the full base `safety.yml`** instead of a trimmed lite-specific copy ([ADR-024](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-024-rtp-lite-assembly-variant.md) 2026-06-20 amendment). The lite-specific `safety.yml` overlay is removed, so lite inherits the base config verbatim - including both the vanilla block-tag grammar (`#minecraft:<tag>`) and state predicates from [ADR-017](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md), which are now sufficiently stable for lite. No driver change was needed (the `SafetyTokenParser` / `SafetyCompilationCache` / `SafetyTokenExpander` already ship in the lite jar); only the `rtp-tags` module (`tags/`, `tagsRefresh.yml`) remains a full-edition feature.
+
 ### Changed
 
 - **The `LINEAR` vertical adjustor now defaults to middle-out search (`direction=2`) in every world, not just the nether/end.** World generation changed such that a center-out vertical scan is the better general default, so the global `LINEAR` default `direction` moved from `0` (bottom-up) to `2` (middle-out) - the same setting already seeded for `_nether`/`_the_end` regions. The dimension-specific direction override is removed from `NetherEndConfigAmender` (its nether `maxY<=128` clamp and `requireSkyLight=false` seeding are unchanged), since middle-out is now the baseline. Existing region configs that set `direction` explicitly are unaffected.
 
 - **The shipped default overworld region now uses the `LINEAR` vertical adjustor with middle-out search (`direction: 2`) and requires sky light (`vert.requireSkyLight: true`) so `/rtp` lands players on open-sky surfaces.** `regions/default.yml` switches `vert.name` from `JUMP` (which has no scan-direction concept) to `LINEAR` with `direction: 2`, matching the middle-out search already used for nether/end, and flips `requireSkyLight` from `false` to `true`. Nether/end regions created from this default still seed `requireSkyLight: false` automatically via `NetherEndConfigAmender` (those dimensions have no sky light), so cross-dimension behavior is unchanged. Existing region configs that set these explicitly are unaffected.
+
+- **Claim-plugin integrations moved out of `rtp-plugin` into the new bundled `LeafRTPClaimAddon`** ([ADR-069](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-069-claim-integrations-extracted-to-bundled-addon.md), superseding [ADR-019](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)). The 12 claim/protection checkers (WorldGuard, GriefDefender, GriefPrevention, Towny Advanced, SaberFactions, FactionsBridge, Lands, RedProtect, Residence, CrashClaim, HuskClaims, KingdomsX), the `IntegrationsKeys` enum, and `integrations.yml` left the core plugin for a single Bukkit-only addon module that registers its verifiers through the public hook facade (ADR-026) exactly as before (REQ-RTP-S-003 unchanged) and self-gates on `PlatformFamily.BUKKIT`. The addon jar is bundled inside both the Pro and lite RTP jars (under `bundled-addons/`) and self-extracted into `<pluginDir>/addons/` on first run, so claim-aware teleport still works out of the box with no extra download. The claim `compileOnly` dependencies and their dedicated soft-dep Maven repositories are removed from `rtp-plugin/build.gradle`. Behaviour change for operators: the per-locale `integrations.yml` translations that previously shipped in the core plugin are dropped (the addon ships an English `integrations.yml`); re-localizing the addon config is tracked follow-up work.
 
 ### Fixed
 
@@ -549,7 +555,7 @@ Earlier versions introduced the multi-module split (`rtp-api` / `rtp-core` / pla
 
 ---
 
-[3.1.4]: https://github.com/DailyStruggle/RTP/compare/v3.1.3...v3.1.4
+[3.2.0]: https://github.com/DailyStruggle/RTP/compare/v3.1.3...v3.2.0
 [3.1.3]: https://github.com/DailyStruggle/RTP/compare/v3.1.2-Lite...v3.1.3
 [3.1.2-Lite]: https://github.com/DailyStruggle/RTP/compare/v3.1.2...v3.1.2-Lite
 [3.1.2]: https://github.com/DailyStruggle/RTP/compare/v3.1.1...v3.1.2
