@@ -257,6 +257,21 @@ Place new code following this decision order:
 
 ---
 
+## Addon Self-Registration Gating (platform + version via the general API)
+
+An addon (or per-platform addon module) that registers a platform-specific component - a `MenuRenderer`, an effect, a claim verifier, a command - shall gate that self-registration on **both platform and Minecraft version**, and shall do so through the **general RTP API**, not through addon-local platform probing or a novel addon-side SPI method.
+
+Rules:
+
+- **Use the `rtp-api` compatibility surface.** `RTPServerAccessor` exposes the authoritative gates: `getPlatformFamily()` (`PlatformFamily`), `getServerIntVersion()` (the headline MC version as a single opaque, monotonically increasing integer - `21` for MC 1.21.x under the legacy `1.MINOR.PATCH` scheme, `26` for the year-based MC 26.x where that component is effectively a major version; do not assume it is a "minor" version), plus the convenience checks `isPlatformFamily(family)`, `isServerVersionAtLeast(min)` / `isServerVersionAtMost(max)`, and the single-call `isCompatible(requiredFamily, minServerVersion, maxServerVersion)`. Prefer these over string-matching `getPlatform()` or `Class.forName("org.bukkit...")`-style probes in addon code.
+- **Do not add novel platform/version-probing methods to an addon SPI** (e.g. the GUI addon's `MenuRenderer`) to accomplish this. New SPI surface is a cross-module / API change and is **D-005 gated** (propose + approval). When a version-aware gate is needed, extend the general `rtp-api` compatibility surface instead so every addon shares one mechanism.
+- **Fail closed on unknown version.** `isServerVersionAtLeast/AtMost` and a version-bounded `isCompatible(...)` return `false` when `getServerIntVersion()` is `null`; gate on platform alone (pass `0` / `Integer.MAX_VALUE`) when no version bound is meaningful.
+- **Skip when core is not loaded.** If `RTP.serverAccessor == null` the runtime cannot be verified; skip registration rather than registering blindly.
+
+Reference implementation: `GuiRenderers.registerIfCompatible(renderer, family, minMinorVersion, maxMinorVersion)` in `rtp-gui-common` delegates entirely to `RTPServerAccessor.isCompatible(...)`, and the three GUI entry points (`RTPGuiBukkitPlugin`, `RTPGuiFabricInitializer`, `RTPGuiNeoForgeMod`) route their renderer registration through it.
+
+---
+
 ## Propose Before Implementation (Rule D-005)
 
 For any change that touches more than one class, crosses a module boundary, or introduces a new command architecture, present a proposal **before** writing code. Include:

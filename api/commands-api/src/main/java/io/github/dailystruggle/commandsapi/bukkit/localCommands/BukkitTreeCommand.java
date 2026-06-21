@@ -76,9 +76,14 @@ public abstract class BukkitTreeCommand extends BukkitCommand implements TreeCom
             return false;
         }
 
-        Consumer<String> messageMethod = messageMethodFactory != null
+        Consumer<String> fallback = messageMethodFactory != null
                 ? messageMethodFactory.apply(sender)
                 : sender::sendMessage;
+        // Prefer the platform-installed MessageSink (keyed by caller UUID) over the
+        // per-command messageMethodFactory, so commands need not carry a
+        // platform-specific reply factory. Falls back to the factory / sender sink
+        // when no MessageSink is installed.
+        Consumer<String> messageMethod = CommandsAPI.messageMethodFor(senderId, fallback);
         CompletableFuture<Boolean> future = onCommand(senderId, sender::hasPermission, messageMethod, args);
 
         return true;

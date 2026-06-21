@@ -1,8 +1,9 @@
 # Safety filters (RTP-lite)
 
 > Stripped from `docs/admin/configuration/SAFETY.md` and `docs/admin/HAZARDS.md`. Lite ships
-> a **flat material allow/deny list** only — block-tag / state-predicate
-> sections from ADR-017 are not present (use RTP-Pro for those).
+> the **full base `safety.yml`** (no longer a trimmed lite-specific copy): the material
+> allow/deny lists plus **vanilla block-tag** (`#minecraft:<tag>`) and **state-predicate**
+> support from ADR-017. Only the `rtp-tags` module (`tags/`, `tagsRefresh.yml`) stays Pro.
 
 ## What's enforced
 
@@ -21,38 +22,9 @@ still satisfies these lists at teleport time (regression-guarded by
 
 ## Default `safety.yml` (lite)
 
-```yaml
-unsafeBlocks:
-  - LAVA
-  - FIRE
-  - SOUL_FIRE
-  - CACTUS
-  - MAGMA_BLOCK
-  - SWEET_BERRY_BUSH
-  - WITHER_ROSE
-  - POWDER_SNOW
-  - CAMPFIRE
-  - SOUL_CAMPFIRE
-
-unsafeBlocksAbove:
-  - LAVA
-  - FIRE
-  - WATER          # head submerged
-  - COBWEB
-
-biomeBlacklist:
-  - OCEAN
-  - DEEP_OCEAN
-  - COLD_OCEAN
-  - DEEP_COLD_OCEAN
-  - FROZEN_OCEAN
-  - DEEP_FROZEN_OCEAN
-  - LUKEWARM_OCEAN
-  - DEEP_LUKEWARM_OCEAN
-  - WARM_OCEAN
-  - RIVER
-  - FROZEN_RIVER
-```
+Lite bundles the same `safety.yml` as the full edition (block tags and state
+predicates included). See `docs/admin/configuration/SAFETY.md` for the full
+reference.
 
 ## After editing safety.yml
 
@@ -65,9 +37,7 @@ Spatial memory was validated under the old rules. Always:
 
 ## Not in lite (Pro only)
 
-- Block tags (e.g. `#minecraft:leaves`) in safety lists — ADR-017.
-- State predicates (e.g. `oak_door[half=lower]`) — ADR-017.
-- `tags/`, `tagsRefresh.yml`.
+- `tags/`, `tagsRefresh.yml` (the `rtp-tags` module).
 
 ## Anvil pre-filter
 

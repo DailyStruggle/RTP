@@ -6,15 +6,22 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitRTPWorld;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
 
 public final class BukkitRTPPlayer implements RTPPlayer {
@@ -171,6 +178,64 @@ public final class BukkitRTPPlayer implements RTPPlayer {
     World world = ((BukkitRTPWorld) to.world()).world();
     Location location = new Location(world, to.x() + 0.5, to.y(), to.z() + 0.5);
     player.setBedSpawnLocation(location, true);
+  }
+
+  @Override
+  public String getClientBlock(RTPLocation location) {
+    if (location == null) return null;
+    World world = ((BukkitRTPWorld) location.world()).world();
+    // S-005: only read an already-loaded block; never let getBlockAt load a chunk.
+    if (!world.isChunkLoaded(location.x() >> 4, location.z() >> 4)) return null;
+    return world.getBlockAt(location.x(), location.y(), location.z()).getBlockData().getAsString();
+  }
+
+  @Override
+  public void sendClientBlockChange(RTPLocation location, String blockData) {
+    if (location == null || blockData == null) return;
+    World world = ((BukkitRTPWorld) location.world()).world();
+    if (!world.isChunkLoaded(location.x() >> 4, location.z() >> 4)) return;
+    BlockData parsed = parseBlockData(blockData);
+    if (parsed == null) return;
+    player.sendBlockChange(new Location(world, location.x(), location.y(), location.z()), parsed);
+  }
+
+  @Override
+  public void sendClientBlockChanges(Map<RTPLocation, String> changes) {
+    if (changes == null || changes.isEmpty()) return;
+    // Bin the changes into BlockState snapshots and hand them to Bukkit's bulk sender, which
+    // packs them into one multi-block-change packet per chunk section instead of one packet per
+    // block. The snapshots are detached copies (block.getState()), so re-typing them never
+    // touches the real world (S-001..S-007), and we never load a chunk (S-005).
+    List<BlockState> states = new ArrayList<>(changes.size());
+    for (Map.Entry<RTPLocation, String> entry : changes.entrySet()) {
+      RTPLocation location = entry.getKey();
+      String blockData = entry.getValue();
+      if (location == null || blockData == null) continue;
+      World world = ((BukkitRTPWorld) location.world()).world();
+      if (!world.isChunkLoaded(location.x() >> 4, location.z() >> 4)) continue;
+      BlockData parsed = parseBlockData(blockData);
+      if (parsed == null) continue;
+      Block block = world.getBlockAt(location.x(), location.y(), location.z());
+      BlockState state = block.getState();
+      state.setBlockData(parsed);
+      states.add(state);
+    }
+    if (!states.isEmpty()) {
+      player.sendBlockChanges(states);
+    }
+  }
+
+  /**
+   * Parse a platform-neutral block-data string into Bukkit {@link BlockData}, logging (never
+   * silently swallowing - S-004) and returning {@code null} on a malformed string.
+   */
+  private static BlockData parseBlockData(String blockData) {
+    try {
+      return Bukkit.createBlockData(blockData);
+    } catch (IllegalArgumentException e) {
+      RTP.log(Level.WARNING, "[RTP] ignoring malformed client block-data string: " + blockData, e);
+      return null;
+    }
   }
 
   public Player player() {

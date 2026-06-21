@@ -60,6 +60,15 @@ Everything below ships in the free build, no add-ons:
 
 Tune `plugins/RTP/config.yml` and `plugins/RTP/regions/*.yml` later. Full guide: [**admin guide**](https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md).
 
+**Bundled addons unpack themselves on first run.** Four addon jars ride inside the LeafRTP jar and self-extract into `plugins/RTP/addons/` the first time the plugin starts - no second download. Delete one from that folder to turn it off (the folder then exists, so it is never re-extracted):
+
+- **LeafRTPGuiAddon** (GUI demo) - a clickable chest destination-picker. It binds the bare `/rtp` root action, so with a GUI renderer present typing `/rtp` opens the picker instead of teleporting immediately (instant teleport stays reachable from the menu and as a fallback), and adds `/rtp gui` (`rtp.gui`).
+- **LeafRTPClaimAddon** (claim integrations) - the 12 claim/protection checkers, so claim-aware teleport works out of the box on the Bukkit family.
+- **LeafRTPRiftAddon** (effect demo) - registers a "Virtual Rift" teleport effect that tears the terrain open into a void during warmup (presentation-only client-side blocks, so it can never compromise safety), usable by name in `effects/*.yml`.
+- **LeafRTPCountdownAddon** (addon-system reference demo) - live teleport and queue-position countdowns, and the canonical copy-paste reference addon.
+
+For those interested in writing their own: every one of these is shipped as a worked coding example. Their full source lives under `addons/` in the repo, and the Rift and Countdown demos are pure `rtp-api` / `effects-api` (zero platform imports), so they double as copy-paste starting points for your own addon.
+
 ---
 
 <details>

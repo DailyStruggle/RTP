@@ -784,6 +784,91 @@ public final class FabricRTPPlayer
         return p != null && !p.isRemoved();
     }
 
+    // ---------------------------------------------------------------------------
+    // Client-side ("fake") block changes (RTPPlayer SPI)
+    //
+    // Reads/sends are purely visual: the server's real blocks are never mutated
+    // (S-001..S-007), only already-loaded blocks are touched (S-005, isChunkLoaded
+    // guard), and a malformed block-data token is logged, never swallowed (S-004).
+    // The block-data string round-trips through the vanilla BlockStateParser — the
+    // same parser FabricRTPWorld#setBlocks uses — so it is platform-internally
+    // compatible with whatever getClientBlock produced.
+    //
+    // Binning note: the bulk sendClientBlockChanges(Map) inherits the RTPPlayer
+    // default, which dispatches one ClientboundBlockUpdatePacket per block. True
+    // section-level binning (one ClientboundSectionBlocksUpdatePacket per chunk
+    // section) is not exposed by a public Vanilla constructor for arbitrary fake
+    // states, so it remains a Bukkit-only optimisation (Player#sendBlockChanges).
+    // ---------------------------------------------------------------------------
+
+    @Override
+    public String getClientBlock(RTPLocation location) {
+        if (location == null) return null;
+        if (handle == null) return null;
+        if (!(location.world() instanceof FabricRTPWorld fw)) return null;
+        ServerLevel level = fw.level();
+        if (level == null) return null;
+        int x = location.x();
+        int y = location.y();
+        int z = location.z();
+        // S-005: only read an already-loaded block; never trigger a chunk load.
+        if (!fw.isChunkLoaded(x >> 4, z >> 4)) return null;
+        try {
+            net.minecraft.world.level.block.state.BlockState state =
+                    level.getBlockState(new net.minecraft.core.BlockPos(x, y, z));
+            return net.minecraft.commands.arguments.blocks.BlockStateParser.serialize(state);
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.FINE,
+                    "[RTP][Fabric] getClientBlock failed at (" + x + "," + y + "," + z + "): " + t);
+            return null;
+        }
+    }
+
+    @Override
+    public void sendClientBlockChange(RTPLocation location, String blockData) {
+        if (location == null || blockData == null) return;
+        ServerPlayer p = handle;
+        if (p == null || p.connection == null) return;
+        if (!(location.world() instanceof FabricRTPWorld fw)) return;
+        ServerLevel level = fw.level();
+        if (level == null) return;
+        int x = location.x();
+        int y = location.y();
+        int z = location.z();
+        if (!fw.isChunkLoaded(x >> 4, z >> 4)) return;
+        net.minecraft.world.level.block.state.BlockState state = parseBlockData(level, blockData);
+        if (state == null) return;
+        try {
+            p.connection.send(new net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket(
+                    new net.minecraft.core.BlockPos(x, y, z), state));
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP][Fabric] sendClientBlockChange failed for " + name + ": " + t.getMessage());
+        }
+    }
+
+    /**
+     * Parse a platform-neutral block-data string into a Mojmap {@code BlockState} via the
+     * vanilla {@code BlockStateParser} (the same parser {@code /setblock} uses). Logs (never
+     * silently swallows - S-004) and returns {@code null} on a malformed token.
+     */
+    private net.minecraft.world.level.block.state.@Nullable BlockState parseBlockData(
+            ServerLevel level, String blockData) {
+        try {
+            net.minecraft.core.HolderLookup<net.minecraft.world.level.block.Block> lookup =
+                    level.registryAccess()
+                            .lookupOrThrow(net.minecraft.core.registries.Registries.BLOCK);
+            return net.minecraft.commands.arguments.blocks.BlockStateParser
+                    .parseForBlock(lookup, blockData, false)
+                    .blockState();
+        } catch (Throwable e) {
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP][Fabric] ignoring malformed client block-data string: " + blockData
+                            + " (" + e.getClass().getSimpleName() + ")");
+            return null;
+        }
+    }
+
     /** Minimal detached sender for clone() when the handle has been released. */
     private static final class DetachedClone implements RTPPlayer {
         private final UUID uuid;

@@ -1,0 +1,32 @@
+plugins {
+    id 'java'
+}
+group = 'io.github.dailystruggle'
+// LeafRTPCountdownAddon carries its OWN version line, independent of the RTP core
+// version: it ships and updates on its own cadence (mirroring LeafRTPGuiAddon).
+version = '1.0.0'
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+// The installable artifact carries the addon's brand name (not the internal
+// module name), so the build produces LeafRTPCountdownAddon-<version>.jar - the
+// jar a user drops into plugins/RTP/addons/.
+base {
+    archivesName = 'LeafRTPCountdownAddon'
+}
+
+repositories {
+    mavenCentral()
+}
+dependencies {
+    // Platform-agnostic addon: compiles only against rtp-api (the RTPAddon SPI) and
+    // rtp-core (Configs / ConfigParser / TeleportPipelineTask). No org.bukkit.* / spigot-api,
+    // so the produced jar is discoverable via ServiceLoader on every RTP platform.
+    compileOnly project(':rtp-api')
+    compileOnly project(':rtp-core')
+}
+test {
+    useJUnitPlatform()
+}

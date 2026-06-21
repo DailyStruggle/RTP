@@ -308,8 +308,9 @@ public final class BukkitHandles implements HandleProvider {
         @Override
         public void spawnFirework(Map<String, Object> data) {
             org.bukkit.plugin.Plugin caller;
-            if (io.github.dailystruggle.effectsapi.EffectsAPI.fireworkSafetyListener != null) {
-                caller = io.github.dailystruggle.effectsapi.EffectsAPI.fireworkSafetyListener.caller;
+            FireworkSafetyListener fsl = io.github.dailystruggle.effectsapi.EffectsAPI.getFireworkSafetyListener();
+            if (fsl != null) {
+                caller = fsl.caller;
             } else {
                 try {
                     caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();

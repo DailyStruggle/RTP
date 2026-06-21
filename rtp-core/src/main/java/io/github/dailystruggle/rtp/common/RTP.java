@@ -970,10 +970,12 @@ public class RTP {
         File pluginDir = serverAccessor.getPluginDirectory();
         if (pluginDir != null) {
           File addonsDir = new File(pluginDir, "addons");
-          // First run only: unpack any addon jars bundled inside the RTP jar (e.g. the
-          // GUI destination-picker demo) so the showcase works out of the box. Keyed on
-          // the folder not yet existing, so deleting the extracted jar (or the folder)
-          // is a permanent opt-out - it is never re-extracted.
+          // First run only: unpack every addon jar bundled inside the RTP jar (e.g. the
+          // GUI destination-picker demo and the claim-plugin integrations) so they work
+          // out of the box. Keyed on the addons folder not yet existing: once it exists RTP
+          // never re-extracts, so deleting a single extracted jar (folder kept) is a permanent
+          // opt-out for that addon. Deleting the whole folder is NOT an opt-out - the folder
+          // is then missing again and every bundled jar is re-extracted on the next run.
           if (!addonsDir.exists()) {
             addons.extractBundledAddons(addonsDir);
           }

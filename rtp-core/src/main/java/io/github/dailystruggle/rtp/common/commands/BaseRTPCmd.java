@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands;
 
+import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
@@ -44,6 +45,15 @@ public interface BaseRTPCmd extends TreeCommand {
   default void msgBadParameter(UUID callerId, String parameterName, String parameterValue, java.util.function.Consumer<String> messageMethod) {
     String msg = msg(MessagesKeys.badArg, "[P0] bad parameter - [arg]");
     msg = msg.replace("[arg]", parameterName + "=" + parameterValue);
+    // When a platform MessageSink is installed it owns formatting AND audit
+    // (its delivery path fires the REQ-RTP-S-004 interceptor), so pre-format
+    // the template and deliver through the supplied consumer without an extra
+    // RTP.log -- a second log here would duplicate the console line. This
+    // replaces the per-platform msg override (formerly BukkitBaseRTPCmd).
+    if (messageMethod != null && CommandsAPI.getMessageSink() != null) {
+      messageMethod.accept(RTP.serverAccessor.format(callerId, msg));
+      return;
+    }
     if(messageMethod != null) messageMethod.accept(msg);
     else RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg, null);
     RTP.log(Level.WARNING, msg);
@@ -58,6 +68,12 @@ public interface BaseRTPCmd extends TreeCommand {
   default void msgInvalidCommand(UUID callerId, String argument, java.util.function.Consumer<String> messageMethod) {
     String msg = msg(MessagesKeys.invalidCommand, "[P0] invalid command - [arg]");
     msg = msg.replace("[arg]", argument);
+    // See msgBadParameter: a platform MessageSink owns formatting + audit, so
+    // pre-format and deliver via the consumer without a duplicate RTP.log.
+    if (messageMethod != null && CommandsAPI.getMessageSink() != null) {
+      messageMethod.accept(RTP.serverAccessor.format(callerId, msg));
+      return;
+    }
     if(messageMethod != null) {
         messageMethod.accept(msg);
     } else {

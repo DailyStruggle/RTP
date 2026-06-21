@@ -360,7 +360,20 @@ if (!excludeNeoforge) {
     }
 }
 
-include 'addons:RTP_ExampleAddon'
+include 'addons:LeafRTPCountdownAddon'
+// LeafRTPRiftAddon - reference demo of effect registration. Registers a single
+// new effects-api prototype ("RIFT", a client-side "world deconstruction" warmup
+// animation) so it joins the built-in effects by name. Fully platform-neutral: the
+// effect drives the dissolve through the rtp-api client block-change SPI
+// (RTPPlayer#getClientBlock / #sendClientBlockChanges, binned) and has no platform
+// dependency, so it runs anywhere the SPI is implemented (Bukkit/Paper/Folia) and is
+// a harmless no-op elsewhere.
+include 'addons:LeafRTPRiftAddon'
+// LeafRTPClaimAddon - bundles every claim/protection-plugin checker behind
+// per-plugin integrations.yml toggles and registers them as RTP safety
+// verifiers. Single Bukkit-only module (every checker is org.bukkit.*-based);
+// self-gates on PlatformFamily.BUKKIT so it is a no-op on Fabric/NeoForge.
+include 'addons:LeafRTPClaimAddon'
 // LeafRTPGuiAddon - DonutSMP-style destination picker, split on the project platform
 // model. rtp-gui-common is platform-neutral (menu model, config via RTP's
 // ConfigParser, the MenuRenderer render seam, and the teleport submit through

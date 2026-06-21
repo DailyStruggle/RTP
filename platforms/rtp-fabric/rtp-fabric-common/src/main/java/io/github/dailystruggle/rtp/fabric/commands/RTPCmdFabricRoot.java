@@ -7,23 +7,11 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.RTPCmd;
-import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
-import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
-import io.github.dailystruggle.rtp.common.commands.parameters.BiomeParameter;
-import io.github.dailystruggle.rtp.common.commands.parameters.BooleanParameter;
-import io.github.dailystruggle.rtp.common.commands.parameters.FloatParameter;
-import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
-import io.github.dailystruggle.rtp.common.commands.parameters.ShapeParameter;
-import io.github.dailystruggle.rtp.common.commands.parameters.VertParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
-import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
-import io.github.dailystruggle.rtp.common.commands.scan.ScanCmd;
-import io.github.dailystruggle.rtp.common.commands.version.VersionCmd;
 import io.github.dailystruggle.rtp.fabric.server.FabricServerAccessor;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -65,166 +53,17 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
     public RTPCmdFabricRoot() {
         super(null);
 
-        // ---- Parameters (parity with RTPCmdBukkit lines 51–144) ----
-        // Validators route world/player lookups through RTP.serverAccessor.* so
-        // no org.bukkit.* leaks into rtp-fabric (ADR-022 §4 / S-005 nuance).
-        // Permission checks use RTP.serverAccessor.getSender(uuid).hasPermission(...);
-        // The BrigadierBridgeContext predicate is currently permissive;
-        // the validator shape stays correct so perms work for free once
-        // fabric-permissions-api is wired.
-
-        // region (with nested world / price / worldborderoverride / shape / vert)
-        RegionParameter regionParameter =
-            new RegionParameter(
-                "rtp.region",
-                "select a region to teleport to",
-                (uuid, s) ->
-                    RTP.selectionAPI.regionNames().contains(s)
-                        && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.regions." + s));
-        regionParameter.put(
-            "world",
-            new WorldParameter(
-                "rtp.params",
-                "override teleport world for this region",
-                (uuid, s) ->
-                    RTP.serverAccessor.getRTPWorld(s) != null
-                        && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.worlds." + s)));
-        regionParameter.put(
-            "price",
-            new FloatParameter(
-                "rtp.params",
-                "override teleport cost for this region",
-                (uuid, s) -> {
-                    try {
-                        Double.parseDouble(s);
-                        return true;
-                    } catch (NumberFormatException exception) {
-                        return false;
-                    }
-                }));
-        regionParameter.put(
-            "worldborderoverride",
-            new BooleanParameter(
-                "rtp.params",
-                "override world-border respect for this region",
-                (uuid, s) -> s.equalsIgnoreCase("true") || s.equalsIgnoreCase("false")));
-        regionParameter.put(
-            "shape",
-            new ShapeParameter(
-                "rtp.params",
-                "override region shape",
-                (uuid, s) -> RTP.factoryMap.get(RTP.factoryNames.shape).contains(s)));
-        regionParameter.put(
-            "vert",
-            new VertParameter(
-                "rtp.params",
-                "modify y selection",
-                (uuid, s) -> RTP.factoryMap.get(RTP.factoryNames.vert).contains(s)));
-        addParameter("region", regionParameter);
-
-        // biome — preserve Locale.ROOT upper-casing (Turkish-i JVM bug;
-        // mirrors RTPCmdBukkit line 109).
-        addParameter(
-            "biome",
-            new BiomeParameter(
-                "rtp.biome",
-                "select a biome to teleport to",
-                (uuid, s) -> {
-                    RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
-                    // Accept namespaced biome ids (e.g. `minecraft:badlands`) as well as
-                    // bare enum names. `ServerAccessor#getBiomes()` now emits both forms
-                    // (parity with Bukkit/Folia/Paper), so a single membership probe over
-                    // the user-typed string + its case/namespace variants covers both
-                    // grammars. Downstream `BiomeNames#matches` handles the namespace
-                    // equivalence at filter time.
-                    if (s == null) return false;
-                    int colon = s.indexOf(':');
-                    String bareKey = (colon >= 0) ? s.substring(colon + 1) : s;
-                    String upper = bareKey.toUpperCase(Locale.ROOT);
-                    java.util.Set<String> biomes = RTP.serverAccessor.getBiomes();
-                    boolean known = biomes.contains(s)
-                            || biomes.contains(upper)
-                            || biomes.contains(bareKey.toLowerCase(Locale.ROOT))
-                            || biomes.contains("minecraft:" + bareKey.toLowerCase(Locale.ROOT));
-                    return known
-                            && (sender.hasPermission("rtp.biome.*")
-                                || sender.hasPermission("rtp.biome." + bareKey)
-                                || sender.hasPermission("rtp.biome." + s));
-                }));
-
-        // player — target-player parameter. Fabric has no commands-api
-        // OnlinePlayerParameter analog, so we register a minimal
-        // CommandParameter subclass: validator covers existence + the
-        // `rtp.notme` self-opt-out (parity with RTPCmdBukkit lines 116–125).
-        //
-        // values() returns the live online-player snapshot via
-        // FabricServerAccessor.getOnlinePlayerNames() so Brigadier surfaces
-        // tab-completion (CHECKLIST-fabric-tabcompletion-audit P3,
-        // commands-api-ADR-001 addendum 2026-05-06). When the accessor is
-        // not yet bound (e.g., very early init), falls back to the empty
-        // set; Brigadier still accepts the typed value because validation
-        // continues to flow through the BiFunction above on execute.
-        addParameter(
-            "player",
-            new CommandParameter(
-                "rtp.other",
-                "teleport someone else",
-                (uuid, s) -> {
-                    RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
-                    if (!sender.hasPermission("rtp.other")) return false;
-                    RTPPlayer target = RTP.serverAccessor.getPlayer(s);
-                    if (target == null || !target.name().equalsIgnoreCase(s)) return false;
-                    RTPCommandSender targetSender = RTP.serverAccessor.getSender(target.uuid());
-                    // Console (non-player sender) is exempt from rtp.notme - parity with RTPCmdBukkit.
-                    return targetSender == null || !(sender instanceof RTPPlayer) || !targetSender.hasPermission("rtp.notme");
-                }) {
-                @Override
-                public Set<String> values() {
-                    return RTP.serverAccessor instanceof FabricServerAccessor f
-                        ? f.getOnlinePlayerNames()
-                        : Collections.emptySet();
-                }
-            });
-
-        // world — top-level world parameter (parity with RTPCmdBukkit line 130).
-        addParameter(
-            "world",
-            new WorldParameter(
-                "rtp.world",
-                "select a world to teleport to",
-                (uuid, s) ->
-                    RTP.serverAccessor.getRTPWorld(s) != null
-                        && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.worlds." + s)));
-
-        // toggletargetperms (parity with RTPCmdBukkit line 140).
-        addParameter(
-            "toggletargetperms",
-            new BooleanParameter(
-                "rtp.params",
-                "check player's perms when running this command",
-                (uuid, s) ->
-                    RTP.serverAccessor.getSender(uuid).hasPermission("rtp.params")
-                        && (s.equalsIgnoreCase("true") || s.equalsIgnoreCase("false"))));
-
-        // ---- Subcommands (parity with RTPCmdBukkit lines 146–151) ----
-        // TestCmd is intentionally deferred — the Bukkit TestCmd lives in
-        // rtp-plugin/.../bukkit/commands/test/TestCmd.java and depends on
-        // Bukkit-only types. A platform-neutral lift is tracked in MULTI_PLATFORM_PLAN.md.
-        addSubCommand(new ReloadCmd(this));
-        addSubCommand(new io.github.dailystruggle.rtp.common.commands.gui.GuiCmd(this));
-        // /rtp help intentionally NOT registered: commands-api's TreeCommand
-        // auto-emits a complete built-in help listing when no HELP
-        // subcommand exists (TreeCommand line 231), which lists every
-        // registered subcommand rather than only those that happen to
-        // have a matching MessagesKeys enum value (the bug the removed
-        // HelpCmd had).
-        addSubCommand(new ConfigCmd(this));
-        addSubCommand(new ScanCmd(this));
-        addSubCommand(new InfoCmd(this));
-        VersionCmd versionCmd = new VersionCmd(this);
-        addSubCommand(versionCmd);
-        getCommandLookup().put(VersionCmd.ALIAS.toUpperCase(), versionCmd);
-        addSubCommand(new io.github.dailystruggle.rtp.common.commands.admin.ClearCacheCmd(this));
+        // Platform-neutral parameters (region / biome / toggletargetperms) and
+        // every common subcommand are assembled once by rtp-core's
+        // CoreCommandTreeBuilder. Only the genuinely platform-bound `player`
+        // and `world` parameters are supplied here through the
+        // PlatformCommandParameters seam (FabricCommandParameters): their
+        // validators and tab-complete values() reach for Fabric online-player /
+        // world enumeration, routed via RTP.serverAccessor.* /
+        // FabricServerAccessor so no net.minecraft.* leaks into the tree.
+        io.github.dailystruggle.rtp.common.commands.CoreCommandTreeBuilder.attachCommonParameters(
+            this, new FabricCommandParameters());
+        io.github.dailystruggle.rtp.common.commands.CoreCommandTreeBuilder.attachCommonSubcommands(this);
 
         // /rtp menu - mirror of RTPCmdBukkit:215-230. ADR-050 Stage 3β.D.2b
         // (2026-05-24) deleted the token registry; clicks carry concrete
@@ -310,5 +149,51 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
     @Override
     public void failEvent(RTPCommandSender sender, String msg) {
         // Intentional no-op on Fabric (by design) — see successEvent().
+    }
+
+    /**
+     * Fabric source for the two platform-bound parameters. Validators route
+     * world/player lookups through {@code RTP.serverAccessor.*} (never
+     * {@code net.minecraft.*}); the {@code player} parameter's {@code values()}
+     * surfaces the live online-player snapshot via
+     * {@link FabricServerAccessor#getOnlinePlayerNames()} so Brigadier offers
+     * tab-completion, falling back to the empty set before the accessor is
+     * bound (typed values still flow through the validator on execute).
+     */
+    private static final class FabricCommandParameters
+        implements io.github.dailystruggle.rtp.common.commands.PlatformCommandParameters {
+
+        @Override
+        public CommandParameter playerParameter() {
+            return new CommandParameter(
+                "rtp.other",
+                "teleport someone else",
+                (uuid, s) -> {
+                    RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
+                    if (!sender.hasPermission("rtp.other")) return false;
+                    RTPPlayer target = RTP.serverAccessor.getPlayer(s);
+                    if (target == null || !target.name().equalsIgnoreCase(s)) return false;
+                    RTPCommandSender targetSender = RTP.serverAccessor.getSender(target.uuid());
+                    // Console (non-player sender) is exempt from rtp.notme - parity with RTPCmdBukkit.
+                    return targetSender == null || !(sender instanceof RTPPlayer) || !targetSender.hasPermission("rtp.notme");
+                }) {
+                @Override
+                public Set<String> values() {
+                    return RTP.serverAccessor instanceof FabricServerAccessor f
+                        ? f.getOnlinePlayerNames()
+                        : Collections.emptySet();
+                }
+            };
+        }
+
+        @Override
+        public CommandParameter worldParameter() {
+            return new WorldParameter(
+                "rtp.world",
+                "select a world to teleport to",
+                (uuid, s) ->
+                    RTP.serverAccessor.getRTPWorld(s) != null
+                        && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.worlds." + s));
+        }
     }
 }

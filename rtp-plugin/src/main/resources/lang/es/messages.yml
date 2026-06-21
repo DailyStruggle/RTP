@@ -275,7 +275,7 @@ menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- elige un mundo"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- elige un bioma"
-menuFrontPageRowHelp: "&2▶ /rtp help &7- list commands"
+menuFrontPageRowHelp: "#7A4FB8❓ listar comandos &7- /rtp help"
 # Front-page admin entry row: the only inline
 # admin-visible row on the front page; click descends into the curated admin
 # panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.

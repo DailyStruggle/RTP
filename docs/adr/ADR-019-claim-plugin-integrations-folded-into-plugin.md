@@ -1,8 +1,15 @@
 # ADR-019 — Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-069](ADR-069-claim-integrations-extracted-to-bundled-addon.md) (2026-06-20)
 **Date:** 2026-04-20
 **Supersedes (partially):** ADR-013 ("Addons as External Gradle Projects") — only for the specific case of the claim-plugin integrations.
+
+> **Superseded.** The claim-plugin checkers no longer live in `rtp-plugin`. They were
+> extracted to the standalone `addons/LeafRTPClaimAddon` module, which is bundled inside
+> the RTP jar and self-extracted into `<pluginDir>/addons/` on first run (the same
+> mechanism as `LeafRTPGuiAddon`). This keeps the "works out of the box" property of this
+> ADR while removing the claim-plugin `compileOnly` deps and Maven repos from
+> `rtp-plugin/build.gradle`. See [ADR-069](ADR-069-claim-integrations-extracted-to-bundled-addon.md).
 
 ## Context
 

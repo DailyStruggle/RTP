@@ -207,6 +207,34 @@ class AddonRegistryTest {
   }
 
   @Test
+  @DisplayName("discover tolerates an addon whose implementation cannot be linked")
+  void discover_isolates_unlinkable_addon() throws Exception {
+    // Mirrors the rtp-lite crash (NoClassDefFoundError: effectsapi/common/Effect): a service
+    // descriptor names a provider that cannot be loaded/linked. Discovery must not propagate
+    // the LinkageError/ServiceConfigurationError and abort plugin startup.
+    File addonsDir = Files.createTempDirectory("rtp-addons-bad").toFile();
+    addonsDir.deleteOnExit();
+    try {
+      File jar = new File(addonsDir, "bad-addon.jar");
+      jar.deleteOnExit();
+      try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(jar))) {
+        jos.putNextEntry(new JarEntry("META-INF/services/" + RTPAddon.class.getName()));
+        jos.write(
+            "io.github.dailystruggle.rtp.common.addon.DoesNotExistAddon\n"
+                .getBytes(StandardCharsets.UTF_8));
+        jos.closeEntry();
+      }
+
+      AddonRegistry registry = new AddonRegistry();
+      registry.discoverFromDirectory(addonsDir); // must not throw
+      assertTrue(registry.registered().isEmpty(), "an unlinkable addon registers nothing");
+    } finally {
+      new File(addonsDir, "bad-addon.jar").delete();
+      addonsDir.delete();
+    }
+  }
+
+  @Test
   @DisplayName("extractBundledAddons copies indexed jars from the classpath and never overwrites")
   void extractBundledAddons_copies_indexed_jars(@TempDir File tempDir) throws Exception {
     // Stage a fake "RTP jar" classpath root holding the bundled-addons index + payload.

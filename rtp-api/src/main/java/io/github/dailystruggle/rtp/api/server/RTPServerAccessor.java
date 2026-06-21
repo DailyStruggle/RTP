@@ -100,12 +100,153 @@ public interface RTPServerAccessor {
   String getPlatform();
 
   /**
-   * Returns the server's major Minecraft data version as an integer
-   * (e.g. {@code 1_21_R1} maps to the NMS version integer).
+   * Returns the coarse {@link PlatformFamily} this server belongs to.
    *
-   * @return the integer NMS version; {@code null} if it cannot be determined
+   * <p>Prefer this over string-matching {@link #getPlatform()} when gating behaviour on the
+   * runtime: a family is derived from authoritative runtime detection rather than the
+   * self-reported brand, so renamed forks (Purpur, Pufferfish, Leaf, Folia forks, ...) resolve
+   * to their base family without a string allowlist.
+   *
+   * <p>The default implementation maps the canonical {@link #getPlatform()} vocabulary; platform
+   * adapters that already perform authoritative detection should override it. When the runtime
+   * cannot be classified the default returns {@link PlatformFamily#UNKNOWN} and logs it at
+   * {@link Level#WARNING} so the unrecognised platform is reportable.
+   *
+   * @return the platform family; never {@code null}
+   */
+  default PlatformFamily getPlatformFamily() {
+    String platform = getPlatform();
+    if (platform != null) {
+      if (platform.equalsIgnoreCase("fabric")) return PlatformFamily.FABRIC;
+      if (platform.equalsIgnoreCase("neoforge")) return PlatformFamily.NEOFORGE;
+      if (platform.equalsIgnoreCase("Folia")
+          || platform.equalsIgnoreCase("Paper")
+          || platform.equalsIgnoreCase("Spigot")) {
+        return PlatformFamily.BUKKIT;
+      }
+    }
+    log(
+        Level.WARNING,
+        "[RTP] Unrecognised server platform '"
+            + platform
+            + "'; classifying as PlatformFamily.UNKNOWN. Platform-specific addon behaviour will be skipped.");
+    return PlatformFamily.UNKNOWN;
+  }
+
+  /**
+   * Returns the server's headline Minecraft version as a single integer - the second
+   * component of the version string.
+   *
+   * <p>Historically Minecraft used a {@code 1.MINOR.PATCH} scheme, so this value was the
+   * <em>minor</em> version (e.g. {@code 21} for MC 1.21.x). Under the newer year-based
+   * scheme (e.g. MC 26.x) the same component is effectively a <em>major</em> version
+   * ({@code 26} == year 26). Treat this number as an opaque, monotonically increasing
+   * comparator rather than assuming it is a "minor" version; the year-based values
+   * (>= 26) sort above the legacy {@code 1.x} values, so range comparisons stay correct
+   * across the scheme change.
+   *
+   * @return the integer server version; {@code null} if it cannot be determined
    */
   Integer getServerIntVersion();
+
+  /**
+   * Tests whether this server belongs to the given {@link PlatformFamily}.
+   *
+   * <p>Convenience over comparing {@link #getPlatformFamily()} by hand. Addons should
+   * prefer this (and {@link #isCompatible(PlatformFamily, int, int)}) for gating
+   * platform-specific behaviour - including self-registration of platform-specific
+   * components - rather than string-matching {@link #getPlatform()} or introducing
+   * their own platform/version probes.
+   *
+   * @param family the family to test against; {@code null} always returns {@code false}
+   * @return {@code true} if this server's family equals {@code family}
+   */
+  default boolean isPlatformFamily(PlatformFamily family) {
+    return family != null && getPlatformFamily() == family;
+  }
+
+  /**
+   * Tests whether the server's integer Minecraft version (see {@link #getServerIntVersion()})
+   * is at least {@code minServerVersion}.
+   *
+   * <p>{@code minServerVersion} is the same opaque integer scale as
+   * {@link #getServerIntVersion()}: {@code 21} for MC 1.21.x, {@code 26} for the year-based
+   * MC 26.x, and so on. It is deliberately not called a "minor" version because under the
+   * year-based scheme the value is effectively a major version.
+   *
+   * <p>When the version cannot be determined ({@link #getServerIntVersion()} returns
+   * {@code null}) this conservatively returns {@code false}: an unverifiable version is
+   * treated as "not known to satisfy the floor".
+   *
+   * @param minServerVersion the inclusive minimum server version
+   * @return {@code true} if the server version is known and {@code >= minServerVersion}
+   */
+  default boolean isServerVersionAtLeast(int minServerVersion) {
+    Integer v = getServerIntVersion();
+    return v != null && v >= minServerVersion;
+  }
+
+  /**
+   * Tests whether the server's integer Minecraft version (see {@link #getServerIntVersion()})
+   * is at most {@code maxServerVersion}.
+   *
+   * <p>{@code maxServerVersion} is on the same opaque integer scale as
+   * {@link #getServerIntVersion()} ({@code 21} for MC 1.21.x, {@code 26} for year-based
+   * MC 26.x); it is not a "minor" version under the year-based scheme.
+   *
+   * <p>When the version cannot be determined this conservatively returns {@code false}.
+   *
+   * @param maxServerVersion the inclusive maximum server version
+   * @return {@code true} if the server version is known and {@code <= maxServerVersion}
+   */
+  default boolean isServerVersionAtMost(int maxServerVersion) {
+    Integer v = getServerIntVersion();
+    return v != null && v <= maxServerVersion;
+  }
+
+  /**
+   * Single-call platform-and-version compatibility gate, intended for addons that must
+   * decide whether to register a platform-specific component (e.g. a menu renderer, an
+   * effect, a claim verifier) on the current runtime.
+   *
+   * <p>The check passes only when both hold:
+   *
+   * <ul>
+   *   <li>the runtime is the {@code requiredFamily} (skipped when {@code requiredFamily}
+   *       is {@code null} - i.e. "any platform"), and</li>
+   *   <li>the server's integer version (see {@link #getServerIntVersion()}) is within the
+   *       inclusive {@code [minServerVersion, maxServerVersion]} range. A version bound is
+   *       only enforced when it is meaningful ({@code minServerVersion > 0} or
+   *       {@code maxServerVersion < Integer.MAX_VALUE}); a meaningful version bound against
+   *       an undeterminable version ({@link #getServerIntVersion()} {@code == null}) fails
+   *       closed.</li>
+   * </ul>
+   *
+   * <p>{@code minServerVersion} / {@code maxServerVersion} are on the same opaque integer
+   * scale as {@link #getServerIntVersion()} ({@code 21} == MC 1.21.x, {@code 26} == the
+   * year-based MC 26.x); they are not "minor" versions under the year-based scheme.
+   *
+   * <p>Pass {@code 0} for {@code minServerVersion} and {@link Integer#MAX_VALUE} for
+   * {@code maxServerVersion} to gate on platform alone.
+   *
+   * @param requiredFamily the required family, or {@code null} for any platform
+   * @param minServerVersion inclusive minimum server version ({@code 0} for no floor)
+   * @param maxServerVersion inclusive maximum server version ({@link Integer#MAX_VALUE} for no ceiling)
+   * @return {@code true} if the runtime satisfies both the platform and version constraints
+   */
+  default boolean isCompatible(PlatformFamily requiredFamily, int minServerVersion, int maxServerVersion) {
+    if (requiredFamily != null && getPlatformFamily() != requiredFamily) {
+      return false;
+    }
+    boolean versionBounded = minServerVersion > 0 || maxServerVersion < Integer.MAX_VALUE;
+    if (versionBounded) {
+      Integer v = getServerIntVersion();
+      if (v == null || v < minServerVersion || v > maxServerVersion) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   /**
    * Looks up a world by its canonical name.

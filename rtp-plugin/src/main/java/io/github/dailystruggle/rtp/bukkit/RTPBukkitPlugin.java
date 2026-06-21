@@ -9,7 +9,6 @@ import io.github.dailystruggle.rtp.bukkit.bukkitListeners.*;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.ChunkyBorderChecker;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
-import io.github.dailystruggle.rtp.bukkit.tools.softdepends.claims.ClaimIntegrations;
 import io.github.dailystruggle.rtp.bukkit.utils.JarUtils;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -679,17 +678,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       }
     }
 
-    // Bundled claim-plugin integrations (formerly the RTP_ClaimPluginIntegrations addon).
-    // Registers a GlobalRegionVerifier per enabled claim plugin; see ADR-019.
-    try {
-      RTP.log(java.util.logging.Level.FINER, "[RTP] setupIntegrations invoking ClaimIntegrations.setup");
-      ClaimIntegrations.setup(this);
-    } catch (Throwable t) {
-      RTP.log(
-          java.util.logging.Level.WARNING,
-          "[RTP] Failed to initialize claim-plugin integrations; continuing without them.",
-          t);
-    }
+    // Claim-plugin integrations now ship as the bundled LeafRTPClaimAddon
+    // (superseding ADR-019): RTP self-extracts it into <pluginDir>/addons/ on
+    // first run and the addon registers its verifiers via the public hook facade.
 
     // Bundled combat-tag plugin integrations for the optional PvP gate (ADR-055).
     // Binds the first enabled combat plugin (PvPManager / CombatLogX / Simple Combat

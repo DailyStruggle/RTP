@@ -1,9 +1,13 @@
 package io.github.dailystruggle.rtp.guiaddon.common;
 
+import io.github.dailystruggle.rtp.api.server.PlatformFamily;
+import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+import io.github.dailystruggle.rtp.common.RTP;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.logging.Level;
 
 /**
  * Process-wide registry of installed {@link MenuRenderer}s, keyed by style.
@@ -39,6 +43,68 @@ public final class GuiRenderers {
       return;
     }
     RENDERERS.put(key, renderer);
+  }
+
+  /**
+   * Registers {@code renderer} only when the current runtime satisfies the given
+   * platform/version constraints, so a platform-specific renderer never self-registers
+   * on an incompatible server.
+   *
+   * <p>The decision is delegated entirely to the general RTP API
+   * ({@link RTPServerAccessor#isCompatible(PlatformFamily, int, int)}) - this addon does
+   * not perform its own platform probing or version parsing. When core is not yet loaded
+   * ({@code RTP.serverAccessor == null}) the compatibility cannot be confirmed and the
+   * renderer is skipped rather than registered blindly.
+   *
+   * @param renderer the renderer to register; ignored when {@code null}
+   * @param requiredFamily the platform family this renderer requires, or {@code null} for any
+   * @param minServerVersion inclusive minimum server version on the {@link
+   *     RTPServerAccessor#getServerIntVersion()} scale ({@code 0} for no floor)
+   * @param maxServerVersion inclusive maximum server version on the same scale
+   *     ({@link Integer#MAX_VALUE} for no ceiling)
+   * @return {@code true} if the renderer was registered; {@code false} if it was skipped
+   */
+  public static boolean registerIfCompatible(
+      MenuRenderer renderer,
+      PlatformFamily requiredFamily,
+      int minServerVersion,
+      int maxServerVersion) {
+    if (renderer == null) {
+      return false;
+    }
+    RTPServerAccessor accessor = RTP.serverAccessor;
+    if (accessor == null) {
+      RTP.log(
+          Level.FINE,
+          "[RTP-GUI] core not loaded; cannot verify platform/version for renderer '"
+              + renderer.key()
+              + "'; skipping self-registration");
+      return false;
+    }
+    if (!accessor.isCompatible(requiredFamily, minServerVersion, maxServerVersion)) {
+      RTP.log(
+          Level.FINE,
+          "[RTP-GUI] skipping renderer '"
+              + renderer.key()
+              + "' ("
+              + renderer.getClass().getName()
+              + "): incompatible runtime (platform="
+              + accessor.getPlatform()
+              + ", family="
+              + accessor.getPlatformFamily()
+              + ", intVersion="
+              + accessor.getServerIntVersion()
+              + "; required family="
+              + requiredFamily
+              + ", versions ["
+              + minServerVersion
+              + ", "
+              + maxServerVersion
+              + "])");
+      return false;
+    }
+    register(renderer);
+    return true;
   }
 
   /**

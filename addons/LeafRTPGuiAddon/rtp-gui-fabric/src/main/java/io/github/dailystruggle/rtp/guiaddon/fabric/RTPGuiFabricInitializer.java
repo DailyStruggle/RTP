@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.guiaddon.fabric;
 
+import io.github.dailystruggle.rtp.api.server.PlatformFamily;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.guiaddon.common.GuiRenderers;
 import io.github.dailystruggle.rtp.guiaddon.common.RTPGuiCommonAddon;
@@ -44,9 +45,13 @@ public final class RTPGuiFabricInitializer implements ModInitializer {
           // programmatically (no MenuRenderer SPI): every platform's chest renderer
           // shares the "chest" style key, so a SPI loop would let one platform's
           // renderer clobber another's in the shared GuiRenderers map.
-          GuiRenderers.register(new FabricMenuRenderer());
+          // Gate self-registration on platform + version via the general RTP API
+          // (no addon-local probing): the Fabric chest renderer registers only on a
+          // Fabric runtime at or above the server-side container-menu floor.
+          GuiRenderers.registerIfCompatible(
+              new FabricMenuRenderer(), PlatformFamily.FABRIC, 20, Integer.MAX_VALUE);
           RTP.log(java.util.logging.Level.INFO,
-              "[RTP-GUI] Fabric chest renderer registered; registering common addon");
+              "[RTP-GUI] Fabric chest renderer registration attempted; registering common addon");
           RTP.addons.register(new RTPGuiCommonAddon());
         });
 

@@ -1,7 +1,36 @@
 # ADR-024 — RTP-lite Assembly Variant
 
-**Status:** Accepted (amended 2026-06-12 — plugin-message network transport in scope for lite)
+**Status:** Accepted (amended 2026-06-20 — lite inherits the full base `safety.yml`)
 **Date:** 2026-04-30
+
+## 2026-06-20 amendment — lite inherits the full base `safety.yml`
+
+The original decision below shipped lite a trimmed, lite-specific `safety.yml` (a flat
+material allow/deny list with no ADR-017 tag or state-predicate tokens), on the grounds
+that the tag grammar was newer and lite favored the minimum operator-facing surface. The
+full ADR-017 parser (`SafetyTokenParser`, `SafetyCompilationCache`, `SafetyTokenExpander`)
+lives in `rtp-api` / `rtp-core` and already ships in the lite jar — only the bundled
+`safety.yml` content differed. Both the vanilla block-tag grammar (`#minecraft:<tag>`)
+and the state-predicate grammar are now sufficiently stable, so there is no longer any
+reason to maintain a separate lite copy.
+
+Concretely:
+
+- `rtp-plugin/src/lite/resources/safety.yml` is **removed**. Lite no longer overlays its
+  own `safety.yml`; the `shadowLiteJar` task no longer excludes the main `safety.yml`, so
+  the lite jar bundles the **full base `rtp-plugin/src/main/resources/safety.yml`**
+  verbatim — block tags **and** state predicates included. No build, code, or driver
+  change beyond the dropped exclude is required — the parser was already present in lite.
+- Because `safety.yml` is no longer a reduced lite baseline, `repackLiteLocales` no longer
+  emits a lite-specific `lang/<loc>/safety.yml` locale tree; lite simply reads the base
+  `safety.yml` (its values are material/biome tokens, not translated prose).
+- `tags/` and `tagsRefresh.yml` (the `rtp-tags` module) remain excluded from lite.
+
+Bullets below that describe `safety.yml` as a "flat material allow/deny list (no tag /
+state-predicate sections)", and that list ADR-017 as inactive in lite, are superseded by
+this amendment; only the `rtp-tags` module stays Pro.
+
+---
 
 ## 2026-06-12 amendment — plugin-message cross-server RTP in scope for lite
 
@@ -241,7 +270,7 @@ RTP-lite:
    - `lang/**`, `language.yml`, `economy.yml`, `integrations.yml`, `logging.yml` are not shipped.
    - `docs/**` and root markdown (`README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SUPPORT.md`, etc.) are not shipped. `LICENSE` is retained.
    - `performance.yml` is shipped trimmed: no `visitorEnabled`, `loginCacheEnabled`, `loginCacheCap`, `effectParsing`, `onEventParsing`.
-   - `safety.yml` is shipped with a flat material allow/deny list (no tag / state-predicate sections).
+   - `safety.yml` is **not** overlaid by lite; the lite jar bundles the full base `safety.yml` (block tags and state predicates included, ADR-017). (Amended 2026-06-20 — see the inherit-base-`safety.yml` amendment above.)
    - `messages.yml` is shipped trimmed to the keys actually consumed by lite (~6 entries).
 4. **Kept.**
    - `rtp-api` surface intact (third-party addons that hook the API still work; they are responsible for not depending on lite-excluded subsystems).
@@ -261,7 +290,7 @@ RTP-lite:
 The following ADRs remain authoritative for the **full** edition but describe subsystems that are absent from the lite artifact:
 
 - ADR-002 (H2/SQLite over flat-file).
-- ADR-017 (Block tags and state predicates in safety lists).
+- ADR-017 — superseded for lite by the 2026-06-20 amendment above: lite inherits the full base `safety.yml`, so both block tags and state predicates ship in lite; only the `rtp-tags` module stays Pro.
 - ADR-019 (Claim plugin integrations folded into plugin).
 - ADR-020 (Language bootstrap and locale-aware ConfigParser).
 - ADR-022 (Single-JAR multi-loader packaging — Folia/Fabric branches).

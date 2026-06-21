@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.api.entity;
 
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -65,5 +66,79 @@ public interface RTPPlayer extends RTPCommandSender {
    */
   default void setRespawnLocation(RTPLocation location) {
     // no-op by default; platform adapters override with the native call
+  }
+
+  /**
+   * Reads the block currently shown to this player at {@code location} and returns its
+   * platform-neutral block-data string (e.g. {@code "minecraft:oak_log[axis=y]"}), in the
+   * same string form a block material is otherwise exchanged across the SPI.
+   *
+   * <p>This is a purely local, in-memory read of an <b>already-loaded</b> block; it must never
+   * trigger a chunk load (REQ-RTP-S-005). Implementations return {@code null} when the block's
+   * chunk is not currently loaded (or when the platform cannot answer), and callers must treat
+   * {@code null} as "skip this position".
+   *
+   * <p>The default implementation returns {@code null}; platform adapters override it.
+   *
+   * <p>Must be called from the thread that owns the player / location (the main server thread,
+   * or the owning region thread on Folia).
+   *
+   * @param location the block position to read; must not be {@code null}
+   * @return the block-data string shown at {@code location}, or {@code null} if unavailable
+   */
+  default String getClientBlock(RTPLocation location) {
+    return null;
+  }
+
+  /**
+   * Sends a single client-side ("fake") block change to this player: the block at
+   * {@code location} is shown as {@code blockData} on the client only, without altering the
+   * world, firing physics, or loading chunks. The fake is purely visual and self-corrects on
+   * the client's next real chunk update, so it can never compromise destination safety
+   * (S-001..S-007).
+   *
+   * <p>Prefer {@link #sendClientBlockChanges(Map)} for more than one block: a bulk send is
+   * binned into one multi-block packet per chunk section, avoiding the packet/CPU spam of many
+   * single-block sends.
+   *
+   * <p>The default implementation is a no-op; platform adapters override it.
+   *
+   * <p>Must be called from the thread that owns the player (the main server thread, or the
+   * owning region thread on Folia).
+   *
+   * @param location  the block position to change on the client; must not be {@code null}
+   * @param blockData the platform-neutral block-data string to show (e.g. {@code "minecraft:air"})
+   */
+  default void sendClientBlockChange(RTPLocation location, String blockData) {
+    // no-op by default; platform adapters override with the native client-side block change
+  }
+
+  /**
+   * Binned bulk variant of {@link #sendClientBlockChange(RTPLocation, String)}: sends all of
+   * {@code changes} to this player's client in as few packets as the platform allows (typically
+   * one multi-block-change packet per affected chunk section), so dissolving/restoring a large
+   * region costs a handful of packets instead of one per block.
+   *
+   * <p>Each entry maps a block position to the platform-neutral block-data string to display
+   * there. Entries with a {@code null} value, or whose chunk is not currently loaded, are
+   * skipped (no chunk load is triggered, REQ-RTP-S-005). Nothing about the real world changes.
+   *
+   * <p>The default implementation falls back to per-block
+   * {@link #sendClientBlockChange(RTPLocation, String)} calls so existing implementations remain
+   * source- and binary-compatible; platform adapters override it with a single batched send.
+   *
+   * <p>Must be called from the thread that owns the player (the main server thread, or the
+   * owning region thread on Folia).
+   *
+   * @param changes the block positions mapped to the block-data strings to show; must not be
+   *                {@code null}
+   */
+  default void sendClientBlockChanges(Map<RTPLocation, String> changes) {
+    if (changes == null) {
+      return;
+    }
+    for (Map.Entry<RTPLocation, String> entry : changes.entrySet()) {
+      sendClientBlockChange(entry.getKey(), entry.getValue());
+    }
   }
 }

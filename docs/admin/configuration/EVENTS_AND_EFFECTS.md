@@ -231,11 +231,11 @@ Use these to validate an enum name and argument order before baking it into a pe
 
 RTP publishes Bukkit-style events under `io.github.dailystruggle.rtp.bukkit.events` (module `rtp-plugin`). An addon consumes them the same way as any other Bukkit event: implement `Listener`, annotate with `@EventHandler`, register with the plugin manager.
 
-### Reference addon — `addons/RTP_ExampleAddon`
+### Reference addon — `addons/LeafRTPCountdownAddon`
 
 A complete, compilable template ships in the repository. It demonstrates the four API touch-points every addon typically needs:
 
-1. **Config registration** — `ConfigParser<ExampleKeys>` participates in `/rtp reload`.
+1. **Config registration** — `ConfigParser<CountdownKeys>` participates in `/rtp reload`.
 2. **Safety contribution** — `GlobalRegionVerifiers.addGlobalRegionVerifier(...)` predicate, invoked asynchronously by the teleport pipeline (S-003 / S-005 compliant).
 3. **Event handling** — a Bukkit `Listener` for one of RTP's lifecycle events.
 4. **Reload hook** — `Configs.onReload(Runnable)` so operator `/rtp reload` picks up addon changes without a restart.
@@ -244,10 +244,10 @@ Relevant files:
 
 | File | Role |
 |------|------|
-| `addons/RTP_ExampleAddon/src/main/java/io/github/dailystruggle/rtp/example/RTPExampleAddon.java` | Plugin main class, wires all four touch-points. |
+| `addons/LeafRTPCountdownAddon/src/main/java/io/github/dailystruggle/rtp/countdownaddon/RTPCountdownAddon.java` | Plugin main class, wires all four touch-points. |
 | `.../ExampleTeleportListener.java` | Minimal `PostTeleportEvent` listener. |
-| `.../ExampleKeys.java` | Enum backing `example.yml`. |
-| `addons/RTP_ExampleAddon/README.md` | Step-by-step walkthrough. |
+| `.../CountdownKeys.java` | Enum backing `countdown.yml`. |
+| `addons/LeafRTPCountdownAddon/README.md` | Step-by-step walkthrough. |
 
 #### Listener shape (`ExampleTeleportListener`)
 
@@ -255,16 +255,16 @@ Relevant files:
 public final class ExampleTeleportListener implements Listener {
   @EventHandler
   public void onPostTeleport(PostTeleportEvent event) {
-    ConfigParser<ExampleKeys> parser =
-        (ConfigParser<ExampleKeys>) RTP.configs.getParser(ExampleKeys.class);
+    ConfigParser<CountdownKeys> parser =
+        (ConfigParser<CountdownKeys>) RTP.configs.getParser(CountdownKeys.class);
     if (parser == null) return;
 
-    Object flag = parser.getConfigValue(ExampleKeys.announceTeleport, false);
+    Object flag = parser.getConfigValue(CountdownKeys.announceTeleport, false);
     boolean enabled = (flag instanceof Boolean) ? (Boolean) flag
                                                  : Boolean.parseBoolean(String.valueOf(flag));
     if (!enabled) return;
 
-    RTP.log(Level.INFO, "[RTP_ExampleAddon] PostTeleportEvent observed: " + event.getDoTeleport());
+    RTP.log(Level.INFO, "[LeafRTPCountdownAddon] PostTeleportEvent observed: " + event.getDoTeleport());
   }
 }
 ```
@@ -311,6 +311,6 @@ Pulled from [`REQUIREMENTS.md §3`](../../dev/REQUIREMENTS.md) (S-00x rules):
 - Source of truth, effect dispatch: `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/effects/BukkitEffectsHandler.java`
 - Source of truth, effect registry: `effects-api/src/main/java/io/github/dailystruggle/effectsapi/EffectFactory.java`
 - Parameter enums: `effects-api/src/main/java/io/github/dailystruggle/effectsapi/LocalEffects/enums/`
-- Developer walkthrough: `addons/RTP_ExampleAddon/README.md`
+- Developer walkthrough: `addons/LeafRTPCountdownAddon/README.md`
 - Safety rules every listener must follow: [`../dev/REQUIREMENTS.md §3`](../../dev/REQUIREMENTS.md)
 - Auto-teleport (`rtp.onevent.*`) permissions: [`COMMANDS.md`](../COMMANDS.md)

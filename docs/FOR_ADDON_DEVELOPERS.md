@@ -37,9 +37,9 @@ talks to instead of talking to the server directly:
 | Resolve players / worlds / locations | `RTP.serverAccessor` (`RTPServerAccessor`) and the `rtp-api` `RTPPlayer` / `RTPWorld` / `RTPLocation` wrappers | `org.bukkit.*`, `net.minecraft.*` types |
 | Log | `RTP.log(...)` | `Bukkit.getLogger()`, `System.out` |
 
-### The proof: `RTP_ExampleAddon`
+### The proof: `LeafRTPCountdownAddon`
 
-[`addons/RTP_ExampleAddon/`](../addons/RTP_ExampleAddon/) is the canonical reference. It is a
+[`addons/LeafRTPCountdownAddon/`](../addons/LeafRTPCountdownAddon/) is the canonical reference. It is a
 **single module with no platform sub-module** - three Java files, one `example.yml`, and one
 `ServiceLoader` descriptor line - and it has **zero `org.bukkit.*` imports**. It is discovered by
 `rtp-core` through the `RTPAddon` SPI and runs identically on Bukkit/Paper/Folia, Fabric, and
@@ -122,5 +122,5 @@ descriptor, classpath placement, and lifecycle). The decision behind it is
 
 ## Also Useful
 
-- [`addons/RTP_ExampleAddon/`](../addons/RTP_ExampleAddon/) — the canonical addon template; among other things it contributes a safety (claim/biome/distance) verifier via `RTPAPI.hooks()`, which is the same seam a claim-check hook uses. The claim-plugin integrations that once shipped as a standalone `RTP_ClaimPluginIntegrations` addon are now bundled directly into the plugin (see [ADR-019](adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)).
+- [`addons/LeafRTPCountdownAddon/`](../addons/LeafRTPCountdownAddon/) — the canonical addon template; among other things it contributes a safety (claim/biome/distance) verifier via `RTPAPI.hooks()`, which is the same seam a claim-check hook uses. The claim-plugin integrations that once shipped as a standalone `RTP_ClaimPluginIntegrations` addon are now bundled directly into the plugin (see [ADR-019](adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)).
 - [CONTRIBUTING.md](../CONTRIBUTING.md) — if you want to upstream a change to `rtp-api` itself, follow the contribution workflow there.

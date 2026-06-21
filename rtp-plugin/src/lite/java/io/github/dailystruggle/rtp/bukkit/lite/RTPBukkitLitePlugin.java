@@ -4,7 +4,6 @@ import io.github.dailystruggle.rtp.bukkit.BootstrapSupport;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.effects.BukkitEffectsHandler;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
-import io.github.dailystruggle.rtp.bukkit.tools.softdepends.claims.ClaimIntegrations;
 import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnPlayerJoin;
 import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnPlayerQuit;
 import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnEventTeleports;
@@ -301,12 +300,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       BukkitEffectsHandler.setupEffects(null);
     }, 1);
 
-    // Step 10: bundled claim-plugin integrations (ADR-019). Lite registers the
-    // claim-plugin verifiers identically to the full bootstrap: each enabled
-    // soft-dep (Lands, GriefDefender, GriefPrevention, Towny,
-    // Factions, SaberFactions, FactionsBridge, RedProtect, Residence, CrashClaim,
-    // HuskClaims, KingdomsX, WorldGuard) contributes a GlobalRegionVerifier.
-    // Vault/economy is wired here identically to the full bootstrap: when Vault
+    // Step 10: Vault/economy is wired here identically to the full bootstrap: when Vault
     // is present and no economy provider is bound yet, bind VaultChecker through
     // the public RTPHooks facade. Lite ships economy.yml, so optional per-region
     // teleport charging works out of the box (ADR-024, 2026-06-01 amendment).
@@ -323,13 +317,6 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       } catch (Throwable t) {
         RTP.log(Level.WARNING,
             "[RTP] Failed to initialize Vault economy; continuing without it.",
-            t);
-      }
-      try {
-        ClaimIntegrations.setup(this);
-      } catch (Throwable t) {
-        RTP.log(Level.WARNING,
-            "[RTP] Failed to initialize claim-plugin integrations; continuing without them.",
             t);
       }
       // Bundled combat-tag plugin integrations for the optional PvP gate (ADR-055).
