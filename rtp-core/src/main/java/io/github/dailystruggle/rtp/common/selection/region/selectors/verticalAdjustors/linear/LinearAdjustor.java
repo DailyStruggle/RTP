@@ -173,6 +173,25 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
     return true;
   }
 
+  /**
+   * Live-chunk analogue of {@link #computeColumnSkyFloor(ChunkColumnProbe, int, int)}:
+   * the highest non-air Y on chunk-local column {@code (x, z)} derived purely
+   * from block data. Any {@code y+1} strictly above this floor has unobstructed
+   * sky access by construction. Stored sky-light nibbles ({@code getSkyLight})
+   * are unreliable on freshly-generated / unticked chunks (the server may report
+   * a stale full 15 before relighting), which let cave candidates pass the legacy
+   * {@code skyLight > 7} gate; walking the palette is deterministic and always
+   * available. Returns {@link Integer#MIN_VALUE} for a fully-air column.
+   */
+  private static int computeColumnSkyFloor(RTPChunk chunk, int x, int z) {
+    int top = chunk.getWorld().getMaxHeight() - 1;
+    int bottom = chunk.getWorld().getMinHeight();
+    for (int y = top; y >= bottom; y--) {
+      if (!chunk.isAir(x, y, z)) return y;
+    }
+    return Integer.MIN_VALUE;
+  }
+
   @Override
   public boolean adjust(@NotNull RTPChunk chunk, @NotNull MutableRTPCoords output) {
     if (chunk == null) return false;
@@ -199,12 +218,12 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
       int z = xz.get(1);
       int globalX = (chunk.x() << 4) + x;
       int globalZ = (chunk.z() << 4) + z;
+      int columnSkyFloor = requireSkyLight ? computeColumnSkyFloor(chunk, x, z) : Integer.MIN_VALUE;
       switch (dir) {
         case 0:
           { // bottom up
             for (int i = minY; i < maxY; i++) {
-              int skylight = 15;
-              if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
+              int skylight = (!requireSkyLight || (i + 1) > columnSkyFloor) ? 15 : 0;
               if (!chunk.isAir(x, i - 1, z)
                   && chunk.isAir(x, i, z)
                   && chunk.isAir(x, i + 1, z)
@@ -223,8 +242,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
         case 1:
           { // top down
             for (int i = maxY; i > minY; i--) {
-              int skylight = 15;
-              if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
+              int skylight = (!requireSkyLight || (i + 1) > columnSkyFloor) ? 15 : 0;
               if (!chunk.isAir(x, i - 1, z)
                   && chunk.isAir(x, i, z)
                   && chunk.isAir(x, i + 1, z)
@@ -248,8 +266,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
             for (int i = 0; i <= maxDistance; i++) {
               // try top
               int y = middle + i;
-              int skylight = 15;
-              if (requireSkyLight) skylight = chunk.getSkyLight(x, y + 1, z);
+              int skylight = (!requireSkyLight || (y + 1) > columnSkyFloor) ? 15 : 0;
               if (!chunk.isAir(x, y - 1, z)
                   && chunk.isAir(x, y, z)
                   && chunk.isAir(x, y + 1, z)
@@ -265,8 +282,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
 
               // try bottom
               y = middle - i;
-              skylight = 15;
-              if (requireSkyLight) skylight = chunk.getSkyLight(x, y + 1, z);
+              skylight = (!requireSkyLight || (y + 1) > columnSkyFloor) ? 15 : 0;
               if (!chunk.isAir(x, y - 1, z)
                   && chunk.isAir(x, y, z)
                   && chunk.isAir(x, y + 1, z)
@@ -290,8 +306,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
             for (int i = maxDistance; i >= 0; i--) {
               // try top
               int y = middle + i;
-              int skylight = 15;
-              if (requireSkyLight) skylight = chunk.getSkyLight(x, y + 1, z);
+              int skylight = (!requireSkyLight || (y + 1) > columnSkyFloor) ? 15 : 0;
               if (!chunk.isAir(x, y - 1, z)
                   && chunk.isAir(x, y, z)
                   && chunk.isAir(x, y + 1, z)
@@ -307,8 +322,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
 
               // try bottom
               y = middle - i;
-              skylight = 15;
-              if (requireSkyLight) skylight = chunk.getSkyLight(x, y + 1, z);
+              skylight = (!requireSkyLight || (y + 1) > columnSkyFloor) ? 15 : 0;
               if (!chunk.isAir(x, y - 1, z)
                   && chunk.isAir(x, y, z)
                   && chunk.isAir(x, y + 1, z)
@@ -338,8 +352,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
             // try each
             for (int k = 0; k < trials.size(); k++) {
               int i = trials.get(k);
-              int skylight = 15;
-              if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
+              int skylight = (!requireSkyLight || (i + 1) > columnSkyFloor) ? 15 : 0;
               if (!chunk.isAir(x, i - 1, z)
                   && chunk.isAir(x, i, z)
                   && chunk.isAir(x, i + 1, z)

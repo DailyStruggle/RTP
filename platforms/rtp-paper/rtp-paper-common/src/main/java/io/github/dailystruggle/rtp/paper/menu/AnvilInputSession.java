@@ -229,14 +229,6 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
         }
 
         active.put(viewer, new Session(List.copyOf(parentPath), paramName, mode));
-        // [diag-staging-cart] Trace anvil open so the operator log shows the
-        // mode (RUN vs STAGE) at the point the listener becomes active.
-        RTP.log(Level.INFO,
-                "[diag-staging-cart] AnvilInputSession.open active viewer=" + viewer
-                        + " paramName=" + paramName
-                        + " mode=" + mode
-                        + " parentPath=" + parentPath
-                        + " cartSink=" + (cartSink != null ? "set" : "null"));
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
@@ -290,6 +282,10 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
 
         session.confirmed = true;
         active.remove(player.getUniqueId());
+        // Remove the seed item (and any input/result item) so vanilla has
+        // nothing to return to the player when the anvil closes. Without
+        // this the seeded PAPER from doOpen() lands in the player inventory.
+        clearAnvilSlots(view);
         dispatchConfirm(player, session, typed, true);
     }
 
@@ -323,6 +319,9 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
         }
         if (typed == null) typed = "";
         typed = typed.trim();
+        // Clear the anvil slots regardless of whether anything was typed so the
+        // seeded PAPER item is not returned to the player on close.
+        clearAnvilSlots(view);
         if (typed.isEmpty()) return;
 
         dispatchConfirm(player, session, typed, false);
@@ -350,15 +349,6 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
      * </ul>
      */
     private void dispatchConfirm(Player player, Session session, String typed, boolean closeInventory) {
-        // [diag-staging-cart] Trace anvil-confirm entry so the operator log
-        // shows whether the click/close path reached the dispatch branch.
-        RTP.log(Level.INFO,
-                "[diag-staging-cart] AnvilInputSession.dispatchConfirm entry viewer=" + player.getUniqueId()
-                        + " mode=" + session.mode
-                        + " paramName=" + session.paramName
-                        + " parentPath=" + session.parentPath
-                        + " typed='" + typed + "'"
-                        + " cartSink=" + (cartSink != null ? "set" : "null"));
         if (session.mode == MenuAction.Mode.STAGE) {
             MenuRedeemSubcommand.CartSink sink = cartSink;
             // file name lives at parentPath[1] for /rtp config <file> paths.
@@ -413,10 +403,6 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
             }
             try {
                 sink.stage(player.getUniqueId(), cartFileName, session.paramName, typed);
-                RTP.log(Level.INFO,
-                        "[diag-staging-cart] STAGE sink.stage ok viewer=" + player.getUniqueId()
-                                + " file=" + cartFileName + " key=" + session.paramName
-                                + " typed='" + typed + "'");
             } catch (RuntimeException e) {
                 RTP.log(Level.WARNING,
                         "menu anvil-input STAGE sink threw for " + player.getUniqueId()
@@ -438,20 +424,12 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
                                 + ": plugin unavailable");
                 return;
             }
-            RTP.log(Level.INFO,
-                    "[diag-staging-cart] STAGE scheduling reopen viewer=" + player.getUniqueId()
-                            + " cmd='" + reopen + "' closeInventory=" + closeInventory);
             scheduleForPlayer(plugin, player, () -> {
-                RTP.log(Level.INFO,
-                        "[diag-staging-cart] STAGE scheduled task fired viewer=" + player.getUniqueId());
                 if (closeInventory) {
                     try { player.closeInventory(); } catch (Throwable ignored) { /* best-effort */ }
                 }
                 try {
-                    boolean ok = player.performCommand(reopen.startsWith("/") ? reopen.substring(1) : reopen);
-                    RTP.log(Level.INFO,
-                            "[diag-staging-cart] STAGE performCommand returned=" + ok
-                                    + " viewer=" + player.getUniqueId() + " cmd='" + reopen + "'");
+                    player.performCommand(reopen.startsWith("/") ? reopen.substring(1) : reopen);
                 } catch (Throwable t) {
                     RTP.log(Level.WARNING,
                             "menu anvil-input STAGE reopen failed for " + player.getUniqueId()
@@ -565,6 +543,25 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
             return p;
         } catch (Throwable t) {
             return null;
+        }
+    }
+
+    /**
+     * Empty the anvil's two input slots and the result slot so vanilla has no
+     * item to hand back to the player when the inventory closes. The seed
+     * {@link Material#PAPER} placed in slot 0 by {@link #doOpen} is otherwise
+     * returned to the player's inventory on close. Best-effort: any failure is
+     * logged at FINE and swallowed (the anvil is closing anyway).
+     */
+    private static void clearAnvilSlots(InventoryView view) {
+        try {
+            Inventory top = view.getTopInventory();
+            top.setItem(0, null);
+            top.setItem(1, null);
+            top.setItem(2, null);
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "menu anvil-input clearAnvilSlots failed: " + t.getMessage());
         }
     }
 

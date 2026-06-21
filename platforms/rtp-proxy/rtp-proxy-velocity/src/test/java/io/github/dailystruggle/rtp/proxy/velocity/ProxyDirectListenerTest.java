@@ -64,7 +64,7 @@ class ProxyDirectListenerTest {
             List<String> reply;
             try (Socket s = new Socket()) {
                 s.connect(new InetSocketAddress("127.0.0.1", port), 1000);
-                s.setSoTimeout(2000);
+                s.setSoTimeout(5000);
                 DataOutputStream out = new DataOutputStream(s.getOutputStream());
                 ProxyDirectWire.writeOpcode(out, ProxyDirectWire.OP_HEARTBEAT);
                 ProxyDirectWire.writeSignedPayload(out,
@@ -136,7 +136,10 @@ class ProxyDirectListenerTest {
     private static String rpcSingle(int port, byte op, String request) throws Exception {
         try (Socket s = new Socket()) {
             s.connect(new InetSocketAddress("127.0.0.1", port), 1000);
-            s.setSoTimeout(2000);
+            // Read timeout must exceed the listener's RPC_AWAIT_MS (2000ms) so a
+            // handler that blocks near its full await budget cannot race the client
+            // read into a spurious SocketTimeoutException.
+            s.setSoTimeout(5000);
             DataOutputStream out = new DataOutputStream(s.getOutputStream());
             ProxyDirectWire.writeOpcode(out, op);
             ProxyDirectWire.writeSignedPayload(out, request, null, 1);
@@ -149,7 +152,8 @@ class ProxyDirectListenerTest {
     private static String rpcSingleWithListReq(int port, byte op, List<String> requests) throws Exception {
         try (Socket s = new Socket()) {
             s.connect(new InetSocketAddress("127.0.0.1", port), 1000);
-            s.setSoTimeout(2000);
+            // Read timeout must exceed the listener's RPC_AWAIT_MS (2000ms); see rpcSingle.
+            s.setSoTimeout(5000);
             DataOutputStream out = new DataOutputStream(s.getOutputStream());
             ProxyDirectWire.writeOpcode(out, op);
             ProxyDirectWire.writeList(out, requests, null, 1);

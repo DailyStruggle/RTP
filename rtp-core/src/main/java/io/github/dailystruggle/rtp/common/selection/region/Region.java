@@ -472,6 +472,21 @@ public class Region extends FactoryValue<RegionKeys> {
         airBelow = rtpChunk.isAir(8, surfaceY - 1, 8);
         airAt = rtpChunk.isAir(8, surfaceY, 8);
         airAbove = rtpChunk.isAir(8, surfaceY + 1, 8);
+      } catch (IllegalArgumentException yOutOfRange) {
+        // Routine, NOT a broken platform read: a void / no-surface column (common
+        // in the End and over ocean trenches) makes getSurfaceHeight return a
+        // sentinel at (or below) world-min, so the surfaceY±1 sample Ys fall
+        // outside the chunk's legal block range and the platform's isAir
+        // correctly rejects them with an out-of-range IllegalArgumentException.
+        // This is the same correct rejection as the vert.adjust==null drop, so
+        // keep it at FINE rather than flooding the console at INFO with a
+        // misleading "block reads are broken" claim.
+        RTP.log(Level.FINE,
+            "[RTP][PROMOTE_DIAG] region=" + name + " chunk=(" + cx + "," + cz
+                + ") DROPPED vert.adjust=null; surfaceY=" + surfaceY
+                + " is a void/no-surface column (isAir sample Y out of range: "
+                + yOutOfRange.getMessage() + ").");
+        return;
       } catch (Throwable t) {
         RTP.log(Level.INFO,
             "[RTP][PROMOTE_DIAG] region=" + name + " chunk=(" + cx + "," + cz

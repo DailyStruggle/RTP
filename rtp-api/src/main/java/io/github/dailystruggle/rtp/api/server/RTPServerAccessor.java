@@ -290,6 +290,24 @@ public interface RTPServerAccessor {
   RTPPlayer getPlayer(String name);
 
   /**
+   * Returns the names of all currently online players, used by the {@code /rtp}
+   * {@code player} (target-player) parameter to surface tab-completion without
+   * leaking platform-specific online-player enumeration into {@code rtp-core}.
+   *
+   * <p>The default returns an empty set; platforms that drive the
+   * platform-neutral command root ({@code CoreRtpRoot} on Fabric / NeoForge)
+   * shall override to surface their live online-player snapshot. Platforms that
+   * author their own root with platform-native enumeration (e.g. the Bukkit
+   * family) need not override.</p>
+   *
+   * @return an immutable snapshot of online player names; never {@code null},
+   *     may be empty
+   */
+  default Set<String> getOnlinePlayerNames() {
+    return java.util.Collections.emptySet();
+  }
+
+  /**
    * Returns a synthetic {@link RTPPlayer} representing the server console, used
    * when an admin command targets the console as the teleport destination.
    *

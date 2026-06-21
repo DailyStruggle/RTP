@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.admin.AdminCmd;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
@@ -153,6 +154,79 @@ class PrefabCommandTest {
         assertEquals(1, store.size());
     }
 
+    @Test
+    void multiWorldApply_repairsNetherVertInDiffAndTrees() throws Exception {
+        // The multi-world prefab clones the overworld regions/default template
+        // into each world. In a nether world that cloned vert (sky-light
+        // required, maxY at the build limit) makes every teleport attempt fail
+        // vert/no-stand-y. The apply step must repair it via the canonical
+        // NetherEndConfigAmender so the preview diff already shows the fix
+        // (option B: diff-consistent).
+        //
+        // Use a dedicated plugin dir (not the shared @TempDir) because this
+        // test writes worlds/*.yml whose open config-file handles trip the
+        // @TempDir auto-delete on Windows; a manually-created dir is left for
+        // the OS to reap, matching MultiConfigRemovalGuardsTest.
+        java.io.File pluginDir =
+                java.nio.file.Files.createTempDirectory("rtp-prefab-nether-test").toFile();
+        accessor = RTPTestSetup.install(pluginDir);
+
+        // Seed a regions/default.yml on disk with an overworld-flavoured vert,
+        // then reload so the live regions MultiConfigParser registers it - the
+        // amender reads the live default as its template.
+        java.io.File regionsDir = new java.io.File(pluginDir, "regions");
+        assertTrue(regionsDir.mkdirs() || regionsDir.isDirectory());
+        java.nio.file.Files.writeString(new java.io.File(regionsDir, "default.yml").toPath(),
+                "world: \"world\"\n"
+                        + "shape:\n  name: \"CIRCLE\"\n  radius: 256\n"
+                        + "vert:\n  name: \"LINEAR\"\n  minY: 32\n  maxY: 255\n"
+                        + "  direction: 2\n  requireSkyLight: true\n");
+        RTP.configs.reloadConfigs();
+
+        accessor.addWorld(new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("world"));
+        accessor.addWorld(new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("world_nether"));
+
+        PrefabNonceStore store = new PrefabNonceStore();
+        PrefabApplyCmd apply = new PrefabApplyCmd(null, store);
+        UUID caller = UUID.randomUUID();
+        accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
+        Map<String, List<String>> params = new HashMap<>();
+        params.put("id", List.of("multi-world"));
+        assertTrue(apply.onCommand(caller, params, null));
+
+        PrefabNonceStore.ConsumeResult cr = store.consumeByCaller(caller, "multi-world");
+        assertTrue(cr.ok(), "apply must mint a pending entry");
+        Map<String, Object> netherRegion = cr.entry().newTrees().get("regions/world_nether");
+        assertNotNull(netherRegion, "a per-world region for the nether must be synthesised");
+        Map<?, ?> vert = (Map<?, ?>) netherRegion.get("vert");
+        assertNotNull(vert, "synthesised nether region must carry a vert block");
+        assertEquals(false, vert.get("requireSkyLight"),
+                "nether has no sky light: the cloned sky-light requirement must be repaired");
+        int maxY = ((Number) vert.get("maxY")).intValue();
+        assertTrue(maxY <= 128,
+                "nether maxY must be clamped under the bedrock ceiling, was " + maxY);
+
+        // Diff consistency (option B): the preview diff itself must carry the
+        // repaired vert.requireSkyLight=false, not the cloned overworld value.
+        List<PrefabApplier.Change> diff = cr.entry().perFileDiff().get("regions/world_nether");
+        assertNotNull(diff, "the synthesised nether region must produce a diff");
+        // For a brand-new region file the whole vert block lands as a single
+        // wholesale "vert" change (the base has no vert to recurse into), so
+        // inspect either the granular vert.requireSkyLight change or the vert
+        // map's nested value.
+        boolean sawRepairedSkyLight = diff.stream().anyMatch(c -> {
+            if (c.keyPath().equalsIgnoreCase("vert.requireSkyLight")) {
+                return Boolean.FALSE.equals(c.newValue());
+            }
+            if (c.keyPath().equalsIgnoreCase("vert") && c.newValue() instanceof Map<?, ?> m) {
+                return Boolean.FALSE.equals(m.get("requireSkyLight"));
+            }
+            return false;
+        });
+        assertTrue(sawRepairedSkyLight,
+                "the apply preview diff must reflect the repaired vert.requireSkyLight=false");
+    }
+
     // --- PrefabConfirmCmd: nonce semantics -----------------------------------
 
     // Post-token-removal (2026-05-24, mirrors ADR-050): the pending diff is
@@ -174,6 +248,57 @@ class PrefabCommandTest {
         boolean result = confirm.onCommand(caller, params, null);
         assertTrue(result, "valid confirm must succeed (caller-bound resolution)");
         assertEquals(0, store.size(), "pending entry must be consumed after successful confirm");
+    }
+
+    @Test
+    void confirm_firesPrefabAppliedEvent() throws Exception {
+        PrefabNonceStore store = new PrefabNonceStore();
+        UUID caller = UUID.randomUUID();
+        accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
+        store.mint(caller, "low-performance",
+                java.util.Collections.singletonMap("performance",
+                        List.of(new PrefabApplier.Change("queue.maxSize", null, 50))));
+
+        AtomicReference<io.github.dailystruggle.rtp.api.event.PrefabAppliedEvent> seen =
+                new AtomicReference<>();
+        try (AutoCloseable sub =
+                     io.github.dailystruggle.rtp.api.RTPAPI.onPrefabApplied(seen::set)) {
+            PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
+            Map<String, List<String>> params = new HashMap<>();
+            params.put("id", List.of("low-performance"));
+            assertTrue(confirm.onCommand(caller, params, null));
+        }
+
+        io.github.dailystruggle.rtp.api.event.PrefabAppliedEvent ev = seen.get();
+        assertNotNull(ev, "a successful confirm must fire a PrefabAppliedEvent");
+        assertEquals("low-performance", ev.prefabId());
+        assertEquals(caller, ev.callerId());
+        assertTrue(ev.writtenFiles().contains("performance"),
+                "performance.yml must be reported as written");
+        assertTrue(ev.changes().containsKey("performance"),
+                "the per-file change map must surface the performance diff");
+        assertEquals("queue.maxSize", ev.changes().get("performance").get(0).keyPath());
+    }
+
+    @Test
+    void confirm_unsubscribedHandler_isNotNotified() throws Exception {
+        PrefabNonceStore store = new PrefabNonceStore();
+        UUID caller = UUID.randomUUID();
+        accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
+        store.mint(caller, "low-performance", Map.of());
+
+        AtomicReference<io.github.dailystruggle.rtp.api.event.PrefabAppliedEvent> seen =
+                new AtomicReference<>();
+        AutoCloseable sub =
+                io.github.dailystruggle.rtp.api.RTPAPI.onPrefabApplied(seen::set);
+        sub.close();
+
+        PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
+        Map<String, List<String>> params = new HashMap<>();
+        params.put("id", List.of("low-performance"));
+        assertTrue(confirm.onCommand(caller, params, null));
+        assertEquals(null, seen.get(),
+                "an unsubscribed handler must not be notified");
     }
 
     @Test

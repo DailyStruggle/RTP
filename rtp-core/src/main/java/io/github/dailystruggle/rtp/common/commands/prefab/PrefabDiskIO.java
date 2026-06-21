@@ -1,15 +1,13 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
+import io.github.dailystruggle.rtp.common.configuration.ConfigBackups;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -35,10 +33,10 @@ import java.util.Objects;
 public final class PrefabDiskIO {
 
     /** Default bak retention if the {@code prefab.bakRetention} knob is absent. */
-    public static final int DEFAULT_BAK_RETENTION = 3;
+    public static final int DEFAULT_BAK_RETENTION = ConfigBackups.DEFAULT_BAK_RETENTION;
 
     /** Sibling suffix prefix: {@code <file>.bak.<epochMillis>}. */
-    public static final String BAK_INFIX = ".bak.";
+    public static final String BAK_INFIX = ConfigBackups.BAK_INFIX;
 
     private PrefabDiskIO() {
     }
@@ -99,8 +97,8 @@ public final class PrefabDiskIO {
      * Write the new tree to disk for a single file id. Behaviour:
      * <ol>
      *   <li>If the original file exists, copy it sideways as
-     *       {@code <name>.bak.<epochMillis>} via {@link Files#copy} with
-     *       {@link StandardCopyOption#REPLACE_EXISTING}.</li>
+     *       {@code <name>.bak.<epochMillis>} via
+     *       {@link ConfigBackups#backup(File, int)}.</li>
      *   <li>Load the original with comments preserved (or create an empty
      *       config when the file is brand-new) so structural comments survive.</li>
      *   <li>Apply each diff entry via {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection#set}
@@ -121,6 +119,28 @@ public final class PrefabDiskIO {
                                        Map<String, Object> newTree,
                                        List<PrefabApplier.Change> changes,
                                        int bakRetention) throws IOException {
+        return writeWithBackup(pluginDirectory, fileId, newTree, changes, bakRetention, null);
+    }
+
+    /**
+     * Overload that seeds the comments of a brand-new target file from a
+     * {@code templateFileId} (e.g. {@code "regions/default"}). When the target
+     * already exists this argument is ignored - the live file's own comments
+     * are preserved as usual. When the target does not exist and the template
+     * file does, the template is loaded (with comments) and re-bound to the
+     * target path before the changes are applied, so a synthesised per-world
+     * region overlay inherits the structural comments of the reference
+     * {@code regions/default.yml} instead of writing a comment-less file.
+     *
+     * @param templateFileId optional file id whose comments seed a new target;
+     *                       {@code null} disables template seeding.
+     */
+    public static Path writeWithBackup(File pluginDirectory,
+                                       String fileId,
+                                       Map<String, Object> newTree,
+                                       List<PrefabApplier.Change> changes,
+                                       int bakRetention,
+                                       String templateFileId) throws IOException {
         Objects.requireNonNull(pluginDirectory, "pluginDirectory");
         Objects.requireNonNull(fileId, "fileId");
         Objects.requireNonNull(newTree, "newTree");
@@ -128,18 +148,8 @@ public final class PrefabDiskIO {
         int retention = Math.max(1, bakRetention);
         File target = resolveFile(pluginDirectory, fileId);
 
-        Path bakPath = null;
-        if (target.exists() && target.isFile()) {
-            String suffix = BAK_INFIX + System.currentTimeMillis();
-            bakPath = target.toPath().resolveSibling(target.getName() + suffix);
-            // Tight loop guard for sub-millisecond consecutive writes (test scaffolds).
-            int collisionGuard = 0;
-            while (Files.exists(bakPath) && collisionGuard++ < 1000) {
-                suffix = BAK_INFIX + (System.currentTimeMillis() + collisionGuard);
-                bakPath = target.toPath().resolveSibling(target.getName() + suffix);
-            }
-            Files.copy(target.toPath(), bakPath, StandardCopyOption.REPLACE_EXISTING);
-        } else {
+        Path bakPath = ConfigBackups.backup(target, retention);
+        if (bakPath == null) {
             // Parent directory may not exist (regions/<new>.yml).
             File parent = target.getParentFile();
             if (parent != null && !parent.exists()) {
@@ -149,11 +159,22 @@ public final class PrefabDiskIO {
             }
         }
 
-        RtpYamlConfig cfg;
+        RtpYamlConfig cfg = null;
         if (target.exists() && target.isFile()) {
             cfg = new RtpYamlConfig(target);
             cfg.loadWithComments();
-        } else {
+        } else if (templateFileId != null) {
+            // New file with a comment template: seed structure and comments
+            // from the template (e.g. regions/default.yml), then re-bind the
+            // config to the target path so the save lands on the new file.
+            File template = resolveFile(pluginDirectory, templateFileId);
+            if (template.exists() && template.isFile()) {
+                cfg = new RtpYamlConfig(template);
+                cfg.loadWithComments();
+                cfg.setConfigurationFile(target);
+            }
+        }
+        if (cfg == null) {
             // New file: write a fresh empty config bound to the target path.
             cfg = new RtpYamlConfig(target);
         }
@@ -161,8 +182,6 @@ public final class PrefabDiskIO {
             cfg.set(c.keyPath(), c.newValue());
         }
         cfg.saveWithComments();
-
-        pruneBaks(pluginDirectory, fileId, retention);
         return bakPath;
     }
 
@@ -174,16 +193,7 @@ public final class PrefabDiskIO {
     public static List<Path> listBaks(File pluginDirectory, String fileId) {
         Objects.requireNonNull(pluginDirectory, "pluginDirectory");
         Objects.requireNonNull(fileId, "fileId");
-        File target = resolveFile(pluginDirectory, fileId);
-        File parent = target.getParentFile();
-        if (parent == null || !parent.isDirectory()) return new ArrayList<>();
-        String prefix = target.getName() + BAK_INFIX;
-        File[] kids = parent.listFiles((dir, name) -> name.startsWith(prefix) && parseEpoch(name, prefix) >= 0);
-        if (kids == null || kids.length == 0) return new ArrayList<>();
-        List<Path> out = new ArrayList<>(kids.length);
-        for (File k : kids) out.add(k.toPath());
-        out.sort(Comparator.comparingLong((Path p) -> parseEpoch(p.getFileName().toString(), prefix)).reversed());
-        return out;
+        return ConfigBackups.listBaks(resolveFile(pluginDirectory, fileId));
     }
 
     /**
@@ -193,21 +203,9 @@ public final class PrefabDiskIO {
      * the next-newest. Returns {@code null} when no backups exist.
      */
     public static Path restoreLatest(File pluginDirectory, String fileId) throws IOException {
-        List<Path> baks = listBaks(pluginDirectory, fileId);
-        if (baks.isEmpty()) return null;
-        Path newest = baks.get(0);
-        File target = resolveFile(pluginDirectory, fileId);
-        try {
-            Files.move(newest, target.toPath(),
-                    StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (UnsupportedOperationException uoe) {
-            // Filesystem can't do ATOMIC_MOVE (Windows across volumes, some
-            // CI containers). Fall back to copy+delete which preserves the
-            // restore semantic at the cost of a non-atomic window.
-            Files.copy(newest, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            Files.deleteIfExists(newest);
-        }
-        return newest;
+        Objects.requireNonNull(pluginDirectory, "pluginDirectory");
+        Objects.requireNonNull(fileId, "fileId");
+        return ConfigBackups.restoreLatest(resolveFile(pluginDirectory, fileId));
     }
 
     /**
@@ -216,21 +214,9 @@ public final class PrefabDiskIO {
      * invokes it automatically.
      */
     public static int pruneBaks(File pluginDirectory, String fileId, int keep) {
-        if (keep < 0) keep = 0;
-        List<Path> baks = listBaks(pluginDirectory, fileId); // newest first
-        if (baks.size() <= keep) return 0;
-        int pruned = 0;
-        for (int i = keep; i < baks.size(); i++) {
-            try {
-                Files.deleteIfExists(baks.get(i));
-                pruned++;
-            } catch (IOException ignored) {
-                // Best-effort prune; surfacing a checked exception per
-                // file would force the write path to roll back the new
-                // backup, which is worse than leaving an extra stale file.
-            }
-        }
-        return pruned;
+        Objects.requireNonNull(pluginDirectory, "pluginDirectory");
+        Objects.requireNonNull(fileId, "fileId");
+        return ConfigBackups.pruneBaks(resolveFile(pluginDirectory, fileId), keep);
     }
 
     /** Resolve a file id to an absolute {@link File} under {@code pluginDirectory}. */
@@ -247,22 +233,6 @@ public final class PrefabDiskIO {
         return new File(pluginDirectory, relPath);
     }
 
-    private static long parseEpoch(String fileName, String prefix) {
-        if (!fileName.startsWith(prefix)) return -1L;
-        String tail = fileName.substring(prefix.length());
-        // Tolerate test-only sub-millisecond disambiguators tacked onto the
-        // epoch (see writeWithBackup): everything must still be ASCII digits.
-        if (tail.isEmpty()) return -1L;
-        for (int i = 0; i < tail.length(); i++) {
-            char c = tail.charAt(i);
-            if (c < '0' || c > '9') return -1L;
-        }
-        try {
-            return Long.parseLong(tail);
-        } catch (NumberFormatException nfe) {
-            return -1L;
-        }
-    }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> deepCopy(Map<String, Object> in) {

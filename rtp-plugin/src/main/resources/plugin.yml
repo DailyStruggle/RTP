@@ -175,7 +175,7 @@ permissions:
     description: allow player to use /rtp version (alias /rtp about) to see plugin and server identity
     default: true
   rtp.admin:
-    description: allow player to use /rtp clearcache and grant all other admin tooling
+    description: allow player to use /rtp clear and grant all other admin tooling
     default: op
     children:
       rtp.reload: true

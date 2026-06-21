@@ -17,7 +17,7 @@
 | `worlds/<world>.yml` | One file per loaded world; created automatically on first start. |
 | `effects/<name>.yml` | Optional per-permission effect bundles consumed by `effects-api`. |
 | `economy.yml` | Optional Vault per-teleport charging (ADR-024, 2026-06-01 amendment). Dormant at zero cost when Vault is absent. |
-| `lite-docs/` | This bundled doc set, extracted on first start. |
+| `docs/` | This bundled doc set, extracted on first start. |
 
 ## Files NOT shipped in lite
 

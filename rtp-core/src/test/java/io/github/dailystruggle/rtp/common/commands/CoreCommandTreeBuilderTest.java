@@ -46,7 +46,7 @@ public class CoreCommandTreeBuilderTest {
     assertTrue(lookup.containsKey("SCAN"), "scan verb missing");
     assertTrue(lookup.containsKey("INFO"), "info verb missing");
     assertTrue(lookup.containsKey("VERSION"), "version verb missing");
-    assertTrue(lookup.containsKey("CLEARCACHE"), "clearcache verb missing");
+    assertTrue(lookup.containsKey("CLEAR"), "clear verb missing");
 
     // VersionCmd is additionally reachable under its ALIAS, pointing at the
     // same instance as the VERSION verb.

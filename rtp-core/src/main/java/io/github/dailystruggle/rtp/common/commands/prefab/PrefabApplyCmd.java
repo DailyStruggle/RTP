@@ -4,8 +4,13 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -132,7 +137,43 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
                                 + " - falling back to empty world list: " + re.getMessage());
             }
         }
-        PrefabApplier.Result result = PrefabApplier.apply(baseline, prefab, worldNames);
+        // expandPerWorld prefabs also repoint each synthesised world's
+        // worlds/<world>.yml "region" field at its new per-world region. Every
+        // loaded world has an in-memory WorldKeys parser by definition (a
+        // worlds/<world>.yml file may not exist on disk when the world runs on
+        // defaults), so seed the baseline from RTP.configs rather than reading
+        // the file. That makes the diff describe the true delta from the live
+        // region binding (e.g. "default" -> "<world>") instead of an absent
+        // value when the physical file is missing.
+        if (prefab.expandPerWorld() && RTP.configs != null) {
+            for (String world : worldNames) {
+                String fileId = "worlds/" + world;
+                Map<String, Object> worldTree = new LinkedHashMap<>();
+                try {
+                    ConfigParser<WorldKeys> worldParser = RTP.configs.getWorldParser(world);
+                    if (worldParser != null) {
+                        Object region = worldParser.getConfigValue(WorldKeys.region, null);
+                        if (region != null) {
+                            worldTree.put("region", region);
+                        }
+                    }
+                } catch (RuntimeException re) {
+                    RTP.log(Level.WARNING,
+                            "[prefab] apply: world region lookup failed for " + fileId
+                                    + " - falling back to empty baseline: " + re.getMessage());
+                }
+                baseline.put(fileId, worldTree);
+            }
+        }
+        // For expandPerWorld prefabs, repair each synthesised per-world region
+        // overlay for its destination dimension before the diff is computed, so
+        // the preview matches what confirm writes. The dimension rules are not
+        // duplicated here: route through the canonical NetherEndConfigAmender
+        // (the same helper /rtp config region uses), reading the live
+        // regions/default vert as the template and the real world height
+        // bounds.
+        MultiWorldExpander.RegionOverlayAmender vertAmender = buildDimensionVertAmender(prefab);
+        PrefabApplier.Result result = PrefabApplier.apply(baseline, prefab, worldNames, vertAmender);
         Map<String, List<PrefabApplier.Change>> diff = result.perFileDiff();
         PrefabNonceStore.Entry entry = nonceStore.mint(callerId, prefab.id(), diff, result.newTrees());
 
@@ -176,6 +217,80 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
             RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
         } catch (RuntimeException ignored) {
             // Tolerant of test scaffolds without a real sender.
+        }
+    }
+
+    /**
+     * Build the per-world dimension vert repair hook for an
+     * {@code expandPerWorld} prefab, or {@code null} when the repair cannot be
+     * applied (non-expanding prefab, no live config system, or no
+     * {@code regions/default} parser to read the template vert from). The hook
+     * delegates the dimension rules to the canonical {@code NetherEndConfigAmender}
+     * so they have exactly one definition shared with {@code /rtp config region}
+     * and the MultiConfig menu.
+     */
+    @SuppressWarnings("unchecked")
+    private static MultiWorldExpander.RegionOverlayAmender buildDimensionVertAmender(Prefab prefab) {
+        if (!prefab.expandPerWorld()) return null;
+        if (RTP.serverAccessor == null || RTP.configs == null) return null;
+        MultiConfigParser<RegionKeys> regions =
+                (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+        if (regions == null) return null;
+        // getParser(...) assumes a "default" entry exists (it falls back to it
+        // for unknown names) and NPEs when the regions tree is empty, so guard
+        // on the registered set first.
+        if (!regions.listParsers().contains(MultiWorldExpander.DEFAULT_REGION_ID)) return null;
+        ConfigParser<RegionKeys> defParser = regions.getParser(MultiWorldExpander.DEFAULT_REGION_ID);
+        if (defParser == null) return null;
+        return (world, overlay) -> {
+            try {
+                io.github.dailystruggle.rtp.api.world.RTPWorld<?> rtpWorld =
+                        RTP.serverAccessor.getRTPWorld(world);
+                if (rtpWorld == null) return;
+                String wn = rtpWorld.name();
+                if (wn == null || !(wn.endsWith("_nether") || wn.endsWith("_the_end"))) return;
+                Map<String, List<String>> pv = new HashMap<>();
+                io.github.dailystruggle.rtp.common.commands.menu.multiconfig.NetherEndConfigAmender
+                        .amend(pv, defParser, rtpWorld);
+                Object vertObj = overlay.get("vert");
+                Map<String, Object> vert;
+                if (vertObj instanceof Map<?, ?> m) {
+                    vert = (Map<String, Object>) m;
+                } else {
+                    vert = new LinkedHashMap<>();
+                    overlay.put("vert", vert);
+                }
+                if (pv.containsKey("vert")) putVert(vert, "name", pv.get("vert").get(0));
+                putVertInt(vert, "maxY", pv.get("maxy"));
+                putVertInt(vert, "minY", pv.get("miny"));
+                if (pv.containsKey("requireskylight")) {
+                    putVert(vert, "requireSkyLight",
+                            Boolean.parseBoolean(pv.get("requireskylight").get(0)));
+                }
+            } catch (RuntimeException re) {
+                RTP.log(Level.WARNING,
+                        "[prefab] dimension vert repair failed for world " + world
+                                + " - " + re.getMessage());
+            }
+        };
+    }
+
+    private static void putVert(Map<String, Object> vert, String key, Object value) {
+        for (Map.Entry<String, Object> e : vert.entrySet()) {
+            if (e.getKey() != null && e.getKey().equalsIgnoreCase(key)) {
+                e.setValue(value);
+                return;
+            }
+        }
+        vert.put(key, value);
+    }
+
+    private static void putVertInt(Map<String, Object> vert, String key, List<String> values) {
+        if (values == null || values.isEmpty()) return;
+        try {
+            putVert(vert, key, Integer.parseInt(values.get(0).trim()));
+        } catch (NumberFormatException ignored) {
+            // Non-numeric amender output is not expected; leave the cloned value.
         }
     }
 }

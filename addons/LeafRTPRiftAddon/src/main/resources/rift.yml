@@ -1,0 +1,39 @@
+# --- effects/rift.yml: "Virtual Rift" demonstration group ---
+#
+# Installed by the LeafRTPRiftAddon when it loads, enabled by default, so the
+# RIFT effect is demonstrable out of the box: on every /rtp, the terrain
+# around the player appears to tear open into a void for a couple of seconds
+# while the teleport warmup runs, then snaps back as they are teleported away.
+#
+# This group is UNGATED (no permission:, no players:) so it applies to every
+# player. To restrict it, add a permission: node (and grant it); to disable the
+# demo entirely, set effects: [] or remove the RIFT line below. The RIFT effect
+# itself is purely client-side (fake block changes) and never touches the real
+# world.
+#
+# Requires performance.yml -> effectParsing: true (the default).
+#
+# Stage: preload. RIFT fires once the teleport is committed (a valid
+# destination was found and its chunks are loading), NOT at request time, so a
+# cancelled or failed request never plays the animation. The teleport warmup
+# (config.yml -> teleportDelay, default 2s) elapses between this stage and the
+# actual teleport, which is the window the animation plays in. Keep `seconds`
+# <= teleportDelay so the rift has time to render before the player is moved.
+#
+# The RIFT effect refuses to fire when the effective teleport delay is below 1
+# second. The delay is read from the same source the teleport uses, so every
+# factor counts: the rtp.nodelay / rtp.noDelay permissions force an instant
+# teleport, an rtp.delay.<n> permission overrides config.yml -> teleportDelay,
+# and only then does teleportDelay apply. An instant teleport leaves no warmup
+# window to fall through, so opening the rift would only briefly carve a hole at
+# the destination (and could suffocate the player). Set teleportDelay >= 1 (and
+# do not grant rtp.nodelay) to see the animation.
+#
+# Grammar: RIFT.<radius>.<seconds> ('.' splits arguments, so all arguments are
+# whole numbers). radius is clamped to [1, 8].
+when: preload
+effects:
+  - RIFT.6.2
+
+# DO NOT TOUCH VERSION NUMBER
+version: "1.0"

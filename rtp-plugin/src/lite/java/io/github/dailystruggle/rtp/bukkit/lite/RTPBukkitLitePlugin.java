@@ -186,8 +186,9 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     }
 
     // Step 3: command registration. Shared with the full bootstrap (ADR-024 helper).
-    // RTPCmdBukkit takes a Plugin parameter; passing `this` (the lite JavaPlugin)
-    // is the parity-correct call for both editions.
+    // The helper builds the platform-neutral CoreRtpRoot (ADR-070) with the
+    // Bukkit seams; passing `this` (the lite JavaPlugin) is the parity-correct
+    // call for both editions.
     BootstrapSupport.registerRtpAndWildCommands(this);
 
     // Step 4: drain startup tasks (region binding etc.). Shared helper (ADR-024).
@@ -222,13 +223,11 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       java.util.function.Predicate<io.github.dailystruggle.rtp.api.entity.RTPCommandSender> guard =
           networkBootstrap.waitlistCommandGuard();
       if (guard != null
-          && RTP.baseCommand instanceof io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit cmd) {
-        cmd.addSenderCheck(s -> {
-          if (!(s instanceof org.bukkit.entity.Player p)) return true;
-          io.github.dailystruggle.rtp.api.entity.RTPCommandSender rs =
-              RTP.serverAccessor.getSender(p.getUniqueId());
-          return rs == null || guard.test(rs);
-        });
+          && RTP.baseCommand instanceof io.github.dailystruggle.rtp.common.commands.CoreRtpRoot cmd) {
+        // commands-api-ADR-003: sender-check list is Predicate<RTPCommandSender>;
+        // register the neutral guard directly (console senders always pass).
+        cmd.addSenderCheck(rs ->
+            !(rs instanceof io.github.dailystruggle.rtp.api.entity.RTPPlayer) || guard.test(rs));
       }
     } catch (Throwable t) {
       RTP.log(Level.WARNING,
@@ -339,24 +338,29 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     // Each omission corresponds to a documented support-load source per ADR-024.
 
     // Bundled stripped admin docs (ADR-024). The lite jar carries a small
-    // `lite-docs/` resource tree (intentionally not under `docs/`, which the
-    // ADR-024 `liteJarStructureCheck` audit forbids in lite). Extract on every
-    // start so upgrades pick up updated bundled copies; existing files are
-    // overwritten, which is safe because lite-docs/** is read-only reference
-    // material, not operator-edited config.
+    // `lite-docs/` resource tree (intentionally not under `docs/` inside the
+    // jar, which the ADR-024 `liteJarStructureCheck` audit forbids in lite).
+    // The resources are extracted into the operator-facing `docs/` folder under
+    // the plugin data directory. Extract on every start so upgrades pick up
+    // updated bundled copies; existing files are overwritten, which is safe
+    // because the extracted docs are read-only reference material, not
+    // operator-edited config.
     extractBundledLiteDocs();
     RTP.log(Level.INFO,
         "[RTP] Documentation extracted to "
-            + new java.io.File(getDataFolder(), "lite-docs").getAbsolutePath());
+            + new java.io.File(getDataFolder(), "docs").getAbsolutePath());
   }
 
   /**
    * Copies every classpath resource under `lite-docs/` into
-   * `<plugin-data>/lite-docs/`. The list of resources is hard-coded rather than
+   * `<plugin-data>/docs/`. The list of resources is hard-coded rather than
    * scanned because Bukkit's classloader does not expose directory listings on
-   * shaded jars. Adding a new bundled doc requires updating both the resource
-   * file and `LITE_DOCS_RESOURCES` below; the lite assembly's smoke test
-   * verifies that every entry resolves.
+   * shaded jars. The jar-internal resource tree stays under `lite-docs/`
+   * because the ADR-024 `liteJarStructureCheck` audit forbids a `docs/` entry
+   * in the lite jar; only the extracted, operator-facing destination is named
+   * `docs/`. Adding a new bundled doc requires updating both the resource file
+   * and the list below; the lite assembly's smoke test verifies that every
+   * entry resolves.
    */
   private void extractBundledLiteDocs() {
     String[] resources = {
@@ -371,9 +375,12 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     };
     java.io.File dataFolder = getDataFolder();
     //noinspection ResultOfMethodCallIgnored
-    new java.io.File(dataFolder, "lite-docs/figures").mkdirs();
+    new java.io.File(dataFolder, "docs/figures").mkdirs();
     for (String resource : resources) {
-      java.io.File target = new java.io.File(dataFolder, resource);
+      // Map the jar-internal `lite-docs/` prefix to the operator-facing `docs/`
+      // destination folder.
+      String relativeTarget = resource.replaceFirst("^lite-docs/", "docs/");
+      java.io.File target = new java.io.File(dataFolder, relativeTarget);
       //noinspection ResultOfMethodCallIgnored
       target.getParentFile().mkdirs();
       try (java.io.InputStream in = getResource(resource)) {

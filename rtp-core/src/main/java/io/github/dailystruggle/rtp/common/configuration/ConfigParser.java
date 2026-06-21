@@ -51,6 +51,13 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   private ClassLoader classLoader = this.getClass().getClassLoader();
 
   /**
+   * Number of rotating {@code <name>.bak.<ts>} siblings retained per config
+   * file on each {@link #save()}. Shared by the live config commands and the
+   * admin prefab pipeline so both honor the same retention cap.
+   */
+  public static int bakRetention = ConfigBackups.DEFAULT_BAK_RETENTION;
+
+  /**
    * Constructor for ConfigParser
    *
    * @param eClass the enum class for configuration keys
@@ -1041,6 +1048,20 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     RtpYamlConfig RtpYamlConfig = cachedLookup.get().get(name);
     RtpYamlConfig.options().copyDefaults(true);
     RtpYamlConfig.options().indent(2);
+    // Snapshot the current on-disk file as a rotating <name>.bak.<ts> sibling
+    // before overwriting it, so an operator (or the prefab rollback path) can
+    // restore the previous revision. Best-effort: a backup failure must not
+    // block the actual config write.
+    try {
+      File configFile = RtpYamlConfig.getConfigurationFile();
+      if (configFile != null) {
+        ConfigBackups.backup(configFile, bakRetention);
+      }
+    } catch (IOException | RuntimeException backupFailure) {
+      RTP.log(Level.WARNING,
+          "[RTP] config backup failed for " + name + " - proceeding with save: "
+              + backupFailure.getMessage());
+    }
     RtpYamlConfig.save();
   }
 

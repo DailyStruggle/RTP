@@ -246,6 +246,7 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
         return sp == null ? null : registerPlayer(sp);
     }
 
+    @Override
     public Set<String> getOnlinePlayerNames() {
         if (playersByName.isEmpty()) return Collections.emptySet();
         return new HashSet<>(playersByName.keySet());

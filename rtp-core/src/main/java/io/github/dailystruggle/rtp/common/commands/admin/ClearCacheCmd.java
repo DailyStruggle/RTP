@@ -15,19 +15,20 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Top-level {@code /rtp clearcache} verb. Clears the L1 (kept), L2 (unkept),
- * and L3 (backlog) caches for every region across the board, releasing any
- * held chunk reservations and dropping the associated persisted rows.
+ * Backs the {@code /rtp clear cache} action (via {@link ClearCacheSubCmd}).
+ * Clears the L1 (kept), L2 (unkept), and L3 (backlog) caches for every region
+ * across the board, releasing any held chunk reservations and dropping the
+ * associated persisted rows.
  *
  * <p>Permission: {@code rtp.admin}.
  */
 public class ClearCacheCmd extends BaseRTPCmdImpl {
 
-  /** Permission key for {@code /rtp clearcache}. */
+  /** Permission key for {@code /rtp clear cache}. */
   public static final String PERMISSION = "rtp.admin";
 
   /**
-   * Constructs the clearcache subcommand.
+   * Constructs the clear-cache command.
    *
    * @param parent the parent command tree (the {@code /rtp} root), or {@code null}
    */

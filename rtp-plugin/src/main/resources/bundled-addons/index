@@ -9,6 +9,5 @@
 # on the next run. Lines starting with '#' and blank lines are ignored.
 LeafRTPGuiAddon.jar
 LeafRTPClaimAddon.jar
-LeafRTPRiftAddon.jar
 LeafRTPCountdownAddon.jar
 README.md

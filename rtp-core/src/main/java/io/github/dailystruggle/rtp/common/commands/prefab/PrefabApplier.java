@@ -154,6 +154,27 @@ public final class PrefabApplier {
             Prefab prefab,
             List<String> worldNames
     ) {
+        return apply(currentTrees, prefab, worldNames, null);
+    }
+
+    /**
+     * Variant of {@link #apply(Map, Prefab, List)} that threads a
+     * {@link MultiWorldExpander.RegionOverlayAmender} into the per-world
+     * expansion so each synthesised region overlay can be repaired for its
+     * destination world's dimension <em>before</em> the merge/diff is
+     * computed. This keeps the preview diff consistent with what the confirm
+     * step writes. A {@code null} amender behaves exactly like the 3-arg
+     * overload.
+     *
+     * @param amender invoked on each freshly-synthesised overlay; may be
+     *                {@code null}.
+     */
+    public static Result apply(
+            Map<String, Map<String, Object>> currentTrees,
+            Prefab prefab,
+            List<String> worldNames,
+            MultiWorldExpander.RegionOverlayAmender amender
+    ) {
         Objects.requireNonNull(currentTrees, "currentTrees");
         Objects.requireNonNull(prefab, "prefab");
         Objects.requireNonNull(worldNames, "worldNames");
@@ -168,7 +189,7 @@ public final class PrefabApplier {
             }
         }
         Map<String, Map<String, Object>> expandedOverlays =
-                MultiWorldExpander.expand(prefab, currentRegions, worldNames);
+                MultiWorldExpander.expand(prefab, currentRegions, worldNames, amender);
         Prefab effective = new Prefab(
                 prefab.id(),
                 prefab.displayKey(),
@@ -179,7 +200,29 @@ public final class PrefabApplier {
                 expandedOverlays,
                 false
         );
-        return apply(currentTrees, effective);
+        Result base = apply(currentTrees, effective);
+
+        // A synthesised per-world region (regions/<world>.yml with
+        // world: "<world>") is inert unless the matching worlds/<world>.yml
+        // points its "region" field at it. Mirror every synthesised region
+        // into a worlds/<world>.yml overlay that sets region: "<world>" so the
+        // world actually uses its own region rather than the shared default.
+        // The merge is sparse and idempotent: a world file already pointing at
+        // its own region yields no diff.
+        Map<String, Map<String, Object>> newTrees = base.newTrees();
+        Map<String, List<Change>> diff = new LinkedHashMap<>(base.perFileDiff());
+        for (String world : expandedOverlays.keySet()) {
+            String fileId = "worlds/" + world;
+            Map<String, Object> overlay = new LinkedHashMap<>();
+            overlay.put("region", world);
+            Map<String, Object> worldBase = newTrees.computeIfAbsent(fileId, k -> new LinkedHashMap<>());
+            List<Change> fileDiff = new ArrayList<>();
+            mergeInto(worldBase, overlay, "", fileDiff);
+            if (!fileDiff.isEmpty()) {
+                diff.put(fileId, fileDiff);
+            }
+        }
+        return new Result(newTrees, diff);
     }
 
     @SuppressWarnings("unchecked")

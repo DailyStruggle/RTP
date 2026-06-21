@@ -343,9 +343,20 @@ public class SelectionAPI {
     final RTPWorld<?> worldFinal = world;
     return tempRegions.computeIfAbsent(worldId, k -> {
       RegionSettings base = baseRegionFinal.getSettings();
-      Shape<?> shape;
-      Object resolvedShape = RTP.serverAccessor.getShape(worldName);
-      shape = (resolvedShape instanceof Shape<?>) ? (Shape<?>) resolvedShape : base.shape();
+      // The shape is inherited from the base region the user specified - that is
+      // the whole point of /rtp region:<r> world:<w>. The target world's own
+      // configured shape is irrelevant here, and a world need not have a
+      // dedicated region at all. The world border only comes into play when the
+      // base region's worldBorderOverride is set, which is carried through below.
+      //
+      // Clone the base shape rather than sharing it: a MemoryShape carries the
+      // base region's accumulated spatial memory (bad-location caches, biome
+      // maps), which is specific to the base world. Sharing the live object
+      // would let the world-override region inherit that spatial memory on init
+      // (and write back into the base region's). Shape#clone resets the
+      // spatial-memory caches, giving the new region a clean slate.
+      Shape<?> baseShape = base.shape();
+      Shape<?> shape = baseShape != null ? baseShape.clone() : null;
       RegionSettings newSettings = new RegionSettings(
           name,
           worldFinal,

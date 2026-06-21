@@ -7,10 +7,23 @@ public class BukkitServerProvider {
     public static class ServerModel {
         public final String accessorClassName;
         public final String schedulerClassName;
+        /**
+         * Canonical platform brand resolved at the entrypoint ("Folia", "Paper", or
+         * "Spigot"). This is the authoritative server-type decision: it is made here,
+         * once, from the same probes that select the accessor/scheduler pair, and is
+         * published onto the accessor at wire time so the accessor does not have to
+         * re-detect the platform via independent class lookups.
+         */
+        public final String platform;
 
         public ServerModel(String accessorClassName, String schedulerClassName) {
+            this(accessorClassName, schedulerClassName, null);
+        }
+
+        public ServerModel(String accessorClassName, String schedulerClassName, String platform) {
             this.accessorClassName = accessorClassName;
             this.schedulerClassName = schedulerClassName;
+            this.platform = platform;
         }
     }
 
@@ -58,9 +71,9 @@ public class BukkitServerProvider {
      */
     private static ServerModel foliaModel(String tunedAccessor, String tunedScheduler, String paperAccessor) {
         if (classExists(tunedScheduler)) {
-            return new ServerModel(tunedAccessor, tunedScheduler);
+            return new ServerModel(tunedAccessor, tunedScheduler, "Folia");
         }
-        return new ServerModel(paperAccessor, BASIC_FOLIA_SCHEDULER);
+        return new ServerModel(paperAccessor, BASIC_FOLIA_SCHEDULER, "Folia");
     }
 
     /**
@@ -74,6 +87,11 @@ public class BukkitServerProvider {
         String version = Bukkit.getBukkitVersion();
         String accessorClassName;
         String schedulerClassName;
+        // Resolve the server type once, here at the entrypoint, from the same probes
+        // that drive accessor/scheduler selection below. The Folia branches publish
+        // "Folia" through foliaModel(...); the non-Folia branches fall through to this
+        // value when constructing their ServerModel.
+        String platform = isPaper() ? "Paper" : "Spigot";
 
         if (version.contains("26.1")) {
             if (isFolia()) {
@@ -128,6 +146,6 @@ public class BukkitServerProvider {
                 schedulerClassName = "io.github.dailystruggle.rtp.bukkitplatform.v1_20_R1.scheduling.BukkitSchedulerImpl";
             }
         }
-        return new ServerModel(accessorClassName, schedulerClassName);
+        return new ServerModel(accessorClassName, schedulerClassName, platform);
     }
 }

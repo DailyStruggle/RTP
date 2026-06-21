@@ -555,6 +555,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    * {@code Collections.emptySet()} stub in {@code RTPCmdFabricRoot} `player`
    * parameter; resolves CHECKLIST-fabric-tabcompletion-audit P3.
    */
+  @Override
   public Set<String> getOnlinePlayerNames() {
     if (playersByName.isEmpty()) return Collections.emptySet();
     return new HashSet<>(playersByName.keySet());

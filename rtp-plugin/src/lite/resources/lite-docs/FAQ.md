@@ -61,6 +61,6 @@ chunk-load latency. Finish your Chunky / WorldBorder pass first, then resume.
 
 ### Q: Where do these docs live on disk?
 
-`plugins/RTP/lite-docs/`. They are extracted from the jar on first start. To
+`plugins/RTP/docs/`. They are extracted from the jar on first start. To
 refresh them after upgrading, delete the folder and restart — the next start
 re-extracts the bundled copy.
