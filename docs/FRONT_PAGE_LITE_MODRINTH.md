@@ -45,9 +45,17 @@ Everything below ships in the free build, no add-ons:
 - **Effects engine:** particles, sounds, fireworks, potions on every teleport phase.
 - **Per-player cooldowns & usage limits** out of the box.
 - **PvP/combat-tag gate, PlaceholderAPI, live map heatmaps, multi-world overrides.**
-- **Extend it without a fork:** the `rtp-api` hooks take one-line suppliers to veto destinations, charge economy, add placeholders, override the world border, gate combat, replace the bare `/rtp` action, or build custom arrival platforms. The [rtp menu addon](https://modrinth.com/plugin/leafrtpguiaddon) does exactly this, swapping bare `/rtp` for its own picker.
+- **Extend it without a fork:** the `rtp-api` hooks take one-line suppliers to veto destinations, charge economy, add placeholders, override the world border, gate combat, replace the bare `/rtp` action, or build custom arrival platforms. The bundled rtp menu addon does exactly this, swapping bare `/rtp` for its own picker.
 
 (How each feature stays cheap: [Architecture](https://github.com/dailystruggle/RTP/wiki/Architecture).)
+
+<div align="center">
+
+<img src="https://cdn.modrinth.com/data/TZNIQSHX/images/e349e726cc4e9ecfcd7823a3bc3c4bf0eeb85f0b.png" alt="The clickable /rtp menu: players pick a world or region by clicking, no commands to memorize">
+
+*The clickable `/rtp menu`: players pick a world or region by clicking, no commands to memorize.*
+
+</div>
 
 ---
 

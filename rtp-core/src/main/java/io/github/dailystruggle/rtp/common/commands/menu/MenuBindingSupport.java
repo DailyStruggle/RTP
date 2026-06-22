@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -91,7 +92,7 @@ public final class MenuBindingSupport {
         ServiceLoader.load(
             AnvilInputOpenerProvider.class, AnvilInputOpenerProvider.class.getClassLoader());
     PlatformFamily family = currentPlatformFamily();
-    for (AnvilInputOpenerProvider provider : loader) {
+    for (AnvilInputOpenerProvider provider : loadProvidersSafely(loader, "menu anvil-input opener")) {
       if (!matchesPlatform(provider.platformFamily(), family)) continue;
       try {
         MenuRedeemSubcommand.AnvilInputOpener opener = provider.create();
@@ -156,7 +157,7 @@ public final class MenuBindingSupport {
     ServiceLoader<MenuRendererProvider> loader =
         ServiceLoader.load(
             MenuRendererProvider.class, MenuRendererProvider.class.getClassLoader());
-    for (MenuRendererProvider provider : loader) {
+    for (MenuRendererProvider provider : loadProvidersSafely(loader, "menu renderer provider")) {
       // Skip a provider bound to a different platform. A universal jar shades
       // the Paper, Fabric, and NeoForge adapters together, so all three
       // `book` providers are on the runtime classpath; without this gate the
@@ -176,6 +177,43 @@ public final class MenuBindingSupport {
       byId.putIfAbsent(id.trim().toLowerCase(Locale.ROOT), provider);
     }
     return byId;
+  }
+
+  /**
+   * Eagerly materialise every loadable provider from a {@link ServiceLoader},
+   * skipping any whose class cannot be linked or instantiated on this runtime.
+   *
+   * <p>A universal jar shades the Paper, Fabric, and NeoForge adapters together,
+   * so a {@code META-INF/services} entry may name a provider class that hard-
+   * references a platform type absent at runtime (e.g. the Bukkit anvil opener
+   * referencing {@code org.bukkit.plugin.Plugin} on a NeoForge server). The lazy
+   * {@code ServiceLoader} iterator surfaces that as a {@link java.util.ServiceConfigurationError}
+   * or a raw {@link LinkageError} (e.g. {@link NoClassDefFoundError}) from
+   * {@code hasNext()}/{@code next()}; left unhandled it would abort the whole
+   * discovery (and the {@code CoreRtpRoot} construction that drives it). We
+   * therefore advance defensively and drop the unloadable provider rather than
+   * failing the platform that does have a valid one.</p>
+   */
+  private static <T> List<T> loadProvidersSafely(ServiceLoader<T> loader, String what) {
+    List<T> providers = new ArrayList<>();
+    Iterator<T> it = loader.iterator();
+    while (true) {
+      T provider;
+      try {
+        if (!it.hasNext()) break;
+        provider = it.next();
+      } catch (java.util.ServiceConfigurationError | LinkageError err) {
+        // Unloadable on this platform (wrong-family provider in a universal
+        // jar). The lazy iterator has already advanced past the bad entry, so
+        // continue to surface any remaining valid providers.
+        RTP.log(
+            Level.FINE,
+            "skipping unloadable " + what + ": " + err);
+        continue;
+      }
+      providers.add(provider);
+    }
+    return providers;
   }
 
   /**

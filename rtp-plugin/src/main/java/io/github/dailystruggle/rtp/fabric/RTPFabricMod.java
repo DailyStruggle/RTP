@@ -2,8 +2,8 @@ package io.github.dailystruggle.rtp.fabric;
 
 import io.github.dailystruggle.commandsapi.brigadier.BrigadierBridgeContext;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.CoreRtpRoot;
 import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
-import io.github.dailystruggle.rtp.fabric.commands.RTPCmdFabricRoot;
 import io.github.dailystruggle.rtp.fabric.database.FabricDatabaseHandler;
 import io.github.dailystruggle.rtp.fabric.events.FabricEventBridge;
 import io.github.dailystruggle.rtp.fabric.server.FabricServerAccessor;
@@ -220,7 +220,7 @@ public final class RTPFabricMod implements ModInitializer {
                     RTP.log(Level.INFO,
                             "[RTP] Fabric map binding NOT installed: version adapter "
                                     + (mapAdapter == null ? "<none>" : mapAdapter.mcVersion())
-                                    + " does not support map charts; /rtp charts will report"
+                                    + " does not support map charts; /rtp visualizations will report"
                                     + " mapBindingMissing (NoopMapBinding active).");
                 }
             } catch (Throwable t) {
@@ -617,12 +617,13 @@ public final class RTPFabricMod implements ModInitializer {
 
             // ----------------------------------------------------------------
             // Brigadier registration of the /rtp root.
-            // Permissions use fabric-permissions-api when available (always-true predicate here so
-            // any player can invoke /rtp during initial smoke testing).
-            // Full subcommand/parameter parity is Step G2 follow-up — see
-            // RTPCmdFabricRoot Javadoc for the parity TODO checklist.
             // ----------------------------------------------------------------
-            RTPCmdFabricRoot root = new RTPCmdFabricRoot();
+            // Build the platform-neutral /rtp root directly (ADR-070): the whole
+            // command tree, parameters, dispatch, outcome events, and menu-binding
+            // selection live in CoreRtpRoot, so Fabric no longer needs a bespoke
+            // root subclass. This mirrors how the Bukkit family now constructs the
+            // shared root in BootstrapSupport.
+            CoreRtpRoot root = new CoreRtpRoot();
             // Register the `rtp test` runtime self-test subtree on Fabric.
             // We use the platform-neutral TestCmd directly (NOT BukkitTestCmd)
             // because four of its subcommands hard-import org.bukkit.* /

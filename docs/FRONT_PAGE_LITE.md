@@ -80,6 +80,14 @@ On **Paper 26.1**, measured on the in-repo benchmark harness, 3 OPed clients spa
 
 It's the rare RTP that's both the fastest *and* the most complete - none of it is held back for speed or ease, and the same off-tick architecture is what keeps it all cheap. (How each feature stays cheap: [Architecture](https://github.com/dailystruggle/RTP/wiki/Architecture).)
 
+<div align="center">
+
+<img src="https://cdn.modrinth.com/data/TZNIQSHX/images/e349e726cc4e9ecfcd7823a3bc3c4bf0eeb85f0b.png" alt="The clickable /rtp menu: players pick a world or region by clicking, no commands to memorize">
+
+*The clickable `/rtp menu`: players pick a world or region by clicking, no commands to memorize.*
+
+</div>
+
 <details>
 <summary><b>Verification & sources</b></summary>
 

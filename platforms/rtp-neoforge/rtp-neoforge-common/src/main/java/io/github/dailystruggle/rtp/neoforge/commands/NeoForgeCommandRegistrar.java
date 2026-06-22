@@ -6,6 +6,7 @@ import io.github.dailystruggle.commandsapi.brigadier.BrigadierBridgeContext;
 import io.github.dailystruggle.commandsapi.brigadier.BrigadierCommandAdapter;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.CoreRtpRoot;
 import io.github.dailystruggle.rtp.neoforge.tools.NeoForgeBrigadierSourceBridge;
 import net.minecraft.commands.CommandSourceStack;
 
@@ -46,7 +47,12 @@ public final class NeoForgeCommandRegistrar {
       return;
     }
     try {
-      RTPCmdNeoForgeRoot root = new RTPCmdNeoForgeRoot();
+      // Build the platform-neutral /rtp root directly (ADR-070): the whole
+      // command tree, parameters, dispatch, outcome events, and menu-binding
+      // selection live in CoreRtpRoot, so NeoForge no longer needs a bespoke
+      // root subclass. This mirrors how the Bukkit family now constructs the
+      // shared root in BootstrapSupport.
+      CoreRtpRoot root = new CoreRtpRoot();
       // Expose the root so other subsystems (info / menu / network) can locate
       // the canonical command tree, mirroring the Bukkit / Fabric entrypoints.
       RTP.baseCommand = root;

@@ -273,7 +273,7 @@ public final class RTPNeoForgeMod {
       } else {
         RTP.log(Level.INFO, "[RTP][NeoForge] map binding NOT installed: version adapter "
             + (mapAdapter == null ? "<none>" : mapAdapter.mcVersion())
-            + " does not support map charts; /rtp charts will report mapBindingMissing.");
+            + " does not support map charts; /rtp visualizations will report mapBindingMissing.");
       }
     } catch (Throwable t) {
       RTP.log(Level.WARNING, "[RTP][NeoForge] map binding install failed; MapDispatch stays on "
@@ -462,8 +462,8 @@ public final class RTPNeoForgeMod {
     // live server). Building the /rtp tree dereferences RTP.getInstance() and
     // RTP.configs (e.g. ReloadCmd), so the server-independent core must already
     // exist here, otherwise NeoForgeCommandRegistrar.register NPEs while
-    // constructing RTPCmdNeoForgeRoot. prepareCore() needs no server, so it is
-    // safe to run on this worker thread; bootCore() re-runs it as a no-op.
+    // constructing the shared CoreRtpRoot. prepareCore() needs no server, so it
+    // is safe to run on this worker thread; bootCore() re-runs it as a no-op.
     try {
       prepareCore();
     } catch (Throwable t) {

@@ -1,9 +1,13 @@
 package io.github.dailystruggle.rtp.guiaddon.fabric;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuLayout;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuModel;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuRenderer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -36,6 +40,53 @@ public final class FabricMenuRenderer implements MenuRenderer {
   /** Style key; matches the Bukkit chest renderer so {@code menuStyle: chest} works everywhere. */
   public static final String STYLE = "chest";
 
+  /**
+   * Live server captured via Fabric lifecycle/tick events. This is the server
+   * resolution path that does NOT touch the obf carrier classes: reflecting over
+   * {@code FabricServerAccessor} / {@code FabricRTPPlayer} forces the JVM to resolve
+   * every declared method signature, some of which are typed with the intermediary
+   * {@code net.minecraft.class_3222} (ServerPlayer). That name does not exist on the
+   * deobfuscated MC 26.x runtime this renderer is compiled against, so the reflective
+   * lookup throws {@link NoClassDefFoundError}. Capturing the Mojmap-typed server here
+   * and resolving players through {@link MinecraftServer#getPlayerList()} keeps the
+   * whole path on the deobf surface.
+   */
+  private static volatile MinecraftServer capturedServer;
+
+  /** Guards one-time registration of the lifecycle/tick capture listeners. */
+  private static volatile boolean lifecycleHooked;
+
+  public FabricMenuRenderer() {
+    ensureServerCapture();
+  }
+
+  /**
+   * Idempotently registers Fabric lifecycle + tick listeners that capture the live
+   * {@link MinecraftServer}. The renderer may be constructed either from
+   * {@code RTPGuiFabricInitializer} (at SERVER_STARTED) or via the {@code MenuRenderer}
+   * SPI discovery path (where the mod entry point never runs), so we cannot rely on
+   * SERVER_STARTED alone: the tick listener back-fills the reference on the next tick
+   * when the server is already running by the time this listener is registered.
+   */
+  private static synchronized void ensureServerCapture() {
+    if (lifecycleHooked) {
+      return;
+    }
+    lifecycleHooked = true;
+    try {
+      ServerLifecycleEvents.SERVER_STARTED.register(s -> capturedServer = s);
+      ServerLifecycleEvents.SERVER_STOPPING.register(s -> capturedServer = null);
+      ServerTickEvents.START_SERVER_TICK.register(s -> {
+        if (capturedServer == null) {
+          capturedServer = s;
+        }
+      });
+    } catch (Throwable cannotHook) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP-GUI] Fabric renderer: could not register server-capture listeners", cannotHook);
+    }
+  }
+
   @Override
   public String key() {
     return STYLE;
@@ -62,79 +113,35 @@ public final class FabricMenuRenderer implements MenuRenderer {
   }
 
   /**
-   * Resolves the live {@link MinecraftServer}: the Fabric mod entry point's captured
-   * reference when running standalone, otherwise RTP's own bound server (via the
-   * platform accessor's {@code getServer()}), which is the only source on the
-   * ServiceLoader / bundled-in-jar load path where the mod entry point never runs.
+   * Resolves the live {@link MinecraftServer} without touching the obf carrier classes.
+   * Prefers the Fabric mod entry point's captured reference (set at SERVER_STARTED when
+   * the addon runs as a standalone mod), then the renderer's own lifecycle/tick capture
+   * (the only source on the ServiceLoader / bundled-in-jar load path, where the mod
+   * entry point never runs).
+   *
+   * <p>We deliberately do NOT reflect over {@code RTP.serverAccessor.getServer()} here:
+   * {@code Class#getMethod} eagerly resolves every declared method signature of
+   * {@code FabricServerAccessor}, and some are typed with the intermediary
+   * {@code net.minecraft.class_3222} (ServerPlayer) which does not exist on the
+   * deobfuscated MC 26.x runtime, throwing {@link NoClassDefFoundError}.
    */
   private static MinecraftServer currentServer() {
     MinecraftServer s = RTPGuiFabricInitializer.server();
     if (s != null) {
       return s;
     }
-    Object accessor = RTP.serverAccessor;
-    if (accessor == null) {
-      RTP.log(java.util.logging.Level.WARNING,
-          "[RTP-GUI] Fabric renderer: RTP.serverAccessor is null; cannot resolve server");
-      return null;
-    }
-    Object result;
-    try {
-      result = accessor.getClass().getMethod("getServer").invoke(accessor);
-    } catch (Throwable noServer) {
-      RTP.log(java.util.logging.Level.WARNING,
-          "[RTP-GUI] Fabric renderer: reflective getServer() on "
-              + accessor.getClass().getName() + " threw", noServer);
-      return null;
-    }
-    if (result == null) {
-      RTP.log(java.util.logging.Level.WARNING,
-          "[RTP-GUI] Fabric renderer: " + accessor.getClass().getName()
-              + ".getServer() returned null (server not yet bound?)");
-      return null;
-    }
-    if (result instanceof MinecraftServer) {
-      return (MinecraftServer) result;
-    }
-    // The accessor handed back a server object whose class is not assignable to the
-    // MinecraftServer type this renderer was compiled against - a classloader /
-    // mappings mismatch between the addon jar and the platform carrier. Fall back to
-    // reflective use of that object instead of dropping to the classic teleport.
-    RTP.log(java.util.logging.Level.WARNING,
-        "[RTP-GUI] Fabric renderer: getServer() returned a "
-            + result.getClass().getName()
-            + " not assignable to this renderer's MinecraftServer ("
-            + MinecraftServer.class.getClassLoader() + " vs "
-            + result.getClass().getClassLoader() + ")");
-    return null;
+    return capturedServer;
   }
 
   /**
-   * Resolves the live {@link ServerPlayer} for {@code playerId}. Primary path: RTP's own
-   * player registry ({@code RTP.serverAccessor.getPlayer(uuid).handle()}), which holds the
-   * {@code ServerPlayer} directly and does not depend on the accessor's typed
-   * {@code getServer()} resolving cleanly across the addon's classloader. Fallback: the
-   * resolved {@link MinecraftServer}'s player list. The {@code handle()} method is invoked
-   * reflectively because the addon does not depend on {@code rtp-fabric-common}.
+   * Resolves the live {@link ServerPlayer} for {@code playerId} via the captured
+   * Mojmap {@link MinecraftServer}'s player list. This stays entirely on the
+   * deobfuscated surface the renderer is compiled against, avoiding any reflection
+   * over the obf carrier types ({@code FabricServerAccessor} / {@code FabricRTPPlayer}),
+   * whose {@code class_3222}-typed method signatures cannot be resolved on MC 26.x.
    */
   private static ServerPlayer resolvePlayer(UUID playerId) {
-    try {
-      Object accessor = RTP.serverAccessor;
-      if (accessor != null) {
-        Object rtpPlayer = accessor.getClass().getMethod("getPlayer", UUID.class)
-            .invoke(accessor, playerId);
-        if (rtpPlayer != null) {
-          Object handle = rtpPlayer.getClass().getMethod("handle").invoke(rtpPlayer);
-          if (handle instanceof ServerPlayer) {
-            return (ServerPlayer) handle;
-          }
-        }
-      }
-    } catch (Throwable viaRegistry) {
-      RTP.log(java.util.logging.Level.FINE,
-          "[RTP-GUI] Fabric renderer: player registry resolution failed for " + playerId
-              + "; falling back to server player list", viaRegistry);
-    }
+    ensureServerCapture();
     MinecraftServer server = currentServer();
     if (server == null) {
       return null;
@@ -155,17 +162,47 @@ public final class FabricMenuRenderer implements MenuRenderer {
       if (player == null) {
         RTP.log(java.util.logging.Level.INFO,
             "[RTP-GUI] Fabric renderer: could not resolve player at open time for " + playerId
-                + " (offline, or neither the player registry nor a bound server was available)");
+                + " (offline, or neither the player registry nor a bound server was available);"
+                + " falling back to a classic teleport so the command never silently no-ops");
+        fallbackTeleport(playerId);
         return;
       }
       RTP.log(java.util.logging.Level.INFO,
           "[RTP-GUI] Fabric renderer opening chest menu for " + playerId);
-      MenuLayout layout = MenuLayout.compute(model);
-      player.openMenu(
-          new SimpleMenuProvider(
-              (id, inv, p) -> new DestinationPickerMenu(id, inv, model, layout),
-              Component.literal(stripTitle(model.title()))));
+      try {
+        MenuLayout layout = MenuLayout.compute(model);
+        player.openMenu(
+            new SimpleMenuProvider(
+                (id, inv, p) -> new DestinationPickerMenu(id, inv, model, layout),
+                Component.literal(stripTitle(model.title()))));
+      } catch (Throwable cannotOpen) {
+        // The menu could not be displayed (e.g. a screen/menu-type linkage
+        // failure on this runtime). Honour the MenuRenderer contract and fall
+        // back to the classic teleport rather than leaving the player with
+        // neither a menu nor a teleport.
+        RTP.log(java.util.logging.Level.WARNING,
+            "[RTP-GUI] Fabric renderer: opening the chest menu for " + playerId
+                + " threw; falling back to a classic teleport", cannotOpen);
+        fallbackTeleport(playerId);
+      }
     });
+  }
+
+  /**
+   * Performs RTP's classic teleport for {@code playerId} when the menu cannot be
+   * shown. The bare {@code /rtp} root action commits to the menu (suppressing the
+   * command's own classic-teleport fallback) before {@link #open} runs on the
+   * server thread, so if the menu fails to open here this is the only remaining
+   * place to honour the "never silently no-op" contract (REQ-RTP-S-004).
+   */
+  private static void fallbackTeleport(UUID playerId) {
+    try {
+      RTPAPI.teleport(playerId, RtpTarget.defaultRegion());
+    } catch (Throwable noTeleport) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP-GUI] Fabric renderer: classic-teleport fallback for " + playerId
+              + " threw", noTeleport);
+    }
   }
 
   private static String stripTitle(String title) {
