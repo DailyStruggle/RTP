@@ -101,9 +101,48 @@ public final class FabricHandles implements HandleProvider {
 
         @Override
         public void spawnParticle(Object type, int count, double dx, double dy, double dz, double speed) {
-            player.serverLevel().sendParticles(player, (ParticleOptions) type, true,
-                    player.getX() + dx, player.getY() + dy, player.getZ() + dz,
-                    count, 0, 0, 0, speed);
+            ServerLevel level = player.serverLevel();
+            double px = player.getX() + dx, py = player.getY() + dy, pz = player.getZ() + dz;
+            // ServerLevel#sendParticles drifted across runtimes: 1.20.x/early 1.21.x
+            // expose a single-boolean (overrideLimiter) overload, while later 1.21.x
+            // (e.g. 1.21.11) replaced it with a two-boolean (longDistance,
+            // overrideLimiter) overload. Try the single-boolean form first, then
+            // fall back to the two-boolean form so this links on both.
+            try {
+                level.sendParticles(player, (ParticleOptions) type, true,
+                        px, py, pz, count, 0, 0, 0, speed);
+            } catch (NoSuchMethodError single) {
+                // The two-boolean overload is absent from this carrier's compile
+                // mappings, and reflective name lookup is unreliable because Loom
+                // remaps Mojmap names to intermediary (so the runtime name is not
+                // "sendParticles"). Locate the overload by its parameter shape
+                // instead: (ServerPlayer, ParticleOptions, boolean, boolean,
+                // double, double, double, int, double, double, double, double).
+                java.lang.reflect.Method target = null;
+                for (java.lang.reflect.Method m : ServerLevel.class.getMethods()) {
+                    Class<?>[] p = m.getParameterTypes();
+                    if (p.length == 12
+                            && ServerPlayer.class.isAssignableFrom(p[0])
+                            && p[1].isAssignableFrom(ParticleOptions.class)
+                            && p[2] == boolean.class && p[3] == boolean.class
+                            && p[4] == double.class && p[5] == double.class && p[6] == double.class
+                            && p[7] == int.class
+                            && p[8] == double.class && p[9] == double.class
+                            && p[10] == double.class && p[11] == double.class) {
+                        target = m;
+                        break;
+                    }
+                }
+                if (target == null) {
+                    throw single;
+                }
+                try {
+                    target.invoke(level, player, type, true, false,
+                            px, py, pz, count, 0.0, 0.0, 0.0, speed);
+                } catch (ReflectiveOperationException reflective) {
+                    throw single;
+                }
+            }
         }
 
         @Override

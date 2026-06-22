@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.guiaddon.neoforge;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuLayout;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuModel;
@@ -144,15 +146,45 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
       if (player == null) {
         RTP.log(java.util.logging.Level.INFO,
             "[RTP-GUI] NeoForge renderer: could not resolve player at open time for " + playerId
-                + " (offline, or neither the player registry nor a bound server was available)");
+                + " (offline, or neither the player registry nor a bound server was available);"
+                + " falling back to a classic teleport so the command never silently no-ops");
+        fallbackTeleport(playerId);
         return;
       }
-      MenuLayout layout = MenuLayout.compute(model);
-      player.openMenu(
-          new SimpleMenuProvider(
-              (id, inv, p) -> new DestinationPickerMenu(id, inv, model, layout),
-              Component.literal(stripTitle(model.title()))));
+      try {
+        MenuLayout layout = MenuLayout.compute(model);
+        player.openMenu(
+            new SimpleMenuProvider(
+                (id, inv, p) -> new DestinationPickerMenu(id, inv, model, layout),
+                Component.literal(stripTitle(model.title()))));
+      } catch (Throwable cannotOpen) {
+        // The menu could not be displayed (e.g. a screen/menu-type linkage
+        // failure on this runtime). Honour the MenuRenderer contract and fall
+        // back to the classic teleport rather than leaving the player with
+        // neither a menu nor a teleport.
+        RTP.log(java.util.logging.Level.WARNING,
+            "[RTP-GUI] NeoForge renderer: opening the chest menu for " + playerId
+                + " threw; falling back to a classic teleport", cannotOpen);
+        fallbackTeleport(playerId);
+      }
     });
+  }
+
+  /**
+   * Performs RTP's classic teleport for {@code playerId} when the menu cannot be
+   * shown. The bare {@code /rtp} root action commits to the menu (suppressing the
+   * command's own classic-teleport fallback) before {@link #open} runs on the
+   * server thread, so if the menu fails to open here this is the only remaining
+   * place to honour the "never silently no-op" contract (REQ-RTP-S-004).
+   */
+  private static void fallbackTeleport(UUID playerId) {
+    try {
+      RTPAPI.teleport(playerId, RtpTarget.defaultRegion());
+    } catch (Throwable noTeleport) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP-GUI] NeoForge renderer: classic-teleport fallback for " + playerId
+              + " threw", noTeleport);
+    }
   }
 
   private static String stripTitle(String title) {

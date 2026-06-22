@@ -15,6 +15,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.TicketType;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -75,25 +77,77 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         return ((long) cx & 0xffffffffL) | ((long) cz << 32);
     }
 
+    // --- Transient generation load-ticket (ported from V26_1_R1NeoForgeVersionAdapter) ---
+    // Without an explicit load-ticket the public getChunkFuture(create=true)
+    // resolves with no ChunkAccess on the deobf MC 26.x chunk system, which
+    // floods the log with nullChunk/asyncLoadNull and starves the kept cache.
+    // A dedicated, non-persistent (S-002: FLAG_PERSIST omitted), self-expiring
+    // (~30s = 600 ticks; a missed release self-heals) ticket type, applied on
+    // the server tick thread and released once the generation future resolves.
+    private static final int RTP_TICKET_RADIUS = 1;
+    private static final int RTP_TEMP_LOAD_TICKET_FLAGS =
+            TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION;
+    private static final TicketType RTP_TEMP_LOAD_TICKET_TYPE =
+            new TicketType(600L, RTP_TEMP_LOAD_TICKET_FLAGS);
+
+    /**
+     * Apply the transient generation load-ticket for {@code cp}. Best-effort:
+     * a failure is logged at FINE and reported via the return value so the
+     * caller skips the matching removal. Must be invoked on the server tick thread.
+     */
+    private boolean tryAddTempLoadTicket(ServerLevel level, ChunkPos cp) {
+        try {
+            level.getChunkSource().addTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, RTP_TICKET_RADIUS);
+            return true;
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][V26_2_R1] temp load-ticket apply failed for chunk=" + cp + ": "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Release the transient generation load-ticket for {@code cp} on the server
+     * tick thread (hops via {@link MinecraftServer#execute} when called
+     * off-thread, e.g. from the chunk-future completion). The ticket type also
+     * carries a timeout, so a dropped removal self-heals.
+     */
+    private void scheduleTempLoadTicketRemoval(ServerLevel level, ChunkPos cp) {
+        MinecraftServer server = level.getServer();
+        Runnable remove = () -> {
+            try {
+                level.getChunkSource().removeTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, RTP_TICKET_RADIUS);
+            } catch (Throwable t) {
+                RTP.log(Level.FINE,
+                        "[RTP][V26_2_R1] temp load-ticket release failed for chunk=" + cp + ": "
+                                + t.getClass().getSimpleName() + ": " + t.getMessage());
+            }
+        };
+        if (server != null && !server.isSameThread()) {
+            server.execute(remove);
+        } else {
+            remove.run();
+        }
+    }
+
     /**
      * Loads {@code (cx, cz)} at {@code ChunkStatus.FULL} and caches a
      * {@link V26_2_R1FabricRTPChunk} wrapper, resolving the future with the
      * chunk key.
      *
-     * <p><b>Non-blocking dispatch (rtp-fabric-ADR-008).</b> The request is
-     * dispatched onto the server tick thread via {@link MinecraftServer#submit},
-     * but it calls vanilla's <i>non-blocking</i> generation entry point
+     * <p><b>Non-blocking dispatch (rtp-fabric-ADR-008, ported from the
+     * V26_1_R1NeoForgeVersionAdapter fix).</b> The transient generation
+     * load-ticket is applied on the server tick thread, then vanilla's public
      * {@code ServerChunkCache#getChunkFuture(cx, cz, FULL, /*create=*&#47;true)}
-     * and chains on the returned future rather than blocking. The previous
-     * implementation called the synchronous-blocking
-     * {@code ServerLevel#getChunk(cx, cz, FULL, /*load=*&#47;true)} from inside
-     * a {@code submit()} task — when the calling thread is the tick thread
-     * (which it always is here) it ends up driving its own task queue from
-     * inside one of its own tasks, deadlocking against any other queued task
-     * in the chunk-generation dependency graph. On the 26.x chunk system that
-     * manifested as chunks never finishing generation (the "chunks are not
-     * getting loaded" symptom). {@code create=true} makes vanilla self-issue
-     * the transient generation ticket, so no extra ticket is required here.</p>
+     * is invoked <i>off</i> the tick thread, where it takes its non-blocking
+     * {@code supplyAsync(() -> getChunkFutureMainThread(...), mainThreadProcessor)}
+     * branch and the normal server tick pumps generation to completion. Invoked
+     * <i>on</i> the tick thread the returned future is never driven (it hangs
+     * until the live-load deadline) or parks the tick loop; <i>without</i> the
+     * load-ticket {@code getChunkFuture(create=true)} resolves with no
+     * {@code ChunkAccess} on the deobf MC 26.x chunk system, flooding the log
+     * with {@code nullChunk/asyncLoadNull} and starving the kept cache.</p>
      */
     @Override
     public CompletableFuture<Long> getChunkAt(int cx, int cz) {
@@ -106,14 +160,21 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         if (chunkCache.containsKey(k)) {
             return CompletableFuture.completedFuture(k);
         }
-        // (1) Dispatch the non-blocking generation request on the tick thread.
-        //     server.submit returns CompletableFuture<CompletableFuture<...>>;
-        //     thenCompose flattens to the inner future that vanilla completes
-        //     off-thread when generation finishes.
-        return server.submit(() -> requestChunkFuture(level, cx, cz))
-                .thenCompose(inner -> inner == null
-                        ? CompletableFuture.completedFuture((ChunkAccess) null)
-                        : inner)
+        final ChunkPos ticketPos = new ChunkPos(cx, cz);
+        // (1) Apply the transient generation load-ticket ON the tick thread, then
+        //     (2) invoke requestChunkFuture (the public getChunkFuture) OFF the
+        //     tick thread via RTP_CONTINUATION_EXECUTOR so vanilla self-pumps
+        //     generation. Release the ticket once the generation future settles.
+        return server.submit(() -> tryAddTempLoadTicket(level, ticketPos))
+                .thenComposeAsync(ticketAdded -> {
+                    CompletableFuture<ChunkAccess> inner = requestChunkFuture(level, cx, cz);
+                    if (inner == null) inner = CompletableFuture.completedFuture((ChunkAccess) null);
+                    return inner.whenComplete((ca, ex) -> {
+                        if (Boolean.TRUE.equals(ticketAdded)) {
+                            scheduleTempLoadTicketRemoval(level, ticketPos);
+                        }
+                    });
+                }, RTP_CONTINUATION_EXECUTOR)
                 .thenApply(ca -> {
                     if (ca == null) return null;
                     chunkCache.put(k, new V26_2_R1FabricRTPChunk(ca, level, id));
@@ -152,7 +213,10 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     /**
      * Invoke vanilla's non-blocking {@code getChunkFuture(cx, cz, FULL, true)}
      * and adapt the result to a {@code CompletableFuture<ChunkAccess>}. MUST be
-     * called on the server tick thread. The vanilla return type drifted
+     * called OFF the server tick thread (see {@link #getChunkAt}): off-thread
+     * the public entry point takes vanilla's non-blocking
+     * {@code supplyAsync(mainThreadProcessor)} branch, which the normal server
+     * tick drains. The vanilla return type drifted
      * ({@code Either<ChunkAccess,...>} on old lines, {@code ChunkResult<ChunkAccess>}
      * on 1.20.5+), so the inner value is unwrapped reflectively (see
      * {@link #unwrapChunk}). Returns {@code null} (an absent future) on a
@@ -193,18 +257,43 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         synchronized (V26_2_R1FabricRTPWorld.class) {
             cached = GET_CHUNK_FUTURE_METHOD;
             if (cached != null) return cached;
+            // Prefer the PUBLIC getChunkFuture over the inner getChunkFutureMainThread:
+            // getChunkAt invokes it OFF the tick thread where only the public entry
+            // point takes the non-blocking supplyAsync(mainThreadProcessor) branch.
+            // Binding the inner method off-thread returns a future the tick loop
+            // never drives (nullChunk/asyncLoadNull). Structural scan as fallback.
             java.lang.reflect.Method found = null;
-            for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
-                for (java.lang.reflect.Method m : c.getDeclaredMethods()) {
-                    if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
-                    Class<?>[] p = m.getParameterTypes();
-                    if (p.length != 4) continue;
-                    if (p[0] != int.class || p[1] != int.class) continue;
-                    if (p[2] != ChunkStatus.class) continue;
-                    if (p[3] != boolean.class) continue;
-                    m.setAccessible(true);
-                    found = m;
-                    break;
+            String[] preferredNames = { "getChunkFuture", "getChunkFutureMainThread" };
+            for (String pname : preferredNames) {
+                for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
+                    for (java.lang.reflect.Method m : c.getDeclaredMethods()) {
+                        if (!pname.equals(m.getName())) continue;
+                        if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
+                        Class<?>[] p = m.getParameterTypes();
+                        if (p.length != 4) continue;
+                        if (p[0] != int.class || p[1] != int.class) continue;
+                        if (p[2] != ChunkStatus.class) continue;
+                        if (p[3] != boolean.class) continue;
+                        m.setAccessible(true);
+                        found = m;
+                        break;
+                    }
+                }
+                if (found != null) break;
+            }
+            if (found == null) {
+                for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
+                    for (java.lang.reflect.Method m : c.getDeclaredMethods()) {
+                        if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
+                        Class<?>[] p = m.getParameterTypes();
+                        if (p.length != 4) continue;
+                        if (p[0] != int.class || p[1] != int.class) continue;
+                        if (p[2] != ChunkStatus.class) continue;
+                        if (p[3] != boolean.class) continue;
+                        m.setAccessible(true);
+                        found = m;
+                        break;
+                    }
                 }
             }
             if (found == null) {
