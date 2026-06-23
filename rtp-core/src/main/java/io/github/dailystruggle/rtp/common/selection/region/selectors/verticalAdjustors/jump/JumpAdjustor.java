@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -28,7 +29,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
 
   /**
    * Snapshot of the configured safety state read at adjustor entry: the
-   * canonicalised {@link SafetyKeys#unsafeBlocks} and {@link SafetyKeys#airBlocks}
+   * canonicalised {@link BlocksKeys#unsafeBlocks} and {@link BlocksKeys#airBlocks}
    * sets (with ADR-017 tag tokens flattened through {@code RTP.serverAccessor
    * .blockTagSnapshot()}) and {@link SafetyKeys#platformDepth}. Plumbed by
    * reference through every helper predicate so a single {@code adjust(...)} /
@@ -70,9 +71,9 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     int depth = 1;
     if (safety != null) {
       expandTokens(
-          safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>()), tagSnapshot, unsafe);
+          RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>()), tagSnapshot, unsafe);
       expandTokens(
-          safety.getConfigValue(SafetyKeys.airBlocks, new ArrayList<>()), tagSnapshot, air);
+          RTP.configs.getConfigValue(BlocksKeys.airBlocks, new ArrayList<>()), tagSnapshot, air);
       // Ground-sweep depth — reuses SafetyKeys.safetyRadius so it stays
       // distinct from SafetyKeys.platformDepth (which exclusively sizes the
       // platform-creation tool in BukkitRTPWorld.platform / FoliaRTPWorld.platform).

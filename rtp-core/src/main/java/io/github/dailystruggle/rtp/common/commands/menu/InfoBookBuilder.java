@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.menu;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
@@ -13,7 +13,6 @@ import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
 import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,7 +22,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-
 /**
  * Curated book-mode builder for {@code /rtp info} (PROPOSAL-info-as-book.md
  * section 4.6). Produces a {@link MenuModel} whose pages mirror, line-for-line,
@@ -99,7 +97,7 @@ public final class InfoBookBuilder {
             } else {
                 // InfoCmd unregistered (defensive: a build profile without it
                 // should still produce a usable book rather than a crash).
-                capturedLines.add(lookupMsg(MessagesKeys.menuInvalid, "&c/rtp info is unavailable"));
+                capturedLines.add(lookupMsg(CommandMessages.menuInvalid, "&c/rtp info is unavailable"));
             }
         } finally {
             RTP.messageTap.remove();
@@ -114,7 +112,7 @@ public final class InfoBookBuilder {
 
         // Title: reuse infoTitle so the book header matches the chat header
         // operators already recognise from console.
-        String title = lookupMsg(MessagesKeys.infoTitle, "&6/rtp info");
+        String title = lookupMsg(CommandMessages.infoTitle, "&6/rtp info");
         return new MenuModel(title == null ? "" : title, pages);
     }
 
@@ -211,9 +209,9 @@ public final class InfoBookBuilder {
         }
 
         // Refresh row.
-        String refreshLabel = lookupMsg(MessagesKeys.infoBookRefreshRow, "&2\u21bb Refresh");
+        String refreshLabel = lookupMsg(CommandMessages.infoBookRefreshRow, "&2\u21bb Refresh");
         String refreshHover = lookupMsg(
-                MessagesKeys.infoBookRefreshHover,
+                CommandMessages.infoBookRefreshHover,
                 "Re-render this page against a fresh metrics snapshot.");
         // ADR-050 Stage 3α: tokenRegistry.mint removed (dead side-effect; renderer emits concrete /rtp menu info commands).
         MenuAction refreshAction = new MenuAction.OpenInfo(scope);
@@ -221,9 +219,9 @@ public final class InfoBookBuilder {
 
         // Switch-to-chat row.
         String switchLabel = lookupMsg(
-                MessagesKeys.infoBookSwitchToTextRow, "&7\u2630 Switch to chat");
+                CommandMessages.infoBookSwitchToTextRow, "&7\u2630 Switch to chat");
         String switchHover = lookupMsg(
-                MessagesKeys.infoBookSwitchToTextHover,
+                CommandMessages.infoBookSwitchToTextHover,
                 "Re-run /rtp info in chat instead of the book.");
         MenuAction switchAction = new MenuAction.SwitchInfoToText(scope);
         lines.add(MenuLine.of(new MenuFragment(switchLabel, switchHover, switchAction)));
@@ -242,7 +240,7 @@ public final class InfoBookBuilder {
         if (scope.kind() == MenuAction.InfoScopeToken.Kind.REGION
                 && !(MapDispatch.getMapBinding() instanceof NoopMapBinding)) {
             String mapLabel = lookupMsg(
-                    MessagesKeys.menuInfoBadPointsLabel,
+                    CommandMessages.menuInfoBadPointsLabel,
                     "&b\u2316 View bad-points map");
             if (mapLabel != null && !mapLabel.isEmpty()) {
                 // ADR-050 Stage 3β: OpenMap is now (Kind, regionName); no token round-trip.
@@ -256,7 +254,7 @@ public final class InfoBookBuilder {
         // template skips silently so locales without the new key keep
         // working unchanged.
         String note = lookupMsg(
-                MessagesKeys.infoBookAutoRefreshDeferredNote,
+                CommandMessages.infoBookAutoRefreshDeferredNote,
                 "&8(auto-refresh not yet supported; click Refresh to update)");
         if (note != null && !note.isEmpty()) {
             lines.add(MenuLine.of(new MenuFragment(note, null, null)));
@@ -280,12 +278,9 @@ public final class InfoBookBuilder {
     }
 
     @SuppressWarnings("unchecked")
-    private static String lookupMsg(MessagesKeys key, String fallback) {
+    private static String lookupMsg(Enum<?> key, String fallback) {
         if (RTP.configs == null) return fallback;
-        ConfigParser<MessagesKeys> lang =
-                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        if (lang == null) return fallback;
-        Object v = lang.getConfigValue(key, fallback);
+        Object v = RTP.configs.getConfigValue(key, fallback);
         return v == null ? fallback : v.toString();
     }
 

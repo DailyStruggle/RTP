@@ -3,10 +3,9 @@ package io.github.dailystruggle.rtp.common.database;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import java.io.File;
@@ -708,8 +707,7 @@ public abstract class DatabaseAccessor<D> {
     }
 
     if (!saveCounts.isEmpty() && isSystemDatabaseLoggingEnabled()) {
-      ConfigParser<MessagesKeys> messages = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-      String msgBase = messages.getConfigValue(MessagesKeys.locationSaved, "").toString();
+      String msgBase = RTP.configs.getConfigValue(SystemMessages.locationSaved, "").toString();
       if (!msgBase.isEmpty()) {
         for (Map.Entry<String, Integer> countEntry : saveCounts.entrySet()) {
           String msg = msgBase.replace("[amount]", String.valueOf(countEntry.getValue()))

@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.effects;
 import io.github.dailystruggle.effectsapi.bukkit.BukkitEffectsInitializer;
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.events.*;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -247,8 +247,6 @@ public class BukkitEffectsHandler {
                     PostTeleportEvent event = new PostTeleportEvent(task);
                     Bukkit.getPluginManager().callEvent(event);
 
-                    ConfigParser<MessagesKeys> lang =
-                            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
                     if (task.player() != null) {
                         Player player = resolveBukkitPlayer(task.player().uuid(), "postteleport-title");
@@ -261,14 +259,19 @@ public class BukkitEffectsHandler {
                          * in-game. Resolve config values up-front (cheap, thread-safe) and hand the
                          * Bukkit API calls to the scheduler.
                          */
-                        String title = lang.getConfigValue(MessagesKeys.title, "").toString();
-                        String subtitle = lang.getConfigValue(MessagesKeys.subtitle, "").toString();
+                        @SuppressWarnings("unchecked")
+                        ConfigParser<PlayerMessages> lang =
+                                (ConfigParser<PlayerMessages>) RTP.configs.getParser(PlayerMessages.class);
+                        if (lang == null) return;
 
-                        int fadeIn = lang.getNumber(MessagesKeys.fadeIn, 0).intValue();
-                        int stay = lang.getNumber(MessagesKeys.stay, 0).intValue();
-                        int fadeOut = lang.getNumber(MessagesKeys.fadeOut, 0).intValue();
+                        String title = RTP.configs.getConfigValue(PlayerMessages.title, "").toString();
+                        String subtitle = RTP.configs.getConfigValue(PlayerMessages.subtitle, "").toString();
 
-                        String actionbar = lang.getConfigValue(MessagesKeys.actionbar, "").toString();
+                        int fadeIn = lang.getNumber(PlayerMessages.fadeIn, 0).intValue();
+                        int stay = lang.getNumber(PlayerMessages.stay, 0).intValue();
+                        int fadeOut = lang.getNumber(PlayerMessages.fadeOut, 0).intValue();
+
+                        String actionbar = RTP.configs.getConfigValue(PlayerMessages.actionbar, "").toString();
 
                         RTP.scheduler.runTask(() -> {
                             SendMessage.title(player, title, subtitle, fadeIn, stay, fadeOut);

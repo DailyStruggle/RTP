@@ -1,0 +1,33 @@
+# --- RTP-metrics-instellingen ---
+# Alleen rapportage-knoppen voor de metrics-SPI. Throttle-/tuning-
+# knoppen blijven in performance.yml staan.
+# Vult MetricsSnapshot.foliaRegions() met regio-detail op Folia.
+# Geen effect op Paper / Bukkit / Fabric (single-region-runtimes geven altijd
+# een lege lijst terug, wat voor die platforms het juiste antwoord is).
+# @type: boolean
+# @default: true
+foliaIncludeRegions: true
+
+# Aggregatiestrategie om per-regio-samples samen te voegen in de
+# scalaire tps{1,5,15}m-velden van MetricsSnapshot op Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: mean
+foliaAggregationTps: "mean"
+
+# Aggregatiestrategie om per-regio-samples samen te voegen in het
+# scalaire mspt-veld van MetricsSnapshot op Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationMspt: "max"
+
+# Aggregatiestrategie om per-regio-samples samen te voegen in het
+# scalaire tickBudgetUtilisation-veld van MetricsSnapshot op Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationTickBudget: "max"
+
+# RAAK HET VERSIENUMMER NIET AAN
+version: 1.0

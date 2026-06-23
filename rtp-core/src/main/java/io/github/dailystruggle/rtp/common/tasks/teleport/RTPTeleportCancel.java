@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks.teleport;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -60,9 +60,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
   }
 
   public static void message(UUID playerId) {
-    ConfigParser<MessagesKeys> lang =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    String msg = lang.getConfigValue(MessagesKeys.teleportCancel, "").toString();
+    String msg = RTP.configs.getConfigValue(PlayerMessages.teleportCancel, "").toString();
     RTP.serverAccessor.sendMessage(playerId, msg);
   }
 

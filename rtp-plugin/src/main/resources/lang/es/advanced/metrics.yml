@@ -1,0 +1,33 @@
+# --- Configuración de métricas de RTP ---
+# Ajustes solo de reporte para la SPI de métricas de la Fase M2. Los ajustes
+# de regulación / afinado siguen en performance.yml.
+# Rellena MetricsSnapshot.foliaRegions() con detalle por región en Folia.
+# Sin efecto en Paper / Bukkit / Fabric (los runtimes de una sola región
+# devuelven siempre una lista vacía, que es la respuesta correcta).
+# @type: boolean
+# @default: true
+foliaIncludeRegions: true
+
+# Estrategia de agregación para combinar muestras por región en los campos
+# escalares tps{1,5,15}m de MetricsSnapshot en Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: mean
+foliaAggregationTps: "mean"
+
+# Estrategia de agregación para combinar muestras por región en el campo
+# escalar mspt de MetricsSnapshot en Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationMspt: "max"
+
+# Estrategia de agregación para combinar muestras por región en el campo
+# escalar tickBudgetUtilisation de MetricsSnapshot en Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationTickBudget: "max"
+
+# NO TOQUES EL NÚMERO DE VERSIÓN
+version: 1.0

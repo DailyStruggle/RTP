@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.safety.SafetyCompilationCache;
@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.*;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
@@ -390,7 +391,7 @@ final class QueueTask {
         if (dt > 5000 || dt < 0) {
             ConfigParser<SafetyKeys> safety =
                     (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-            Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+            Object value = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
             if (value instanceof Collection<?> collection) {
                 unsafeBlocks.clear();
                 unsafeBlocks.addAll(
@@ -773,7 +774,7 @@ final class QueueTask {
                     "[ENQUEUE_TRACE] LocationGenerator ENQUEUED playerId=" + playerId
                             + " queueSize=" + data.queueLocation
                             + " -> calling sendMessage(queueUpdate)");
-            RTP.serverAccessor.sendMessage(playerId, MessagesKeys.queueUpdate);
+            RTP.serverAccessor.sendMessage(playerId, PlayerMessages.queueUpdate);
             RTP.log(Level.FINE,
                     "[ENQUEUE_TRACE] LocationGenerator sendMessage(queueUpdate) RETURNED playerId=" + playerId);
         } catch (Throwable t) {

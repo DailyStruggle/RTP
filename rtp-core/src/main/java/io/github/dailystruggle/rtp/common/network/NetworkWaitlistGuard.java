@@ -1,9 +1,8 @@
 package io.github.dailystruggle.rtp.common.network;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.RTP;
 
 import java.util.Objects;
@@ -31,7 +30,7 @@ import java.util.logging.Level;
  * </p>
  *
  * <p>The rendered body is sourced from
- * {@link MessagesKeys#alreadyQueued} in {@code messages.yml} per
+ * {@link NetworkMessages#alreadyQueued} in {@code messages.yml} per
  * REQ-RTP-F-013. Placeholder {@code [position]} is substituted client-side
  * with the FIFO position when known; an empty value is emitted when the
  * proxy has not yet assigned one (e.g. {@code TRANSFERRING}).</p>
@@ -41,7 +40,7 @@ public final class NetworkWaitlistGuard implements Predicate<RTPCommandSender> {
     /**
      * Hardcoded fallback used only when {@code RTP.configs} has not been
      * initialised (test contexts, very early bootstrap). Production
-     * rendering reads {@link MessagesKeys#alreadyQueued} from
+     * rendering reads {@link NetworkMessages#alreadyQueued} from
      * {@code messages.yml} per REQ-RTP-F-013.
      */
     private static final String DEFAULT_ALREADY_QUEUED =
@@ -108,11 +107,9 @@ public final class NetworkWaitlistGuard implements Predicate<RTPCommandSender> {
     private static String resolveTemplate() {
         try {
             if (RTP.configs != null) {
-                ConfigParser<MessagesKeys> parser =
-                        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-                if (parser != null) {
-                    Object v = parser.getConfigValue(
-                            MessagesKeys.alreadyQueued, DEFAULT_ALREADY_QUEUED);
+                if (RTP.configs != null) {
+                    Object v = RTP.configs.getConfigValue(
+                            NetworkMessages.alreadyQueued, DEFAULT_ALREADY_QUEUED);
                     if (v != null) return v.toString();
                 }
             }

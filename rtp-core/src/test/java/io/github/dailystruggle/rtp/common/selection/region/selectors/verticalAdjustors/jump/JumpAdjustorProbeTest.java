@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe;
@@ -214,12 +214,12 @@ public class JumpAdjustorProbeTest {
     // Seed safety.yml's airBlocks via the in-memory EnumMap (the YAML-backed parser
     // is not materialised in unit tests). Same reflection approach as
     // ReqRtpS004NullChunkAttributionTest / ReqRtpS005StaleChunkGuardTest.
-    ConfigParser<SafetyKeys> safety =
-        (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+    ConfigParser<BlocksKeys> blocks =
+        (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
     java.lang.reflect.Field dataField = FactoryValue.class.getDeclaredField("data");
     dataField.setAccessible(true);
-    EnumMap<SafetyKeys, Object> safetyData = (EnumMap<SafetyKeys, Object>) dataField.get(safety);
-    safetyData.put(SafetyKeys.airBlocks, new ArrayList<>(Arrays.asList("TALL_GRASS")));
+    EnumMap<BlocksKeys, Object> blocksData = (EnumMap<BlocksKeys, Object>) dataField.get(blocks);
+    blocksData.put(BlocksKeys.airBlocks, new ArrayList<>(Arrays.asList("TALL_GRASS")));
 
     // No static cache to reset — readSafetySnapshot() reads the parser per call.
 
@@ -251,12 +251,12 @@ public class JumpAdjustorProbeTest {
   @Test
   void airBlocksFromConfig_expandsMinecraftTagToFlowerHeadSpace() throws Exception {
     // Seed the config with a tag token.
-    ConfigParser<SafetyKeys> safety =
-        (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+    ConfigParser<BlocksKeys> blocks =
+        (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
     java.lang.reflect.Field dataField = FactoryValue.class.getDeclaredField("data");
     dataField.setAccessible(true);
-    EnumMap<SafetyKeys, Object> safetyData = (EnumMap<SafetyKeys, Object>) dataField.get(safety);
-    safetyData.put(SafetyKeys.airBlocks, new ArrayList<>(Arrays.asList("#minecraft:flowers")));
+    EnumMap<BlocksKeys, Object> blocksData = (EnumMap<BlocksKeys, Object>) dataField.get(blocks);
+    blocksData.put(BlocksKeys.airBlocks, new ArrayList<>(Arrays.asList("#minecraft:flowers")));
 
     // No static cache to reset — readSafetySnapshot() reads the parser per call.
 
@@ -314,13 +314,13 @@ public class JumpAdjustorProbeTest {
   @SuppressWarnings("unchecked")
   @Test
   void statePredicatedTokens_preservedInReappliedConfig() throws Exception {
-    ConfigParser<SafetyKeys> safety =
-        (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+    ConfigParser<BlocksKeys> blocks =
+        (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
     java.lang.reflect.Field dataField = FactoryValue.class.getDeclaredField("data");
     dataField.setAccessible(true);
-    EnumMap<SafetyKeys, Object> safetyData = (EnumMap<SafetyKeys, Object>) dataField.get(safety);
-    safetyData.put(
-        SafetyKeys.unsafeBlocks,
+    EnumMap<BlocksKeys, Object> blocksData = (EnumMap<BlocksKeys, Object>) dataField.get(blocks);
+    blocksData.put(
+        BlocksKeys.unsafeBlocks,
         new ArrayList<>(Arrays.asList("LAVA", "CAMPFIRE[lit=true]")));
 
     // Behavioural assertion: the probe path drops state-predicated tokens (it has

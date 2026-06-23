@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands;
 
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -69,14 +69,16 @@ public class InvalidCommandTest {
         reloadCmd = new TestReloadCmd(null);
 
         // Set some default messages in the mock config
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<MessagesKeys> lang =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<MessagesKeys>)
-                        io.github.dailystruggle.rtp.common.RTP.configs.getParser(MessagesKeys.class);
-        java.util.EnumMap<MessagesKeys, Object> data = new java.util.EnumMap<>(MessagesKeys.class);
-        data.put(MessagesKeys.busy, "busy");
-        data.put(MessagesKeys.consoleCmdNotAllowed, "You must be an in-game player");
-        data.put(MessagesKeys.invalidCommand, "invalid command - [arg]");
-        lang.setData(data);
+        java.util.Map<Enum<?>, Object> data = new java.util.HashMap<>();
+        data.put(PlayerMessages.busy, "busy");
+        data.put(PlayerMessages.consoleCmdNotAllowed, "You must be an in-game player");
+        data.put(PlayerMessages.invalidCommand, "invalid command - [arg]");
+        data.forEach((k, v) -> {
+            Object fv = io.github.dailystruggle.rtp.common.RTP.configs.getParser((Class) k.getDeclaringClass());
+            if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
+                ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).set((Enum) k, v);
+            }
+        });
     }
 
     @Test
@@ -85,7 +87,7 @@ public class InvalidCommandTest {
         accessor.addPlayer(sender);
 
         // Pre-heat language parser with some defaults to ensure MockRTPServerAccessor picks them up
-        accessor.sendMessage(sender.uuid(), MessagesKeys.invalidCommand, "frobnicate");
+        accessor.sendMessage(sender.uuid(), PlayerMessages.invalidCommand, "frobnicate");
         sender.sentMessages.clear();
 
         // Create a custom RTP root command to use its onCommand logic
@@ -119,7 +121,7 @@ public class InvalidCommandTest {
         accessor.addPlayer(sender);
 
         // Ensure messages are loaded
-        accessor.sendMessage(sender.uuid(), MessagesKeys.busy, "");
+        accessor.sendMessage(sender.uuid(), PlayerMessages.busy, "");
         sender.sentMessages.clear();
 
         io.github.dailystruggle.rtp.common.RTP.reloading.set(true);
@@ -148,7 +150,7 @@ public class InvalidCommandTest {
         accessor.addPlayer(console);
 
         // Pre-heat language parser
-        accessor.sendMessage(console.uuid(), MessagesKeys.invalidCommand, "frobnicate");
+        accessor.sendMessage(console.uuid(), PlayerMessages.invalidCommand, "frobnicate");
         console.sentMessages.clear();
 
         TestRTPCmd rtpCmd = new TestRTPCmd();
@@ -180,10 +182,7 @@ public class InvalidCommandTest {
         accessor.addPlayer(sender);
 
         // Pre-heat language parser
-        io.github.dailystruggle.rtp.common.configuration.ConfigParser<MessagesKeys> lang =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<MessagesKeys>)
-                        io.github.dailystruggle.rtp.common.RTP.configs.getParser(MessagesKeys.class);
-        lang.getData().put(MessagesKeys.badArg, "bad parameter - [arg]");
+        ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) io.github.dailystruggle.rtp.common.RTP.configs.getParser(PlayerMessages.class)).set(PlayerMessages.badArg, "bad parameter - [arg]");
 
         sender.sentMessages.clear();
 

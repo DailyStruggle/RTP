@@ -5,7 +5,7 @@ import io.github.dailystruggle.mapsapi.MapBinding;
 import io.github.dailystruggle.mapsapi.MapBindingLifecycle;
 import io.github.dailystruggle.mapsapi.MapHandle;
 import io.github.dailystruggle.mapsapi.noop.NoopMapBinding;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
@@ -18,7 +18,6 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
-
 /**
  * Orchestrator for the ADR-047 declarative chart-composition bridge
  * (REQ-RTP-MAP-006): given a {@link ChartSpec} and a viewer UUID,
@@ -31,14 +30,14 @@ import java.util.logging.Level;
  *
  * <ol>
  *   <li>If the active {@code MapBinding} is the {@link NoopMapBinding},
- *       send {@link MessagesKeys#mapBindingMissing} and log WARNING.</li>
+ *       send {@link CommandMessages#mapBindingMissing} and log WARNING.</li>
  *   <li>Look up {@link ChartSpecResolvers#get}; on {@code null}, send
- *       {@link MessagesKeys#mapResolverMissing} and log WARNING.</li>
+ *       {@link CommandMessages#mapResolverMissing} and log WARNING.</li>
  *   <li>Call {@link ChartSpecResolver#resolve}; on
  *       {@link ChartSpecResolver.UnresolvableChartSpecException}, send
- *       {@link MessagesKeys#mapUnavailable} and log WARNING.</li>
+ *       {@link CommandMessages#mapUnavailable} and log WARNING.</li>
  *   <li>Allocate a handle via {@link MapBinding#allocate}; on any
- *       {@link RuntimeException}, send {@link MessagesKeys#mapBusy} and log
+ *       {@link RuntimeException}, send {@link CommandMessages#mapBusy} and log
  *       WARNING.</li>
  *   <li>Paint via {@link MapBinding#renderEphemeral}.</li>
  * </ol>
@@ -246,7 +245,7 @@ public final class MapDispatch {
       RTP.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
               + " skipped: no concrete MapBinding installed (NoopMapBinding active).");
-      sendMessage(viewer, MessagesKeys.mapBindingMissing);
+      sendMessage(viewer, CommandMessages.mapBindingMissing);
       return false;
     }
 
@@ -255,7 +254,7 @@ public final class MapDispatch {
       RTP.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
               + " skipped: no ChartSpecResolver registered.");
-      sendMessage(viewer, MessagesKeys.mapResolverMissing);
+      sendMessage(viewer, CommandMessages.mapResolverMissing);
       return false;
     }
 
@@ -276,7 +275,7 @@ public final class MapDispatch {
       RTP.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
               + " unresolvable: " + e.getMessage());
-      sendMessage(viewer, MessagesKeys.mapUnavailable);
+      sendMessage(viewer, CommandMessages.mapUnavailable);
       return false;
     } catch (RuntimeException e) {
       // S-004: never swallow. Defensive translation of an unexpected
@@ -285,7 +284,7 @@ public final class MapDispatch {
       RTP.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
               + " resolver threw: " + e.getMessage(), e);
-      sendMessage(viewer, MessagesKeys.mapUnavailable);
+      sendMessage(viewer, CommandMessages.mapUnavailable);
       return false;
     }
 
@@ -309,7 +308,7 @@ public final class MapDispatch {
       RTP.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
               + " allocate failed: " + e.getMessage(), e);
-      sendMessage(viewer, MessagesKeys.mapBusy);
+      sendMessage(viewer, CommandMessages.mapBusy);
       return false;
     }
 
@@ -362,7 +361,7 @@ public final class MapDispatch {
       RTP.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
               + " render failed: " + e.getMessage(), e);
-      sendMessage(viewer, MessagesKeys.mapUnavailable);
+      sendMessage(viewer, CommandMessages.mapUnavailable);
       return false;
     } finally {
       MemoryTracker.untrack(trackingId);
@@ -394,7 +393,7 @@ public final class MapDispatch {
         RTP.log(Level.WARNING,
             "ChartSpec " + spec.kind() + " for viewer " + viewer
                 + " deliverTo failed: " + e.getMessage(), e);
-        sendMessage(viewer, MessagesKeys.mapUnavailable);
+        sendMessage(viewer, CommandMessages.mapUnavailable);
       }
     };
 
@@ -418,7 +417,7 @@ public final class MapDispatch {
     return true;
   }
 
-  private static void sendMessage(UUID viewer, MessagesKeys key) {
+  private static void sendMessage(UUID viewer, Enum<?> key) {
     if (RTP.serverAccessor == null) return; // test contexts; warning already logged
     try {
       RTP.serverAccessor.sendMessage(viewer, key);

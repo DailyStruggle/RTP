@@ -1,0 +1,7 @@
+# --- Language Mapping: biomes.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# biomes.yml (right). Restored from the pre-split per-locale safety.lang.yml
+# so the translated key names survive the ADR-071 advanced/ relocation.
+biomeWhitelist: "生物群系白名单"
+biomes: "生物群系"
+version: "version"

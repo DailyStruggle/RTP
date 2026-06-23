@@ -1,0 +1,8 @@
+# --- Language Mapping: blocks.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# blocks.yml (right). blocks.yml is language-neutral (material-id list), so
+# every row is identity; the file exists purely to mirror the value file
+# under lang/advanced/ and keep the config loader's path uniform.
+airBlocks: "airBlocks"
+unsafeBlocks: "unsafeBlocks"
+version: "version"

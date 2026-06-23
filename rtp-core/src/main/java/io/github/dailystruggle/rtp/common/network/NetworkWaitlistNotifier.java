@@ -1,8 +1,7 @@
 package io.github.dailystruggle.rtp.common.network;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -32,7 +31,7 @@ import java.util.logging.Level;
  * {@link #start(long)} / {@link #shutdown()}.</p>
  *
  * <p>The rendered body is sourced from
- * {@link MessagesKeys#networkQueued} in {@code messages.yml} per
+ * {@link NetworkMessages#networkQueued} in {@code messages.yml} per
  * REQ-RTP-F-013. Placeholder {@code [position]} is substituted client-side
  * with the FIFO position when known.</p>
  */
@@ -41,7 +40,7 @@ public class NetworkWaitlistNotifier {
     /**
      * Hardcoded fallback used only when {@code RTP.configs} has not been
      * initialised (test contexts, very early bootstrap). Production
-     * rendering reads {@link MessagesKeys#networkQueued} from
+     * rendering reads {@link NetworkMessages#networkQueued} from
      * {@code messages.yml} per REQ-RTP-F-013.
      */
     private static final String DEFAULT_NETWORK_QUEUED =
@@ -138,11 +137,9 @@ public class NetworkWaitlistNotifier {
     private static String resolveTemplate() {
         try {
             if (RTP.configs != null) {
-                ConfigParser<MessagesKeys> parser =
-                        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-                if (parser != null) {
-                    Object v = parser.getConfigValue(
-                            MessagesKeys.networkQueued, DEFAULT_NETWORK_QUEUED);
+                if (RTP.configs != null) {
+                    Object v = RTP.configs.getConfigValue(
+                            NetworkMessages.networkQueued, DEFAULT_NETWORK_QUEUED);
                     if (v != null) return v.toString();
                 }
             }

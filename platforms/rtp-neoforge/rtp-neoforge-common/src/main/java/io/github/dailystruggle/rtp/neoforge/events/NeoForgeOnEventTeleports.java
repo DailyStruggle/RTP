@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.neoforge.events;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
@@ -109,7 +109,7 @@ public final class NeoForgeOnEventTeleports {
                 TeleportData data = RTP.getInstance().latestTeleportData.get(id);
                 long time = (data == null) ? 0 : data.time;
                 if (!sender.hasPermission("rtp.nocooldown") && (start - time) < cooldownTime) {
-                    RTP.serverAccessor.sendMessage(id, MessagesKeys.cooldownMessage);
+                    RTP.serverAccessor.sendMessage(id, PlayerMessages.cooldownMessage);
                     return;
                 }
                 if (verbose) {

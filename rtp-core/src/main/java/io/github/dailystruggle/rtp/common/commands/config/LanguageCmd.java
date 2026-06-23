@@ -3,11 +3,10 @@ package io.github.dailystruggle.rtp.common.commands.config;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
 import org.jetbrains.annotations.Nullable;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
@@ -78,9 +77,7 @@ public class LanguageCmd extends BaseRTPCmdImpl {
       return false;
     }
 
-    ConfigParser<MessagesKeys> lang =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    String updateMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updating, ""));
+    String updateMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updating, ""));
     updateMsg = updateMsg.replace("[filename]", LanguageBootstrap.FILE_NAME);
     RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updateMsg);
 
@@ -102,7 +99,7 @@ public class LanguageCmd extends BaseRTPCmdImpl {
         return;
       }
 
-      String updatedMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updated, ""));
+      String updatedMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updated, ""));
       updatedMsg = updatedMsg.replace("[filename]", LanguageBootstrap.FILE_NAME);
       RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updatedMsg);
 

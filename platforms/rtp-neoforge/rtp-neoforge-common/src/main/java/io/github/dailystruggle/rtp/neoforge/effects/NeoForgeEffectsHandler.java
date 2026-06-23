@@ -1,4 +1,5 @@
 package io.github.dailystruggle.rtp.neoforge.effects;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
+import io.github.dailystruggle.rtp.common.configuration.Messages;
 
 /**
  * NeoForge counterpart of
@@ -145,26 +147,23 @@ public final class NeoForgeEffectsHandler {
             if (!(task.player() instanceof NeoForgeRTPPlayer np)) return;
 
             @SuppressWarnings("unchecked")
-            io.github.dailystruggle.rtp.common.configuration.ConfigParser<
-                    io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys> lang =
-                    (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
-                            io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys>)
-                            RTP.configs.getParser(
-                                    io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.class);
+            io.github.dailystruggle.rtp.common.configuration.ConfigParser<PlayerMessages> lang =
+                    (io.github.dailystruggle.rtp.common.configuration.ConfigParser<PlayerMessages>)
+                            RTP.configs.getParser(PlayerMessages.class);
             if (lang == null) return;
 
-            final String title = lang.getConfigValue(
-                    io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.title, "").toString();
-            final String subtitle = lang.getConfigValue(
-                    io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.subtitle, "").toString();
+            final String title = RTP.configs.getConfigValue(
+                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.title, "").toString();
+            final String subtitle = RTP.configs.getConfigValue(
+                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.subtitle, "").toString();
             final int fadeIn = lang.getNumber(
-                    io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.fadeIn, 0).intValue();
+                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.fadeIn, 0).intValue();
             final int stay = lang.getNumber(
-                    io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.stay, 0).intValue();
+                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.stay, 0).intValue();
             final int fadeOut = lang.getNumber(
-                    io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.fadeOut, 0).intValue();
-            final String actionbar = lang.getConfigValue(
-                    io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.actionbar, "").toString();
+                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.fadeOut, 0).intValue();
+            final String actionbar = RTP.configs.getConfigValue(
+                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.actionbar, "").toString();
 
             if ((title == null || title.isEmpty())
                     && (subtitle == null || subtitle.isEmpty())

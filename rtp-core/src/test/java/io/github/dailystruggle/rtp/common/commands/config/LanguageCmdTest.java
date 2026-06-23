@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.config;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
@@ -41,12 +40,16 @@ public class LanguageCmdTest {
         Configs configs = new Configs(tempDir.toFile());
         RTP.configs = configs;
 
-        ConfigParser<MessagesKeys> lang = mock(ConfigParser.class);
+        ConfigParser lang = mock(ConfigParser.class);
         lang.language_mapping = new java.util.concurrent.ConcurrentHashMap<>();
         lang.reverse_language_mapping = new java.util.concurrent.ConcurrentHashMap<>();
         lang.name = "messages";
         when(lang.getConfigValue(any(), any())).thenReturn("");
-        configs.configParserMap.put(MessagesKeys.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages.class, lang);
 
         RTP.baseCommand = mock(io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand.class);
         Map<String, CommandsAPICommand> commandLookup = new HashMap<>();

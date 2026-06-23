@@ -1334,22 +1334,56 @@ public final class NetworkModeBootstrap {
         }
     }
 
+    /** ADR-071 rule 4: one-time deprecation latch for the relocated network.yml. */
+    private static volatile boolean warnedLegacyNetworkYml = false;
+
     /**
-     * Copy the bundled {@code network.yml} resource into the plugin data
-     * folder if it does not already exist. Mirrors the convention used by
-     * other RTP config files; idempotent.
+     * Ensure the backend's network config exists at {@code advanced/network.yml}
+     * under the plugin data folder, returning that file.
+     *
+     * <p>ADR-071 relocates this advanced-tuning file from the plugin root into the
+     * deliberate {@code advanced/} tier. The resolution order is:
+     * <ol>
+     *   <li>If {@code advanced/network.yml} already exists, use it.</li>
+     *   <li>Otherwise, if a legacy root {@code network.yml} exists (a pre-ADR-071
+     *       install), move the operator's file into {@code advanced/} verbatim and
+     *       log a one-time deprecation warning. A silent relocation that strands an
+     *       operator's tuned transport settings is prohibited (rule 4).</li>
+     *   <li>Otherwise, extract the bundled {@code advanced/network.yml} resource.</li>
+     * </ol>
+     * Idempotent.
      */
     public static File ensureNetworkYml(File pluginDataFolder, Class<?> resourceOwner) {
-        File target = new File(pluginDataFolder, "network.yml");
+        File target = new File(pluginDataFolder, "advanced" + File.separator + "network.yml");
         if (target.isFile()) return target;
-        try (InputStream in = resourceOwner.getClassLoader().getResourceAsStream("network.yml")) {
+
+        //noinspection ResultOfMethodCallIgnored
+        target.getParentFile().mkdirs();
+
+        // Migrate a legacy root network.yml (pre-ADR-071) into advanced/ verbatim.
+        File legacy = new File(pluginDataFolder, "network.yml");
+        if (legacy.isFile()) {
+            try {
+                Files.move(legacy.toPath(), target.toPath());
+                if (!warnedLegacyNetworkYml) {
+                    warnedLegacyNetworkYml = true;
+                    RTP.log(Level.WARNING, "[RTP] 'network.yml' has moved to 'advanced/network.yml' "
+                            + "(ADR-071). Your existing transport settings were migrated automatically.");
+                }
+                return target;
+            } catch (IOException e) {
+                RTP.log(Level.WARNING,
+                        "[RTP] failed to migrate legacy network.yml into advanced/: " + e.getMessage(), e);
+                // Fall through to extraction so the backend still has a usable file.
+            }
+        }
+
+        try (InputStream in = resourceOwner.getClassLoader().getResourceAsStream("advanced/network.yml")) {
             if (in == null) return target;
-            //noinspection ResultOfMethodCallIgnored
-            pluginDataFolder.mkdirs();
             Files.copy(in, target.toPath());
         } catch (IOException e) {
             RTP.log(Level.WARNING,
-                    "[RTP] failed to write default network.yml: " + e.getMessage(), e);
+                    "[RTP] failed to write default advanced/network.yml: " + e.getMessage(), e);
         }
         return target;
     }

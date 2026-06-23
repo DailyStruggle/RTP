@@ -1,9 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.info;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
@@ -20,9 +19,9 @@ import org.jetbrains.annotations.Nullable;
  * time in (sampled periodically by the platform adapter), ordered by descending
  * share. Read-only; never triggers a teleport.
  *
- * <p>The three line templates ({@link MessagesKeys#infoBiomeActivityHeader},
- * {@link MessagesKeys#infoBiomeActivityRow},
- * {@link MessagesKeys#infoBiomeActivityEmpty}) carry their own {@code [biome*]}
+ * <p>The three line templates ({@link CommandMessages#infoBiomeActivityHeader},
+ * {@link CommandMessages#infoBiomeActivityRow},
+ * {@link CommandMessages#infoBiomeActivityEmpty}) carry their own {@code [biome*]}
  * tokens; an empty template skips that line silently so locales missing the keys
  * keep working.
  */
@@ -75,18 +74,16 @@ public class BiomeActivityCmd extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
-    ConfigParser<MessagesKeys> lang =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
     Map<String, Long> snapshot = RTP.biomeActivity.snapshot();
     long total = RTP.biomeActivity.totalSamples();
 
     if (snapshot.isEmpty() || total <= 0L) {
-      emit(callerId, lang.getConfigValue(MessagesKeys.infoBiomeActivityEmpty, "").toString());
+      emit(callerId, RTP.configs.getConfigValue(CommandMessages.infoBiomeActivityEmpty, "").toString());
       return true;
     }
 
-    String header = lang.getConfigValue(MessagesKeys.infoBiomeActivityHeader, "").toString();
+    String header = RTP.configs.getConfigValue(CommandMessages.infoBiomeActivityHeader, "").toString();
     if (!header.isEmpty()) {
       header =
           header
@@ -95,7 +92,7 @@ public class BiomeActivityCmd extends BaseRTPCmdImpl {
       emit(callerId, header);
     }
 
-    String rowTemplate = lang.getConfigValue(MessagesKeys.infoBiomeActivityRow, "").toString();
+    String rowTemplate = RTP.configs.getConfigValue(CommandMessages.infoBiomeActivityRow, "").toString();
     if (rowTemplate.isEmpty()) return true;
 
     int rank = 0;

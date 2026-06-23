@@ -1,5 +1,10 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
+import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
+
+import java.util.List;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -142,5 +147,86 @@ public class Adr071LegacyConfigMigrationTest {
         // alter the merge result).
         Map<String, Object> again = configs.getDatabaseConfig();
         assertEquals("mysql", String.valueOf(again.get("type")));
+    }
+
+    // --- ADR-071 rule 4: whole-file relocation into advanced/ ---
+
+    @Test
+    @DisplayName("migrateLegacyRootConfig folds a legacy root logging.yml into the relocated parser and archives it")
+    void migratesLegacyRootLoggingFile() throws IOException {
+        // A pre-ADR-071 install left logging.yml at the plugin root with a customized value.
+        Files.writeString(tempDir.resolve("logging.yml"),
+                "command: true\nteleport: false\nversion: 1.0\n");
+
+        Configs configs = new Configs(tempDir.toFile());
+        ConfigParser<LoggingKeys> parser = new ConfigParser<>(
+                LoggingKeys.class, "advanced/logging.yml", "1.1", tempDir.toFile(),
+                new YamlFileDatabase(tempDir.toFile()), "en");
+
+        configs.migrateLegacyRootConfig(parser, "logging.yml");
+
+        assertEquals("true", String.valueOf(parser.getConfigValue(LoggingKeys.command, null)),
+                "customized legacy logging.command must be carried forward to advanced/logging.yml");
+        assertEquals("false", String.valueOf(parser.getConfigValue(LoggingKeys.teleport, null)),
+                "customized legacy logging.teleport must be carried forward");
+        assertFalse(tempDir.resolve("logging.yml").toFile().exists(),
+                "the legacy root logging.yml must be archived (renamed), not left in place");
+        assertTrue(tempDir.resolve("logging.yml.migrated").toFile().exists(),
+                "the legacy file must be archived as logging.yml.migrated");
+    }
+
+    // --- ADR-071 rule 4: split-key relocation out of a file that stays in place ---
+
+    @Test
+    @DisplayName("migrateLegacyKeysFromFile folds moved safety.yml keys into the relocated parser and leaves safety.yml in place")
+    void migratesSplitKeysFromSafetyFile() throws IOException {
+        // A pre-ADR-071 install carries airBlocks/unsafeBlocks inside safety.yml.
+        Files.writeString(tempDir.resolve("safety.yml"),
+                "invulnerabilityTime: 5\n"
+                        + "airBlocks:\n"
+                        + "  - \"AIR\"\n"
+                        + "  - \"CAVE_AIR\"\n"
+                        + "unsafeBlocks:\n"
+                        + "  - \"LAVA\"\n"
+                        + "version: 1.1\n");
+
+        Configs configs = new Configs(tempDir.toFile());
+        ConfigParser<BlocksKeys> blocks = new ConfigParser<>(
+                BlocksKeys.class, "advanced/blocks.yml", "1.0", tempDir.toFile(),
+                new YamlFileDatabase(tempDir.toFile()), "en");
+
+        configs.migrateLegacyKeysFromFile(blocks, "safety.yml", "blocks");
+
+        Object air = blocks.getConfigValue(BlocksKeys.airBlocks, null);
+        assertTrue(air instanceof List<?> && ((List<?>) air).contains("AIR"),
+                "legacy safety.yml airBlocks must be folded into advanced/blocks.yml");
+        Object unsafe = blocks.getConfigValue(BlocksKeys.unsafeBlocks, null);
+        assertTrue(unsafe instanceof List<?> && ((List<?>) unsafe).contains("LAVA"),
+                "legacy safety.yml unsafeBlocks must be folded into advanced/blocks.yml");
+        assertTrue(tempDir.resolve("safety.yml").toFile().exists(),
+                "safety.yml must stay in place (it still owns the remaining safety knobs)");
+    }
+
+    @Test
+    @DisplayName("migrateLegacyKeysFromFile is a no-op when the legacy source file is absent")
+    void migrateSplitKeysNoopWhenAbsent() {
+        Configs configs = new Configs(tempDir.toFile());
+        ConfigParser<BlocksKeys> blocks = new ConfigParser<>(
+                BlocksKeys.class, "advanced/blocks.yml", "1.0", tempDir.toFile(),
+                new YamlFileDatabase(tempDir.toFile()), "en");
+        // No safety.yml written: must not throw.
+        configs.migrateLegacyKeysFromFile(blocks, "safety.yml", "blocks");
+    }
+
+    @Test
+    @DisplayName("migrateLegacyRootConfig is a no-op when no legacy root file is present")
+    void migrateNoopWhenAbsent() {
+        Configs configs = new Configs(tempDir.toFile());
+        ConfigParser<LoggingKeys> parser = new ConfigParser<>(
+                LoggingKeys.class, "advanced/logging.yml", "1.1", tempDir.toFile(),
+                new YamlFileDatabase(tempDir.toFile()), "en");
+        // No legacy logging.yml written: must not throw and must not create an archive.
+        configs.migrateLegacyRootConfig(parser, "logging.yml");
+        assertFalse(tempDir.resolve("logging.yml.migrated").toFile().exists());
     }
 }

@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,7 +94,7 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
     r.sampledWorld = world.name();
 
     // --- Step 2: assert unsafe-block lookup uses a cached snapshot. ---
-    // LocationGenerator materialises SafetyKeys.unsafeBlocks once per
+    // LocationGenerator materialises BlocksKeys.unsafeBlocks once per
     // getLocation() call and iterates it per candidate; the list reference
     // must therefore be stable across repeated reads inside a single
     // decision window. We read twice and demand identity to surface any
@@ -102,14 +102,14 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
     // also violate the "zero config memory tree lock contention" note in
     // the job spec).
     @SuppressWarnings("unchecked")
-    ConfigParser<SafetyKeys> safetyParser =
-        (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-    if (safetyParser == null) {
-      r.notes = "SafetyKeys parser missing";
+    ConfigParser<BlocksKeys> blocksParser =
+        (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
+    if (blocksParser == null) {
+      r.notes = "BlocksKeys parser missing";
       return r;
     }
-    Object snap1 = safetyParser.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
-    Object snap2 = safetyParser.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+    Object snap1 = blocksParser.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
+    Object snap2 = blocksParser.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
     r.unsafeBlocksCached = (snap1 == snap2);
     // Record the bucket size so operators can cross-check against their
     // configured unsafeBlocks list length without scraping the YAML.

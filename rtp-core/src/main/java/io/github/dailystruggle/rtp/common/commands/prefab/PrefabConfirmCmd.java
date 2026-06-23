@@ -23,7 +23,6 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 import org.jetbrains.annotations.Nullable;
-
 /**
  * {@code /rtp admin prefab confirm <id> <token>} - validate a confirmation
  * nonce. Per the locked design decision (no {@code --commit} flag), this is
@@ -186,7 +185,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
 
         // Best-effort reload: not fatal if it fails (the files are correct on
         // disk; the operator can /rtp reload manually). Mirror ReloadCmd's
-        // user-facing chatter (MessagesKeys.reloading / reloaded with
+        // user-facing chatter (SystemMessages.reloading / reloaded with
         // [filename] -> "configs") so prefab confirm produces the same
         // "loading configs..." / "successfully loaded configs." lines the
         // operator sees on /rtp reload, instead of a silent swap.
@@ -195,7 +194,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         try {
             if (RTP.configs != null) {
                 emitReloadStatus(callerId,
-                        io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.reloading);
+                        io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages.reloading);
                 RTP.reloading.set(true);
                 try {
                     reloaded = RTP.configs.reload();
@@ -204,7 +203,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
                 }
                 if (reloaded) {
                     emitReloadStatus(callerId,
-                            io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.reloaded);
+                            io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages.reloaded);
                 }
             }
         } catch (RuntimeException re) {
@@ -410,7 +409,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
      * reload}. Mirrors the pattern in {@code ReloadCmd}.
      */
     private void emitReloadStatus(UUID callerId,
-                                  io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys key) {
+                                  Enum<?> key) {
         String tmpl;
         try {
             tmpl = msg(key, "");

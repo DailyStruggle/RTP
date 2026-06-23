@@ -1,9 +1,7 @@
 package io.github.dailystruggle.rtp.common.tools;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-
 /**
  * Resolves {@code /rtp info} health colour bands per {@code METRICS_PLAN.md > Health
  * colour coding} (B12). Returns a legacy {@code &}-code prefix ({@code &a} green,
@@ -61,8 +59,8 @@ public final class ColourBands {
      */
     public static String forTps(double tps) {
         if (Double.isNaN(tps)) return UNKNOWN;
-        double green = resolveDouble(MessagesKeys.infoThresholdTpsGreen, DEFAULT_TPS_GREEN);
-        double yellow = resolveDouble(MessagesKeys.infoThresholdTpsYellow, DEFAULT_TPS_YELLOW);
+        double green = resolveDouble(CommandMessages.infoThresholdTpsGreen, DEFAULT_TPS_GREEN);
+        double yellow = resolveDouble(CommandMessages.infoThresholdTpsYellow, DEFAULT_TPS_YELLOW);
         if (tps >= green) return GREEN;
         if (tps >= yellow) return YELLOW;
         return RED;
@@ -78,8 +76,8 @@ public final class ColourBands {
      */
     public static String forMspt(double msptMs) {
         if (Double.isNaN(msptMs)) return UNKNOWN;
-        double green = resolveDouble(MessagesKeys.infoThresholdMsptGreen, DEFAULT_MSPT_GREEN);
-        double yellow = resolveDouble(MessagesKeys.infoThresholdMsptYellow, DEFAULT_MSPT_YELLOW);
+        double green = resolveDouble(CommandMessages.infoThresholdMsptGreen, DEFAULT_MSPT_GREEN);
+        double yellow = resolveDouble(CommandMessages.infoThresholdMsptYellow, DEFAULT_MSPT_YELLOW);
         if (msptMs <= green) return GREEN;
         if (msptMs <= yellow) return YELLOW;
         return RED;
@@ -109,8 +107,8 @@ public final class ColourBands {
      */
     public static String forCacheFill(double fillRatio) {
         if (Double.isNaN(fillRatio)) return UNKNOWN;
-        double green = resolveDouble(MessagesKeys.infoThresholdCacheFillGreen, DEFAULT_CACHE_FILL_GREEN);
-        double yellow = resolveDouble(MessagesKeys.infoThresholdCacheFillYellow, DEFAULT_CACHE_FILL_YELLOW);
+        double green = resolveDouble(CommandMessages.infoThresholdCacheFillGreen, DEFAULT_CACHE_FILL_GREEN);
+        double yellow = resolveDouble(CommandMessages.infoThresholdCacheFillYellow, DEFAULT_CACHE_FILL_YELLOW);
         if (fillRatio >= green) return GREEN;
         if (fillRatio >= yellow) return YELLOW;
         return RED;
@@ -127,7 +125,7 @@ public final class ColourBands {
     public static String forNetworkAge(double ageSeconds) {
         if (Double.isNaN(ageSeconds)) return UNKNOWN;
         double yellow =
-                resolveDouble(MessagesKeys.infoThresholdNetworkAgeYellow, DEFAULT_NETWORK_AGE_YELLOW);
+                resolveDouble(CommandMessages.infoThresholdNetworkAgeYellow, DEFAULT_NETWORK_AGE_YELLOW);
         return (ageSeconds < yellow) ? GREEN : YELLOW;
     }
 
@@ -137,14 +135,11 @@ public final class ColourBands {
      * when the configuration system is not yet initialised. Never throws.
      */
     @SuppressWarnings("unchecked")
-    static double resolveDouble(MessagesKeys key, double fallback) {
+    static double resolveDouble(Enum<?> key, double fallback) {
         try {
             RTP rtp = RTP.getInstance();
             if (rtp == null || RTP.configs == null) return fallback;
-            ConfigParser<MessagesKeys> parser =
-                    (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-            if (parser == null) return fallback;
-            Object raw = parser.getConfigValue(key, null);
+            Object raw = RTP.configs.getConfigValue(key, null);
             return parseDouble(raw, fallback);
         } catch (Throwable t) {
             return fallback;

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.bukkitListeners;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
@@ -312,7 +312,7 @@ public class OnEventTeleports implements Listener {
       TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
       long time = (data == null) ? 0 : data.time;
       if (!player.hasPermission("rtp.nocooldown") && (start - time) < cooldownTime) {
-        RTP.serverAccessor.sendMessage(player.getUniqueId(), MessagesKeys.cooldownMessage);
+        RTP.serverAccessor.sendMessage(player.getUniqueId(), PlayerMessages.cooldownMessage);
         return;
       }
       if (verbose) RTP.log(Level.INFO, "#0080FF[RTP] teleporting player:" + player + " on join");

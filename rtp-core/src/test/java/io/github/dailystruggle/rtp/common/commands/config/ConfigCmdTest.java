@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.commands.config;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -108,10 +107,10 @@ public class ConfigCmdTest {
         }).when(performanceConfig).setConfigValue(anyString(), any());
         configs.configParserMap.put(PerformanceKeys.class, performanceConfig);
 
-        ConfigParser<MessagesKeys> lang = mock(io.github.dailystruggle.rtp.common.configuration.ConfigParser.class);
+        ConfigParser lang = mock(io.github.dailystruggle.rtp.common.configuration.ConfigParser.class);
         lang.language_mapping = new java.util.concurrent.ConcurrentHashMap<>();
         lang.reverse_language_mapping = new java.util.concurrent.ConcurrentHashMap<>();
-        doReturn(new java.util.EnumMap<>(io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.class)).when(lang).getData();
+        doReturn(new java.util.EnumMap<>(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.class)).when(lang).getData();
         when(lang.getConfigValue(any(), any())).thenReturn("");
         lang.name = "messages";
         try {
@@ -119,7 +118,11 @@ public class ConfigCmdTest {
             fileDatabaseField.setAccessible(true);
             fileDatabaseField.set(lang, mockDb);
         } catch (Exception e) {}
-        configs.configParserMap.put(MessagesKeys.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages.class, lang);
 
         RTP.baseCommand = mock(io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand.class);
         Map<String, io.github.dailystruggle.commandsapi.common.CommandsAPICommand> commandLookup = new HashMap<>();

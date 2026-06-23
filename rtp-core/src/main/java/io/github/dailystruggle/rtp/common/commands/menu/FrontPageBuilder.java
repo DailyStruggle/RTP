@@ -2,14 +2,13 @@ package io.github.dailystruggle.rtp.common.commands.menu;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +17,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
-
 /**
  * Stage B — curated front-page builder for {@code /rtp menu} (no args).
  *
@@ -46,8 +44,8 @@ import java.util.function.Predicate;
  *   <li>One token is minted per clickable fragment, mirroring
  *       {@link CommandTreeMenuBuilder}'s contract so renderers can carry
  *       opaque {@code menu:<token>} payloads (ADR-035 §3).</li>
- *   <li>Title and hint rows reuse {@link MessagesKeys#menuRootTitle} /
- *       {@link MessagesKeys#menuRootHint} from Stage A.5, keeping visual
+ *   <li>Title and hint rows reuse {@link CommandMessages#menuRootTitle} /
+ *       {@link CommandMessages#menuRootHint} from Stage A.5, keeping visual
  *       consistency with the reflector page when an admin disables Stage B.</li>
  * </ul>
  */
@@ -96,7 +94,7 @@ public final class FrontPageBuilder {
 
         // Title + hint (same as the reflector's root page so the two pages
         // share visual chrome).
-        String title = lookupMsg(MessagesKeys.menuRootTitle, "&6&l⚡ RTP menu");
+        String title = lookupMsg(CommandMessages.menuRootTitle, "&6&l⚡ RTP menu");
         if (title != null && !title.isEmpty()) {
             lines.add(MenuLine.of(new MenuFragment(title, null, null)));
         }
@@ -111,7 +109,7 @@ public final class FrontPageBuilder {
 
         // Section divider before the teleport block (always present).
         String teleportSection =
-                lookupMsg(MessagesKeys.menuFrontPageSectionTeleport, "&8» #3E6B45 teleport");
+                lookupMsg(CommandMessages.menuFrontPageSectionTeleport, "&8» #3E6B45 teleport");
         if (teleportSection != null && !teleportSection.isEmpty()) {
             lines.add(MenuLine.of(new MenuFragment(teleportSection, null, null)));
         }
@@ -120,7 +118,7 @@ public final class FrontPageBuilder {
         // whether the caller can teleport).
         addParsedRow(
                 lines,
-                lookupMsg(MessagesKeys.menuFrontPageRowTeleport, "#1B7A33🎲 teleport &7- /rtp"),
+                lookupMsg(CommandMessages.menuFrontPageRowTeleport, "#1B7A33🎲 teleport &7- /rtp"),
                 new MenuAction.RunRtpCommand(new String[0]));
 
         // Blank spacer separating the teleport action from the pickers.
@@ -143,7 +141,7 @@ public final class FrontPageBuilder {
         // Help footer — always last, always visible.
         addParsedRow(
                 lines,
-                lookupMsg(MessagesKeys.menuFrontPageRowHelp, "#7A4FB8❓ list commands &7- /rtp help"),
+                lookupMsg(CommandMessages.menuFrontPageRowHelp, "#7A4FB8❓ list commands &7- /rtp help"),
                 new MenuAction.RunRtpCommand(new String[]{"help"}));
 
         MenuPage page = new MenuPage(lines);
@@ -173,7 +171,7 @@ public final class FrontPageBuilder {
                 && parameterHasSuggestions(regionParam, viewer)) {
             addParsedRow(
                     lines,
-                    lookupMsg(MessagesKeys.menuFrontPageRowRegion, "#1F6FB2🌍 pick a region &7- /rtp region:..."),
+                    lookupMsg(CommandMessages.menuFrontPageRowRegion, "#1F6FB2🌍 pick a region &7- /rtp region:..."),
                     new MenuAction.RunRtpCommand(new String[]{"menu", "region"}));
         }
         CommandParameter worldParam = findParameter(rtpRoot, "world");
@@ -182,7 +180,7 @@ public final class FrontPageBuilder {
                 && parameterHasSuggestions(worldParam, viewer)) {
             addParsedRow(
                     lines,
-                    lookupMsg(MessagesKeys.menuFrontPageRowWorld, "#1F6FB2🌐 pick a world &7- /rtp world:..."),
+                    lookupMsg(CommandMessages.menuFrontPageRowWorld, "#1F6FB2🌐 pick a world &7- /rtp world:..."),
                     new MenuAction.RunRtpCommand(new String[]{"menu", "world"}));
         }
         CommandParameter biomeParam = findParameter(rtpRoot, "biome");
@@ -191,7 +189,7 @@ public final class FrontPageBuilder {
                 && parameterHasSuggestions(biomeParam, viewer)) {
             addParsedRow(
                     lines,
-                    lookupMsg(MessagesKeys.menuFrontPageRowBiome, "#1F8A40🌳 pick a biome &7- /rtp biome:..."),
+                    lookupMsg(CommandMessages.menuFrontPageRowBiome, "#1F8A40🌳 pick a biome &7- /rtp biome:..."),
                     new MenuAction.RunRtpCommand(new String[]{"menu", "biome"}));
         }
     }
@@ -211,11 +209,11 @@ public final class FrontPageBuilder {
      */
     private void appendAdminRows(List<MenuLine> lines) {
         String[] labelHover = splitRowLabel(
-                lookupMsg(MessagesKeys.menuFrontPageRowAdmin, "&6⚙ Admin panel"));
+                lookupMsg(CommandMessages.menuFrontPageRowAdmin, "&6⚙ Admin panel"));
         // Prefer the dedicated admin hover message; fall back to the
         // description parsed out of the row label.
         String hover = lookupMsg(
-                MessagesKeys.menuFrontPageHoverAdmin,
+                CommandMessages.menuFrontPageHoverAdmin,
                 "Operator tools: config, scans, diagnostics, reload.");
         if (hover == null || hover.isEmpty()) hover = labelHover[1];
         addRow(lines, labelHover[0], hover, new MenuAction.OpenAdminPanel());
@@ -358,12 +356,9 @@ public final class FrontPageBuilder {
     }
 
     @SuppressWarnings("unchecked")
-    private static String lookupMsg(MessagesKeys key, String fallback) {
+    private static String lookupMsg(Enum<?> key, String fallback) {
         if (RTP.configs == null) return fallback;
-        ConfigParser<MessagesKeys> lang =
-                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        if (lang == null) return fallback;
-        Object v = lang.getConfigValue(key, fallback);
+        Object v = RTP.configs.getConfigValue(key, fallback);
         return v == null ? fallback : v.toString();
     }
 }

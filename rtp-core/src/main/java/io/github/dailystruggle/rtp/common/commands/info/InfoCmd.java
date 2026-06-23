@@ -2,14 +2,13 @@ package io.github.dailystruggle.rtp.common.commands.info;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
 import io.github.dailystruggle.rtp.api.DownloadInfo;
@@ -17,7 +16,6 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.Nullable;
-
 public class InfoCmd extends BaseRTPCmdImpl {
   public InfoCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
@@ -71,16 +69,14 @@ public class InfoCmd extends BaseRTPCmdImpl {
   }
 
   /**
-   * {@link MessagesKeys}-keyed variant of {@link #emit(UUID, String)}. When the
+   * Enum-keyed variant of {@link #emit(UUID, String)}. When the
    * tap is active the key is resolved from the language parser, substituted,
    * and forwarded; otherwise the call is delegated to the normal accessor.
    */
-  private static void emit(UUID callerId, MessagesKeys key) {
+  private static void emit(UUID callerId, Enum<?> key) {
     java.util.function.Consumer<String> tap = RTP.messageTap.get();
     if (tap != null) {
-      ConfigParser<MessagesKeys> lang =
-          (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-      String raw = lang == null ? "" : lang.getConfigValue(key, "").toString();
+      String raw = RTP.configs == null ? "" : String.valueOf(RTP.configs.getConfigValue(key, ""));
       if (!raw.isEmpty()) tap.accept(PlaceholderProvider.fillPlaceholders(raw, callerId));
       return;
     }
@@ -103,8 +99,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
     RTP.serverAccessor.sendMessageAndSuggest(callerId, line, suggestion);
   }
 
-  private void sendWorldInfo(UUID callerId, RTPWorld world, ConfigParser<MessagesKeys> lang) {
-    Object worldInfoObj = lang.getConfigValue(MessagesKeys.worldInfo, "");
+  private void sendWorldInfo(UUID callerId, RTPWorld world) {
+    Object worldInfoObj = RTP.configs.getConfigValue(CommandMessages.worldInfo, "");
     if (!(worldInfoObj instanceof List)) return;
     List<String> worldInfo =
         ((List<?>) worldInfoObj).stream().map(String::valueOf).collect(Collectors.toList());
@@ -117,8 +113,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
     }
   }
 
-  private void sendRegionInfo(UUID callerId, Region region, ConfigParser<MessagesKeys> lang) {
-    Object regionInfoObj = lang.getConfigValue(MessagesKeys.regionInfo, "");
+  private void sendRegionInfo(UUID callerId, Region region) {
+    Object regionInfoObj = RTP.configs.getConfigValue(CommandMessages.regionInfo, "");
     if (!(regionInfoObj instanceof List)) return;
     List<String> regionInfo =
         ((List<?>) regionInfoObj).stream().map(String::valueOf).collect(Collectors.toList());
@@ -147,26 +143,24 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
   private boolean onCommandInner(
       UUID callerId, Map<String, List<String>> parameterValues) {
-    ConfigParser<MessagesKeys> lang =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
     if (parameterValues.isEmpty()) {
       if (callerId.equals(RTPAPI.serverId)) {
-        emit(callerId, MessagesKeys.infoTitle);
-        emit(callerId, MessagesKeys.infoConsoleWorldHeader);
+        emit(callerId, CommandMessages.infoTitle);
+        emit(callerId, CommandMessages.infoConsoleWorldHeader);
         for (RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
-          sendWorldInfo(callerId, world, lang);
+          sendWorldInfo(callerId, world);
         }
 
         emit(callerId, "");
-        emit(callerId, MessagesKeys.infoConsoleRegionHeader);
+        emit(callerId, CommandMessages.infoConsoleRegionHeader);
         RTP.selectionAPI.permRegionLookup.values().forEach(region -> {
-          sendRegionInfo(callerId, region, lang);
+          sendRegionInfo(callerId, region);
         });
       } else {
-        emit(callerId, MessagesKeys.infoTitle);
-        emit(callerId, MessagesKeys.infoWorldHeader);
-        String worlds = lang.getConfigValue(MessagesKeys.infoWorld, "").toString();
+        emit(callerId, CommandMessages.infoTitle);
+        emit(callerId, CommandMessages.infoWorldHeader);
+        String worlds = RTP.configs.getConfigValue(CommandMessages.infoWorld, "").toString();
         for (RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
           try {
             RTP.worldContext.set(world);
@@ -179,8 +173,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
           }
         }
 
-        emit(callerId, MessagesKeys.infoRegionHeader);
-        String regions = lang.getConfigValue(MessagesKeys.infoRegion, "").toString();
+        emit(callerId, CommandMessages.infoRegionHeader);
+        String regions = RTP.configs.getConfigValue(CommandMessages.infoRegion, "").toString();
         RTP.selectionAPI
                 .permRegionLookup
                 .values()
@@ -200,35 +194,35 @@ public class InfoCmd extends BaseRTPCmdImpl {
                         });
       }
 
-      String infoTickets = lang.getConfigValue(MessagesKeys.infoTickets, "").toString();
-      String infoTeleports = lang.getConfigValue(MessagesKeys.infoTeleports, "").toString();
-      String infoMSPT = lang.getConfigValue(MessagesKeys.infoMSPT, "").toString();
-      String infoTotalLoads = lang.getConfigValue(MessagesKeys.infoTotalLoads, "").toString();
-      String infoLoadsByOrigin = lang.getConfigValue(MessagesKeys.infoLoadsByOrigin, "").toString();
-      String infoLeakRate = lang.getConfigValue(MessagesKeys.infoLeakRate, "").toString();
+      String infoTickets = RTP.configs.getConfigValue(CommandMessages.infoTickets, "").toString();
+      String infoTeleports = RTP.configs.getConfigValue(CommandMessages.infoTeleports, "").toString();
+      String infoMSPT = RTP.configs.getConfigValue(CommandMessages.infoMSPT, "").toString();
+      String infoTotalLoads = RTP.configs.getConfigValue(CommandMessages.infoTotalLoads, "").toString();
+      String infoLoadsByOrigin = RTP.configs.getConfigValue(CommandMessages.infoLoadsByOrigin, "").toString();
+      String infoLeakRate = RTP.configs.getConfigValue(CommandMessages.infoLeakRate, "").toString();
       // Metrics SPI health block — surfaces the same MetricsSnapshot data that the
       // bStats integration and (planned) multi-server publisher consume. Per
       // METRICS_PLAN.md > /rtp info Surface, these are operator-facing live signals
       // for triage. Empty templates skip silently so existing locale files without
       // the new keys keep working unchanged.
-      String infoQueueDepth = lang.getConfigValue(MessagesKeys.infoQueueDepth, "").toString();
-      String infoPendingTeleports = lang.getConfigValue(MessagesKeys.infoPendingTeleports, "").toString();
-      String infoAvgPipelineMs = lang.getConfigValue(MessagesKeys.infoAvgPipelineMs, "").toString();
-      String infoPipelinePercentiles = lang.getConfigValue(MessagesKeys.infoPipelinePercentiles, "").toString();
-      String infoSlowPipeline = lang.getConfigValue(MessagesKeys.infoSlowPipeline, "").toString();
-      String infoQueueGrowth = lang.getConfigValue(MessagesKeys.infoQueueGrowth, "").toString();
-      String infoHeap = lang.getConfigValue(MessagesKeys.infoHeap, "").toString();
-      String infoHealthPipelineHeader = lang.getConfigValue(MessagesKeys.infoHealthPipelineHeader, "").toString();
-      String infoTps = lang.getConfigValue(MessagesKeys.infoTps, "").toString();
-      String infoMSPTLive = lang.getConfigValue(MessagesKeys.infoMSPTLive, "").toString();
-      String infoSoftCap = lang.getConfigValue(MessagesKeys.infoSoftCap, "").toString();
-      String infoDatabaseLatencyMs = lang.getConfigValue(MessagesKeys.infoDatabaseLatencyMs, "").toString();
+      String infoQueueDepth = RTP.configs.getConfigValue(CommandMessages.infoQueueDepth, "").toString();
+      String infoPendingTeleports = RTP.configs.getConfigValue(CommandMessages.infoPendingTeleports, "").toString();
+      String infoAvgPipelineMs = RTP.configs.getConfigValue(CommandMessages.infoAvgPipelineMs, "").toString();
+      String infoPipelinePercentiles = RTP.configs.getConfigValue(CommandMessages.infoPipelinePercentiles, "").toString();
+      String infoSlowPipeline = RTP.configs.getConfigValue(CommandMessages.infoSlowPipeline, "").toString();
+      String infoQueueGrowth = RTP.configs.getConfigValue(CommandMessages.infoQueueGrowth, "").toString();
+      String infoHeap = RTP.configs.getConfigValue(CommandMessages.infoHeap, "").toString();
+      String infoHealthPipelineHeader = RTP.configs.getConfigValue(CommandMessages.infoHealthPipelineHeader, "").toString();
+      String infoTps = RTP.configs.getConfigValue(CommandMessages.infoTps, "").toString();
+      String infoMSPTLive = RTP.configs.getConfigValue(CommandMessages.infoMSPTLive, "").toString();
+      String infoSoftCap = RTP.configs.getConfigValue(CommandMessages.infoSoftCap, "").toString();
+      String infoDatabaseLatencyMs = RTP.configs.getConfigValue(CommandMessages.infoDatabaseLatencyMs, "").toString();
       // ADR-052: generation success/failure rate + per-cause rejection breakdown.
-      String infoFailureRate = lang.getConfigValue(MessagesKeys.infoFailureRate, "").toString();
-      String infoFailureBreakdown = lang.getConfigValue(MessagesKeys.infoFailureBreakdown, "").toString();
-      String infoTopRejectionCause = lang.getConfigValue(MessagesKeys.infoTopRejectionCause, "").toString();
-      String infoDisclaimerHeader = lang.getConfigValue(MessagesKeys.infoDisclaimerHeader, "").toString();
-      String infoDisclaimer = lang.getConfigValue(MessagesKeys.infoDisclaimer, "").toString();
+      String infoFailureRate = RTP.configs.getConfigValue(CommandMessages.infoFailureRate, "").toString();
+      String infoFailureBreakdown = RTP.configs.getConfigValue(CommandMessages.infoFailureBreakdown, "").toString();
+      String infoTopRejectionCause = RTP.configs.getConfigValue(CommandMessages.infoTopRejectionCause, "").toString();
+      String infoDisclaimerHeader = RTP.configs.getConfigValue(CommandMessages.infoDisclaimerHeader, "").toString();
+      String infoDisclaimer = RTP.configs.getConfigValue(CommandMessages.infoDisclaimer, "").toString();
 
       // Live-metric rows render the documented "n/a" sentinel when no metrics
       // binding has sampled yet. Suppress those rows entirely (rather than print a
@@ -274,8 +268,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
       List<io.github.dailystruggle.metrics.api.FoliaRegionSample> foliaRegions =
           io.github.dailystruggle.rtp.common.tools.PlaceholderProvider.currentSnapshot().foliaRegions;
       if (!foliaRegions.isEmpty()) {
-        String infoFoliaRegionsHeader = lang.getConfigValue(MessagesKeys.infoFoliaRegionsHeader, "").toString();
-        String infoFoliaRegion = lang.getConfigValue(MessagesKeys.infoFoliaRegion, "").toString();
+        String infoFoliaRegionsHeader = RTP.configs.getConfigValue(CommandMessages.infoFoliaRegionsHeader, "").toString();
+        String infoFoliaRegion = RTP.configs.getConfigValue(CommandMessages.infoFoliaRegion, "").toString();
         if (!infoFoliaRegionsHeader.isEmpty())
           emit(callerId, infoFoliaRegionsHeader);
         if (!infoFoliaRegion.isEmpty()) {
@@ -301,7 +295,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
       for (String worldName : worldNames) {
         RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);
         if (rtpWorld == null || rtpWorld.isInactive()) continue;
-        sendWorldInfo(callerId, rtpWorld, lang);
+        sendWorldInfo(callerId, rtpWorld);
       }
     }
 
@@ -310,7 +304,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
       for (String regionName : regionNames) {
         Region region = RTP.selectionAPI.getRegion(regionName);
         if (region == null) continue;
-        sendRegionInfo(callerId, region, lang);
+        sendRegionInfo(callerId, region);
       }
     }
 

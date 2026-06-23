@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-
 /**
  * Curated confirmation-menu page builder rendered after a viewer clicks a
  * Setup-section prefab row in the admin panel (PROPOSAL-admin-panel-prefabs.md
@@ -81,7 +80,7 @@ public final class PrefabConfirmationMenuBuilder {
         List<MenuLine> lines = new ArrayList<>();
 
         // Title. Per-prefab `displayKey` is a forward-compatibility placeholder
-        // for a future MessagesKeys entry; until then we fall through to
+        // for a future Enum<?> entry; until then we fall through to
         // the prefab id as the displayed name.
         String displayName = prefab.id();
         // Book parchment contrast: yellow (&6) and white (&f) wash out on

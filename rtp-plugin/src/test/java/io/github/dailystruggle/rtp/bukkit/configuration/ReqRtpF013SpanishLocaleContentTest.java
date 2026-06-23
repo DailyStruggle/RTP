@@ -1,6 +1,9 @@
 package io.github.dailystruggle.rtp.bukkit.configuration;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.Yaml;
@@ -11,7 +14,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,7 +23,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
 /**
  * REQ-RTP-F-013 / ADR-020 — content-parity regression tests for the shipped
  * Spanish {@code messages.yml}. Per-locale {@code messages.lang.yml} maps enum
@@ -53,17 +54,30 @@ public class ReqRtpF013SpanishLocaleContentTest {
     private static final Pattern PLACEHOLDER = Pattern.compile("\\[[A-Za-z0-9_]+]");
 
     /** Keys whose YAML value is intentionally not a scalar string in the baseline. */
-    private static final Set<MessagesKeys> LIST_KEYS = EnumSet.of(
-            MessagesKeys.placeholders,
-            MessagesKeys.worldInfo,
-            MessagesKeys.regionInfo);
-    private static final Set<MessagesKeys> INT_KEYS = EnumSet.of(
-            MessagesKeys.fadeIn,
-            MessagesKeys.stay,
-            MessagesKeys.fadeOut);
-    private static final Set<MessagesKeys> BOOLEAN_KEYS = EnumSet.of(
-            MessagesKeys.showDevTag);
+    private static final Set<Enum<?>> LIST_KEYS = setOf(
+            PlaceholderMessages.placeholders,
+            CommandMessages.worldInfo,
+            CommandMessages.regionInfo);
+    private static final Set<Enum<?>> INT_KEYS = setOf(
+            PlayerMessages.fadeIn,
+            PlayerMessages.stay,
+            PlayerMessages.fadeOut);
+    private static final Set<Enum<?>> BOOLEAN_KEYS = setOf(
+            SystemMessages.showDevTag);
 
+    private static Set<Enum<?>> setOf(Enum<?>... keys) {
+        return new java.util.HashSet<>(java.util.Arrays.asList(keys));
+    }
+
+    private static List<Enum<?>> allMessageKeys() {
+        List<Enum<?>> all = new ArrayList<>();
+        java.util.Collections.addAll(all, PlaceholderMessages.values());
+        java.util.Collections.addAll(all, PlayerMessages.values());
+        java.util.Collections.addAll(all, io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages.values());
+        java.util.Collections.addAll(all, CommandMessages.values());
+        java.util.Collections.addAll(all, SystemMessages.values());
+        return all;
+    }
     /** English baseline as the union of every {@code messages/*.yml} member file. */
     private static Map<String, Object> loadBaseline() throws IOException {
         assertTrue(Files.isDirectory(BASELINE_DIR),
@@ -108,10 +122,10 @@ public class ReqRtpF013SpanishLocaleContentTest {
      * wins, baseline {@code messages.lang.yml} fills gaps, and any enum entry
      * missing from both falls back to the enum name itself (identity).
      */
-    private static Map<MessagesKeys, String> effectiveKeyMap(
+    private static Map<Enum<?>, String> effectiveKeyMap(
             Map<String, String> localeMap, Map<String, String> baselineMap) {
-        Map<MessagesKeys, String> resolved = new HashMap<>();
-        for (MessagesKeys key : MessagesKeys.values()) {
+        Map<Enum<?>, String> resolved = new HashMap<>();
+        for (Enum<?> key : allMessageKeys()) {
             String name = key.name();
             String mapped = localeMap.get(name);
             if (mapped == null) mapped = baselineMap.get(name);
@@ -128,7 +142,7 @@ public class ReqRtpF013SpanishLocaleContentTest {
         Map<String, Object> es = load(SPANISH_PATH);
         Map<String, String> esLangMap = loadLangMap(SPANISH_LANG_MAP_PATH);
         Map<String, String> enLangMap = loadLangMap(BASELINE_LANG_MAP_PATH);
-        Map<MessagesKeys, String> resolved = effectiveKeyMap(esLangMap, enLangMap);
+        Map<Enum<?>, String> resolved = effectiveKeyMap(esLangMap, enLangMap);
 
         // For every key the English baseline ships, the Spanish locale must
         // ship it too — under whatever name messages.lang.yml declares for it.
@@ -136,9 +150,9 @@ public class ReqRtpF013SpanishLocaleContentTest {
         // than the default config; partial overlays are not acceptable here.)
         List<String> missing = new ArrayList<>();
         for (String enKey : en.keySet()) {
-            // Locate the MessagesKeys enum for this baseline key, if any.
-            MessagesKeys enumKey = null;
-            for (MessagesKeys k : MessagesKeys.values()) {
+            // Locate the Enum<?> enum for this baseline key, if any.
+            Enum<?> enumKey = null;
+            for (Enum<?> k : allMessageKeys()) {
                 if (k.name().equals(enKey)) { enumKey = k; break; }
             }
             String esKey = (enumKey != null) ? resolved.get(enumKey) : enKey;
@@ -154,16 +168,16 @@ public class ReqRtpF013SpanishLocaleContentTest {
     }
 
     @Test
-    @DisplayName("every key in lang/es/messages.yml resolves back to a MessagesKeys via messages.lang.yml")
+    @DisplayName("every key in lang/es/messages.yml resolves back to a Enum<?> via messages.lang.yml")
     void spanishLocaleHasNoUnknownKeys() throws IOException {
         Map<String, Object> es = load(SPANISH_PATH);
         Map<String, String> esLangMap = loadLangMap(SPANISH_LANG_MAP_PATH);
         Map<String, String> enLangMap = loadLangMap(BASELINE_LANG_MAP_PATH);
-        Map<MessagesKeys, String> resolved = effectiveKeyMap(esLangMap, enLangMap);
+        Map<Enum<?>, String> resolved = effectiveKeyMap(esLangMap, enLangMap);
 
         // Build the inverse of the effective map: translatedName -> enumKey.
-        Map<String, MessagesKeys> inverse = new HashMap<>();
-        for (Map.Entry<MessagesKeys, String> e : resolved.entrySet()) {
+        Map<String, Enum<?>> inverse = new HashMap<>();
+        for (Map.Entry<Enum<?>, String> e : resolved.entrySet()) {
             inverse.put(e.getValue(), e.getKey());
         }
 
@@ -174,18 +188,18 @@ public class ReqRtpF013SpanishLocaleContentTest {
             }
         }
         assertTrue(unknown.isEmpty(),
-                "Spanish locale defines keys that no MessagesKeys entry resolves to "
+                "Spanish locale defines keys that no Enum<?> entry resolves to "
                         + "via lang/es/messages.lang.yml or the baseline fallback "
                         + "(likely typo or stale entry): " + unknown);
     }
 
     @Test
-    @DisplayName("every MessagesKeys enum entry is resolvable through the shipped baseline")
+    @DisplayName("every Enum<?> enum entry is resolvable through the shipped baseline")
     void everyEnumEntryIsResolvable() throws IOException {
         Map<String, Object> en = loadBaseline();
 
         List<String> unresolved = new ArrayList<>();
-        for (MessagesKeys key : MessagesKeys.values()) {
+        for (Enum<?> key : allMessageKeys()) {
             // The English baseline is the authoritative key set: every enum
             // entry must exist there. Locales translate names via messages.lang.yml.
             if (!en.containsKey(key.name())) {
@@ -193,7 +207,7 @@ public class ReqRtpF013SpanishLocaleContentTest {
             }
         }
         assertTrue(unresolved.isEmpty(),
-                "MessagesKeys entries that the English baseline messages.yml does not "
+                "Enum<?> entries that the English baseline messages.yml does not "
                         + "define: " + unresolved
                         + ". Add the key to messages.yml or remove the unused enum entry.");
     }
@@ -203,11 +217,11 @@ public class ReqRtpF013SpanishLocaleContentTest {
     void spanishValueTypesMatchBaseline() throws IOException {
         Map<String, Object> en = loadBaseline();
         Map<String, Object> es = load(SPANISH_PATH);
-        Map<MessagesKeys, String> resolved = effectiveKeyMap(
+        Map<Enum<?>, String> resolved = effectiveKeyMap(
                 loadLangMap(SPANISH_LANG_MAP_PATH), loadLangMap(BASELINE_LANG_MAP_PATH));
 
         List<String> mismatches = new ArrayList<>();
-        for (MessagesKeys key : MessagesKeys.values()) {
+        for (Enum<?> key : allMessageKeys()) {
             Object enVal = en.get(key.name());
             Object esVal = es.get(resolved.get(key));
             if (enVal == null || esVal == null) continue; // completeness test owns this
@@ -228,11 +242,11 @@ public class ReqRtpF013SpanishLocaleContentTest {
     void spanishPlaceholdersArePreserved() throws IOException {
         Map<String, Object> en = loadBaseline();
         Map<String, Object> es = load(SPANISH_PATH);
-        Map<MessagesKeys, String> resolved = effectiveKeyMap(
+        Map<Enum<?>, String> resolved = effectiveKeyMap(
                 loadLangMap(SPANISH_LANG_MAP_PATH), loadLangMap(BASELINE_LANG_MAP_PATH));
 
         List<String> lost = new ArrayList<>();
-        for (MessagesKeys key : MessagesKeys.values()) {
+        for (Enum<?> key : allMessageKeys()) {
             Object enVal = en.get(key.name());
             Object esVal = es.get(resolved.get(key));
             if (enVal == null || esVal == null) continue;
@@ -258,11 +272,11 @@ public class ReqRtpF013SpanishLocaleContentTest {
     void spanishValuesAvoidNorwayProblem() throws IOException {
         Map<String, Object> en = loadBaseline();
         Map<String, Object> es = load(SPANISH_PATH);
-        Map<MessagesKeys, String> resolved = effectiveKeyMap(
+        Map<Enum<?>, String> resolved = effectiveKeyMap(
                 loadLangMap(SPANISH_LANG_MAP_PATH), loadLangMap(BASELINE_LANG_MAP_PATH));
 
         List<String> offenders = new ArrayList<>();
-        for (MessagesKeys key : MessagesKeys.values()) {
+        for (Enum<?> key : allMessageKeys()) {
             Object enVal = en.get(key.name());
             Object esVal = es.get(resolved.get(key));
             if (enVal == null || esVal == null) continue;
@@ -285,24 +299,24 @@ public class ReqRtpF013SpanishLocaleContentTest {
     void declaredTypedKeysAreConsistent() throws IOException {
         Map<String, Object> en = loadBaseline();
         Map<String, Object> es = load(SPANISH_PATH);
-        Map<MessagesKeys, String> resolved = effectiveKeyMap(
+        Map<Enum<?>, String> resolved = effectiveKeyMap(
                 loadLangMap(SPANISH_LANG_MAP_PATH), loadLangMap(BASELINE_LANG_MAP_PATH));
 
-        for (MessagesKeys key : LIST_KEYS) {
+        for (Enum<?> key : LIST_KEYS) {
             assertTrue(en.get(key.name()) instanceof List,
                     "Baseline key " + key + " must be a YAML list");
             assertTrue(es.get(resolved.get(key)) instanceof List,
                     "Spanish key " + key + " (as '" + resolved.get(key)
                             + "') must be a YAML list");
         }
-        for (MessagesKeys key : INT_KEYS) {
+        for (Enum<?> key : INT_KEYS) {
             assertTrue(en.get(key.name()) instanceof Number,
                     "Baseline key " + key + " must be numeric");
             assertTrue(es.get(resolved.get(key)) instanceof Number,
                     "Spanish key " + key + " (as '" + resolved.get(key)
                             + "') must be numeric");
         }
-        for (MessagesKeys key : BOOLEAN_KEYS) {
+        for (Enum<?> key : BOOLEAN_KEYS) {
             assertTrue(en.get(key.name()) instanceof Boolean,
                     "Baseline key " + key + " must be boolean");
             assertTrue(es.get(resolved.get(key)) instanceof Boolean,

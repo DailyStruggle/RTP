@@ -2,7 +2,8 @@ package io.github.dailystruggle.rtp.common.commands.scan;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -39,11 +40,9 @@ public class ScanStartCmd extends ScanSubCmd {
     List<Region> regions = getRegions(callerId, parameterValues.get("region"));
     for (Region region : regions) {
       ScanTask scanTask = RTP.getInstance().scanTasks.get(region.name);
-      ConfigParser<MessagesKeys> parser =
-          (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
       if (scanTask != null) {
-        if (parser == null) continue;
-        String msg = String.valueOf(parser.getConfigValue(MessagesKeys.scanRunning, ""));
+        if (RTP.configs == null) continue;
+        String msg = String.valueOf(RTP.configs.getConfigValue(CommandMessages.scanRunning, ""));
         if (msg == null || msg.isEmpty()) continue;
         msg = msg.replace("[region]", region.name);
         RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");
@@ -55,8 +54,8 @@ public class ScanStartCmd extends ScanSubCmd {
       if (shapeObj instanceof MemoryShape) {
         shape = (MemoryShape<?>) shapeObj;
       } else {
-        if (parser == null) continue;
-        String msg = String.valueOf(parser.getConfigValue(MessagesKeys.badArg, ""));
+        if (RTP.configs == null) continue;
+        String msg = String.valueOf(RTP.configs.getConfigValue(PlayerMessages.badArg, ""));
         if (msg == null || msg.isEmpty()) continue;
         msg = msg.replace("[arg]", "region=" + region.name);
         RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
@@ -75,8 +74,8 @@ public class ScanStartCmd extends ScanSubCmd {
       ScanTask task = new ScanTask(region, 0L);
       RTP.getInstance().scanTasks.put(region.name, task);
       RTP.scheduler.runTaskAsynchronously(task);
-      if (parser == null) continue;
-      String msg = String.valueOf(parser.getConfigValue(MessagesKeys.scanStart, ""));
+      if (RTP.configs == null) continue;
+      String msg = String.valueOf(RTP.configs.getConfigValue(CommandMessages.scanStart, ""));
       if (msg == null || msg.isEmpty()) continue;
       msg = msg.replace("[region]", region.name);
       RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");

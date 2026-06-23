@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.network;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
 import io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult;
 import io.github.dailystruggle.rtp.common.network.BukkitNetworkCommandHook;
 import io.github.dailystruggle.rtp.common.network.NetworkEnrolmentBuffer;
@@ -196,7 +196,7 @@ class LobbyModeTest {
         RoutingResult r = hook.route(UUID.randomUUID(), Map.of());
 
         var rej = assertInstanceOf(RoutingResult.Reject.class, r);
-        assertEquals(MessagesKeys.networkRegionUnavailable.name(), rej.messageKey());
+        assertEquals(NetworkMessages.networkRegionUnavailable.name(), rej.messageKey());
     }
 
     @Test

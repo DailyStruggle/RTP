@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.bukkitplatform.server;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
@@ -302,11 +301,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void sendMessage(UUID target, MessagesKeys msgType, String tag) {
-    ConfigParser<MessagesKeys> lang =
-            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    String message = lang.getConfigValue(msgType, "").toString();
-    RTP.log(Level.FINE, "[ENQUEUE_TRACE] AbstractServerAccessor.sendMessage(UUID, MessagesKeys) target=" + target
+  public void sendMessage(UUID target, Enum<?> msgType, String tag) {
+    Object cv = RTP.configs.getConfigValue(msgType, "");
+    String message = cv == null ? "" : cv.toString();
+    RTP.log(Level.FINE, "[ENQUEUE_TRACE] AbstractServerAccessor.sendMessage(UUID, Enum) target=" + target
             + " msgType=" + msgType
             + " resolvedLen=" + (message == null ? -1 : message.length())
             + " resolvedEmpty=" + (message == null || message.isEmpty())
@@ -315,10 +313,9 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag) {
-    ConfigParser<MessagesKeys> lang =
-            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    String message = lang.getConfigValue(msgType, "").toString();
+  public void sendMessage(UUID target1, UUID target2, Enum<?> msgType, String tag) {
+    Object cv = RTP.configs.getConfigValue(msgType, "");
+    String message = cv == null ? "" : cv.toString();
     sendMessage(target1, target2, message, tag);
   }
 

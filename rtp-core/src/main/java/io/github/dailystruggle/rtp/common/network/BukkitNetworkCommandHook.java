@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.network;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
 import io.github.dailystruggle.rtp.api.network.NetworkCommandHook;
 import io.github.dailystruggle.rtp.common.RTP;
 
@@ -23,7 +23,7 @@ import java.util.logging.Level;
  *   <li>Parse via {@link NetworkRouter#parseRegionArgQualified(String)} to
  *       split out an optional {@code server:region} qualifier. Malformed
  *       input rejects with the localized
- *       {@link MessagesKeys#networkRegionUnavailable} message; the player's
+ *       {@link NetworkMessages#networkRegionUnavailable} message; the player's
  *       region argument never silently falls through to the local pipeline.</li>
  *   <li>Ask {@link NetworkRouter#route(UUID, String, String)} for a routing
  *       decision (hard-pin to {@code serverHint} when present).</li>
@@ -233,7 +233,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
                     peerRegionRegistry.pickMostKept();
             if (pick.isEmpty()) {
                 return RoutingResult.reject(
-                        MessagesKeys.networkRegionUnavailable.name(), "");
+                        NetworkMessages.networkRegionUnavailable.name(), "");
             }
             regionKey = pick.get().regionKey();
             serverHint = pick.get().serverId();
@@ -247,7 +247,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
                 // raw input as the [region] placeholder so the player sees
                 // exactly what they typed.
                 return RoutingResult.reject(
-                        MessagesKeys.networkRegionUnavailable.name(),
+                        NetworkMessages.networkRegionUnavailable.name(),
                         regionArg == null ? "" : regionArg);
             }
             regionKey = (parsed == null) ? null : parsed.regionKey();
@@ -341,7 +341,7 @@ public final class BukkitNetworkCommandHook implements NetworkCommandHook {
                                 + " regionArg=" + regionArg
                                 + " -> REJECT(REGION_UNAVAILABLE)");
                 return RoutingResult.reject(
-                        MessagesKeys.networkRegionUnavailable.name(),
+                        NetworkMessages.networkRegionUnavailable.name(),
                         placeholder);
             }
             // Lobby auto-retry (user-confirmed, this issue): on a lobby

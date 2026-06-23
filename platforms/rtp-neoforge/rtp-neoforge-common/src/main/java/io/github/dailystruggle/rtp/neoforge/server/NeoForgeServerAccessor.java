@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.neoforge.server;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
@@ -41,7 +40,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.logging.Level;
-
 /**
  * NeoForge platform implementation of {@link RTPServerAccessor},
  * the NeoForge analogue of {@code FabricServerAccessor}.
@@ -302,7 +300,7 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     // ---------------------------------------------------------------------------
 
     @Override
-    public void sendMessage(UUID target, MessagesKeys msgType, String tag) {
+    public void sendMessage(UUID target, Enum<?> msgType, String tag) {
         if (target == null || msgType == null) return;
         String template = lookupMessageTemplate(msgType);
         if (template == null) return;
@@ -310,7 +308,7 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag) {
+    public void sendMessage(UUID target1, UUID target2, Enum<?> msgType, String tag) {
         if (msgType == null) return;
         String template = lookupMessageTemplate(msgType);
         if (template == null) return;
@@ -399,7 +397,7 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
         if (text == null) return "";
         UUID uuid = (player != null) ? player : RTPAPI.serverId;
         text = PlaceholderProvider.fillPlaceholders(text, uuid);
-        if (langParser() != null) {
+        if (configsLoaded()) {
             text = PlaceholderProvider.fillNumericPlaceholders(text);
         }
         return text;
@@ -410,23 +408,19 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
         if (text == null) return "";
         UUID uuid = (player != null) ? player : RTPAPI.serverId;
         text = PlaceholderProvider.fillPlaceholders(text, uuid);
-        if (langParser() != null) {
+        if (configsLoaded()) {
             text = PlaceholderProvider.fillNumericPlaceholders(text);
         }
         return NeoForgeAnsiText.stripColor(text);
     }
 
-    @SuppressWarnings("unchecked")
-    private static @Nullable ConfigParser<MessagesKeys> langParser() {
-        if (RTP.configs == null) return null;
-        return (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+    private static boolean configsLoaded() {
+        return RTP.configs != null;
     }
 
-    private static @Nullable String lookupMessageTemplate(MessagesKeys key) {
+    private static @Nullable String lookupMessageTemplate(Enum<?> key) {
         if (RTP.configs == null) return null;
-        ConfigParser<MessagesKeys> lang = langParser();
-        if (lang == null) return null;
-        Object v = lang.getConfigValue(key, "");
+        Object v = RTP.configs.getConfigValue(key, "");
         return v == null ? null : v.toString();
     }
 

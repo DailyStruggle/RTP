@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.folia.server;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
@@ -40,7 +39,6 @@ import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import io.github.dailystruggle.rtp.folia.thread.GlobalRegionThread;
-
 public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   protected final Map<UUID, FoliaRTPWorld> worldMap = new ConcurrentHashMap<>();
   protected final ConcurrentHashMap<RegionKey, ConcurrentLinkedQueue<io.github.dailystruggle.rtp.common.tasks.RTPRunnable>> regionQueues = new ConcurrentHashMap<>();
@@ -216,18 +214,14 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void sendMessage(UUID target, MessagesKeys msgType, String tag) {
-    ConfigParser<MessagesKeys> lang =
-            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    String message = lang.getConfigValue(msgType, "").toString();
+  public void sendMessage(UUID target, Enum<?> msgType, String tag) {
+    String message = String.valueOf(RTP.configs.getConfigValue(msgType, ""));
     sendMessage(target, message, tag);
   }
 
   @Override
-  public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag) {
-    ConfigParser<MessagesKeys> lang =
-            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    String message = lang.getConfigValue(msgType, "").toString();
+  public void sendMessage(UUID target1, UUID target2, Enum<?> msgType, String tag) {
+    String message = String.valueOf(RTP.configs.getConfigValue(msgType, ""));
     sendMessage(target1, target2, message, tag);
   }
 

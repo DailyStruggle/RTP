@@ -3,9 +3,8 @@ package io.github.dailystruggle.rtp.common.commands.menu;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
@@ -14,7 +13,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.logging.Level;
-
 /**
  * Self-contained dispatcher for the {@code /rtp visualization &lt;kind&gt;}
  * sub-command family. Owns nothing menu/cart-related: it is intentionally
@@ -27,12 +25,12 @@ import java.util.logging.Level;
  * <ol>
  *   <li>Gates on {@link MenuPermissionGates#ADMIN_MENU_PERMISSION} (chart
  *       data surfaces admin-facing internals). Denial logs WARN and rejects
- *       through {@link MessagesKeys#menuInvalid} (S-004).</li>
+ *       through {@link CommandMessages#menuInvalid} (S-004).</li>
  *   <li>Builds a {@link ChartSpec} from {@code (kind, regionName)} inline.
  *       Invalid inputs reject through {@code menuInvalid}.</li>
  *   <li>Hands off to {@link MapDispatch#paint(ChartSpec, UUID)}, which owns
  *       the configurable viewer-facing failure surfaces
- *       ({@link MessagesKeys#mapBindingMissing} /
+ *       ({@link CommandMessages#mapBindingMissing} /
  *       {@code mapResolverMissing} / {@code mapUnavailable} /
  *       {@code mapBusy}).</li>
  * </ol>
@@ -226,7 +224,7 @@ final class VisualizationDispatch {
     }
 
     /**
-     * S-004 reject through {@link MessagesKeys#menuInvalid}. Logs WARN
+     * S-004 reject through {@link CommandMessages#menuInvalid}. Logs WARN
      * unconditionally; the viewer-facing message goes through the supplied
      * {@code messageMethod} when present, falling back to
      * {@link RTP#serverAccessor}. Mirrors {@code MenuRedeemSubcommand#reject}
@@ -236,7 +234,7 @@ final class VisualizationDispatch {
                                String logMessage,
                                @Nullable Consumer<String> messageMethod) {
         RTP.log(Level.WARNING, logMessage);
-        String userMsg = resolveMessage(MessagesKeys.menuInvalid, "Invalid menu command.");
+        String userMsg = resolveMessage(CommandMessages.menuInvalid, "Invalid menu command.");
         if (messageMethod != null) {
             messageMethod.accept(userMsg);
         } else if (RTP.serverAccessor != null) {
@@ -251,13 +249,10 @@ final class VisualizationDispatch {
      * tests). Mirrors {@code BaseRTPCmd#msg} without inheriting from it.
      */
     @SuppressWarnings("unchecked")
-    private static String resolveMessage(MessagesKeys key, String defaultValue) {
+    private static String resolveMessage(Enum<?> key, String defaultValue) {
         try {
             if (RTP.configs == null) return defaultValue;
-            ConfigParser<MessagesKeys> messages =
-                    (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-            if (messages == null) return defaultValue;
-            Object value = messages.getConfigValue(key, defaultValue);
+            Object value = RTP.configs.getConfigValue(key, defaultValue);
             return value == null ? defaultValue : value.toString();
         } catch (RuntimeException e) {
             return defaultValue;

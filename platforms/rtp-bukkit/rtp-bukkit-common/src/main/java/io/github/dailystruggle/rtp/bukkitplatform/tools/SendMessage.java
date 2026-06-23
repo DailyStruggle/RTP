@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.bukkitplatform.tools;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.softdepends.PAPIChecker;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -78,7 +77,6 @@ public class SendMessage {
    */
   private static final List<BiConsumer<Level, String>> leveledInterceptors =
       new CopyOnWriteArrayList<>();
-  private static ConfigParser<MessagesKeys> lang = null;
 
   public static void addInterceptor(Consumer<String> interceptor) {
     interceptors.add(interceptor);
@@ -117,12 +115,6 @@ public class SendMessage {
     }
   }
 
-  private static ConfigParser<MessagesKeys> getLang() {
-    if (lang == null && RTP.configs != null) {
-      lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    }
-    return lang;
-  }
 
   public static void sendMessage(CommandSender target1, CommandSender target2, String message) {
     if (message == null || message.isEmpty()) return;
@@ -252,7 +244,7 @@ public class SendMessage {
 
     text = PlaceholderProvider.fillPlaceholders(text, uuid);
 
-    if (numericPlaceholders && getLang() != null) {
+    if (numericPlaceholders && RTP.configs != null) {
       text = PlaceholderProvider.fillNumericPlaceholders(text);
     }
 

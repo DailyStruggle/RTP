@@ -1,0 +1,33 @@
+# --- RTP メトリクス設定 ---
+# メトリクス SPI のレポート専用つまみ。スロットル / チューニング
+# つまみは引き続き performance.yml に置かれます。
+# Folia で MetricsSnapshot.foliaRegions() にリージョン別詳細を格納します。
+# Paper / Bukkit / Fabric では効果なし (単一リージョン環境では常に空の
+# リストを返し、それがこれらのプラットフォームでは正しい挙動です)。
+# @type: boolean
+# @default: true
+foliaIncludeRegions: true
+
+# Folia 上で MetricsSnapshot のスカラー tps{1,5,15}m フィールドに
+# リージョン別サンプルを集約する方式。
+# @type: enum
+# @options: [mean, max]
+# @default: mean
+foliaAggregationTps: "mean"
+
+# Folia 上で MetricsSnapshot のスカラー mspt フィールドにリージョン別
+# サンプルを集約する方式。
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationMspt: "max"
+
+# Folia 上で MetricsSnapshot のスカラー tickBudgetUtilisation
+# フィールドにリージョン別サンプルを集約する方式。
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationTickBudget: "max"
+
+# バージョン番号は変更しないでください
+version: 1.0

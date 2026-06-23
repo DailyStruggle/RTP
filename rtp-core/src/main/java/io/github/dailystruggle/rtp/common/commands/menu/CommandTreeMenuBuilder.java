@@ -7,7 +7,7 @@ import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.FloatParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.api.menu.MenuConsumerProfile;
 import io.github.dailystruggle.rtp.api.menu.MenuFragment;
@@ -29,7 +29,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
-
 /**
  * Command-tree menu reflector (ADR-044).
  *
@@ -154,11 +153,11 @@ public final class CommandTreeMenuBuilder {
         //    so the menu has visible framing before the player descends
         //    into any subcommand. Stage A.5 — REQ-RTP-F-013.
         if (assembledPath.isEmpty()) {
-            String title = lookupMsg(MessagesKeys.menuRootTitle, "&6&l⚡ RTP menu");
+            String title = lookupMsg(CommandMessages.menuRootTitle, "&6&l⚡ RTP menu");
             if (title != null && !title.isEmpty()) {
                 lines.add(MenuLine.of(new MenuFragment(title, null, null)));
             }
-            String hint = lookupMsg(MessagesKeys.menuRootHint,
+            String hint = lookupMsg(CommandMessages.menuRootHint,
                     "&7click an option below to begin");
             if (hint != null && !hint.isEmpty()) {
                 lines.add(MenuLine.of(new MenuFragment(hint, null, null)));
@@ -171,7 +170,7 @@ public final class CommandTreeMenuBuilder {
         //    assembledPath. Prepended only on non-root pages (the root /rtp
         //    menu page has nothing to show). Stage A.4 — REQ-RTP-F-013.
         if (!assembledPath.isEmpty()) {
-            String headerTmpl = lookupMsg(MessagesKeys.menuConstructed,
+            String headerTmpl = lookupMsg(CommandMessages.menuConstructed,
                     "building: /rtp [command]");
             String headerLabel = headerTmpl
                     .replace("[command]", String.join(" ", assembledPath));
@@ -182,7 +181,7 @@ public final class CommandTreeMenuBuilder {
         if (!assembledPath.isEmpty()) {
             String[] parentPath = assembledPath.subList(0, assembledPath.size() - 1)
                     .toArray(new String[0]);
-            String backLabel = lookupMsg(MessagesKeys.menuBack, "« back");
+            String backLabel = lookupMsg(CommandMessages.menuBack, "« back");
             lines.add(MenuLine.of(new MenuFragment(backLabel, null,
                     new MenuAction.OpenMenu(parentPath))));
         }
@@ -192,7 +191,7 @@ public final class CommandTreeMenuBuilder {
         //     menu page we're already on).
         if (!assembledPath.isEmpty()) {
             String[] runArgs = assembledPath.toArray(new String[0]);
-            String tmpl = lookupMsg(MessagesKeys.menuExecute, "▶ run /rtp [command]");
+            String tmpl = lookupMsg(CommandMessages.menuExecute, "▶ run /rtp [command]");
             String label = tmpl.replace("[command]", String.join(" ", assembledPath));
             lines.add(MenuLine.of(new MenuFragment(label, null,
                     new MenuAction.RunRtpCommand(runArgs))));
@@ -340,12 +339,12 @@ public final class CommandTreeMenuBuilder {
         if (typeName != null) {
             Set<String> values = safeValues(param);
             if (values != null && !values.isEmpty() && values.size() <= 16) {
-                String tmpl = lookupMsg(MessagesKeys.menuHoverFallbackBounds,
+                String tmpl = lookupMsg(CommandMessages.menuHoverFallbackBounds,
                         "[type]: [values]");
                 return tmpl.replace("[type]", typeName)
                         .replace("[values]", String.join(", ", values));
             }
-            String tmpl = lookupMsg(MessagesKeys.menuHoverFallbackType, "[type]");
+            String tmpl = lookupMsg(CommandMessages.menuHoverFallbackType, "[type]");
             return tmpl.replace("[type]", typeName);
         }
 
@@ -435,13 +434,13 @@ public final class CommandTreeMenuBuilder {
         Objects.requireNonNull(paramName, "paramName");
 
         // Back row → re-open the parent command page.
-        String backLabel = lookupMsg(MessagesKeys.menuBack, "« back");
+        String backLabel = lookupMsg(CommandMessages.menuBack, "« back");
         MenuLine backLine = MenuLine.of(new MenuFragment(backLabel, null,
                 new MenuAction.OpenMenu(parentPath.toArray(new String[0]))));
 
         // Header row (non-clickable, no action — orientation only).
         String assembledStr = String.join(" ", parentPath);
-        String headerTmpl = lookupMsg(MessagesKeys.menuPickValue,
+        String headerTmpl = lookupMsg(CommandMessages.menuPickValue,
                 "pick a value for [param] (will run: /rtp [command] [param]:<value>)");
         String headerLabel = headerTmpl
                 .replace("[param]", paramName)
@@ -487,7 +486,7 @@ public final class CommandTreeMenuBuilder {
             // '=' separator matches commands-api parameter parsing.
             typePrefix = "/rtp " + assembledStr + " " + paramName + "=";
         }
-        String typeLabel = lookupMsg(MessagesKeys.menuTypeValue,
+        String typeLabel = lookupMsg(CommandMessages.menuTypeValue,
                 "✎ type a custom value...");
         // ADR-045 — on renderers that support it (Paper/Folia BookMenuRenderer),
         // this row opens an anvil GUI; the renderer mints a token bound to a
@@ -586,8 +585,8 @@ public final class CommandTreeMenuBuilder {
                 ? 1
                 : (valueLines.size() + valuesPerPage - 1) / valuesPerPage;
         List<MenuPage> pages = new ArrayList<>(totalPages);
-        String prevTmpl = lookupMsg(MessagesKeys.menuPagePrev, "« previous page ([page])");
-        String nextTmpl = lookupMsg(MessagesKeys.menuPageNext, "next page ([page]) »");
+        String prevTmpl = lookupMsg(CommandMessages.menuPagePrev, "« previous page ([page])");
+        String nextTmpl = lookupMsg(CommandMessages.menuPageNext, "next page ([page]) »");
         for (int p = 0; p < totalPages; p++) {
             List<MenuLine> pageLines = new ArrayList<>();
             pageLines.add(backLine);
@@ -657,7 +656,7 @@ public final class CommandTreeMenuBuilder {
         List<MenuLine> lines = new ArrayList<>();
 
         // Back row → /rtp menu root page (empty path).
-        String backLabel = lookupMsg(MessagesKeys.menuBack, "« back");
+        String backLabel = lookupMsg(CommandMessages.menuBack, "« back");
         lines.add(MenuLine.of(new MenuFragment(backLabel, null,
                 new MenuAction.OpenMenu(new String[0]))));
 
@@ -677,16 +676,16 @@ public final class CommandTreeMenuBuilder {
         // panel; the per-kind selector pages handle Add/Remove/Edit of
         // individual entries via MultiConfigMenuBuilder.
         String regionsLabel = lookupMsg(
-                MessagesKeys.menuAdminPanelRowRegions, "&b\u2699 Regions");
+                CommandMessages.menuAdminPanelRowRegions, "&b\u2699 Regions");
         String regionsHover = lookupMsg(
-                MessagesKeys.menuAdminPanelHoverRegions,
+                CommandMessages.menuAdminPanelHoverRegions,
                 "Add, remove, or edit per-region configs.");
         lines.add(MenuLine.of(new MenuFragment(regionsLabel, regionsHover,
                 new MenuAction.OpenMultiConfigSelector("regions"))));
         String worldsLabel = lookupMsg(
-                MessagesKeys.menuAdminPanelRowWorlds, "&b\u2699 Worlds");
+                CommandMessages.menuAdminPanelRowWorlds, "&b\u2699 Worlds");
         String worldsHover = lookupMsg(
-                MessagesKeys.menuAdminPanelHoverWorlds,
+                CommandMessages.menuAdminPanelHoverWorlds,
                 "Add, remove, or edit per-world configs.");
         lines.add(MenuLine.of(new MenuFragment(worldsLabel, worldsHover,
                 new MenuAction.OpenMultiConfigSelector("worlds"))));
@@ -696,9 +695,9 @@ public final class CommandTreeMenuBuilder {
         // effects-api-ADR-005 and Configs.reloadConfigs() lines 278-281
         // where the parser is registered under name="effects").
         String effectsLabel = lookupMsg(
-                MessagesKeys.menuAdminPanelRowEffects, "&b\u2699 Effects");
+                CommandMessages.menuAdminPanelRowEffects, "&b\u2699 Effects");
         String effectsHover = lookupMsg(
-                MessagesKeys.menuAdminPanelHoverEffects,
+                CommandMessages.menuAdminPanelHoverEffects,
                 "Add, remove, or edit per-group teleport effects.");
         lines.add(MenuLine.of(new MenuFragment(effectsLabel, effectsHover,
                 new MenuAction.OpenMultiConfigSelector("effects"))));
@@ -787,7 +786,7 @@ public final class CommandTreeMenuBuilder {
         // Back row → selector page. Encoded as an OpenConfigSelector action
         // (not OpenMenu) so the redeem path re-renders the curated selector
         // rather than reflecting an arbitrary command tree node.
-        String backLabel = lookupMsg(MessagesKeys.menuBack, "« back");
+        String backLabel = lookupMsg(CommandMessages.menuBack, "« back");
         MenuLine backRow = MenuLine.of(new MenuFragment(backLabel, null,
                 new MenuAction.OpenConfigSelector()));
         // Header — locale key deferred to step 8; English fallback only.
@@ -877,13 +876,13 @@ public final class CommandTreeMenuBuilder {
                 // Header shortened to "pending" so the &l-bolded label fits
                 // on a single book line (the prior "-- pending changes --"
                 // wrapped to two lines on the parchment width).
-                String pendingHeader = lookupMsg(MessagesKeys.configPendingHeader,
+                String pendingHeader = lookupMsg(CommandMessages.configPendingHeader,
                         "&1&l-- pending --");
-                String pendingRowTmpl = lookupMsg(MessagesKeys.configPendingRowFormat,
+                String pendingRowTmpl = lookupMsg(CommandMessages.configPendingRowFormat,
                         "&9[key]&8 = &0[value]");
-                String pendingRowHover = lookupMsg(MessagesKeys.configPendingRowHover,
+                String pendingRowHover = lookupMsg(CommandMessages.configPendingRowHover,
                         "click to unstage");
-                String applyLabel = lookupMsg(MessagesKeys.configApplyRow, "&2&l[apply]");
+                String applyLabel = lookupMsg(CommandMessages.configApplyRow, "&2&l[apply]");
                 // Discard row intentionally removed (2026-05-22 per user
                 // request): clicking any pending row already unstages that
                 // entry, and the Back row leaves the page without applying —
@@ -1050,7 +1049,7 @@ public final class CommandTreeMenuBuilder {
         List<MenuLine> lines = new ArrayList<>();
 
         // Back row → per-file config page.
-        String backLabel = lookupMsg(MessagesKeys.menuBack, "« back");
+        String backLabel = lookupMsg(CommandMessages.menuBack, "« back");
         lines.add(MenuLine.of(new MenuFragment(backLabel, null,
                 new MenuAction.OpenConfigFile(fileName))));
 
@@ -1144,7 +1143,7 @@ public final class CommandTreeMenuBuilder {
 
         // Back row → re-open type picker (page 3a) via the OpenConfigKey
         // redeem, which dispatches back to the shape/vert subtree entry.
-        String backLabel = lookupMsg(MessagesKeys.menuBack, "« back");
+        String backLabel = lookupMsg(CommandMessages.menuBack, "« back");
         lines.add(MenuLine.of(new MenuFragment(backLabel, null,
                 new MenuAction.OpenConfigKey(fileName, paramName))));
 
@@ -1332,12 +1331,9 @@ public final class CommandTreeMenuBuilder {
         return out;
     }
 
-    private static String lookupMsg(MessagesKeys key, String fallback) {
+    private static String lookupMsg(Enum<?> key, String fallback) {
         if (RTP.configs == null) return fallback;
-        ConfigParser<MessagesKeys> lang =
-                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        if (lang == null) return fallback;
-        Object v = lang.getConfigValue(key, fallback);
+        Object v = RTP.configs.getConfigValue(key, fallback);
         return v == null ? fallback : v.toString();
     }
 }

@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.reload;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -77,7 +77,7 @@ public class ReloadCmd extends BaseRTPCmdImpl {
 
     RTP.reloading.set(true);
 
-    String msg = msg(MessagesKeys.reloading, "");
+    String msg = msg(SystemMessages.reloading, "");
     if (!msg.isEmpty()) {
       msg =
           filenamePattern
@@ -94,7 +94,7 @@ public class ReloadCmd extends BaseRTPCmdImpl {
       // re-read on the next teleport instead of serving the stale in-memory copy (ADR-058).
       io.github.dailystruggle.rtp.api.schematic.AbstractFileSchematicPaster.clearCache();
 
-      String msgReloaded = msg(MessagesKeys.reloaded, "");
+      String msgReloaded = msg(SystemMessages.reloaded, "");
       if (!msgReloaded.isEmpty()) {
         msgReloaded =
             filenamePattern

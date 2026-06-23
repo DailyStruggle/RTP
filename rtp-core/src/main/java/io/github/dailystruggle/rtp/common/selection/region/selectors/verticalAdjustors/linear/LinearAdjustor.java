@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.GenericVerticalAdjustorKeys;
@@ -36,7 +37,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
       new EnumMap<>(GenericVerticalAdjustorKeys.class);
   /**
    * Snapshot of the configured safety state read at adjustor entry: the
-   * canonicalised {@link SafetyKeys#unsafeBlocks} set and {@link
+   * canonicalised {@link BlocksKeys#unsafeBlocks} set and {@link
    * SafetyKeys#platformDepth}. Plumbed by reference through every helper
    * predicate ({@link #acceptY}, {@link #isGroundSafe}, {@link #scanProbe})
    * so a single {@code adjust(...)} / {@code adjustFromProbeWithReason(...)}
@@ -60,7 +61,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
         (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
     Set<String> unsafe = new HashSet<>();
     if (safety != null) {
-      Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+      Object value = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
       if (value instanceof Collection) {
         for (Object item : (Collection<?>) value) {
           if (item == null) continue;

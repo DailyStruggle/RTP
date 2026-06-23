@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.commands.scan;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -27,7 +26,6 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-
 /**
  * JUnit 5 tests for the Fill command pipeline:
  * {@link ScanCmd}, {@link ScanStartCmd}, {@link ScanPauseCmd},
@@ -90,17 +88,21 @@ public class ScanCmdTest {
         RTP.selectionAPI = new SelectionAPI();
         RTP.selectionAPI.permRegionLookup.put("default", region);
 
-        // Mock MessagesKeys parser so messages are non-empty
-        ConfigParser<MessagesKeys> langParser = mock(ConfigParser.class);
+        // Mock Enum<?> parser so messages are non-empty
+        ConfigParser langParser = mock(ConfigParser.class);
         langParser.language_mapping = new java.util.concurrent.ConcurrentHashMap<>();
         langParser.reverse_language_mapping = new java.util.concurrent.ConcurrentHashMap<>();
         langParser.name = "messages";
-        when(langParser.getConfigValue(any(MessagesKeys.class), any()))
+        when(langParser.getConfigValue(any(), any()))
                 .thenAnswer(inv -> {
-                    MessagesKeys key = inv.getArgument(0);
+                    Enum<?> key = inv.getArgument(0);
                     return key.name() + " [region]";
                 });
-        RTP.configs.configParserMap.put(MessagesKeys.class, langParser);
+        RTP.configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages.class, langParser);
+        RTP.configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.class, langParser);
+        RTP.configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages.class, langParser);
+        RTP.configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages.class, langParser);
+        RTP.configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages.class, langParser);
 
         // Mock MultiConfigParser<RegionKeys> so getParser(regionName) returns a safe ConfigParser
         MultiConfigParser<RegionKeys> multiConfigParser = mock(MultiConfigParser.class);

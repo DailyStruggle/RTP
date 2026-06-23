@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.api.server;
 
 import io.github.dailystruggle.rtp.api.annotations.PublicApi;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
@@ -371,9 +370,9 @@ public interface RTPServerAccessor {
    * @param tag     an optional context tag passed to placeholder handlers;
    *                {@code null} means no tag
    */
-  void sendMessage(UUID target, MessagesKeys msgType, String tag);
+  void sendMessage(UUID target, Enum<?> msgType, String tag);
 
-  default void sendMessage(UUID target, MessagesKeys msgType) {
+  default void sendMessage(UUID target, Enum<?> msgType) {
     sendMessage(target, msgType, null);
   }
 
@@ -386,9 +385,9 @@ public interface RTPServerAccessor {
    * @param msgType the message key; must not be {@code null}
    * @param tag     optional context tag; {@code null} means no tag
    */
-  void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag);
+  void sendMessage(UUID target1, UUID target2, Enum<?> msgType, String tag);
 
-  default void sendMessage(UUID target1, UUID target2, MessagesKeys msgType) {
+  default void sendMessage(UUID target1, UUID target2, Enum<?> msgType) {
     sendMessage(target1, target2, msgType, null);
   }
 

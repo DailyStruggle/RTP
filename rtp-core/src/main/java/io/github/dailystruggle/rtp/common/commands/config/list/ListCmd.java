@@ -2,10 +2,9 @@ package io.github.dailystruggle.rtp.common.commands.config.list;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
 import java.io.IOException;
 import java.util.List;
@@ -61,9 +60,7 @@ public class ListCmd extends BaseRTPCmdImpl {
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
     addCommands();
 
-    ConfigParser<MessagesKeys> lang =
-            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    String updateMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updating, ""));
+    String updateMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updating, ""));
     if (updateMsg != null) updateMsg = updateMsg.replace("[filename]", name);
     RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, updateMsg);
 
@@ -88,7 +85,7 @@ public class ListCmd extends BaseRTPCmdImpl {
         return;
       }
 
-      String updatedMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updated, ""));
+      String updatedMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updated, ""));
       if (updatedMsg != null) updatedMsg = updatedMsg.replace("[filename]", name);
       RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, updatedMsg);
     });

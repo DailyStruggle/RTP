@@ -1,0 +1,258 @@
+# RTP Netzwerkmodus (Multi-Server / Multi-Proxy) Standardmäßig deaktiviert; das Umstellen von `network.enabled: true` nimmt dieses Backend in das serverübergreifende Netzwerk auf.
+network:
+  # When false this file is read and validated, then ignored - no threads, tables, or transport open.
+  # @type: boolean
+  # @default: false
+  enabled: false
+  # Stabile Backend-Identität.
+  # @type: string
+  # @default: "
+  serverId: ""
+  # Umgebungsvariable mit dem gemeinsamen HMAC-Secret.
+  # @type: string
+  # @default: "RTP_NET_SECRET"
+  secretEnv: "RTP_NET_SECRET"
+
+# Backing store for cross-process state.
+transport:
+  # Speicher-Backend für prozessübergreifenden Zustand.
+  # @type: enum
+  # @options: ["auto", "plugin-message", "in-memory", "sql", "redis"]
+  # @default: "auto"
+  type: "auto"
+  pluginMessage:
+    # Proxy plugin-messaging channel.
+    # @type: string
+    # @default: "bungeecord:main"
+    channel: "bungeecord:main"
+  redis:
+    # Erforderlich, wenn `type: redis`.
+    # @type: string
+    # @default: "localhost"
+    host: "localhost"
+    # Standard-Redis-Port.
+    # @type: integer
+    # @default: 6379
+    port: 6379
+    # Optional.
+    # @type: string
+    # @default: "
+    password: ""
+
+# Backend heartbeat / peer-staleness cadence (shared by every transport tier).
+heartbeat:
+  # Wie oft dieses Backend seine Zustandszeile veröffentlicht.
+  # @type: integer
+  # @default: 1000
+  intervalMs: 1000
+  # How long a peer's last-seen state stays trusted before it is treated as unknown.
+  # @type: integer
+  # @default: 5000
+  staleAfterMs: 5000
+
+# Router auf Backend-Seite.
+routing:
+  # `local`  - niemals in die serverübergreifende Warteschlange eintragen (Standard; keine Verhaltensänderung).
+  # @type: enum
+  # @options: ["local", "auto", "always"]
+  # @default: "local"
+  mode: "local"
+  # Lobby-Modus.
+  # @type: boolean
+  # @default: false
+  lobbyMode: false
+
+# Serverübergreifende Warteschlange.
+queue:
+  # Maximale Anzahl lokal gepufferter Eintragungen, bevor der Gegendruck neue `/rtp`-Aufrufe mit `RoutingDecision.FallbackReason.QUEUE_FULL` ablehnt.
+  # @type: integer
+  # @default: 50
+  maxDepth: 50
+  # Flush-Takt für Dirty-Writes des Backends (ms). Niedriger = geringere Ende-zu-Ende- Latenz, höher = weniger Roundtrips zum Transport.
+  # @type: integer
+  # @default: 250
+  flushIntervalMs: 250
+  # Poll-Takt des Backend-Status-Caches (ms). Bestimmt, wie oft das Backend `rtp:net:wq:status:<pid>` liest, um den Fortschritt je Spieler zu aktualisieren.
+  # @type: integer
+  # @default: 1000
+  pollIntervalMs: 1000
+  # Optionales passives Altern der Envelope-HASHes.
+  # @type: integer
+  # @default: 0
+  entryTtlMs: 0
+  # Ratenbegrenzung für serverübergreifende `/rtp`-Eintragungen (Token-Bucket).
+  # @type: number
+  # @default: 5
+  crossServerRequestsPerSecond: 5
+  # Cross-server /rtp enrolment rate limit: burst size.
+  # @type: number
+  # @default: 10
+  crossServerRequestsBurst: 10
+  # Anzahl der BLPOP-Worker auf Proxy-Seite (rtp-proxy-velocity).
+  # @type: integer
+  # @default: 1
+  workerThreads: 1
+
+# Lebenszyklus der Reservierungs-Tokens (REQ-RTP-NET-011).
+reservation:
+  # Takt des TTL-Reapers auf Proxy-Seite (ms). Der Reaper räumt abgelaufene Tokens auf und löst `ReleaseSink.onRelease(tokenId, TTL_EXPIRED)` aus, damit am selben Ort liegende Backends die Koordinate an `networkKeptLocations` zurückgeben können.
+  # @type: integer
+  # @default: 30000
+  reapIntervalMs: 30000
+  # TTL je Token (ms). Eine beanspruchte, aber nicht verbrauchte Reservierung, die älter als dieser Wert ist, gilt als verwaist und wird freigegeben.
+  # @type: integer
+  # @default: 60000
+  ttlMs: 60000
+
+# Politik bei Regions-Kollisionen.
+regionCollision:
+  # Collision policy applied at startup.
+  # @type: enum
+  # @options: ["warn", "rename-local", "reject-startup"]
+  # @default: "warn"
+  policy: "warn"
+
+# Optional per-destination policy overlay (matched by serverId); leave commented for the common case.
+#servers:
+#  example-backend:
+#    # Permission required to target this destination (empty = none).
+#    # @type: string
+#    # @default: "
+#    permission: "
+#    # Label shown in menus / suggestions (default: serverId).
+#    # @type: string
+#    # @default: "
+#    display-name: "Example"
+#    # Hide from tab-completion when it has no servable region.
+#    # @type: boolean
+#    # @default: false
+#    hide-when-unavailable: false
+#    # Allow targeting it even when it reports no servable region.
+#    # @type: boolean
+#    # @default: true
+#    allow-when-unavailable: true
+# Bewertungstabelle des Load Balancers.
+loadBalancer:
+  # Weight of the built-in region-scarcity term.
+  # @type: number
+  # @default: 0
+  regionScarcityWeight: 0
+  # Scoring terms, one per metric.
+  terms:
+    # Tick pressure; sigmoid knee at 0.6.
+    mspt:
+      # Metric input.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "mspt"
+      input: "mspt"
+      # Term weight.
+      # @type: number
+      # @default: 1.0
+      weight: 1.0
+      curve:
+        # Curve type.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "sigmoid"
+        type: "sigmoid"
+        # Steepness.
+        # @type: number
+        # @range: [0.1, 20]
+        # @default: 8.0
+        k: 8.0
+        # Midpoint.
+        # @type: number
+        # @range: [0, 1]
+        # @default: 0.6
+        x0: 0.6
+    # Queue depth; small queues silent, large ones explode.
+    queue:
+      # Metric input.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "queueDepth"
+      input: "queueDepth"
+      # Term weight.
+      # @type: number
+      # @default: 1.0
+      weight: 1.0
+      curve:
+        # Curve type.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "exponential"
+        type: "exponential"
+        # Steepness.
+        # @type: number
+        # @range: [0.1, 20]
+        # @default: 3.0
+        k: 3.0
+    # Heap gate; fires at >= 85% used.
+    heap:
+      # Metric input.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "heapUsed"
+      input: "heapUsed"
+      # Term weight.
+      # @type: number
+      # @default: 5.0
+      weight: 5.0
+      curve:
+        # Curve type.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "step"
+        type: "step"
+        # Step threshold.
+        # @type: number
+        # @range: [0, 1]
+        # @default: 0.85
+        threshold: 0.85
+    # Region gate; fires when the kept pool is >= 95% full.
+    region:
+      # Metric input.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "keptRegion"
+      input: "keptRegion"
+      # Term weight.
+      # @type: number
+      # @default: 5.0
+      weight: 5.0
+      curve:
+        # Curve type.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "step"
+        type: "step"
+        # Step threshold.
+        # @type: number
+        # @range: [0, 1]
+        # @default: 0.95
+        threshold: 0.95
+    # Gentle tie-breaker on kept count.
+    kept:
+      # Metric input.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "keptCount"
+      input: "keptCount"
+      # Term weight.
+      # @type: number
+      # @default: 0.25
+      weight: 0.25
+      curve:
+        # Curve type.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "logarithmic"
+        type: "logarithmic"
+        # Steepness.
+        # @type: number
+        # @range: [0.1, 20]
+        # @default: 9.0
+        k: 9.0
+
+version: 1.1

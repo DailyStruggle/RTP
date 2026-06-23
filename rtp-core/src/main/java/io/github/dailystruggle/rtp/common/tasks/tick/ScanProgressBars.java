@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.tasks.tick;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.server.ProgressBar;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 
 import java.util.HashMap;
@@ -37,11 +37,9 @@ public final class ScanProgressBars {
   public static void update() {
     if (RTP.getInstance() == null || RTP.serverAccessor == null) return;
 
-    ConfigParser<MessagesKeys> langParser =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    if (langParser == null) return;
+    if (RTP.configs == null) return;
 
-    String template = langParser.getConfigValue(MessagesKeys.scanBossBar, "").toString();
+    String template = RTP.configs.getConfigValue(CommandMessages.scanBossBar, "").toString();
     // Empty template = progress bar disabled.
     if (template == null || template.isEmpty()) {
       RTP.serverAccessor.clearProgressBars();
@@ -70,7 +68,7 @@ public final class ScanProgressBars {
       regionNames.append(entry.getKey());
     }
 
-    String etaStr = formatEta(maxEta, langParser);
+    String etaStr = formatEta(maxEta);
 
     double progressFraction = (totalChunks > 0)
         ? Math.min(1.0, (double) totalChunksDone / totalChunks)
@@ -103,17 +101,17 @@ public final class ScanProgressBars {
   }
 
   /** Format seconds into a human-readable ETA string, mirroring PlaceholderProvider. */
-  private static String formatEta(long totalSeconds, ConfigParser<MessagesKeys> langParser) {
+  private static String formatEta(long totalSeconds) {
     long days = TimeUnit.SECONDS.toDays(totalSeconds);
     long hours = TimeUnit.SECONDS.toHours(totalSeconds) % 24;
     long minutes = TimeUnit.SECONDS.toMinutes(totalSeconds) % 60;
     long seconds = totalSeconds % 60;
 
     StringBuilder sb = new StringBuilder();
-    if (days > 0) sb.append(days).append(langParser.getConfigValue(MessagesKeys.days, "d")).append(" ");
-    if (hours > 0) sb.append(hours).append(langParser.getConfigValue(MessagesKeys.hours, "h")).append(" ");
-    if (minutes > 0) sb.append(minutes).append(langParser.getConfigValue(MessagesKeys.minutes, "m")).append(" ");
-    if (seconds > 0 || sb.length() == 0) sb.append(seconds).append(langParser.getConfigValue(MessagesKeys.seconds, "s"));
+    if (days > 0) sb.append(days).append(RTP.configs.getConfigValue(PlayerMessages.days, "d")).append(" ");
+    if (hours > 0) sb.append(hours).append(RTP.configs.getConfigValue(PlayerMessages.hours, "h")).append(" ");
+    if (minutes > 0) sb.append(minutes).append(RTP.configs.getConfigValue(PlayerMessages.minutes, "m")).append(" ");
+    if (seconds > 0 || sb.length() == 0) sb.append(seconds).append(RTP.configs.getConfigValue(PlayerMessages.seconds, "s"));
     return sb.toString().trim();
   }
 }

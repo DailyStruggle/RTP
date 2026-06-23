@@ -9,6 +9,7 @@ public enum PerformanceKeys {
   maxHeapPercent,
   viewDistanceSelect,
   viewDistanceTeleport,
+  viewDistanceRestoreInterval,
   postTeleportQueueing,
   syncLoading,
   checkOnChunkLoads,

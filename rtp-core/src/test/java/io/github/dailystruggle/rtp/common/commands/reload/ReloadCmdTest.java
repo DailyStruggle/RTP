@@ -15,7 +15,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.*;
-
 public class ReloadCmdTest {
 
     @TempDir
@@ -121,7 +120,7 @@ public class ReloadCmdTest {
         UUID senderId = UUID.randomUUID();
         accessor.addPlayer(new MockRTPPlayer(senderId, "admin3", null));
 
-        // The real MessagesKeys parser is registered; reloading/reloaded messages
+        // The real Enum<?> parser is registered; reloading/reloaded messages
         // may contain [filename] — the command should replace it with "configs"
         assertDoesNotThrow(() -> reloadCmd.onCommand(senderId, new HashMap<>(), null));
     }

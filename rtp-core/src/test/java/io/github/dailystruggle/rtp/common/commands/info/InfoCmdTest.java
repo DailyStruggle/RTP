@@ -6,7 +6,7 @@ import static org.mockito.Mockito.*;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -176,8 +176,6 @@ public class InfoCmdTest {
 
         // Override lang to return a List for worldInfo
         @SuppressWarnings("unchecked")
-        ConfigParser<MessagesKeys> lang =
-                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
         Map<String, List<String>> params = new HashMap<>();
         params.put("world", Collections.singletonList("world"));
@@ -279,19 +277,17 @@ public class InfoCmdTest {
                 };
         RTP.metrics.setBinding(folia);
         @SuppressWarnings("unchecked")
-        ConfigParser<MessagesKeys> lang =
-                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         // Inject explicit templates — the test ConfigParser stub returns the
         // enum name as default text, which would not exercise the row-token
         // substitution. Setting the values directly is the minimal surface
         // for verifying the rendering path.
-        java.util.EnumMap<MessagesKeys, Object> langData = lang.getData();
-        Object prevHeader = langData.get(MessagesKeys.infoFoliaRegionsHeader);
-        Object prevRow = langData.get(MessagesKeys.infoFoliaRegion);
-        langData.put(MessagesKeys.infoFoliaRegionsHeader, "--- Folia Regions ---");
-        langData.put(MessagesKeys.infoFoliaRegion,
-                "[regionId]: tps=[tps1m] mspt=[mspt] players=[playerCount] queue=[queueDepth] tickBudget=[tickBudgetUtilisation]");
-        lang.setData(langData);
+        ConfigParser<CommandMessages> lang =
+                (ConfigParser<CommandMessages>) RTP.configs.getParser(CommandMessages.class);
+        Object prevHeader = lang.getConfigValue(CommandMessages.infoFoliaRegionsHeader, null);
+        Object prevRow = lang.getConfigValue(CommandMessages.infoFoliaRegion, null);
+        lang.setData(java.util.Map.of(
+                "infoFoliaRegionsHeader", "--- Folia Regions ---",
+                "infoFoliaRegion", "[regionId]: tps=[tps1m] mspt=[mspt] players=[playerCount] queue=[queueDepth] tickBudget=[tickBudgetUtilisation]"));
         try {
             boolean result = infoCmd.onCommand(senderId, new HashMap<>(), null);
             assertTrue(result);
@@ -314,12 +310,9 @@ public class InfoCmdTest {
                     "Expected region-1 row with substituted tokens, got: " + sent);
         } finally {
             RTP.metrics.setBinding(null);
-            java.util.EnumMap<MessagesKeys, Object> restore = lang.getData();
-            if (prevHeader == null) restore.remove(MessagesKeys.infoFoliaRegionsHeader);
-            else restore.put(MessagesKeys.infoFoliaRegionsHeader, prevHeader);
-            if (prevRow == null) restore.remove(MessagesKeys.infoFoliaRegion);
-            else restore.put(MessagesKeys.infoFoliaRegion, prevRow);
-            lang.setData(restore);
+            lang.setData(java.util.Map.of(
+                    "infoFoliaRegionsHeader", prevHeader == null ? "" : prevHeader,
+                    "infoFoliaRegion", prevRow == null ? "" : prevRow));
         }
     }
 

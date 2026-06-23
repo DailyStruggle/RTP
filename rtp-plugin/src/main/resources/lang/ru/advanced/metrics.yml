@@ -1,0 +1,33 @@
+# --- Настройки метрик RTP ---
+# Только настройки отчётности для SPI метрик фазы M2. Настройки
+# регулирования / тюнинга по-прежнему находятся в performance.yml.
+# Заполняет MetricsSnapshot.foliaRegions() детализацией по регионам на Folia.
+# Не влияет на Paper / Bukkit / Fabric (рантаймы с одним регионом всегда
+# возвращают пустой список, что является корректным ответом).
+# @type: boolean
+# @default: true
+foliaIncludeRegions: true
+
+# Стратегия агрегации, объединяющая выборки по регионам в скалярные
+# поля tps{1,5,15}m объекта MetricsSnapshot на Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: mean
+foliaAggregationTps: "mean"
+
+# Стратегия агрегации, объединяющая выборки по регионам в скалярное
+# поле mspt объекта MetricsSnapshot на Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationMspt: "max"
+
+# Стратегия агрегации, объединяющая выборки по регионам в скалярное
+# поле tickBudgetUtilisation объекта MetricsSnapshot на Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationTickBudget: "max"
+
+# НЕ ТРОГАЙТЕ НОМЕР ВЕРСИИ
+version: 1.0

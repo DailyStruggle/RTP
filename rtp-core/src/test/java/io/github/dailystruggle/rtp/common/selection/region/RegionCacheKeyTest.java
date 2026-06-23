@@ -2,6 +2,8 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -16,8 +18,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -25,17 +27,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * POTENTIAL_BUGS.md 2026-04-30 follow-up: every key on the cache-hash allowlist
- * must invalidate the {@link RegionCacheKey#cacheKey} when its value in
- * {@code safety.yml} changes, and every excluded key must not.
+ * must invalidate the {@link RegionCacheKey#cacheKey} when its value changes, and
+ * every excluded key must not.
  *
- * <p>This test pins the in/out boundary of {@link RegionCacheKey} against
- * {@link SafetyKeys}. If a new safety key is added that participates in the
- * validity predicate, this test fails until it is folded into the hash; if a
- * cosmetic key is folded in by accident, the "excluded keys are stable" case
- * fails. Either failure mode is a regression the maintainer should resolve
- * explicitly.
+ * <p>ADR-071 split the landing block lists into {@link BlocksKeys} and the biome
+ * filter into {@link BiomesKeys}; the cache-hash allowlist now spans all three
+ * parsers ({@link SafetyKeys}, {@link BlocksKeys}, {@link BiomesKeys}). This test
+ * pins the in/out boundary of {@link RegionCacheKey} against each.
  */
-@DisplayName("RegionCacheKey: safety.yml validity edits invalidate the cache hash")
+@DisplayName("RegionCacheKey: safety validity edits invalidate the cache hash")
 public class RegionCacheKeyTest {
 
     @TempDir
@@ -44,11 +44,11 @@ public class RegionCacheKeyTest {
     private TrackedMockWorld world;
     private Circle shape;
     private LinearAdjustor vert;
-    private ConfigParser<SafetyKeys> safety;
-    private EnumMap<SafetyKeys, Object> safetyData;
+    private Map<Enum<?>, Object> safetyData;
+    private Map<Enum<?>, Object> blocksData;
+    private Map<Enum<?>, Object> biomesData;
 
     @BeforeEach
-    @SuppressWarnings("unchecked")
     void setUp() throws ReflectiveOperationException {
         RTPTestSetup.install(tempDir.toFile());
         world = new TrackedMockWorld("region_cache_key_world");
@@ -56,28 +56,44 @@ public class RegionCacheKeyTest {
         shape = new Circle();
         vert = new LinearAdjustor(new ArrayList<>());
 
-        safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        safetyData = dataMapOf(SafetyKeys.class);
+        blocksData = dataMapOf(BlocksKeys.class);
+        biomesData = dataMapOf(BiomesKeys.class);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T extends Enum<T>> Map<Enum<?>, Object> dataMapOf(Class<T> cls)
+            throws ReflectiveOperationException {
+        ConfigParser<T> parser = (ConfigParser<T>) RTP.configs.getParser(cls);
         java.lang.reflect.Field dataField = FactoryValue.class.getDeclaredField("data");
         dataField.setAccessible(true);
-        safetyData = (EnumMap<SafetyKeys, Object>) dataField.get(safety);
+        return (Map) dataField.get(parser);
+    }
+
+    /** Route a key to the EnumMap of the parser that owns its declaring enum. */
+    private Map<Enum<?>, Object> mapFor(Enum<?> key) {
+        if (key instanceof BlocksKeys) return blocksData;
+        if (key instanceof BiomesKeys) return biomesData;
+        return safetyData;
     }
 
     private String currentKey() {
         return RegionCacheKey.cacheKey(world, shape, vert);
     }
 
-    private boolean keyChangesUnderMutation(SafetyKeys key, Object newValue) {
-        Object previous = safetyData.get(key);
+    private boolean keyChangesUnderMutation(Enum<?> key, Object newValue) {
+        Map<Enum<?>, Object> data = mapFor(key);
+        Object previous = data.get(key);
         try {
             String before = currentKey();
-            safetyData.put(key, newValue);
+            data.put(key, newValue);
             String after = currentKey();
             return !before.equals(after);
         } finally {
             if (previous == null) {
-                safetyData.remove(key);
+                data.remove(key);
             } else {
-                safetyData.put(key, previous);
+                data.put(key, previous);
             }
         }
     }
@@ -92,7 +108,7 @@ public class RegionCacheKeyTest {
     @Test
     @DisplayName("included: unsafeBlocks edit invalidates the cache key")
     void unsafeBlocks_in_hash() {
-        assertTrue(keyChangesUnderMutation(SafetyKeys.unsafeBlocks,
+        assertTrue(keyChangesUnderMutation(BlocksKeys.unsafeBlocks,
                         new ArrayList<>(Arrays.asList("LAVA", "MAGMA_BLOCK", "FIRE"))),
                 "Adding an unsafe block must invalidate cached 'safe' flags.");
     }
@@ -100,7 +116,7 @@ public class RegionCacheKeyTest {
     @Test
     @DisplayName("included: airBlocks edit invalidates the cache key")
     void airBlocks_in_hash() {
-        assertTrue(keyChangesUnderMutation(SafetyKeys.airBlocks,
+        assertTrue(keyChangesUnderMutation(BlocksKeys.airBlocks,
                         new ArrayList<>(Arrays.asList("AIR", "CAVE_AIR", "VOID_AIR"))),
                 "Editing air-block list shifts JumpAdjustor's air predicate.");
     }
@@ -131,10 +147,10 @@ public class RegionCacheKeyTest {
     @Test
     @DisplayName("included: biomeWhitelist toggle and biomes list edits invalidate the cache key")
     void biome_keys_in_hash() {
-        assertTrue(keyChangesUnderMutation(SafetyKeys.biomeWhitelist, Boolean.TRUE)
-                        || keyChangesUnderMutation(SafetyKeys.biomeWhitelist, Boolean.FALSE),
+        assertTrue(keyChangesUnderMutation(BiomesKeys.biomeWhitelist, Boolean.TRUE)
+                        || keyChangesUnderMutation(BiomesKeys.biomeWhitelist, Boolean.FALSE),
                 "biomeWhitelist toggle must invalidate the cache.");
-        assertTrue(keyChangesUnderMutation(SafetyKeys.biomes,
+        assertTrue(keyChangesUnderMutation(BiomesKeys.biomes,
                         new ArrayList<>(Arrays.asList("PLAINS", "FOREST", "TAIGA"))),
                 "Editing the region biome list must invalidate cached 'bad' flags.");
     }
@@ -142,7 +158,7 @@ public class RegionCacheKeyTest {
     @Test
     @DisplayName("excluded: invulnerabilityTime / staleChunkRetryLimit / version edits are STABLE")
     void cosmetic_keys_not_in_hash() {
-        // These three keys are runtime/cosmetic and must not invalidate persisted
+        // These keys are runtime/cosmetic and must not invalidate persisted
         // shape data — a server admin tweaking them should not pay a re-scan cost.
         assertEquals(currentKey(), mutateAndKey(SafetyKeys.invulnerabilityTime, 5000L),
                 "invulnerabilityTime is post-teleport cosmetic; cache must survive its edits.");
@@ -153,20 +169,20 @@ public class RegionCacheKeyTest {
     @Test
     @DisplayName("list order does not matter: [STONE, DIRT] and [dirt, stone] fold to the same key")
     void list_order_is_normalized() {
-        Object previous = safetyData.get(SafetyKeys.unsafeBlocks);
+        Object previous = blocksData.get(BlocksKeys.unsafeBlocks);
         try {
-            safetyData.put(SafetyKeys.unsafeBlocks,
+            blocksData.put(BlocksKeys.unsafeBlocks,
                     new ArrayList<>(Arrays.asList("STONE", "DIRT")));
             String a = currentKey();
-            safetyData.put(SafetyKeys.unsafeBlocks,
+            blocksData.put(BlocksKeys.unsafeBlocks,
                     new ArrayList<>(Arrays.asList("dirt", "stone")));
             String b = currentKey();
             assertEquals(a, b, "Cache key must be invariant under list re-ordering and case.");
         } finally {
             if (previous == null) {
-                safetyData.remove(SafetyKeys.unsafeBlocks);
+                blocksData.remove(BlocksKeys.unsafeBlocks);
             } else {
-                safetyData.put(SafetyKeys.unsafeBlocks, previous);
+                blocksData.put(BlocksKeys.unsafeBlocks, previous);
             }
         }
     }
@@ -187,10 +203,10 @@ public class RegionCacheKeyTest {
     @Test
     @DisplayName("allowlist regression guard: adding a new SafetyKeys enum constant must be classified")
     void allowlist_covers_every_enum_constant() {
-        // The full allowlist plus the documented exclusions must cover the enum.
-        // If a new key is added that is neither in SAFETY_HASH_KEYS nor in the
-        // documented exclusion list below, this test fails. The maintainer must
-        // then explicitly decide which side of the boundary the new key belongs on.
+        // ADR-071: the cache-hash allowlist now spans three enums. This guard pins
+        // the SafetyKeys side of the boundary: every SafetyKeys constant must be
+        // either cache-invalidating (included) or cache-stable (excluded). The
+        // moved block/biome keys are guarded by their own per-key tests above.
         java.util.EnumSet<SafetyKeys> excluded = java.util.EnumSet.of(
                 SafetyKeys.invulnerabilityTime,
                 SafetyKeys.staleChunkRetryLimit,
@@ -208,11 +224,7 @@ public class RegionCacheKeyTest {
                 SafetyKeys.platformAirHeight,
                 SafetyKeys.platformDepth,
                 SafetyKeys.platformMaterial,
-                SafetyKeys.airBlocks,
-                SafetyKeys.unsafeBlocks,
-                SafetyKeys.anvilPrefilterEnabled,
-                SafetyKeys.biomeWhitelist,
-                SafetyKeys.biomes);
+                SafetyKeys.anvilPrefilterEnabled);
         java.util.EnumSet<SafetyKeys> union = java.util.EnumSet.copyOf(included);
         union.addAll(excluded);
         java.util.EnumSet<SafetyKeys> all = java.util.EnumSet.allOf(SafetyKeys.class);
@@ -229,16 +241,17 @@ public class RegionCacheKeyTest {
         assertNotEquals(0, included.size(), "Included set must be non-empty.");
     }
 
-    private String mutateAndKey(SafetyKeys key, Object newValue) {
-        Object previous = safetyData.get(key);
+    private String mutateAndKey(Enum<?> key, Object newValue) {
+        Map<Enum<?>, Object> data = mapFor(key);
+        Object previous = data.get(key);
         try {
-            safetyData.put(key, newValue);
+            data.put(key, newValue);
             return currentKey();
         } finally {
             if (previous == null) {
-                safetyData.remove(key);
+                data.remove(key);
             } else {
-                safetyData.put(key, previous);
+                data.put(key, previous);
             }
         }
     }

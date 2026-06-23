@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
@@ -9,6 +9,8 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.BiomeNames;
@@ -394,16 +396,20 @@ public class ScanTask extends RTPRunnable {
             (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
     ConfigParser<SafetyKeys> safety =
             (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+    ConfigParser<BlocksKeys> blocks =
+            (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
+    ConfigParser<BiomesKeys> biomesParser =
+            (ConfigParser<BiomesKeys>) RTP.configs.getParser(BiomesKeys.class);
 
-    Object o = safety.getConfigValue(SafetyKeys.biomeWhitelist, false);
+    Object o = biomesParser.getConfigValue(BiomesKeys.biomeWhitelist, false);
     boolean whitelist = (o instanceof Boolean) ? (Boolean) o : Boolean.parseBoolean(o.toString());
 
-    o = safety.getConfigValue(SafetyKeys.biomes, new ArrayList<String>());
+    o = biomesParser.getConfigValue(BiomesKeys.biomes, new ArrayList<String>());
     if (!(o instanceof List<?>)) {
       new IllegalArgumentException(
-              "expected list for biomes in safety.yml, received - " + o.getClass().getSimpleName())
+              "expected list for biomes in advanced/biomes.yml, received - " + o.getClass().getSimpleName())
               .printStackTrace();
-      safety.set(SafetyKeys.biomes, new ArrayList<String>());
+      biomesParser.set(BiomesKeys.biomes, new ArrayList<String>());
     }
 
     List<?> objList = (o instanceof List) ? ((List<?>) o) : new ArrayList<String>();
@@ -424,7 +430,7 @@ public class ScanTask extends RTPRunnable {
       defaultBiomes = set;
     }
 
-    o = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+    o = blocks.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
     Set<String> unsafeBlocks =
             (o instanceof Collection)
                     ? ((Collection<?>) o).stream().map(o1 -> o1.toString().toUpperCase()).collect(Collectors.toSet())
@@ -688,8 +694,7 @@ public class ScanTask extends RTPRunnable {
             + " currentInFlight=" + inFlight.get() + " cap=" + MAX_PENDING_CHUNKS
             + cacheSuffix + gcSuffix + fullLoadSuffix + probeOutcomeSuffix);
 
-        ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        String msg = langParser.getConfigValue(MessagesKeys.scanStatus, "").toString();
+        String msg = RTP.configs.getConfigValue(CommandMessages.scanStatus, "").toString();
 
         if (msg != null && !msg.isEmpty()) {
           // Replace the placeholder with the formatted number

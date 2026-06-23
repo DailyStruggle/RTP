@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.network;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
 import io.github.dailystruggle.rtp.api.network.NetworkCommandHook;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
@@ -96,7 +96,7 @@ class BukkitNetworkCommandHookTest {
                 Map.of("region", List.of("backend-a:default")));
 
         var reject = assertInstanceOf(NetworkCommandHook.RoutingResult.Reject.class, result);
-        assertEquals(MessagesKeys.networkRegionUnavailable.name(), reject.messageKey());
+        assertEquals(NetworkMessages.networkRegionUnavailable.name(), reject.messageKey());
         assertEquals("backend-a:default", reject.placeholder());
     }
 
@@ -110,7 +110,7 @@ class BukkitNetworkCommandHookTest {
                 Map.of("region", List.of("a:b:c")));
 
         var reject = assertInstanceOf(NetworkCommandHook.RoutingResult.Reject.class, result);
-        assertEquals(MessagesKeys.networkRegionUnavailable.name(), reject.messageKey());
+        assertEquals(NetworkMessages.networkRegionUnavailable.name(), reject.messageKey());
         assertEquals("a:b:c", reject.placeholder());
     }
 
@@ -125,7 +125,7 @@ class BukkitNetworkCommandHookTest {
                 Map.of("region", List.of("missing")));
 
         var reject = assertInstanceOf(NetworkCommandHook.RoutingResult.Reject.class, result);
-        assertEquals(MessagesKeys.networkRegionUnavailable.name(), reject.messageKey());
+        assertEquals(NetworkMessages.networkRegionUnavailable.name(), reject.messageKey());
         assertEquals("missing", reject.placeholder());
     }
 
