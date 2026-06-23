@@ -1,0 +1,140 @@
+# --- RTP Player-Facing Messages ---
+# Strings a player sees directly: the teleport flow, command feedback sent to
+# the player, on-screen visuals, time-unit labels, command descriptions, and
+# the PlaceholderAPI status words.
+#
+# Formatting:
+#   - Bukkit legacy color codes (e.g. &a, &e, &c)
+#   - Hex color codes (e.g. #2636ef)
+#   - MiniMessage tags (e.g. <gradient:#5e4fa2:#f79459>, <rainbow>, <#rrggbb>)
+#     On Paper/Folia all MiniMessage tags are supported.
+#     On Spigot, gradient/rainbow/transition tags are expanded to per-character
+#     hex codes; other MiniMessage tags are stripped by the legacy pipeline.
+#   - PlaceholderAPI placeholders (when PAPI is installed)
+#
+# Placeholders:
+#   - Shared "[Pn]" placeholders (e.g. [P0], the RTP prefix) live in
+#     placeholders.yml and apply to every message in this file.
+#   - Per-message placeholders (e.g. [attempts], [world]) are documented inline
+#     above each message that uses them.
+
+# ###############################################################################
+# Section 1: Teleportation
+# ###############################################################################
+# when teleporting, say this
+alreadyTeleporting: "&7[P0] ⚡ you're already teleporting!"
+
+# if the plugin is currently reloading
+teleportDeniedReloading: "&7[P0] teleports are temporarily disabled while the plugin reloads. Please try again shortly."
+delayMessage: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teleporting in [delay]. Don't move</gradient>"
+chunkLoading: "&7[P0] ⚙ Loading chunks! please wait..."
+teleportMessage: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teleported in [attempts] attempts, in [processingTime]</gradient>"
+
+# if teleport is cancelled
+teleportCancel: "&7[P0] ⚡ Teleport cancelled!"
+
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] You cannot random-teleport while in combat."
+
+# if no safe places after reaching max attempts
+# placeholder: [attempts] - the maximum number of attempts
+unsafe: "&7[P0] ⌖ could not find a safe location within [attempts] attempts"
+
+# when the player is on cooldown
+# placeholder: [remainingCooldown] - the remaining time
+cooldownMessage: "&7[P0] ⚡ You can't teleport again for [remainingCooldown]"
+
+# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+# placeholder: [remainingLockTime] - time left until the lockAfterResetSeconds window resets.
+# Resolves to empty when no reset window is configured (an absolute cap); if you run an
+# absolute cap, reword this without the placeholder (e.g. "Please try again later.").
+lockedAfterUses: "&7[P0] ⌖ You have reached your random-teleport limit. Try again in [remainingLockTime]."
+
+# if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
+noLocationsQueued: "#f5eb73[P0] ⌖ no locations ready at this time"
+
+# when the queue line shifts
+# placeholder: [spot] - the current position in line
+queueUpdate: "#2636ef[P0] your spot in line: [spot]"
+
+# if the player doesn't have enough money to teleport in the region
+# placeholder: [money] - how much money is required for the command
+notEnoughMoney: "&7[P0] you need at least $[money] for that."
+
+# ###############################################################################
+# Section 2: Command Feedback
+# ###############################################################################
+# Player- and console-facing responses to a command attempt (sent directly to
+# whoever ran the command), distinct from the operator lifecycle logs in
+# system.yml.
+# world doesn't exist in bukkit
+# placeholder: [world] - the world name
+invalidWorld: "&7[P0] could not find world '[world]'"
+
+# plugin doesn't have the command the user requested
+# placeholder: [arg] - the argument attempted
+badArg: "&c[P0] invalid command argument [arg]"
+
+# plugin doesn't have the subcommand or parameter the user requested
+# placeholder: [arg] - the argument attempted
+invalidCommand: "&c[P0] invalid command - [arg]"
+
+# user doesn't have permission for the command requested
+noPerms: "&7I'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
+
+# plugin is busy reloading
+busy: "&c[P0] busy"
+
+# when the console tries to run a command meant only for players
+consoleCmdNotAllowed: "&c[P0] You must be an in-game player to execute this command."
+
+# ###############################################################################
+# Section 4: Visuals
+# ###############################################################################
+# title settings
+# remove or set title to "" to disable
+# PlaceholderAPI is recommended for coordinates
+title: "<rainbow>Teleported!</rainbow>"
+subtitle: "<gradient:#A78BFA:#E876A0>have fun!</gradient>"
+fadeIn: 20
+stay: 20
+fadeOut: 20
+
+# actionbar setting
+actionbar: ""
+
+# ###############################################################################
+# Section 5: Time Formatting
+# ###############################################################################
+# for time placeholders, what to call days, hours, minutes, seconds, and milliseconds
+days: "d"
+hours: "h"
+minutes: "m"
+seconds: "s"
+millis: "ms"
+
+# ###############################################################################
+# Section 6: Command Descriptions
+# ###############################################################################
+# shown in help command
+rtp: "&b/rtp - teleport to a random location"
+rtp_description: "teleport to a random location"
+help: "&b/rtp help - see this"
+help_description: "describe commands"
+reload: "&b/rtp reload - reload config files"
+reload_description: "reload config files"
+scan: "&b/rtp scan - try all possible region placements to improve load times"
+scan_description: "clear stored data and try all possible region placements"
+config_description: "update configuration files at runtime"
+info_description: "check the current state of the plugin"
+test_description: "test RTP functions"
+
+# ###############################################################################
+# Section 12: PlaceholderAPI Support
+# ###############################################################################
+# status placeholders for players
+PLAYER_AVAILABLE: "&aAVAILABLE"
+PLAYER_COOLDOWN: "#9D7CD8ON COOLDOWN"
+PLAYER_SETUP: "&bPICKING A LOCATION"
+PLAYER_LOADING: "&bLOADING CHUNKS"
+PLAYER_TELEPORTING: "&bTELEPORTING"

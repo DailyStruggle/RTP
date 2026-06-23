@@ -1,0 +1,20 @@
+# --- Mensagens do RTP (este idioma) ---
+# Textos de mensagens para jogadores e operadores neste idioma, agrupados por tema.
+# Copia gerada automaticamente das mensagens em ingles; nao editar a mao (sera sobrescrito).
+
+# --- Mensagens do RTP (Português) ---
+# Tradução das mensagens visíveis ao jogador e ao console.
+# IMPORTANTE:
+# - Os nomes de chave deste arquivo correspondem à coluna direita de
+# lang/pt/messages.lang.yml (a tradução dos nomes internos de chave do
+# plugin). Se uma chave não aparecer em messages.lang.yml, é usada a
+# chave em inglês do arquivo base (lang/messages.lang.yml).
+# - Preserve os marcadores entre colchetes como estão: [P0], [delay],
+# [attempts], [world], [region], [remainingCooldown], [scan_chunks], etc.
+# - Preserve os códigos de cor &a &7 &c e hexadecimais (#2636ef).
+# ###############################################################################
+# Seção 1: Configuração geral
+# ###############################################################################
+marcadores:
+  # P0
+  - "[RTP]"

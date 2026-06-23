@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.neoforge.database;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.DatabaseKeys;
 import io.github.dailystruggle.rtp.common.database.options.DatabaseAccessorFactory;
 
 import java.io.File;
@@ -52,8 +52,10 @@ public final class NeoForgeDatabaseHandler {
 
         RTP.configs.reloadConfigs();
 
-        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
-        Map<String, Object> databaseMap = configParser.getMap(ConfigKeys.database);
+        // ADR-071: database settings now live in database.yml (split out of config.yml).
+        ConfigParser<DatabaseKeys> databaseParser =
+                (ConfigParser<DatabaseKeys>) RTP.configs.getParser(DatabaseKeys.class);
+        Map<String, Object> databaseMap = RTP.configs.getDatabaseConfig();
 
         // Mirror BukkitDatabaseHandler defaults so the requested -> H2 -> flat-file
         // fallback chain in DatabaseAccessorFactory is preserved verbatim across platforms.
@@ -97,11 +99,13 @@ public final class NeoForgeDatabaseHandler {
             previousType = "yaml";
             try {
                 databaseMap.put("type", "yaml");
-                configParser.set(ConfigKeys.database, databaseMap);
-                configParser.save();
+                if (databaseParser != null) {
+                    databaseParser.set(DatabaseKeys.database, databaseMap);
+                    databaseParser.save();
+                }
             } catch (Exception e) {
                 RTP.log(Level.WARNING,
-                        "NeoForgeDatabaseHandler: failed to persist database.type=yaml to config.yml", e);
+                        "NeoForgeDatabaseHandler: failed to persist database.type=yaml to database.yml", e);
             }
         }
 

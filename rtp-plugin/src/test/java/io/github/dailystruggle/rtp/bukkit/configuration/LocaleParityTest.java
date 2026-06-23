@@ -60,7 +60,15 @@ public class LocaleParityTest {
     private static final Path RESOURCES =
             Paths.get("src", "main", "resources");
     private static final Path LANG_ROOT = RESOURCES.resolve("lang");
-    private static final Path BASELINE_MESSAGES = RESOURCES.resolve("messages.yml");
+    /**
+     * The English baseline messages are split, per concern, across this
+     * directory (placeholders / player / network / commands / system) rather
+     * than a single top-level messages.yml. The locale trees still ship a
+     * single lang/&lt;locale&gt;/messages.yml, so "messages" is treated as a
+     * directory-backed baseline category whose key set is the union of these
+     * member files.
+     */
+    private static final Path MESSAGES_DIR = RESOURCES.resolve("messages");
     private static final Pattern PLACEHOLDER = Pattern.compile("\\[[A-Za-z0-9_]+]");
 
     /** Subdirectories under {@code lang/} that are NOT locale folders. */
@@ -141,13 +149,73 @@ public class LocaleParityTest {
             }
         }
 
+        /**
+         * Raw-text scan for CSV-escaping corruption in every shipped locale
+         * value file. The locale YAML tree is derived output of the
+         * {@code scripts/locale-*-csv.py} pipeline; a botched CSV round-trip
+         * double-quotes comment/value cells and over-escapes backslashes,
+         * writing signatures that are never valid in these hand-authored
+         * configs: quadrupled quotes ({@code ""}{@code ""}), tripled quotes
+         * ({@code "}{@code ""}), a stray leading {@code "#} that promotes a
+         * comment to a YAML key, and runaway backslash runs ({@code \\\\}).
+         *
+         * <p>This is the detector for the failure that motivated the test:
+         * {@code lang/zh/network.yml} (and its siblings) leaking
+         * mechanically-corrupted English content past the coverage checks.
+         * It scans the raw bytes (not the parsed map) so it catches corruption
+         * that lives in comments, and so it reports a precise file:line even
+         * when the file no longer parses as YAML.
+         */
+        @Test
+        @DisplayName("No locale file contains CSV-escaping corruption (quadrupled/tripled quotes, leading \"#, backslash runs)")
+        void noCsvEscapingCorruption() throws IOException {
+            if (!Files.isDirectory(LANG_ROOT)) return;
+
+            List<String> failures = new ArrayList<>();
+            List<Path> files = new ArrayList<>();
+            try (var stream = Files.walk(LANG_ROOT)) {
+                stream.filter(Files::isRegularFile)
+                      .filter(p -> p.getFileName().toString().endsWith(".yml"))
+                      .forEach(files::add);
+            }
+            files.sort((a, b) -> a.toString().compareTo(b.toString()));
+
+            for (Path file : files) {
+                List<String> lines = Files.readAllLines(file);
+                for (int i = 0; i < lines.size(); i++) {
+                    String line = lines.get(i);
+                    String why = null;
+                    if (line.contains("\"\"\"\"")) {
+                        why = "quadrupled double-quotes (\"\"\"\")";
+                    } else if (line.contains("\"\"\"")) {
+                        why = "tripled double-quotes (\"\"\")";
+                    } else if (line.stripLeading().startsWith("\"#")) {
+                        why = "stray leading quote promotes a comment to a YAML key (\"#)";
+                    } else if (line.contains("\\\\\\\\")) {
+                        why = "runaway backslash escaping (\\\\\\\\)";
+                    }
+                    if (why != null) {
+                        String shown = line.length() > 80 ? line.substring(0, 80) + "..." : line;
+                        failures.add(String.format("%s:%d - %s | %s",
+                                LANG_ROOT.relativize(file), i + 1, why, shown.strip()));
+                    }
+                }
+            }
+
+            if (!failures.isEmpty()) {
+                fail("CSV-escaping corruption found in shipped locale files (re-run the "
+                        + "locale TSV pipeline from a clean baseline; never hand-edit the "
+                        + "corrupted output):\n  " + String.join("\n  ", failures));
+            }
+        }
+
         @Test
         @DisplayName("Each locale's messages.yml preserves baseline placeholder tokens")
         void messagePlaceholdersArePreserved() throws IOException {
             if (!Files.isDirectory(LANG_ROOT)) return;
-            if (!Files.exists(BASELINE_MESSAGES)) return;
+            if (!Files.isDirectory(MESSAGES_DIR)) return;
 
-            Set<String> baselinePlaceholders = collectPlaceholders(loadYaml(BASELINE_MESSAGES));
+            Set<String> baselinePlaceholders = collectPlaceholders(loadBaselineValues("messages"));
             List<String> failures = new ArrayList<>();
 
             try (DirectoryStream<Path> locales = Files.newDirectoryStream(LANG_ROOT, Files::isDirectory)) {
@@ -178,6 +246,133 @@ public class LocaleParityTest {
                 fail("Placeholder fidelity issues:\n  " + String.join("\n  ", failures));
             }
         }
+
+        /**
+         * Catches user-facing message values that were never translated: a
+         * non-English locale's {@code messages.yml} value that, after stripping
+         * color codes ({@code &a}, {@code #RRGGBB}, {@code §x}) and
+         * {@code [placeholder]} tokens, is byte-for-byte identical to the
+         * English baseline value for the same key and still contains real words.
+         *
+         * <p>This is the actual "what was not translated and should be" signal.
+         * It is deliberately NOT keyed off {@code .lang.yml} key-name identity:
+         * locales legitimately keep the English key <em>name</em> (an internal
+         * config identifier) while translating the value, so a self-mapped key
+         * name carries no signal. What matters is the rendered value.
+         *
+         * <p>Pure color/placeholder strings (e.g. {@code "&2&l[apply]"}) leave
+         * no residual letters and are skipped; genuinely-English tokens that a
+         * locale intentionally leaves verbatim can be suppressed via
+         * {@link #UNTRANSLATED_ALLOW}.
+         */
+        @Test
+        @DisplayName("No locale messages.yml value is left as the untranslated English baseline string")
+        void noUntranslatedBaselineValues() throws IOException {
+            if (!Files.isDirectory(LANG_ROOT)) return;
+            if (!Files.isDirectory(MESSAGES_DIR)) return;
+
+            Map<String, Object> baseline = loadBaselineValues("messages");
+            Map<String, String> baselineNorm = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> e : baseline.entrySet()) {
+                if (e.getValue() instanceof String s) {
+                    baselineNorm.put(e.getKey(), normalizeForTranslation(s));
+                }
+            }
+
+            Path baselineLang = LANG_ROOT.resolve("messages.lang.yml");
+            Map<String, String> baselineLangMap = Files.exists(baselineLang)
+                    ? loadLangMap(baselineLang) : Collections.emptyMap();
+
+            List<String> failures = new ArrayList<>();
+            for (Path localeDir : discoverLocaleDirs()) {
+                String localeName = localeDir.getFileName().toString();
+                Path messages = localeDir.resolve("messages.yml");
+                if (!Files.exists(messages)) continue;
+
+                // A locale that does not even parse is a separate defect owned
+                // by noCsvEscapingCorruption / the parse-level coverage tests;
+                // skip it here so this value-level signal stays meaningful.
+                Map<String, Object> localeValues;
+                Map<String, String> localeLangMap;
+                try {
+                    localeValues = loadYaml(messages);
+                    Path localeLang = localeDir.resolve("messages.lang.yml");
+                    localeLangMap = Files.exists(localeLang)
+                            ? loadLangMap(localeLang) : Collections.emptyMap();
+                } catch (RuntimeException | AssertionError parseFailure) {
+                    continue;
+                }
+
+                for (Map.Entry<String, String> b : baselineNorm.entrySet()) {
+                    String baseKey = b.getKey();
+                    String baseResidual = b.getValue();
+                    if (baseResidual.isEmpty()) continue;
+                    if (UNTRANSLATED_ALLOW.contains(baseResidual)) continue;
+
+                    String translated = localeLangMap.get(baseKey);
+                    if (translated == null) translated = baselineLangMap.get(baseKey);
+                    if (translated == null) translated = baseKey;
+
+                    Object localeRaw = localeValues.get(translated);
+                    if (!(localeRaw instanceof String s)) continue;
+                    if (normalizeForTranslation(s).equals(baseResidual)) {
+                        failures.add(String.format("%s/messages.yml '%s' still English: \"%s\"",
+                                localeName, translated, s));
+                    }
+                }
+            }
+
+            if (!failures.isEmpty()) {
+                fail("Untranslated English message values shipped in non-baseline locales "
+                        + "(translate the value, or add the residual token to "
+                        + "UNTRANSLATED_ALLOW if it is intentionally English):\n  "
+                        + String.join("\n  ", failures));
+            }
+        }
+    }
+
+    /**
+     * Residual (color- and placeholder-stripped) tokens that are intentionally
+     * left in English across every locale - brand names, command literals,
+     * and technical acronyms - so {@link ResourceParity#noUntranslatedBaselineValues}
+     * does not flag them.
+     */
+    private static final Set<String> UNTRANSLATED_ALLOW = Set.of(
+            // time-unit suffix letters - universal symbols, kept verbatim
+            "d", "h", "m", "s", "ms",
+            // command literal
+            "rtpinfo",
+            // prefab identifiers (config keys, not prose)
+            "survivaldefault", "lowperformance", "highperformance",
+            "foliatuned", "multiworld",
+            // diagnostic rows that are only acronyms (TPS/MSPT/JVM/MiB/cps)
+            // plus [placeholder] tokens - no translatable prose remains
+            "jvmheapmib", "tpsmmm", "servermsptmstickbudget",
+            "tpsmsptplayersqueuebudget", "cpslandeta",
+            // cross-language cognates that are spelled identically in several
+            // locales (notably French/English) - a verbatim spelling is the
+            // correct translation, so do not flag it as untranslated
+            "configuration", "diagnostics", "type",
+            // brand + universal "menu" loanword
+            "rtpmenu");
+
+    private static final Pattern COLOR_AMP = Pattern.compile("[&\u00a7][0-9A-Za-z]");
+    private static final Pattern COLOR_HEX = Pattern.compile("#[0-9A-Fa-f]{6}");
+    private static final Pattern BRACKET_TOKEN = Pattern.compile("\\[[^\\]]*]");
+    private static final Pattern NON_LETTER = Pattern.compile("[^A-Za-z]");
+
+    /**
+     * Strips legacy/hex color codes and {@code [placeholder]} tokens, then
+     * removes every non-letter character and lowercases. Two values whose only
+     * difference is formatting/placeholders collapse to the same residual; a
+     * value with no translatable words collapses to the empty string.
+     */
+    private static String normalizeForTranslation(String value) {
+        String s = COLOR_HEX.matcher(value).replaceAll("");
+        s = COLOR_AMP.matcher(s).replaceAll("");
+        s = BRACKET_TOKEN.matcher(s).replaceAll("");
+        s = NON_LETTER.matcher(s).replaceAll("");
+        return s.toLowerCase();
     }
 
     // =========================================================================
@@ -194,9 +389,8 @@ public class LocaleParityTest {
             List<DynamicTest> tests = new ArrayList<>();
             for (String category : discoverBaselineCategories()) {
                 tests.add(DynamicTest.dynamicTest(category, () -> {
-                    Path valuePath = RESOURCES.resolve(category + ".yml");
                     Path langPath = LANG_ROOT.resolve(category + ".lang.yml");
-                    Map<String, Object> values = loadYaml(valuePath);
+                    Map<String, Object> values = loadBaselineValues(category);
                     Map<String, String> langMap = loadLangMap(langPath);
 
                     List<String> missing = new ArrayList<>();
@@ -223,12 +417,11 @@ public class LocaleParityTest {
                 String localeName = localeDir.getFileName().toString();
                 for (String category : categories) {
                     tests.add(DynamicTest.dynamicTest(localeName + " / " + category, () -> {
-                        Path baselineValue = RESOURCES.resolve(category + ".yml");
                         Path baselineLang = LANG_ROOT.resolve(category + ".lang.yml");
                         Path localeValue = localeDir.resolve(category + ".yml");
                         Path localeLang = localeDir.resolve(category + ".lang.yml");
 
-                        Map<String, Object> baselineValues = loadYaml(baselineValue);
+                        Map<String, Object> baselineValues = loadBaselineValues(category);
                         Map<String, String> baselineLangMap = loadLangMap(baselineLang);
 
                         if (!Files.exists(localeValue)) {
@@ -280,8 +473,7 @@ public class LocaleParityTest {
                     Path localeLang = localeDir.resolve(category + ".lang.yml");
                     if (!Files.exists(localeLang)) continue;
                     tests.add(DynamicTest.dynamicTest(localeName + " / " + category + ".lang.yml", () -> {
-                        Path baselineValue = RESOURCES.resolve(category + ".yml");
-                        Set<String> baselineKeys = loadYaml(baselineValue).keySet();
+                        Set<String> baselineKeys = loadBaselineValues(category).keySet();
                         Map<String, String> map = loadLangMap(localeLang);
                         List<String> stale = new ArrayList<>();
                         for (String key : map.keySet()) {
@@ -327,8 +519,33 @@ public class LocaleParityTest {
                 if (Files.exists(langSibling)) categories.add(stem);
             }
         }
+        // "messages" is directory-backed (messages/*.yml) with sibling
+        // lang/messages.lang.yml; it has no top-level messages.yml to discover.
+        if (Files.isDirectory(MESSAGES_DIR)
+                && Files.exists(LANG_ROOT.resolve("messages.lang.yml"))
+                && !categories.contains("messages")) {
+            categories.add("messages");
+        }
         Collections.sort(categories);
         return categories;
+    }
+
+    /**
+     * Baseline value map for a category. For the directory-backed "messages"
+     * category this is the union of every {@code messages/*.yml} member file;
+     * for all others it is the single top-level {@code <category>.yml}.
+     */
+    private static Map<String, Object> loadBaselineValues(String category) throws IOException {
+        if ("messages".equals(category)) {
+            Map<String, Object> merged = new LinkedHashMap<>();
+            if (Files.isDirectory(MESSAGES_DIR)) {
+                try (DirectoryStream<Path> ymls = Files.newDirectoryStream(MESSAGES_DIR, "*.yml")) {
+                    for (Path p : ymls) merged.putAll(loadYaml(p));
+                }
+            }
+            return merged;
+        }
+        return loadYaml(RESOURCES.resolve(category + ".yml"));
     }
 
     /** Locale dirs: every directory under {@code lang/} not in {@link #NON_LOCALE_DIRS}. */

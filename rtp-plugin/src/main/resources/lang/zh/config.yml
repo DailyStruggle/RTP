@@ -60,61 +60,15 @@ setRespawnOnTeleport: false
   # @type: list<string>
   - ""
 
-# --- 数据库设置 ---
-# 缓存的位置和玩家数据存储于何处。
-数据库:
-  # 可用类型: yaml, sqlite, mysql, postgresql
-  # - yaml/sqlite: 本地文件（无需额外配置）
-  # - mysql/postgresql: 远程数据库（需要下方的凭据）
-  # @type: enum
-  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
-  # @default: "sqlite"
-  type: "sqlite"
-  # Redis 主机。
-  # @type: string
-  host: "127.0.0.1"
-  # Redis 端口。
-  # @type: integer
-  # @range: [1, 65535]
-  port: 3306
-  # 数据库 / 模式名称。仅 mysql/postgresql 使用。
-  # @type: string
-  name: "rtp"
-  # 数据库用户名。仅 mysql/postgresql 使用。
-  # @type: string
-  username: "root"
-  # Redis 密码。空字符串禁用认证。
-  # @type: string
-  password: "password"
-
-# --- 网络与同步 ---
-# Redis 用于在多台服务器之间同步缓存的位置。
-网络:
-  redis:
-    # Enable Redis-backed network state binding.
-    # @type: boolean
-    # @default: false
-    enabled: false
-    # Redis host.
-    # @type: string
-    host: "127.0.0.1"
-    # Redis port.
-    # @type: integer
-    # @range: [1, 65535]
-    port: 6379
-    # Redis password. Empty string disables auth.
-    # @type: string
-    password: ""
-
 # 通用菜单框架。
 # `renderer` 是渲染器 id 的有序偏好列表。出现异常或缺少适配器时，
 # 框架会遍历该列表并回退到下一条目。若列表耗尽，无 token 的打开页
 # 路径将回退到可配置的 `menuInvalid` 消息。可用 id: book。(聊天
 # 渲染器将在后续版本中提供，届时会加入默认列表。)
 menu:
-  # 渲染器 id 的有序偏好列表。
+  # Ordered preference list of renderer ids.
   # @type: list<enum>
-  # @options: [\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\book\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\, \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\chat\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\]
+  # @options: ["book", "chat"]
   renderer:
     # 通用菜单框架。
     # `renderer` 是渲染器 id 的有序偏好列表。出现异常或缺少适配器时，
@@ -124,4 +78,4 @@ menu:
     - "book"
 
 # 请勿修改版本号
-version: 3.0
+version: 3.1

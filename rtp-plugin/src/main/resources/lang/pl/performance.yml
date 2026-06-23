@@ -231,7 +231,7 @@ progUzupelnieniaBacklog: 0.5
 # teleportacja jest audytowana: zapisywane jest WARN, a skumulowany licznik
 # slowPipelineCount (pokazywany przez /rtp info) jest zwiększany. Audytowane są
 # tylko teleportacje natychmiastowe/bez kolejki; te z kolejki są wyłączone, bo ich
-# zmierzony czas obejmuje oczekiwanie w kolejce. 0 lub mniej wyłącza audyt. Zob. ADR-053.
+# zmierzony czas obejmuje oczekiwanie w kolejce. 0 lub mniej wyłącza audyt. Zob.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
@@ -241,7 +241,7 @@ progWolnegoPipelineMs: 5000
 # Głębokość publicznej kolejki teleportacji (oczekujący gracze), przy której
 # audytowane jest spiętrzenie kolejki: zapisywane jest WARN wyzwalane zboczem,
 # a skumulowany licznik queueGrowthWarnCount (pokazywany przez /rtp info) jest
-# zwiększany raz na przekroczenie. 0 lub mniej wyłącza audyt (opcjonalny). Zob. ADR-053.
+# zwiększany raz na przekroczenie. 0 lub mniej wyłącza audyt (opcjonalny). Zob.
 # @type: integer
 # @range: [0, null]
 # @unit: players

@@ -13,19 +13,19 @@ erstattungBeiAbbruch: true
 # @default: 50.0
 preis: 50.0
 
-# Kosten für die Teleportation eines anderen Spielers (/rtp <Spieler>).
+# Kosten für die Teleportation eines anderen Spielers (rtp <Spieler>).
 # @type: number
 # @range: [0.0, null]
 # @default: 200.0
 preisAnderer: 200.0
 
-# Kosten für die Verwendung benutzerdefinierter Parameter (/rtp region:<Region>, etc.).
+# Kosten für die Verwendung benutzerdefinierter Parameter (rtp region:<Region>, etc.).
 # @type: number
 # @range: [0.0, null]
 # @default: 1000000000.0
 preisParameter: 1000000000.0
 
-# Zusätzliche Kosten für die Angabe eines Bioms (/rtp biome:<Biom>).
+# Zusätzliche Kosten für die Angabe eines Bioms (rtp biome:<Biom>).
 # @type: number
 # @range: [0.0, null]
 # @default: 5000.0

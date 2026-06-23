@@ -1,134 +1,12 @@
-# --- RTP User-Facing Messages ---
-# All player- and console-visible strings.
+# --- RTP Operator / Command-Output Messages ---
+# Strings emitted by operator-facing commands and menus: the scan command, the
+# /rtp info diagnostics, and the generalized menu framework (front page, admin
+# panel, config editor, maps, multi-config submenus).
 #
-# Formatting:
-#   - Bukkit legacy color codes (e.g. &a, &e, &c)
-#   - Hex color codes (e.g. #2636ef)
-#   - MiniMessage tags (e.g. <gradient:#5e4fa2:#f79459>, <rainbow>, <#rrggbb>)
-#     On Paper/Folia all MiniMessage tags are supported.
-#     On Spigot, gradient/rainbow/transition tags are expanded to per-character
-#     hex codes; other MiniMessage tags are stripped by the legacy pipeline.
-#   - PlaceholderAPI placeholders (when PAPI is installed)
-#
-# Placeholders:
-#   - Shared "[Pn]" placeholders are defined in the `placeholders` list below.
-#     [P0] is the RTP prefix by default.
-#   - Per-message placeholders (e.g. [attempts], [world]) are documented inline
-#     above each message that uses them.
-#
-# ###############################################################################
-# Section 1: General Configuration
-# ###############################################################################
-# list of additional placeholders
-# format: Pn - where n is the index in this list
-placeholders:
-  # P0 - plugin prefix shown in every message. Uses a rainbow gradient on
-  # Paper/Folia and per-character hex codes on Spigot.
-  - "<rainbow>[RTP]</rainbow>"
+# Formatting and shared [Pn] placeholders follow the same rules as player.yml.
 
 # ###############################################################################
-# Section 2: Teleportation
-# ###############################################################################
-# when teleporting, say this
-alreadyTeleporting: "&7[P0] ⚡ you're already teleporting!"
-
-# if the plugin is currently reloading
-teleportDeniedReloading: "&7[P0] teleports are temporarily disabled while the plugin reloads. Please try again shortly."
-delayMessage: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teleporting in [delay]. Don't move</gradient>"
-chunkLoading: "&7[P0] ⚙ Loading chunks! please wait..."
-teleportMessage: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teleported in [attempts] attempts, in [processingTime]</gradient>"
-
-# if teleport is cancelled
-teleportCancel: "&7[P0] ⚡ Teleport cancelled!"
-
-# if no safe places after reaching max attempts
-# placeholder: [attempts] - the maximum number of attempts
-unsafe: "&7[P0] ⌖ could not find a safe location within [attempts] attempts"
-
-# when the player is on cooldown
-# placeholder: [remainingCooldown] - the remaining time
-cooldownMessage: "&7[P0] ⚡ You can't teleport again for [remainingCooldown]"
-
-# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
-# placeholder: [remainingLockTime] - time left until the lockAfterResetSeconds window resets.
-# Resolves to empty when no reset window is configured (an absolute cap); if you run an
-# absolute cap, reword this without the placeholder (e.g. "Please try again later.").
-lockedAfterUses: "&7[P0] ⌖ You have reached your random-teleport limit. Try again in [remainingLockTime]."
-
-# if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
-noLocationsQueued: "#f5eb73[P0] ⌖ no locations ready at this time"
-
-# when the queue line shifts
-# placeholder: [spot] - the current position in line
-queueUpdate: "#2636ef[P0] your spot in line: [spot]"
-
-# if the player doesn't have enough money to teleport in the region
-# placeholder: [money] - how much money is required for the command
-notEnoughMoney: "&7[P0] you need at least $[money] for that."
-
-# ###############################################################################
-# Section 3: Time Formatting
-# ###############################################################################
-# for time placeholders, what to call days, hours, minutes, seconds, and milliseconds
-days: "d"
-hours: "h"
-minutes: "m"
-seconds: "s"
-millis: "ms"
-
-# ###############################################################################
-# Section 4: System & Management
-# ###############################################################################
-# a configuration file 'version' is lower than the latest
-# placeholder: [filename] - name of file, including file extension
-oldFile: "&b[P0] old [filename] detected. Updating"
-
-# detected a bukkit world that isn't in the config file
-# placeholder: [world] - the world detected
-newWorld: "&b[P0] detected a new world '[world]'"
-
-# world doesn't exist in bukkit
-# placeholder: [world] - the world name
-invalidWorld: "&7[P0] could not find world '[world]'"
-
-# plugin reload/update text
-# placeholder: [filename] - name of file
-reloading: "&b[P0] loading [filename]..."
-reloaded: "&b[P0] successfully loaded [filename]."
-updating: "&a[P0] updating [filename]..."
-updated: "&a[P0] successfully updated [filename]."
-
-# plugin doesn't have the command the user requested
-# placeholder: [arg] - the argument attempted
-badArg: "&c[P0] invalid command argument [arg]"
-
-# when the console tries to run a command meant only for players
-consoleCmdNotAllowed: "&c[P0] You must be an in-game player to execute this command."
-
-# plugin is busy reloading
-busy: "&c[P0] busy"
-
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
-pvpInCombat: "&c[P0] You cannot random-teleport while in combat."
-
-# plugin doesn't have the subcommand or parameter the user requested
-# placeholder: [arg] - the argument attempted
-invalidCommand: "&c[P0] invalid command - [arg]"
-
-# user doesn't have permission for the command requested
-noPerms: "&7I'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
-
-# ###############################################################################
-# Section 5: Administrative Logs
-# ###############################################################################
-# logged when locations are saved/loaded from database
-# placeholder: [amount] - number of locations
-# placeholder: [region] - name of region
-locationSaved: "&7[P0] Successfully saved [amount] locations for [region]"
-locationLoaded: "&7[P0] Successfully loaded [amount] locations for [region]"
-
-# ###############################################################################
-# Section 6: Scan Command
+# Section 7: Scan Command
 # ###############################################################################
 # messages related to the scan command
 # placeholder: [scan_regions] - list of regions
@@ -150,7 +28,7 @@ scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunk
 scanBossBar: "&aScanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
 
 # ###############################################################################
-# Section 7: Info Command
+# Section 8: Info Command
 # ###############################################################################
 # messages related to the info command
 infoTitle: "&2&l/rtp info"
@@ -160,17 +38,17 @@ infoMSPT: "&7Current Plugin MSPT: #7E9CC8[mspt]"
 infoTotalLoads: "&7Lifetime Chunks Loaded: #7E9CC8[loads]"
 infoLoadsByOrigin: "&7Loads by Origin: #7E9CC8[loadsByOrigin]"
 infoLeakRate: "&7Current Chunk Leak Rate: #7E9CC8[leakRate]"
-# --- Metrics SPI health block ---
+# --- Health metrics block ---
 infoQueueDepth: "&7Players Waiting In Region Queues: #7E9CC8[queueDepth]"
 infoPendingTeleports: "&7Pending Teleport Pipelines: #7E9CC8[pendingTeleports]"
 infoAvgPipelineMs: "&7Avg Pipeline Latency: #7E9CC8[avgPipelineMs] ms"
-# Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
+# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7Pipeline Latency (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-# Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
+# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7Slow Teleports (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-# Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7Queue-Growth Warnings (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7JVM Heap: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # Header line for the Health pipeline labelled block in /rtp info.
@@ -183,18 +61,18 @@ infoMSPTLive: "&7Server MSPT: #7E9CC8[mspt] ms (&7tick budget: #7E9CC8[tickBudge
 infoSoftCap: "&7Players: #7E9CC8[playerCount] / [softCap]"
 # Most recent database round-trip latency in ms. Placeholder: [databaseLatencyMs].
 infoDatabaseLatencyMs: "&7Database Latency: #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics (ADR-052), sourced from the process-global RtpOutcomeStats.
+# Generation outcome metrics.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Generation Success: #7E9CC8[genSuccessRate]&7 (fail #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
 # Single most common rejection cause and its share of all failures. Placeholders:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7Top Rejection Cause: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
-# Per-cause rejection breakdown (the analogue of a competitor's /rtp unsafe-stats).
+# Per-cause rejection breakdown.
 # Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
 infoFailureBreakdown: "&7Rejections by Cause: #7E9CC8[genFailureBreakdown]"
-# Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
-# to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&e/&c.
+# Health colour-band thresholds. Used to colour the coloured-variant
+# placeholders (e.g. [tps1mColoured]) green/yellow/red.
 infoThresholdTpsGreen: 19.5
 infoThresholdTpsYellow: 18.0
 infoThresholdMsptGreen: 30.0
@@ -248,27 +126,10 @@ regionInfo:
   - "#58CCED  - top reject cause: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
-# Section 8: Command Descriptions
+# Section 9: Generalized Menu Framework
 # ###############################################################################
-# shown in help command
-rtp: "&b/rtp - teleport to a random location"
-rtp_description: "teleport to a random location"
-help: "&b/rtp help - see this"
-help_description: "describe commands"
-reload: "&b/rtp reload - reload config files"
-reload_description: "reload config files"
-scan: "&b/rtp scan - try all possible region placements to improve load times"
-scan_description: "clear stored data and try all possible region placements"
-config_description: "update configuration files at runtime"
-info_description: "check the current state of the plugin"
-test_description: "test RTP functions"
-
-# ###############################################################################
-# Section 8b: Generalized Menu Framework
-# ###############################################################################
-# Sent when a concrete /rtp menu ... command is malformed, points at an
-# unknown path/parameter, or fails its server-side permission gate.
-# ADR-050: menu clicks are concrete commands, so there is no token to expire.
+# Sent when a /rtp menu command is malformed, points at an unknown
+# path/parameter, or fails its permission check.
 menuInvalid: "&c[P0] that menu command is invalid."
 # Sent when a menu command cannot resolve the calling player UUID.
 menuUnknownPlayer: "&c[P0] menu commands can only be used by in-game players."
@@ -283,25 +144,25 @@ menuBack: "&7« back"
 # Label template for the "execute the assembled command" row prepended to every
 # runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
 menuExecute: "&2▶ run [command]"
-# Header row at the top of a parameter-value picker sub-page (Stage A.2).
+# Header row at the top of a parameter-value picker sub-page.
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
 menuPickValue: "&7pick a value for [param] (will run: /rtp [command] [param]:<value>)"
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list.
 menuTypeValue: "&7✎ type a custom value..."
-# Non-clickable header row at the top of every non-root menu page (Stage A.4).
+# Non-clickable header row at the top of every non-root menu page.
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
 menuConstructed: "&7building: #7E9CC8/rtp [command]"
-# Non-clickable title row prepended to the root /rtp menu page (Stage A.5).
+# Non-clickable title row prepended to the root /rtp menu page.
 # Provides a welcoming header before the player descends into any subcommand.
 menuRootTitle: "#5FB3B3&l⚡ RTP menu"
 # Non-clickable subtitle/hint row prepended to the root /rtp menu page below
-# menuRootTitle (Stage A.5). Short orientation text for first-time users.
+# menuRootTitle. Short orientation text for first-time users.
 menuRootHint: "&7click an option below to begin"
-# Navigation rows appended to paginated menu pages (Stage A.6) — clicking
-# them moves to the previous/next page of the same model. Placeholder:
+# Navigation rows appended to paginated menu pages - clicking them moves
+# to the previous/next page of the same model. Placeholder:
 # [page] - the 1-based human-readable target page number.
 menuPagePrev: "&7« previous page ([page])"
 menuPageNext: "&7next page ([page]) »"
@@ -313,9 +174,9 @@ menuFrontPageRowRegion: "#1F6FB2🌍 pick a region &7- /rtp region:..."
 menuFrontPageRowWorld: "#1F6FB2🌐 pick a world &7- /rtp world:..."
 menuFrontPageRowBiome: "#1F8A40🌳 pick a biome &7- /rtp biome:..."
 menuFrontPageRowHelp: "#7A4FB8❓ list commands &7- /rtp help"
-# Front-page admin entry row: the only inline
-# admin-visible row on the front page; click descends into the curated admin
-# panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
+# Front-page admin entry row: the only inline admin-visible row on the
+# front page; click descends into the admin panel. Hidden when the viewer
+# lacks rtp.menu.admin.
 menuFrontPageRowAdmin: "#9D7CD8▶ admin panel &7- operator tools"
 # Hover text for the admin-panel entry row. No placeholders.
 menuFrontPageHoverAdmin: "&7operator tools: config, scans, diagnostics, reload"
@@ -413,12 +274,12 @@ infoBookOverflowFooter: "&7(content truncated - click to view full output in cha
 # book is not currently supported on this build (deferred to a later
 # milestone). Users may click the Refresh row to refresh manually.
 infoBookAutoRefreshDeferredNote: "&8(auto-refresh not yet supported; click Refresh to update)"
-# Non-clickable title row at the top of the config-file selector page (Stage C.1).
+# Non-clickable title row at the top of the config-file selector page.
 # Shown when an admin clicks "/rtp config" from the front page.
 configSelectorTitle: "#5FB3B3&l⚙ config files"
 # Label for the "back to /rtp menu root" navigation row on the config selector page.
 configSelectorBackRow: "&7« back to menu"
-# Non-clickable title row at the top of a single config-file page (Stage C.2).
+# Non-clickable title row at the top of a single config-file page.
 # Placeholder: [file] - the config file name (e.g. "performance", "safety").
 configFileTitle: "#5FB3B3&l⚙ config: #9D7CD8[file]"
 # Label for the "back to config selector" navigation row on a single config-file page.
@@ -431,10 +292,10 @@ configKeyRowFormat: "#7E9CC8[key]&7: #B084DC[value]"
 # Hover text for a per-key row on a config-file page. Placeholders:
 #   [key], [value], [type] - the config key name, current value, and declared type.
 configKeyHoverFormat: "&7click to edit #7E9CC8[key] &7(type: [type])"
-# Non-clickable title row at the top of a shape/vert type-picker page (Stage C.3a).
+# Non-clickable title row at the top of a shape/vert type-picker page.
 # Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
 configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: #9D7CD8[current]&7)"
-# Non-clickable title row at the top of a shape/vert sub-parameter page (Stage C.3b).
+# Non-clickable title row at the top of a shape/vert sub-parameter page.
 # Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
 configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- #9D7CD8[type] &7sub-parameters"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
@@ -461,75 +322,24 @@ configApplyRow: "&2&l[apply]"
 # Clears the cart without applying.
 configDiscardRow: "&c&l[discard]"
 
-# --- ADR-047 declarative chart composition bridge (REQ-RTP-MAP-006) ---
-# Sent to the viewer when an OPEN_MAP menu action fires but no concrete
-# MapBinding is registered (NoopMapBinding is still active, e.g. on the
-# Lite assembly or before RTPHooks wires the platform binding).
+# --- Map / chart rendering ---
+# Sent when a map row is clicked but map rendering is not available on this
+# server (e.g. the Lite assembly, or no map provider installed).
 mapBindingMissing: "&c[P0] map rendering is not available on this server."
-# Sent when MapDispatch receives a ChartSpec whose Kind has no registered
-# ChartSpecResolver (e.g. Stage 1 viewer clicks a Stage 3 sparkline before
-# the resolver lands).
+# Sent when a chart is requested but no renderer is registered for that
+# chart type.
 mapResolverMissing: "&c[P0] no chart resolver registered for this request."
-# Sent when a resolver runs but the underlying data source is unavailable
-# for the requested target (unknown region, no data yet, world unloaded).
+# Sent when chart data is unavailable for the requested target (unknown
+# region, no data yet, world unloaded).
 # Placeholder: [region] - the requested region name (may be empty).
 mapUnavailable: "&e[P1] chart data is not available right now."
-# Sent when the active MapBinding cannot allocate a map handle right now
-# (binding-defined back-pressure, e.g. per-viewer cap reached).
+# Sent when the map service cannot allocate a map right now (e.g. a
+# per-viewer cap has been reached).
 mapBusy: "&e[P1] the map service is busy; please try again shortly."
-# Label for the clickable "/rtp info" menu row that, on click, mints a
-# ChartSpec(BAD_POINTS_HEATMAP, ...) token and asks the active MapBinding
-# to render a 128x128 heatmap of the current region's known bad-point
-# spiral indices. The row is omitted at render time when NoopMapBinding
-# is the installed binding (REQ-RTP-MAP-006 / ADR-047).
+# Label for the clickable "/rtp info" menu row that renders a heatmap of
+# the current region's known bad locations. Hidden when map rendering is
+# not available on this server.
 menuInfoBadPointsLabel: "#9D7CD8&l# bad-points map"
-
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the L2 baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
-# position.
-networkQueued: "&7[P0] queued for a cross-server destination (position [position])..."
-# Sent when a player runs /rtp* while they already hold a non-terminal
-# cross-server enrolment (ADR-015 / REQ-RTP-NET-015 command-lock). Placeholder:
-# [position] - FIFO position when known; empty when the proxy has not yet
-# assigned one.
-alreadyQueued: "&cYou are already waiting in the cross-server queue (position [position]). Please wait."
-# Sent when a cross-server waitlist entry is reaped after exceeding its
-# configured TTL (ADR-015). No placeholders.
-networkTimedOut: "&c[P0] cross-server teleport timed out while waiting for a backend."
-# Sent when a cross-server waitlist enrolment is rejected because the shared
-# waitlist has reached its configured maximum size (ADR-015 REJECTED_FULL).
-# No placeholders.
-waitlistFull: "&c[P0] cross-server queue is full; please try again shortly."
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
-networkRouting: "&7[P0] routing to a backend..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
-networkReserved: "&a[P0] coordinate reserved on [server]. Transferring..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
-networkTransferring: "&a[P0] transferring to [server]..."
-# Sent when the cross-server path gave up and the request fell back to
-# the local backend. Placeholder: [reason] - one of the
-# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
-networkFallback: "&e[P0] cross-server unavailable ([reason]); falling back to local."
-# Sent when the cross-server request failed terminally (no fallback was
-# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
-networkFailed: "&c[P0] cross-server teleport failed: [reason]."
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
-networkRegionUnavailable: "&c[P0] no backend is currently serving region '[region]'."
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
-networkRegionAmbiguous: "&c[P0] region '[region]' is ambiguous across backends; please pin a server."
 
 # --- MultiConfig submenu ---
 # Header row fallback used when no per-kind header key is registered.
@@ -575,40 +385,3 @@ multiconfigResultNameInvalid: "&cname '[name]' is not allowed; use letters, digi
 # Result message when an ADD collides with an existing entry name.
 # Placeholder: [name].
 multiconfigResultNameTaken: "&can entry named '[name]' already exists."
-
-# ###############################################################################
-# Section 9: PlaceholderAPI Support
-# ###############################################################################
-# status placeholders for players
-PLAYER_AVAILABLE: "&aAVAILABLE"
-PLAYER_COOLDOWN: "#9D7CD8ON COOLDOWN"
-PLAYER_SETUP: "&bPICKING A LOCATION"
-PLAYER_LOADING: "&bLOADING CHUNKS"
-PLAYER_TELEPORTING: "&bTELEPORTING"
-
-# ###############################################################################
-# Section 10: Visuals
-# ###############################################################################
-# title settings
-# remove or set title to "" to disable
-# PlaceholderAPI is recommended for coordinates
-title: "<rainbow>Teleported!</rainbow>"
-subtitle: "<gradient:#A78BFA:#E876A0>have fun!</gradient>"
-fadeIn: 20
-stay: 20
-fadeOut: 20
-
-# actionbar setting
-actionbar: ""
-
-# ###############################################################################
-# Section 11: Metadata
-# ###############################################################################
-# DO NOT TOUCH VERSION NUMBER
-version: 1.0
-
-# ###############################################################################
-# Section 12: Developer Options
-# ###############################################################################
-# set to true to append a dev tag (e.g. §8(RTP:ClassName)) to every message
-showDevTag: false

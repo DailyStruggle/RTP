@@ -200,7 +200,7 @@ beiChunkLadenPruefen: true
 # @default: false
 besucherAktiviert: true
 
-# Reservierten Cache für Beitritts-Teleports vorhalten (rtp.onevent.firstjoin / rtp.onevent.join). Größe richtet sich nach verbleibenden freien Spieler-Slots. Siehe
+# Reservierten Cache für Beitritts-Teleports vorhalten (rtp.onevent.firstjoin / rtp.onevent.join). Größe richtet sich nach verbleibenden freien Spieler-Slots.
 # @type: boolean
 # @default: false
 loginCacheAktiviert: false
@@ -221,7 +221,7 @@ vorgeneriertBevorzugung: 0.0
 
 # Anteil der L3-Backlog-Kapazität, bei dem das Auffüllen wieder einsetzt (Hysterese).
 # 0.5 = erst auffüllen, wenn L3 auf 50% geleert ist (Standard). 1.0 = kontinuierlich
-# auffüllen. Höhere Werte gruppieren .mca-Bin-Prüfungen für bessere
+# auffüllen. Höhere Werte gruppieren.mca-Bin-Prüfungen für bessere
 # CPU-/Speichereffizienz.
 # @type: number
 # @range: [0.0, 1.0]
@@ -232,7 +232,7 @@ rueckstauAuffuellSchwelle: 0.5
 # geprüft wird: eine WARN wird protokolliert und der kumulative slowPipelineCount-Zähler
 # (angezeigt von /rtp info) wird erhöht. Nur sofortige/nicht eingereihte Teleports werden
 # geprüft; eingereihte at-rate-Teleports werden ausgeschlossen, da ihre gemessene Zeit
-# die Warteschlangen-Wartezeit enthält. 0 oder darunter deaktiviert die Prüfung. Siehe ADR-053.
+# die Warteschlangen-Wartezeit enthält. 0 oder darunter deaktiviert die Prüfung.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
@@ -242,7 +242,7 @@ langsamePipelineSchwelleMs: 5000
 # Tiefe der öffentlichen Teleport-Warteschlange (wartende Spieler), ab der die
 # Warteschlangen-Rückstauprüfung erfolgt: eine flankengesteuerte WARN wird protokolliert und der
 # kumulative queueGrowthWarnCount-Zähler (angezeigt von /rtp info) wird einmal pro
-# überschreitung erhöht. 0 oder darunter deaktiviert die Prüfung (Opt-in). Siehe ADR-053.
+# überschreitung erhöht. 0 oder darunter deaktiviert die Prüfung (Opt-in).
 # @type: integer
 # @range: [0, null]
 # @unit: players

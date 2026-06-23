@@ -18,7 +18,7 @@
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
-# @default: 5
+# @default: 5"
 tiempoInvulnerabilidad: 5
 
 # Radio de comprobación de seguridad (bloques)
@@ -44,7 +44,7 @@ radioSeguridad: 0
 # Predeterminado: 2. Súbelo sólo en forks con un GC de chunks muy agresivo.
 # @type: integer
 # @range: [0, null]
-# @default: 2
+# @default: 2"
 staleChunkRetryLimit: 2
 
 # Pre-filtro Anvil de sólo lectura (sólo Spigot vanilla)
@@ -302,7 +302,7 @@ pvpCheckEnabled: false
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
-# @default: 15
+# @default: 15"
 pvpCombatTagSeconds: 15
 
 # What to do when a combat-tagged player requests (or is mid-)/rtp.

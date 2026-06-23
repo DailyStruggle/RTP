@@ -260,7 +260,7 @@ backlogBijvulDrempel: 0.5
 # wordt gecontroleerd: er wordt een WARN gelogd en de cumulatieve teller
 # slowPipelineCount (getoond door /rtp info) verhoogd. Alleen directe/niet-gewachtrijde
 # teleports worden gecontroleerd; gewachtrijde worden uitgesloten omdat hun gemeten
-# tijd de wachtrijtijd bevat. 0 of lager schakelt de controle uit. Zie ADR-053.
+# tijd de wachtrijtijd bevat. 0 of lager schakelt de controle uit.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
@@ -270,7 +270,7 @@ traagPipelineDrempelMs: 5000
 # Diepte van de publieke teleportwachtrij (wachtende spelers) waarop of waarboven
 # de wachtrij-tegendruk wordt gecontroleerd: er wordt een flankgetriggerde WARN
 # gelogd en de cumulatieve teller queueGrowthWarnCount (getoond door /rtp info) wordt
-# eenmaal per overschrijding verhoogd. 0 of lager schakelt de controle uit (opt-in). Zie ADR-053.
+# eenmaal per overschrijding verhoogd. 0 of lager schakelt de controle uit (opt-in).
 # @type: integer
 # @range: [0, null]
 # @unit: players

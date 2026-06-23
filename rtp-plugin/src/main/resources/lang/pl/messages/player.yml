@@ -1,0 +1,115 @@
+# --- Komunikaty RTP (ten jezyk) ---
+# Teksty komunikatow dla graczy i operatorow w tym jezyku, pogrupowane tematycznie.
+# Automatycznie wygenerowana kopia angielskich komunikatow; nie edytowac recznie (zostanie nadpisane).
+
+# ###############################################################################
+# Sekcja 2: Teleportacja
+# ###############################################################################
+# podczas teleportacji wyswietl to
+juzTeleportowany: "&7[P0] ⚡ już jesteś teleportowany!"
+
+# gdy wtyczka jest aktualnie przeładowywana
+teleportOdmowaPrzeladowanie: "&7[P0] teleportacje są tymczasowo wyłączone, gdy plugin się przeładowuje. Spróbuj ponownie za chwilę."
+wiadomoscOpoznienia: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teleportacja za [delay]. Nie ruszaj sie.</gradient>"
+ladowanieChunkow: "&7[P0] ⚙ Wczytywanie chunkow! prosze czekac..."
+wiadomoscTeleportu: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Przeteleportowano w [attempts] probach, w [processingTime]</gradient>"
+
+# jesli teleportacja zostanie anulowana
+teleportAnulowano: "&7[P0] ⚡ Teleportacja anulowana!"
+
+# brak bezpiecznych miejsc po wyczerpaniu maksymalnej liczby prób
+# zmienna: [attempts] - maksymalna liczba prób
+niebezpieczny: "&7[P0] ⌖ nie udało się znaleźć bezpiecznego miejsca w ciągu [attempts] prób"
+
+# gdy gracz jest na odnowieniu
+# zmienna: [remainingCooldown] - pozostały czas
+wiadomoscOdnowienia: "&7[P0] ⚡ Nie możesz teleportować się ponownie przez [remainingCooldown]"
+
+# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+lockedAfterUses: "&7[P0] ⌖ Osiągnąłeś limit losowych teleportacji. Spróbuj ponownie za [remainingLockTime]."
+
+# gdy region nie ma żadnych lokalizacji w kolejce, a gracz nie posiada uprawnienia rtp.unqueued
+brakLokalizacjiWKolejce: "#f5eb73[P0] ⌖ brak gotowych lokalizacji w tej chwili"
+
+# gdy kolejka się przesuwa
+# zmienna: [spot] - bieżąca pozycja w kolejce
+aktualizacjaKolejki: "#2636ef[P0] twoje miejsce w kolejce: [spot]"
+
+# gdy gracz nie ma wystarczająco pieniędzy na teleportację w regionie
+# zmienna: [money] - kwota wymagana przez polecenie
+zaMaloPieniedzy: "&7[P0] potrzebujesz co najmniej $[money] na to."
+
+# ###############################################################################
+# Sekcja 3: Formatowanie czasu
+# ###############################################################################
+# dla symboli czasu: jak nazywac dni, godziny, minuty, sekundy i milisekundy
+dni: "d"
+godziny: "h"
+minuty: "m"
+sekundy: "s"
+millis: "ms"
+
+# świat nie istnieje w bukkit
+# zmienna: [world] - nazwa świata
+nieprawidlowySwiat: "&7[P0] nie udało się znaleźć świata '[world]'"
+
+# wtyczka nie zawiera polecenia, o które prosił użytkownik
+# zmienna: [arg] - próbowany argument
+nieprawidlowyArgument: "&c[P0] nieprawidłowy argument polecenia [arg]"
+
+# gdy konsola próbuje wykonać polecenie tylko dla graczy
+komendaKonsoliNiedozwolona: "&c[P0] Musisz być graczem w grze, aby wykonać to polecenie."
+
+# wtyczka jest zajeta przeladowywaniem
+zajety: "&c[P0] zajęty"
+
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] Nie możesz losowo się teleportować podczas walki."
+
+# wtyczka nie ma podkomendy lub parametru zadanego przez uzytkownika
+# zmienna: [arg] - sprobowany argument
+nieprawidlowaKomenda: "&c[P0] nieprawidłowe polecenie - [arg]"
+
+# użytkownik nie ma uprawnień do żądanego polecenia
+brakUprawnien: "&7Przykro mi, ale nie masz uprawnień do wykonania tego polecenia. Skontaktuj się z administratorami serwera, jeśli uważasz, że to błąd."
+
+# ###############################################################################
+# Sekcja 8: Opisy komend
+# ###############################################################################
+# wyswietlane w komendzie pomocy
+rtp: "&b/rtp - teleportuj do losowej lokalizacji"
+rtpOpis: "teleportuj do losowej lokalizacji"
+pomoc: "&b/rtp help - zobacz to"
+pomocOpis: "opisz polecenia"
+przeladuj: "&b/rtp reload - przeładuj pliki konfiguracyjne"
+przeladujOpis: "przeładuj pliki konfiguracyjne"
+scan: "&b/rtp scan - wypróbuj wszystkie możliwe rozmieszczenia regionów, aby skrócić czas wczytywania"
+skanOpis: "wyczyść zapisane dane i wypróbuj wszystkie możliwe rozmieszczenia regionów"
+konfigOpis: "aktualizuj pliki konfiguracyjne w czasie działania"
+infoOpis: "sprawdź bieżący stan pluginu"
+testOpis: "testuj funkcje RTP"
+
+# ###############################################################################
+# Sekcja 9: Wsparcie PlaceholderAPI
+# ###############################################################################
+# symbole statusu dla graczy
+GRACZ_DOSTEPNY: "&aDOSTĘPNY"
+GRACZ_ODNOWIENIE: "&7ON COOLDOWN"
+GRACZ_KONFIGURACJA: "&bWYBIERANIE LOKALIZACJI"
+GRACZ_LADOWANIE: "&bWCZYTYWANIE CHUNKÓW"
+GRACZ_TELEPORTACJA: "&bTELEPORTACJA"
+
+# ###############################################################################
+# Sekcja 10: Wizualne
+# ###############################################################################
+# ustawienia tytulu
+# usun lub ustaw title na ", aby wylaczyc
+# zalecane jest PlaceholderAPI dla wspolrzednych
+tytul: "<rainbow>Przeteleportowano!</rainbow>"
+podtytul: "<gradient:#A78BFA:#E876A0>baw się dobrze!</gradient>"
+pojawienie: 20
+pozostanie: 20
+zanik: 20
+
+# actionbar setting
+pasekAkcji: ""

@@ -1,5 +1,5 @@
 # --- Plugin Logging Toggles (lite) ---
-# Trimmed for RTP-lite per ADR-024. Lite drops the SQL/database subsystem and
+# Trimmed for RTP-lite. Lite drops the SQL/database subsystem and
 # the verbose reload/region-init diagnostics that ship with Pro, but it still
 # needs an explicit min_level so FINE/FINER/FINEST logs do not flood the
 # console. Without this file, no logging filter is loaded and every fine log

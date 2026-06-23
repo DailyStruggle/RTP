@@ -73,7 +73,7 @@ platformRestoreSeconds: -1
 # Accepts Bukkit Material names and "#minecraft:<tag>" tag references
 #.
 # @type: list<material>
-# @source: material
+# @source: material"
 airBlocks:
   - "AIR"
   - "CAVE_AIR"
@@ -147,7 +147,7 @@ airBlocks:
 # Accepts Bukkit Material names, "#minecraft:<tag>" tag references, and
 # state predicates such as "*[waterlogged=true]".
 # @type: list<material>
-# @source: material
+# @source: material"
 unsafeBlocks:
   - "WATER"
   - "LAVA"
@@ -224,7 +224,7 @@ pvpCheckEnabled: false
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
-# @default: 15
+# @default: 15"
 pvpCombatTagSeconds: 15
 
 # What to do when a combat-tagged player requests (or is mid-)/rtp.

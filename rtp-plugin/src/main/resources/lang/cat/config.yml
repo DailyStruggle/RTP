@@ -63,52 +63,6 @@ human_tricks:
   # @type: list<string>
   - ""
 
-# --- Scratching post (database) ---
-# Where cached warm-spots and kitty data are remembered.
-scratching_post:
-  # Allowed types: yaml, sqlite, mysql, postgresql
-  # - yaml/sqlite: local file (no extra setup)
-  # - mysql/postgresql: remote post (credentials below)
-  # @type: enum
-  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
-  # @default: "sqlite"
-  type: "sqlite"
-  # Network post credentials (ignored for local types)
-  # @type: string
-  host: "127.0.0.1"
-  # Port for the kibble-stash. Only mysql/postgresql sniff at this one.
-  # @type: integer
-  # @range: [1, 65535]
-  port: 3306
-  # Kibble-stash / schema name. Sniffed by mysql/postgresql only.
-  # @type: string
-  name: "rtp"
-  # Kibble-stash username. Sniffed by mysql/postgresql only.
-  # @type: string
-  username: "root"
-  # Tall-human's secret kibble-stash password. Sniffed by mysql/postgresql only.
-  # @type: string
-  password: "password"
-
-# --- Yarn ball (network sync) ---
-# Redis is used to share warm-spots between many tall-human boxes.
-yarn_ball:
-  redis:
-    # Enable Redis-backed network state binding.
-    # @type: boolean
-    # @default: false
-    enabled: false
-    # Redis host.
-    # @type: string
-    host: "127.0.0.1"
-    # Redis port.
-    # @type: integer
-    # @range: [1, 65535]
-    port: 6379
-    # Redis password. Empty string disables auth.
-    # @type: string
-    password: ""
-
 # Generalized menu framework.
 # `renderer` is an ordered preference list of renderer ids. On exception or
 # missing adapter the framework walks the list and falls back to the next
@@ -131,4 +85,4 @@ menu:
     - "book"
 
 # Do not bite the version number, sacred catnip
-meowsion: 3.0
+meowsion: 3.1

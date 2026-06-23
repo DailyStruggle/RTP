@@ -1,0 +1,46 @@
+# --- RTP System / Logging / Control Messages ---
+# Admin/console lifecycle notices, administrative log lines, plugin metadata,
+# and developer options. Not shown to ordinary players.
+#
+# Formatting and shared [Pn] placeholders follow the same rules as player.yml.
+
+# ###############################################################################
+# Section 10: System & Management
+# ###############################################################################
+# Admin/console lifecycle notices (config version bumps, world detection, reload
+# and update progress). Not shown to ordinary players.
+# a configuration file 'version' is lower than the latest
+# placeholder: [filename] - name of file, including file extension
+oldFile: "&b[P0] old [filename] detected. Updating"
+
+# detected a bukkit world that isn't in the config file
+# placeholder: [world] - the world detected
+newWorld: "&b[P0] detected a new world '[world]'"
+
+# plugin reload/update text
+# placeholder: [filename] - name of file
+reloading: "&b[P0] loading [filename]..."
+reloaded: "&b[P0] successfully loaded [filename]."
+updating: "&a[P0] updating [filename]..."
+updated: "&a[P0] successfully updated [filename]."
+
+# ###############################################################################
+# Section 11: Administrative Logs
+# ###############################################################################
+# logged when locations are saved/loaded from database
+# placeholder: [amount] - number of locations
+# placeholder: [region] - name of region
+locationSaved: "&7[P0] Successfully saved [amount] locations for [region]"
+locationLoaded: "&7[P0] Successfully loaded [amount] locations for [region]"
+
+# ###############################################################################
+# Section 14: Developer Options
+# ###############################################################################
+# set to true to append a dev tag (e.g. §8(RTP:ClassName)) to every message
+showDevTag: false
+
+# ###############################################################################
+# Section 13: Metadata
+# ###############################################################################
+# DO NOT TOUCH VERSION NUMBER
+version: 1.1

@@ -1,0 +1,14 @@
+# --- RTP Shared Placeholders ---
+# The shared "[Pn]" placeholders applied to every message across all the other
+# messages/*.yml files. [P0] is the RTP prefix by default and appears nearly
+# everywhere, so it lives in its own file for easy editing.
+#
+# format: Pn - where n is the index in this list
+
+# ###############################################################################
+# Section 0: Placeholders
+# ###############################################################################
+placeholders:
+  # P0 - plugin prefix shown in every message. Uses a rainbow gradient on
+  # Paper/Folia and per-character hex codes on Spigot.
+  - "<rainbow>[RTP]</rainbow>"

@@ -1,0 +1,42 @@
+# --- Messaggi RTP (questa lingua) ---
+# Testi dei messaggi per giocatori e operatori in questa lingua, raggruppati per argomento.
+# Copia generata automaticamente dai messaggi inglesi; non modificare a mano (viene sovrascritto).
+
+# ###############################################################################
+# Sezione 4: Sistema e gestione
+# ###############################################################################
+# la 'version' di un file di configurazione è inferiore all'ultima
+# segnaposto: [filename] - nome del file, inclusa l'estensione
+fileVecchio: "&b[P0] rilevato [filename] vecchio. Aggiornamento in corso"
+
+# rilevato un mondo di Bukkit che non è nel file di configurazione
+# segnaposto: [world] - il mondo rilevato
+nuovoMondo: "&b[P0] rilevato un nuovo mondo '[world]'"
+
+# testo di ricaricamento/aggiornamento del plugin
+# segnaposto: [filename] - nome del file
+ricaricamento: "&b[P0] caricamento di [filename]..."
+ricaricato: "&b[P0] [filename] caricato con successo."
+aggiornamento: "&a[P0] aggiornamento di [filename]..."
+aggiornato: "&a[P0] [filename] aggiornato con successo."
+
+# ###############################################################################
+# Sezione 5: Log amministrativi
+# ###############################################################################
+# registrato quando le posizioni vengono salvate/caricate dal database
+# segnaposto: [amount] - numero di posizioni
+# segnaposto: [region] - nome della regione
+posizioneSalvata: "&7[P0] Salvate con successo [amount] posizioni per [region]"
+posizioneCaricata: "&7[P0] Caricate con successo [amount] posizioni per [region]"
+
+# ###############################################################################
+# Sezione 11: Metadati
+# ###############################################################################
+# NON MODIFICARE IL NUMERO DI VERSIONE
+versione: 1.0
+
+# ###############################################################################
+# Sezione 12: Opzioni per sviluppatori
+# ###############################################################################
+# imposta a true per aggiungere un'etichetta dev (es. §8(RTP:ClassName)) a ogni messaggio
+mostraEtichettaDev: false

@@ -29,7 +29,11 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 ### Changed
 
+- Config organization ([ADR-071](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-071-config-organization-and-discoverability.md)): `config.yml` is now purely teleport behavior. The `database:` block moved to a new `database.yml`, and the redundant `network.redis` block (superseded by `network.yml`'s `transport.redis.*`) was removed from `config.yml`. Existing tuned values under the old `config.yml` locations are not auto-migrated; re-set `database.type`/connection in `database.yml` and Redis transport in `network.yml` if you had customized them. `config.yml` version bumped to 3.1.
+
 ### Fixed
+
+- **NeoForge 1.21.x carrier hardened against the same `getChunkFuture` tick-thread stall.** `V1_21_R1NeoForgeVersionAdapter#requestFullChunkAsync` invoked vanilla's public `ServerChunkCache#getChunkFuture(..., create=true)` directly on the calling thread, and the shared live-load path (`NeoForgeRTPWorld#loadLiveChunk`) dispatches it on the server tick thread via `MinecraftServer#execute` - so on the main thread the public entry point parks on `mainThreadProcessor.managedBlock(...)` until generation finishes, a synchronous main-thread chunk load (S-005) that could starve the tick loop and trip the ServerWatchdog under concurrent `/rtp` load, exactly like the 26.1 crash. The 1.21 carrier now mirrors the 26.1 fix: it applies the transient generation load-ticket on the tick thread, then hops the `getChunkFuture` invocation onto an RTP async worker (where vanilla takes its non-blocking `supplyAsync(mainThreadProcessor)` branch and the normal tick pumps generation to completion), releasing the temporary ticket back on the tick thread once the future settles.
 
 ---
 

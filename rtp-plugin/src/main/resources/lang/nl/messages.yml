@@ -8,14 +8,14 @@
 # [world], [region], [remainingCooldown], [scan_chunks], enz.
 # - Behoud de kleurcodes &a &7 &c en hexadecimale codes (#2636ef).
 # ###############################################################################
-# Sectie 1: Algemene instellingen
+# Sectie 0: Tijdelijke aanduidingen
 # ###############################################################################
 plaatshouders:
   # P0
   - "[RTP]"
 
 # ###############################################################################
-# Sectie 2: Teletransport
+# Sectie 1: Teletransport
 # ###############################################################################
 alTeletransporteert: "&7[P0] ⚡ je wordt al geteletransporteerd!"
 
@@ -27,6 +27,9 @@ teletransportBericht: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Geteletransporteerd in
 
 # if teleport is cancelled
 teletransportAnnuleren: "&7[P0] ⚡ Teletransport geannuleerd!"
+
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] Je kunt niet willekeurig teleporteren tijdens een gevecht."
 
 # als er na het maximum aantal pogingen geen veilige plek is
 # placeholder: [attempts] - het maximum aantal pogingen
@@ -51,46 +54,15 @@ wachtrijUpdate: "#2636ef[P0] jouw positie in de wachtrij: [spot]"
 onvoldoendeSaldo: "&7[P0] je hebt minimaal $[money] nodig."
 
 # ###############################################################################
-# Sectie 3: Tijdnotatie
+# Sectie 2: Commandofeedback
 # ###############################################################################
-dagen: "d"
-uren: "u"
-minuten: "m"
-seconden: "s"
-milliseconden: "ms"
-
-# ###############################################################################
-# Sectie 4: Systeem en beheer
-# ###############################################################################
-oudBestand: "&b[P0] een oud [filename] gevonden. Bijwerken"
-
-# een bukkit-wereld gedetecteerd die niet in het configuratiebestand staat
-# placeholder: [world] - de gedetecteerde wereld
-nieuweWereld: "&b[P0] nieuwe wereld '[world]' gedetecteerd"
-
 # wereld bestaat niet in bukkit
 # placeholder: [world] - de wereldnaam
 ongeldigeWereld: "&7[P0] wereld '[world]' kon niet worden gevonden"
 
-# plugin reload-/updatetekst
-# placeholder: [filename] - bestandsnaam
-herladen: "&b[P0] [filename] laden..."
-herladen_klaar: "&b[P0] [filename] succesvol geladen."
-bijwerken: "&a[P0] [filename] bijwerken..."
-bijgewerkt: "&a[P0] [filename] succesvol bijgewerkt."
-
 # de plugin heeft het gevraagde commando niet
 # placeholder: [arg] - het geprobeerde argument
 ongeldigArgument: "&c[P0] ongeldig opdrachtargument [arg]"
-
-# wanneer de console een spelers-only commando probeert uit te voeren
-consoleOpdrachNietToegestaan: "&c[P0] Je moet een speler in het spel zijn om dit commando uit te voeren."
-
-# plugin is busy reloading
-busy: "&c[P0] bezig"
-
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
-pvpInCombat: "&c[P0] Je kunt niet willekeurig teleporteren tijdens een gevecht."
 
 # plugin doesn't have the subcommand or parameter the user requested
 # placeholder: [arg] - the argument attempted
@@ -99,14 +71,99 @@ invalidCommand: "&c[P0] ongeldig commando - [arg]"
 # gebruiker heeft geen permissie voor het gevraagde commando
 geenRechten: "&7Sorry, maar je hebt geen toestemming om dit commando uit te voeren. Neem contact op met de serverbeheerders als je denkt dat dit een fout is."
 
-# ###############################################################################
-# Sectie 5: Beheerderslogboeken
-# ###############################################################################
-locatieOpgeslagen: "&7[P0] [amount] locaties succesvol opgeslagen voor [region]"
-locatieGeladen: "&7[P0] [amount] locaties succesvol geladen voor [region]"
+# plugin is busy reloading
+busy: "&c[P0] bezig"
+
+# wanneer de console een spelers-only commando probeert uit te voeren
+consoleOpdrachNietToegestaan: "&c[P0] Je moet een speler in het spel zijn om dit commando uit te voeren."
 
 # ###############################################################################
-# Sectie 6: Scan-opdracht
+# Sectie 3: Server-overschrijdende teleportatie (netwerkmodus)
+# ###############################################################################
+# Sent only when `network.enabled: true` and the player's `/rtp` is routed
+# across the cross-server wait queue (see network.yml `routing.mode`).
+# All keys are optional from the player's perspective - the L2 baseline
+# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
+# Sent when the request has been accepted into the cross-server wait queue
+# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
+# position from `pollStatus`; may be empty if the transport returns no
+# position.
+networkQueued: "&7[P0] in de wachtrij voor een cross-server bestemming (positie [position])..."
+# Sent when a player runs /rtp* while they already hold a non-terminal
+# cross-server enrolment (command-lock). Placeholder:
+# [position] - FIFO position when known; empty when the proxy has not yet
+# assigned one.
+alreadyQueued: "&cJe wacht al in de cross-server wachtrij (positie [position]). Even geduld."
+# Sent when a cross-server waitlist entry is reaped after exceeding its
+# configured TTL. No placeholders.
+networkTimedOut: "&c[P0] cross-server teleport verliep terwijl er op een backend werd gewacht."
+# Sent when a cross-server waitlist enrolment is rejected because the shared
+# waitlist has reached its configured maximum size (REJECTED_FULL).
+# No placeholders.
+waitlistFull: "&c[P0] cross-server wachtrij is vol; probeer het zo opnieuw."
+# Sent when the queue has handed the request off to the proxy router and
+# a backend selection is in progress.
+networkRouting: "&7[P0] routeren naar een backend..."
+# Sent when a backend has reserved a coordinate for this player and the
+# proxy is about to initiate the cross-server hop. Placeholder: [server]
+# - the destination backend's serverId.
+networkReserved: "&a[P0] coördinaat gereserveerd op [server]. Overdragen..."
+# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+networkTransferring: "&a[P0] overdragen naar [server]..."
+# Sent when the cross-server path gave up and the request fell back to
+# the local backend. Placeholder: [reason] - one of the
+# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
+networkFallback: "&e[P0] cross-server niet beschikbaar ([reason]); terugvallen op lokaal."
+# Sent when the cross-server request failed terminally (no fallback was
+# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
+networkFailed: "&c[P0] cross-server teleport mislukt: [reason]."
+# Sent when the player asked for a specific region (`/rtp <region>`) but
+# no backend in the network is currently serving it. Placeholder:
+# [region] - the requested region name.
+networkRegionUnavailable: "&c[P0] geen backend bedient regio '[region]' op dit moment."
+# Sent when the requested region name resolves to two or more backends and
+# the operator-configured policy cannot pick one (only fires
+# under stronger policies than the default `warn`). Placeholder: [region].
+networkRegionAmbiguous: "&c[P0] regio '[region]' is dubbelzinnig over backends; kies een server."
+
+# ###############################################################################
+# Sectie 4: Visuele elementen
+# ###############################################################################
+titel: "<rainbow>Geteleporteerd!</rainbow>"
+ondertitel: "<gradient:#A78BFA:#E876A0>veel plezier!</gradient>"
+infaden: 20
+blijven: 20
+uitfaden: 20
+
+# actionbar setting
+actiebalk: ""
+
+# ###############################################################################
+# Sectie 5: Tijdnotatie
+# ###############################################################################
+dagen: "d"
+uren: "u"
+minuten: "m"
+seconden: "s"
+milliseconden: "ms"
+
+# ###############################################################################
+# Sectie 6: Opdrachtbeschrijvingen
+# ###############################################################################
+rtp: "&b/rtp - teletransporteer naar een willekeurige locatie"
+rtp_beschrijving: "teletransporteer naar een willekeurige locatie"
+hulp: "&b/rtp help - deze hulp weergeven"
+hulp_beschrijving: "opdrachten beschrijven"
+herladen_opdracht: "&b/rtp reload - configuratiebestanden herladen"
+herladen_beschrijving: "configuratiebestanden herladen"
+scan: "&b/rtp scan - alle mogelijke regiolocaties testen om laadtijden te verbeteren"
+scan_beschrijving: "opgeslagen gegevens wissen en alle mogelijke regiolocaties testen"
+config_beschrijving: "configuratiebestanden tijdens uitvoering bijwerken"
+info_beschrijving: "huidige pluginstatus controleren"
+test_beschrijving: "RTP-functies testen"
+
+# ###############################################################################
+# Sectie 7: Scan-opdracht
 # ###############################################################################
 scanStarten: "&a[P0] scantaak gestart voor regio's: [scan_regions]"
 scanResetten: "&7[P0] scanwachtrij gereset voor regio's: [scan_regions]"
@@ -120,10 +177,10 @@ scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunk
 # Boss-bar title shown to players with rtp.scan permission while a world scan is running.
 # Set to empty string to disable the boss-bar.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+scanBossBar: "Scannen van [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
 
 # ###############################################################################
-# Sectie 7: Info-opdracht
+# Sectie 8: Info-opdracht
 # ###############################################################################
 titelInfo: "&2&l/rtp info"
 infoTickets: "&7Actieve globale chunk-tickets: #7E9CC8[tickets]"
@@ -136,13 +193,13 @@ infoLekSnelheid: "&7Huidige chunk-leksnelheid: #7E9CC8[leakRate]"
 infoQueueDepth: "&7Spelers in wachtrij van regio's: #7E9CC8[queueDepth]"
 infoPendingTeleports: "&7Wachtende teleportpijplijnen: #7E9CC8[pendingTeleports]"
 infoAvgPipelineMs: "&7Gemiddelde pijplijnlatentie: #7E9CC8[avgPipelineMs] ms"
-# Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
+# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7Pijplijnlatentie (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-# Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
+# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7Trage teleports (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-# Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7Waarschuwingen wachtrijgroei (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7JVM-heap: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # Koptekstregel voor het Health-pipeline-blok in /rtp info.
@@ -155,7 +212,7 @@ infoMSPTLive: "&7Server-MSPT: #7E9CC8[mspt] ms (&7tickbudget: #7E9CC8[tickBudget
 infoSoftCap: "&7Spelers: #7E9CC8[playerCount] / [softCap]"
 # Meest recente database round-trip-latentie in ms. Placeholder: [databaseLatencyMs].
 infoDatabaseLatencyMs: "&7Databaselatentie: #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics (ADR-052), sourced from the process-global RtpOutcomeStats.
+# Generation outcome metrics, sourced from the process-global RtpOutcomeStats.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Generatiesucces: #7E9CC8[genSuccessRate]&7 (mislukt #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
@@ -219,22 +276,7 @@ regioGegevens:
   - "#58CCED  - voornaamste afwijzingsoorzaak: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
-# Sectie 8: Opdrachtbeschrijvingen
-# ###############################################################################
-rtp: "&b/rtp - teletransporteer naar een willekeurige locatie"
-rtp_beschrijving: "teletransporteer naar een willekeurige locatie"
-hulp: "&b/rtp help - deze hulp weergeven"
-hulp_beschrijving: "opdrachten beschrijven"
-herladen_opdracht: "&b/rtp reload - configuratiebestanden herladen"
-herladen_beschrijving: "configuratiebestanden herladen"
-scan: "&b/rtp scan - alle mogelijke regiolocaties testen om laadtijden te verbeteren"
-scan_beschrijving: "opgeslagen gegevens wissen en alle mogelijke regiolocaties testen"
-config_beschrijving: "configuratiebestanden tijdens uitvoering bijwerken"
-info_beschrijving: "huidige pluginstatus controleren"
-test_beschrijving: "RTP-functies testen"
-
-# ###############################################################################
-# Section 8b: Generalized Menu Framework
+# Sectie 9: Generalized Menu Framework
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 menuInvalid: "&c[P0] that menu link is invalid."
@@ -246,17 +288,17 @@ menuHoverFallbackType: "type: [type]"
 # Hover-fallback template used by the menu reflector when a parameter exposes a
 # small curated value set. Placeholder: [values] - comma-joined accepted values.
 menuHoverFallbackBounds: "geaccepteerd: [values]"
-# Label for the "go back one level" navigation row prepended to every non-root menu page.
+# Label for the "go back one level" navigation row prepended to every non-root menu page."
 menuBack: "&7« terug"
 # Label template for the "execute the assembled command" row prepended to every
-# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
+# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation."
 menuExecute: "&2▶ voer [command] uit"
 # Header row at the top of a parameter-value picker sub-page (Stage A.2).
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
 menuPickValue: "&7kies een waarde voor [param] (voert uit: /rtp [command] [param]:<value>)"
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
-# can type any value, including ones not in the suggestion list.
+# can type any value, including ones not in the suggestion list."
 menuTypeValue: "&7✎ typ een aangepaste waarde..."
 # Non-clickable header row at the top of every non-root menu page (Stage A.4).
 # Surfaces the currently-constructed /rtp invocation including any staged
@@ -274,7 +316,7 @@ menuRootHint: "&7klik hieronder op een optie om te beginnen"
 menuPagePrev: "&7« vorige pagina ([page])"
 menuPageNext: "&7volgende pagina ([page]) »"
 # Section divider on the front page above teleport rows (player view).
-menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
+menuFrontPageSectionTeleport: "&8--- &7teleportatie &8---"
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
@@ -289,16 +331,16 @@ menuFrontPageRowAdmin: "#9D7CD8▶ beheerderspaneel &7- operatorgereedschap"
 menuFrontPageHoverAdmin: "&7operatorgereedschap: config, scans, diagnostiek, herladen"
 # --- Admin panel book page ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
-menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+menuAdminPanelTitle: "#5FB3B3&l⚙ beheerpaneel"
 # Non-clickable hint row below menuAdminPanelTitle. No placeholders.
 menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
 # Section dividers on the admin panel. No placeholders.
-menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
-menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
-menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
-menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
+menuAdminPanelSectionConfig: "&8--- &7configuratie &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7diagnostiek &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7levenscyclus &8---"
+menuAdminPanelSectionBrowse: "&8--- &7bladeren &8---"
 # Admin-panel rows + hovers. No placeholders.
-menuAdminPanelRowConfig: "&b▶ config editor"
+menuAdminPanelRowConfig: "&b▶ configuratie-editor"
 menuAdminPanelHoverConfig: "&7open de samengestelde configuratiekiezer"
 menuAdminPanelRowRegions: "#5FB3B3▶ regio's"
 menuAdminPanelHoverRegions: "&7voeg toe, verwijder of bewerk configuraties per regio"
@@ -306,17 +348,17 @@ menuAdminPanelRowWorlds: "#5FB3B3▶ werelden"
 menuAdminPanelHoverWorlds: "&7voeg toe, verwijder of bewerk configuraties per wereld"
 menuAdminPanelRowEffects: "#5FB3B3▶ effecten"
 menuAdminPanelHoverEffects: "&7voeg toe, verwijder of bewerk teleporteffecten per groep"
-menuAdminPanelRowInfo: "&b▶ server info"
+menuAdminPanelRowInfo: "&b▶ serverinformatie"
 menuAdminPanelHoverInfo: "&7toon de pluginversie, regio-aantallen en wachtrijstatus"
 menuAdminPanelRowDiagnostics: "&c▶ volledige diagnostiek"
 menuAdminPanelHoverDiagnostics: "&7voert de volledige diagnostische suite uit; kan zwaar zijn"
-menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
+menuAdminPanelRowMemory: "&b▶ momentopname geheugentracker"
 menuAdminPanelHoverMemory: "&7dump actieve chunk-ticket- en pijplijntoewijzingen"
-menuAdminPanelRowScan: "&b▶ scan control"
+menuAdminPanelRowScan: "&b▶ scanbesturing"
 menuAdminPanelHoverScan: "&7open het scansubmenu (start / pauzeer / annuleer)"
 menuAdminPanelRowReload: "&c▶ herladen"
 menuAdminPanelHoverReload: "&7herlaadt alle configuratiebestanden; lopende teleports kunnen worden beïnvloed"
-menuAdminPanelRowBrowse: "&b▶ browse all commands"
+menuAdminPanelRowBrowse: "&b▶ alle commando's bekijken"
 menuAdminPanelHoverBrowse: "&7open de gespiegelde /rtp-commandoboom"
 menuAdminPanelRowBack: "&7« terug"
 # --- Visualizations submenu (admin map of bad locations per region) ---
@@ -382,14 +424,14 @@ infoBookOverflowFooter: "&7(inhoud afgekapt - klik om de volledige uitvoer in ch
 # milestone). Users may click the Refresh row to refresh manually.
 infoBookAutoRefreshDeferredNote: "&8(automatisch verversen nog niet ondersteund; klik op Verversen)"
 # Non-clickable title row at the top of the config-file selector page (Stage C.1).
-# Shown when an admin clicks "/rtp config" from the front page.
+# Shown when an admin clicks "/rtp config" from the front page."
 configSelectorTitle: "#5FB3B3&l⚙ configuratiebestanden"
-# Label for the "back to /rtp menu root" navigation row on the config selector page.
+# Label for the "back to /rtp menu root" navigation row on the config selector page."
 configSelectorBackRow: "&7« terug naar menu"
 # Non-clickable title row at the top of a single config-file page (Stage C.2).
-# Placeholder: [file] - the config file name (e.g. "performance", "safety").
-configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
-# Label for the "back to config selector" navigation row on a single config-file page.
+# Placeholder: [file] - the config file name (e.g. "performance", "safety")."
+configFileTitle: "#5FB3B3&l⚙ configuratie: &7[file]"
+# Label for the "back to config selector" navigation row on a single config-file page."
 configFileBackRow: "&7« terug naar configuratiebestanden"
 # Non-clickable hint row shown when a config file has no editable keys.
 configFileEmptyHint: "&7(geen bewerkbare sleutels in dit bestand)"
@@ -398,13 +440,13 @@ configFileEmptyHint: "&7(geen bewerkbare sleutels in dit bestand)"
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
 # Hover text for a per-key row on a config-file page. Placeholders:
 #   [key], [value], [type] - the config key name, current value, and declared type.
-configKeyHoverFormat: "&7click to edit &7[key] &7(type: [type])"
+configKeyHoverFormat: "&7klik om te bewerken &7[key] &7(type: [type])"
 # Non-clickable title row at the top of a shape/vert type-picker page (Stage C.3a).
-# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
-configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name."
+configTypePickerTitle: "#5FB3B3&l⚙ kies [param]-type &7(huidig: &7[current]&7)"
 # Non-clickable title row at the top of a shape/vert sub-parameter page (Stage C.3b).
-# Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
-configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+# Placeholders: [param] - "shape" or "vert"; [type] - the active type name."
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7deelparameters"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
 configViewRawHint: "&7[P0] boekweergave niet beschikbaar; terugvallen op ruwe dump."
@@ -412,7 +454,7 @@ configViewRawHint: "&7[P0] boekweergave niet beschikbaar; terugvallen op ruwe du
 configValueUnsetPlaceholder: "&8(niet ingesteld)"
 # Non-clickable header row separating the "Changeable" list from the "Pending"
 # staging-cart list on a config-file page when the viewer has staged one or
-# more uncommitted edits. No placeholders.
+# more uncommitted edits. No placeholders."
 configPendingHeader: "&6&l-- pending changes --"
 # Per-row label for a staged (pending) key=value entry on a config-file page.
 # Clicking the row removes it from the cart. Placeholders: [key], [value].
@@ -421,13 +463,13 @@ configPendingRowFormat: "&9[key]&8 = &0[value]"
 # config-file page. No placeholders.
 configPendingRowHover: "klik om te annuleren"
 # Clickable label for the "apply staged changes" row on a config-file page.
-# Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
+# Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart."
 configApplyRow: "&2&l[apply]"
 # Clickable label for the "discard staged changes" row on a config-file page.
-# Clears the cart without applying.
+# Clears the cart without applying."
 configDiscardRow: "&c&l[discard]"
 
-# --- ADR-047 declarative chart composition bridge (REQ-RTP-MAP-006) ---
+# --- declarative chart composition bridge ---
 # Sent to the viewer when an OPEN_MAP menu action fires but no concrete
 # MapBinding is registered (NoopMapBinding is still active, e.g. on the
 # Lite assembly or before RTPHooks wires the platform binding).
@@ -444,58 +486,11 @@ mapUnavailable: "&e[P1] grafiekgegevens zijn op dit moment niet beschikbaar."
 # (binding-defined back-pressure, e.g. per-viewer cap reached).
 mapBusy: "&e[P1] de kaartdienst is bezig; probeer het zo dadelijk opnieuw."
 # Label for the clickable "/rtp info" menu row that, on click, mints a
-# ChartSpec(BAD_POINTS_HEATMAP, ...) token and asks the active MapBinding
+# ChartSpec(BAD_POINTS_HEATMAP,...) token and asks the active MapBinding
 # to render a 128x128 heatmap of the current region's known bad-point
 # spiral indices. The row is omitted at render time when NoopMapBinding
-# is the installed binding (REQ-RTP-MAP-006 / ADR-047).
+# is the installed binding."
 menuInfoBadPointsLabel: "#9D7CD8&l# kaart met onveilige punten"
-
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the L2 baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
-# position.
-networkQueued: "&7[P0] in de wachtrij voor een cross-server bestemming (positie [position])..."
-# Sent when a player runs /rtp* while they already hold a non-terminal
-# cross-server enrolment (ADR-015 / REQ-RTP-NET-015 command-lock). Placeholder:
-# [position] - FIFO position when known; empty when the proxy has not yet
-# assigned one.
-alreadyQueued: "&cJe wacht al in de cross-server wachtrij (positie [position]). Even geduld."
-# Sent when a cross-server waitlist entry is reaped after exceeding its
-# configured TTL (ADR-015). No placeholders.
-networkTimedOut: "&c[P0] cross-server teleport verliep terwijl er op een backend werd gewacht."
-# Sent when a cross-server waitlist enrolment is rejected because the shared
-# waitlist has reached its configured maximum size (ADR-015 REJECTED_FULL).
-# No placeholders.
-waitlistFull: "&c[P0] cross-server wachtrij is vol; probeer het zo opnieuw."
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
-networkRouting: "&7[P0] routeren naar een backend..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
-networkReserved: "&a[P0] coördinaat gereserveerd op [server]. Overdragen..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
-networkTransferring: "&a[P0] overdragen naar [server]..."
-# Sent when the cross-server path gave up and the request fell back to
-# the local backend. Placeholder: [reason] - one of the
-# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
-networkFallback: "&e[P0] cross-server niet beschikbaar ([reason]); terugvallen op lokaal."
-# Sent when the cross-server request failed terminally (no fallback was
-# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
-networkFailed: "&c[P0] cross-server teleport mislukt: [reason]."
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
-networkRegionUnavailable: "&c[P0] geen backend bedient regio '[region]' op dit moment."
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
-networkRegionAmbiguous: "&c[P0] regio '[region]' is dubbelzinnig over backends; kies een server."
 
 # --- MultiConfig submenu ---
 # Header row fallback used when no per-kind header key is registered.
@@ -509,7 +504,7 @@ multiconfigHeaderWorlds: "#5FB3B3&l werelden"
 multiconfigToggleRemoveModeOff: "&8[ ] verwijdermodus"
 # Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
 multiconfigToggleRemoveModeOn: "&c[x] verwijdermodus (klik op een item om te verwijderen)"
-# Selector row label for the "+ Add new..." entry. No placeholders.
+# Selector row label for the "+ Add new..." entry. No placeholders."
 multiconfigRowAdd: "&2+ nieuw toevoegen..."
 # Hover text for the Add row. Placeholder: [name] - prefilled default name.
 multiconfigRowAddHover: "&7typ een naam in de aambeeldprompt; vooringevuld: &f[name]"
@@ -543,7 +538,29 @@ multiconfigResultNameInvalid: "&cnaam '[name]' is niet toegestaan; gebruik lette
 multiconfigResultNameTaken: "&cer bestaat al een item met de naam '[name]'."
 
 # ###############################################################################
-# Sectie 9: PlaceholderAPI-ondersteuning
+# Sectie 10: Systeem en beheer
+# ###############################################################################
+oudBestand: "&b[P0] een oud [filename] gevonden. Bijwerken"
+
+# een bukkit-wereld gedetecteerd die niet in het configuratiebestand staat
+# placeholder: [world] - de gedetecteerde wereld
+nieuweWereld: "&b[P0] nieuwe wereld '[world]' gedetecteerd"
+
+# plugin reload-/updatetekst
+# placeholder: [filename] - bestandsnaam
+herladen: "&b[P0] [filename] laden..."
+herladen_klaar: "&b[P0] [filename] succesvol geladen."
+bijwerken: "&a[P0] [filename] bijwerken..."
+bijgewerkt: "&a[P0] [filename] succesvol bijgewerkt."
+
+# ###############################################################################
+# Sectie 11: Beheerderslogboeken
+# ###############################################################################
+locatieOpgeslagen: "&7[P0] [amount] locaties succesvol opgeslagen voor [region]"
+locatieGeladen: "&7[P0] [amount] locaties succesvol geladen voor [region]"
+
+# ###############################################################################
+# Sectie 12: PlaceholderAPI-ondersteuning
 # ###############################################################################
 SPELER_BESCHIKBAAR: "&aBESCHIKBAAR"
 SPELER_WACHTTIJD: "&7WACHTTIJD"
@@ -552,23 +569,11 @@ SPELER_LAADT: "&bCHUNKS LADEN"
 SPELER_TELETRANSPORTEERT: "&bTELETRANSPORTEERT"
 
 # ###############################################################################
-# Sectie 10: Visuele elementen
-# ###############################################################################
-titel: "<rainbow>Geteleporteerd!</rainbow>"
-ondertitel: "<gradient:#A78BFA:#E876A0>veel plezier!</gradient>"
-infaden: 20
-blijven: 20
-uitfaden: 20
-
-# actionbar setting
-actiebalk: ""
-
-# ###############################################################################
-# Sectie 11: Metadata
+# Sectie 13: Metadata
 # ###############################################################################
 version: 1.0
 
 # ###############################################################################
-# Sectie 12: Ontwikkelaarsopties
+# Sectie 14: Ontwikkelaarsopties
 # ###############################################################################
 devTagTonen: false

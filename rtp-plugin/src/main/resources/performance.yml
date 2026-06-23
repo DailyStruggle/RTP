@@ -242,7 +242,7 @@ backlogRefillThreshold: 0.5
 # is audited: a WARN is logged and the cumulative slowPipelineCount counter
 # (surfaced by /rtp info) is incremented. Only immediate/unqueued teleports are
 # audited; queued at-rate teleports are excluded because their measured time
-# includes queue-wait. 0 or below disables the audit. See ADR-053.
+# includes queue-wait. 0 or below disables the audit.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
@@ -252,7 +252,7 @@ slowPipelineThresholdMs: 5000
 # Public teleport-queue depth (players waiting) at or above which queue
 # backpressure is audited: an edge-triggered WARN is logged and the cumulative
 # queueGrowthWarnCount counter (surfaced by /rtp info) is incremented once per
-# crossing. 0 or below disables the audit (opt-in). See ADR-053.
+# crossing. 0 or below disables the audit (opt-in).
 # @type: integer
 # @range: [0, null]
 # @unit: players

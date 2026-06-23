@@ -1,0 +1,50 @@
+# --- Messages RTP (cette langue) ---
+# Textes des messages destines aux joueurs et aux operateurs dans cette langue, groupes par theme.
+# Copie generee automatiquement des messages anglais; ne pas editer a la main (sera ecrase).
+
+# --- Cross-server network mode messages ---
+# Sent only when `network.enabled: true` and the player's `/rtp` is routed
+# across the cross-server wait queue (see network.yml `routing.mode`).
+# All keys are optional from the player's perspective - the L2 baseline
+# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
+# Sent when the request has been accepted into the cross-server wait queue
+# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
+# position from `pollStatus`; may be empty if the transport returns no
+# position.
+networkQueued: "&7[P0] en file pour une destination inter-serveurs (position [position])..."
+# Sent when a player runs /rtp* while they already hold a non-terminal
+# cross-server enrolment (ADR-015 / REQ-RTP-NET-015 command-lock). Placeholder:
+# [position] - FIFO position when known; empty when the proxy has not yet
+# assigned one.
+alreadyQueued: "&cVous attendez déjà dans la file inter-serveurs (position [position]). Veuillez patienter."
+# Sent when a cross-server waitlist entry is reaped after exceeding its
+# configured TTL (ADR-015). No placeholders.
+networkTimedOut: "&c[P0] la téléportation inter-serveurs a expiré en attendant un serveur."
+# Sent when a cross-server waitlist enrolment is rejected because the shared
+# waitlist has reached its configured maximum size (ADR-015 REJECTED_FULL).
+# No placeholders.
+waitlistFull: "&c[P0] la file inter-serveurs est pleine ; réessayez bientôt."
+# Sent when the queue has handed the request off to the proxy router and
+# a backend selection is in progress.
+networkRouting: "&7[P0] routage vers un serveur..."
+# Sent when a backend has reserved a coordinate for this player and the
+# proxy is about to initiate the cross-server hop. Placeholder: [server]
+# - the destination backend's serverId.
+networkReserved: "&a[P0] coordonnée réservée sur [server]. Transfert..."
+# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+networkTransferring: "&a[P0] transfert vers [server]..."
+# Sent when the cross-server path gave up and the request fell back to
+# the local backend. Placeholder: [reason] - one of the
+# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
+networkFallback: "&e[P0] inter-serveurs indisponible ([reason]) ; retour au serveur local."
+# Sent when the cross-server request failed terminally (no fallback was
+# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
+networkFailed: "&c[P0] la téléportation inter-serveurs a échoué : [reason]."
+# Sent when the player asked for a specific region (`/rtp <region>`) but
+# no backend in the network is currently serving it. Placeholder:
+# [region] - the requested region name.
+networkRegionUnavailable: "&c[P0] aucun serveur ne dessert actuellement la région '[region]'."
+# Sent when the requested region name resolves to two or more backends and
+# the operator-configured policy cannot pick one (only fires
+# under stronger policies than the default `warn`). Placeholder: [region].
+networkRegionAmbiguous: "&c[P0] la région '[region]' est ambiguë entre serveurs ; veuillez fixer un serveur."

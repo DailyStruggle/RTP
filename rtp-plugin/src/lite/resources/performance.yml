@@ -1,8 +1,8 @@
-# --- RTP-lite Performance Settings (ADR-024) ---
+# --- RTP-lite Performance Settings ---
 # Subset of the full performance.yml. Keys removed in lite:
 #   visitorEnabled         (observation mode -- not present in lite)
-#   loginCacheEnabled      (ADR-023 login reserve cache -- not present in lite)
-#   loginCacheCap          (ADR-023 -- not present in lite)
+#   loginCacheEnabled      (login reserve cache -- not present in lite)
+#   loginCacheCap          (not present in lite)
 #   onEventParsing         (per-permission startup parse -- not present in lite)
 #
 # biomeRecall is retained as a showcase feature.

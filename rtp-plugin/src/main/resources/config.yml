@@ -60,50 +60,6 @@ consoleCommands:
 playerCommands:
   - ""
 
-# Database backend used for persistence.
-# yaml/sqlite are file-backed and require no extra config; mysql and
-# postgresql use the host/port/name/username/password fields below.
-database:
-  # Backend type.
-  # @type: enum
-  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
-  # @default: "sqlite"
-  type: "sqlite"
-  # Database host. Used by mysql/postgresql only.
-  # @type: string
-  host: "127.0.0.1"
-  # Database port. Used by mysql/postgresql only.
-  # @type: integer
-  # @range: [1, 65535]
-  port: 3306
-  # Database / schema name. Used by mysql/postgresql only.
-  # @type: string
-  name: "rtp"
-  # Database username. Used by mysql/postgresql only.
-  # @type: string
-  username: "root"
-  # Database password. Used by mysql/postgresql only.
-  # @type: string
-  password: "password"
-
-# Cross-server / proxy transport settings.
-network:
-  redis:
-    # Enable Redis-backed network state binding.
-    # @type: boolean
-    # @default: false
-    enabled: false
-    # Redis host.
-    # @type: string
-    host: "127.0.0.1"
-    # Redis port.
-    # @type: integer
-    # @range: [1, 65535]
-    port: 6379
-    # Redis password. Empty string disables auth.
-    # @type: string
-    password: ""
-
 # Generalized menu framework.
 # `renderer` is an ordered preference list of renderer ids. On exception or
 # missing adapter the framework walks the list and falls back to the next
@@ -119,4 +75,4 @@ menu:
     - "book"
 
 # DO NOT TOUCH VERSION NUMBER
-version: 3.0
+version: 3.1

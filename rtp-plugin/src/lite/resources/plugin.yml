@@ -1,14 +1,14 @@
-# --- RTP-lite Plugin Descriptor (ADR-024) ---
+# --- RTP-lite Plugin Descriptor ---
 # Distinct from src/main/resources/plugin.yml. The lite shadow JAR ships ONLY
 # this descriptor (the full descriptor is excluded from the lite artifact via
 # DuplicatesStrategy.EXCLUDE). The lite bootstrap class is divergent on purpose;
 # do not point this descriptor at io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin.
 #
-# Lite scope (per ADR-024):
+# Lite scope:
 #   - No SQL/Redis persistence, no shutdown flush.
 #   - Basic Folia support (regionized scheduling + async teleport via the Paper
-#     adapter); the tuned rtp-folia adapter remains Pro. No anvil*, no tags.
-#     (* anvil is actually retained in lite per the ADR-024 2026-05-07 amendment.)
+#     adapter); the tuned rtp-folia adapter remains Pro. No tags.
+#     (anvil is retained in lite.)
 #   - No multilingual support; locale hardcoded to English.
 #   - No on-event/effect permission parsing; no login reserve cache; no visitor mode.
 #
@@ -22,17 +22,17 @@ main: io.github.dailystruggle.rtp.bukkit.lite.RTPBukkitLitePlugin
 api-version: 1.13
 prefix: 'RTP'
 authors: [ leaf26 ]
-description: 'Random teleport, lite edition (no SQL; basic Folia support) -- see ADR-024'
+description: 'Random teleport, lite edition (no SQL; basic Folia support)'
 # Claim-plugin softdepends are included in lite as of 2026-05-11: lite is the
 # small-server target and claim-protection support is a baseline operator
 # expectation there. Vault is included as of 2026-06-01 so optional per-region
-# teleport charging works in lite (ADR-024 economy amendment). Chunky/ChunkyBorder
-# and PlaceholderAPI remain Pro-only. See ADR-024.
+# teleport charging works in lite. Chunky/ChunkyBorder
+# and PlaceholderAPI remain Pro-only.
 # CombatLogX / PvPManager / SimpleCombatLog are listed so the PvP gate's bundled
-# combat-tag adapters (ADR-055) can resolve those plugins' API classes at runtime
+# combat-tag adapters can resolve those plugins' API classes at runtime
 # (Paper/Folia gates cross-plugin class access behind a declared dependency).
 softdepend: [ Vault, GriefDefender, GriefPrevention, Towny, Factions, FactionsBridge, Lands, RedProtect, Residence, CrashClaim, HuskClaims, Kingdoms, WorldGuard, CombatLogX, PvPManager, SimpleCombatLog ]
-# Basic Folia support (ADR-024 / ADR-061): the free build ships a correctness-first
+# Basic Folia support: the free build ships a correctness-first
 # regionized scheduler (FoliaAwareScheduler) + async teleport in the Paper adapter so it
 # runs on Folia. The tuned, throughput-optimized rtp-folia adapter stays a LeafRTP-Pro
 # early-access feature and is not bundled here.

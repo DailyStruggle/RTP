@@ -1,4 +1,3 @@
-# --- RTP User-Facing Messages (cat dialect) ---
 # Every meow, hiss, and purr the kitty wants the human staff to read.
 # Formatting:
 # - Bukkit legacy color codes (e.g. &a, &7, &c)
@@ -12,7 +11,7 @@
 # Note: keys like `busy` and `invalidCommand` are not key-renamed in
 # messages.lang.yml, so they keep their English left-hand names below.
 # ###############################################################################
-# Section 1: General Configuration
+# Section 0: Placeholders
 # ###############################################################################
 # list of additional placeholders
 # format: Pn - where n is the index in this list
@@ -21,7 +20,7 @@ empty_bowls:
   - "[RTP]"
 
 # ###############################################################################
-# Section 2: Pouncing
+# Section 1: Pouncing
 # ###############################################################################
 # already mid-pounce
 already_pouncing: "&7[P0] ⚡ mrrp! you're already pouncing!"
@@ -34,6 +33,9 @@ pounce_message: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Pounced in [attempts] attemp
 
 # pounce cancelled
 pounce_cancelled: "&7[P0] ⚡ Pounce cancelled! mrow."
+
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] no pouncing away while you're scrapping, kitty."
 
 # no safe spots after max attempts
 # placeholder: [attempts] - the maximum number of attempts
@@ -58,7 +60,93 @@ line_of_kitties_shuffled: "#2636ef[P0] your spot in the line of kitties: [spot]"
 not_enough_treats: "&7[P0] you need at least $[money] treats for that."
 
 # ###############################################################################
-# Section 3: Time Formatting
+# Section 2: Command Feedback
+# ###############################################################################
+# bukkit-box has no such world
+# placeholder: [world] - the world name
+not_a_real_box: "&7[P0] could not find box '[world]'"
+
+# tall-human asked for a trick the kitty does not know
+# placeholder: [arg] - the argument attempted
+silly_word: "&c[P0] silly word, kitty: [arg]"
+
+# unknown subcommand
+# placeholder: [arg] - the argument attempted
+silly_meow: "&c[P0] silly meow, kitty - [arg]"
+
+# no permission
+no_treats_for_you: "&7I'm sorry, but no treats for you. please ask the head kitty if you think this is wrong."
+
+# kitty is grooming and busy
+busy: "&c[P0] busy grooming"
+
+# the tall-human terminal is trying a kitty-only trick
+tall_human_forbidden: "&c[P0] only an in-game kitty can do that, tall human."
+
+# ###############################################################################
+# Section 3: Cross-Server Pouncing (Network Mode)
+# ###############################################################################
+# Sent only when `network.enabled: true` and the player's `/rtp` is routed
+# across the cross-server wait queue (see network.yml `routing.mode`).
+# All keys are optional from the player's perspective - the L2 baseline
+# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
+# Sent when the request has been accepted into the cross-server wait queue
+# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
+# position from `pollStatus`; may be empty if the transport returns no
+# position.
+lined_up_for_a_neighbour_box: "&7[P0] lined up for a warm spot in a neighbour box (position [position])..."
+# Sent when a player runs /rtp* while they already hold a non-terminal
+# cross-server enrolment (command-lock). Placeholder:
+# [position] - FIFO position when known; empty when the proxy has not yet
+# assigned one.
+already_in_neighbour_line: "&cyou're already sitting in the line for a neighbour box (position [position]). sit and wait, kitty."
+# Sent when a cross-server waitlist entry is reaped after exceeding its
+# configured TTL. No placeholders.
+neighbour_nap_too_long: "&c[P0] napped too long waiting for a neighbour box - the pounce timed out."
+# Sent when a cross-server waitlist enrolment is rejected because the shared
+# waitlist has reached its configured maximum size (REJECTED_FULL).
+# No placeholders.
+neighbour_line_too_crowded: "&c[P0] the neighbour-box line is packed with kitties; try again in a moment."
+# Sent when the queue has handed the request off to the proxy router and
+# a backend selection is in progress.
+sniffing_for_a_neighbour: "&7[P0] sniffing out a neighbour box..."
+# Sent when a backend has reserved a coordinate for this player and the
+# proxy is about to initiate the cross-server hop. Placeholder: [server]
+# - the destination backend's serverId.
+warm_spot_claimed_next_door: "&a[P0] warm spot claimed on [server]. leaping over the fence..."
+# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+leaping_to_neighbour: "&a[P0] leaping over to [server]..."
+# Sent when the cross-server path gave up and the request fell back to
+# the local backend. Placeholder: [reason] - one of the
+# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
+no_neighbour_pouncing_home: "&e[P0] no neighbour boxes available ([reason]); pouncing back to the home box."
+# Sent when the cross-server request failed terminally (no fallback was
+# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
+neighbour_pounce_flopped: "&c[P0] the neighbour-box pounce flopped: [reason]."
+# Sent when the player asked for a specific region (`/rtp <region>`) but
+# no backend in the network is currently serving it. Placeholder:
+# [region] - the requested region name.
+networkRegionUnavailable: "&c[P0] no neighbour box is currently serving territory '[region]'."
+# Sent when the requested region name resolves to two or more backends and
+# the operator-configured policy cannot pick one (only fires
+# under stronger policies than the default `warn`). Placeholder: [region].
+networkRegionAmbiguous: "&c[P0] territory '[region]' is ambiguous across neighbour boxes; please pin a box."
+# Section 4: Visuals
+# ###############################################################################
+# title settings
+# remove or set big_meow to " to disable
+# PlaceholderAPI is recommended for coordinates
+big_meow: "<rainbow>Teletransportat!</rainbow>"
+little_meow: "<gradient:#A78BFA:#E876A0>purr-fect fun!</gradient>"
+slow_blink_in: 20
+stay_visible: 20
+slow_blink_out: 20
+
+# tummy_strip (actionbar) setting
+tummy_strip: ""
+
+# ###############################################################################
+# Section 5: Time Formatting
 # ###############################################################################
 # for time placeholders: how a kitty counts time
 many_naps: "d"
@@ -68,58 +156,23 @@ tail_flicks: "s"
 whisker_twitches: "ms"
 
 # ###############################################################################
-# Section 4: System & Management
+# Section 6: Command Descriptions
 # ###############################################################################
-# a config file 'version' is older than the latest
-# placeholder: [filename] - name of file, including file extension
-ancient_scroll: "&b[P0] dusty old [filename] sniffed out. grooming it fresh"
-
-# sniffed a new bukkit world not in the config file
-# placeholder: [world] - the world detected
-new_box: "&b[P0] sniffed a new box '[world]'"
-
-# bukkit-box has no such world
-# placeholder: [world] - the world name
-not_a_real_box: "&7[P0] could not find box '[world]'"
-
-# tall-human reload / update text
-# placeholder: [filename] - name of file
-grooming: "&b[P0] grooming [filename]..."
-groomed_complete: "&b[P0] finished grooming [filename]."
-rearranging_whiskers: "&a[P0] rearranging [filename]..."
-groomed: "&a[P0] [filename] all tidy."
-
-# tall-human asked for a trick the kitty does not know
-# placeholder: [arg] - the argument attempted
-silly_word: "&c[P0] silly word, kitty: [arg]"
-
-# the tall-human terminal is trying a kitty-only trick
-tall_human_forbidden: "&c[P0] only an in-game kitty can do that, tall human."
-
-# kitty is grooming and busy
-busy: "&c[P0] busy grooming"
-
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
-pvpInCombat: "&c[P0] no pouncing away while you're scrapping, kitty."
-
-# unknown subcommand
-# placeholder: [arg] - the argument attempted
-silly_meow: "&c[P0] silly meow, kitty - [arg]"
-
-# no permission
-no_treats_for_you: "&7I'm sorry, but no treats for you. please ask the head kitty if you think this is wrong."
+# shown in the help (ask-for-pets) command
+pounce: "&b/rtp - pounce to a random spot"
+pounce_description: "pounce to a random spot"
+ask_for_pets: "&b/rtp help - mrrp, see this list"
+ask_for_pets_description: "describe what each meow does"
+groom: "&b/rtp reload - re-lick config files"
+groom_description: "re-lick config files"
+sniff: "&b/rtp scan - try every territory placement to make pouncing faster"
+sniff_description: "forget stored data and try every territory placement"
+setup_description: "update config files at runtime"
+meow_info_description: "check the kitty's current state"
+practice_pounce_description: "practice-test RTP functions"
 
 # ###############################################################################
-# Section 5: Administrative Logs
-# ###############################################################################
-# logged when warm-spots are saved/loaded from the scratching post
-# placeholder: [amount] - number of locations
-# placeholder: [region] - name of region
-warm_spot_saved: "&7[P0] saved [amount] warm-spots for [region]"
-warm_spot_remembered: "&7[P0] remembered [amount] warm-spots for [region]"
-
-# ###############################################################################
-# Section 6: Sniff (Scan) Command
+# Section 7: Sniff (Scan) Command
 # ###############################################################################
 # sniff command status messages
 # placeholder: [scan_regions] - list of regions
@@ -138,7 +191,7 @@ sniff_status: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChu
 sniff_bar: "Sniffing [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% warm-spots) ETA [scan_eta]"
 
 # ###############################################################################
-# Section 7: Info (Meow) Command
+# Section 8: Info (Meow) Command
 # ###############################################################################
 # info command output
 meow_title: "&2&l/rtp info"
@@ -152,13 +205,13 @@ drool_rate: "&7Current drool (chunk leak) rate: #7E9CC8[leakRate]"
 kitties_in_territory_lines: "&7Kitties waiting in territory lines: #7E9CC8[queueDepth]"
 pending_pounces: "&7Pending pounce pipelines: #7E9CC8[pendingTeleports]"
 average_pounce_lag: "&7Average pounce lag: #7E9CC8[avgPipelineMs] ms"
-# Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
+# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7Pounce-pipe lag (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-# Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
+# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7Slow pounces (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-# Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7Line-growth hisses (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 tall_human_brain_jar: "&7Tall-human brain-jar: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # Header line for the Health pipeline labelled block in /rtp info.
@@ -171,7 +224,7 @@ box_purr_rate: "&7Box purr-rate (mspt): #7E9CC8[mspt] ms (&7whisker budget: #7E9
 kitties_in_the_box: "&7Kitties: #7E9CC8[playerCount] / [softCap]"
 # Latest kibble-stash round-trip latency in ms. Placeholder: [databaseLatencyMs].
 scratching_post_lag: "&7Scratching-post lag: #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics (ADR-052), sourced from the process-global RtpOutcomeStats.
+# Generation outcome metrics, sourced from the process-global RtpOutcomeStats.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Hunt success: #7E9CC8[genSuccessRate]&7 (flop #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
@@ -235,23 +288,7 @@ territory_info:
   - "#58CCED  - top hiss reason: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
-# Section 8: Command Descriptions
-# ###############################################################################
-# shown in the help (ask-for-pets) command
-pounce: "&b/rtp - pounce to a random spot"
-pounce_description: "pounce to a random spot"
-ask_for_pets: "&b/rtp help - mrrp, see this list"
-ask_for_pets_description: "describe what each meow does"
-groom: "&b/rtp reload - re-lick config files"
-groom_description: "re-lick config files"
-sniff: "&b/rtp scan - try every territory placement to make pouncing faster"
-sniff_description: "forget stored data and try every territory placement"
-setup_description: "update config files at runtime"
-meow_info_description: "check the kitty's current state"
-practice_pounce_description: "practice-test RTP functions"
-
-# ###############################################################################
-# Section 8b: Generalized Menu Framework
+# Section 9: Generalized Menu Framework
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 scratching_slip_silly: "&c[P0] that scratching slip is all chewed up."
@@ -263,15 +300,12 @@ paw_hint_type: "paw-flavour: [type]"
 # Hover-fallback template used by the menu reflector when a parameter exposes a
 # small curated value set. Placeholder: [values] - comma-joined accepted values.
 menuHoverFallbackBounds: "accepted flavours: [values]"
-# Label for the "go back one level" navigation row prepended to every non-root menu page.
 menuBack: "&7« scamper back"
-# Label template for the "execute the assembled command" row prepended to every
-# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
+# runnable non-root menu page. Placeholder: [command] - the assembled /rtp... invocation.
 menuExecute: "&2▶ pounce [command]"
 # Header row at the top of a parameter-value picker sub-page (Stage A.2).
-# Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
+# Placeholders: [param] - parameter name; [command] - assembled /rtp... invocation.
 pick_a_flavour: "&7pick a flavour for [param] (will pounce: /rtp [command] [param]:<value>)"
-# Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list.
 menuTypeValue: "&7✎ type a custom flavour..."
@@ -291,7 +325,7 @@ paw_an_option: "&7paw an option below to begin"
 menuPagePrev: "&7« earlier page ([page])"
 menuPageNext: "&7onward page ([page]) »"
 # Section divider on the front page above teleport rows (player view).
-menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
+menuFrontPageSectionTeleport: "&8--- &7pounce &8---"
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&2▶ /rtp &7- pounce to a random warm spot"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- sniff a territory"
@@ -306,14 +340,14 @@ menuFrontPageRowAdmin: "#9D7CD8▶ head-kitty panel &7- staff tools"
 menuFrontPageHoverAdmin: "&7staff tools: setup, sniffing, hairball checks, grooming"
 # --- Admin panel book page ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
-menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+menuAdminPanelTitle: "#5FB3B3&l⚙ human-staff panel"
 # Non-clickable hint row below menuAdminPanelTitle. No placeholders.
 menuAdminPanelHint: "&7paw an option; chompy actions show a warning hover"
 # Section dividers on the admin panel. No placeholders.
-menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
-menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
-menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
-menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
+menuAdminPanelSectionConfig: "&8--- &7purr-ferences &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7vet check &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7nine lives &8---"
+menuAdminPanelSectionBrowse: "&8--- &7sniff around &8---"
 # Admin-panel rows + hovers. No placeholders.
 menuAdminPanelRowConfig: "&b▶ setup editor"
 menuAdminPanelHoverConfig: "&7open the curated setup picker"
@@ -321,7 +355,7 @@ menuAdminPanelRowRegions: "#5FB3B3▶ territories"
 menuAdminPanelHoverRegions: "&7add, remove, or groom per-territory setups"
 menuAdminPanelRowWorlds: "#5FB3B3▶ boxes"
 menuAdminPanelHoverWorlds: "&7add, remove, or groom per-box setups"
-menuAdminPanelRowEffects: "#5FB3B3▶ effects"
+menuAdminPanelRowEffects: "#5FB3B3▶ sparkles"
 menuAdminPanelHoverEffects: "&7add, remove, or groom per-group pounce effects"
 menuAdminPanelRowInfo: "&b▶ box info"
 menuAdminPanelHoverInfo: "&7show plugin version, territory counts, and line state"
@@ -338,23 +372,23 @@ menuAdminPanelHoverBrowse: "&7open the reflected /rtp meow tree"
 menuAdminPanelRowBack: "&7« scamper back"
 # --- Visualizations submenu (admin map of bad locations per region) ---
 # Admin-panel row: open the Visualizations submenu. No placeholders.
-menuAdminPanelRowVisualizations: "#5FB3B3▶ visualizations"
+menuAdminPanelRowVisualizations: "#5FB3B3▶ shiny pictures"
 # Hover text for the admin-panel Visualizations row. No placeholders.
 menuAdminPanelHoverVisualizations: "&7open maps and other head-kitty visualizations"
 # Section divider above the Visualizations block on the admin panel.
-menuAdminPanelSectionVisualizations: "&8» &7visualizations"
+menuAdminPanelSectionVisualizations: "&8» &7shiny pictures"
 # Non-clickable title row at the top of the Visualizations submenu.
 menuVisualizationsTitle: "#9D7CD8&l⌖ map sniffs"
 # Non-clickable hint row below the title.
 menuVisualizationsHint: "&7pick a territory to view its stinky-spots map"
 # Visualizations row template; [region] - region name.
-menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- region shape map"
+menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- territory shape map"
 # Hover text for a Visualizations region row; [region] - region name.
 menuVisualizationsHoverRegion: "&7open a map showing stinky spots in &b[region]"
 # Non-clickable hint row shown when no regions are configured.
 menuVisualizationsEmpty: "&7(no territories configured)"
 # Visualizations submenu back row (returns to the admin panel).
-menuVisualizationsRowBack: "&7« back"
+menuVisualizationsRowBack: "&7« scurry back"
 # --- Admin panel Setup section: curated prefabs ---
 # Section divider above the Setup (quick start) block on the admin panel.
 menuAdminPanelSectionSetup: "&8» &7setup (quick paw start)"
@@ -398,36 +432,29 @@ infoBookOverflowFooter: "&7(too many meows for one page - paw to see the rest in
 # book is not currently supported on this build (deferred to a later
 # milestone). Users may click the Refresh row to refresh manually.
 infoBookAutoRefreshDeferredNote: "&8(auto-grooming not yet supported; paw re-sniff to update)"
-# Non-clickable title row at the top of the config-file selector page (Stage C.1).
 # Shown when an admin clicks "/rtp config" from the front page.
 configSelectorTitle: "#5FB3B3&l⚙ setup files"
-# Label for the "back to /rtp menu root" navigation row on the config selector page.
 configSelectorBackRow: "&7« back to the meow menu"
-# Non-clickable title row at the top of a single config-file page (Stage C.2).
 # Placeholder: [file] - the config file name (e.g. "performance", "safety").
-configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
-# Label for the "back to config selector" navigation row on a single config-file page.
+configFileTitle: "#5FB3B3&l⚙ purr-ferences: &7[file]"
 configFileBackRow: "&7« back to setup files"
 # Non-clickable hint row shown when a config file has no editable keys.
 configFileEmptyHint: "&7(no groomable keys in this file)"
 # Per-key row label on a config-file page. Placeholders:
-#   [key]   - the config key name; [value] - the currently-stored value.
+# [key] - the config key name; [value] - the currently-stored value.
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
 # Hover text for a per-key row on a config-file page. Placeholders:
-#   [key], [value], [type] - the config key name, current value, and declared type.
+# [key], [value], [type] - the config key name, current value, and declared type.
 configKeyHoverFormat: "&7paw to groom &7[key] &7(flavour: [type])"
-# Non-clickable title row at the top of a shape/vert type-picker page (Stage C.3a).
 # Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
-configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
-# Non-clickable title row at the top of a shape/vert sub-parameter page (Stage C.3b).
+configTypePickerTitle: "#5FB3B3&l⚙ pick [param] kind &7(current: &7[current]&7)"
 # Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
-configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7tiny tweaks"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
 configViewRawHint: "&7[P0] booklet view unavailable; falling back to raw dump."
 # Placeholder text rendered in place of a config value that has not been set.
 configValueUnsetPlaceholder: "&8(no scent)"
-# Non-clickable header row separating the "Changeable" list from the "Pending"
 # staging-cart list on a config-file page when the viewer has staged one or
 # more uncommitted edits. No placeholders.
 configPendingHeader: "&6&l-- pending changes --"
@@ -437,14 +464,12 @@ configPendingRowFormat: "&9[key]&8 = &0[value]"
 # Hover text shown when the viewer hovers a pending (staged) row on a
 # config-file page. No placeholders.
 configPendingRowHover: "paw to unstage"
-# Clickable label for the "apply staged changes" row on a config-file page.
-# Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
+# Runs the assembled /rtp config <file> k1=v1... command and clears the cart.
 configApplyRow: "&2&l[apply]"
-# Clickable label for the "discard staged changes" row on a config-file page.
 # Clears the cart without applying.
 configDiscardRow: "&c&l[discard]"
 
-# --- ADR-047 declarative chart composition bridge (REQ-RTP-MAP-006) ---
+# --- declarative chart composition bridge ---
 # Sent to the viewer when an OPEN_MAP menu action fires but no concrete
 # MapBinding is registered (NoopMapBinding is still active, e.g. on the
 # Lite assembly or before RTPHooks wires the platform binding).
@@ -460,59 +485,11 @@ mapUnavailable: "&e[P1] chart kibble is not available right now."
 # Sent when the active MapBinding cannot allocate a map handle right now
 # (binding-defined back-pressure, e.g. per-viewer cap reached).
 mapBusy: "&e[P1] the map-sniffer is busy; try again in a few licks."
-# Label for the clickable "/rtp info" menu row that, on click, mints a
-# ChartSpec(BAD_POINTS_HEATMAP, ...) token and asks the active MapBinding
+# ChartSpec(BAD_POINTS_HEATMAP,...) token and asks the active MapBinding
 # to render a 128x128 heatmap of the current region's known bad-point
 # spiral indices. The row is omitted at render time when NoopMapBinding
-# is the installed binding (REQ-RTP-MAP-006 / ADR-047).
+# is the installed binding.
 menuInfoBadPointsLabel: "#9D7CD8&l# bad-spots map"
-
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the L2 baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
-# position.
-lined_up_for_a_neighbour_box: "&7[P0] lined up for a warm spot in a neighbour box (position [position])..."
-# Sent when a player runs /rtp* while they already hold a non-terminal
-# cross-server enrolment (ADR-015 / REQ-RTP-NET-015 command-lock). Placeholder:
-# [position] - FIFO position when known; empty when the proxy has not yet
-# assigned one.
-already_in_neighbour_line: "&cyou're already sitting in the line for a neighbour box (position [position]). sit and wait, kitty."
-# Sent when a cross-server waitlist entry is reaped after exceeding its
-# configured TTL (ADR-015). No placeholders.
-neighbour_nap_too_long: "&c[P0] napped too long waiting for a neighbour box - the pounce timed out."
-# Sent when a cross-server waitlist enrolment is rejected because the shared
-# waitlist has reached its configured maximum size (ADR-015 REJECTED_FULL).
-# No placeholders.
-neighbour_line_too_crowded: "&c[P0] the neighbour-box line is packed with kitties; try again in a moment."
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
-sniffing_for_a_neighbour: "&7[P0] sniffing out a neighbour box..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
-warm_spot_claimed_next_door: "&a[P0] warm spot claimed on [server]. leaping over the fence..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
-leaping_to_neighbour: "&a[P0] leaping over to [server]..."
-# Sent when the cross-server path gave up and the request fell back to
-# the local backend. Placeholder: [reason] - one of the
-# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
-no_neighbour_pouncing_home: "&e[P0] no neighbour boxes available ([reason]); pouncing back to the home box."
-# Sent when the cross-server request failed terminally (no fallback was
-# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
-neighbour_pounce_flopped: "&c[P0] the neighbour-box pounce flopped: [reason]."
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
-networkRegionUnavailable: "&c[P0] no neighbour box is currently serving territory '[region]'."
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
-networkRegionAmbiguous: "&c[P0] territory '[region]' is ambiguous across neighbour boxes; please pin a box."
 
 # --- MultiConfig submenu ---
 # Header row fallback used when no per-kind header key is registered.
@@ -526,7 +503,6 @@ multiconfigHeaderWorlds: "#5FB3B3&l boxes"
 multiconfigToggleRemoveModeOff: "&8[ ] chompy mode"
 # Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
 multiconfigToggleRemoveModeOn: "&c[x] chompy mode (paw an entry to chomp it)"
-# Selector row label for the "+ Add new..." entry. No placeholders.
 multiconfigRowAdd: "&2+ sniff out a new one..."
 # Hover text for the Add row. Placeholder: [name] - prefilled default name.
 multiconfigRowAddHover: "&7type a name in the scratching prompt; prefilled: &f[name]"
@@ -560,7 +536,34 @@ multiconfigResultNameInvalid: "&cname '[name]' is hiss-worthy; use letters, digi
 multiconfigResultNameTaken: "&can entry named '[name]' already lives here."
 
 # ###############################################################################
-# Section 9: PlaceholderAPI Support
+# Section 10: System & Management
+# ###############################################################################
+# a config file 'version' is older than the latest
+# placeholder: [filename] - name of file, including file extension
+ancient_scroll: "&b[P0] dusty old [filename] sniffed out. grooming it fresh"
+
+# sniffed a new bukkit world not in the config file
+# placeholder: [world] - the world detected
+new_box: "&b[P0] sniffed a new box '[world]'"
+
+# tall-human reload / update text
+# placeholder: [filename] - name of file
+grooming: "&b[P0] grooming [filename]..."
+groomed_complete: "&b[P0] finished grooming [filename]."
+rearranging_whiskers: "&a[P0] rearranging [filename]..."
+groomed: "&a[P0] [filename] all tidy."
+
+# ###############################################################################
+# Section 11: Administrative Logs
+# ###############################################################################
+# logged when warm-spots are saved/loaded from the scratching post
+# placeholder: [amount] - number of locations
+# placeholder: [region] - name of region
+warm_spot_saved: "&7[P0] saved [amount] warm-spots for [region]"
+warm_spot_remembered: "&7[P0] remembered [amount] warm-spots for [region]"
+
+# ###############################################################################
+# Section 12: PlaceholderAPI Support
 # ###############################################################################
 # kitty status placeholders
 KITTY_READY: "&aREADY TO POUNCE"
@@ -570,28 +573,13 @@ KITTY_WAKING_UP: "&bLOADING KIBBLE"
 KITTY_POUNCING: "&bPOUNCING"
 
 # ###############################################################################
-# Section 10: Visuals
-# ###############################################################################
-# title settings
-# remove or set big_meow to "" to disable
-# PlaceholderAPI is recommended for coordinates
-big_meow: "<rainbow>Teletransportat!</rainbow>"
-little_meow: "<gradient:#A78BFA:#E876A0>purr-fect fun!</gradient>"
-slow_blink_in: 20
-stay_visible: 20
-slow_blink_out: 20
-
-# tummy_strip (actionbar) setting
-tummy_strip: ""
-
-# ###############################################################################
-# Section 11: Metadata
+# Section 13: Metadata
 # ###############################################################################
 # Do not bite the version number, sacred catnip
 meowsion: 1.0
 
 # ###############################################################################
-# Section 12: Developer Options
+# Section 14: Developer Options
 # ###############################################################################
 # set to true to append a kitten tag (e.g. §8(RTP:ClassName)) to every message
 show_kitten_tag: false

@@ -18,7 +18,7 @@
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
-# @default: 5
+# @default: 5"
 времяНеуязвимости: 5
 
 # Радиус проверки безопасности (блоки)
@@ -44,7 +44,7 @@
 # По умолчанию: 2. Увеличивайте только в форках с очень агрессивным GC чанков.
 # @type: integer
 # @range: [0, null]
-# @default: 2
+# @default: 2"
 staleChunkRetryLimit: 2
 
 # Anvil-префильтр только для чтения (только Spigot vanilla)
@@ -300,7 +300,7 @@ pvpCheckEnabled: false
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
-# @default: 15
+# @default: 15"
 pvpCombatTagSeconds: 15
 
 # What to do when a combat-tagged player requests (or is mid-)/rtp.

@@ -124,6 +124,30 @@ reproducible by readers".
 
 ## Tier 2 — Upcoming features (not caveat-driven)
 
+- [ ] **Config-file organization + discoverability (operator feedback).** Recurring operator
+  feedback (e.g. the public thread where a user who praised the plugin's performance still found the
+  config "could use some work - there are a lot of different files and it can get confusing"): the
+  split-by-file config tree is hard to navigate, related knobs are scattered, and there is no obvious
+  ordering by how commonly a setting is touched. Partial progress already shipped - the in-game config
+  surface (prefab/recipe configurations + a search tool, surfaced via the `/rtp` config menu) - but the
+  on-disk experience still needs work. Concretely, to be settled in a D-005 ADR before any file moves
+  (config-file renames/moves are a migration + locale-parity event, so they cannot be done casually):
+  - **Order settings by common relevance**, not alphabetically or by internal grouping - the knobs an
+    operator changes most (range, shape, world, cooldown, cost) should sort to the top of their file
+    and the menu, with advanced/rarely-touched settings below.
+  - **Group all teleportation-related settings in one place.** Operators expect "everything about a
+    teleport" (distance, shape, vertical window, biome/block exclusions, cooldown, warmup, cost) to be
+    co-located rather than spread across `config.yml`, `safety.yml`, `economy.yml`, `regions.yml`, etc.
+    Evaluate a logical/virtual grouping (in-menu and in docs) that does not necessarily require
+    physically merging the YAML files, so the on-disk parity contract and per-file comments stay intact.
+  - **`messages.yml` reorganization.** `messages.yml` has outgrown a single flat file since the menu
+    work landed; plan a sectioned/sub-grouped layout (or documented sub-files) so message keys are
+    findable. Any restructure must round-trip through the locale TSV pipeline and keep
+    `LocaleParityTest` green across all 12 locales (see *Locale Config TSV Pipeline* in `AGENTS.md`).
+  - **Constraints.** Honor [ADR-020](../adr/ADR-020-locale-bootstrap-and-yaml-baseline.md) (locale
+    bootstrap), keep config-key re-keying intact, and ship a migration path for existing installs
+    rather than silently relocating keys. The in-game search/prefab surface is the near-term mitigation;
+    the file reorg is the durable fix.
 - [x] ~~**World-scan UX polish.** The admin lifecycle exists; operator affordances around it do not.
   Concretely: progress indication (both console and in-game bossbar), resume-across-restart
   semantics, and a per-region "warmth report" export. This is what converts the feature from
@@ -435,6 +459,28 @@ reproducible by readers".
   Candidate gap list (audit each for current upstream API before adding; already-shipped targets
   pruned): MinePlots, hClaims, UltimateClaims, Pueblos. Folds into the existing "Claim-plugin
   integration audit" item above — same workstream, this just sharpens the target list.
+- [ ] **Locale coverage expansion (close the gap with BetterRTP, weighted by real server traffic).**
+  RTP ships 12 parity-enforced locales (`en`, `de`, `es`, `fr`, `it`, `ja`, `ko`, `nl`, `pl`, `pt`,
+  `ru`, `zh`) plus the `cat` novelty dialect, against BetterRTP's ~21 community-contributed locales.
+  RTP's depth advantages stand (re-keying config keys via `<file>.lang.yml` rename maps across every
+  config file, and CI-enforced parity via `LocaleParityTest`), so this item is purely about breadth.
+  Weighting candidate languages by two observed "Server Location" distributions (rather than raw
+  count or global speaker totals) shows RTP already covers ~70-82% of measurable server traffic with
+  its 12 locales, and the whole gap to BetterRTP (4-6 points) is driven by the same short list:
+  - **Add the highest-value missing locales:** `vi` (Vietnamese), `tr` (Turkish), `cs` (Czech), and
+    `fi` (Finnish - the single largest language *neither* plugin ships, ~3.4% of servers in one
+    sampled distribution). Lower-priority follow-ups: `id` (Indonesian), `th` (Thai), and splitting
+    `zh` into Simplified/Traditional if demand warrants.
+  - **Caveat (do not over-trust server-location data):** location charts measure where the *server*
+    is hosted, not where players/admins are. Remote/cloud-hosted communities (Korea is the clearest
+    example - large player base, frequently hosted in Singapore/Japan/US hubs or folded into "Other")
+    are systematically undercounted, so `ko` and similar locales carry latent value the charts cannot
+    see. Treat the per-distribution weighting as a *floor* on a language's value, not the value
+    itself; do not drop or deprioritize an existing locale on the strength of a location chart alone.
+  - Each new locale follows the existing TSV pipeline (`locale-files-to-csv` -> `reconcile-locale-csvs`
+    -> translate in `scripts/out/locale-<lang>.tsv` -> `locale-files-from-csv`), must pass
+    `LocaleParityTest`, and should prefer native-speaker review over machine translation per
+    `TRANSLATION_GUIDE.md`. No architecture change; pure content + parity work.
 - [ ] **Foreign config importer (`rtp config import <plugin>`, one-shot migration aid).** Design
   settled in [ADR-066](../adr/ADR-066-foreign-config-importer.md) (Proposed, D-005). Lower the
   switching cost for operators moving off a competitor by translating its on-disk config into RTP's

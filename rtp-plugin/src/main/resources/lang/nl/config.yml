@@ -63,52 +63,6 @@ spelerOpdrachten:
   # @type: list<string>
   - ""
 
-# --- Databaseconfiguratie ---
-# Waar gecachte locaties en spelergegevens worden opgeslagen.
-database:
-  # Beschikbare typen: yaml, sqlite, mysql, postgresql
-  # - yaml/sqlite: lokale bestanden (geen extra configuratie nodig)
-  # - mysql/postgresql: externe database (vereist onderstaande gegevens)
-  # @type: enum
-  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
-  # @default: "sqlite"
-  type: "sqlite"
-  # Netwerkdatabasegegevens (genegeerd voor lokale typen)
-  # @type: string
-  host: "127.0.0.1"
-  # Database-poort. Alleen gebruikt door mysql/postgresql.
-  # @type: integer
-  # @range: [1, 65535]
-  port: 3306
-  # Database- / schemanaam. Alleen gebruikt door mysql/postgresql.
-  # @type: string
-  name: "rtp"
-  # Database-gebruikersnaam. Alleen gebruikt door mysql/postgresql.
-  # @type: string
-  username: "root"
-  # Database-wachtwoord. Alleen gebruikt door mysql/postgresql.
-  # @type: string
-  password: "password"
-
-# --- Netwerk en synchronisatie ---
-# Redis wordt gebruikt om gecachte locaties tussen meerdere servers te synchroniseren.
-netwerk:
-  redis:
-    # Enable Redis-backed network state binding.
-    # @type: boolean
-    # @default: false
-    enabled: false
-    # Redis host.
-    # @type: string
-    host: "127.0.0.1"
-    # Redis port.
-    # @type: integer
-    # @range: [1, 65535]
-    port: 6379
-    # Redis password. Empty string disables auth.
-    # @type: string
-    password: ""
-
 # Algemeen menu-framework.
 # `renderer` is een geordende voorkeurlijst van renderer-ids. Bij een
 # uitzondering of ontbrekende adapter loopt het framework de lijst door en
@@ -131,4 +85,4 @@ menu:
     - "book"
 
 # WIJZIG HET VERSIENUMMER NIET
-version: 3.0
+version: 3.1

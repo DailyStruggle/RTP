@@ -1,0 +1,50 @@
+# --- RTP mews (this kitty's tongue) ---
+# Player- and staff-facing mews for this language, grouped by what they're for.
+# Auto-copied from the baseline mews; do not paw-edit (it gets overwritten).
+
+# --- Cross-server network mode messages ---
+# Sent only when `network.enabled: true` and the player's `/rtp` is routed
+# across the cross-server wait queue (see network.yml `routing.mode`).
+# All keys are optional from the player's perspective - the L2 baseline
+# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
+# Sent when the request has been accepted into the cross-server wait queue
+# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
+# position from `pollStatus`; may be empty if the transport returns no
+# position.
+lined_up_for_a_neighbour_box: "&7[P0] lined up for a warm spot in a neighbour box (position [position])..."
+# Sent when a player runs /rtp* while they already hold a non-terminal
+# cross-server enrolment (ADR-015 / REQ-RTP-NET-015 command-lock). Placeholder:
+# [position] - FIFO position when known; empty when the proxy has not yet
+# assigned one.
+already_in_neighbour_line: "&cyou're already sitting in the line for a neighbour box (position [position]). sit and wait, kitty."
+# Sent when a cross-server waitlist entry is reaped after exceeding its
+# configured TTL (ADR-015). No placeholders.
+neighbour_nap_too_long: "&c[P0] napped too long waiting for a neighbour box - the pounce timed out."
+# Sent when a cross-server waitlist enrolment is rejected because the shared
+# waitlist has reached its configured maximum size (ADR-015 REJECTED_FULL).
+# No placeholders.
+neighbour_line_too_crowded: "&c[P0] the neighbour-box line is packed with kitties; try again in a moment."
+# Sent when the queue has handed the request off to the proxy router and
+# a backend selection is in progress.
+sniffing_for_a_neighbour: "&7[P0] sniffing out a neighbour box..."
+# Sent when a backend has reserved a coordinate for this player and the
+# proxy is about to initiate the cross-server hop. Placeholder: [server]
+# - the destination backend's serverId.
+warm_spot_claimed_next_door: "&a[P0] warm spot claimed on [server]. leaping over the fence..."
+# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+leaping_to_neighbour: "&a[P0] leaping over to [server]..."
+# Sent when the cross-server path gave up and the request fell back to
+# the local backend. Placeholder: [reason] - one of the
+# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
+no_neighbour_pouncing_home: "&e[P0] no neighbour boxes available ([reason]); pouncing back to the home box."
+# Sent when the cross-server request failed terminally (no fallback was
+# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
+neighbour_pounce_flopped: "&c[P0] the neighbour-box pounce flopped: [reason]."
+# Sent when the player asked for a specific region (`/rtp <region>`) but
+# no backend in the network is currently serving it. Placeholder:
+# [region] - the requested region name.
+networkRegionUnavailable: "&c[P0] no neighbour box is currently serving territory '[region]'."
+# Sent when the requested region name resolves to two or more backends and
+# the operator-configured policy cannot pick one (only fires
+# under stronger policies than the default `warn`). Placeholder: [region].
+networkRegionAmbiguous: "&c[P0] territory '[region]' is ambiguous across neighbour boxes; please pin a box."

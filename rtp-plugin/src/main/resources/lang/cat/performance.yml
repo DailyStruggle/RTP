@@ -213,7 +213,7 @@ prefers_explored_land: 0.0
 
 # Fraction of L3 backlog capacity at which top-up resumes (hysteresis).
 # 0.5 = top-up only after L3 drains to 50% (default). 1.0 = top-up
-# nonstop. Bigger values bunch .mca-bin sniffs together for better
+# nonstop. Bigger values bunch.mca-bin sniffs together for better
 # CPU/memory thriftiness.
 # @type: number
 # @range: [0.0, 1.0]
@@ -224,7 +224,7 @@ backlog_refill_threshold: 0.5
 # is audited: a WARN is logged and the cumulative slowPipelineCount counter
 # (shown by /rtp info) is bumped. Only immediate/unqueued pounces are audited;
 # queued at-rate pounces are excluded because their measured time includes
-# queue-wait. 0 or below disables the audit. See ADR-053.
+# queue-wait. 0 or below disables the audit.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
@@ -234,7 +234,7 @@ slow_pounce_threshold_ms: 5000
 # Public pounce-queue depth (cats waiting) at or above which queue backpressure
 # is audited: an edge-triggered WARN is logged and the cumulative
 # queueGrowthWarnCount counter (shown by /rtp info) is bumped once per crossing.
-# 0 or below disables the audit (opt-in). See ADR-053.
+# 0 or below disables the audit (opt-in).
 # @type: integer
 # @range: [0, null]
 # @unit: players

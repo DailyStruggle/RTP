@@ -1,0 +1,23 @@
+# --- RTP-Nachrichten (diese Sprache) ---
+# Nachrichtentexte fuer Spieler und Operatoren in dieser Sprache, nach Themen gruppiert.
+# Automatisch aus den englischen Nachrichten erzeugt; nicht von Hand bearbeiten (wird ueberschrieben).
+
+# --- RTP-Nachrichten für Benutzer ---
+# Alle für Spieler und Konsole sichtbaren Zeichenketten.
+# Formatierung:
+# - Bukkit-Legacy-Farbcodes (z. B. &a, &7, &c)
+# - Hex-Farbcodes (z. B. #2636ef)
+# - PlaceholderAPI-Platzhalter (wenn PAPI installiert ist)
+# Platzhalter:
+# - Gemeinsame "[Pn]"-Platzhalter werden in der untenstehenden Liste `placeholders` definiert.
+# [P0] ist standardmäßig das RTP-Präfix.
+# - Nachrichtenspezifische Platzhalter (z. B. [attempts], [world]) werden inline
+# über jeder Nachricht dokumentiert, die sie verwendet.
+# ###############################################################################
+# Abschnitt 1: Allgemeine Konfiguration
+# ###############################################################################
+# Liste zusätzlicher Platzhalter
+# Format: Pn - wobei n der Index in dieser Liste ist
+platzhalter:
+  # P0
+  - "[RTP]"

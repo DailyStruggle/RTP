@@ -1,0 +1,26 @@
+# --- Komunikaty RTP (ten jezyk) ---
+# Teksty komunikatow dla graczy i operatorow w tym jezyku, pogrupowane tematycznie.
+# Automatycznie wygenerowana kopia angielskich komunikatow; nie edytowac recznie (zostanie nadpisane).
+
+# --- Komunikaty RTP widoczne dla gracza ---
+# Wszystkie ciagi widoczne dla gracza i konsoli.
+#
+# Formatowanie:
+#   - klasyczne kody kolorow Bukkit (np. &a, &e, &c)
+#   - szesnastkowe kody kolorow (np. #2636ef)
+#   - symbole PlaceholderAPI (gdy PAPI jest zainstalowane)
+#
+# Symbole zastepcze:
+#   - Wspolne symbole "[Pn]" sa zdefiniowane na liscie `placeholders` ponizej.
+#     [P0] to domyslnie prefiks RTP.
+#   - Symbole specyficzne dla komunikatu (np. [attempts], [world]) sa opisane
+#     bezposrednio nad kazdym komunikatem, ktory ich uzywa.
+#
+# ###############################################################################
+# Sekcja 1: Konfiguracja ogolna
+# ###############################################################################
+# lista dodatkowych symboli zastepczych
+# format: Pn - gdzie n to indeks na tej liscie
+symboleZastepcze:
+  # P0
+  - "[RTP]"

@@ -1,4 +1,3 @@
-# --- RTP-Nachrichten für Benutzer ---
 # Alle für Spieler und Konsole sichtbaren Zeichenketten.
 # Formatierung:
 # - Bukkit-Legacy-Farbcodes (z. B. &a, &7, &c)
@@ -10,7 +9,7 @@
 # - Nachrichtenspezifische Platzhalter (z. B. [attempts], [world]) werden inline
 # über jeder Nachricht dokumentiert, die sie verwendet.
 # ###############################################################################
-# Abschnitt 1: Allgemeine Konfiguration
+# Abschnitt 0: Platzhalter
 # ###############################################################################
 # Liste zusätzlicher Platzhalter
 # Format: Pn - wobei n der Index in dieser Liste ist
@@ -19,7 +18,7 @@ platzhalter:
   - "[RTP]"
 
 # ###############################################################################
-# Abschnitt 2: Teleportation
+# Abschnitt 1: Teleportation
 # ###############################################################################
 # beim Teleportieren dies anzeigen
 wirdBereitsTeleportiert: "&7[P0] ⚡ du wirst bereits teleportiert!"
@@ -32,6 +31,9 @@ teleportNachricht: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teleportiert in [attempts
 
 # wenn der Teleport abgebrochen wird
 teleportAbbruch: "&7[P0] ⚡ Teleport abgebrochen!"
+
+# Wird gesendet, wenn die optionale PvP-Kampfprüfung /rtp ablehnt, weil sich der Spieler im Kampf befindet
+pvpImKampf: "&c[P0] Du kannst dich im Kampf nicht zufällig teleportieren."
 
 # wenn nach Erreichen der maximalen Versuche keine sicheren Orte gefunden wurden
 # Platzhalter: [attempts] - die maximale Anzahl Versuche
@@ -56,7 +58,93 @@ warteschlangenAktualisierung: "#2636ef[P0] dein Platz in der Schlange: [spot]"
 nichtGenugGeld: "&7[P0] du brauchst dafür mindestens $[money]."
 
 # ###############################################################################
-# Abschnitt 3: Zeitformatierung
+# Abschnitt 2: Befehlsrückmeldung
+# ###############################################################################
+# Welt existiert nicht in Bukkit
+# Platzhalter: [world] - der Weltname
+ungueltigeWelt: "&7[P0] konnte Welt '[world]' nicht finden"
+
+# das Plugin kennt den vom Benutzer angeforderten Befehl nicht
+# Platzhalter: [arg] - das versuchte Argument
+ungueltigesArgument: "&c[P0] ungültiges Befehlsargument [arg]"
+
+# das Plugin kennt den vom Benutzer angeforderten Unterbefehl oder Parameter nicht
+# Platzhalter: [arg] - das versuchte Argument
+ungueltigerBefehl: "&c[P0] ungültiger Befehl - [arg]"
+
+# Benutzer hat keine Berechtigung für den angeforderten Befehl
+keineBerechtigung: "&7Es tut mir leid, aber du hast keine Berechtigung, diesen Befehl auszuführen. Bitte wende dich an die Server-Administratoren, falls du glaubst, dass dies ein Fehler ist."
+
+# das Plugin ist mit dem Neuladen beschäftigt
+beschaeftigt: "&c[P0] beschäftigt"
+
+# wenn die Konsole einen nur für Spieler gedachten Befehl ausführt
+konsolenBefehlNichtErlaubt: "&c[P0] Du musst ein Spieler im Spiel sein, um diesen Befehl auszuführen."
+
+# ###############################################################################
+# Abschnitt 3: Serverübergreifende Teleportation (Netzwerkmodus)
+# ###############################################################################
+# Wird nur gesendet, wenn `network.enabled: true` ist und das `/rtp` des Spielers über
+# die serverübergreifende Warteschlange geleitet wird (siehe network.yml `routing.mode`).
+# Aus Sicht des Spielers sind alle Schlüssel optional - der L2-Basiszyklus aus
+# `delayMessage` / `teleportMessage` steuert weiterhin den sichtbaren Ablauf.
+# Wird gesendet, wenn die Anfrage in die serverübergreifende Warteschlange aufgenommen wurde
+# und auf eine Backend-Reservierung wartet. Platzhalter: [position] - 0-basierte
+# Position aus `pollStatus`; kann leer sein, wenn der Transport keine
+# Position zurückgibt.
+netzwerkInWarteschlange: "&7[P0] für ein serverübergreifendes Ziel eingereiht (Position [position])..."
+# Wird gesendet, wenn ein Spieler /rtp* ausführt, während er bereits eine nicht abgeschlossene
+# serverübergreifende Anmeldung hält (Befehlssperre). Platzhalter:
+# [position] - FIFO-Position, falls bekannt; leer, wenn der Proxy noch keine
+# zugewiesen hat.
+bereitsInWarteschlange: "&cDu wartest bereits in der serverübergreifenden Warteschlange (Position [position]). Bitte warte."
+# Wird gesendet, wenn ein serverübergreifender Warteschlangeneintrag nach Überschreiten seiner
+# konfigurierten TTL entfernt wird. Keine Platzhalter.
+netzwerkZeitueberschreitung: "&c[P0] serverübergreifender Teleport hat beim Warten auf ein Backend das Zeitlimit überschritten."
+# Wird gesendet, wenn eine serverübergreifende Warteschlangenanmeldung abgelehnt wird, weil die gemeinsame
+# Warteschlange ihre konfigurierte Maximalgröße erreicht hat (REJECTED_FULL).
+# Keine Platzhalter.
+warteschlangeVoll: "&c[P0] serverübergreifende Warteschlange ist voll; bitte versuche es gleich erneut."
+# Wird gesendet, wenn die Warteschlange die Anfrage an den Proxy-Router übergeben hat und
+# eine Backend-Auswahl läuft.
+netzwerkWeiterleitung: "&7[P0] leite zu einem Backend weiter..."
+# Wird gesendet, wenn ein Backend eine Koordinate für diesen Spieler reserviert hat und der
+# Proxy im Begriff ist, den serverübergreifenden Sprung einzuleiten. Platzhalter: [server]
+# - die serverId des Ziel-Backends.
+netzwerkReserviert: "&a[P0] Koordinate auf [server] reserviert. Übertrage..."
+# Wird gesendet, während der Proxy den Sprung ausführt. Platzhalter: [server] - Ziel.
+netzwerkUebertragung: "&a[P0] übertrage zu [server]..."
+# Wird gesendet, wenn der serverübergreifende Pfad aufgegeben hat und die Anfrage auf
+# das lokale Backend zurückgefallen ist. Platzhalter: [reason] - einer der
+# `RoutingDecision.FallbackReason`-Werte (z. B. NO_LIVE_PEER, QUEUE_FULL).
+netzwerkRueckfall: "&e[P0] serverübergreifend nicht verfügbar ([reason]); greife lokal zurück."
+# Wird gesendet, wenn die serverübergreifende Anfrage endgültig fehlgeschlagen ist (kein Rückfall war
+# möglich). Platzhalter: [reason] - der `DispatchOutcome.Failed.Reason`.
+netzwerkFehlgeschlagen: "&c[P0] serverübergreifender Teleport fehlgeschlagen: [reason]."
+# Wird gesendet, wenn der Spieler eine bestimmte Region angefordert hat (`/rtp <region>`), aber
+# derzeit kein Backend im Netzwerk sie bedient. Platzhalter:
+# [region] - der angeforderte Regionsname.
+netzwerkRegionNichtVerfuegbar: "&c[P0] derzeit bedient kein Backend die Region '[region]'."
+# Wird gesendet, wenn der angeforderte Regionsname zu zwei oder mehr Backends aufgelöst wird und
+# die vom Operator konfigurierte Richtlinie keines auswählen kann (wird nur
+# unter strengeren Richtlinien als dem Standard `warn` ausgelöst). Platzhalter: [region].
+netzwerkRegionMehrdeutig: "&c[P0] Region '[region]' ist über mehrere Backends mehrdeutig; bitte einen Server festlegen."
+# Abschnitt 4: Visuelles
+# ###############################################################################
+# Titeleinstellungen
+# entfernen oder Titel auf " setzen, um zu deaktivieren
+# Für Koordinaten wird PlaceholderAPI empfohlen
+titel: "<rainbow>Teleportiert!</rainbow>"
+untertitel: "<gradient:#A78BFA:#E876A0>Viel Spaß!</gradient>"
+einblenden: 20
+bleiben: 20
+ausblenden: 20
+
+# Aktionsleisten-Einstellung
+aktionsleiste: ""
+
+# ###############################################################################
+# Abschnitt 5: Zeitformatierung
 # ###############################################################################
 # Bezeichnungen für Tage, Stunden, Minuten, Sekunden und Millisekunden in Zeit-Platzhaltern
 tage: "d"
@@ -66,58 +154,22 @@ sekunden: "s"
 millis: "ms"
 
 # ###############################################################################
-# Abschnitt 4: System & Verwaltung
+# Abschnitt 6: Befehlsbeschreibungen
 # ###############################################################################
-# die 'version' einer Konfigurationsdatei ist niedriger als die neueste
-# Platzhalter: [filename] - Dateiname einschließlich Dateiendung
-alteDatei: "&b[P0] alte [filename] erkannt. Aktualisiere"
-
-# eine Bukkit-Welt erkannt, die nicht in der Konfigurationsdatei steht
-# Platzhalter: [world] - die erkannte Welt
-neueWelt: "&b[P0] neue Welt '[world]' erkannt"
-
-# Welt existiert nicht in Bukkit
-# Platzhalter: [world] - der Weltname
-ungueltigeWelt: "&7[P0] konnte Welt '[world]' nicht finden"
-
-# Text für Plugin-Reload/Update
-# Platzhalter: [filename] - Dateiname
-ladeNeu: "&b[P0] lade [filename]..."
-neuGeladen: "&b[P0] [filename] erfolgreich geladen."
-aktualisiere: "&a[P0] aktualisiere [filename]..."
-aktualisiert: "&a[P0] [filename] erfolgreich aktualisiert."
-
-# das Plugin kennt den vom Benutzer angeforderten Befehl nicht
-# Platzhalter: [arg] - das versuchte Argument
-ungueltigesArgument: "&c[P0] ungültiges Befehlsargument [arg]"
-
-# wenn die Konsole einen nur für Spieler gedachten Befehl ausführt
-konsolenBefehlNichtErlaubt: "&c[P0] Du musst ein Spieler im Spiel sein, um diesen Befehl auszuführen."
-
-# das Plugin ist mit dem Neuladen beschäftigt
-beschaeftigt: "&c[P0] beschäftigt"
-
-# Wird gesendet, wenn die optionale PvP-Kampfprüfung /rtp ablehnt, weil sich der Spieler im Kampf befindet
-pvpImKampf: "&c[P0] Du kannst dich im Kampf nicht zufällig teleportieren."
-
-# das Plugin kennt den vom Benutzer angeforderten Unterbefehl oder Parameter nicht
-# Platzhalter: [arg] - das versuchte Argument
-ungueltigerBefehl: "&c[P0] ungültiger Befehl - [arg]"
-
-# Benutzer hat keine Berechtigung für den angeforderten Befehl
-keineBerechtigung: "&7Es tut mir leid, aber du hast keine Berechtigung, diesen Befehl auszuführen. Bitte wende dich an die Server-Administratoren, falls du glaubst, dass dies ein Fehler ist."
+rtp: "&b/rtp - zu einem zufälligen Ort teleportieren"
+rtpBeschreibung: "zu einem zufälligen Ort teleportieren"
+hilfe: "&b/rtp help - dies anzeigen"
+hilfeBeschreibung: "Befehle beschreiben"
+neuladen: "&b/rtp reload - Konfigurationsdateien neu laden"
+neuladenBeschreibung: "Konfigurationsdateien neu laden"
+scan: "&b/rtp scan - alle möglichen Regionsplatzierungen testen, um Ladezeiten zu verbessern"
+scanBeschreibung: "gespeicherte Daten löschen und alle möglichen Regionsplatzierungen testen"
+konfigBeschreibung: "Konfigurationsdateien zur Laufzeit aktualisieren"
+infoBeschreibung: "den aktuellen Zustand des Plugins prüfen"
+testBeschreibung: "RTP-Funktionen testen"
 
 # ###############################################################################
-# Abschnitt 5: Administrative Protokolle
-# ###############################################################################
-# protokolliert, wenn Orte in der Datenbank gespeichert/geladen werden
-# Platzhalter: [amount] - Anzahl der Orte
-# Platzhalter: [region] - Name der Region
-ortGespeichert: "&7[P0] [amount] Orte für [region] erfolgreich gespeichert"
-ortGeladen: "&7[P0] [amount] Orte für [region] erfolgreich geladen"
-
-# ###############################################################################
-# Abschnitt 6: Scan-Befehl
+# Abschnitt 7: Scan-Befehl
 # ###############################################################################
 # Nachrichten zum Scan-Befehl
 # Platzhalter: [scan_regions] - Liste der Regionen
@@ -133,10 +185,10 @@ scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunk
 # Boss-bar title shown to players with rtp.scan permission while a world scan is running.
 # Set to empty string to disable the boss-bar.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+scanBossBar: "Scanne [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% Land) ETA [scan_eta]"
 
 # ###############################################################################
-# Abschnitt 7: Info-Befehl
+# Abschnitt 8: Info-Befehl
 # ###############################################################################
 # Nachrichten zum Info-Befehl
 infoTitel: "&2&l/rtp info"
@@ -150,13 +202,13 @@ infoLeckRate: "&7Aktuelle Chunk-Leak-Rate: #7E9CC8[leakRate]"
 infoWarteschlangenTiefe: "&7Spieler in Regions-Warteschlangen: #7E9CC8[queueDepth]"
 infoAusstehendeTeleports: "&7Ausstehende Teleport-Pipelines: #7E9CC8[pendingTeleports]"
 infoDurchschnittPipelineMs: "&7Durchschnittliche Pipeline-Latenz: #7E9CC8[avgPipelineMs] ms"
-# Perzentile der Pipeline-Latenz (ADR-053). Platzhalter: [pipelineMsP50] [pipelineMsP75]
+# Perzentile der Pipeline-Latenz. Platzhalter: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7Pipeline-Latenz (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-# Prüfung langsamer Teleports (ADR-053, nur sofortige/nicht eingereihte Teleports). Platzhalter:
+# Prüfung langsamer Teleports (nur sofortige/nicht eingereihte Teleports). Platzhalter:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7Langsame Teleports (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-# Prüfung des Warteschlangen-Wachstums (ADR-053). Platzhalter: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+# Prüfung des Warteschlangen-Wachstums. Platzhalter: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7Warteschlangen-Wachstumswarnungen (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7JVM-Heap: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # Kopfzeile für den als Pipeline gekennzeichneten Block in /rtp info.
@@ -169,7 +221,7 @@ infoMSPTLive: "&7Server-MSPT: #7E9CC8[mspt] ms (&7Tick-Budget: #7E9CC8[tickBudge
 infoSoftLimit: "&7Spieler: #7E9CC8[playerCount] / [softCap]"
 # Aktuelle Round-Trip-Latenz der Datenbank in ms. Platzhalter: [databaseLatencyMs].
 infoDatenbankLatenzMs: "&7Datenbank-Latenz: #7E9CC8[databaseLatencyMs] ms"
-# Metriken zum Generierungsergebnis (ADR-052), aus den prozessweiten RtpOutcomeStats.
+# Metriken zum Generierungsergebnis, aus den prozessweiten RtpOutcomeStats.
 # Erfolgs-/Fehlerrate über alle erfassten Generierungsversuche. Platzhalter:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Generierungserfolg: #7E9CC8[genSuccessRate]&7 (Fehler #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
@@ -233,22 +285,7 @@ regionInfo:
   - "#58CCED  - häufigste Ablehnungsursache: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
-# Abschnitt 8: Befehlsbeschreibungen
-# ###############################################################################
-rtp: "&b/rtp - zu einem zufälligen Ort teleportieren"
-rtpBeschreibung: "zu einem zufälligen Ort teleportieren"
-hilfe: "&b/rtp help - dies anzeigen"
-hilfeBeschreibung: "Befehle beschreiben"
-neuladen: "&b/rtp reload - Konfigurationsdateien neu laden"
-neuladenBeschreibung: "Konfigurationsdateien neu laden"
-scan: "&b/rtp scan - alle möglichen Regionsplatzierungen testen, um Ladezeiten zu verbessern"
-scanBeschreibung: "gespeicherte Daten löschen und alle möglichen Regionsplatzierungen testen"
-konfigBeschreibung: "Konfigurationsdateien zur Laufzeit aktualisieren"
-infoBeschreibung: "den aktuellen Zustand des Plugins prüfen"
-testBeschreibung: "RTP-Funktionen testen"
-
-# ###############################################################################
-# Abschnitt 8b: Verallgemeinertes Menü-Framework
+# Abschnitt 9: Verallgemeinertes Menü-Framework
 # ###############################################################################
 # Wird gesendet, wenn ein Menü-Token unbekannt oder fehlerhaft ist oder einem anderen Spieler gehört.
 menueUngueltig: "&c[P0] dieser Menü-Link ist ungültig."
@@ -260,15 +297,12 @@ menueHoverTypFallback: "Typ: [type]"
 # Hover-Ersatzvorlage, die der Menü-Reflektor verwendet, wenn ein Parameter eine kleine
 # kuratierte Wertemenge bereitstellt. Platzhalter: [values] - kommagetrennte zulässige Werte.
 menueHoverGrenzenFallback: "akzeptiert: [values]"
-# Bezeichnung der "eine Ebene zurück"-Navigationszeile, die jeder Nicht-Wurzel-Menüseite vorangestellt wird.
 menueZurueck: "&7« zurück"
-# Bezeichnungsvorlage für die Zeile "zusammengebauten Befehl ausführen", die jeder
-# ausführbaren Nicht-Wurzel-Menüseite vorangestellt wird. Platzhalter: [command] - der zusammengebaute /rtp ...-Aufruf.
+# ausführbaren Nicht-Wurzel-Menüseite vorangestellt wird. Platzhalter: [command] - der zusammengebaute /rtp...-Aufruf.
 menueAusfuehren: "&2▶ [command] ausführen"
 # Kopfzeile oben auf einer Unterseite zur Parameterwertauswahl (Stufe A.2).
-# Platzhalter: [param] - Parametername; [command] - zusammengebauter /rtp ...-Aufruf.
+# Platzhalter: [param] - Parametername; [command] - zusammengebauter /rtp...-Aufruf.
 menueWertWaehlen: "&7wähle einen Wert für [param] (führt aus: /rtp [command] [param]:<value>)"
-# Bezeichnung der Ersatzzeile "eigenen Wert eingeben" auf einer Parameterwert-Auswahlseite.
 # Ein Klick füllt den Chat mit dem zusammengebauten Befehl bis '<param>:' vor, sodass der Spieler
 # einen beliebigen Wert eingeben kann, auch solche, die nicht in der Vorschlagsliste stehen.
 menueWertEingeben: "&7✎ eigenen Wert eingeben..."
@@ -288,7 +322,7 @@ menueHauptHinweis: "&7klicke unten auf eine Option, um zu beginnen"
 menueSeiteZurueck: "&7« vorherige Seite ([page])"
 menueSeiteVor: "&7nächste Seite ([page]) »"
 # Abschnittstrenner auf der Startseite über den Teleport-Zeilen (Spieleransicht).
-menueStartseiteAbschnittTeleport: "&8--- &7teleport &8---"
+menueStartseiteAbschnittTeleport: "&8--- &7Teleportation &8---"
 # Startseitenzeilen. Keine Platzhalter.
 menueStartseiteZeileTeleport: "&2▶ /rtp &7- zu einem zufälligen Ort teleportieren"
 menueStartseiteZeileRegion: "&2▶ /rtp region:&7... &7- eine Region wählen"
@@ -303,7 +337,7 @@ menueStartseiteZeileAdmin: "#9D7CD8▶ Admin-Panel &7- Operator-Werkzeuge"
 menueStartseiteHoverAdmin: "&7Operator-Werkzeuge: Konfiguration, Scans, Diagnose, Neuladen"
 # --- Admin-Panel-Buchseite ---
 # Nicht anklickbare Titelzeile oben im Admin-Panel. Keine Platzhalter.
-menueAdminPanelTitel: "#5FB3B3&l⚙ Admin-Panel"
+menueAdminPanelTitel: "#5FB3B3&l⚙ Verwaltungspanel"
 # Nicht anklickbare Hinweiszeile unterhalb von menuAdminPanelTitle. Keine Platzhalter.
 menueAdminPanelHinweis: "&7klicke eine Option; destruktive Aktionen zeigen einen Warnhinweis"
 # Abschnittstrenner im Admin-Panel. Keine Platzhalter.
@@ -320,7 +354,7 @@ menueAdminPanelZeileWelten: "#5FB3B3▶ Welten"
 menueAdminPanelHoverWelten: "&7weltbezogene Konfigurationen hinzufügen, entfernen oder bearbeiten"
 menueAdminPanelZeileEffekte: "#5FB3B3▶ Effekte"
 menueAdminPanelHoverEffekte: "&7gruppenbezogene Teleport-Effekte hinzufügen, entfernen oder bearbeiten"
-menueAdminPanelZeileInfo: "&b▶ Server-Info"
+menueAdminPanelZeileInfo: "&b▶ Server-Informationen"
 menueAdminPanelHoverInfo: "&7Plugin-Version, Regionsanzahl und Warteschlangenstatus anzeigen"
 menueAdminPanelZeileDiagnose: "&c▶ vollständige Diagnose"
 menueAdminPanelHoverDiagnose: "&7führt die vollständige Diagnose-Suite aus; kann aufwendig sein"
@@ -395,28 +429,22 @@ infoBuchUeberlaufFusszeile: "&7(Inhalt gekürzt - klicke, um die vollständige A
 # Buchs in diesem Build derzeit nicht unterstützt wird (auf einen späteren
 # Meilenstein verschoben). Nutzer können die Aktualisieren-Zeile anklicken, um manuell zu aktualisieren.
 infoBuchAutoAktualisierenHinweis: "&8(automatisches Aktualisieren noch nicht unterstützt; klicke auf Aktualisieren)"
-# Nicht anklickbare Titelzeile oben auf der Auswahlseite der Konfigurationsdateien (Stufe C.1).
 # Wird angezeigt, wenn ein Admin auf der Startseite "/rtp config" anklickt.
 konfigSelektorTitel: "#5FB3B3&l⚙ Konfigurationsdateien"
-# Bezeichnung der Navigationszeile "zurück zur /rtp-Menüwurzel" auf der Konfigurationsauswahlseite.
 konfigSelektorZurueckZeile: "&7« zurück zum Menü"
-# Nicht anklickbare Titelzeile oben auf einer einzelnen Konfigurationsdateiseite (Stufe C.2).
 # Platzhalter: [file] - der Name der Konfigurationsdatei (z. B. "performance", "safety").
 konfigDateiTitel: "#5FB3B3&l⚙ Konfiguration: &7[file]"
-# Bezeichnung der Navigationszeile "zurück zur Konfigurationsauswahl" auf einer einzelnen Konfigurationsdateiseite.
 konfigDateiZurueckZeile: "&7« zurück zu Konfigurationsdateien"
 # Nicht anklickbare Hinweiszeile, die angezeigt wird, wenn eine Konfigurationsdatei keine bearbeitbaren Schlüssel hat.
 konfigDateiLeerHinweis: "&7(keine bearbeitbaren Schlüssel in dieser Datei)"
 # Zeilenbezeichnung pro Schlüssel auf einer Konfigurationsdateiseite. Platzhalter:
-#   [key]   - der Konfigurationsschlüsselname; [value] - der aktuell gespeicherte Wert.
+# [key] - der Konfigurationsschlüsselname; [value] - der aktuell gespeicherte Wert.
 konfigSchluesselZeilenFormat: "&7[key]&7: #7E9CC8[value]"
 # Hover-Text für eine Zeile pro Schlüssel auf einer Konfigurationsdateiseite. Platzhalter:
-#   [key], [value], [type] - der Konfigurationsschlüsselname, aktueller Wert und deklarierter Typ.
+# [key], [value], [type] - der Konfigurationsschlüsselname, aktueller Wert und deklarierter Typ.
 konfigSchluesselHoverFormat: "&7zum Bearbeiten klicken &7[key] &7(Typ: [type])"
-# Nicht anklickbare Titelzeile oben auf einer shape/vert-Typauswahlseite (Stufe C.3a).
 # Platzhalter: [param] - "shape" oder "vert"; [current] - aktuell aktiver Typname.
 konfigTypAuswahlTitel: "#5FB3B3&l⚙ [param]-Typ wählen &7(aktuell: &7[current]&7)"
-# Nicht anklickbare Titelzeile oben auf einer shape/vert-Unterparameterseite (Stufe C.3b).
 # Platzhalter: [param] - "shape" oder "vert"; [type] - der aktive Typname.
 konfigUnterparameterSeitenTitel: "#5FB3B3&l⚙ [param] &7- &7[type] &7Unterparameter"
 # Hinweis, der gesendet wird, wenn die Buchansicht auf den alten Roh-YAML-Chat-Auszug zurückgreift
@@ -424,7 +452,6 @@ konfigUnterparameterSeitenTitel: "#5FB3B3&l⚙ [param] &7- &7[type] &7Unterparam
 konfigRohansichtHinweis: "&7[P0] Buchansicht nicht verfügbar; greife auf Rohausgabe zurück."
 # Platzhaltertext, der anstelle eines nicht gesetzten Konfigurationswerts gerendert wird.
 konfigWertNichtGesetztPlatzhalter: "&8(nicht gesetzt)"
-# Nicht anklickbare Kopfzeile, die die "Änderbar"-Liste von der "Ausstehend"-
 # Vormerkliste auf einer Konfigurationsdateiseite trennt, wenn der Betrachter eine oder
 # mehrere nicht übernommene Änderungen vorgemerkt hat. Keine Platzhalter.
 konfigAusstehendKopf: "&6&l-- pending changes --"
@@ -434,14 +461,12 @@ konfigAusstehendZeilenFormat: "&9[key]&8 = &0[value]"
 # Hover-Text, der angezeigt wird, wenn der Betrachter eine ausstehende (vorgemerkte) Zeile auf einer
 # Konfigurationsdateiseite überfährt. Keine Platzhalter.
 konfigAusstehendZeileHover: "klicke, um zu verwerfen"
-# Anklickbare Bezeichnung der Zeile "vorgemerkte Änderungen übernehmen" auf einer Konfigurationsdateiseite.
-# Führt den zusammengebauten Befehl /rtp config <file> k1=v1 ... aus und leert den Warenkorb.
+# Führt den zusammengebauten Befehl /rtp config <file> k1=v1... aus und leert den Warenkorb.
 konfigAnwendenZeile: "&2&l[apply]"
-# Anklickbare Bezeichnung der Zeile "vorgemerkte Änderungen verwerfen" auf einer Konfigurationsdateiseite.
 # Leert den Warenkorb, ohne zu übernehmen.
 konfigVerwerfenZeile: "&c&l[discard]"
 
-# --- ADR-047 deklarative Diagramm-Kompositionsbrücke (REQ-RTP-MAP-006) ---
+# --- deklarative Diagramm-Kompositionsbrücke ---
 # Wird an den Betrachter gesendet, wenn eine OPEN_MAP-Menüaktion ausgelöst wird, aber kein konkretes
 # MapBinding registriert ist (NoopMapBinding ist noch aktiv, z. B. bei der
 # Lite-Assembly oder bevor RTPHooks das Plattform-Binding verdrahtet).
@@ -457,59 +482,11 @@ karteNichtVerfuegbar: "&e[P1] Kartendaten sind derzeit nicht verfügbar."
 # Wird gesendet, wenn das aktive MapBinding derzeit keinen Karten-Handle zuweisen kann
 # (vom Binding definierter Gegendruck, z. B. Obergrenze pro Betrachter erreicht).
 karteBeschaeftigt: "&e[P1] der Kartendienst ist beschäftigt; bitte versuche es gleich erneut."
-# Bezeichnung der anklickbaren "/rtp info"-Menüzeile, die beim Klick einen
-# ChartSpec(BAD_POINTS_HEATMAP, ...)-Token erzeugt und das aktive MapBinding bittet,
+# ChartSpec(BAD_POINTS_HEATMAP,...)-Token erzeugt und das aktive MapBinding bittet,
 # eine 128x128-Heatmap der bekannten Schlecht-Punkt-Spiralindizes der aktuellen
 # Region zu rendern. Die Zeile wird beim Rendern ausgelassen, wenn NoopMapBinding
-# das installierte Binding ist (REQ-RTP-MAP-006 / ADR-047).
+# das installierte Binding ist.
 menueInfoSchlechteOrteBezeichnung: "#9D7CD8&l# Karte schlechter Orte"
-
-# --- Nachrichten für den serverübergreifenden Netzwerkmodus ---
-# Wird nur gesendet, wenn `network.enabled: true` ist und das `/rtp` des Spielers über
-# die serverübergreifende Warteschlange geleitet wird (siehe network.yml `routing.mode`).
-# Aus Sicht des Spielers sind alle Schlüssel optional - der L2-Basiszyklus aus
-# `delayMessage` / `teleportMessage` steuert weiterhin den sichtbaren Ablauf.
-# Wird gesendet, wenn die Anfrage in die serverübergreifende Warteschlange aufgenommen wurde
-# und auf eine Backend-Reservierung wartet. Platzhalter: [position] - 0-basierte
-# Position aus `pollStatus`; kann leer sein, wenn der Transport keine
-# Position zurückgibt.
-netzwerkInWarteschlange: "&7[P0] für ein serverübergreifendes Ziel eingereiht (Position [position])..."
-# Wird gesendet, wenn ein Spieler /rtp* ausführt, während er bereits eine nicht abgeschlossene
-# serverübergreifende Anmeldung hält (ADR-015 / REQ-RTP-NET-015 Befehlssperre). Platzhalter:
-# [position] - FIFO-Position, falls bekannt; leer, wenn der Proxy noch keine
-# zugewiesen hat.
-bereitsInWarteschlange: "&cDu wartest bereits in der serverübergreifenden Warteschlange (Position [position]). Bitte warte."
-# Wird gesendet, wenn ein serverübergreifender Warteschlangeneintrag nach Überschreiten seiner
-# konfigurierten TTL entfernt wird (ADR-015). Keine Platzhalter.
-netzwerkZeitueberschreitung: "&c[P0] serverübergreifender Teleport hat beim Warten auf ein Backend das Zeitlimit überschritten."
-# Wird gesendet, wenn eine serverübergreifende Warteschlangenanmeldung abgelehnt wird, weil die gemeinsame
-# Warteschlange ihre konfigurierte Maximalgröße erreicht hat (ADR-015 REJECTED_FULL).
-# Keine Platzhalter.
-warteschlangeVoll: "&c[P0] serverübergreifende Warteschlange ist voll; bitte versuche es gleich erneut."
-# Wird gesendet, wenn die Warteschlange die Anfrage an den Proxy-Router übergeben hat und
-# eine Backend-Auswahl läuft.
-netzwerkWeiterleitung: "&7[P0] leite zu einem Backend weiter..."
-# Wird gesendet, wenn ein Backend eine Koordinate für diesen Spieler reserviert hat und der
-# Proxy im Begriff ist, den serverübergreifenden Sprung einzuleiten. Platzhalter: [server]
-# - die serverId des Ziel-Backends.
-netzwerkReserviert: "&a[P0] Koordinate auf [server] reserviert. Übertrage..."
-# Wird gesendet, während der Proxy den Sprung ausführt. Platzhalter: [server] - Ziel.
-netzwerkUebertragung: "&a[P0] übertrage zu [server]..."
-# Wird gesendet, wenn der serverübergreifende Pfad aufgegeben hat und die Anfrage auf
-# das lokale Backend zurückgefallen ist. Platzhalter: [reason] - einer der
-# `RoutingDecision.FallbackReason`-Werte (z. B. NO_LIVE_PEER, QUEUE_FULL).
-netzwerkRueckfall: "&e[P0] serverübergreifend nicht verfügbar ([reason]); greife lokal zurück."
-# Wird gesendet, wenn die serverübergreifende Anfrage endgültig fehlgeschlagen ist (kein Rückfall war
-# möglich). Platzhalter: [reason] - der `DispatchOutcome.Failed.Reason`.
-netzwerkFehlgeschlagen: "&c[P0] serverübergreifender Teleport fehlgeschlagen: [reason]."
-# Wird gesendet, wenn der Spieler eine bestimmte Region angefordert hat (`/rtp <region>`), aber
-# derzeit kein Backend im Netzwerk sie bedient. Platzhalter:
-# [region] - der angeforderte Regionsname.
-netzwerkRegionNichtVerfuegbar: "&c[P0] derzeit bedient kein Backend die Region '[region]'."
-# Wird gesendet, wenn der angeforderte Regionsname zu zwei oder mehr Backends aufgelöst wird und
-# die vom Operator konfigurierte Richtlinie keines auswählen kann (wird nur
-# unter strengeren Richtlinien als dem Standard `warn` ausgelöst). Platzhalter: [region].
-netzwerkRegionMehrdeutig: "&c[P0] Region '[region]' ist über mehrere Backends mehrdeutig; bitte einen Server festlegen."
 
 # --- MultiConfig-Untermenü ---
 # Ersatz-Kopfzeile, die verwendet wird, wenn kein Kopfzeilenschlüssel pro Art registriert ist.
@@ -523,7 +500,6 @@ multikonfigKopfWelten: "#5FB3B3&l Welten"
 multikonfigEntfernenModusAus: "&8[ ] Entfernen-Modus"
 # Umschaltzeilenbezeichnung, wenn der Entfernen-Modus AN ist. Klicks auf Eintragszeilen löschen.
 multikonfigEntfernenModusAn: "&c[x] Entfernen-Modus (klicke einen Eintrag zum Löschen)"
-# Auswahlzeilenbezeichnung für den Eintrag "+ neu hinzufügen...". Keine Platzhalter.
 multikonfigZeileHinzufuegen: "&2+ neu hinzufügen..."
 # Hover-Text für die Hinzufügen-Zeile. Platzhalter: [name] - vorausgefüllter Standardname.
 multikonfigZeileHinzufuegenHover: "&7gib einen Namen im Amboss-Dialog ein; vorausgefüllt: &f[name]"
@@ -557,7 +533,34 @@ multikonfigErgebnisNameUngueltig: "&cName '[name]' ist nicht erlaubt; verwende B
 multikonfigErgebnisNameVergeben: "&cein Eintrag mit dem Namen '[name]' existiert bereits."
 
 # ###############################################################################
-# Abschnitt 9: PlaceholderAPI-Unterstützung
+# Abschnitt 10: System & Verwaltung
+# ###############################################################################
+# die 'version' einer Konfigurationsdatei ist niedriger als die neueste
+# Platzhalter: [filename] - Dateiname einschließlich Dateiendung
+alteDatei: "&b[P0] alte [filename] erkannt. Aktualisiere"
+
+# eine Bukkit-Welt erkannt, die nicht in der Konfigurationsdatei steht
+# Platzhalter: [world] - die erkannte Welt
+neueWelt: "&b[P0] neue Welt '[world]' erkannt"
+
+# Text für Plugin-Reload/Update
+# Platzhalter: [filename] - Dateiname
+ladeNeu: "&b[P0] lade [filename]..."
+neuGeladen: "&b[P0] [filename] erfolgreich geladen."
+aktualisiere: "&a[P0] aktualisiere [filename]..."
+aktualisiert: "&a[P0] [filename] erfolgreich aktualisiert."
+
+# ###############################################################################
+# Abschnitt 11: Administrative Protokolle
+# ###############################################################################
+# protokolliert, wenn Orte in der Datenbank gespeichert/geladen werden
+# Platzhalter: [amount] - Anzahl der Orte
+# Platzhalter: [region] - Name der Region
+ortGespeichert: "&7[P0] [amount] Orte für [region] erfolgreich gespeichert"
+ortGeladen: "&7[P0] [amount] Orte für [region] erfolgreich geladen"
+
+# ###############################################################################
+# Abschnitt 12: PlaceholderAPI-Unterstützung
 # ###############################################################################
 # Status-Platzhalter für Spieler
 SPIELER_VERFUEGBAR: "&aVERFÜGBAR"
@@ -567,27 +570,12 @@ SPIELER_LADEN: "&bLADE CHUNKS"
 SPIELER_TELEPORTIERT: "&bTELEPORTIERE"
 
 # ###############################################################################
-# Abschnitt 10: Visuelles
-# ###############################################################################
-# Titeleinstellungen
-# entfernen oder Titel auf "" setzen, um zu deaktivieren
-# Für Koordinaten wird PlaceholderAPI empfohlen
-titel: "<rainbow>Teleportiert!</rainbow>"
-untertitel: "<gradient:#A78BFA:#E876A0>Viel Spaß!</gradient>"
-einblenden: 20
-bleiben: 20
-ausblenden: 20
-
-# Aktionsleisten-Einstellung
-aktionsleiste: ""
-
-# ###############################################################################
-# Abschnitt 11: Metadaten
+# Abschnitt 13: Metadaten
 # ###############################################################################
 version: 1.0
 
 # ###############################################################################
-# Abschnitt 12: Entwickleroptionen
+# Abschnitt 14: Entwickleroptionen
 # ###############################################################################
 # auf true setzen, um an jede Nachricht ein Entwickler-Tag anzuhängen (z. B. §8(RTP:ClassName))
 entwicklerTagAnzeigen: false
