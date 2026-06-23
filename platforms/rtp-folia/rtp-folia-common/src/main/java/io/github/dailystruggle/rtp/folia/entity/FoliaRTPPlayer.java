@@ -345,6 +345,54 @@ public final class FoliaRTPPlayer implements RTPPlayer {
     return org.bukkit.boss.BarColor.GREEN;
   }
 
+  // --- Per-player view distance (ADR-072) ----------------------------------
+  // Resolved reflectively for the same reason as the Bukkit adapter, and called
+  // on the owning region thread (the clamp/restore is dispatched via the entity
+  // scheduler), so mutating player state here is region-safe.
+  private static final java.lang.reflect.Method GET_VIEW_DISTANCE;
+  private static final java.lang.reflect.Method SET_VIEW_DISTANCE;
+
+  static {
+    java.lang.reflect.Method get = null;
+    java.lang.reflect.Method set = null;
+    try {
+      get = Player.class.getMethod("getViewDistance");
+    } catch (Throwable ignored) {
+      // older API without per-player view distance; feature no-ops
+    }
+    try {
+      set = Player.class.getMethod("setViewDistance", int.class);
+    } catch (Throwable ignored) {
+      // older API without per-player view distance; feature no-ops
+    }
+    GET_VIEW_DISTANCE = get;
+    SET_VIEW_DISTANCE = set;
+  }
+
+  @Override
+  @RegionThread
+  public int getViewDistance() {
+    if (GET_VIEW_DISTANCE == null) return -1;
+    try {
+      Object v = GET_VIEW_DISTANCE.invoke(player);
+      return (v instanceof Integer) ? (Integer) v : -1;
+    } catch (Throwable t) {
+      RTP.log(Level.FINE, "[RTP] getViewDistance unavailable for " + uuid(), t);
+      return -1;
+    }
+  }
+
+  @Override
+  @RegionThread
+  public void setViewDistance(int viewDistance) {
+    if (SET_VIEW_DISTANCE == null) return;
+    try {
+      SET_VIEW_DISTANCE.invoke(player, viewDistance);
+    } catch (Throwable t) {
+      RTP.log(Level.FINE, "[RTP] setViewDistance(" + viewDistance + ") failed for " + uuid(), t);
+    }
+  }
+
   @RegionThread
   Player player() {
     return player;

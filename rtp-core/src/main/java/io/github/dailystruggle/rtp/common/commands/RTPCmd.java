@@ -2,7 +2,8 @@ package io.github.dailystruggle.rtp.common.commands;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
@@ -22,7 +23,7 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
-
+import io.github.dailystruggle.rtp.common.configuration.Messages;
 public interface RTPCmd extends BaseRTPCmd {
 
   /**
@@ -203,9 +204,7 @@ public interface RTPCmd extends BaseRTPCmd {
         java.util.function.Consumer<String> messageMethod = sender::sendMessage;
 
         if (RTP.reloading.get()) {
-            ConfigParser<MessagesKeys> langParser =
-                    (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-            String msg = (String) langParser.getConfigValue(MessagesKeys.busy, "");
+            String msg = (String) RTP.configs.getConfigValue(PlayerMessages.busy, "");
             messageMethod.accept(msg);
             return true;
         }
@@ -213,9 +212,7 @@ public interface RTPCmd extends BaseRTPCmd {
     // ------------------------D--------------------------------------------------------------------------------------
     // guard command perms with custom message
     if (!sender.hasPermission("rtp.use")) {
-      ConfigParser<MessagesKeys> langParser =
-              (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-      String msg = (String) langParser.getConfigValue(MessagesKeys.noPerms, "");
+      String msg = (String) RTP.configs.getConfigValue(PlayerMessages.noPerms, "");
       messageMethod.accept(msg);
       return true;
     }
@@ -266,9 +263,7 @@ public interface RTPCmd extends BaseRTPCmd {
       if (dt < 0) dt = Long.MAX_VALUE + dt;
 
       if (!hasSubCommand && dt < sender.cooldown()) {
-        ConfigParser<MessagesKeys> langParser =
-                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        String msg = (String) langParser.getConfigValue(MessagesKeys.cooldownMessage, "");
+        String msg = (String) RTP.configs.getConfigValue(PlayerMessages.cooldownMessage, "");
         messageMethod.accept(msg);
         RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT cooldown senderId=" + senderId
                 + " dtMs=" + dt + " cooldownMs=" + sender.cooldown());
@@ -292,9 +287,7 @@ public interface RTPCmd extends BaseRTPCmd {
                   cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
           if (RTP.getInstance().teleportLimitStore.isLocked(
                   senderId, cap, resetMillis, System.currentTimeMillis())) {
-            ConfigParser<MessagesKeys> langParser =
-                    (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-            String msg = (String) langParser.getConfigValue(MessagesKeys.lockedAfterUses, "");
+            String msg = (String) RTP.configs.getConfigValue(PlayerMessages.lockedAfterUses, "");
             messageMethod.accept(msg);
             RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT lockAfterUses senderId="
                     + senderId + " cap=" + cap);
@@ -305,18 +298,14 @@ public interface RTPCmd extends BaseRTPCmd {
     }
 
     if (RTP.reloading.get()) {
-      ConfigParser<MessagesKeys> langParser =
-              (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-      String msg = (String) langParser.getConfigValue(MessagesKeys.teleportDeniedReloading, "");
+      String msg = (String) RTP.configs.getConfigValue(PlayerMessages.teleportDeniedReloading, "");
       messageMethod.accept(msg);
       RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT reloading senderId=" + senderId);
       return true;
     }
 
     if (!hasSubCommand && RTP.getInstance().processingPlayers.contains(senderId)) {
-      ConfigParser<MessagesKeys> langParser =
-              (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-      String msg = (String) langParser.getConfigValue(MessagesKeys.alreadyTeleporting, "");
+      String msg = (String) RTP.configs.getConfigValue(PlayerMessages.alreadyTeleporting, "");
       messageMethod.accept(msg);
       RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT alreadyTeleporting senderId=" + senderId);
       return true;
@@ -385,12 +374,10 @@ public interface RTPCmd extends BaseRTPCmd {
 
     if (senderId.equals(new java.util.UUID(0, 0)) && !rtpArgs.containsKey("player")) {
       if(messageMethod != null) {
-        ConfigParser<MessagesKeys> langParser =
-                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        String msg = (String) langParser.getConfigValue(MessagesKeys.consoleCmdNotAllowed, "");
+        String msg = (String) RTP.configs.getConfigValue(PlayerMessages.consoleCmdNotAllowed, "");
         messageMethod.accept(msg);
       }
-      else RTP.serverAccessor.sendMessage(senderId, MessagesKeys.consoleCmdNotAllowed);
+      else RTP.serverAccessor.sendMessage(senderId, PlayerMessages.consoleCmdNotAllowed);
       return true;
     }
 
@@ -413,9 +400,7 @@ public interface RTPCmd extends BaseRTPCmd {
           decision = io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.local();
         }
         if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.CrossServer cross) {
-          ConfigParser<MessagesKeys> langParser =
-                  (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-          String tmpl = (String) langParser.getConfigValue(MessagesKeys.networkQueued, "");
+          String tmpl = (String) RTP.configs.getConfigValue(NetworkMessages.networkQueued, "");
           // Empty-template fallback: a stale messages.yml (pre-network-mode
           // install missing the new key) must NEVER produce silent
           // dispatch, otherwise the player sees no response and spams
@@ -445,15 +430,9 @@ public interface RTPCmd extends BaseRTPCmd {
           return true;
         }
         if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.Reject reject) {
-          ConfigParser<MessagesKeys> langParser =
-                  (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-          MessagesKeys key;
-          try {
-            key = MessagesKeys.valueOf(reject.messageKey());
-          } catch (IllegalArgumentException ex) {
-            key = MessagesKeys.networkRegionUnavailable;
-          }
-          String tmpl = (String) langParser.getConfigValue(key, "");
+          Enum<?> key = Messages.byName(reject.messageKey());
+          if (key == null) key = NetworkMessages.networkRegionUnavailable;
+          String tmpl = (String) RTP.configs.getConfigValue(key, "");
           String msg = tmpl == null ? "" : tmpl
                   .replace("[region]", reject.placeholder())
                   .replace("[reason]", reject.placeholder());
@@ -497,13 +476,11 @@ public interface RTPCmd extends BaseRTPCmd {
       if (pvpAction != io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW) {
         // DENY / CANCEL / DELAY all collapse to "refuse this new request" at the
         // pre-dispatch surface (there is no in-progress teleport to abort yet).
-        ConfigParser<MessagesKeys> langParser =
-                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        String msg = (String) langParser.getConfigValue(MessagesKeys.pvpInCombat,
+        String msg = (String) RTP.configs.getConfigValue(PlayerMessages.pvpInCombat,
                 "&c[RTP] You cannot use /rtp while in combat.");
         if (msg != null && !msg.isEmpty()) {
           if (messageMethod != null) messageMethod.accept(msg);
-          else RTP.serverAccessor.sendMessage(senderId, MessagesKeys.pvpInCombat);
+          else RTP.serverAccessor.sendMessage(senderId, PlayerMessages.pvpInCombat);
         }
         // S-004: the refusal is never silent.
         RTP.log(Level.WARNING, "[RTP] PvP gate refused /rtp for " + senderId
@@ -540,8 +517,6 @@ public interface RTPCmd extends BaseRTPCmd {
       RTP.log(Level.INFO, "#0080ff[RTP] RTP command triggered by " + sender.name() + ".");
     }
 
-    ConfigParser<MessagesKeys> langParser =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     ConfigParser<EconomyKeys> eco =
         (ConfigParser<EconomyKeys>) RTP.configs.getParser(EconomyKeys.class);
     ConfigParser<PerformanceKeys> perf =
@@ -565,7 +540,7 @@ public interface RTPCmd extends BaseRTPCmd {
         if (p == null) {
           String msg =
               (String)
-                  langParser.getConfigValue(MessagesKeys.badArg, "[P0] bad parameter - [arg]");
+                  RTP.configs.getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
           msg = msg.replace("[arg]", "player=" + playerName);
           if(messageMethod != null) messageMethod.accept(msg);
           else RTP.serverAccessor.sendMessage(senderId, msg);
@@ -580,7 +555,7 @@ public interface RTPCmd extends BaseRTPCmd {
       players = new ArrayList<>(1);
       players.add((RTPPlayer) sender);
     } else { // if no players and sender isn't a player, idk who to send
-      String msg = (String) langParser.getConfigValue(MessagesKeys.consoleCmdNotAllowed, "");
+      String msg = (String) RTP.configs.getConfigValue(PlayerMessages.consoleCmdNotAllowed, "");
       if(messageMethod != null) messageMethod.accept(msg);
       failEvent(sender, msg);
       RTP.getInstance().processingPlayers.remove(senderId);
@@ -608,7 +583,7 @@ public interface RTPCmd extends BaseRTPCmd {
       double bal = economy.bal(senderId);
       floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0d).doubleValue();
       if ((bal - price) < floor) {
-        String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
+        String s = RTP.configs.getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
         s = s.replace("[money]", String.valueOf(price));
         if(messageMethod != null) messageMethod.accept(s);
         else RTP.serverAccessor.sendMessage(senderId, s);
@@ -632,7 +607,7 @@ public interface RTPCmd extends BaseRTPCmd {
       if (data != null) {
         if (!data.completed) {
           RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute short-circuit ALREADY_TELEPORTING playerId=" + player.uuid() + " -> skipping pipeline (sending alreadyTeleporting message via serverAccessor)");
-          String msg = (String) langParser.getConfigValue(MessagesKeys.alreadyTeleporting, "");
+          String msg = (String) RTP.configs.getConfigValue(PlayerMessages.alreadyTeleporting, "");
           RTP.serverAccessor.sendMessage(senderId, player.uuid(), msg);
           failEvent(sender, msg);
           continue;
@@ -642,7 +617,7 @@ public interface RTPCmd extends BaseRTPCmd {
           long dt = System.currentTimeMillis() - data.time;
           if (dt < 0) dt = Long.MAX_VALUE + dt;
           if (dt < player.cooldown()) {
-            RTP.serverAccessor.sendMessage(senderId, player.uuid(), MessagesKeys.cooldownMessage);
+            RTP.serverAccessor.sendMessage(senderId, player.uuid(), PlayerMessages.cooldownMessage);
             continue;
           }
         }
@@ -674,7 +649,7 @@ public interface RTPCmd extends BaseRTPCmd {
         ConfigParser<WorldKeys> worldParser = RTP.configs.getWorldParser(worldName);
 
         if (worldParser == null) {
-          String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "[P0] bad parameter - [arg]");
+          String msg = (String) RTP.configs.getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
           msg = msg.replace("[arg]", "world=" + worldName);
           if(messageMethod != null) messageMethod.accept(msg);
           else RTP.serverAccessor.sendMessage(senderId, msg);
@@ -718,7 +693,7 @@ public interface RTPCmd extends BaseRTPCmd {
         RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute region resolved senderId=" + senderId
                 + " requestedRegion=" + regionName + " resolvedRegion=" + region.name);
       } catch (IllegalArgumentException | IllegalStateException exception) {
-        String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "[P0] bad parameter - [arg]");
+        String msg = (String) RTP.configs.getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
         msg = msg.replace("[arg]", "region=" + regionName);
         RTP.serverAccessor.sendMessage(senderId, msg);
         RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute REJECT badArg region senderId=" + senderId
@@ -754,7 +729,7 @@ public interface RTPCmd extends BaseRTPCmd {
 
       RTPWorld rtpWorld = region.getWorld();
       if (rtpWorld == null) {
-        String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "[P0] bad parameter - [arg]");
+        String msg = (String) RTP.configs.getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
         msg = msg.replace("[arg]", "region=" + regionName);
         RTP.serverAccessor.sendMessage(senderId, msg);
         RTP.log(Level.WARNING, msg);
@@ -789,7 +764,7 @@ public interface RTPCmd extends BaseRTPCmd {
         data.cost += region.getNumber(RegionKeys.price, 0.0d).doubleValue();
 
         if (economy.bal(senderId) - data.cost < floor) {
-          String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
+          String s = RTP.configs.getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
           s = s.replace("[money]", String.valueOf(price));
           RTP.serverAccessor.sendMessage(senderId, s);
           RTP.getInstance().processingPlayers.remove(senderId);
@@ -805,7 +780,7 @@ public interface RTPCmd extends BaseRTPCmd {
                 RTP.log(java.util.logging.Level.WARNING,
                     "[RTP] economy.take returned false for " + senderId
                         + " cost=" + takeCostSelf + " (balance check passed earlier)");
-                String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
+                String s = RTP.configs.getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
                 s = s.replace("[money]", String.valueOf(priceSelfForMsg));
                 RTP.serverAccessor.sendMessage(senderId, s);
               }
@@ -825,7 +800,7 @@ public interface RTPCmd extends BaseRTPCmd {
         data.cost += region.getNumber(RegionKeys.price, 0.0d).doubleValue();
 
         if (economy.bal(player.uuid()) - data.cost < floor) {
-          String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
+          String s = RTP.configs.getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
           s = s.replace("[money]", String.valueOf(price));
           RTP.serverAccessor.sendMessage(senderId, player.uuid(), s);
           RTP.getInstance().processingPlayers.remove(senderId);
@@ -842,7 +817,7 @@ public interface RTPCmd extends BaseRTPCmd {
                 RTP.log(java.util.logging.Level.WARNING,
                     "[RTP] economy.take returned false for " + otherId
                         + " cost=" + takeCostOther + " (balance check passed earlier)");
-                String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
+                String s = RTP.configs.getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
                 s = s.replace("[money]", String.valueOf(priceOtherForMsg));
                 RTP.serverAccessor.sendMessage(senderId, otherId, s);
               }
@@ -963,7 +938,7 @@ public interface RTPCmd extends BaseRTPCmd {
       long delay = (toggleTargetPerms) ? player.delay() : sender.delay();
       data.delay = delay;
       if (delay > 0) {
-        String msg = langParser.getConfigValue(MessagesKeys.delayMessage, "").toString();
+        String msg = RTP.configs.getConfigValue(PlayerMessages.delayMessage, "").toString();
         RTP.serverAccessor.sendMessage(senderId, player.uuid(), msg);
       }
 

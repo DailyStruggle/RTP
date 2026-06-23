@@ -1,7 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
@@ -198,9 +199,7 @@ public class Region extends FactoryValue<RegionKeys> {
         RTP.getInstance().databaseAccessor.loadCachedLocations(name);
     if (storedLocations.isEmpty()) return;
     hydrateCacheFromDatabase(storedLocations);
-    ConfigParser<MessagesKeys> messages =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    String msg = messages.getConfigValue(MessagesKeys.locationLoaded, "").toString();
+    String msg = RTP.configs.getConfigValue(SystemMessages.locationLoaded, "").toString();
     if (!msg.isEmpty()) {
       msg = msg.replace("[amount]", String.valueOf(storedLocations.size()));
       msg = msg.replace("[region]", name);
@@ -1015,7 +1014,7 @@ public class Region extends FactoryValue<RegionKeys> {
         // spam the player with identical spot numbers while the queue is
         // stalled.
         if (previousSpot != i) {
-          RTP.serverAccessor.sendMessage(id, MessagesKeys.queueUpdate);
+          RTP.serverAccessor.sendMessage(id, PlayerMessages.queueUpdate);
         }
       }
     }

@@ -1,8 +1,7 @@
 package io.github.dailystruggle.rtp.common.network;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
 import java.util.List;
 import java.util.Map;
@@ -10,7 +9,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
-
 /**
  * Lobby-side auto-retry queue for {@code /rtp} attempts that hit a
  * <em>transient</em> {@link RoutingDecision.LocalFallback} reason.
@@ -238,7 +236,7 @@ public final class LobbyDispatchRetryQueue {
      * {@code processingPlayers} lock. Used by the {@code PlayerQuitEvent}
      * listener and by {@link #shutdown()}.
      */
-    public void cancel(UUID playerId, MessagesKeys messageKey) {
+    public void cancel(UUID playerId, Enum<?> messageKey) {
         if (playerId == null) return;
         enrolled.remove(playerId);
         Entry entry = parked.remove(playerId);
@@ -284,7 +282,7 @@ public final class LobbyDispatchRetryQueue {
         // networkRegionUnavailable here as the closest existing key; a
         // dedicated networkNotReady key is a deferred follow-up.
         for (UUID id : parked.keySet()) {
-            cancel(id, MessagesKeys.networkRegionUnavailable);
+            cancel(id, NetworkMessages.networkRegionUnavailable);
         }
     }
 
@@ -316,14 +314,14 @@ public final class LobbyDispatchRetryQueue {
     private void advance(Entry entry, long now) {
         // TTL gate (wall-clock).
         if (now - entry.createdAtMs >= maxTotalMs) {
-            terminate(entry, MessagesKeys.networkRegionUnavailable,
+            terminate(entry, NetworkMessages.networkRegionUnavailable,
                     "timeout after " + (now - entry.createdAtMs) + "ms");
             return;
         }
         entry.attempts++;
         // Attempt cap.
         if (entry.attempts > maxAttempts) {
-            terminate(entry, MessagesKeys.networkRegionUnavailable,
+            terminate(entry, NetworkMessages.networkRegionUnavailable,
                     "exhausted " + maxAttempts + " attempts");
             return;
         }
@@ -344,7 +342,7 @@ public final class LobbyDispatchRetryQueue {
         } catch (IllegalArgumentException malformed) {
             // The player typed malformed `server:region`. Terminal -
             // retrying will not help.
-            terminate(entry, MessagesKeys.networkRegionUnavailable,
+            terminate(entry, NetworkMessages.networkRegionUnavailable,
                     "malformed region arg: " + regionArg);
             return;
         }
@@ -380,7 +378,7 @@ public final class LobbyDispatchRetryQueue {
             if (reason == RoutingDecision.FallbackReason.REGION_UNAVAILABLE
                     || reason == RoutingDecision.FallbackReason.UNKNOWN) {
                 // Terminal: retrying does not help.
-                terminate(entry, MessagesKeys.networkRegionUnavailable, reason.name());
+                terminate(entry, NetworkMessages.networkRegionUnavailable, reason.name());
                 return;
             }
             // Transient gate still tripped. Leave the entry parked; the
@@ -394,17 +392,17 @@ public final class LobbyDispatchRetryQueue {
         if (decision instanceof RoutingDecision.Local) {
             // Cannot happen on a lobby (no local regions), but defensive:
             // treat as terminal - the lobby cannot serve locally.
-            terminate(entry, MessagesKeys.networkRegionUnavailable,
+            terminate(entry, NetworkMessages.networkRegionUnavailable,
                     "router returned Local on a lobby");
             return;
         }
         // Defensive: unknown subtype.
-        terminate(entry, MessagesKeys.networkRegionUnavailable,
+        terminate(entry, NetworkMessages.networkRegionUnavailable,
                 "unhandled routing decision: " + decision.getClass().getName());
     }
 
     /** Drop the entry, send a terminal message, release the lock. */
-    private void terminate(Entry entry, MessagesKeys key, String reasonDetail) {
+    private void terminate(Entry entry, Enum<?> key, String reasonDetail) {
         parked.remove(entry.playerId);
         sendLocalized(entry, key, reasonDetail);
         releaseLock(entry.playerId);
@@ -415,12 +413,10 @@ public final class LobbyDispatchRetryQueue {
     }
 
     @SuppressWarnings("unchecked")
-    private static void sendLocalized(Entry entry, MessagesKeys key, String placeholder) {
+    private static void sendLocalized(Entry entry, Enum<?> key, String placeholder) {
         String tmpl;
         try {
-            ConfigParser<MessagesKeys> langParser =
-                    (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-            tmpl = (String) langParser.getConfigValue(key, "");
+            tmpl = (String) RTP.configs.getConfigValue(key, "");
         } catch (Throwable t) {
             tmpl = "";
         }

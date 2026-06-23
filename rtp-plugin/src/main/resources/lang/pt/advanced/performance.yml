@@ -1,0 +1,312 @@
+# --- Configuração de desempenho do RTP ---
+# Ajuste fino do plugin para o desempenho do servidor.
+# Tentativas máximas de busca
+# Quantas vezes o plugin buscará uma localização segura antes de desistir.
+# Impacto: ALTO - valores altos podem aumentar muito o uso de CPU por requisição.
+# @type: integer
+# @range: [1, null]
+# @default: 32
+tentativasMaximas: 10
+
+# Pré-carregamento de destino (chunks)
+# Raio de chunks a pré-carregar ao redor do destino.
+# Número de chunks carregados = ( 1 + 2 * raio )^2.
+# Impacto: ALTO - um valor muito alto pode causar quedas de TPS ao teletransportar.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+distanciaVisaoSelecao: 0
+
+# Raio de chunks carregado ao redor da localização final logo antes do
+# teleporte. 0 carrega apenas o chunk de destino.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+distanciaVisaoTeletransporte: 0
+
+# Total de ticks durante os quais a distancia de visao de um jogador
+# teletransportado e restaurada de forma constante apos a chegada. No
+# teletransporte, a distancia de visao e reduzida brevemente para o raio
+# viewDistanceTeleport (minimo 2), para que o servidor carregue apenas um
+# pequeno anel de chunks ao posicionar o jogador, e depois aumentada de
+# novo ao longo destes ticks. Isso suaviza o pico de carga de chunks que
+# pode travar um tick em hosts fracos. 0 desativa o limite. Sem efeito se
+# viewDistanceTeleport ja for igual ou maior que a distancia de visao do
+# jogador.
+# @type: integer
+# @range: [0, null]
+# @unit: ticks
+# @default: 200
+intervaloRestauracaoVisao: 200
+
+# Frequência de seleção (ticks do jogo)
+# Tempo entre buscas por novas localizações para preencher os caches de região.
+# ( 20 ticks = 1 segundo ).
+# Impacto: MÉDIO - valores menores preenchem o cache mais rápido mas usam mais CPU.
+# @type: integer
+# @range: [1, null]
+# @unit: ticks
+# @default: 20
+periodo: 20
+
+# Tempo alocado por tarefa (milissegundos)
+# Tempo máximo (ms) dedicado a tarefas do RTP por tick.
+# Faixa: 0 - 50.
+# Impacto: MÉDIO - valores altos permitem processar mais rápido, ao custo do tempo de tick.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+tempoAlocadoSincrono: 50
+
+# Milissegundos máximos por tick gastos em tarefas assíncronas.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+tempoAlocadoAssincrono: 50
+
+# Requisito mínimo de TPS
+# TPS mínimo do servidor antes de enfileirar uma nova localização para o cache.
+# Faixa: 0.0 - 20.0.
+# Impacto: BAIXO - evita que o plugin adicione lag quando o servidor está com problemas.
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+tpsMinimo: 19.0
+
+# Uso máximo do heap da JVM (porcentagem do heap máximo) antes que a geração
+# do cache em segundo plano seja pausada. Cada localização em cache fixa um
+# chunk, portanto um preenchimento ilimitado em um servidor com pouco heap pode
+# levar a JVM a uma coleta de lixo constante e deixar o servidor sem resposta
+# sem nenhum erro no console. Enquanto o uso estiver igual ou acima desse
+# limite, o RTP para de reabastecer o cache de localizações, mas continua
+# servindo as localizações já armazenadas aos jogadores em espera. 0 ou 100
+# desativa o limite.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapPorcentagem: 85.0
+
+# Enfileiramento pós-teletransporte
+# Se true, o plugin tentará preencher o cache de localizações imediatamente após um RTP.
+# Impacto: MÉDIO
+# @type: boolean
+# @default: false
+enfileirarPosTeletransporte: false
+
+# Carregamento síncrono
+# Usar carregamento síncrono de chunks para a seleção de localizações.
+# Impacto: ALTO - NÃO RECOMENDADO! Pode provocar travamentos sérios do servidor.
+# @type: boolean
+# @default: false
+carregamentoSincrono: false
+
+# Análise de permissões (inicialização)
+# onEventParsing: Incompatível com permissões amplas tipo *.*.
+# Impacto: MÉDIO (onEvent) / BAIXO (effect)
+# @type: boolean
+# @default: false
+analiseAoEvento: false
+
+# Analisar os nós de permissão de efeitos na inicialização.
+# @type: boolean
+# @default: true
+analiseEfeitos: true
+
+# Cache de seleção de biomas
+# biomeRecall: Reutilizar localizações previamente encontradas por bioma.
+# biomeRecallForced: Usar apenas biomas já descobertos e armazenados em cache.
+# Impacto: BAIXO a MÉDIO
+# @type: boolean
+# @default: true
+lembrancaBioma: true
+
+# Quando ativado, atende pedidos filtrados por bioma apenas a partir do cache
+# (nunca gera novas buscas de bioma). Requer biomeRecall.
+# @type: boolean
+# @default: false
+lembrancaBiomaForcada: false
+
+# Enviesa a seleção filtrada por bioma para que cada bioma solicitado seja
+# escolhido com igual probabilidade, em vez de proporcional ao quanto da região
+# ele cobre. Evita que biomas comuns abafem os raros quando vários são solicitados.
+# Requer biomeRecall; sem efeito em teleportes sem filtro (bioma padrão).
+# @type: boolean
+# @default: false
+biomaPonderado: false
+
+# Per-biome relative selection weights for biome-filtered teleports.
+# Only consulted when biomeWeighted is true. Biomes not listed here use
+# weight 1.0, so an empty/all-equal map reproduces the equal-probability
+# behavior of biomeWeighted on its own. A biome given weight 2.0 is
+# steered toward roughly twice as often as a weight-1.0 biome among the
+# requested set (when both are present in biome-recall memory); 0.0
+# suppresses a biome. Requires biomeRecall; no effect on unfiltered
+# (default-biome) teleports. The shipped plains entry is a weight-1.0
+# no-op example - replace or extend it with the biomes you want to bias.
+# @type: map<string, number>
+pesosBioma:
+  # Peso relativo de seleção para este bioma (1.0 = sem viés).
+  # @type: number
+  # @range: [0.0, null]
+  # @default: 1.0
+  plains: 1.0
+  sunflower_plains: 1.0
+  snowy_plains: 1.0
+  ice_spikes: 1.0
+  desert: 1.0
+  swamp: 1.0
+  mangrove_swamp: 1.0
+  forest: 1.0
+  flower_forest: 1.0
+  birch_forest: 1.0
+  dark_forest: 1.0
+  old_growth_birch_forest: 1.0
+  old_growth_pine_taiga: 1.0
+  old_growth_spruce_taiga: 1.0
+  taiga: 1.0
+  snowy_taiga: 1.0
+  savanna: 1.0
+  savanna_plateau: 1.0
+  windswept_hills: 1.0
+  windswept_gravelly_hills: 1.0
+  windswept_forest: 1.0
+  windswept_savanna: 1.0
+  jungle: 1.0
+  sparse_jungle: 1.0
+  bamboo_jungle: 1.0
+  badlands: 1.0
+  eroded_badlands: 1.0
+  wooded_badlands: 1.0
+  meadow: 1.0
+  cherry_grove: 1.0
+  pale_garden: 1.0
+  grove: 1.0
+  snowy_slopes: 1.0
+  frozen_peaks: 1.0
+  jagged_peaks: 1.0
+  stony_peaks: 1.0
+  river: 1.0
+  frozen_river: 1.0
+  beach: 1.0
+  snowy_beach: 1.0
+  stony_shore: 1.0
+  warm_ocean: 1.0
+  lukewarm_ocean: 1.0
+  deep_lukewarm_ocean: 1.0
+  ocean: 1.0
+  deep_ocean: 1.0
+  cold_ocean: 1.0
+  deep_cold_ocean: 1.0
+  frozen_ocean: 1.0
+  deep_frozen_ocean: 1.0
+  mushroom_fields: 1.0
+  dripstone_caves: 1.0
+  lush_caves: 1.0
+  deep_dark: 1.0
+  # --- O Nether ---
+  nether_wastes: 1.0
+  warped_forest: 1.0
+  crimson_forest: 1.0
+  soul_sand_valley: 1.0
+  basalt_deltas: 1.0
+  # --- O End ---
+  the_end: 1.0
+  end_highlands: 1.0
+  end_midlands: 1.0
+  small_end_islands: 1.0
+  end_barrens: 1.0
+  # --- Diversos / técnico ---
+  the_void: 1.0
+
+# Verificação passiva de chunks
+# Busca localizações seguras dentro de todos os chunks carregados no alcance de uma região.
+# Impacto: ALTO - pode aumentar significativamente a carga do servidor em eventos de carregamento de chunks.
+# @type: boolean
+# @default: true
+verificarNoCarregamentoChunk: true
+
+# Modo de preenchimento de cache por observação (Region Data Visitor)
+# Quando o cache de pré-geração está cheio, uma única RegionCacheTask de
+# observação é agendada por região segundo o mesmo `period` de preenchimento de
+# cache. Reutiliza o mesmo pipeline do LocationGenerator que o preenchimento de
+# cache padrão, mas descarta o candidato seguro resultante em vez de enfileirá-lo,
+# de modo que os efeitos colaterais (registro de localizações ruins, coleta de
+# biomas observados) se acumulam em segundo plano sem que a fila cresça além do
+# seu limite. NUNCA aciona a geração de mundo: chunks que não estão em disco são
+# omitidos pelo pre-filtro Anvil do com veredicto UNKNOWN.
+# visitorEnabled: interruptor mestre (true ativa o modo observação).
+# A cadência é herdada do ajuste `period` acima; não há um parâmetro de taxa
+# separado.
+# Impacto: BAIXO - limitado pelo `period` existente; só há trabalho quando o
+# cache não tem margem para preenchimentos no modo padrão.
+# @type: boolean
+# @default: false
+visitanteAtivado: true
+
+# Manter cache reservado para teletransportes ao entrar (rtp.onevent.firstjoin / rtp.onevent.join). Dimensionado pelos slots vazios restantes. Ver
+# @type: boolean
+# @default: false
+cacheLoginAtivado: false
+
+# Limite rígido do cache de entrada. 0 = automático (max-players do servidor na inicialização).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+limiteCacheLogin: 0
+
+# Probabilidade de rejeitar um chunk não gerado por tentativa de seleção.
+# 0.0 = sem viés (padrão), 1.0 = evitar estritamente terreno não gerado.
+# Chunks gerados sempre passam.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+preferenciaPregerado: 0.0
+
+# Fração da capacidade do backlog L3 na qual o reabastecimento é retomado
+# (histerese). 0.5 = reabastecer só quando o L3 cair para 50% (padrão).
+# 1.0 = reabastecer continuamente. Valores maiores agrupam as verificações
+# de bins .mca para melhor eficiência de CPU/memória.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+limiteReabastecimentoBacklog: 0.5
+
+# Limite de latência (ms) acima do qual um teleporte atendido imediatamente
+# (sem fila) é auditado: um WARN é registrado e o contador cumulativo
+# slowPipelineCount (exibido por /rtp info) é incrementado. Apenas teleportes
+# imediatos/sem fila são auditados; os enfileirados são excluídos porque seu
+# tempo medido inclui a espera na fila. 0 ou menos desativa a auditoria. Veja
+# @type: integer
+# @range: [0, null]
+# @unit: ms
+# @default: 5000
+limitePipelineLentaMs: 5000
+
+# Profundidade da fila pública de teleporte (jogadores aguardando) a partir da qual
+# a contrapressão da fila é auditada: um WARN acionado por borda é registrado e o
+# contador cumulativo queueGrowthWarnCount (exibido por /rtp info) é incrementado
+# uma vez por cruzamento. 0 ou menos desativa a auditoria (opcional). Veja
+# @type: integer
+# @range: [0, null]
+# @unit: players
+# @default: 0
+limiteAvisoCrescimentoFila: 0
+
+# Configurações de /rtp admin prefab. O fluxo apply -> confirm grava cada arquivo de
+# configuração alterado com um backup chamado <file>.yml.bak.<epochMillis>;
+# bakRetention limita quantos desses backups são mantidos por arquivo, removendo
+# primeiro os mais antigos. Defina 1 para manter apenas o mais recente; valores abaixo
+# de 1 são ajustados para 1. /rtp admin prefab rollback percorre os backups do mais
+# novo ao mais antigo ao longo de várias invocações.
+prefabricado:
+  # Number of timestamped config backups kept per file before pruning.
+  # @type: integer
+  # @range: [1, null]
+  # @default: 3
+  bakRetention: 3
+# NÃO ALTERE O NÚMERO DA VERSÃO
+version: 1.0

@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.reload;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -84,17 +84,15 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
     RTPServerAccessor serverAccessor = RTP.serverAccessor;
     Configs configs = RTP.configs;
 
-    ConfigParser<MessagesKeys> lang =
-        (ConfigParser<MessagesKeys>) configs.getParser(MessagesKeys.class);
-    if (lang == null) return true;
+    if (RTP.configs == null) return true;
 
-    String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading, ""));
+    String msg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.reloading, ""));
     if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
     serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
 
     parser.check(parser.version, parser.pluginDirectory, null);
 
-    msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded, ""));
+    msg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.reloaded, ""));
     if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
     serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
 
@@ -102,14 +100,12 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
   }
 
   public boolean subReloadMulti(UUID senderId, MultiConfigParser<?> parser) {
-    ConfigParser<MessagesKeys> lang =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    if (lang == null) return true;
+    if (RTP.configs == null) return true;
 
     RTPServerAccessor serverAccessor = RTP.serverAccessor;
     RTPCommandSender commandSender = serverAccessor.getSender(senderId);
 
-    String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading, ""));
+    String msg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.reloading, ""));
     if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
     serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
 
@@ -126,7 +122,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
       // Configs.reloadRegions() gating so /rtp reload regions on a lobby stays a no-op.
       if (RTP.lobbyMode) {
         RTP.configs.multiConfigParserMap.put(parser.myClass, newParser);
-        msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded, ""));
+        msg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.reloaded, ""));
         if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
         serverAccessor.sendMessage(RTPAPI.serverId, commandSender.uuid(), msg);
         return true;
@@ -155,7 +151,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
     RTP.configs.multiConfigParserMap.put(parser.myClass, newParser);
 
-    msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded, ""));
+    msg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.reloaded, ""));
     if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
     serverAccessor.sendMessage(RTPAPI.serverId, commandSender.uuid(), msg);
 

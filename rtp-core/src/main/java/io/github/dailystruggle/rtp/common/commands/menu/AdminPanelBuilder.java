@@ -2,14 +2,13 @@ package io.github.dailystruggle.rtp.common.commands.menu;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +17,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
-
 /**
  * Curated admin-panel page builder for {@code /rtp menu} (PROPOSAL-admin-panel.md v2).
  *
@@ -114,12 +112,12 @@ public final class AdminPanelBuilder {
         List<MenuLine> lines = new ArrayList<>();
 
         // Title + hint.
-        String title = lookupMsg(MessagesKeys.menuAdminPanelTitle, "&6&l\u2699 Admin panel");
+        String title = lookupMsg(CommandMessages.menuAdminPanelTitle, "&6&l\u2699 Admin panel");
         if (title != null && !title.isEmpty()) {
             lines.add(MenuLine.of(new MenuFragment(title, null, null)));
         }
         String hint = lookupMsg(
-                MessagesKeys.menuAdminPanelHint,
+                CommandMessages.menuAdminPanelHint,
                 "&7click an option below");
         if (hint != null && !hint.isEmpty()) {
             lines.add(MenuLine.of(new MenuFragment(hint, null, null)));
@@ -155,9 +153,9 @@ public final class AdminPanelBuilder {
         if (hasSubcommand(rtpRoot, "config") && safeTest(permission, CONFIG_VIEW_PERMISSION)) {
             addRow(
                     configRows,
-                    lookupMsg(MessagesKeys.menuAdminPanelRowConfig, "&b\u2699 Config editor"),
+                    lookupMsg(CommandMessages.menuAdminPanelRowConfig, "&b\u2699 Config editor"),
                     lookupMsg(
-                            MessagesKeys.menuAdminPanelHoverConfig,
+                            CommandMessages.menuAdminPanelHoverConfig,
                             "Open the curated config selector."),
                     new MenuAction.OpenConfigSelector());
         }
@@ -166,7 +164,7 @@ public final class AdminPanelBuilder {
         // not the admin panel. See PROPOSAL-multiconfig-menu.md.
         appendSection(
                 lines,
-                MessagesKeys.menuAdminPanelSectionConfig,
+                CommandMessages.menuAdminPanelSectionConfig,
                 "&8\u00bb &7configuration",
                 configRows);
 
@@ -182,9 +180,9 @@ public final class AdminPanelBuilder {
             // other curated builder uses when its SAM is missing.
             addRow(
                     diagRows,
-                    lookupMsg(MessagesKeys.menuAdminPanelRowInfo, "&b\u2139 Server info"),
+                    lookupMsg(CommandMessages.menuAdminPanelRowInfo, "&b\u2139 Server info"),
                     lookupMsg(
-                            MessagesKeys.menuAdminPanelHoverInfo,
+                            CommandMessages.menuAdminPanelHoverInfo,
                             "Show plugin version, region counts, and queue state."),
                     new MenuAction.OpenInfo(MenuAction.InfoScopeToken.global()));
         }
@@ -192,9 +190,9 @@ public final class AdminPanelBuilder {
             addRow(
                     diagRows,
                     lookupMsg(
-                            MessagesKeys.menuAdminPanelRowDiagnostics, "&b\u26a1 Full diagnostics"),
+                            CommandMessages.menuAdminPanelRowDiagnostics, "&b\u26a1 Full diagnostics"),
                     lookupMsg(
-                            MessagesKeys.menuAdminPanelHoverDiagnostics,
+                            CommandMessages.menuAdminPanelHoverDiagnostics,
                             "Runs the full diagnostic suite."),
                     new MenuAction.RunRtpCommand(new String[]{"test", "full"}));
             // /rtp test memory: an optional subcommand on the test subtree.
@@ -203,10 +201,10 @@ public final class AdminPanelBuilder {
                 addRow(
                         diagRows,
                         lookupMsg(
-                                MessagesKeys.menuAdminPanelRowMemory,
+                                CommandMessages.menuAdminPanelRowMemory,
                                 "&b\u26ed Memory tracker snapshot"),
                         lookupMsg(
-                                MessagesKeys.menuAdminPanelHoverMemory,
+                                CommandMessages.menuAdminPanelHoverMemory,
                                 "Dump active chunk-ticket and pipeline allocations."),
                         new MenuAction.RunRtpCommand(new String[]{"test", "memory"}));
             }
@@ -214,9 +212,9 @@ public final class AdminPanelBuilder {
         if (hasSubcommand(rtpRoot, "scan") && safeTest(permission, SCAN_PERMISSION)) {
             addRow(
                     diagRows,
-                    lookupMsg(MessagesKeys.menuAdminPanelRowScan, "&b\u21bb Scan control"),
+                    lookupMsg(CommandMessages.menuAdminPanelRowScan, "&b\u21bb Scan control"),
                     lookupMsg(
-                            MessagesKeys.menuAdminPanelHoverScan,
+                            CommandMessages.menuAdminPanelHoverScan,
                             "Open the scan submenu (start / pause / cancel)."),
                     new MenuAction.OpenMenu(new String[]{"scan"}));
         }
@@ -227,15 +225,15 @@ public final class AdminPanelBuilder {
         addRow(
                 diagRows,
                 lookupMsg(
-                        MessagesKeys.menuAdminPanelRowVisualizations,
+                        CommandMessages.menuAdminPanelRowVisualizations,
                         "&b\u2316 Visualizations"),
                 lookupMsg(
-                        MessagesKeys.menuAdminPanelHoverVisualizations,
+                        CommandMessages.menuAdminPanelHoverVisualizations,
                         "Open maps and other operator-facing visualizations."),
                 new MenuAction.OpenVisualizations());
         appendSection(
                 lines,
-                MessagesKeys.menuAdminPanelSectionDiagnostics,
+                CommandMessages.menuAdminPanelSectionDiagnostics,
                 "&8\u00bb &7diagnostics",
                 diagRows);
 
@@ -244,15 +242,15 @@ public final class AdminPanelBuilder {
         if (hasSubcommand(rtpRoot, "reload") && safeTest(permission, RELOAD_PERMISSION)) {
             addRow(
                     lifecycleRows,
-                    lookupMsg(MessagesKeys.menuAdminPanelRowReload, "&c\u26a0 Reload"),
+                    lookupMsg(CommandMessages.menuAdminPanelRowReload, "&c\u26a0 Reload"),
                     lookupMsg(
-                            MessagesKeys.menuAdminPanelHoverReload,
+                            CommandMessages.menuAdminPanelHoverReload,
                             "Reloads all config files."),
                     new MenuAction.RunRtpCommand(new String[]{"reload"}));
         }
         appendSection(
                 lines,
-                MessagesKeys.menuAdminPanelSectionLifecycle,
+                CommandMessages.menuAdminPanelSectionLifecycle,
                 "&8\u00bb &7lifecycle",
                 lifecycleRows);
 
@@ -263,14 +261,14 @@ public final class AdminPanelBuilder {
         List<MenuLine> browseRows = new ArrayList<>();
         addRow(
                 browseRows,
-                lookupMsg(MessagesKeys.menuAdminPanelRowBrowse, "&b\u2630 Browse all commands"),
+                lookupMsg(CommandMessages.menuAdminPanelRowBrowse, "&b\u2630 Browse all commands"),
                 lookupMsg(
-                        MessagesKeys.menuAdminPanelHoverBrowse,
+                        CommandMessages.menuAdminPanelHoverBrowse,
                         "Open the reflected /rtp command tree."),
                 new MenuAction.OpenMenu(new String[0]));
         appendSection(
                 lines,
-                MessagesKeys.menuAdminPanelSectionBrowse,
+                CommandMessages.menuAdminPanelSectionBrowse,
                 "&8\u00bb &7browse",
                 browseRows);
 
@@ -280,7 +278,7 @@ public final class AdminPanelBuilder {
         // paginate() helper so a page-break does not produce a dangling
         // blank row at the top of the final page.
         MenuLine backRow = null;
-        String backLabel = lookupMsg(MessagesKeys.menuAdminPanelRowBack, "&7\u21a9 Back");
+        String backLabel = lookupMsg(CommandMessages.menuAdminPanelRowBack, "&7\u21a9 Back");
         if (backLabel != null && !backLabel.isEmpty()) {
             backRow = MenuLine.of(new MenuFragment(
                     backLabel, null, new MenuAction.OpenFrontPage()));
@@ -395,7 +393,7 @@ public final class AdminPanelBuilder {
     }
 
     private static void appendSection(List<MenuLine> dest,
-                                      MessagesKeys dividerKey,
+                                      Enum<?> dividerKey,
                                       String dividerFallback,
                                       List<MenuLine> body) {
         if (body == null || body.isEmpty()) return;
@@ -457,12 +455,9 @@ public final class AdminPanelBuilder {
     }
 
     @SuppressWarnings("unchecked")
-    private static String lookupMsg(MessagesKeys key, String fallback) {
+    private static String lookupMsg(Enum<?> key, String fallback) {
         if (RTP.configs == null) return fallback;
-        ConfigParser<MessagesKeys> lang =
-                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        if (lang == null) return fallback;
-        Object v = lang.getConfigValue(key, fallback);
+        Object v = RTP.configs.getConfigValue(key, fallback);
         return v == null ? fallback : v.toString();
     }
 }

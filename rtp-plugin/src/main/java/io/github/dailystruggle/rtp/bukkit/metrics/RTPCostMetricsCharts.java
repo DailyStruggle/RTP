@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.bukkit.metrics;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.metrics.api.MetricsBinding;
@@ -609,7 +610,7 @@ public final class RTPCostMetricsCharts {
       Object anvil = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
       if (!Boolean.parseBoolean(String.valueOf(anvil))) on.add("anvil_prefilter_off");
       // biomeWhitelist default: false; on means non-default.
-      Object biome = safety.getConfigValue(SafetyKeys.biomeWhitelist, Boolean.FALSE);
+      Object biome = RTP.configs.getConfigValue(BiomesKeys.biomeWhitelist, Boolean.FALSE);
       if (Boolean.parseBoolean(String.valueOf(biome))) on.add("biome_whitelist");
       if (on.isEmpty()) return "default";
       return String.join("+", on);

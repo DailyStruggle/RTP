@@ -1,12 +1,12 @@
 package io.github.dailystruggle.rtp.common.commands;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.network.NetworkCommandHook;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -16,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,14 +72,17 @@ public class RTPCmdNetworkHookTest {
 
     // Seed deterministic templates for the network message keys the hook emits.
     @SuppressWarnings("unchecked")
-    ConfigParser<MessagesKeys> lang =
-            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    EnumMap<MessagesKeys, Object> data = new EnumMap<>(MessagesKeys.class);
-    data.put(MessagesKeys.networkQueued, "QUEUED region=[region] server=[server] pos=[position]");
-    data.put(MessagesKeys.networkRegionUnavailable, "UNAVAILABLE region=[region]");
-    data.put(MessagesKeys.networkFallback, "FALLBACK reason=[reason]");
-    data.put(MessagesKeys.consoleCmdNotAllowed, "console disallowed");
-    lang.setData(data);
+    java.util.Map<Enum<?>, Object> data = new java.util.HashMap<>();
+    data.put(NetworkMessages.networkQueued, "QUEUED region=[region] server=[server] pos=[position]");
+    data.put(NetworkMessages.networkRegionUnavailable, "UNAVAILABLE region=[region]");
+    data.put(NetworkMessages.networkFallback, "FALLBACK reason=[reason]");
+    data.put(PlayerMessages.consoleCmdNotAllowed, "console disallowed");
+    data.forEach((k, v) -> {
+            Object fv = RTP.configs.getParser((Class) k.getDeclaringClass());
+            if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
+                ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).setData(java.util.Map.of(((Enum<?>) k).name(), v));
+            }
+        });
   }
 
   @AfterEach
@@ -145,14 +147,17 @@ public class RTPCmdNetworkHookTest {
     accessor.addPlayer(new MockRTPPlayer(playerId, "p2b", null));
     // Wipe the networkQueued template to simulate a stale messages.yml.
     @SuppressWarnings("unchecked")
-    ConfigParser<MessagesKeys> lang =
-            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    EnumMap<MessagesKeys, Object> data = new EnumMap<>(MessagesKeys.class);
-    data.put(MessagesKeys.networkQueued, "");
-    data.put(MessagesKeys.networkRegionUnavailable, "UNAVAILABLE region=[region]");
-    data.put(MessagesKeys.networkFallback, "FALLBACK reason=[reason]");
-    data.put(MessagesKeys.consoleCmdNotAllowed, "console disallowed");
-    lang.setData(data);
+    java.util.Map<Enum<?>, Object> data = new java.util.HashMap<>();
+    data.put(NetworkMessages.networkQueued, "");
+    data.put(NetworkMessages.networkRegionUnavailable, "UNAVAILABLE region=[region]");
+    data.put(NetworkMessages.networkFallback, "FALLBACK reason=[reason]");
+    data.put(PlayerMessages.consoleCmdNotAllowed, "console disallowed");
+    data.forEach((k, v) -> {
+            Object fv = RTP.configs.getParser((Class) k.getDeclaringClass());
+            if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
+                ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).setData(java.util.Map.of(((Enum<?>) k).name(), v));
+            }
+        });
 
     RTP.networkCommandHook = (uuid, args) ->
             NetworkCommandHook.RoutingResult.crossServer(UUID.randomUUID(), "east", "backend-b");
@@ -176,7 +181,7 @@ public class RTPCmdNetworkHookTest {
     UUID playerId = UUID.randomUUID();
     accessor.addPlayer(new MockRTPPlayer(playerId, "p3", null));
     RTP.networkCommandHook = (uuid, args) ->
-            NetworkCommandHook.RoutingResult.reject(MessagesKeys.networkRegionUnavailable.name(), "mars");
+            NetworkCommandHook.RoutingResult.reject(NetworkMessages.networkRegionUnavailable.name(), "mars");
 
     TestRTPCmd cmd = new TestRTPCmd();
     Map<String, List<String>> args = new HashMap<>();
@@ -263,7 +268,7 @@ public class RTPCmdNetworkHookTest {
     RTP.getInstance().processingPlayers.add(playerId); // simulate outer onCommand add
     RTP.networkCommandHook = (uuid, args) ->
             NetworkCommandHook.RoutingResult.reject(
-                    MessagesKeys.networkRegionUnavailable.name(), "mars");
+                    NetworkMessages.networkRegionUnavailable.name(), "mars");
 
     TestRTPCmd cmd = new TestRTPCmd();
     boolean res = cmd.onCommand(playerId, new HashMap<>(), null, s -> {});

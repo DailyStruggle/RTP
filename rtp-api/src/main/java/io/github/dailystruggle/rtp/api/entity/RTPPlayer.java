@@ -185,4 +185,45 @@ public interface RTPPlayer extends RTPCommandSender {
   default void clearProgressBar(String id) {
     // no-op by default; platform adapters override with the native per-player progress bar
   }
+
+  /**
+   * Returns this player's current server-side view distance in chunks, or a non-positive value
+   * when the platform exposes no per-player view-distance API.
+   *
+   * <p>This is the per-player <i>delivery</i> view distance (the radius of chunks the server
+   * tracks and streams to this client), not the chunk radius RTP itself pre-loads around a
+   * destination. It is purely runtime state and is never persisted; a server restart
+   * re-negotiates it to the world/server default.
+   *
+   * <p>The default implementation returns {@code -1} to signal "unsupported", so callers can
+   * skip any view-distance behaviour on platforms without a per-player API. Platform adapters
+   * override it with the native getter.
+   *
+   * <p>Must be called from the thread that owns the player (the main server thread, or the
+   * owning region thread on Folia).
+   *
+   * @return the current per-player view distance in chunks, or {@code -1} if unsupported
+   */
+  default int getViewDistance() {
+    return -1;
+  }
+
+  /**
+   * Sets this player's server-side view distance in chunks (per-player delivery radius). Used by
+   * the teleport view-distance clamp and steady restore (ADR-072) to shrink the chunk-tracking
+   * ring the engine expands when the player is placed, then ramp it back up over time.
+   *
+   * <p>The value is runtime-only and never persisted. Implementations should clamp it to the
+   * platform's supported range (the minimum renderable view distance is 2 chunks). On a platform
+   * with no per-player view-distance API the default implementation is a no-op, so the clamp
+   * feature silently degrades to "off" rather than failing.
+   *
+   * <p>Must be called from the thread that owns the player (the main server thread, or the
+   * owning region thread on Folia).
+   *
+   * @param viewDistance the desired per-player view distance in chunks
+   */
+  default void setViewDistance(int viewDistance) {
+    // no-op by default; platform adapters override with the native per-player view-distance call
+  }
 }

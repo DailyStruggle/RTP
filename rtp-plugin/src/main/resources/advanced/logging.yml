@@ -1,0 +1,71 @@
+# --- Plugin Logging Toggles ---
+# Documentation: plugins/RTP/docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# Log all files reloaded during /rtp reload
+# @type: boolean
+# @default: false
+detailed_reload: false
+
+# Log region initialization details
+# @type: boolean
+# @default: false
+detailed_region_init: false
+
+# Log player-executed RTP commands
+# @type: boolean
+# @default: false
+command: false
+
+# Log successful teleport events
+# @type: boolean
+# @default: true
+teleport: true
+
+# Log RTP triggered by world changes
+# @type: boolean
+# @default: true
+event_changeworld: true
+
+# Log RTP triggered on join
+# @type: boolean
+# @default: true
+event_join: true
+
+# Log RTP triggered on respawn
+# @type: boolean
+# @default: true
+event_respawn: true
+
+# Log move event processing
+# @type: boolean
+# @default: true
+event_move: true
+
+# Log teleport event processing
+# @type: boolean
+# @default: true
+event_teleport: true
+
+# Log info when location selection fails
+# @type: boolean
+# @default: true
+selection_failure: true
+
+# Debug logs for memory activity
+# @type: boolean
+# @default: false
+system_memory_tracker: false
+
+# Debug logs for database activity
+# @type: boolean
+# @default: false
+system_database: false
+
+# Plugin-scoped minimum log level. Effective filter is the finer of this and the
+# Bukkit logger's own level. ALL keeps behavior identical to the Bukkit logger.
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
+min_level: "INFO"
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.1

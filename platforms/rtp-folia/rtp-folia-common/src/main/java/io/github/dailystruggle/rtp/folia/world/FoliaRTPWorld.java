@@ -14,6 +14,7 @@ import java.util.function.Function;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -529,14 +530,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     }
   }
 
-  /** Snapshot the current {@code SafetyKeys.unsafeBlocks} list. */
+  /** Snapshot the current {@code BlocksKeys.unsafeBlocks} list. */
   @SuppressWarnings("unchecked")
   private static java.util.Set<String> currentUnsafeBlocks() {
     try {
-      ConfigParser<SafetyKeys> safety =
-          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-      if (safety == null) return java.util.Collections.emptySet();
-      Object raw = safety.getConfigValue(SafetyKeys.unsafeBlocks, new java.util.ArrayList<>());
+      if (RTP.configs == null) return java.util.Collections.emptySet();
+      Object raw = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
       if (raw instanceof java.util.Collection<?> c) {
         java.util.Set<String> out = new java.util.HashSet<>(c.size());
         for (Object o : c) if (o != null) out.add(o.toString());

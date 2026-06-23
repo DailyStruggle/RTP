@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.mock;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
@@ -9,7 +8,6 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
 import org.jetbrains.annotations.Nullable;
@@ -26,7 +24,6 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
 /**
  * Full in-memory implementation of {@link RTPServerAccessor} for use in unit tests.
  *
@@ -204,18 +201,17 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     // -------------------------------------------------------------------------
 
     @Override
-    public void sendMessage(UUID target, MessagesKeys msgType, String tag) {
+    public void sendMessage(UUID target, Enum<?> msgType, String tag) {
         RTPCommandSender sender = getSender(target);
         if (sender != null) {
-            ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-            Object configValue = lang.getConfigValue(msgType, null);
+            Object configValue = RTP.configs.getConfigValue(msgType, null);
             String msg = (configValue != null) ? String.valueOf(configValue) : msgType.name();
             sender.sendMessage(msg);
         }
     }
 
     @Override
-    public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag) {
+    public void sendMessage(UUID target1, UUID target2, Enum<?> msgType, String tag) {
         sendMessage(target1, msgType, tag);
     }
 

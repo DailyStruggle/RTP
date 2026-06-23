@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.admin;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 
@@ -106,7 +106,7 @@ public class AdminCmd extends BaseRTPCmdImpl {
     private static void rejectMenuInvalid(UUID callerId) {
         if (callerId == null || RTP.serverAccessor == null) return;
         try {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, MessagesKeys.menuInvalid);
+            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, CommandMessages.menuInvalid);
         } catch (RuntimeException ignored) {
             // serverAccessor failures (test scaffolds without a sender) are not fatal.
         }

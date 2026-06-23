@@ -1,0 +1,10 @@
+# --- Language Mapping: metrics.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# metrics.yml (right). metrics.yml is language-neutral (reporting knobs), so
+# every row is identity; the file exists purely to mirror the value file
+# under lang/advanced/ and keep the config loader's path uniform.
+foliaIncludeRegions: "foliaIncludeRegions"
+foliaAggregationTps: "foliaAggregationTps"
+foliaAggregationMspt: "foliaAggregationMspt"
+foliaAggregationTickBudget: "foliaAggregationTickBudget"
+version: "version"

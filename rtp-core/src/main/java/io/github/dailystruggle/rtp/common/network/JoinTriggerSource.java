@@ -61,7 +61,7 @@ import java.util.logging.Level;
  * </ul>
  *
  * <p>L2 of {@code CHECKLIST-cross-server-rtp.md}. New configurable
- * {@code MessageKey}s for cross-server-only feedback ({@code rtp.network.expired},
+ * {@code Enum<?>}s for cross-server-only feedback ({@code rtp.network.expired},
  * {@code rtp.network.failed}) are deferred to L5 row 41 per the L2 proposal;
  * this slice ships server-side WARNING-only diagnostics.</p>
  */

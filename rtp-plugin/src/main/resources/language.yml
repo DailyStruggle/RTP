@@ -11,3 +11,6 @@
 # After editing this file, run /rtp reload (or restart the server).
 
 language: en
+
+# Config schema version (do not edit).
+version: 1.0

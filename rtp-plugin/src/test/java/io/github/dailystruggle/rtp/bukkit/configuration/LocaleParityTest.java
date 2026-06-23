@@ -72,7 +72,7 @@ public class LocaleParityTest {
     private static final Pattern PLACEHOLDER = Pattern.compile("\\[[A-Za-z0-9_]+]");
 
     /** Subdirectories under {@code lang/} that are NOT locale folders. */
-    private static final Set<String> NON_LOCALE_DIRS = Set.of("shape", "vert");
+    private static final Set<String> NON_LOCALE_DIRS = Set.of("shape", "vert", "advanced");
 
     // =========================================================================
     // Group 1: resource hygiene + per-locale lang-map / value-file integrity
@@ -517,6 +517,20 @@ public class LocaleParityTest {
                 String stem = name.substring(0, name.length() - ".yml".length());
                 Path langSibling = LANG_ROOT.resolve(stem + ".lang.yml");
                 if (Files.exists(langSibling)) categories.add(stem);
+            }
+        }
+        // ADR-071: the advanced/ tier holds ordinary single-file parsers under a
+        // subdirectory. Each advanced/<file>.yml whose sibling lang map lives at
+        // lang/advanced/<file>.lang.yml is a category named "advanced/<file>".
+        Path advancedDir = RESOURCES.resolve("advanced");
+        if (Files.isDirectory(advancedDir)) {
+            try (DirectoryStream<Path> ymls = Files.newDirectoryStream(advancedDir, "*.yml")) {
+                for (Path yml : ymls) {
+                    String name = yml.getFileName().toString();
+                    String stem = name.substring(0, name.length() - ".yml".length());
+                    Path langSibling = LANG_ROOT.resolve("advanced").resolve(stem + ".lang.yml");
+                    if (Files.exists(langSibling)) categories.add("advanced/" + stem);
+                }
             }
         }
         // "messages" is directory-backed (messages/*.yml) with sibling

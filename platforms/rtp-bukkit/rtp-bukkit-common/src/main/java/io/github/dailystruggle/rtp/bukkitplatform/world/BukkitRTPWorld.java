@@ -14,6 +14,7 @@ import java.util.function.Function;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -519,17 +520,15 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * Snapshot the current {@code SafetyKeys.unsafeBlocks} list as a plain {@code Set<String>}.
+   * Snapshot the current {@code BlocksKeys.unsafeBlocks} list as a plain {@code Set<String>}.
    * Returns an empty set on any lookup failure — the pre-filter treats an empty set as
    * "never reject", which is the safe default.
    */
   @SuppressWarnings("unchecked")
   private static java.util.Set<String> currentUnsafeBlocks() {
     try {
-      ConfigParser<SafetyKeys> safety =
-          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-      if (safety == null) return java.util.Collections.emptySet();
-      Object raw = safety.getConfigValue(SafetyKeys.unsafeBlocks, new java.util.ArrayList<>());
+      if (RTP.configs == null) return java.util.Collections.emptySet();
+      Object raw = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
       if (raw instanceof java.util.Collection<?> c) {
         java.util.Set<String> out = new java.util.HashSet<>(c.size());
         for (Object o : c) if (o != null) out.add(o.toString());

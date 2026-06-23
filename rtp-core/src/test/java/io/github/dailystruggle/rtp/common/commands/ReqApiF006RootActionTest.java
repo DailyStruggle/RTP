@@ -2,12 +2,11 @@ package io.github.dailystruggle.rtp.common.commands;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -18,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -71,12 +69,15 @@ public class ReqApiF006RootActionTest {
     void setUp() {
         accessor = RTPTestSetup.install(tempDir);
 
-        ConfigParser<MessagesKeys> lang =
-                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        EnumMap<MessagesKeys, Object> data = new EnumMap<>(MessagesKeys.class);
-        data.put(MessagesKeys.alreadyTeleporting, "you're already teleporting!");
-        data.put(MessagesKeys.cooldownMessage, "cooldown active");
-        lang.setData(data);
+        java.util.Map<Enum<?>, Object> data = new java.util.HashMap<>();
+        data.put(PlayerMessages.alreadyTeleporting, "you're already teleporting!");
+        data.put(PlayerMessages.cooldownMessage, "cooldown active");
+        data.forEach((k, v) -> {
+            Object fv = RTP.configs.getParser((Class) k.getDeclaringClass());
+            if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
+                ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).set((Enum) k, v);
+            }
+        });
 
         RTP.getInstance().processingPlayers.clear();
         RTPAPI.hooks().rootAction().clear();

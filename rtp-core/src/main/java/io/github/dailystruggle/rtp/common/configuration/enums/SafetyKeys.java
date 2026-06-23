@@ -29,8 +29,6 @@ public enum SafetyKeys {
    * Pending restores are persisted to the database and resumed across restarts.
    */
   platformRestoreSeconds,
-  airBlocks,
-  unsafeBlocks,
   /**
    * Toggle for the vanilla-Spigot Anvil read-only pre-filter (ADR-016 / REQ-RTP-S-005).
    * When enabled, {@code BukkitRTPWorld.getChunkAt} will probe the persisted
@@ -71,7 +69,5 @@ public enum SafetyKeys {
   pvpTagVictim,
   /** Native tracker: stamp a player as in-combat when they <i>deal</i> PvP damage. Default: true. */
   pvpTagAggressor,
-  biomeWhitelist,
-  biomes,
   version
 }

@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -10,7 +10,6 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 
 import org.jetbrains.annotations.Nullable;
-
 /**
  * Single render boundary for the menu subsystem.
  *
@@ -26,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
  * } catch (RuntimeException e) {
  *     RTP.log(Level.WARNING, "menu <context> render failed for " + viewer
  *             + ": " + e.getMessage(), e);
- *     reject(viewer, MessagesKeys.menuInvalid,
+ *     reject(viewer, CommandMessages.menuInvalid,
  *             "menu <context> rejected: renderer failure", messageMethod);
  *     return false;
  * }
@@ -63,7 +62,7 @@ final class MenuDrawer {
      * @param rejecter audit hook invoked on renderer failure with a
      *                 short S-004 diagnostic string. Implemented by
      *                 {@code MenuRedeemSubcommand::reject} (curried over
-     *                 {@code (viewer, MessagesKeys.menuInvalid, msg, messageMethod)});
+     *                 {@code (viewer, CommandMessages.menuInvalid, msg, messageMethod)});
      *                 may be {@code null} to suppress the audit (tests).
      * @param context  short label naming the dispatch site (e.g.
      *                 {@code "param-picker"}, {@code "admin-panel"}).
@@ -105,7 +104,7 @@ final class MenuDrawer {
                     "menu " + context + " render failed for " + viewer
                             + tail + ": " + e.getMessage(), e);
             if (rejecter != null) {
-                rejecter.reject(viewer, MessagesKeys.menuInvalid,
+                rejecter.reject(viewer, CommandMessages.menuInvalid,
                         "menu " + context + " rejected: renderer failure",
                         messageMethod);
             }
@@ -121,7 +120,7 @@ final class MenuDrawer {
     @FunctionalInterface
     interface Rejecter {
         void reject(UUID viewer,
-                    MessagesKeys key,
+                    Enum<?> key,
                     String auditDiagnostic,
                     @Nullable Consumer<String> messageMethod);
     }

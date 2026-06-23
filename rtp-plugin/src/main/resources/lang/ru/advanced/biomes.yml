@@ -1,0 +1,39 @@
+# --- RTP Biome Filter (advanced) ---
+# Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
+# Split out of safety.yml so the common safety knobs stay uncluttered.
+#
+# If true, the biomes list is a whitelist (only these biomes are
+# allowed). If false, it is a blacklist (these biomes are excluded).
+# @type: boolean
+# @default: false
+белыйСписокБиомов: false
+
+# Biomes treated as whitelist or blacklist members per biomeWhitelist.
+# @type: list<biome>
+# @source: biome
+биомы:
+  - "OCEAN"
+  - "DEEP_OCEAN"
+  - "WARM_OCEAN"
+  - "LUKEWARM_OCEAN"
+  - "DEEP_LUKEWARM_OCEAN"
+  - "COLD_OCEAN"
+  - "DEEP_COLD_OCEAN"
+  - "FROZEN_OCEAN"
+  - "DEEP_FROZEN_OCEAN"
+  - "RIVER"
+  - "FROZEN_RIVER"
+  - "BEACH"
+  - "SNOWY_BEACH"
+  - "STONY_SHORE"
+  - "SWAMP"
+  - "MANGROVE_SWAMP"
+  - "SMALL_END_ISLANDS"
+  - "BASALT_DELTAS"
+  - "DRIPSTONE_CAVES"
+  - "LUSH_CAVES"
+  - "DEEP_DARK"
+  - "THE_VOID"
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

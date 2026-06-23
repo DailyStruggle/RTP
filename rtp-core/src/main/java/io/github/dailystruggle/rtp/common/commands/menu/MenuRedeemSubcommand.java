@@ -4,7 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.api.menu.MenuConsumerProfile;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
@@ -27,7 +27,6 @@ import java.util.function.Predicate;
 import java.util.logging.Level;
 
 import org.jetbrains.annotations.Nullable;
-
 /**
  * The {@code /rtp menu:<token>} redeem subcommand (ADR-035 §3,
  * CHECKLIST-generalized-menu.md item 2.2).
@@ -1053,7 +1052,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                              @Nullable CommandsAPICommand nextCommand,
                              @Nullable Consumer<String> messageMethod) {
         if (senderId == null) {
-            reject(null, MessagesKeys.menuUnknownPlayer,
+            reject(null, CommandMessages.menuUnknownPlayer,
                     "menu redeem rejected: no sender UUID", messageMethod);
             return false;
         }
@@ -1101,7 +1100,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             int pageIndex = extractPageIndex(parameterValues);
             return openPage(senderId, nextCommand, pageIndex, messageMethod);
         }
-        reject(senderId, MessagesKeys.menuInvalid,
+        reject(senderId, CommandMessages.menuInvalid,
                 "menu redeem rejected: open-page disabled", messageMethod);
         return false;
     }
@@ -1169,7 +1168,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             // to dispatch through) and refuse rather than silently no-op.
             RTP.log(Level.WARNING,
                     "menu open-action received with open-page disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu open rejected: open-page disabled", messageMethod);
             return false;
         }
@@ -1197,7 +1196,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                         "menu open-action path segment '" + segment
                                 + "' did not resolve to a TreeCommand under "
                                 + target.name() + " for " + senderId);
-                reject(senderId, MessagesKeys.menuInvalid,
+                reject(senderId, CommandMessages.menuInvalid,
                         "menu open rejected: unknown path segment '" + segment + "'",
                         messageMethod);
                 return false;
@@ -1226,14 +1225,14 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (renderer == null || paramPickerBuilder == null) {
             RTP.log(Level.WARNING,
                     "menu param-picker received with picker-page disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu param-picker rejected: picker-page disabled", messageMethod);
             return false;
         }
         String[] parentPath = picker.parentPath();
         TreeCommand target = rtpRoot;
         for (String segment : parentPath) {
-            // Stage A.3: skip staged `name=value` parameter assignments —
+            // Stage A.3: skip staged ame=value` parameter assignments —
             // they ride along in the assembled path without advancing the
             // command-node walk (see dispatchOpen).
             if (segment != null && segment.indexOf('=') >= 0) {
@@ -1253,7 +1252,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                         "menu param-picker path segment '" + segment
                                 + "' did not resolve to a TreeCommand under "
                                 + target.name() + " for " + senderId);
-                reject(senderId, MessagesKeys.menuInvalid,
+                reject(senderId, CommandMessages.menuInvalid,
                         "menu param-picker rejected: unknown path segment '" + segment + "'",
                         messageMethod);
                 return false;
@@ -1274,7 +1273,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu param-picker unknown parameter '" + paramName
                             + "' on " + target.name() + " for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu param-picker rejected: unknown parameter '" + paramName + "'",
                     messageMethod);
             return false;
@@ -1288,12 +1287,12 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     "menu param-picker failed for " + senderId
                             + " node=" + target.name() + " param=" + paramName
                             + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu param-picker rejected: builder failure", messageMethod);
             return false;
         }
         if (model == null) {
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu param-picker rejected: builder returned null model",
                     messageMethod);
             return false;
@@ -1339,7 +1338,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (renderer == null) {
             RTP.log(Level.WARNING,
                     "menu selection received with menu disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu selection rejected: menu disabled", messageMethod);
             return false;
         }
@@ -1359,7 +1358,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                         "menu selection path segment '" + segment
                                 + "' did not resolve to a TreeCommand under "
                                 + target.name() + " for " + senderId);
-                reject(senderId, MessagesKeys.menuInvalid,
+                reject(senderId, CommandMessages.menuInvalid,
                         "menu selection rejected: unknown path segment '" + segment + "'",
                         messageMethod);
                 return false;
@@ -1377,7 +1376,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu selection unknown parameter '" + paramName
                             + "' on " + target.name() + " for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu selection rejected: unknown parameter '" + paramName + "'",
                     messageMethod);
             return false;
@@ -1403,12 +1402,12 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     "menu selection failed for " + senderId
                             + " node=" + target.name() + " param=" + paramName
                             + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu selection rejected: builder failure", messageMethod);
             return false;
         }
         if (model == null) {
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu selection rejected: builder returned null model",
                     messageMethod);
             return false;
@@ -1440,7 +1439,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (anvilInputOpener == null) {
             RTP.log(Level.WARNING,
                     "menu anvil-input received with anvil-input disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu anvil-input rejected: anvil-input disabled", messageMethod);
             return false;
         }
@@ -1474,7 +1473,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                         "menu anvil-input path segment '" + segment
                                 + "' did not resolve to a TreeCommand under "
                                 + target.name() + " for " + senderId);
-                reject(senderId, MessagesKeys.menuInvalid,
+                reject(senderId, CommandMessages.menuInvalid,
                         "menu anvil-input rejected: unknown path segment '" + segment + "'",
                         messageMethod);
                 return false;
@@ -1511,7 +1510,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     "menu anvil-input opener failed for " + senderId
                             + " node=" + target.name() + " param=" + paramName
                             + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu anvil-input rejected: opener failure", messageMethod);
             return false;
         }
@@ -1519,7 +1518,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu anvil-input opener refused for " + senderId
                             + " node=" + target.name() + " param=" + paramName);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu anvil-input rejected: opener refused", messageMethod);
             return false;
         }
@@ -1566,7 +1565,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (renderer == null || configSubtreeBuilder == null) {
             RTP.log(Level.WARNING,
                     "menu config-selector received with config-subtree disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-selector rejected: config-subtree disabled", messageMethod);
             return false;
         }
@@ -1574,7 +1573,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-selector denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-selector rejected: permission denied", messageMethod);
             return false;
         }
@@ -1585,12 +1584,12 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-selector builder failed for " + senderId
                             + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-selector rejected: builder failure", messageMethod);
             return false;
         }
         if (model == null) {
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-selector rejected: builder returned null model",
                     messageMethod);
             return false;
@@ -1612,7 +1611,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (renderer == null || configSubtreeBuilder == null) {
             RTP.log(Level.WARNING,
                     "menu config-file received with config-subtree disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-file rejected: config-subtree disabled", messageMethod);
             return false;
         }
@@ -1620,7 +1619,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-file denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-file rejected: permission denied", messageMethod);
             return false;
         }
@@ -1639,7 +1638,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-file builder failed for " + senderId
                             + " file=" + fileName + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-file rejected: builder failure", messageMethod);
             return false;
         }
@@ -1647,7 +1646,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-file unknown file '" + fileName
                             + "' for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-file rejected: unknown file '" + fileName + "'",
                     messageMethod);
             return false;
@@ -1825,7 +1824,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (anvilInputOpener == null) {
             RTP.log(Level.WARNING,
                     "menu config-key received with anvil-input disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-key rejected: anvil-input disabled", messageMethod);
             return false;
         }
@@ -1833,7 +1832,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-key denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-key rejected: permission denied", messageMethod);
             return false;
         }
@@ -1870,7 +1869,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (!(configCmd instanceof TreeCommand configTree)) {
             RTP.log(Level.WARNING,
                     "menu config-key cannot resolve 'config' subcommand for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-key rejected: config subcommand unavailable",
                     messageMethod);
             return false;
@@ -1894,7 +1893,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-key unknown file=" + fileName
                             + " for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-key rejected: unknown file '" + fileName + "'",
                     messageMethod);
             return false;
@@ -1944,7 +1943,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-search prompt denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-search prompt rejected: permission denied",
                     messageMethod);
             return false;
@@ -1975,7 +1974,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (renderer == null || configSearchBuilder == null) {
             RTP.log(Level.WARNING,
                     "menu config-search received with config-search builder disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-search rejected: config-search builder disabled",
                     messageMethod);
             return false;
@@ -1984,7 +1983,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-search denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-search rejected: permission denied", messageMethod);
             return false;
         }
@@ -1998,7 +1997,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     "menu config-search builder failed for " + senderId
                             + " query=" + query + " page=" + page
                             + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-search rejected: builder failure", messageMethod);
             return false;
         }
@@ -2006,7 +2005,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-search unresolved (query=" + query
                             + ", page=" + page + ") for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-search rejected: unresolved (query=" + query
                             + ", page=" + page + ")", messageMethod);
             return false;
@@ -2048,7 +2047,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (renderer == null || curatedPageBuilder == null) {
             RTP.log(Level.WARNING,
                     "menu admin-panel received with curated-page builder disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu admin-panel rejected: curated-page builder disabled",
                     messageMethod);
             return false;
@@ -2057,7 +2056,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu admin-panel denied: " + senderId
                             + " lacks " + ADMIN_MENU_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu admin-panel rejected: permission denied", messageMethod);
             return false;
         }
@@ -2068,12 +2067,12 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu admin-panel builder failed for " + senderId
                             + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu admin-panel rejected: builder failure", messageMethod);
             return false;
         }
         if (model == null) {
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu admin-panel rejected: builder returned null model",
                     messageMethod);
             return false;
@@ -2098,7 +2097,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu visualizations received with curated-page builder disabled for "
                             + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu visualizations rejected: curated-page builder disabled",
                     messageMethod);
             return false;
@@ -2107,7 +2106,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu visualizations denied: " + senderId
                             + " lacks " + ADMIN_MENU_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu visualizations rejected: permission denied", messageMethod);
             return false;
         }
@@ -2118,12 +2117,12 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu visualizations builder failed for " + senderId
                             + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu visualizations rejected: builder failure", messageMethod);
             return false;
         }
         if (model == null) {
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu visualizations rejected: builder returned null model",
                     messageMethod);
             return false;
@@ -2147,7 +2146,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (kind == null) {
             RTP.log(Level.WARNING,
                     "menu visualization-regions rejected: null kind for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu visualization-regions rejected: null kind", messageMethod);
             return false;
         }
@@ -2155,7 +2154,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu visualization-regions received with curated-page builder disabled for "
                             + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu visualization-regions rejected: curated-page builder disabled",
                     messageMethod);
             return false;
@@ -2164,7 +2163,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu visualization-regions denied: " + senderId
                             + " lacks " + ADMIN_MENU_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu visualization-regions rejected: permission denied", messageMethod);
             return false;
         }
@@ -2175,12 +2174,12 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu visualization-regions builder failed for " + senderId
                             + " kind=" + kind + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu visualization-regions rejected: builder failure", messageMethod);
             return false;
         }
         if (model == null) {
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu visualization-regions rejected: builder returned null model",
                     messageMethod);
             return false;
@@ -2202,7 +2201,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (renderer == null || curatedPageBuilder == null) {
             RTP.log(Level.WARNING,
                     "menu front-page received with curated-page builder disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu front-page rejected: curated-page builder disabled",
                     messageMethod);
             return false;
@@ -2214,12 +2213,12 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu front-page builder failed for " + senderId
                             + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu front-page rejected: builder failure", messageMethod);
             return false;
         }
         if (model == null) {
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu front-page rejected: builder returned null model",
                     messageMethod);
             return false;
@@ -2253,7 +2252,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (renderer == null || infoBookBuilder == null) {
             RTP.log(Level.WARNING,
                     "menu info-book received with info-book builder disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu info-book rejected: info-book builder disabled",
                     messageMethod);
             return false;
@@ -2261,7 +2260,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (!hasInfoPermission(senderId)) {
             RTP.log(Level.WARNING,
                     "menu info-book denied: " + senderId + " lacks rtp.info");
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu info-book rejected: permission denied", messageMethod);
             return false;
         }
@@ -2272,12 +2271,12 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu info-book builder failed for " + senderId
                             + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu info-book rejected: builder failure", messageMethod);
             return false;
         }
         if (model == null) {
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu info-book rejected: builder returned null model",
                     messageMethod);
             return false;
@@ -2300,7 +2299,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (!hasInfoPermission(senderId)) {
             RTP.log(Level.WARNING,
                     "menu info-switch-to-text denied: " + senderId + " lacks rtp.info");
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu info-switch-to-text rejected: permission denied",
                     messageMethod);
             return false;
@@ -2318,7 +2317,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                 RTP.log(Level.WARNING,
                         "menu info-switch-to-text: unknown scope kind "
                                 + action.scope().kind() + " for " + senderId);
-                reject(senderId, MessagesKeys.menuInvalid,
+                reject(senderId, CommandMessages.menuInvalid,
                         "menu info-switch-to-text rejected: unknown scope",
                         messageMethod);
                 return false;
@@ -2343,7 +2342,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      *       prior {@code ChartSpecTokens} round-trip is gone). Invalid
      *       inputs collapse to {@code menuInvalid} (S-004).</li>
      *   <li>Hands off to {@link MapDispatch#paint(ChartSpec, UUID)}, which
-     *       owns the {@link MessagesKeys#mapBindingMissing} /
+     *       owns the {@link CommandMessages#mapBindingMissing} /
      *       {@code mapResolverMissing} / {@code mapUnavailable} /
      *       {@code mapBusy} viewer-facing surfaces. We return {@code true} on
      *       a successful paint and {@code false} otherwise; the viewer has
@@ -2358,7 +2357,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu open-map denied: " + senderId
                             + " lacks " + ADMIN_MENU_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu open-map rejected: permission denied",
                     messageMethod);
             return false;
@@ -2373,7 +2372,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     "menu open-map rejected: invalid ChartSpec (kind=" + action.kind()
                             + ", regionName='" + action.regionName() + "') for " + senderId
                             + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu open-map rejected: invalid ChartSpec",
                     messageMethod);
             return false;
@@ -2392,7 +2391,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu open-map MapDispatch.paint threw for " + senderId
                             + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu open-map rejected: dispatch failure", messageMethod);
             return false;
         }
@@ -2567,12 +2566,12 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu open-page failed for " + senderId
                             + " node=" + target.name() + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu open rejected: page builder failure", messageMethod);
             return false;
         }
         if (model == null) {
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu open rejected: builder returned null model", messageMethod);
             return false;
         }
@@ -2598,7 +2597,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-stage denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-stage rejected: permission denied", messageMethod);
             return false;
         }
@@ -2610,7 +2609,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                             + " file=" + stage.fileName()
                             + " key=" + stage.paramName()
                             + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-stage rejected: cart failure", messageMethod);
             return false;
         }
@@ -2636,7 +2635,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-unstage denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-unstage rejected: permission denied", messageMethod);
             return false;
         }
@@ -2648,7 +2647,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                             + " file=" + unstage.fileName()
                             + " key=" + unstage.paramName()
                             + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-unstage rejected: cart failure", messageMethod);
             return false;
         }
@@ -2673,7 +2672,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-apply denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-apply rejected: permission denied", messageMethod);
             return false;
         }
@@ -2682,7 +2681,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-apply: empty cart for " + senderId
                             + " file=" + apply.fileName());
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-apply rejected: empty cart for '" + apply.fileName() + "'",
                     messageMethod);
             return false;
@@ -2742,7 +2741,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu config-discard denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu config-discard rejected: permission denied", messageMethod);
             return false;
         }
@@ -2811,7 +2810,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (renderer == null || multiConfigBuilder == null) {
             RTP.log(Level.WARNING,
                     "menu multiconfig-selector received with multiconfig disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-selector rejected: multiconfig disabled", messageMethod);
             return false;
         }
@@ -2819,7 +2818,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu multiconfig-selector denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-selector rejected: permission denied", messageMethod);
             return false;
         }
@@ -2836,7 +2835,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu multiconfig-selector unknown parserKind '"
                             + effectiveKind + "' for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-selector rejected: unknown parser kind", messageMethod);
             return false;
         }
@@ -2865,12 +2864,12 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu multiconfig-selector builder failed for " + senderId
                             + " kind=" + effectiveKind + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-selector rejected: builder failure", messageMethod);
             return false;
         }
         if (model == null) {
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-selector rejected: builder returned null model",
                     messageMethod);
             return false;
@@ -2904,7 +2903,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (renderer == null || multiConfigBuilder == null) {
             RTP.log(Level.WARNING,
                     "menu multiconfig-entry received with multiconfig disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-entry rejected: multiconfig disabled", messageMethod);
             return false;
         }
@@ -2912,7 +2911,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu multiconfig-entry denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-entry rejected: permission denied", messageMethod);
             return false;
         }
@@ -2923,7 +2922,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (parser == null) {
             RTP.log(Level.WARNING,
                     "menu multiconfig-entry unknown parserKind '" + kind + "' for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-entry rejected: unknown parser kind", messageMethod);
             return false;
         }
@@ -2948,12 +2947,12 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu multiconfig-entry builder failed for " + senderId
                             + " kind=" + kind + " entry=" + entry + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-entry rejected: builder failure", messageMethod);
             return false;
         }
         if (model == null) {
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-entry rejected: builder returned null model",
                     messageMethod);
             return false;
@@ -2992,7 +2991,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (renderer == null || multiConfigBuilder == null) {
             RTP.log(Level.WARNING,
                     "menu multiconfig-mutate received with multiconfig disabled for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-mutate rejected: multiconfig disabled", messageMethod);
             return false;
         }
@@ -3000,7 +2999,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu multiconfig-mutate denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-mutate rejected: permission denied", messageMethod);
             return false;
         }
@@ -3012,7 +3011,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (parser == null) {
             RTP.log(Level.WARNING,
                     "menu multiconfig-mutate unknown parserKind '" + kind + "' for " + senderId);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-mutate rejected: unknown parser kind", messageMethod);
             return false;
         }
@@ -3026,7 +3025,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                         "menu multiconfig-mutate REMOVE rejected: '" + entry
                                 + "' is locked under kind '" + kind + "' for " + senderId
                                 + " (reason: " + guard.reason(entry) + ")");
-                reject(senderId, MessagesKeys.menuInvalid,
+                reject(senderId, CommandMessages.menuInvalid,
                         "menu multiconfig-mutate rejected: entry locked", messageMethod);
                 return false;
             }
@@ -3036,7 +3035,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                 RTP.log(Level.WARNING,
                         "menu multiconfig-mutate REMOVE failed for " + senderId
                                 + " kind=" + kind + " entry=" + entry + ": " + e.getMessage(), e);
-                reject(senderId, MessagesKeys.menuInvalid,
+                reject(senderId, CommandMessages.menuInvalid,
                         "menu multiconfig-mutate rejected: remove failure", messageMethod);
                 return false;
             }
@@ -3064,7 +3063,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                 RTP.log(Level.WARNING,
                         "menu multiconfig-mutate ADD failed for " + senderId
                                 + " kind=" + kind + " entry=" + entry + ": " + e.getMessage(), e);
-                reject(senderId, MessagesKeys.menuInvalid,
+                reject(senderId, CommandMessages.menuInvalid,
                         "menu multiconfig-mutate rejected: add failure", messageMethod);
                 return false;
             }
@@ -3382,7 +3381,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu redeem dispatch failed for " + senderId
                             + " args=" + java.util.Arrays.toString(args) + ": " + e.getMessage(), e);
-            reject(senderId, MessagesKeys.menuInvalid,
+            reject(senderId, CommandMessages.menuInvalid,
                     "menu redeem rejected: dispatch failure",
                     messageMethod);
             return false;
@@ -3421,11 +3420,11 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
     void rejectMenuInvalid(@Nullable UUID senderId,
                            String logMessage,
                            @Nullable Consumer<String> messageMethod) {
-        reject(senderId, MessagesKeys.menuInvalid, logMessage, messageMethod);
+        reject(senderId, CommandMessages.menuInvalid, logMessage, messageMethod);
     }
 
     private void reject(@Nullable UUID senderId,
-                        MessagesKeys key,
+                        Enum<?> key,
                         String logMessage,
                         @Nullable Consumer<String> messageMethod) {
         // S-004: never silently swallow. The log is unconditional; the user
@@ -3440,11 +3439,9 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         }
     }
 
-    private static String defaultFor(MessagesKeys key) {
-        return switch (key) {
-            case menuInvalid -> "Invalid menu command.";
-            case menuUnknownPlayer -> "Menus may only be used by online players.";
-            default -> key.name();
-        };
+    private static String defaultFor(Enum<?> key) {
+        if (key == CommandMessages.menuInvalid) return "Invalid menu command.";
+        if (key == CommandMessages.menuUnknownPlayer) return "Menus may only be used by online players.";
+        return key.name();
     }
 }

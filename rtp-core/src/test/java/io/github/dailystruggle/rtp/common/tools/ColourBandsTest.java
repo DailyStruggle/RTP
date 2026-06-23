@@ -102,7 +102,7 @@ class ColourBandsTest {
         assertEquals(
                 ColourBands.DEFAULT_TPS_GREEN,
                 ColourBands.resolveDouble(
-                        io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys
+                        io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages
                                 .infoThresholdTpsGreen,
                         ColourBands.DEFAULT_TPS_GREEN));
     }

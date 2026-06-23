@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,12 +82,15 @@ public class RTPCmdPvPGateTest {
     PvPGate.nativeTracker().clearAll();
 
     @SuppressWarnings("unchecked")
-    ConfigParser<MessagesKeys> lang =
-            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    EnumMap<MessagesKeys, Object> data = new EnumMap<>(MessagesKeys.class);
-    data.put(MessagesKeys.pvpInCombat, "IN_COMBAT refused");
-    data.put(MessagesKeys.consoleCmdNotAllowed, "console disallowed");
-    lang.setData(data);
+    java.util.Map<Enum<?>, Object> data = new java.util.HashMap<>();
+    data.put(PlayerMessages.pvpInCombat, "IN_COMBAT refused");
+    data.put(PlayerMessages.consoleCmdNotAllowed, "console disallowed");
+    data.forEach((k, v) -> {
+            Object fv = RTP.configs.getParser((Class) k.getDeclaringClass());
+            if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
+                ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).set((Enum) k, v);
+            }
+        });
   }
 
   @AfterEach

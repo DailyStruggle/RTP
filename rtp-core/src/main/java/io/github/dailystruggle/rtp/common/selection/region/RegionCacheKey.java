@@ -2,7 +2,8 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -13,7 +14,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
@@ -73,17 +73,17 @@ public final class RegionCacheKey {
    *   <li>{@link SafetyKeys#version} — file-format marker.</li>
    * </ul>
    */
-  private static final EnumSet<SafetyKeys> SAFETY_HASH_KEYS = EnumSet.of(
+  private static final List<Enum<?>> SAFETY_HASH_KEYS = List.of(
       SafetyKeys.safetyRadius,
       SafetyKeys.platformRadius,
       SafetyKeys.platformAirHeight,
       SafetyKeys.platformDepth,
       SafetyKeys.platformMaterial,
-      SafetyKeys.airBlocks,
-      SafetyKeys.unsafeBlocks,
+      BlocksKeys.airBlocks,
+      BlocksKeys.unsafeBlocks,
       SafetyKeys.anvilPrefilterEnabled,
-      SafetyKeys.biomeWhitelist,
-      SafetyKeys.biomes);
+      BiomesKeys.biomeWhitelist,
+      BiomesKeys.biomes);
 
   /**
    * Compute the human-readable cache key suffix.
@@ -147,25 +147,19 @@ public final class RegionCacheKey {
    * carried into a configured environment will still be flushed on first match.
    */
   private static void appendSafetySnapshot(StringBuilder sb) {
-    ConfigParser<SafetyKeys> safety = safetyParser();
-    if (safety == null) return;
-    for (SafetyKeys key : SAFETY_HASH_KEYS) {
-      Object value = safety.getConfigValue(key, null);
+    if (RTP.configs == null) return;
+    for (Enum<?> key : SAFETY_HASH_KEYS) {
+      Object value;
+      try {
+        value = RTP.configs.getConfigValue(key, null);
+      } catch (RuntimeException e) {
+        return;
+      }
       sb.append("safety.")
           .append(key.name().toLowerCase())
           .append('=')
           .append(serializeSafetyValue(value))
           .append(';');
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  private static ConfigParser<SafetyKeys> safetyParser() {
-    try {
-      if (RTP.configs == null) return null;
-      return (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-    } catch (RuntimeException e) {
-      return null;
     }
   }
 

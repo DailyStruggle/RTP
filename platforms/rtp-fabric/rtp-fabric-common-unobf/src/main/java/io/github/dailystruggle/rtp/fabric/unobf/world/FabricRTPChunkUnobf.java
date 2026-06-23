@@ -6,8 +6,7 @@ import io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.anvil.PaletteNormalizer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -242,10 +241,7 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
         Set<String> cached = AIR_BLOCKS_CACHE.get();
         try {
             if (RTP.configs == null) return cached;
-            ConfigParser<SafetyKeys> safety =
-                    (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-            if (safety == null) return cached;
-            Object value = safety.getConfigValue(SafetyKeys.airBlocks, new ArrayList<>());
+            Object value = RTP.configs.getConfigValue(BlocksKeys.airBlocks, new ArrayList<>());
             if (!(value instanceof Collection<?> coll)) return cached;
             Map<String, Set<String>> tagSnapshot = Collections.emptyMap();
             if (RTP.serverAccessor != null) {

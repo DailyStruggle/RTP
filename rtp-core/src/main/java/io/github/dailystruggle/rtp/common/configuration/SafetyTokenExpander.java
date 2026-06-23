@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -14,8 +14,8 @@ import java.util.Set;
 import java.util.logging.Level;
 
 /**
- * Eager, one-shot expansion of {@link SafetyKeys#airBlocks} and
- * {@link SafetyKeys#unsafeBlocks} at config-load time.
+ * Eager, one-shot expansion of {@link BlocksKeys#airBlocks} and
+ * {@link BlocksKeys#unsafeBlocks} at config-load time.
  *
  * <p>Historically, tag expansion ({@code #minecraft:leaves} → {@code OAK_LEAVES,
  * BIRCH_LEAVES, ACACIA_LEAVES, ...}) was performed lazily on the first
@@ -53,7 +53,7 @@ public final class SafetyTokenExpander {
      * {@code JumpAdjustor.refreshSafetySets}) can resolve them once the server
      * tag registry is populated. This keeps the early-bootstrap path safe.
      */
-    public static void expandAndApply(ConfigParser<SafetyKeys> safety) {
+    public static void expandAndApply(ConfigParser<BlocksKeys> safety) {
         expandAndApply(safety, 0);
     }
 
@@ -70,7 +70,7 @@ public final class SafetyTokenExpander {
     /** Delay between deferred retries, in server ticks (~2 s @ 20 TPS). */
     private static final long RETRY_DELAY_TICKS = 40L;
 
-    private static void expandAndApply(ConfigParser<SafetyKeys> safety, int attempt) {
+    private static void expandAndApply(ConfigParser<BlocksKeys> safety, int attempt) {
         if (safety == null) return;
 
         // Force a fresh read of the Bukkit tag registry. At plugin-enable time the
@@ -93,15 +93,15 @@ public final class SafetyTokenExpander {
         }
 
         int unresolved = 0;
-        unresolved += applyOne(safety, SafetyKeys.airBlocks, tagSnapshot, attempt);
-        unresolved += applyOne(safety, SafetyKeys.unsafeBlocks, tagSnapshot, attempt);
+        unresolved += applyOne(safety, BlocksKeys.airBlocks, tagSnapshot, attempt);
+        unresolved += applyOne(safety, BlocksKeys.unsafeBlocks, tagSnapshot, attempt);
 
         if (unresolved > 0 && attempt < MAX_DEFERRED_RETRIES) {
             scheduleRetry(safety, attempt + 1);
         }
     }
 
-    private static void scheduleRetry(ConfigParser<SafetyKeys> safety, int nextAttempt) {
+    private static void scheduleRetry(ConfigParser<BlocksKeys> safety, int nextAttempt) {
         try {
             if (RTP.scheduler == null) return;
             RTP.scheduler.runTaskLater(() -> {
@@ -126,8 +126,8 @@ public final class SafetyTokenExpander {
     }
 
     private static int applyOne(
-            ConfigParser<SafetyKeys> safety,
-            SafetyKeys key,
+            ConfigParser<BlocksKeys> safety,
+            BlocksKeys key,
             Map<String, Set<String>> tagSnapshot,
             int attempt) {
         Object raw = safety.getConfigValue(key, new ArrayList<>());

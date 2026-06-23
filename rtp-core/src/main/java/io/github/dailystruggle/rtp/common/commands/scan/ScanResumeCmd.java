@@ -1,9 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.scan;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import java.util.Collections;
@@ -38,8 +37,6 @@ public class ScanResumeCmd extends ScanSubCmd {
     List<Region> regions = getRegions(callerId, parameterValues.get("region"));
     for (Region region : regions) {
       ScanTask scanTask = RTP.getInstance().scanTasks.get(region.name);
-      ConfigParser<MessagesKeys> parser =
-          (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
       if (scanTask == null) {
         Map<String, List<String>> singleRegion = new HashMap<>(parameterValues);
         singleRegion.put("region", Collections.singletonList(region.name));
@@ -50,8 +47,8 @@ public class ScanResumeCmd extends ScanSubCmd {
       scanTask.pause.set(false);
       RTP.scheduler.runTaskAsynchronously(scanTask);
 
-      if (parser == null) continue;
-      String msg = String.valueOf(parser.getConfigValue(MessagesKeys.scanResume, ""));
+      if (RTP.configs == null) continue;
+      String msg = String.valueOf(RTP.configs.getConfigValue(CommandMessages.scanResume, ""));
       if (msg == null || msg.isEmpty()) continue;
       msg = msg.replace("[region]", region.name);
       RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");

@@ -5,8 +5,7 @@ import io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.bukkitplatform.anvil.PaletteNormalizer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -162,7 +161,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
   }
 
   /**
-   * 5-second-throttled reconciled snapshot of {@code SafetyKeys.airBlocks}. Built
+   * 5-second-throttled reconciled snapshot of {@code BlocksKeys.airBlocks}. Built
    * from {@code RTP.configs} via {@link PaletteNormalizer#reconcileAll(Collection)} so the
    * canonical, tag-expanded forms (per {@code JumpAdjustor.refreshSafetySets}'s
    * mutation of the parser) line up with both the live {@code Material.name()}
@@ -187,10 +186,8 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
       return AIR_BLOCKS_CACHE.get();
     }
     try {
-      ConfigParser<SafetyKeys> safety =
-          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-      if (safety == null) return cached;
-      Object value = safety.getConfigValue(SafetyKeys.airBlocks, new ArrayList<>());
+      if (RTP.configs == null) return cached;
+      Object value = RTP.configs.getConfigValue(BlocksKeys.airBlocks, new ArrayList<>());
       if (!(value instanceof Collection<?> coll)) return cached;
       // Tag expansion: #namespace:tag tokens (e.g. "#minecraft:leaves") are NOT
       // resolved by Material.matchMaterial, so PaletteNormalizer.reconcileAll

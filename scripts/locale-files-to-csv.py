@@ -189,12 +189,20 @@ def main() -> int:
     # --- Baseline: top-level *.yml (excluding plugin.yml/language.yml) ---
     baseline_rows: list[dict] = []
     baseline_file_count = 0
-    for f in sorted(
-        (p for p in resources_root.glob("*.yml") if p.is_file() and p.name not in ("plugin.yml", "language.yml")),
-        key=lambda p: p.name,
-    ):
+    baseline_files = [
+        p for p in resources_root.glob("*.yml")
+        if p.is_file() and p.name not in ("plugin.yml", "language.yml")
+    ]
+    # ADR-071: the advanced/ tier holds ordinary single-file baseline parsers under
+    # a subdirectory. Fold them in with their relpath ("advanced/<file>.yml") so the
+    # locale TSVs (which scan lang/<locale>/ recursively) have a baseline counterpart.
+    advanced_dir = resources_root / "advanced"
+    if advanced_dir.is_dir():
+        baseline_files.extend(p for p in advanced_dir.glob("*.yml") if p.is_file())
+    for f in sorted(baseline_files, key=lambda p: str(p.relative_to(resources_root)).replace("\\", "/")):
+        rel = str(f.relative_to(resources_root)).replace("\\", "/")
         baseline_file_count += 1
-        baseline_rows.extend(convert_yaml_file_to_rows(f, f.name))
+        baseline_rows.extend(convert_yaml_file_to_rows(f, rel))
 
     baseline_out = output_dir / "baseline.tsv"
     set_base_keys(baseline_rows, {})
@@ -205,6 +213,10 @@ def main() -> int:
     locale_dirs = sorted((p for p in lang_root.iterdir() if p.is_dir()), key=lambda p: p.name)
     for ld in locale_dirs:
         locale = ld.name
+        # ADR-071: lang/advanced/ holds the baseline advanced-tier lang maps, not a
+        # locale; its value files are folded into baseline above, so skip it here.
+        if locale == "advanced":
+            continue
         if locale in ("shape", "vert"):
             for f in sorted((p for p in ld.rglob("*.yml") if p.is_file()), key=lambda p: str(p)):
                 rel = str(f.relative_to(resources_root)).replace("\\", "/")

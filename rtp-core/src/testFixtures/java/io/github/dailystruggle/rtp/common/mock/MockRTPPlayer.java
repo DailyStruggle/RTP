@@ -11,6 +11,8 @@ public class MockRTPPlayer extends MockRTPCommandSender implements RTPPlayer {
 
     private RTPLocation location;
     private boolean online;
+    /** Per-player view distance; -1 models a platform without a per-player view-distance API. */
+    private int viewDistance = -1;
 
     public MockRTPPlayer(UUID uuid, String name, RTPLocation initialLocation) {
         super(uuid, name);
@@ -40,5 +42,15 @@ public class MockRTPPlayer extends MockRTPCommandSender implements RTPPlayer {
 
     public void setOnline(boolean online) {
         this.online = online;
+    }
+
+    @Override
+    public int getViewDistance() {
+        return viewDistance;
+    }
+
+    @Override
+    public void setViewDistance(int viewDistance) {
+        this.viewDistance = viewDistance;
     }
 }

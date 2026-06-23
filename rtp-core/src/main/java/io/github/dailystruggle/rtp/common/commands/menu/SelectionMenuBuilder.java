@@ -1,20 +1,18 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
-
 /**
  * A clean, reusable "pick one of these" selection page.
  *
@@ -70,7 +68,7 @@ public final class SelectionMenuBuilder {
         String[] parentPathArr = parentPath.toArray(new String[0]);
 
         MenuLine backLine = MenuLine.of(new MenuFragment(
-                lookupMsg(MessagesKeys.menuBack, "&7« back"), null,
+                lookupMsg(CommandMessages.menuBack, "&7« back"), null,
                 new MenuAction.OpenMenu(parentPathArr)));
 
         String name = (displayName == null || displayName.isEmpty()) ? paramName : displayName;
@@ -115,8 +113,8 @@ public final class SelectionMenuBuilder {
         int totalPages = valueLines.isEmpty()
                 ? 1
                 : (valueLines.size() + valuesPerPage - 1) / valuesPerPage;
-        String prevTmpl = lookupMsg(MessagesKeys.menuPagePrev, "&7« previous page ([page])");
-        String nextTmpl = lookupMsg(MessagesKeys.menuPageNext, "&7next page ([page]) »");
+        String prevTmpl = lookupMsg(CommandMessages.menuPagePrev, "&7« previous page ([page])");
+        String nextTmpl = lookupMsg(CommandMessages.menuPageNext, "&7next page ([page]) »");
         List<MenuPage> pages = new ArrayList<>(totalPages);
         for (int p = 0; p < totalPages; p++) {
             List<MenuLine> pageLines = new ArrayList<>();
@@ -147,12 +145,9 @@ public final class SelectionMenuBuilder {
     }
 
     @SuppressWarnings("unchecked")
-    private static String lookupMsg(MessagesKeys key, String fallback) {
+    private static String lookupMsg(Enum<?> key, String fallback) {
         if (RTP.configs == null) return fallback;
-        ConfigParser<MessagesKeys> lang =
-                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        if (lang == null) return fallback;
-        Object v = lang.getConfigValue(key, fallback);
+        Object v = RTP.configs.getConfigValue(key, fallback);
         return v == null ? fallback : v.toString();
     }
 }

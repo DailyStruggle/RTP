@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
@@ -47,7 +46,7 @@ public class RegionSubParameterUpdateTest {
 
     private ConfigParser<RegionKeys> regionConfig;
     private EnumMap<RegionKeys, Object> regionData;
-    private ConfigParser<MessagesKeys> lang;
+    private ConfigParser lang;
     private io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase mockDb;
 
     @BeforeEach
@@ -106,10 +105,14 @@ public class RegionSubParameterUpdateTest {
         lang.language_mapping = new ConcurrentHashMap<>();
         lang.reverse_language_mapping = new ConcurrentHashMap<>();
         lang.name = "messages.yml";
-        doReturn(new EnumMap<>(MessagesKeys.class)).when(lang).getData();
+        doReturn(new java.util.EnumMap<>(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.class)).when(lang).getData();
         when(lang.getConfigValue(any(), any())).thenReturn("");
         fileDatabaseField.set(lang, mockDb);
-        configs.configParserMap.put(MessagesKeys.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages.class, lang);
+        configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages.class, lang);
 
         // Populate the shape and vert factories with at least one entry each so
         // SubConfigCmd's `factory.get("SQUARE")` / `factory.get("JUMP")` paths resolve.

@@ -12,7 +12,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.UUID;
-
 public class SubReloadCmdTest {
 
     @TempDir
@@ -66,7 +65,7 @@ public class SubReloadCmdTest {
 
     @Test
     void subReload_withConfigParser_delegatesToSubReloadSingle() {
-        // subReloadSingle requires RTP.configs to have a MessagesKeys parser.
+        // subReloadSingle requires RTP.configs to have a Enum<?> parser.
         // RTPTestSetup.install() registers all core parsers including MessagesKeys,
         // so this should succeed and return true.
         FactoryValue<?> parser = RTP.configs.getParser(

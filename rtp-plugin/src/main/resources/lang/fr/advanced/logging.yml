@@ -1,0 +1,71 @@
+# --- Paramètres de journalisation du plugin ---
+# Documentation : plugins/RTP/docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# Journaliser tous les fichiers rechargés lors de /rtp reload
+# @type: boolean
+# @default: false
+rechargementDetaille: false
+
+# Journaliser les détails de l'initialisation des régions
+# @type: boolean
+# @default: false
+initialisationRegionDetaillee: false
+
+# Journaliser les commandes RTP exécutées par les joueurs
+# @type: boolean
+# @default: false
+commande: false
+
+# Journaliser les événements de téléportation réussis
+# @type: boolean
+# @default: true
+teleportation: true
+
+# Journaliser le RTP déclenché par des changements de monde
+# @type: boolean
+# @default: true
+evenementChangementMonde: true
+
+# Journaliser le RTP déclenché lors de la connexion
+# @type: boolean
+# @default: true
+evenementConnexion: true
+
+# Journaliser le RTP déclenché lors de la réapparition
+# @type: boolean
+# @default: true
+evenementReapparition: true
+
+# Journaliser le traitement des événements de mouvement
+# @type: boolean
+# @default: true
+evenementMouvement: true
+
+# Journaliser le traitement des événements de téléportation
+# @type: boolean
+# @default: true
+evenementTeleport: true
+
+# Journaliser les informations lorsque la sélection de l'emplacement échoue
+# @type: boolean
+# @default: true
+echecSelection: true
+
+# Journaux de débogage pour l'activité mémoire
+# @type: boolean
+# @default: false
+systemeTraceurMemoire: false
+
+# Journaux de débogage pour l'activité de la base de données
+# @type: boolean
+# @default: false
+systemeBaseDonnees: false
+
+# Niveau minimum de journalisation du plugin. Le filtre effectif est le plus
+# fin entre celui-ci et le logger de Bukkit. ALL : comportement identique.
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
+niveauMinimum: "INFO"
+
+# NE PAS MODIFIER LE NUMÉRO DE VERSION
+version: 1.0

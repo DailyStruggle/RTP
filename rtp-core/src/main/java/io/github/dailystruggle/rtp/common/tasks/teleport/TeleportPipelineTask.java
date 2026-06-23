@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks.teleport;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
@@ -65,6 +66,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
     public static String unsafe = "";
     public static String teleportMessage = "";
     public static long viewDistanceTeleport = 0;
+    /**
+     * ADR-072: total ticks over which a teleported player's clamped view distance is ramped
+     * back up to its pre-teleport value. {@code 0} disables the view-distance clamp entirely.
+     */
+    public static long viewDistanceRestoreInterval = 200;
     public static boolean postTeleportQueueing = false;
     /** BetterRTP SetAsRespawn parity: anchor the player's respawn to the landed location. */
     public static boolean setRespawnOnTeleport = false;
@@ -79,14 +85,14 @@ public final class TeleportPipelineTask extends RTPRunnable {
     }
 
     public static void reload() {
-      ConfigParser<MessagesKeys> langParser =
-          (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-      unsafe = langParser.getConfigValue(MessagesKeys.unsafe, "").toString();
-      teleportMessage = langParser.getConfigValue(MessagesKeys.teleportMessage, "").toString();
+      unsafe = RTP.configs.getConfigValue(PlayerMessages.unsafe, "").toString();
+      teleportMessage = RTP.configs.getConfigValue(PlayerMessages.teleportMessage, "").toString();
 
       ConfigParser<PerformanceKeys> perf =
           (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
       viewDistanceTeleport = perf.getNumber(PerformanceKeys.viewDistanceTeleport, 0L).longValue();
+      viewDistanceRestoreInterval =
+          perf.getNumber(PerformanceKeys.viewDistanceRestoreInterval, 200L).longValue();
       postTeleportQueueing = Boolean.parseBoolean(
           perf.getConfigValue(PerformanceKeys.postTeleportQueueing, false).toString());
 
@@ -546,7 +552,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
         return;
       }
 
-      if(!chunkSet.complete().isDone()) RTP.serverAccessor.sendMessage(player().uuid(), MessagesKeys.chunkLoading);
+      if(!chunkSet.complete().isDone()) RTP.serverAccessor.sendMessage(player().uuid(), PlayerMessages.chunkLoading);
 
       RTP.log(Level.FINER, "[PIPELINE_TRACE] runLoad awaiting chunkSet alreadyDone="
               + chunkSet.complete().isDone() + " cx=" + (coords.x() >> 4) + " cz=" + (coords.z() >> 4));
@@ -630,7 +636,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
       pvpAction = io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW;
     }
     if (pvpAction != io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW) {
-      RTP.serverAccessor.sendMessage(playerId, MessagesKeys.pvpInCombat);
+      RTP.serverAccessor.sendMessage(playerId, PlayerMessages.pvpInCombat);
       // S-004: the abort is never silent.
       RTP.log(Level.WARNING, "[RTP] PvP gate aborted teleport at execution prefilter for "
           + playerId + " (action=" + pvpAction + ", in combat)");
@@ -743,6 +749,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
       teleportData.completed = true;
       teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
       RTP.getInstance().processingPlayers.remove(playerId);
+
+      // ADR-072: clamp the player's view distance immediately before the teleport so the engine's
+      // implicit placement/chunk-tracking ring is small, then steadily restore it. Applied here
+      // (before setLocation) so it shrinks the very burst the feature exists to smooth. No-ops when
+      // disabled, unsupported by the platform, or when the clamp would not actually shrink the view.
+      ViewDistanceRestoreTask.clampAndSchedule(
+          player, (int) ConfigCache.viewDistanceTeleport, ConfigCache.viewDistanceRestoreInterval);
 
       CompletableFuture<Boolean> setLocation = player.setLocation(location);
       RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport setLocation dispatched playerId=" + playerId
@@ -860,7 +873,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
    * DB-rehydrated paths (which legitimately carry a null reservation) and ends up stamping a
    * glass block under every teleport. Gate instead on an actual look at the landing column:
    * build a platform only when the block below the landing Y is non-solid (air / liquid / unsafe)
-   * OR the landing block itself is in {@link SafetyKeys#unsafeBlocks}.
+   * OR the landing block itself is in {@link BlocksKeys#unsafeBlocks}.
    *
    * <p>The check is read-only against {@link RTPWorld#getCachedChunk(long)}, so no chunk load
    * is triggered (REQ-RTP-S-005). If the landing chunk is not cached — which can happen during
@@ -891,7 +904,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       java.util.Set<String> unsafe = new java.util.HashSet<>();
       if (safety != null) {
-        Object raw = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+        Object raw = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
         if (raw instanceof java.util.Collection<?> col) {
           for (Object o : col) if (o != null) unsafe.add(o.toString().toUpperCase());
         }

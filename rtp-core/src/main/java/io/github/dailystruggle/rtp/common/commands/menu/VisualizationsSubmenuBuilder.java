@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.api.menu.MenuFragment;
@@ -8,7 +8,6 @@ import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -17,7 +16,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeSet;
 import java.util.UUID;
-
 /**
  * Curated submenu reached from the admin panel "Visualizations" row.
  *
@@ -93,7 +91,7 @@ public final class VisualizationsSubmenuBuilder {
 
         List<MenuLine> lines = new ArrayList<>();
 
-        String title = lookupMsg(MessagesKeys.menuVisualizationsTitle, "&5&l\u2316 Visualizations");
+        String title = lookupMsg(CommandMessages.menuVisualizationsTitle, "&5&l\u2316 Visualizations");
         if (title != null && !title.isEmpty()) {
             lines.add(MenuLine.of(new MenuFragment(title, null, null)));
         }
@@ -116,7 +114,7 @@ public final class VisualizationsSubmenuBuilder {
             lines.add(MenuLine.of(new MenuFragment(row.label, row.hover, action)));
         }
 
-        String backLabel = lookupMsg(MessagesKeys.menuVisualizationsRowBack, "&7\u21a9 Back");
+        String backLabel = lookupMsg(CommandMessages.menuVisualizationsRowBack, "&7\u21a9 Back");
         MenuLine backRow = null;
         if (backLabel != null && !backLabel.isEmpty()) {
             backRow = MenuLine.of(new MenuFragment(
@@ -153,7 +151,7 @@ public final class VisualizationsSubmenuBuilder {
 
         List<MenuLine> lines = new ArrayList<>();
 
-        String title = lookupMsg(MessagesKeys.menuVisualizationsTitle, "&5&l\u2316 Visualizations");
+        String title = lookupMsg(CommandMessages.menuVisualizationsTitle, "&5&l\u2316 Visualizations");
         if (title != null && !title.isEmpty()) {
             lines.add(MenuLine.of(new MenuFragment(title, null, null)));
         }
@@ -165,16 +163,16 @@ public final class VisualizationsSubmenuBuilder {
         List<String> regionNames = collectRegionNames();
         if (regionNames.isEmpty()) {
             String empty = lookupMsg(
-                    MessagesKeys.menuVisualizationsEmpty, "&7(no regions configured)");
+                    CommandMessages.menuVisualizationsEmpty, "&7(no regions configured)");
             if (empty != null && !empty.isEmpty()) {
                 lines.add(MenuLine.of(new MenuFragment(empty, null, null)));
             }
         } else {
             String rowTemplate = lookupMsg(
-                    MessagesKeys.menuVisualizationsRowRegion,
+                    CommandMessages.menuVisualizationsRowRegion,
                     "&b\u25b6 [region] &7- region shape map");
             String hoverTemplate = lookupMsg(
-                    MessagesKeys.menuVisualizationsHoverRegion,
+                    CommandMessages.menuVisualizationsHoverRegion,
                     "&7open a map showing bad locations in &b[region]");
             for (String regionName : regionNames) {
                 MenuAction action = new MenuAction.OpenMap(kind, regionName);
@@ -187,7 +185,7 @@ public final class VisualizationsSubmenuBuilder {
         }
 
         // Back row -> top-level chart-kind picker (one level up).
-        String backLabel = lookupMsg(MessagesKeys.menuVisualizationsRowBack, "&7\u21a9 Back");
+        String backLabel = lookupMsg(CommandMessages.menuVisualizationsRowBack, "&7\u21a9 Back");
         MenuLine backRow = null;
         if (backLabel != null && !backLabel.isEmpty()) {
             backRow = MenuLine.of(new MenuFragment(
@@ -260,12 +258,9 @@ public final class VisualizationsSubmenuBuilder {
     }
 
     @SuppressWarnings({"unchecked", "unused"})
-    private static String lookupMsg(MessagesKeys key, String fallback) {
+    private static String lookupMsg(Enum<?> key, String fallback) {
         if (RTP.configs == null) return fallback;
-        ConfigParser<MessagesKeys> lang =
-                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        if (lang == null) return fallback;
-        Object v = lang.getConfigValue(key, fallback);
+        Object v = RTP.configs.getConfigValue(key, fallback);
         String s = v == null ? fallback : v.toString();
         return s;
     }

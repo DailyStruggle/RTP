@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.commands.config;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
@@ -122,9 +122,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
-    ConfigParser<MessagesKeys> lang =
-            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    String updateMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updating, ""));
+    String updateMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updating, ""));
     if (updateMsg != null) updateMsg = updateMsg.replace("[filename]", factoryValue.name);
     RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updateMsg);
 
@@ -265,7 +263,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         ex.printStackTrace();
       }
 
-      String updatedMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updated, ""));
+      String updatedMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updated, ""));
       if (updatedMsg != null) updatedMsg = updatedMsg.replace("[filename]", configParser.name);
       RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updatedMsg);
 

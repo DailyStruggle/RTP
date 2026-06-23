@@ -1,0 +1,7 @@
+# --- Language Mapping: blocks.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# blocks.yml (right). Restored from the pre-split per-locale safety.lang.yml
+# so the translated key names survive the ADR-071 advanced/ relocation.
+airBlocks: "blocchiAria"
+unsafeBlocks: "blocchiPericolosi"
+version: "version"

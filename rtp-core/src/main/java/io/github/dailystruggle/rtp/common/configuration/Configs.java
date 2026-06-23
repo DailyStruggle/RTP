@@ -1,7 +1,11 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.effectsapi.common.EffectsGroupKeys;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
@@ -108,6 +112,27 @@ public class Configs {
    * @param parserEnumClass the enum class
    * @return the configuration parser, or null if not found
    */
+  /**
+   * Generic value shortcut: resolve the configured value for any config-parser
+   * enum constant by routing to the parser registered under the key's declaring
+   * enum (ADR-071). Returns {@code def} when no parser owns the key. This is the
+   * single mechanism replacing the former per-file parser lookups at message
+   * call sites.
+   *
+   * @param key the config enum constant (its declaring class identifies the parser)
+   * @param def the fallback value
+   * @return the resolved value, or {@code def}
+   */
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  public Object getConfigValue(Enum<?> key, Object def) {
+    if (key == null) return def;
+    FactoryValue<?> fv = getParser((Class) key.getDeclaringClass());
+    if (fv instanceof ConfigParser<?> cp) {
+      return ((ConfigParser) cp).getConfigValue((Enum) key, def);
+    }
+    return def;
+  }
+
   public <T extends Enum<T>> FactoryValue<T> getParser(Class<T> parserEnumClass) {
     if (configParserMap.containsKey(parserEnumClass))
       return (FactoryValue<T>) configParserMap.get(parserEnumClass);
@@ -223,6 +248,180 @@ public class Configs {
     }
   }
 
+  // ADR-071 rule 4: whole-file relocations into advanced/ that have already fired
+  // their one-time deprecation log, keyed by the legacy root file name.
+  private static final java.util.Set<String> warnedLegacyRootFiles =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+  /**
+   * ADR-071 rule 4: migrate a whole config file that has been relocated into a
+   * subdirectory (e.g. {@code logging.yml} -> {@code advanced/logging.yml}). When a
+   * legacy copy is still present at the plugin root, its operator-customized values
+   * are folded into the relocated parser, the legacy file is archived (renamed, not
+   * deleted), and a one-time deprecation warning is logged. A silent relocation that
+   * strands an operator's tuned values is prohibited.
+   *
+   * @param parser the relocated parser (authoritative new location)
+   * @param legacyFileName the legacy root file name to migrate from
+   */
+  void migrateLegacyRootConfig(ConfigParser<?> parser, String legacyFileName) {
+    File legacy = new File(pluginDirectory, legacyFileName);
+    if (!legacy.exists() || !legacy.isFile()) return;
+    try {
+      RtpYamlConfig yaml = RtpYamlConfig.load(legacy);
+      Map<String, Object> legacyMap = yaml.getMapValues(false);
+      boolean changed = false;
+      for (Map.Entry<String, Object> e : legacyMap.entrySet()) {
+        if (e.getKey() == null || e.getKey().equalsIgnoreCase("version")) continue;
+        try {
+          parser.set(e.getKey(), e.getValue());
+          changed = true;
+        } catch (RuntimeException ignored) {
+          // legacy key no longer recognized; drop it rather than fail the migration
+        }
+      }
+      if (changed) {
+        try {
+          parser.save();
+        } catch (Exception saveEx) {
+          RTP.log(Level.FINER, "[RTP] migrateLegacyRootConfig(" + legacyFileName
+              + ") save failed: " + saveEx.getMessage());
+        }
+      }
+      File archived = new File(pluginDirectory, legacyFileName + ".migrated");
+      if (!legacy.renameTo(archived)) {
+        RTP.log(Level.FINER,
+            "[RTP] migrateLegacyRootConfig(" + legacyFileName + ") could not archive legacy file");
+      }
+      if (warnedLegacyRootFiles.add(legacyFileName)) {
+        RTP.log(Level.WARNING, "[RTP] '" + legacyFileName + "' has moved to 'advanced/"
+            + legacyFileName + "' (ADR-071). Your settings were migrated; the old file was "
+            + "archived as '" + legacyFileName + ".migrated'.");
+      }
+    } catch (Exception ex) {
+      RTP.log(Level.FINER,
+          "[RTP] migrateLegacyRootConfig(" + legacyFileName + ") failed: " + ex.getMessage());
+    }
+  }
+
+  // ADR-071 rule 4: split-key migrations (a subset of keys moved out of a file
+  // that itself stays in place, e.g. airBlocks/biomes leaving safety.yml) that
+  // have already fired their one-time deprecation log, keyed by category label.
+  private static final java.util.Set<String> warnedLegacySplitKeys =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+  /**
+   * ADR-071 rule 4: migrate a subset of keys that were extracted out of a config
+   * file which itself remains at its original location. Unlike
+   * {@link #migrateLegacyRootConfig}, the legacy source file is <i>not</i>
+   * archived: it still owns the keys that did not move (e.g. {@code safety.yml}
+   * keeps the safety knobs after {@code airBlocks}/{@code unsafeBlocks} and
+   * {@code biomeWhitelist}/{@code biomes} move into {@code advanced/blocks.yml} /
+   * {@code advanced/biomes.yml}). Any value the legacy file still carries for a key
+   * the relocated parser recognizes is folded in (so an operator's customization is
+   * not stranded when the source file is rewritten on its own version bump), then a
+   * one-time deprecation warning is logged per category.
+   *
+   * @param parser the relocated parser (authoritative new location)
+   * @param legacySourceFile the file the keys were extracted from (left in place)
+   * @param categoryLabel a short label for the warn-once latch / log message
+   */
+  void migrateLegacyKeysFromFile(ConfigParser<?> parser, String legacySourceFile, String categoryLabel) {
+    File legacy = new File(pluginDirectory, legacySourceFile);
+    if (!legacy.exists() || !legacy.isFile()) return;
+    try {
+      RtpYamlConfig yaml = RtpYamlConfig.load(legacy);
+      Map<String, Object> legacyMap = yaml.getMapValues(false);
+      boolean migrated = false;
+      for (Map.Entry<String, Object> e : legacyMap.entrySet()) {
+        if (e.getKey() == null || e.getKey().equalsIgnoreCase("version")) continue;
+        try {
+          // parser.set rejects keys the relocated enum does not own; only the
+          // moved keys (e.g. airBlocks) are honored here.
+          parser.set(e.getKey(), e.getValue());
+          migrated = true;
+        } catch (RuntimeException ignored) {
+          // key not owned by this parser; skip
+        }
+      }
+      if (migrated) {
+        try {
+          parser.save();
+        } catch (Exception saveEx) {
+          RTP.log(Level.FINER, "[RTP] migrateLegacyKeysFromFile(" + categoryLabel
+              + ") save failed: " + saveEx.getMessage());
+        }
+        if (warnedLegacySplitKeys.add(categoryLabel)) {
+          RTP.log(Level.WARNING, "[RTP] the '" + categoryLabel + "' settings have moved out of "
+              + "'" + legacySourceFile + "' into 'advanced/" + categoryLabel + ".yml' (ADR-071). "
+              + "Your customized values were migrated; you may remove them from '"
+              + legacySourceFile + "'.");
+        }
+      }
+    } catch (Exception ex) {
+      RTP.log(Level.FINER,
+          "[RTP] migrateLegacyKeysFromFile(" + categoryLabel + ") failed: " + ex.getMessage());
+    }
+  }
+
+  /** ADR-071 rule 4: one-time latch for the legacy flat messages.yml deprecation log. */
+  private static volatile boolean warnedLegacyFlatMessages = false;
+
+  /**
+   * ADR-071 rule 4: migrate a legacy flat {@code messages.yml} (the pre-split
+   * monolithic message file) into the per-concern {@code messages/} files. Each
+   * top-level key is routed to the parser that now owns it (resolved via
+   * {@link Messages#byName(String)}), the affected files are saved, the legacy
+   * file is archived (renamed, not deleted), and a one-time deprecation warning
+   * is logged. No operator loses a tuned string on upgrade.
+   *
+   * @param parserMap the freshly-built parser map (message parsers already registered)
+   */
+  void migrateLegacyFlatMessages(Map<Class<?>, ConfigParser<?>> parserMap) {
+    File legacy = new File(pluginDirectory, "messages.yml");
+    if (!legacy.exists() || !legacy.isFile()) return;
+    try {
+      RtpYamlConfig yaml = RtpYamlConfig.load(legacy);
+      Map<String, Object> legacyMap = yaml.getMapValues(false);
+      java.util.Set<Class<?>> touched = new java.util.HashSet<>();
+      for (Map.Entry<String, Object> e : legacyMap.entrySet()) {
+        String key = e.getKey();
+        if (key == null || key.equalsIgnoreCase("version")) continue;
+        Enum<?> mk = Messages.byName(key);
+        if (mk == null) continue; // key no longer recognized; drop rather than fail
+        Class<?> owner = mk.getDeclaringClass();
+        ConfigParser<?> parser = parserMap.get(owner);
+        if (parser == null) continue;
+        try {
+          parser.set(key, e.getValue());
+          touched.add(owner);
+        } catch (RuntimeException ignored) {
+          // unrecognized key; skip
+        }
+      }
+      for (Class<?> owner : touched) {
+        try {
+          parserMap.get(owner).save();
+        } catch (Exception saveEx) {
+          RTP.log(Level.FINER, "[RTP] migrateLegacyFlatMessages() save failed for "
+              + owner.getSimpleName() + ": " + saveEx.getMessage());
+        }
+      }
+      File archived = new File(pluginDirectory, "messages.yml.migrated");
+      if (!legacy.renameTo(archived)) {
+        RTP.log(Level.FINER, "[RTP] migrateLegacyFlatMessages() could not archive legacy file");
+      }
+      if (!warnedLegacyFlatMessages) {
+        warnedLegacyFlatMessages = true;
+        RTP.log(Level.WARNING, "[RTP] the flat 'messages.yml' has been split into the 'messages/' "
+            + "directory (ADR-071). Your customized strings were migrated; the old file was "
+            + "archived as 'messages.yml.migrated'.");
+      }
+    } catch (Exception ex) {
+      RTP.log(Level.FINER, "[RTP] migrateLegacyFlatMessages() failed: " + ex.getMessage());
+    }
+  }
+
   /**
    * Reads the bundled {@code database.yml} {@code database} defaults from the JAR
    * resource. Returns an empty map for assemblies that ship no database.yml (lite).
@@ -231,7 +430,7 @@ public class Configs {
    */
   private Map<String, Object> readBundledDatabaseDefaults() {
     try (java.io.InputStream in =
-        RTP.class.getClassLoader().getResourceAsStream("database.yml")) {
+        RTP.class.getClassLoader().getResourceAsStream("advanced/database.yml")) {
       if (in == null) return new HashMap<>();
       RtpYamlConfig yaml = new RtpYamlConfig();
       yaml.loadConfiguration(in, true);
@@ -375,81 +574,118 @@ public class Configs {
     String locale = LanguageBootstrap.resolve(pluginDirectory);
     RTP.log(Level.FINE, "[RTP] reloadConfigs(): active locale resolved as '" + locale + "'");
 
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser logging.yml");
+    // ADR-071: logging.yml is advanced tuning, relocated under advanced/. A legacy
+    // root logging.yml left by an older install is migrated and archived (rule 4).
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/logging.yml");
     ConfigParser<LoggingKeys> logging =
-            new ConfigParser<>(LoggingKeys.class, "logging.yml", "1.0", pluginDirectory, fileDatabase, locale);
+            new ConfigParser<>(LoggingKeys.class, "advanced/logging.yml", "1.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(LoggingKeys.class, logging);
+    migrateLegacyRootConfig(logging, "logging.yml");
 
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser config.yml");
     ConfigParser<ConfigKeys> config =
             new ConfigParser<>(ConfigKeys.class, "config.yml", "3.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(ConfigKeys.class, config);
 
-    // ADR-071: database/persistence settings live in their own database.yml,
-    // split out of config.yml so config.yml is purely teleport behavior. The
-    // parser is lite-tolerant: the rtp-lite assembly (ADR-024) ships no
-    // database.yml resource, so register it only when the bundled resource (or
-    // an on-disk copy) is present. When absent, the database handlers fall back
-    // to the yaml/flat-file default.
+    // ADR-071: database/persistence settings live in their own advanced/database.yml,
+    // split out of config.yml so config.yml is purely teleport behavior, and tiered
+    // under advanced/ as a backend-tuning file. The parser is lite-tolerant: the
+    // rtp-lite assembly (ADR-024) ships no database.yml resource, so register it only
+    // when the bundled resource (or an on-disk copy) is present. When absent, the
+    // database handlers fall back to the yaml/flat-file default. A legacy root
+    // database.yml left by an older install is migrated and archived (rule 4).
     boolean databaseResourcePresent =
-            RTP.class.getClassLoader().getResource("database.yml") != null
+            RTP.class.getClassLoader().getResource("advanced/database.yml") != null
+                    || new File(pluginDirectory, "advanced" + File.separator + "database.yml").exists()
                     || new File(pluginDirectory, "database.yml").exists();
     if (databaseResourcePresent) {
-      RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser database.yml");
+      RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/database.yml");
       ConfigParser<DatabaseKeys> database =
-              new ConfigParser<>(DatabaseKeys.class, "database.yml", "1.0", pluginDirectory, fileDatabase, locale);
+              new ConfigParser<>(DatabaseKeys.class, "advanced/database.yml", "1.1", pluginDirectory, fileDatabase, locale);
       newConfigParserMap.put(DatabaseKeys.class, database);
+      migrateLegacyRootConfig(database, "database.yml");
     } else {
       RTP.log(Level.FINER, "[RTP] reloadConfigs(): database.yml resource absent (lite); skipping parser");
     }
 
-    // messages.yml is split, per concern, into a messages/ directory (player /
-    // network / commands / system, plus shared placeholders). The English
-    // baseline uses the merged-directory parser, which loads and merges those
-    // member files and migrates a legacy single-file messages.yml into the tree.
-    // Other locales keep their single lang/<locale>/messages.yml for now.
-    String sanitizedLocale = LanguageBootstrap.sanitize(locale);
-    boolean englishLocale = sanitizedLocale == null || sanitizedLocale.isEmpty()
-            || sanitizedLocale.equalsIgnoreCase(LanguageBootstrap.DEFAULT_LOCALE);
-    ConfigParser<MessagesKeys> lang;
-    if (englishLocale) {
-      RTP.log(Level.FINER, "[RTP] reloadConfigs(): building merged parser messages/");
-      lang = new ConfigParser<>(MessagesKeys.class, "messages.yml", "1.1", pluginDirectory,
-              fileDatabase, locale, "messages",
-              java.util.List.of("placeholders.yml", "player.yml", "network.yml",
-                      "commands.yml", "system.yml"));
-    } else {
-      RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages.yml");
-      lang = new ConfigParser<>(MessagesKeys.class, "messages.yml", "1.0", pluginDirectory, fileDatabase, locale);
-    }
-    newConfigParserMap.put(MessagesKeys.class, lang);
+    // ADR-071 rule 3: messages.yml is split, per concern, into a messages/
+    // directory, and the former monolithic MessagesKeys enum into one small enum
+    // per file. Each message file is an ordinary subpathed single-file parser
+    // (one enum, one file, one parser) - no merge-loader.
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/placeholders.yml");
+    newConfigParserMap.put(PlaceholderMessages.class,
+            new ConfigParser<>(PlaceholderMessages.class, "messages/placeholders.yml", "1.1", pluginDirectory, fileDatabase, locale));
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/player.yml");
+    newConfigParserMap.put(PlayerMessages.class,
+            new ConfigParser<>(PlayerMessages.class, "messages/player.yml", "1.1", pluginDirectory, fileDatabase, locale));
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/network.yml");
+    newConfigParserMap.put(NetworkMessages.class,
+            new ConfigParser<>(NetworkMessages.class, "messages/network.yml", "1.1", pluginDirectory, fileDatabase, locale));
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/commands.yml");
+    newConfigParserMap.put(CommandMessages.class,
+            new ConfigParser<>(CommandMessages.class, "messages/commands.yml", "1.1", pluginDirectory, fileDatabase, locale));
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/system.yml");
+    newConfigParserMap.put(SystemMessages.class,
+            new ConfigParser<>(SystemMessages.class, "messages/system.yml", "1.1", pluginDirectory, fileDatabase, locale));
+    // ADR-071 rule 4: a legacy flat messages.yml left by an older install is read
+    // once, its operator customizations folded into the matching per-concern
+    // files, archived (renamed, not deleted), and logged.
+    migrateLegacyFlatMessages(newConfigParserMap);
 
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser economy.yml");
     ConfigParser<EconomyKeys> economy =
             new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(EconomyKeys.class, economy);
 
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser performance.yml");
+    // ADR-071: performance.yml is advanced tuning, relocated under advanced/. A legacy
+    // root performance.yml left by an older install is migrated and archived (rule 4).
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/performance.yml");
     ConfigParser<PerformanceKeys> performance =
-            new ConfigParser<>(PerformanceKeys.class, "performance.yml", "1.0", pluginDirectory, fileDatabase, locale);
+            new ConfigParser<>(PerformanceKeys.class, "advanced/performance.yml", "1.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(PerformanceKeys.class, performance);
+    migrateLegacyRootConfig(performance, "performance.yml");
 
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser metrics.yml");
+    // ADR-071: metrics.yml is advanced tuning, relocated under advanced/. A legacy
+    // root metrics.yml left by an older install is migrated and archived (rule 4).
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/metrics.yml");
     ConfigParser<MetricsKeys> metrics =
-            new ConfigParser<>(MetricsKeys.class, "metrics.yml", "1.0", pluginDirectory, fileDatabase, locale);
+            new ConfigParser<>(MetricsKeys.class, "advanced/metrics.yml", "1.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(MetricsKeys.class, metrics);
+    migrateLegacyRootConfig(metrics, "metrics.yml");
 
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser safety/*.yml");
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser safety.yml");
     ConfigParser<SafetyKeys> safety =
-            new ConfigParser<>(SafetyKeys.class, "safety", "1.0", pluginDirectory, fileDatabase, locale);
+            new ConfigParser<>(SafetyKeys.class, "safety", "1.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(SafetyKeys.class, safety);
+
+    // ADR-071: the landing block lists (airBlocks / unsafeBlocks) and the biome
+    // filter (biomeWhitelist / biomes) are split out of safety.yml into advanced/
+    // tier files, each its own enum + file + parser. safety.yml keeps only the
+    // high-touch safety knobs.
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/blocks.yml");
+    ConfigParser<BlocksKeys> blocks =
+            new ConfigParser<>(BlocksKeys.class, "advanced/blocks.yml", "1.0", pluginDirectory, fileDatabase, locale);
+    newConfigParserMap.put(BlocksKeys.class, blocks);
+
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/biomes.yml");
+    ConfigParser<BiomesKeys> biomes =
+            new ConfigParser<>(BiomesKeys.class, "advanced/biomes.yml", "1.0", pluginDirectory, fileDatabase, locale);
+    newConfigParserMap.put(BiomesKeys.class, biomes);
+
+    // ADR-071 rule 4: an older install carries airBlocks/unsafeBlocks and
+    // biomeWhitelist/biomes inside the root safety.yml. Fold any operator
+    // customizations into the new parsers before the safety parser rewrites
+    // safety.yml on its version bump (which would otherwise drop them), warn
+    // once, and leave safety.yml in place (it still owns the remaining knobs).
+    migrateLegacyKeysFromFile(blocks, "safety.yml", "blocks");
+    migrateLegacyKeysFromFile(biomes, "safety.yml", "biomes");
 
     // Resolve #namespace:tag tokens (e.g. #minecraft:leaves) in airBlocks /
     // unsafeBlocks now, while we have the parser in hand and before any
     // probe / scan / live isAir / isSafe call can observe the raw form.
     // Logs the resolved lists at INFO for operator-visible debugging of
     // "placed on leaves / water" reports. See SafetyTokenExpander javadoc.
-    SafetyTokenExpander.expandAndApply(safety);
+    SafetyTokenExpander.expandAndApply(blocks);
 
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser regions/*.yml");
     MultiConfigParser<RegionKeys> regions =

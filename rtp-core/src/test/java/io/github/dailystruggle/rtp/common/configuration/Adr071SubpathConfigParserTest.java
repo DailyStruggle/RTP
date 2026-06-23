@@ -102,4 +102,65 @@ public class Adr071SubpathConfigParserTest {
         assertEquals("blocks.yml", ConfigParser.leafName("advanced\\blocks.yml"));
         assertEquals("config.yml", ConfigParser.leafName("config.yml"));
     }
+
+    // ADR-071 item 2.4: the same subpath handling must work against the already-shipped
+    // messages/ subdirectory, not only the synthetic advanced/ fixture. Driven by the
+    // bundled test resource at messages/player.yml.
+
+    enum PlayerMsgKeys {
+        alreadyTeleporting,
+        busy,
+        days,
+        version
+    }
+
+    private ConfigParser<PlayerMsgKeys> messagesParser() {
+        return new ConfigParser<>(
+                PlayerMsgKeys.class,
+                "messages/player.yml",
+                "1.0",
+                tempDir.toFile(),
+                new YamlFileDatabase(tempDir.toFile()),
+                "en");
+    }
+
+    @Test
+    @DisplayName("a messages/ subpathed name splits into subDir 'messages' and a bare leaf")
+    void messagesSubpathSplits() {
+        ConfigParser<PlayerMsgKeys> parser = messagesParser();
+        assertEquals("messages", parser.subDir, "subDir should carry the messages/ directory");
+        assertEquals("player.yml", parser.name, "name should be the bare leaf file name");
+    }
+
+    @Test
+    @DisplayName("the messages/ resource is extracted under <pluginDir>/messages/ (not flattened)")
+    void messagesExtractsUnderSubDir() {
+        messagesParser();
+        File onDisk = new File(tempDir.toFile(), "messages" + File.separator + "player.yml");
+        assertTrue(onDisk.exists(),
+                "subpathed messages config should be extracted to " + onDisk.getAbsolutePath());
+        assertFalse(new File(tempDir.toFile(), "player.yml").exists(),
+                "messages config must not be flattened to the plugin root");
+        assertFalse(new File(tempDir.toFile(), "messages_player.yml").exists(),
+                "the subdirectory separator must not be sanitized into the file name");
+    }
+
+    @Test
+    @DisplayName("values from a messages/ subpathed file are loaded and readable")
+    void messagesValuesLoad() {
+        ConfigParser<PlayerMsgKeys> parser = messagesParser();
+        assertEquals("&c[P0] busy", String.valueOf(parser.getConfigValue(PlayerMsgKeys.busy, null)),
+                "busy should be loaded from the subpathed messages file");
+        assertEquals("d", String.valueOf(parser.getConfigValue(PlayerMsgKeys.days, null)));
+    }
+
+    @Test
+    @DisplayName("the lang map mirror is created under lang/messages/ for the English locale")
+    void messagesLangMirrorUnderSubDir() {
+        messagesParser();
+        File langMirror = new File(tempDir.toFile(),
+                "lang" + File.separator + "messages" + File.separator + "player.lang.yml");
+        assertTrue(langMirror.exists(),
+                "lang mirror should be created at " + langMirror.getAbsolutePath());
+    }
 }

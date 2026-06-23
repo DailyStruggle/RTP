@@ -6,6 +6,8 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
@@ -192,10 +194,10 @@ final class PregenState {
         Set<String> biomeNames;
         if (biomeNamesIn == null || biomeNamesIn.isEmpty()) {
             defaultBiomes = true;
-            Object o = safety.getConfigValue(SafetyKeys.biomeWhitelist, false);
+            Object o = RTP.configs.getConfigValue(BiomesKeys.biomeWhitelist, false);
             biomeWhitelist = (o instanceof Boolean b) ? b : Boolean.parseBoolean(o.toString());
 
-            o = safety.getConfigValue(SafetyKeys.biomes, null);
+            o = RTP.configs.getConfigValue(BiomesKeys.biomes, null);
             List<String> biomeList =
                     (o instanceof List<?> list)
                             ? list.stream().map(Object::toString).toList()
@@ -227,7 +229,7 @@ final class PregenState {
             return null;
         }
 
-        Object o = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+        Object o = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
         Set<String> unsafeBlocks =
                 (o instanceof Collection<?> collection)
                         ? collection

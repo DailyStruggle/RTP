@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.tools;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -165,8 +166,6 @@ public class PlaceholderProvider {
                     if (n.longValue() == 0) return "0";
 
                     long time = n.longValue();
-                    ConfigParser<MessagesKeys> langParser =
-                            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
                     long days = TimeUnit.SECONDS.toDays(time);
                     long hours = TimeUnit.SECONDS.toHours(time) % 24;
                     long minutes = TimeUnit.SECONDS.toMinutes(time) % 60;
@@ -174,15 +173,15 @@ public class PlaceholderProvider {
 
                     String replacement = "";
                     if (days > 0)
-                        replacement += days + langParser.getConfigValue(MessagesKeys.days, "").toString() + " ";
+                        replacement += days + RTP.configs.getConfigValue(PlayerMessages.days, "").toString() + " ";
                     if (hours > 0)
                         replacement +=
-                                hours + langParser.getConfigValue(MessagesKeys.hours, "").toString() + " ";
+                                hours + RTP.configs.getConfigValue(PlayerMessages.hours, "").toString() + " ";
                     if (minutes > 0)
                         replacement +=
-                                minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
+                                minutes + RTP.configs.getConfigValue(PlayerMessages.minutes, "").toString() + " ";
                     if (seconds > 0)
-                        replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
+                        replacement += seconds + RTP.configs.getConfigValue(PlayerMessages.seconds, "").toString();
                     return replacement;
                 });
         placeholders.put(
@@ -198,8 +197,6 @@ public class PlaceholderProvider {
 
                     long time = n.longValue();
                     if (time <= 0) time = 0;
-                    ConfigParser<MessagesKeys> langParser =
-                            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
                     long days = TimeUnit.SECONDS.toDays(time);
                     long hours = TimeUnit.SECONDS.toHours(time) % 24;
                     long minutes = TimeUnit.SECONDS.toMinutes(time) % 60;
@@ -207,15 +204,15 @@ public class PlaceholderProvider {
 
                     String replacement = "";
                     if (days > 0)
-                        replacement += days + langParser.getConfigValue(MessagesKeys.days, "").toString() + " ";
+                        replacement += days + RTP.configs.getConfigValue(PlayerMessages.days, "").toString() + " ";
                     if (hours > 0)
                         replacement +=
-                                hours + langParser.getConfigValue(MessagesKeys.hours, "").toString() + " ";
+                                hours + RTP.configs.getConfigValue(PlayerMessages.hours, "").toString() + " ";
                     if (minutes > 0)
                         replacement +=
-                                minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
+                                minutes + RTP.configs.getConfigValue(PlayerMessages.minutes, "").toString() + " ";
                     if (seconds > 0)
-                        replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
+                        replacement += seconds + RTP.configs.getConfigValue(PlayerMessages.seconds, "").toString();
                     return replacement;
                 });
         placeholders.put(
@@ -238,8 +235,6 @@ public class PlaceholderProvider {
                         long remainingTime = n - currTime;
                         if (remainingTime < 0) remainingTime = 0;
 
-                        ConfigParser<MessagesKeys> langParser =
-                                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
                         long days = TimeUnit.MILLISECONDS.toDays(remainingTime);
                         long hours = TimeUnit.MILLISECONDS.toHours(remainingTime) % 24;
                         long minutes = TimeUnit.MILLISECONDS.toMinutes(remainingTime) % 60;
@@ -253,20 +248,20 @@ public class PlaceholderProvider {
                         String replacement = "";
                         if (days > 0)
                             replacement +=
-                                    days + langParser.getConfigValue(MessagesKeys.days, "").toString() + " ";
+                                    days + RTP.configs.getConfigValue(PlayerMessages.days, "").toString() + " ";
                         if (hours > 0)
                             replacement +=
-                                    hours + langParser.getConfigValue(MessagesKeys.hours, "").toString() + " ";
+                                    hours + RTP.configs.getConfigValue(PlayerMessages.hours, "").toString() + " ";
                         if (minutes > 0)
                             replacement +=
-                                    minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
+                                    minutes + RTP.configs.getConfigValue(PlayerMessages.minutes, "").toString() + " ";
                         if (seconds > 0) {
 
                             replacement +=
-                                    seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
+                                    seconds + RTP.configs.getConfigValue(PlayerMessages.seconds, "").toString();
                         }
                         if (seconds < 2) {
-                            replacement += millis + langParser.getConfigValue(MessagesKeys.millis, "").toString();
+                            replacement += millis + RTP.configs.getConfigValue(PlayerMessages.millis, "").toString();
                         }
                         return replacement;
                     }
@@ -286,8 +281,6 @@ public class PlaceholderProvider {
                             uuid, cap, resetMillis, System.currentTimeMillis());
                     if (remainingTime <= 0) return "";
 
-                    ConfigParser<MessagesKeys> langParser =
-                            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
                     long days = TimeUnit.MILLISECONDS.toDays(remainingTime);
                     long hours = TimeUnit.MILLISECONDS.toHours(remainingTime) % 24;
                     long minutes = TimeUnit.MILLISECONDS.toMinutes(remainingTime) % 60;
@@ -296,20 +289,20 @@ public class PlaceholderProvider {
                     String replacement = "";
                     if (days > 0)
                         replacement +=
-                                days + langParser.getConfigValue(MessagesKeys.days, "").toString() + " ";
+                                days + RTP.configs.getConfigValue(PlayerMessages.days, "").toString() + " ";
                     if (hours > 0)
                         replacement +=
-                                hours + langParser.getConfigValue(MessagesKeys.hours, "").toString() + " ";
+                                hours + RTP.configs.getConfigValue(PlayerMessages.hours, "").toString() + " ";
                     if (minutes > 0)
                         replacement +=
-                                minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
+                                minutes + RTP.configs.getConfigValue(PlayerMessages.minutes, "").toString() + " ";
                     if (seconds > 0)
                         replacement +=
-                                seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
+                                seconds + RTP.configs.getConfigValue(PlayerMessages.seconds, "").toString();
                     // Sub-second remainder: show at least "1s" so the clock is never blank
                     // while the player is still locked.
                     if (replacement.isEmpty())
-                        replacement = "1" + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
+                        replacement = "1" + RTP.configs.getConfigValue(PlayerMessages.seconds, "").toString();
                     return replacement.trim();
                 });
         placeholders.put(
@@ -673,8 +666,6 @@ public class PlaceholderProvider {
 
                     long time = (teleportData != null) ? teleportData.processingTime : 0L;
 
-                    ConfigParser<MessagesKeys> langParser =
-                            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
                     long days = TimeUnit.MILLISECONDS.toDays(time);
                     long hours = TimeUnit.MILLISECONDS.toHours(time) % 24;
                     long minutes = TimeUnit.MILLISECONDS.toMinutes(time) % 60;
@@ -687,17 +678,17 @@ public class PlaceholderProvider {
 
                     String replacement = "";
                     if (days > 0)
-                        replacement += days + langParser.getConfigValue(MessagesKeys.days, "").toString() + " ";
+                        replacement += days + RTP.configs.getConfigValue(PlayerMessages.days, "").toString() + " ";
                     if (hours > 0)
                         replacement +=
-                                hours + langParser.getConfigValue(MessagesKeys.hours, "").toString() + " ";
+                                hours + RTP.configs.getConfigValue(PlayerMessages.hours, "").toString() + " ";
                     if (minutes > 0)
                         replacement +=
-                                minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
+                                minutes + RTP.configs.getConfigValue(PlayerMessages.minutes, "").toString() + " ";
                     if (seconds > 0)
-                        replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
+                        replacement += seconds + RTP.configs.getConfigValue(PlayerMessages.seconds, "").toString();
                     if (seconds < 2) {
-                        replacement += millis + langParser.getConfigValue(MessagesKeys.millis, "").toString();
+                        replacement += millis + RTP.configs.getConfigValue(PlayerMessages.millis, "").toString();
                     }
                     return replacement;
                 });
@@ -738,19 +729,17 @@ public class PlaceholderProvider {
                     }
 
                     TeleportData data = RTP.getInstance().latestTeleportData.get(uuid);
-                    ConfigParser<MessagesKeys> lang =
-                            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
                     if (data == null)
-                        return lang.getConfigValue(MessagesKeys.PLAYER_AVAILABLE, "").toString();
+                        return RTP.configs.getConfigValue(PlayerMessages.PLAYER_AVAILABLE, "").toString();
                     if (data.completed) {
                         long dt = System.currentTimeMillis() - data.time;
                         if (dt < 0) dt = Long.MAX_VALUE + dt;
                         if (dt < sender.cooldown()) {
-                            return lang.getConfigValue(MessagesKeys.PLAYER_COOLDOWN, "").toString();
+                            return RTP.configs.getConfigValue(PlayerMessages.PLAYER_COOLDOWN, "").toString();
                         }
 
-                        return lang.getConfigValue(MessagesKeys.PLAYER_AVAILABLE, "").toString();
+                        return RTP.configs.getConfigValue(PlayerMessages.PLAYER_AVAILABLE, "").toString();
                     }
 
                     RTPRunnable nextTask = data.nextTask;
@@ -758,11 +747,11 @@ public class PlaceholderProvider {
                         TeleportPipelineTask task = (TeleportPipelineTask) nextTask;
                         switch (task.getPhase()) {
                             case TELEPORT:
-                                return lang.getConfigValue(MessagesKeys.PLAYER_TELEPORTING, "").toString();
+                                return RTP.configs.getConfigValue(PlayerMessages.PLAYER_TELEPORTING, "").toString();
                             case LOAD:
-                                return lang.getConfigValue(MessagesKeys.PLAYER_LOADING, "").toString();
+                                return RTP.configs.getConfigValue(PlayerMessages.PLAYER_LOADING, "").toString();
                             case SETUP:
-                                return lang.getConfigValue(MessagesKeys.PLAYER_SETUP, "").toString();
+                                return RTP.configs.getConfigValue(PlayerMessages.PLAYER_SETUP, "").toString();
                             default:
                                 break;
                         }
@@ -920,10 +909,8 @@ public class PlaceholderProvider {
                             if (task.latestEtaSeconds > maxEta) maxEta = task.latestEtaSeconds;
                         }
 
-                        ConfigParser<MessagesKeys> langParser =
-                                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
-                        if (langParser == null) return maxEta + "s";
+                        if (RTP.configs == null) return maxEta + "s";
 
                         long days = TimeUnit.SECONDS.toDays(maxEta);
                         long hours = TimeUnit.SECONDS.toHours(maxEta) % 24;
@@ -933,17 +920,17 @@ public class PlaceholderProvider {
                         StringBuilder replacement = new StringBuilder();
 
                         if (days > 0) {
-                            replacement.append(days).append(String.valueOf(langParser.getConfigValue(MessagesKeys.days, ""))).append(" ");
+                            replacement.append(days).append(String.valueOf(RTP.configs.getConfigValue(PlayerMessages.days, ""))).append(" ");
                         }
                         if (hours > 0) {
-                            replacement.append(hours).append(String.valueOf(langParser.getConfigValue(MessagesKeys.hours, ""))).append(" ");
+                            replacement.append(hours).append(String.valueOf(RTP.configs.getConfigValue(PlayerMessages.hours, ""))).append(" ");
                         }
                         if (minutes > 0) {
-                            replacement.append(minutes).append(String.valueOf(langParser.getConfigValue(MessagesKeys.minutes, ""))).append(" ");
+                            replacement.append(minutes).append(String.valueOf(RTP.configs.getConfigValue(PlayerMessages.minutes, ""))).append(" ");
                         }
 
                         if (seconds > 0 || replacement.length() == 0) {
-                            replacement.append(seconds).append(String.valueOf(langParser.getConfigValue(MessagesKeys.seconds, "")));
+                            replacement.append(seconds).append(String.valueOf(RTP.configs.getConfigValue(PlayerMessages.seconds, "")));
                         }
 
                         return replacement.toString().trim();
@@ -1014,7 +1001,7 @@ public class PlaceholderProvider {
                 MultiConfigParser<WorldKeys> worlds =
                         (MultiConfigParser<WorldKeys>) RTP.configs.getParser(WorldKeys.class);
                 ConfigParser<WorldKeys> parser = worlds.getParser(world.name());
-                return parser.getConfigValue(WorldKeys.requirePermission, false).toString();
+                return RTP.configs.getConfigValue(WorldKeys.requirePermission, false).toString();
             }
             return "false";
         });
@@ -1025,7 +1012,7 @@ public class PlaceholderProvider {
                 MultiConfigParser<WorldKeys> worlds =
                         (MultiConfigParser<WorldKeys>) RTP.configs.getParser(WorldKeys.class);
                 ConfigParser<WorldKeys> parser = worlds.getParser(world.name());
-                String override = parser.getConfigValue(WorldKeys.override, "[0]").toString();
+                String override = RTP.configs.getConfigValue(WorldKeys.override, "[0]").toString();
                 if (override.startsWith("[") && override.endsWith("]")) {
                     try {
                         int num = Integer.parseInt(override.substring(1, override.length() - 1));
@@ -1209,8 +1196,7 @@ public class PlaceholderProvider {
     }
 
     public static String fillNumericPlaceholders(String text) {
-        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        if (lang == null) return text;
+        if (RTP.configs == null) return text;
         // [p0], [p1]...
         text = fillNumericPlaceholders(text, Pattern.compile("\\[([Pp])(\\d*)]"), "\\[[Pp]\\d*]");
         // %p0%, %p1%...
@@ -1231,9 +1217,7 @@ public class PlaceholderProvider {
             matcher.reset();
 
             String replacement = "[invalid]";
-            ConfigParser<MessagesKeys> parser =
-                    (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-            Object o = parser.getConfigValue(MessagesKeys.placeholders, new ArrayList<>());
+            Object o = RTP.configs.getConfigValue(PlaceholderMessages.placeholders, new ArrayList<>());
             if (o instanceof List<?> pList) {
                 if (pList.size() > bits) {
                     replacement = pList.get(bits).toString();
