@@ -70,74 +70,6 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   public static int bakRetention = ConfigBackups.DEFAULT_BAK_RETENTION;
 
   /**
-   * Member file names (relative to the {@code <pluginDir>/messages} directory,
-   * e.g. {@code "player.yml"}) when this parser operates in merged-directory
-   * mode, or {@code null} for a normal single-file parser. In merged mode the
-   * value data for a single enum schema ({@link io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys})
-   * is split across several physical files in a {@code messages/} directory;
-   * the parser loads and merges them, routing each key's write-back to the file
-   * that owns it. Only used for the English baseline (other locales keep the
-   * single {@code lang/<locale>/messages.yml}).
-   */
-  private List<String> mergedMembers = null;
-
-  /** The directory (relative to {@link #pluginDirectory}) that holds the merged member files. */
-  private String mergedDir = null;
-
-  /** Live member YAML configs in merged mode, keyed by member file name. */
-  private Map<String, RtpYamlConfig> mergedMemberConfigs = new LinkedHashMap<>();
-
-  /** Maps an on-disk top-level YAML key to the member file that owns it (merged mode). */
-  private Map<String, String> mergedKeyOwner = new HashMap<>();
-
-  /** Fallback owner member for keys not present in any member file (merged mode). */
-  private String mergedPrimaryMember = null;
-
-  /**
-   * Merged-directory constructor. Splits a single enum schema across several
-   * physical files under {@code <pluginDir>/<dir>/} (e.g. {@code messages/}),
-   * loading and merging them into one logical parser. Write-back (set/save) is
-   * routed to the member file that owns each key, and an existing single-file
-   * {@code <name>} left over from a previous version is migrated into the split
-   * tree on first load.
-   *
-   * @param eClass          the enum class for configuration keys
-   * @param name            the logical config name (e.g. {@code "messages.yml"}), used for the
-   *                        {@code .lang.yml} mapping and the {@code /rtp config} sub-command name
-   * @param version         the required version string
-   * @param pluginDirectory the plugin data directory
-   * @param fileDatabase    the file database
-   * @param locale          the locale code (merged mode is intended for the English baseline)
-   * @param dir             the sub-directory holding the member files (e.g. {@code "messages"})
-   * @param members         the member file names within {@code dir} (e.g. {@code ["player.yml", ...]})
-   */
-  public ConfigParser(
-      Class<E> eClass,
-      final String name,
-      final String version,
-      final File pluginDirectory,
-      YamlFileDatabase fileDatabase,
-      String locale,
-      String dir,
-      List<String> members) {
-    super(eClass, sanitizeName(name));
-    this.fileDatabase = fileDatabase;
-    String sn = sanitizeName(name);
-    this.name = (sn.endsWith(".yml")) ? sn : sn + ".yml";
-    this.version = version;
-    this.pluginDirectory = pluginDirectory;
-    this.locale = LanguageBootstrap.sanitize(locale);
-    this.mergedDir = dir;
-    this.mergedMembers = new ArrayList<>(members);
-    // Default ownership for unknown / brand-new keys: the last member (system.yml
-    // for messages), which also carries the version stamp.
-    this.mergedPrimaryMember = this.mergedMembers.isEmpty()
-        ? null
-        : this.mergedMembers.get(this.mergedMembers.size() - 1);
-    check(version, pluginDirectory, null);
-  }
-
-  /**
    * Constructor for ConfigParser
    *
    * @param eClass the enum class for configuration keys
@@ -794,10 +726,6 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    * @param langFile the language file
    */
   public void check(final String version, final File pluginDirectory, @Nullable File langFile) {
-    if (mergedMembers != null) {
-      checkMerged(pluginDirectory, langFile);
-      return;
-    }
     // construct language file from enum vals
     // todo: apply translation to loads and saves
     try {
@@ -907,214 +835,6 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         if (yf != null) yf.save();
       } catch (IOException e) {
         RTP.log(Level.WARNING, e.getMessage(), e);
-      }
-    }
-  }
-
-  /**
-   * Merged-directory variant of {@link #check}. Ensures the {@code <pluginDir>/<dir>}
-   * member files exist (extracting from the JAR when missing), migrates any legacy
-   * single-file {@code <name>} into the split tree, then loads and merges every
-   * member file into one logical {@link #data} map. An in-memory aggregate
-   * {@link RtpYamlConfig} is published under {@link #name} in the shared file-database
-   * cache so {@link #getYamlRoot()} (menu hover) keeps working unchanged.
-   */
-  private void checkMerged(File pluginDirectory, @Nullable File langFile) {
-    try {
-      loadLangFile(langFile);
-    } catch (IOException | IllegalArgumentException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
-    }
-
-    cachedLookup = fileDatabase.cachedLookup;
-    if (cachedLookup.get() == null) fileDatabase.connect();
-
-    File dir = new File(pluginDirectory, mergedDir);
-    if (!dir.exists() && !dir.mkdirs()) {
-      RTP.log(Level.WARNING, "[RTP] unable to create directory " + dir.getAbsolutePath());
-    }
-
-    // Extract any missing member from the JAR (English baseline at messages/<member>).
-    for (String member : mergedMembers) {
-      File f = new File(dir, member);
-      if (!f.exists()) extractMergedMember(member, f);
-    }
-
-    // Migrate a legacy single-file messages.yml (operator customizations) into the tree.
-    migrateLegacyMessages(pluginDirectory, dir);
-
-    // Load + merge members; build the aggregate and the key->owner map.
-    mergedMemberConfigs = new LinkedHashMap<>();
-    mergedKeyOwner = new HashMap<>();
-    RtpYamlConfig aggregate = new RtpYamlConfig(new File(pluginDirectory, this.name).getPath());
-    for (String member : mergedMembers) {
-      File f = new File(dir, member);
-      if (!f.exists()) continue;
-      RtpYamlConfig cfg = new RtpYamlConfig(f.getPath());
-      try {
-        cfg.loadWithComments();
-      } catch (IOException | RuntimeException e) {
-        RTP.log(Level.WARNING, "[RTP] failed to load merged member " + f + ": " + e.getMessage());
-        continue;
-      }
-      mergedMemberConfigs.put(member, cfg);
-      for (String key : cfg.getKeys(false)) {
-        mergedKeyOwner.put(key, member);
-        Object value = cfg.get(key);
-        aggregate.set(key, value);
-        String comment = cfg.getComment(key);
-        if (comment != null && !comment.isEmpty()) {
-          try {
-            aggregate.setComment(key, comment);
-          } catch (RuntimeException ignored) {
-          }
-        }
-      }
-    }
-    cachedLookup.get().put(this.name, aggregate);
-
-    // Populate the enum-keyed data map from the merged aggregate.
-    data.clear();
-    for (E v : myClass.getEnumConstants()) {
-      Object keyName = language_mapping.get(v.name());
-      if (keyName == null) keyName = v.name();
-      Object fromString = aggregate.get(keyName.toString());
-      if (fromString != null) data.put(v, fromString);
-    }
-  }
-
-  /** Extract a merged member ({@code <dir>/<member>}) from the JAR to {@code target}. */
-  private void extractMergedMember(String member, File target) {
-    String jarPath = mergedDir + "/" + member;
-    try (java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream(jarPath)) {
-      if (in == null) {
-        RTP.log(Level.WARNING, "[RTP] missing JAR resource for merged member " + jarPath);
-        return;
-      }
-      File parent = target.getParentFile();
-      if (parent != null && !parent.exists()) parent.mkdirs();
-      try (FileOutputStream out = new FileOutputStream(target)) {
-        byte[] buf = new byte[1024];
-        int len;
-        while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
-      }
-    } catch (IOException e) {
-      RTP.log(Level.WARNING, "[RTP] failed to extract merged member " + jarPath, e);
-    }
-  }
-
-  /**
-   * One-time migration of a legacy single-file {@code <pluginDir>/<name>} (e.g.
-   * {@code messages.yml}) into the merged member tree. Only operator-customized
-   * values (those differing from the shipped English baseline) are transferred,
-   * each into the member file that owns its key. The legacy file is then renamed
-   * to {@code <name>.migrated} (kept, not deleted) so nothing is lost.
-   */
-  private void migrateLegacyMessages(File pluginDirectory, File dir) {
-    File legacy = new File(pluginDirectory, this.name);
-    if (!legacy.exists() || !legacy.isFile()) return;
-
-    RtpYamlConfig old = new RtpYamlConfig(legacy.getPath());
-    try {
-      old.loadWithComments();
-    } catch (IOException | RuntimeException e) {
-      RTP.log(Level.WARNING,
-          "[RTP] legacy " + this.name + " could not be parsed for migration: " + e.getMessage());
-      return;
-    }
-
-    // Load live (on-disk) member configs to write the customized values into,
-    // and derive key ownership from them so migration works even when the JAR
-    // member resources are not on the classpath.
-    Map<String, String> keyToMember = new HashMap<>();
-    Map<String, RtpYamlConfig> live = new LinkedHashMap<>();
-    for (String member : mergedMembers) {
-      File f = new File(dir, member);
-      RtpYamlConfig cfg = new RtpYamlConfig(f.getPath());
-      try {
-        if (f.exists()) cfg.loadWithComments();
-      } catch (IOException | RuntimeException ignored) {
-        continue;
-      }
-      live.put(member, cfg);
-      if (f.exists()) {
-        for (String key : cfg.getKeys(false)) keyToMember.putIfAbsent(key, member);
-      }
-    }
-
-    // Shipped English baseline values (from the bundled member resources), used
-    // to skip transferring values the operator never actually changed.
-    Map<String, Object> baselineValues = new HashMap<>();
-    for (String member : mergedMembers) {
-      RtpYamlConfig jar = parseJarYaml(mergedDir + "/" + member);
-      if (jar == null) continue;
-      for (String key : jar.getKeys(false)) baselineValues.put(key, jar.get(key));
-    }
-
-    Set<String> changedMembers = new HashSet<>();
-    for (String key : old.getKeys(false)) {
-      if (key.equalsIgnoreCase("version")) continue;
-      String member = keyToMember.get(key);
-      if (member == null) continue; // unknown / removed key - drop
-      Object oldVal = old.get(key);
-      if (oldVal == null) continue;
-      if (valuesEqual(oldVal, baselineValues.get(key))) continue; // not customized
-      RtpYamlConfig cfg = live.get(member);
-      if (cfg == null) continue;
-      cfg.set(key, oldVal);
-      changedMembers.add(member);
-    }
-
-    for (String member : changedMembers) {
-      RtpYamlConfig cfg = live.get(member);
-      try {
-        cfg.save();
-      } catch (IOException e) {
-        RTP.log(Level.WARNING, "[RTP] migration: failed to save member " + member + ": " + e.getMessage());
-      }
-    }
-
-    // Archive the legacy file so it is not re-migrated and nothing is lost.
-    File archived = new File(pluginDirectory, this.name + ".migrated");
-    try {
-      Files.deleteIfExists(archived.toPath());
-      Files.move(legacy.toPath(), archived.toPath());
-      RTP.log(Level.INFO,
-          "[RTP] migrated legacy " + this.name + " into " + mergedDir + "/ (archived as "
-              + archived.getName() + ")");
-    } catch (IOException e) {
-      RTP.log(Level.WARNING, "[RTP] could not archive legacy " + this.name + ": " + e.getMessage());
-    }
-  }
-
-  /** Parse a bundled JAR YAML resource into a loaded {@link RtpYamlConfig}, or {@code null}. */
-  @Nullable
-  private RtpYamlConfig parseJarYaml(String jarPath) {
-    java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream(jarPath);
-    if (in == null) return null;
-    File tmp = null;
-    try {
-      tmp = File.createTempFile("rtp-merged-", "-" + jarPath.replace('/', '_'));
-      try (FileOutputStream out = new FileOutputStream(tmp)) {
-        byte[] buf = new byte[1024];
-        int len;
-        while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
-      }
-      RtpYamlConfig cfg = new RtpYamlConfig(tmp.getPath());
-      cfg.loadWithComments();
-      return cfg;
-    } catch (IOException | RuntimeException e) {
-      return null;
-    } finally {
-      try {
-        in.close();
-      } catch (IOException ignored) {
-      }
-      if (tmp != null) {
-        try {
-          Files.deleteIfExists(tmp.toPath());
-        } catch (IOException ignored) {
-        }
       }
     }
   }
@@ -1336,11 +1056,6 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
     super.set(key, value);
 
-    if (mergedMembers != null) {
-      setMerged(key, value);
-      return;
-    }
-
     RtpYamlConfig RtpYamlConfig = cachedLookup.get().get(name);
     Object yamlKey = language_mapping.get(key.name());
     if (yamlKey == null) yamlKey = key.name();
@@ -1405,38 +1120,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   /**
-   * Merged-mode write-back: route the edited key to the member file that owns it
-   * (defaulting to the primary member for a brand-new key) and keep the in-memory
-   * aggregate in sync. {@link #data} was already updated by {@code super.set}.
-   */
-  private void setMerged(E key, Object value) {
-    Object yamlKey = language_mapping.get(key.name());
-    if (yamlKey == null) yamlKey = key.name();
-    String yamlKeyStr = yamlKey.toString();
-
-    String member = mergedKeyOwner.get(yamlKeyStr);
-    if (member == null) {
-      member = mergedPrimaryMember;
-      if (member != null) mergedKeyOwner.put(yamlKeyStr, member);
-    }
-    if (member != null) {
-      RtpYamlConfig cfg = mergedMemberConfigs.get(member);
-      if (cfg != null) cfg.set(yamlKeyStr, value);
-    }
-    RtpYamlConfig aggregate = cachedLookup.get().get(name);
-    if (aggregate != null) aggregate.set(yamlKeyStr, value);
-  }
-
-  /**
    * Save the configuration to disk
    *
    * @throws IOException if an I/O error occurs
    */
   public void save() throws IOException {
-    if (mergedMembers != null) {
-      saveMerged();
-      return;
-    }
     RtpYamlConfig RtpYamlConfig = cachedLookup.get().get(name);
     RtpYamlConfig.options().copyDefaults(true);
     RtpYamlConfig.options().indent(2);
@@ -1455,25 +1143,6 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
               + backupFailure.getMessage());
     }
     RtpYamlConfig.save();
-  }
-
-  /** Merged-mode save: back up and write every member file. */
-  private void saveMerged() throws IOException {
-    for (RtpYamlConfig cfg : mergedMemberConfigs.values()) {
-      cfg.options().copyDefaults(true);
-      cfg.options().indent(2);
-      try {
-        File configFile = cfg.getConfigurationFile();
-        if (configFile != null) {
-          ConfigBackups.backup(configFile, bakRetention);
-        }
-      } catch (IOException | RuntimeException backupFailure) {
-        RTP.log(Level.WARNING,
-            "[RTP] config backup failed for a " + name + " member - proceeding with save: "
-                + backupFailure.getMessage());
-      }
-      cfg.save();
-    }
   }
 
   @Override
