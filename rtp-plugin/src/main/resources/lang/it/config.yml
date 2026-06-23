@@ -61,50 +61,6 @@ comandiConsole:
 comandiGiocatore:
   - ""
 
-# Backend del database usato per la persistenza.
-# yaml/sqlite sono basati su file e non richiedono configurazione extra; mysql e
-# postgresql usano i campi host/port/name/username/password qui sotto.
-database:
-  # Backend type.
-  # @type: enum
-  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
-  # @default: "sqlite"
-  type: "sqlite"
-  # Host del database. Usato solo da mysql/postgresql.
-  # @type: string
-  host: "127.0.0.1"
-  # Porta del database. Usata solo da mysql/postgresql.
-  # @type: integer
-  # @range: [1, 65535]
-  port: 3306
-  # Nome del database / schema. Usato solo da mysql/postgresql.
-  # @type: string
-  name: "rtp"
-  # Nome utente del database. Usato solo da mysql/postgresql.
-  # @type: string
-  username: "root"
-  # Password del database. Usata solo da mysql/postgresql.
-  # @type: string
-  password: "password"
-
-# Impostazioni di trasporto cross-server / proxy.
-rete:
-  redis:
-    # Enable Redis-backed network state binding.
-    # @type: boolean
-    # @default: false
-    enabled: false
-    # Redis host.
-    # @type: string
-    host: "127.0.0.1"
-    # Redis port.
-    # @type: integer
-    # @range: [1, 65535]
-    port: 6379
-    # Redis password. Empty string disables auth.
-    # @type: string
-    password: ""
-
 # Framework di menù generalizzato.
 # `renderer` è una lista ordinata di preferenze di id di renderer. In caso di
 # eccezione o di adattatore mancante il framework percorre la lista e ripiega
@@ -113,11 +69,11 @@ rete:
 # book. (Il renderer chat arriva in un follow-up e sarà aggiunto alla lista
 # predefinita a quel punto.)
 menu:
-  # Lista ordinata di preferenze di id di renderer.
+  # Ordered preference list of renderer ids.
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:
     - "book"
 
 # NON MODIFICARE IL NUMERO DI VERSIONE
-versione: 3.0
+versione: 3.1

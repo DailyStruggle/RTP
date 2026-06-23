@@ -1,0 +1,41 @@
+# --- RTP Cross-Server (Network Mode) Messages ---
+# Player-facing feedback shown during a cross-server /rtp, only used when
+# cross-server network mode is enabled. All keys are optional - the baseline
+# delayMessage / teleportMessage cycle still drives the visible flow.
+#
+# Formatting and shared [Pn] placeholders follow the same rules as player.yml.
+
+# ###############################################################################
+# Section 3: Cross-Server Teleport (Network Mode)
+# ###############################################################################
+# Sent when the request joins the cross-server queue. Placeholder: [position]
+# - position in line; may be empty.
+networkQueued: "&7[P0] queued for a cross-server destination (position [position])..."
+# Sent when a player runs /rtp while already waiting in the cross-server queue.
+# Placeholder: [position] - position in line; may be empty.
+alreadyQueued: "&cYou are already waiting in the cross-server queue (position [position]). Please wait."
+# Sent when a cross-server queue entry waited too long and was dropped.
+# No placeholders.
+networkTimedOut: "&c[P0] cross-server teleport timed out while waiting for a backend."
+# Sent when the cross-server queue is full and the request is rejected.
+# No placeholders.
+waitlistFull: "&c[P0] cross-server queue is full; please try again shortly."
+# Sent while a destination server is being selected.
+networkRouting: "&7[P0] routing to a backend..."
+# Sent when a destination has been reserved and the transfer is starting.
+# Placeholder: [server] - the destination server name.
+networkReserved: "&a[P0] coordinate reserved on [server]. Transferring..."
+# Sent while the transfer is in progress. Placeholder: [server] - destination.
+networkTransferring: "&a[P0] transferring to [server]..."
+# Sent when the cross-server path gave up and fell back to the local server.
+# Placeholder: [reason] - the reason for falling back.
+networkFallback: "&e[P0] cross-server unavailable ([reason]); falling back to local."
+# Sent when the cross-server request failed and no fallback was possible.
+# Placeholder: [reason] - the failure reason.
+networkFailed: "&c[P0] cross-server teleport failed: [reason]."
+# Sent when the requested region is not currently served by any server.
+# Placeholder: [region] - the requested region name.
+networkRegionUnavailable: "&c[P0] no backend is currently serving region '[region]'."
+# Sent when the requested region name matches more than one server.
+# Placeholder: [region] - the requested region name.
+networkRegionAmbiguous: "&c[P0] region '[region]' is ambiguous across backends; please pin a server."

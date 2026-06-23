@@ -64,7 +64,7 @@ spielerBefehle:
 # zurück. Verfügbare IDs: book. (Der Chat-Renderer kommt im Folge-Release
 # und wird dann der Standardliste hinzugefügt.)
 menu:
-  # Geordnete Präferenzliste von Renderer-IDs.
+  # Ordered preference list of renderer ids.
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:
@@ -78,4 +78,4 @@ menu:
     - "book"
 
 # ÄNDERE NICHT DIE VERSIONSNUMMER
-version: 3.0
+version: 3.1

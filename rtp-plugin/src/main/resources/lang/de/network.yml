@@ -1,233 +1,256 @@
-# RTP Netzwerkmodus (Multi-Server / Multi-Proxy)
-#
-# Standardmäßig deaktiviert; das Umstellen von
-# `network.enabled: true` nimmt dieses Backend in das serverübergreifende Netzwerk auf.
-#
-# REQ-RTP-NET-002 (Verhaltensgleichheit bei Deaktivierung): wenn `enabled: false`,
-# wird diese Datei gelesen, validiert und ansonsten ignoriert - es starten keine Threads,
-# es werden keine Datenbanktabellen erstellt, es öffnet kein Transport. Das Backend verhält
-# sich byte-identisch zu einem Build ohne Netzwerkmodus.
+# RTP Netzwerkmodus (Multi-Server / Multi-Proxy) Standardmäßig deaktiviert; das Umstellen von `network.enabled: true` nimmt dieses Backend in das serverübergreifende Netzwerk auf.
 network:
+  # When false this file is read and validated, then ignored - no threads, tables, or transport open.
+  # @type: boolean
+  # @default: false
   enabled: false
-  # Stabile Backend-Identität. Erforderlich, wenn `enabled: true`. Kein Standard - der
-  # Betreiber MUSS eine angeben; zwei Backends mit derselben serverId überschreiben
-  # gegenseitig ihre Heartbeat-Zeile.
+  # Stabile Backend-Identität.
+  # @type: string
+  # @default: "
   serverId: ""
-  # Umgebungsvariable mit dem gemeinsamen HMAC-Secret. Erforderlich, wenn
-  # `enabled: true` UND `transport.type: redis`; die SQL-Bindung behandelt
-  # die Umgebungsvariable derzeit als optional (DB-Verbindungs-Authentifizierung + TLS bilden die
-  # Sicherheitsgrenze).
+  # Umgebungsvariable mit dem gemeinsamen HMAC-Secret.
+  # @type: string
+  # @default: "RTP_NET_SECRET"
   secretEnv: "RTP_NET_SECRET"
 
+# Backing store for cross-process state.
 transport:
   # Speicher-Backend für prozessübergreifenden Zustand.
-  # - `in-memory`: nur für die Entwicklung; nichts verlässt die JVM (REQ-RTP-NET-002
-  #   Gleichheit per Konstruktion).
-  # - `sql`: DB-als-Bus. Verwendet den vorhandenen RTP-Datenbank-
-  #   Accessor-Pool aus `database.yml` wieder. Rückfalloption, wenn Redis nicht verfügbar ist.
-  # - `redis`: Jedis-gestützte Heartbeats + Pub/Sub-Verteilung.
-  #   Heartbeats und Snapshot funktionieren; der atomare Claim (genutzt für
-  #   backend-übergreifende Reservierungs-Tokens) steht noch nicht bereit. Projektziel ist
-  #   redis-first; stelle `type: redis` um, sobald du eine von allen Backends und Proxys
-  #   gemeinsam genutzte Redis-Instanz hast.
+  # @type: enum
+  # @options: ["auto", "plugin-message", "in-memory", "sql", "redis"]
+  # @default: "auto"
   type: "auto"
-  # Plugin-messaging transport tuning. Used when `type` is `auto` (and a
-  # proxy was detected) or `plugin-message`. Ignored by the other transports.
   pluginMessage:
-    # Proxy plugin-messaging channel. Leave as the default unless your proxy
-    # is configured to use a non-standard channel name.
+    # Proxy plugin-messaging channel.
+    # @type: string
+    # @default: "bungeecord:main"
     channel: "bungeecord:main"
   redis:
-    # Erforderlich, wenn `type: redis`. Hostname oder IP der Redis-Instanz,
-    # die von jedem Backend und Proxy im Netzwerk gemeinsam genutzt wird.
+    # Erforderlich, wenn `type: redis`.
+    # @type: string
+    # @default: "localhost"
     host: "localhost"
-    # Standard-Redis-Port. Überschreiben, falls dein Deployment einen abweichenden verwendet.
+    # Standard-Redis-Port.
+    # @type: integer
+    # @default: 6379
     port: 6379
-    # Optional. Für unauthentifiziertes Redis (Dev/Test) leer lassen / weglassen;
-    # setzen, wenn Redis-ACL oder `requirepass` konfiguriert ist.
+    # Optional.
+    # @type: string
+    # @default: "
     password: ""
 
+# Backend heartbeat / peer-staleness cadence (shared by every transport tier).
 heartbeat:
-  # Wie oft dieses Backend seine Zustandszeile veröffentlicht. 1000ms ist der Standard,
-  # der von Publishern auf Proxy- und Backend-Seite verwendet wird; die Poll-Schleife
-  # des Proxys muss Zeilen innerhalb von `staleAfterMs` sehen, um sie als aktiv zu werten.
+  # Wie oft dieses Backend seine Zustandszeile veröffentlicht.
+  # @type: integer
+  # @default: 1000
   intervalMs: 1000
-  # How long a peer's last-seen state stays trusted before it is treated as
-  # unknown. On the plugin-message tier this is also the snapshot stale
-  # window: a peer that goes unknown is still accepted as a destination (the
-  # destination decides on arrival), it just stops being suggested. Keep it
-  # comfortably above `intervalMs` so one dropped heartbeat does not flap a
-  # peer to unknown.
+  # How long a peer's last-seen state stays trusted before it is treated as unknown.
+  # @type: integer
+  # @default: 5000
   staleAfterMs: 5000
-# Router auf Backend-Seite. Wenn `routing.mode`
-# `local` ist (Standard), führt `/rtp` nur die lokale Pipeline aus und der Rest
-# dieser Datei ist nur informativ. Auf `auto` umstellen, um dieses Backend in
-# die serverübergreifende Warteschlange aufzunehmen (weiterhin lokal zuerst, wenn das lokale
-# Backend die angeforderte Region verfügbar hat).
+
+# Router auf Backend-Seite.
 routing:
-  # `local`  - niemals in die serverübergreifende Warteschlange eintragen (Standard;
-  #            keine Verhaltensänderung).
-  # `auto`   - lokal bevorzugen, wenn dieses Backend die Region bedienen kann; nur dann
-  #            in die Warteschlange eintragen, wenn lokal nicht bedient werden kann.
-  # `always` - immer in die Warteschlange eintragen (Entwickler- / Abnahme-
-  #            Testmodus; nicht für die Produktion empfohlen).
+  # `local`  - niemals in die serverübergreifende Warteschlange eintragen (Standard; keine Verhaltensänderung).
+  # @type: enum
+  # @options: ["local", "auto", "always"]
+  # @default: "local"
   mode: "local"
-  # Lobby-Modus. Wenn true, wird dieses Backend zu einem reinen Dispatch-
-  # Knoten:
-  #  - Heartbeats veröffentlichen eine leere `regions`-Menge und `acceptingRequests:false`,
-  #    damit Peers dieses Backend nie als serverübergreifendes Ziel auswählen.
-  #  - Ein bloßes `/rtp` (ohne `region=`-Argument) leitet automatisch zum Peer +
-  #    der Region mit dem größten `regionKeptCounts`-Wert im Snapshot weiter
-  #    ("most-kept"-Politik). Explizites `rtp region=<server>:<region>`
-  #    funktioniert weiterhin.
-  #  - Wenn kein Peer eine Region anbietet, lehnt bloßes `/rtp` mit der
-  #    lokalisierten `networkRegionUnavailable`-Meldung ab, statt stillschweigend
-  #    in die (leere) lokale Pipeline durchzufallen.
-  # Standard false bewahrt das vorherige Verhalten.
+  # Lobby-Modus.
+  # @type: boolean
+  # @default: false
   lobbyMode: false
-# Serverübergreifende Warteschlange. Alle Schlüssel hier werden
-# ignoriert, wenn `network.enabled: false` oder `routing.mode: local`.
+
+# Serverübergreifende Warteschlange.
 queue:
-  # Maximale Anzahl lokal gepufferter Eintragungen, bevor der Gegendruck
-  # neue `/rtp`-Aufrufe mit `RoutingDecision.FallbackReason.QUEUE_FULL` ablehnt.
+  # Maximale Anzahl lokal gepufferter Eintragungen, bevor der Gegendruck neue `/rtp`-Aufrufe mit `RoutingDecision.FallbackReason.QUEUE_FULL` ablehnt.
+  # @type: integer
+  # @default: 50
   maxDepth: 50
-  # Flush-Takt für Dirty-Writes des Backends (ms). Niedriger = geringere Ende-zu-Ende-
-  # Latenz, höher = weniger Roundtrips zum Transport. 250ms ist der
-  # Standard.
+  # Flush-Takt für Dirty-Writes des Backends (ms). Niedriger = geringere Ende-zu-Ende- Latenz, höher = weniger Roundtrips zum Transport.
+  # @type: integer
+  # @default: 250
   flushIntervalMs: 250
-  # Poll-Takt des Backend-Status-Caches (ms). Bestimmt, wie oft das Backend
-  # `rtp:net:wq:status:<pid>` liest, um den Fortschritt je Spieler zu aktualisieren.
+  # Poll-Takt des Backend-Status-Caches (ms). Bestimmt, wie oft das Backend `rtp:net:wq:status:<pid>` liest, um den Fortschritt je Spieler zu aktualisieren.
+  # @type: integer
+  # @default: 1000
   pollIntervalMs: 1000
-  # Optionales passives Altern der Envelope-HASHes. `0` deaktiviert (terminale
-  # Übergänge löschen den Envelope-HASH weiterhin explizit per DEL); auf einen
-  # positiven Wert setzen, wenn du eine betreiber-sichtbare TTL für hängende Envelopes willst.
+  # Optionales passives Altern der Envelope-HASHes.
+  # @type: integer
+  # @default: 0
   entryTtlMs: 0
-  # Ratenbegrenzung für serverübergreifende `/rtp`-Eintragungen (Token-Bucket). Betreiber-
-  # Sicherheitsnetz gegen außer Kontrolle geratene Clients.
+  # Ratenbegrenzung für serverübergreifende `/rtp`-Eintragungen (Token-Bucket).
+  # @type: number
+  # @default: 5
   crossServerRequestsPerSecond: 5
+  # Cross-server /rtp enrolment rate limit: burst size.
+  # @type: number
+  # @default: 10
   crossServerRequestsBurst: 10
-  # Anzahl der BLPOP-Worker auf Proxy-Seite (rtp-proxy-velocity). Nur erhöhen, wenn
-  # beobachtet wird, dass der Proxy einen einzelnen Worker auslastet; der Dispatcher und
-  # der Transport-Pool sind die eigentlichen Engpässe.
+  # Anzahl der BLPOP-Worker auf Proxy-Seite (rtp-proxy-velocity).
+  # @type: integer
+  # @default: 1
   workerThreads: 1
+
 # Lebenszyklus der Reservierungs-Tokens (REQ-RTP-NET-011).
 reservation:
-  # Takt des TTL-Reapers auf Proxy-Seite (ms). Der Reaper räumt abgelaufene Tokens auf
-  # und löst `ReleaseSink.onRelease(tokenId, TTL_EXPIRED)` aus, damit am selben Ort liegende
-  # Backends die Koordinate an `networkKeptLocations` zurückgeben können.
+  # Takt des TTL-Reapers auf Proxy-Seite (ms). Der Reaper räumt abgelaufene Tokens auf und löst `ReleaseSink.onRelease(tokenId, TTL_EXPIRED)` aus, damit am selben Ort liegende Backends die Koordinate an `networkKeptLocations` zurückgeben können.
+  # @type: integer
+  # @default: 30000
   reapIntervalMs: 30000
-  # TTL je Token (ms). Eine beanspruchte, aber nicht verbrauchte Reservierung, die älter
-  # als dieser Wert ist, gilt als verwaist und wird freigegeben.
+  # TTL je Token (ms). Eine beanspruchte, aber nicht verbrauchte Reservierung, die älter als dieser Wert ist, gilt als verwaist und wird freigegeben.
+  # @type: integer
+  # @default: 60000
   ttlMs: 60000
+
 # Politik bei Regions-Kollisionen.
-# Nur `warn` wird ausgeliefert; `rename-local` und `reject-startup` sind
-# dokumentierte Folgeaufgaben. Unbekannte Werte fallen stillschweigend auf `warn` zurück.
 regionCollision:
+  # Collision policy applied at startup.
+  # @type: enum
+  # @options: ["warn", "rename-local", "reject-startup"]
+  # @default: "warn"
   policy: "warn"
+
+# Optional per-destination policy overlay (matched by serverId); leave commented for the common case.
+#servers:
+#  example-backend:
+#    # Permission required to target this destination (empty = none).
+#    # @type: string
+#    # @default: "
+#    permission: "
+#    # Label shown in menus / suggestions (default: serverId).
+#    # @type: string
+#    # @default: "
+#    display-name: "Example"
+#    # Hide from tab-completion when it has no servable region.
+#    # @type: boolean
+#    # @default: false
+#    hide-when-unavailable: false
+#    # Allow targeting it even when it reports no servable region.
+#    # @type: boolean
+#    # @default: true
+#    allow-when-unavailable: true
 # Bewertungstabelle des Load Balancers.
-# Wird von `PeerRegionRegistry.pickMostKept()` auf Lobby-/Backend-JVMs genutzt, um
-# die Regionsauswahl bei leerem `/rtp` zu steuern (und, wenn `routing.mode: auto`, die
-# Ersatz-Regionswahl bei serverübergreifender Eintragung). Dasselbe Schema wird
-# von der `network-proxy.yml` des Velocity-Proxys geparst, sodass für eine Seite
-# abgestimmte Kurven/Gewichte auf die andere kopiert werden können.
-#
-# Bewertung je `(serverId, regionKey)`-Paar:
-#   score(b, r) = ( Sigma_i  weight_i * curve_i( normalize_i( metric_i(b) ) ) ) / backendWeight(b)
-#               + regionScarcityWeight * exponential_k5( 1 - keptCount(b, r) / refCount )
-# Die niedrigste Bewertung gewinnt; Gleichstände werden nach serverId, dann regionKey aufsteigend
-# aufgelöst. Der synthetisierte Regionsknappheits-Term priorisiert stark Regionen, deren
-# Kept-Pool flach ist (eine zu 90% leere Region trägt ~0,85 bei, eine zu 50% leere
-# nur ~0,07) - dies ist der kurvengesteuerte Ersatz für die alte
-# "most-kept wins"-Politik v1.
-#
-# Es werden zwei Konfigurationsformen akzeptiert; die Lobby liest die jeweils vorhandene.
-#
-# 1) Unterkonfigurations-Block `terms` (bevorzugt). Jeder Term ist eine Map, die mit
-#    einer frei wählbaren Bezeichnung indiziert ist, mit `input`, `weight` und einer verschachtelten
-#    `curve`-Untermap. Unterstützte Eingaben: mspt, queueDepth, heapUsed, heapFree,
-#    playerCount, keptCount, tps, keptRegion. Unterstützte Kurven: linear,
-#    exponential (k), logarithmic (k), sigmoid (k, x0), step (threshold),
-#    power (p). Parametergrenzen: k in [0.1, 20], p in [0.1, 8],
-#    x0/threshold in [0, 1].
-#
-# 2) Alte flache Gewichte (msptWeight, queueDepthWeight, heapWeight,
-#    playerCountWeight) werden zur Abwärtskompatibilität zu linearen Termen synthetisiert.
-#
-# `regionScarcityWeight` (Standard 1.0) steuert den synthetisierten
-# Regionsknappheits-Term. Auf 0 setzen, um ihn zu deaktivieren (z. B. wenn du einen
-# expliziten `keptRegion`-Eingabeterm hinzufügst und volle Kontrolle willst). Das Hinzufügen
-# eines beliebigen expliziten `keptRegion`-Terms unterdrückt den synthetisierten automatisch.
-#
-# Der Block unten wird AKTIV ausgeliefert, sodass die Betreiberunterstützung "Werte bearbeiten"
-# statt "erst auskommentieren, dann bearbeiten" ist. Die Standardwerte unten spiegeln das vorherige
-# "most-kept wins"-Verhalten v1 mit einem sanften Abfall wider (der synthetisierte
-# Regionsknappheits-Term ist deaktiviert, weil der explizite `region`-Term das Signal besitzt),
-# aber mit `step`-Kurven auf `heapUsed` und `keptRegion`, sodass
-# überlastete Backends ohne Betreibereingriff stillschweigend übersprungen werden.
-#
-# Fünf Terme, einer je Metrik (keine doppelten Beschränkungen). Die Kurve trägt
-# den weich-vs-hart-Ausdruck: `step` nahe dem oberen Ende seines Bereichs wirkt als
-# Gate, das nur auslöst, wenn die Metrik kritisch ist, der Kandidat kann
-# aber dennoch gewinnen, wenn jede Alternative noch schlechter ist (sanfte Degradation).
-#   - mspt:   sigmoid x0=0.6 (Produktionsknick; löst aus, wenn der Tick unter Druck steht)
-#   - queue:  exponential (kleine Warteschlangen still, große explodieren)
-#   - heap:   step bei heapUsed >= 0.85, Gewicht 5.0 (wirksames Gate)
-#   - region: step bei keptRegion >= 0.95, Gewicht 5.0 (wirksames Gate)
-#   - kept:   logarithmic, Gewicht 0.25 (sanfter Gleichstandsbrecher)
-# regionScarcityWeight ist 0, weil der explizite `region`-Term unten das
-# Kept-Region-Signal besitzt.
 loadBalancer:
-  # Weight of the built-in region-scarcity term. 0 here because the explicit
-  # `region` term below already owns the kept-region signal.
+  # Weight of the built-in region-scarcity term.
   # @type: number
   # @default: 0
   regionScarcityWeight: 0
-  # Scoring terms, one per metric. Each has an `input`, a `weight`, and a
-  # `curve` (type + parameters). Defaults gate overloaded backends.
+  # Scoring terms, one per metric.
   terms:
     # Tick pressure; sigmoid knee at 0.6.
     mspt:
+      # Metric input.
       # @type: enum
       # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "mspt"
       input: "mspt"
+      # Term weight.
       # @type: number
+      # @default: 1.0
       weight: 1.0
       curve:
+        # Curve type.
         # @type: enum
         # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "sigmoid"
         type: "sigmoid"
+        # Steepness.
         # @type: number
         # @range: [0.1, 20]
+        # @default: 8.0
         k: 8.0
+        # Midpoint.
         # @type: number
         # @range: [0, 1]
+        # @default: 0.6
         x0: 0.6
     # Queue depth; small queues silent, large ones explode.
     queue:
+      # Metric input.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "queueDepth"
       input: "queueDepth"
+      # Term weight.
+      # @type: number
+      # @default: 1.0
       weight: 1.0
       curve:
+        # Curve type.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "exponential"
         type: "exponential"
+        # Steepness.
+        # @type: number
+        # @range: [0.1, 20]
+        # @default: 3.0
         k: 3.0
     # Heap gate; fires at >= 85% used.
     heap:
+      # Metric input.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "heapUsed"
       input: "heapUsed"
+      # Term weight.
+      # @type: number
+      # @default: 5.0
       weight: 5.0
       curve:
+        # Curve type.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "step"
         type: "step"
+        # Step threshold.
+        # @type: number
         # @range: [0, 1]
+        # @default: 0.85
         threshold: 0.85
     # Region gate; fires when the kept pool is >= 95% full.
     region:
+      # Metric input.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "keptRegion"
       input: "keptRegion"
+      # Term weight.
+      # @type: number
+      # @default: 5.0
       weight: 5.0
       curve:
+        # Curve type.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "step"
         type: "step"
+        # Step threshold.
+        # @type: number
+        # @range: [0, 1]
+        # @default: 0.95
         threshold: 0.95
     # Gentle tie-breaker on kept count.
     kept:
+      # Metric input.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "keptCount"
       input: "keptCount"
+      # Term weight.
+      # @type: number
+      # @default: 0.25
       weight: 0.25
       curve:
+        # Curve type.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "logarithmic"
         type: "logarithmic"
+        # Steepness.
+        # @type: number
+        # @range: [0.1, 20]
+        # @default: 9.0
         k: 9.0

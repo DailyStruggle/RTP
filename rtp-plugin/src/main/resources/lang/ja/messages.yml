@@ -8,14 +8,14 @@
 # [world], [region], [remainingCooldown], [scan_chunks] など。
 # - カラーコード &a &7 &c と HEX カラー (#2636ef) はそのまま残してください。
 # ###############################################################################
-# セクション 1: 一般設定
+# セクション 0: プレースホルダー
 # ###############################################################################
 プレースホルダ:
   # P0
   - "[RTP]"
 
 # ###############################################################################
-# セクション 2: テレポート
+# セクション 1: テレポート
 # ###############################################################################
 既にテレポート中: "&7[P0] ⚡ あなたは既にテレポート中です！"
 
@@ -27,6 +27,9 @@
 
 # if teleport is cancelled
 テレポート取消: "&7[P0] ⚡ テレポートをキャンセルしました！"
+
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] 戦闘中はランダムテレポートできません。"
 
 # 最大試行回数に達しても安全な場所が見つからなかったとき
 # プレースホルダー: [attempts] - 最大試行回数
@@ -51,46 +54,15 @@ lockedAfterUses: "&7[P0] ⌖ ランダムテレポートの上限に達しまし
 残高不足: "&7[P0] この操作には少なくとも $[money] が必要です。"
 
 # ###############################################################################
-# セクション 3: 時間表記
+# セクション 2: コマンドフィードバック
 # ###############################################################################
-日: "日"
-時: "時間"
-分: "分"
-秒: "秒"
-ミリ秒: "ミリ秒"
-
-# ###############################################################################
-# セクション 4: システム / 管理
-# ###############################################################################
-旧ファイル: "&b[P0] 古い [filename] を検出しました。更新中"
-
-# 設定ファイルにない bukkit ワールドを検出しました
-# プレースホルダー: [world] - 検出されたワールド
-新ワールド: "&b[P0] 新ワールド '[world]' を検出しました"
-
 # bukkit にそのワールドが存在しません
 # プレースホルダー: [world] - ワールド名
 無効なワールド: "&7[P0] ワールド '[world]' は見つかりません"
 
-# プラグインのリロード / 更新メッセージ
-# プレースホルダー: [filename] - ファイル名
-リロード中: "&b[P0] [filename] をロード中……"
-リロード完了: "&b[P0] [filename] のロードが完了しました。"
-更新中: "&a[P0] [filename] を更新中……"
-更新済み: "&a[P0] [filename] を正常に更新しました。"
-
 # プラグインに該当するコマンドがありません
 # プレースホルダー: [arg] - 試行された引数
 無効な引数: "&c[P0] コマンド引数が無効です [arg]"
-
-# プレイヤー専用のコマンドをコンソールが実行しようとしたとき
-コンソール不可: "&c[P0] このコマンドはゲーム内プレイヤーとして実行する必要があります。"
-
-# busy と invalidCommand は messages.lang.yml で翻訳されていない -> 英語キー名 (英語ベースラインへフォールバック)。
-busy: "&c[P0] 取り込み中"
-
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
-pvpInCombat: "&c[P0] 戦闘中はランダムテレポートできません。"
 
 # plugin doesn't have the subcommand or parameter the user requested
 # placeholder: [arg] - the argument attempted
@@ -99,14 +71,99 @@ invalidCommand: "&c[P0] 無効なコマンド - [arg]"
 # ユーザーに要求されたコマンドの権限がありません
 権限なし: "&7申し訳ありません。このコマンドを実行する権限がありません。これが誤りだと思う場合はサーバー管理者に連絡してください。"
 
-# ###############################################################################
-# セクション 5: 管理ログ
-# ###############################################################################
-位置保存: "&7[P0] [region] の位置を [amount] 件保存しました"
-位置ロード: "&7[P0] [region] の位置を [amount] 件ロードしました"
+# busy と invalidCommand は messages.lang.yml で翻訳されていない -> 英語キー名 (英語ベースラインへフォールバック)。
+busy: "&c[P0] 取り込み中"
+
+# プレイヤー専用のコマンドをコンソールが実行しようとしたとき
+コンソール不可: "&c[P0] このコマンドはゲーム内プレイヤーとして実行する必要があります。"
 
 # ###############################################################################
-# セクション 6: スキャンコマンド
+# セクション 3: サーバー間テレポート（ネットワークモード）
+# ###############################################################################
+# Sent only when `network.enabled: true` and the player's `/rtp` is routed
+# across the cross-server wait queue (see network.yml `routing.mode`).
+# All keys are optional from the player's perspective - the L2 baseline
+# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
+# Sent when the request has been accepted into the cross-server wait queue
+# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
+# position from `pollStatus`; may be empty if the transport returns no
+# position.
+networkQueued: "&7[P0] サーバー間の目的地を待機中です (順番 [position])..."
+# Sent when a player runs /rtp* while they already hold a non-terminal
+# cross-server enrolment (command-lock). Placeholder:
+# [position] - FIFO position when known; empty when the proxy has not yet
+# assigned one.
+alreadyQueued: "&cすでにサーバー間キューで待機中です (順番 [position])。お待ちください。"
+# Sent when a cross-server waitlist entry is reaped after exceeding its
+# configured TTL. No placeholders.
+networkTimedOut: "&c[P0] バックエンドの待機中にサーバー間テレポートがタイムアウトしました。"
+# Sent when a cross-server waitlist enrolment is rejected because the shared
+# waitlist has reached its configured maximum size (REJECTED_FULL).
+# No placeholders.
+waitlistFull: "&c[P0] サーバー間キューが満杯です。しばらくしてからもう一度お試しください。"
+# Sent when the queue has handed the request off to the proxy router and
+# a backend selection is in progress.
+networkRouting: "&7[P0] バックエンドへルーティング中..."
+# Sent when a backend has reserved a coordinate for this player and the
+# proxy is about to initiate the cross-server hop. Placeholder: [server]
+# - the destination backend's serverId.
+networkReserved: "&a[P0] [server] に座標を予約しました。転送中..."
+# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+networkTransferring: "&a[P0] [server] へ転送中..."
+# Sent when the cross-server path gave up and the request fell back to
+# the local backend. Placeholder: [reason] - one of the
+# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
+networkFallback: "&e[P0] サーバー間が利用できません ([reason])。ローカルに切り替えます。"
+# Sent when the cross-server request failed terminally (no fallback was
+# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
+networkFailed: "&c[P0] サーバー間テレポートに失敗しました: [reason]。"
+# Sent when the player asked for a specific region (`/rtp <region>`) but
+# no backend in the network is currently serving it. Placeholder:
+# [region] - the requested region name.
+networkRegionUnavailable: "&c[P0] 現在リージョン '[region]' を提供しているバックエンドはありません。"
+# Sent when the requested region name resolves to two or more backends and
+# the operator-configured policy cannot pick one (only fires
+# under stronger policies than the default `warn`). Placeholder: [region].
+networkRegionAmbiguous: "&c[P0] リージョン '[region]' は複数のバックエンドで曖昧です。サーバーを指定してください。"
+
+# ###############################################################################
+# セクション 4: ビジュアル要素
+# ###############################################################################
+タイトル: "<rainbow>テレポートしました！</rainbow>"
+サブタイトル: "<gradient:#A78BFA:#E876A0>楽しんでね！</gradient>"
+フェードイン: 20
+表示時間: 20
+フェードアウト: 20
+
+# actionbar setting
+アクションバー: ""
+
+# ###############################################################################
+# セクション 5: 時間表記
+# ###############################################################################
+日: "日"
+時: "時間"
+分: "分"
+秒: "秒"
+ミリ秒: "ミリ秒"
+
+# ###############################################################################
+# セクション 6: コマンド説明
+# ###############################################################################
+rtp: "&b/rtp - ランダムな場所にテレポートする"
+rtp_説明: "ランダムな場所にテレポートする"
+ヘルプ: "&b/rtp help - このヘルプを表示する"
+ヘルプ_説明: "コマンド説明"
+リロード: "&b/rtp reload - 設定ファイルをリロードする"
+リロード_説明: "設定ファイルをリロードする"
+スキャン: "&b/rtp scan - リージョン内のすべての可能な位置をスキャンしてロード速度を向上させる"
+スキャン_説明: "保存済みデータをクリアし、リージョン内のすべての可能な位置をスキャンする"
+設定_説明: "実行時に設定ファイルを更新する"
+情報_説明: "プラグインの現在の状態を表示する"
+テスト_説明: "RTP 機能をテストする"
+
+# ###############################################################################
+# セクション 7: スキャンコマンド
 # ###############################################################################
 スキャン開始: "&a[P0] 以下のリージョンでスキャンタスクを開始しました: [scan_regions]"
 スキャンリセット: "&7[P0] 以下のリージョンのスキャンキューをリセットしました: [scan_regions]"
@@ -120,10 +177,10 @@ invalidCommand: "&c[P0] 無効なコマンド - [arg]"
 # Boss-bar title shown to players with rtp.scan permission while a world scan is running.
 # Set to empty string to disable the boss-bar.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+scanBossBar: "スキャン中 [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% 陸地) ETA [scan_eta]"
 
 # ###############################################################################
-# セクション 7: 情報コマンド
+# セクション 8: 情報コマンド
 # ###############################################################################
 情報タイトル: "&2&l/rtp info"
 情報_チケット: "&7グローバルアクティブチャンクチケット: #7E9CC8[tickets]"
@@ -136,13 +193,13 @@ infoLoadsByOrigin: "&7発生源別の読み込み: #7E9CC8[loadsByOrigin]"
 infoQueueDepth: "&7リージョンキューで待機中のプレイヤー: #7E9CC8[queueDepth]"
 infoPendingTeleports: "&7保留中のテレポートパイプライン: #7E9CC8[pendingTeleports]"
 infoAvgPipelineMs: "&7パイプライン平均遅延: #7E9CC8[avgPipelineMs] ms"
-# Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
+# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7パイプライン遅延 (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-# Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
+# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7遅いテレポート (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-# Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7キュー増加の警告 (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7JVMヒープ: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # /rtp info の Health pipeline ラベルブロックのヘッダー行。
@@ -155,7 +212,7 @@ infoMSPTLive: "&7サーバーMSPT: #7E9CC8[mspt] ms (&7ティック予算: #7E9C
 infoSoftCap: "&7プレイヤー: #7E9CC8[playerCount] / [softCap]"
 # データベースの最新ラウンドトリップレイテンシ（ms）。プレースホルダー: [databaseLatencyMs]。
 infoDatabaseLatencyMs: "&7データベース遅延: #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics (ADR-052), sourced from the process-global RtpOutcomeStats.
+# Generation outcome metrics, sourced from the process-global RtpOutcomeStats.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7生成成功率: #7E9CC8[genSuccessRate]&7 (失敗 #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
@@ -219,22 +276,7 @@ infoBiomeActivityEmpty: "&8--- &7まだバイオーム占有がサンプリン�
   - "#58CCED  - 主な拒否理由: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
-# セクション 8: コマンド説明
-# ###############################################################################
-rtp: "&b/rtp - ランダムな場所にテレポートする"
-rtp_説明: "ランダムな場所にテレポートする"
-ヘルプ: "&b/rtp help - このヘルプを表示する"
-ヘルプ_説明: "コマンド説明"
-リロード: "&b/rtp reload - 設定ファイルをリロードする"
-リロード_説明: "設定ファイルをリロードする"
-スキャン: "&b/rtp scan - リージョン内のすべての可能な位置をスキャンしてロード速度を向上させる"
-スキャン_説明: "保存済みデータをクリアし、リージョン内のすべての可能な位置をスキャンする"
-設定_説明: "実行時に設定ファイルを更新する"
-情報_説明: "プラグインの現在の状態を表示する"
-テスト_説明: "RTP 機能をテストする"
-
-# ###############################################################################
-# Section 8b: Generalized Menu Framework
+# セクション 9: Generalized Menu Framework
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 menuInvalid: "&c[P0] that menu link is invalid."
@@ -246,17 +288,17 @@ menuHoverFallbackType: "種類: [type]"
 # Hover-fallback template used by the menu reflector when a parameter exposes a
 # small curated value set. Placeholder: [values] - comma-joined accepted values.
 menuHoverFallbackBounds: "受理: [values]"
-# Label for the "go back one level" navigation row prepended to every non-root menu page.
+# Label for the "go back one level" navigation row prepended to every non-root menu page."
 menuBack: "&7« 戻る"
 # Label template for the "execute the assembled command" row prepended to every
-# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
+# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation."
 menuExecute: "&2▶ [command] を実行"
 # Header row at the top of a parameter-value picker sub-page (Stage A.2).
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
 menuPickValue: "&7[param] の値を選択 (実行: /rtp [command] [param]:<value>)"
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
-# can type any value, including ones not in the suggestion list.
+# can type any value, including ones not in the suggestion list."
 menuTypeValue: "&7✎ カスタム値を入力..."
 # Non-clickable header row at the top of every non-root menu page (Stage A.4).
 # Surfaces the currently-constructed /rtp invocation including any staged
@@ -274,7 +316,7 @@ menuRootHint: "&7下のオプションをクリックして開始"
 menuPagePrev: "&7« 前のページ ([page])"
 menuPageNext: "&7次のページ ([page]) »"
 # Section divider on the front page above teleport rows (player view).
-menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
+menuFrontPageSectionTeleport: "&8--- &7テレポート &8---"
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
@@ -289,16 +331,16 @@ menuFrontPageRowAdmin: "#9D7CD8▶ 管理パネル &7- 運営者ツール"
 menuFrontPageHoverAdmin: "&7運営者ツール: 設定, スキャン, 診断, リロード"
 # --- Admin panel book page ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
-menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+menuAdminPanelTitle: "#5FB3B3&l⚙ 管理パネル"
 # Non-clickable hint row below menuAdminPanelTitle. No placeholders.
 menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
 # Section dividers on the admin panel. No placeholders.
-menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
-menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
-menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
-menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
+menuAdminPanelSectionConfig: "&8--- &7設定 &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7診断 &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7ライフサイクル &8---"
+menuAdminPanelSectionBrowse: "&8--- &7閲覧 &8---"
 # Admin-panel rows + hovers. No placeholders.
-menuAdminPanelRowConfig: "&b▶ config editor"
+menuAdminPanelRowConfig: "&b▶ 設定エディタ"
 menuAdminPanelHoverConfig: "&7厳選された設定セレクターを開く"
 menuAdminPanelRowRegions: "#5FB3B3▶ リージョン"
 menuAdminPanelHoverRegions: "&7リージョンごとの設定を追加・削除・編集"
@@ -306,17 +348,17 @@ menuAdminPanelRowWorlds: "#5FB3B3▶ ワールド"
 menuAdminPanelHoverWorlds: "&7ワールドごとの設定を追加・削除・編集"
 menuAdminPanelRowEffects: "#5FB3B3▶ エフェクト"
 menuAdminPanelHoverEffects: "&7グループごとのテレポートエフェクトを追加・削除・編集"
-menuAdminPanelRowInfo: "&b▶ server info"
+menuAdminPanelRowInfo: "&b▶ サーバー情報"
 menuAdminPanelHoverInfo: "&7プラグインのバージョン, リージョン数, キュー状態を表示"
 menuAdminPanelRowDiagnostics: "&c▶ 完全診断"
 menuAdminPanelHoverDiagnostics: "&7完全な診断スイートを実行します。負荷が高い場合があります"
-menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
+menuAdminPanelRowMemory: "&b▶ メモリトラッカーのスナップショット"
 menuAdminPanelHoverMemory: "&7アクティブなチャンクチケットとパイプラインの割り当てをダンプ"
-menuAdminPanelRowScan: "&b▶ scan control"
+menuAdminPanelRowScan: "&b▶ スキャン制御"
 menuAdminPanelHoverScan: "&7スキャンサブメニューを開く (開始 / 一時停止 / キャンセル)"
 menuAdminPanelRowReload: "&c▶ リロード"
 menuAdminPanelHoverReload: "&7すべての設定ファイルをリロードします。進行中のテレポートに影響する場合があります"
-menuAdminPanelRowBrowse: "&b▶ browse all commands"
+menuAdminPanelRowBrowse: "&b▶ すべてのコマンドを閲覧"
 menuAdminPanelHoverBrowse: "&7反映された /rtp コマンドツリーを開く"
 menuAdminPanelRowBack: "&7« 戻る"
 # --- Visualizations submenu (admin map of bad locations per region) ---
@@ -382,14 +424,14 @@ infoBookOverflowFooter: "&7(内容が切り詰められました - クリック�
 # milestone). Users may click the Refresh row to refresh manually.
 infoBookAutoRefreshDeferredNote: "&8(自動更新は未対応です。更新をクリックしてください)"
 # Non-clickable title row at the top of the config-file selector page (Stage C.1).
-# Shown when an admin clicks "/rtp config" from the front page.
+# Shown when an admin clicks "/rtp config" from the front page."
 configSelectorTitle: "#5FB3B3&l⚙ 設定ファイル"
-# Label for the "back to /rtp menu root" navigation row on the config selector page.
+# Label for the "back to /rtp menu root" navigation row on the config selector page."
 configSelectorBackRow: "&7« メニューに戻る"
 # Non-clickable title row at the top of a single config-file page (Stage C.2).
-# Placeholder: [file] - the config file name (e.g. "performance", "safety").
-configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
-# Label for the "back to config selector" navigation row on a single config-file page.
+# Placeholder: [file] - the config file name (e.g. "performance", "safety")."
+configFileTitle: "#5FB3B3&l⚙ 設定: &7[file]"
+# Label for the "back to config selector" navigation row on a single config-file page."
 configFileBackRow: "&7« 設定ファイルに戻る"
 # Non-clickable hint row shown when a config file has no editable keys.
 configFileEmptyHint: "&7(このファイルに編集可能なキーはありません)"
@@ -398,13 +440,13 @@ configFileEmptyHint: "&7(このファイルに編集可能なキーはありま�
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
 # Hover text for a per-key row on a config-file page. Placeholders:
 #   [key], [value], [type] - the config key name, current value, and declared type.
-configKeyHoverFormat: "&7click to edit &7[key] &7(type: [type])"
+configKeyHoverFormat: "&7クリックして編集 &7[key] &7(タイプ: [type])"
 # Non-clickable title row at the top of a shape/vert type-picker page (Stage C.3a).
-# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
-configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name."
+configTypePickerTitle: "#5FB3B3&l⚙ [param] のタイプを選択 &7(現在: &7[current]&7)"
 # Non-clickable title row at the top of a shape/vert sub-parameter page (Stage C.3b).
-# Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
-configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+# Placeholders: [param] - "shape" or "vert"; [type] - the active type name."
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7サブパラメータ"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
 configViewRawHint: "&7[P0] 本表示は利用できません。生のダンプにフォールバックします。"
@@ -412,7 +454,7 @@ configViewRawHint: "&7[P0] 本表示は利用できません。生のダンプ�
 configValueUnsetPlaceholder: "&8(未設定)"
 # Non-clickable header row separating the "Changeable" list from the "Pending"
 # staging-cart list on a config-file page when the viewer has staged one or
-# more uncommitted edits. No placeholders.
+# more uncommitted edits. No placeholders."
 configPendingHeader: "&6&l-- pending changes --"
 # Per-row label for a staged (pending) key=value entry on a config-file page.
 # Clicking the row removes it from the cart. Placeholders: [key], [value].
@@ -421,13 +463,13 @@ configPendingRowFormat: "&9[key]&8 = &0[value]"
 # config-file page. No placeholders.
 configPendingRowHover: "クリックで取り消し"
 # Clickable label for the "apply staged changes" row on a config-file page.
-# Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
+# Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart."
 configApplyRow: "&2&l[apply]"
 # Clickable label for the "discard staged changes" row on a config-file page.
-# Clears the cart without applying.
+# Clears the cart without applying."
 configDiscardRow: "&c&l[discard]"
 
-# --- ADR-047 declarative chart composition bridge (REQ-RTP-MAP-006) ---
+# --- declarative chart composition bridge ---
 # Sent to the viewer when an OPEN_MAP menu action fires but no concrete
 # MapBinding is registered (NoopMapBinding is still active, e.g. on the
 # Lite assembly or before RTPHooks wires the platform binding).
@@ -444,58 +486,11 @@ mapUnavailable: "&e[P1] 現在チャートデータを利用できません。"
 # (binding-defined back-pressure, e.g. per-viewer cap reached).
 mapBusy: "&e[P1] マップサービスがビジーです。しばらくしてからもう一度お試しください。"
 # Label for the clickable "/rtp info" menu row that, on click, mints a
-# ChartSpec(BAD_POINTS_HEATMAP, ...) token and asks the active MapBinding
+# ChartSpec(BAD_POINTS_HEATMAP,...) token and asks the active MapBinding
 # to render a 128x128 heatmap of the current region's known bad-point
 # spiral indices. The row is omitted at render time when NoopMapBinding
-# is the installed binding (REQ-RTP-MAP-006 / ADR-047).
+# is the installed binding."
 menuInfoBadPointsLabel: "#9D7CD8&l# 不適切な位置のマップ"
-
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the L2 baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
-# position.
-networkQueued: "&7[P0] サーバー間の目的地を待機中です (順番 [position])..."
-# Sent when a player runs /rtp* while they already hold a non-terminal
-# cross-server enrolment (ADR-015 / REQ-RTP-NET-015 command-lock). Placeholder:
-# [position] - FIFO position when known; empty when the proxy has not yet
-# assigned one.
-alreadyQueued: "&cすでにサーバー間キューで待機中です (順番 [position])。お待ちください。"
-# Sent when a cross-server waitlist entry is reaped after exceeding its
-# configured TTL (ADR-015). No placeholders.
-networkTimedOut: "&c[P0] バックエンドの待機中にサーバー間テレポートがタイムアウトしました。"
-# Sent when a cross-server waitlist enrolment is rejected because the shared
-# waitlist has reached its configured maximum size (ADR-015 REJECTED_FULL).
-# No placeholders.
-waitlistFull: "&c[P0] サーバー間キューが満杯です。しばらくしてからもう一度お試しください。"
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
-networkRouting: "&7[P0] バックエンドへルーティング中..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
-networkReserved: "&a[P0] [server] に座標を予約しました。転送中..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
-networkTransferring: "&a[P0] [server] へ転送中..."
-# Sent when the cross-server path gave up and the request fell back to
-# the local backend. Placeholder: [reason] - one of the
-# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
-networkFallback: "&e[P0] サーバー間が利用できません ([reason])。ローカルに切り替えます。"
-# Sent when the cross-server request failed terminally (no fallback was
-# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
-networkFailed: "&c[P0] サーバー間テレポートに失敗しました: [reason]。"
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
-networkRegionUnavailable: "&c[P0] 現在リージョン '[region]' を提供しているバックエンドはありません。"
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
-networkRegionAmbiguous: "&c[P0] リージョン '[region]' は複数のバックエンドで曖昧です。サーバーを指定してください。"
 
 # --- MultiConfig submenu ---
 # Header row fallback used when no per-kind header key is registered.
@@ -509,7 +504,7 @@ multiconfigHeaderWorlds: "#5FB3B3&l ワールド"
 multiconfigToggleRemoveModeOff: "&8[ ] 削除モード"
 # Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
 multiconfigToggleRemoveModeOn: "&c[x] 削除モード (項目をクリックで削除)"
-# Selector row label for the "+ Add new..." entry. No placeholders.
+# Selector row label for the "+ Add new..." entry. No placeholders."
 multiconfigRowAdd: "&2+ 新規追加..."
 # Hover text for the Add row. Placeholder: [name] - prefilled default name.
 multiconfigRowAddHover: "&7金床のプロンプトに名前を入力。事前入力: &f[name]"
@@ -543,7 +538,29 @@ multiconfigResultNameInvalid: "&c名前 '[name]' は使用できません。文�
 multiconfigResultNameTaken: "&c'[name]' という名前の項目は既に存在します。"
 
 # ###############################################################################
-# セクション 9: PlaceholderAPI サポート
+# セクション 10: システム / 管理
+# ###############################################################################
+旧ファイル: "&b[P0] 古い [filename] を検出しました。更新中"
+
+# 設定ファイルにない bukkit ワールドを検出しました
+# プレースホルダー: [world] - 検出されたワールド
+新ワールド: "&b[P0] 新ワールド '[world]' を検出しました"
+
+# プラグインのリロード / 更新メッセージ
+# プレースホルダー: [filename] - ファイル名
+リロード中: "&b[P0] [filename] をロード中……"
+リロード完了: "&b[P0] [filename] のロードが完了しました。"
+更新中: "&a[P0] [filename] を更新中……"
+更新済み: "&a[P0] [filename] を正常に更新しました。"
+
+# ###############################################################################
+# セクション 11: 管理ログ
+# ###############################################################################
+位置保存: "&7[P0] [region] の位置を [amount] 件保存しました"
+位置ロード: "&7[P0] [region] の位置を [amount] 件ロードしました"
+
+# ###############################################################################
+# セクション 12: PlaceholderAPI サポート
 # ###############################################################################
 プレイヤー_利用可能: "&a利用可能"
 プレイヤー_クールダウン: "&7待機中"
@@ -552,23 +569,11 @@ multiconfigResultNameTaken: "&c'[name]' という名前の項目は既に存在�
 プレイヤー_テレポート中: "&bテレポート中"
 
 # ###############################################################################
-# セクション 10: ビジュアル要素
-# ###############################################################################
-タイトル: "<rainbow>テレポートしました！</rainbow>"
-??????: "<gradient:#A78BFA:#E876A0>楽しんでね！</gradient>"
-フェードイン: 20
-表示時間: 20
-フェードアウト: 20
-
-# actionbar setting
-アクションバー: ""
-
-# ###############################################################################
-# セクション 11: メタデータ
+# セクション 13: メタデータ
 # ###############################################################################
 version: 1.0
 
 # ###############################################################################
-# セクション 12: 開発オプション
+# セクション 14: 開発オプション
 # ###############################################################################
 開発タグ表示: false

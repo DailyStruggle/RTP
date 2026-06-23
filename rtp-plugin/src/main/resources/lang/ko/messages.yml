@@ -8,14 +8,14 @@
 # [world], [region], [remainingCooldown], [scan_chunks] 등.
 # - 색상 코드 &a &7 &c 와 HEX 색상 (#2636ef) 은 그대로 두세요.
 # ###############################################################################
-# 섹션 1: 일반 설정
+# 섹션 0: 자리 표시자
 # ###############################################################################
 자리표시자:
   # P0
   - "[RTP]"
 
 # ###############################################################################
-# 섹션 2: 텔레포트
+# 섹션 1: 텔레포트
 # ###############################################################################
 이미텔레포트중: "&7[P0] ⚡ 이미 텔레포트 중입니다!"
 
@@ -27,6 +27,9 @@
 
 # if teleport is cancelled
 텔레포트취소: "&7[P0] ⚡ 텔레포트가 취소되었습니다!"
+
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] 전투 중에는 무작위 텔레포트를 할 수 없습니다."
 
 # 최대 시도 횟수에 도달해도 안전한 장소를 찾지 못한 경우
 # 자리표시자: [attempts] - 최대 시도 횟수
@@ -51,46 +54,15 @@ lockedAfterUses: "&7[P0] ⌖ 랜덤 텔레포트 한도에 도달했습니다. [
 잔액부족: "&7[P0] 이 작업에는 최소 $[money] 이(가) 필요합니다."
 
 # ###############################################################################
-# 섹션 3: 시간 표기
+# 섹션 2: 명령 피드백
 # ###############################################################################
-일: "일"
-시간: "시간"
-분: "분"
-초: "초"
-밀리초: "밀리초"
-
-# ###############################################################################
-# 섹션 4: 시스템 / 관리
-# ###############################################################################
-구파일: "&b[P0] 오래된 [filename] 을(를) 감지했습니다. 업데이트 중"
-
-# 설정 파일에 없는 bukkit 월드를 감지했습니다
-# 자리표시자: [world] - 감지된 월드
-신규월드: "&b[P0] 새 월드 '[world]' 을(를) 감지했습니다"
-
 # bukkit 에 해당 월드가 존재하지 않습니다
 # 자리표시자: [world] - 월드 이름
 잘못된월드: "&7[P0] 월드 '[world]' 을(를) 찾을 수 없습니다"
 
-# 플러그인 리로드 / 업데이트 메시지
-# 자리표시자: [filename] - 파일 이름
-리로드중: "&b[P0] [filename] 을(를) 로딩 중……"
-리로드완료: "&b[P0] [filename] 로딩이 완료되었습니다."
-업데이트중: "&a[P0] [filename] 업데이트 중……"
-업데이트완료: "&a[P0] [filename] 업데이트가 정상적으로 완료되었습니다."
-
 # 플러그인에 사용자가 요청한 명령어가 없습니다
 # 자리표시자: [arg] - 시도된 인수
 잘못된인수: "&c[P0] 잘못된 명령어 인수입니다 [arg]"
-
-# 콘솔이 플레이어 전용 명령어를 실행하려 할 때
-콘솔불가: "&c[P0] 이 명령어는 게임 내 플레이어로 실행해야 합니다."
-
-# busy 와 invalidCommand 는 messages.lang.yml 에서 번역되지 않음 -> 영어 키 이름 (영어 기준선으로 폴백).
-busy: "&c[P0] 처리 중"
-
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
-pvpInCombat: "&c[P0] 전투 중에는 무작위 텔레포트를 할 수 없습니다."
 
 # plugin doesn't have the subcommand or parameter the user requested
 # placeholder: [arg] - the argument attempted
@@ -99,14 +71,100 @@ invalidCommand: "&c[P0] 잘못된 명령어 - [arg]"
 # 사용자가 요청한 명령어에 대한 권한이 없습니다
 권한없음: "&7죄송합니다. 이 명령어를 실행할 권한이 없습니다. 오류라고 생각되시면 서버 관리자에게 문의하세요."
 
-# ###############################################################################
-# 섹션 5: 관리 로그
-# ###############################################################################
-위치저장: "&7[P0] [region] 의 위치 [amount] 개를 저장했습니다"
-위치로드: "&7[P0] [region] 의 위치 [amount] 개를 로드했습니다"
+# busy 와 invalidCommand 는 messages.lang.yml 에서 번역되지 않음 -> 영어 키 이름 (영어 기준선으로 폴백).
+busy: "&c[P0] 처리 중"
+
+# 콘솔이 플레이어 전용 명령어를 실행하려 할 때
+콘솔불가: "&c[P0] 이 명령어는 게임 내 플레이어로 실행해야 합니다."
 
 # ###############################################################################
-# 섹션 6: 스캔 명령어
+# 섹션 3: 서버 간 텔레포트(네트워크 모드)
+# ###############################################################################
+# Sent only when `network.enabled: true` and the player's `/rtp` is routed
+# across the cross-server wait queue (see network.yml `routing.mode`).
+# All keys are optional from the player's perspective - the L2 baseline
+# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
+# Sent when the request has been accepted into the cross-server wait queue
+# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
+# position from `pollStatus`; may be empty if the transport returns no
+# position.
+networkQueued: "&7[P0] 서버 간 목적지를 위해 대기 중입니다 (순번 [position])..."
+# Sent when a player runs /rtp* while they already hold a non-terminal
+# cross-server enrolment (command-lock). Placeholder:
+# [position] - FIFO position when known; empty when the proxy has not yet
+# assigned one.
+alreadyQueued: "&c이미 서버 간 대기열에서 기다리고 있습니다 (순번 [position]). 잠시 기다려 주세요."
+# Sent when a cross-server waitlist entry is reaped after exceeding its
+# configured TTL. No placeholders.
+networkTimedOut: "&c[P0] 백엔드를 기다리는 동안 서버 간 텔레포트가 시간 초과되었습니다."
+# Sent when a cross-server waitlist enrolment is rejected because the shared
+# waitlist has reached its configured maximum size (REJECTED_FULL).
+# No placeholders.
+waitlistFull: "&c[P0] 서버 간 대기열이 가득 찼습니다. 잠시 후 다시 시도해 주세요."
+# Sent when the queue has handed the request off to the proxy router and
+# a backend selection is in progress.
+networkRouting: "&7[P0] 백엔드로 라우팅 중..."
+# Sent when a backend has reserved a coordinate for this player and the
+# proxy is about to initiate the cross-server hop. Placeholder: [server]
+# - the destination backend's serverId.
+networkReserved: "&a[P0] [server]에 좌표를 예약했습니다. 전송 중..."
+# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+networkTransferring: "&a[P0] [server](으)로 전송 중..."
+# Sent when the cross-server path gave up and the request fell back to
+# the local backend. Placeholder: [reason] - one of the
+# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
+networkFallback: "&e[P0] 서버 간 연결을 사용할 수 없습니다 ([reason]). 로컬로 전환합니다."
+# Sent when the cross-server request failed terminally (no fallback was
+# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
+networkFailed: "&c[P0] 서버 간 텔레포트에 실패했습니다: [reason]."
+# Sent when the player asked for a specific region (`/rtp <region>`) but
+# no backend in the network is currently serving it. Placeholder:
+# [region] - the requested region name.
+networkRegionUnavailable: "&c[P0] 현재 '[region]' 지역을 제공하는 백엔드가 없습니다."
+# Sent when the requested region name resolves to two or more backends and
+# the operator-configured policy cannot pick one (only fires
+# under stronger policies than the default `warn`). Placeholder: [region].
+networkRegionAmbiguous: "&c[P0] '[region]' 지역이 여러 백엔드에서 모호합니다. 서버를 지정해 주세요."
+
+# ###############################################################################
+# 섹션 4: 시각 요소
+# ###############################################################################
+타이틀: "<rainbow>텔레포트됨!</rainbow>"
+# B77DF7?#BF76F5??!
+부제목: "<gradient:#A78BFA:#E876A0>즐겨봐요!</gradient>"
+페이드인: 20
+표시시간: 20
+페이드아웃: 20
+
+# actionbar setting
+액션바: ""
+
+# ###############################################################################
+# 섹션 5: 시간 표기
+# ###############################################################################
+일: "일"
+시간: "시간"
+분: "분"
+초: "초"
+밀리초: "밀리초"
+
+# ###############################################################################
+# 섹션 6: 명령어 설명
+# ###############################################################################
+rtp: "&b/rtp - 무작위 위치로 텔레포트합니다"
+rtp_설명: "무작위 위치로 텔레포트합니다"
+도움말: "&b/rtp help - 이 도움말을 표시합니다"
+도움말_설명: "명령어 설명"
+리로드: "&b/rtp reload - 설정 파일을 리로드합니다"
+리로드_설명: "설정 파일을 리로드합니다"
+스캔: "&b/rtp scan - 리전 내 가능한 모든 위치를 스캔하여 로드 속도를 향상시킵니다"
+스캔_설명: "저장된 데이터를 지우고 리전 내 가능한 모든 위치를 스캔합니다"
+설정_설명: "런타임에 설정 파일을 업데이트합니다"
+정보_설명: "플러그인의 현재 상태를 표시합니다"
+테스트_설명: "RTP 기능을 테스트합니다"
+
+# ###############################################################################
+# 섹션 7: 스캔 명령어
 # ###############################################################################
 스캔시작: "&a[P0] 다음 리전에서 스캔 작업을 시작했습니다: [scan_regions]"
 스캔리셋: "&7[P0] 다음 리전의 스캔 큐를 초기화했습니다: [scan_regions]"
@@ -120,10 +178,10 @@ invalidCommand: "&c[P0] 잘못된 명령어 - [arg]"
 # Boss-bar title shown to players with rtp.scan permission while a world scan is running.
 # Set to empty string to disable the boss-bar.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+scanBossBar: "스캔 중 [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% 육지) ETA [scan_eta]"
 
 # ###############################################################################
-# 섹션 7: 정보 명령어
+# 섹션 8: 정보 명령어
 # ###############################################################################
 정보제목: "&2&l/rtp info"
 정보_티켓: "&7전역 활성 청크 티켓: #7E9CC8[tickets]"
@@ -136,13 +194,13 @@ infoLoadsByOrigin: "&7출처별 로드: #7E9CC8[loadsByOrigin]"
 infoQueueDepth: "&7리전 대기열에서 대기 중인 플레이어: #7E9CC8[queueDepth]"
 infoPendingTeleports: "&7대기 중인 텔레포트 파이프라인: #7E9CC8[pendingTeleports]"
 infoAvgPipelineMs: "&7평균 파이프라인 지연: #7E9CC8[avgPipelineMs] ms"
-# Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
+# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7파이프라인 지연 (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-# Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
+# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7느린 텔레포트 (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-# Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7대기열 증가 경고 (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7JVM 힙: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # /rtp info 의 Health pipeline 라벨 블록 헤더 줄.
@@ -155,7 +213,7 @@ infoMSPTLive: "&7서버 MSPT: #7E9CC8[mspt] ms (&7틱 예산: #7E9CC8[tickBudget
 infoSoftCap: "&7플레이어: #7E9CC8[playerCount] / [softCap]"
 # 데이터베이스의 최근 왕복 지연 시간 (ms). 자리표시자: [databaseLatencyMs].
 infoDatabaseLatencyMs: "&7데이터베이스 지연: #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics (ADR-052), sourced from the process-global RtpOutcomeStats.
+# Generation outcome metrics, sourced from the process-global RtpOutcomeStats.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7생성 성공률: #7E9CC8[genSuccessRate]&7 (실패 #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
@@ -219,22 +277,7 @@ infoBiomeActivityEmpty: "&8--- &7아직 바이옴 점유가 샘플링되지 않�
   - "#58CCED  - 주요 거부 원인: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
-# 섹션 8: 명령어 설명
-# ###############################################################################
-rtp: "&b/rtp - 무작위 위치로 텔레포트합니다"
-rtp_설명: "무작위 위치로 텔레포트합니다"
-도움말: "&b/rtp help - 이 도움말을 표시합니다"
-도움말_설명: "명령어 설명"
-리로드: "&b/rtp reload - 설정 파일을 리로드합니다"
-리로드_설명: "설정 파일을 리로드합니다"
-스캔: "&b/rtp scan - 리전 내 가능한 모든 위치를 스캔하여 로드 속도를 향상시킵니다"
-스캔_설명: "저장된 데이터를 지우고 리전 내 가능한 모든 위치를 스캔합니다"
-설정_설명: "런타임에 설정 파일을 업데이트합니다"
-정보_설명: "플러그인의 현재 상태를 표시합니다"
-테스트_설명: "RTP 기능을 테스트합니다"
-
-# ###############################################################################
-# Section 8b: Generalized Menu Framework
+# 섹션 9: Generalized Menu Framework
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 menuInvalid: "&c[P0] that menu link is invalid."
@@ -246,17 +289,17 @@ menuHoverFallbackType: "유형: [type]"
 # Hover-fallback template used by the menu reflector when a parameter exposes a
 # small curated value set. Placeholder: [values] - comma-joined accepted values.
 menuHoverFallbackBounds: "허용: [values]"
-# Label for the "go back one level" navigation row prepended to every non-root menu page.
+# Label for the "go back one level" navigation row prepended to every non-root menu page."
 menuBack: "&7« 뒤로"
 # Label template for the "execute the assembled command" row prepended to every
-# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
+# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation."
 menuExecute: "&2▶ [command] 실행"
 # Header row at the top of a parameter-value picker sub-page (Stage A.2).
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
 menuPickValue: "&7[param] 의 값을 선택 (실행: /rtp [command] [param]:<value>)"
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
-# can type any value, including ones not in the suggestion list.
+# can type any value, including ones not in the suggestion list."
 menuTypeValue: "&7✎ 사용자 지정 값 입력..."
 # Non-clickable header row at the top of every non-root menu page (Stage A.4).
 # Surfaces the currently-constructed /rtp invocation including any staged
@@ -274,7 +317,7 @@ menuRootHint: "&7아래 옵션을 클릭하여 시작하세요"
 menuPagePrev: "&7« 이전 페이지 ([page])"
 menuPageNext: "&7다음 페이지 ([page]) »"
 # Section divider on the front page above teleport rows (player view).
-menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
+menuFrontPageSectionTeleport: "&8--- &7텔레포트 &8---"
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
@@ -289,16 +332,16 @@ menuFrontPageRowAdmin: "#9D7CD8▶ 관리자 패널 &7- 운영자 도구"
 menuFrontPageHoverAdmin: "&7운영자 도구: 설정, 스캔, 진단, 리로드"
 # --- Admin panel book page ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
-menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+menuAdminPanelTitle: "#5FB3B3&l⚙ 관리자 패널"
 # Non-clickable hint row below menuAdminPanelTitle. No placeholders.
 menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
 # Section dividers on the admin panel. No placeholders.
-menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
-menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
-menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
-menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
+menuAdminPanelSectionConfig: "&8--- &7설정 &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7진단 &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7수명 주기 &8---"
+menuAdminPanelSectionBrowse: "&8--- &7탐색 &8---"
 # Admin-panel rows + hovers. No placeholders.
-menuAdminPanelRowConfig: "&b▶ config editor"
+menuAdminPanelRowConfig: "&b▶ 설정 편집기"
 menuAdminPanelHoverConfig: "&7선별된 설정 선택기를 엽니다"
 menuAdminPanelRowRegions: "#5FB3B3▶ 리전"
 menuAdminPanelHoverRegions: "&7리전별 설정 추가, 제거 또는 편집"
@@ -306,17 +349,17 @@ menuAdminPanelRowWorlds: "#5FB3B3▶ 월드"
 menuAdminPanelHoverWorlds: "&7월드별 설정 추가, 제거 또는 편집"
 menuAdminPanelRowEffects: "#5FB3B3▶ 효과"
 menuAdminPanelHoverEffects: "&7그룹별 텔레포트 효과 추가, 제거 또는 편집"
-menuAdminPanelRowInfo: "&b▶ server info"
+menuAdminPanelRowInfo: "&b▶ 서버 정보"
 menuAdminPanelHoverInfo: "&7플러그인 버전, 리전 수, 대기열 상태 표시"
 menuAdminPanelRowDiagnostics: "&c▶ 전체 진단"
 menuAdminPanelHoverDiagnostics: "&7전체 진단 모음을 실행합니다. 비용이 클 수 있습니다"
-menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
+menuAdminPanelRowMemory: "&b▶ 메모리 추적기 스냅샷"
 menuAdminPanelHoverMemory: "&7활성 청크 티켓 및 파이프라인 할당을 덤프"
-menuAdminPanelRowScan: "&b▶ scan control"
+menuAdminPanelRowScan: "&b▶ 스캔 제어"
 menuAdminPanelHoverScan: "&7스캔 하위 메뉴 열기 (시작 / 일시정지 / 취소)"
 menuAdminPanelRowReload: "&c▶ 리로드"
 menuAdminPanelHoverReload: "&7모든 설정 파일을 리로드합니다. 진행 중인 텔레포트가 영향받을 수 있습니다"
-menuAdminPanelRowBrowse: "&b▶ browse all commands"
+menuAdminPanelRowBrowse: "&b▶ 모든 명령어 탐색"
 menuAdminPanelHoverBrowse: "&7반영된 /rtp 명령어 트리를 엽니다"
 menuAdminPanelRowBack: "&7« 뒤로"
 # --- Visualizations submenu (admin map of bad locations per region) ---
@@ -382,14 +425,14 @@ infoBookOverflowFooter: "&7(내용이 잘렸습니다 - 클릭하여 전체 출�
 # milestone). Users may click the Refresh row to refresh manually.
 infoBookAutoRefreshDeferredNote: "&8(자동 새로고침은 아직 지원되지 않습니다. 새로고침을 클릭하세요)"
 # Non-clickable title row at the top of the config-file selector page (Stage C.1).
-# Shown when an admin clicks "/rtp config" from the front page.
+# Shown when an admin clicks "/rtp config" from the front page."
 configSelectorTitle: "#5FB3B3&l⚙ 설정 파일"
-# Label for the "back to /rtp menu root" navigation row on the config selector page.
+# Label for the "back to /rtp menu root" navigation row on the config selector page."
 configSelectorBackRow: "&7« 메뉴로 돌아가기"
 # Non-clickable title row at the top of a single config-file page (Stage C.2).
-# Placeholder: [file] - the config file name (e.g. "performance", "safety").
-configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
-# Label for the "back to config selector" navigation row on a single config-file page.
+# Placeholder: [file] - the config file name (e.g. "performance", "safety")."
+configFileTitle: "#5FB3B3&l⚙ 설정: &7[file]"
+# Label for the "back to config selector" navigation row on a single config-file page."
 configFileBackRow: "&7« 설정 파일로 돌아가기"
 # Non-clickable hint row shown when a config file has no editable keys.
 configFileEmptyHint: "&7(이 파일에 편집 가능한 키가 없습니다)"
@@ -398,13 +441,13 @@ configFileEmptyHint: "&7(이 파일에 편집 가능한 키가 없습니다)"
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
 # Hover text for a per-key row on a config-file page. Placeholders:
 #   [key], [value], [type] - the config key name, current value, and declared type.
-configKeyHoverFormat: "&7click to edit &7[key] &7(type: [type])"
+configKeyHoverFormat: "&7클릭하여 편집 &7[key] &7(유형: [type])"
 # Non-clickable title row at the top of a shape/vert type-picker page (Stage C.3a).
-# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
-configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name."
+configTypePickerTitle: "#5FB3B3&l⚙ [param] 유형 선택 &7(현재: &7[current]&7)"
 # Non-clickable title row at the top of a shape/vert sub-parameter page (Stage C.3b).
-# Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
-configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+# Placeholders: [param] - "shape" or "vert"; [type] - the active type name."
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7하위 매개변수"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
 configViewRawHint: "&7[P0] 책 보기를 사용할 수 없습니다. 원시 덤프로 대체합니다."
@@ -412,7 +455,7 @@ configViewRawHint: "&7[P0] 책 보기를 사용할 수 없습니다. 원시 덤�
 configValueUnsetPlaceholder: "&8(설정 안 됨)"
 # Non-clickable header row separating the "Changeable" list from the "Pending"
 # staging-cart list on a config-file page when the viewer has staged one or
-# more uncommitted edits. No placeholders.
+# more uncommitted edits. No placeholders."
 configPendingHeader: "&6&l-- pending changes --"
 # Per-row label for a staged (pending) key=value entry on a config-file page.
 # Clicking the row removes it from the cart. Placeholders: [key], [value].
@@ -421,13 +464,13 @@ configPendingRowFormat: "&9[key]&8 = &0[value]"
 # config-file page. No placeholders.
 configPendingRowHover: "클릭하여 취소"
 # Clickable label for the "apply staged changes" row on a config-file page.
-# Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
+# Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart."
 configApplyRow: "&2&l[apply]"
 # Clickable label for the "discard staged changes" row on a config-file page.
-# Clears the cart without applying.
+# Clears the cart without applying."
 configDiscardRow: "&c&l[discard]"
 
-# --- ADR-047 declarative chart composition bridge (REQ-RTP-MAP-006) ---
+# --- declarative chart composition bridge ---
 # Sent to the viewer when an OPEN_MAP menu action fires but no concrete
 # MapBinding is registered (NoopMapBinding is still active, e.g. on the
 # Lite assembly or before RTPHooks wires the platform binding).
@@ -444,58 +487,11 @@ mapUnavailable: "&e[P1] 현재 차트 데이터를 사용할 수 없습니다."
 # (binding-defined back-pressure, e.g. per-viewer cap reached).
 mapBusy: "&e[P1] 맵 서비스가 사용 중입니다. 잠시 후 다시 시도하세요."
 # Label for the clickable "/rtp info" menu row that, on click, mints a
-# ChartSpec(BAD_POINTS_HEATMAP, ...) token and asks the active MapBinding
+# ChartSpec(BAD_POINTS_HEATMAP,...) token and asks the active MapBinding
 # to render a 128x128 heatmap of the current region's known bad-point
 # spiral indices. The row is omitted at render time when NoopMapBinding
-# is the installed binding (REQ-RTP-MAP-006 / ADR-047).
+# is the installed binding."
 menuInfoBadPointsLabel: "#9D7CD8&l# 부적합 위치 맵"
-
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the L2 baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
-# position.
-networkQueued: "&7[P0] 서버 간 목적지를 위해 대기 중입니다 (순번 [position])..."
-# Sent when a player runs /rtp* while they already hold a non-terminal
-# cross-server enrolment (ADR-015 / REQ-RTP-NET-015 command-lock). Placeholder:
-# [position] - FIFO position when known; empty when the proxy has not yet
-# assigned one.
-alreadyQueued: "&c이미 서버 간 대기열에서 기다리고 있습니다 (순번 [position]). 잠시 기다려 주세요."
-# Sent when a cross-server waitlist entry is reaped after exceeding its
-# configured TTL (ADR-015). No placeholders.
-networkTimedOut: "&c[P0] 백엔드를 기다리는 동안 서버 간 텔레포트가 시간 초과되었습니다."
-# Sent when a cross-server waitlist enrolment is rejected because the shared
-# waitlist has reached its configured maximum size (ADR-015 REJECTED_FULL).
-# No placeholders.
-waitlistFull: "&c[P0] 서버 간 대기열이 가득 찼습니다. 잠시 후 다시 시도해 주세요."
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
-networkRouting: "&7[P0] 백엔드로 라우팅 중..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
-networkReserved: "&a[P0] [server]에 좌표를 예약했습니다. 전송 중..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
-networkTransferring: "&a[P0] [server](으)로 전송 중..."
-# Sent when the cross-server path gave up and the request fell back to
-# the local backend. Placeholder: [reason] - one of the
-# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
-networkFallback: "&e[P0] 서버 간 연결을 사용할 수 없습니다 ([reason]). 로컬로 전환합니다."
-# Sent when the cross-server request failed terminally (no fallback was
-# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
-networkFailed: "&c[P0] 서버 간 텔레포트에 실패했습니다: [reason]."
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
-networkRegionUnavailable: "&c[P0] 현재 '[region]' 지역을 제공하는 백엔드가 없습니다."
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
-networkRegionAmbiguous: "&c[P0] '[region]' 지역이 여러 백엔드에서 모호합니다. 서버를 지정해 주세요."
 
 # --- MultiConfig submenu ---
 # Header row fallback used when no per-kind header key is registered.
@@ -509,7 +505,7 @@ multiconfigHeaderWorlds: "#5FB3B3&l 월드"
 multiconfigToggleRemoveModeOff: "&8[ ] 제거 모드"
 # Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
 multiconfigToggleRemoveModeOn: "&c[x] 제거 모드 (항목을 클릭하여 삭제)"
-# Selector row label for the "+ Add new..." entry. No placeholders.
+# Selector row label for the "+ Add new..." entry. No placeholders."
 multiconfigRowAdd: "&2+ 새로 추가..."
 # Hover text for the Add row. Placeholder: [name] - prefilled default name.
 multiconfigRowAddHover: "&7모루 프롬프트에 이름을 입력하세요. 미리 채워짐: &f[name]"
@@ -543,7 +539,29 @@ multiconfigResultNameInvalid: "&c이름 '[name]' 은(는) 허용되지 않습니
 multiconfigResultNameTaken: "&c'[name]' (이)라는 이름의 항목이 이미 존재합니다."
 
 # ###############################################################################
-# 섹션 9: PlaceholderAPI 지원
+# 섹션 10: 시스템 / 관리
+# ###############################################################################
+구파일: "&b[P0] 오래된 [filename] 을(를) 감지했습니다. 업데이트 중"
+
+# 설정 파일에 없는 bukkit 월드를 감지했습니다
+# 자리표시자: [world] - 감지된 월드
+신규월드: "&b[P0] 새 월드 '[world]' 을(를) 감지했습니다"
+
+# 플러그인 리로드 / 업데이트 메시지
+# 자리표시자: [filename] - 파일 이름
+리로드중: "&b[P0] [filename] 을(를) 로딩 중……"
+리로드완료: "&b[P0] [filename] 로딩이 완료되었습니다."
+업데이트중: "&a[P0] [filename] 업데이트 중……"
+업데이트완료: "&a[P0] [filename] 업데이트가 정상적으로 완료되었습니다."
+
+# ###############################################################################
+# 섹션 11: 관리 로그
+# ###############################################################################
+위치저장: "&7[P0] [region] 의 위치 [amount] 개를 저장했습니다"
+위치로드: "&7[P0] [region] 의 위치 [amount] 개를 로드했습니다"
+
+# ###############################################################################
+# 섹션 12: PlaceholderAPI 지원
 # ###############################################################################
 플레이어_사용가능: "&a사용 가능"
 플레이어_쿨다운: "&7대기 중"
@@ -552,24 +570,11 @@ multiconfigResultNameTaken: "&c'[name]' (이)라는 이름의 항목이 이미 �
 플레이어_텔레포트중: "&b텔레포트 중"
 
 # ###############################################################################
-# 섹션 10: 시각 요소
-# ###############################################################################
-타이틀: "<rainbow>텔레포트됨!</rainbow>"
-# B77DF7?#BF76F5??!
-?????: "<gradient:#A78BFA:#E876A0>즐겨봐요!</gradient>"
-페이드인: 20
-표시시간: 20
-페이드아웃: 20
-
-# actionbar setting
-액션바: ""
-
-# ###############################################################################
-# 섹션 11: 메타데이터
+# 섹션 13: 메타데이터
 # ###############################################################################
 version: 1.0
 
 # ###############################################################################
-# 섹션 12: 개발 옵션
+# 섹션 14: 개발 옵션
 # ###############################################################################
 개발태그표시: false

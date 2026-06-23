@@ -63,52 +63,6 @@ setRespawnOnTeleport: false
   # @type: list<string>
   - ""
 
-# --- 데이터베이스 설정 ---
-# 캐시된 위치 및 플레이어 데이터의 저장소.
-데이터베이스:
-  # 사용 가능한 type: yaml, sqlite, mysql, postgresql
-  # - yaml/sqlite: 로컬 파일(추가 설정 불필요)
-  # - mysql/postgresql: 원격 데이터베이스(아래 인증 정보 필요)
-  # @type: enum
-  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
-  # @default: "sqlite"
-  type: "sqlite"
-  # 네트워크 데이터베이스 인증 정보(로컬에서는 무시됨)
-  # @type: string
-  host: "127.0.0.1"
-  # 데이터베이스 포트. mysql/postgresql 에서만 사용됩니다.
-  # @type: integer
-  # @range: [1, 65535]
-  port: 3306
-  # 데이터베이스 / 스키마 이름. mysql/postgresql 에서만 사용됩니다.
-  # @type: string
-  name: "rtp"
-  # 데이터베이스 사용자 이름. mysql/postgresql 에서만 사용됩니다.
-  # @type: string
-  username: "root"
-  # 데이터베이스 비밀번호. mysql/postgresql 에서만 사용됩니다.
-  # @type: string
-  password: "password"
-
-# --- 네트워크 동기화 ---
-# Redis 는 여러 서버 간 캐시된 위치를 동기화하는 데 사용됩니다.
-네트워크:
-  redis:
-    # Enable Redis-backed network state binding.
-    # @type: boolean
-    # @default: false
-    enabled: false
-    # Redis host.
-    # @type: string
-    host: "127.0.0.1"
-    # Redis port.
-    # @type: integer
-    # @range: [1, 65535]
-    port: 6379
-    # Redis password. Empty string disables auth.
-    # @type: string
-    password: ""
-
 # 일반화된 메뉴 프레임워크.
 # `renderer` 는 렌더러 ID 우선순위 리스트입니다. 예외가 발생하거나
 # 어댑터가 없는 경우 프레임워크는 리스트를 순회하며 다음 항목으로
@@ -131,4 +85,4 @@ menu:
     - "book"
 
 # 버전 번호는 변경하지 마세요
-version: 3.0
+version: 3.1

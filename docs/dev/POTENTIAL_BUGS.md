@@ -23,6 +23,8 @@ A correct entry describes **someone else's future problem** that the current tas
 
 Append to the *Open* section below using the template. Keep entries short — one paragraph each. If a deeper analysis is warranted, link to a separate doc rather than inlining it here.
 
+Entries in the *Open* section are ordered by **priority** (highest first): runtime crashes and safety/thread-safety hazards first, then correctness/maintainability and operator-facing config issues, then performance, and finally cosmetic / log-noise / test-noise findings. When adding a new entry, insert it at the position matching its severity rather than strictly by date.
+
 ### Template
 
 ```markdown
@@ -37,30 +39,21 @@ Append to the *Open* section below using the template. Keep entries short — on
 
 ## Open
 
+### 2026-05-16 — `economy-isolation` Vault debit running on caller thread (real isolation breach)
 
-### 2026-06-18 - NeoForge 1.21 carrier (`V1_21_R1NeoForgeVersionAdapter`) shares the blocking `getChunkFuture` defect just fixed on 26.1
+- **Discovered during:** Phase-M1 Paper devstack smoke for the B → C gate in `docs/dev/scratch/CHECKLIST-metrics-and-multiserver.md` (Paper 26.1.2, 23:01 transcript).
+- **Location:** the Vault economy adapter path exercised by `[RTP test/economy-isolation]` — likely `platforms/rtp-bukkit/rtp-bukkit-common/.../economy/` (Vault wrapper); subcommand at `rtp-plugin/.../bukkit/commands/test/EconomyIsolationTestCmd` (or equivalent under `commands/test/`).
+- **Symptom / hypothesis:** Live Paper run reports `debit ran on caller thread 'Craft Scheduler Thread - 2 - RTP'; Vault isolation breached (latency=49863us)`. Vault calls are expected to be dispatched via Global Region / Async Scheduler per Folia threading rules (mirrored on Paper for parity), but the debit is executing on the caller's async RTP scheduler thread instead of being hopped onto an isolated executor.
+- **Impact:** Vault implementations that touch non-thread-safe state (most of them) can be corrupted by RTP-initiated debits/credits; on Folia this would throw `ThreadAccessException`. On Paper it is a latent data-race risk. Predates this session.
+- **Suggested next step:** Audit the Vault wrapper for an explicit `RTP.scheduler.runAsync` / global-region hop around `economy.withdrawPlayer(...)`; if absent, add one and re-run `[RTP test/economy-isolation]`. Add a regression test that asserts the debit thread name differs from the caller's.
 
-- **Discovered during:** fixing the NeoForge 26.1.2 ServerWatchdog crash (this session). Only the `v26_1_R1` carrier was changed; the sibling 1.21 carrier was left untouched as it is outside the reported crash's runtime.
-- **Location:** `platforms/rtp-neoforge/rtp-neoforge-v1_21_R1/src/main/java/io/github/dailystruggle/rtp/neoforge/v1_21_R1/V1_21_R1NeoForgeVersionAdapter.java` `resolveGetChunkFutureMethod` (prefers public `getChunkFuture` by name, line ~146) and `requestFullChunkAsync` (line ~207).
-- **Symptom / hypothesis:** Same shape as the 26.1 crash: `requestFullChunkAsync` is dispatched on the server tick thread (`NeoForgeRTPWorld#loadLiveChunk` -> `MinecraftServer#execute`), and vanilla's public `getChunkFuture`, when called on the main thread, parks the tick thread on `mainThreadProcessor.managedBlock(...)` until generation finishes. On a cache-miss this can trip the 60s ServerWatchdog (S-005).
-- **Impact:** Potential tick-thread stall / watchdog crash on NeoForge 1.21.x during `/rtp` live chunk loads, same as the 26.1.2 crash report 2026-06-18. Not yet reproduced on 1.21.
-- **Suggested next step:** Mirror the 26.1 fix: prefer the non-blocking inner `getChunkFutureMainThread` in `resolveGetChunkFutureMethod` (it returns the pending future without `managedBlock`), keeping the existing tick-thread dispatch. Verify whether the 1.21 carrier's temporary load-ticket is still needed once the non-blocking entry point is used.
+### 2026-05-24 - cross-server /rtp completes for a disconnected player (CANCELLED -> RESERVED -> COMPLETED resurrection)
 
-### 2026-06-14 - claim-integration `integrations.yml` reroll toggles are startup-only; `/rtp reload` does not (un)register verifiers
-
-- **Discovered during:** claim-plugin audit follow-up (this session). High-severity items (WorldGuard inversion, legacy Factions removal) and the sync-verifier fail-safe (#4) were fixed; this reload-toggle finding was reported and deliberately left for a separate pass.
-- **Location:** `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/tools/softdepends/claims/ClaimIntegrations.java` (`setup` -> `registerVerifiers`, called once at startup); the `Configs.onReload` hook only rebuilds the `ConfigParser`. There is no per-verifier unregister path on `GlobalRegionVerifiers` (only `clearGlobalRegionVerifiers()`).
-- **Symptom / hypothesis:** `ClaimIntegrations.setup` registers each enabled claim verifier exactly once. Turning an integration off in `integrations.yml` and running `/rtp reload` leaves its verifier active; turning one on after startup never registers it. The live-reload hook implies the toggles are dynamic, but they are effectively restart-only.
-- **Impact:** Operator confusion / config that silently does not take effect until a full restart. No safety regression (a stale-active verifier still rejects claimed land; a never-registered one only fails to add protection the operator just enabled).
-- **Suggested next step:** Either (a) document the `rerollX` keys as restart-only in the `integrations.yml` comments and the docs, or (b) add a targeted unregister/re-register path. Option (b) is non-trivial: a blanket `clearGlobalRegionVerifiers()` + re-register on reload would also drop any third-party verifiers registered via `RTPAPI.hooks().verifiers()`, so it needs a token/handle-based remove API on `GlobalRegionVerifiers` (and the `RegionVerifierRegistry` facade) so each `*Checker` removes only its own registration.
-
-### 2026-06-14 - global `Semaphore(1)` serializes every per-attempt verification pass
-
-- **Discovered during:** claim-plugin audit follow-up (this session).
-- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/selection/region/GlobalRegionVerifiers.java` - `regionVerifiersLock` (`Semaphore(1)`) is held for the entire sync-verifier loop and while assembling the async chain in `checkGlobalRegionVerifiers`, on every candidate coordinate.
-- **Symptom / hypothesis:** Under a busy multi-region queue, every concurrent per-attempt verification serializes on the single permit, even though the common case is a read-only iteration of two small lists. This is a throughput bottleneck, not a correctness bug.
-- **Impact:** Reduced verification throughput under concurrent load (multiple regions / large queues). No functional defect.
-- **Suggested next step:** Replace the read-side lock with a copy-on-write snapshot of the two verifier lists (e.g. `CopyOnWriteArrayList`, or volatile immutable-list references swapped on register/clear) so `checkGlobalRegionVerifiers` runs lock-free and only the rare register/clear mutations synchronize.
+- **Discovered during:** verification of a `lobby-a` /rtp log trace (this session). The trace showed `terminal: ... newState=CANCELLED` fire on disconnect, then ~2s later `supplier: ... CANCELLED(pos=0) -> RESERVED(pos=0)`, then ~2s after that `terminal: ... newState=COMPLETED`. The user chose to defer the fix to bundle it with Phase 2 A2 (atomic-claim Lua); recording here so it is not lost.
+- **Location:** `platforms/rtp-proxy/rtp-proxy-common/src/main/java/io/github/dailystruggle/rtp/proxy/common/dispatch/DefaultRtpDispatcher.java` `claimAfterSelect` / `sendAfterClaim` (the only pre-claim `sender.isConnected(...)` gate is at line 225, before snapshot read; nothing re-checks before the reservation claim or before the final `COMPLETED` emission). Lobby-side silent acceptance: `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/network/NetworkStatusCache.java#pollOnce` lines 253-263 (the supplier-transition log path only checks `s.nonTerminal()` on the *new* state, not on `prev`).
+- **Symptom / hypothesis:** Two distinct defects. (a) The proxy dispatcher does not re-check `sender.isConnected(...)` between the early gate and the reservation-claim step, so a player who disconnects mid-dispatch still has a reservation token allocated and a `COMPLETED` emitted against them. The `PLAYER_DISCONNECTED` branch at `DefaultRtpDispatcher.java:429` exists but only fires on the transfer step, not on the claim step. (b) `NetworkStatusCache.pollOnce` logs any terminal -> non-terminal transition as if it were normal forward progress (`CANCELLED(pos=0) -> RESERVED(pos=0)`) instead of treating it as a protocol violation, swallowing the only signal a lobby has that something is wrong upstream. Terminal states (CANCELLED/COMPLETED/FAILED) are one-way per `QueueStatus.State` line 59 and `ReqRtpNet015NetworkWaitlistTest:87`.
+- **Impact:** Per-disconnect: one reservation token wasted, one backend teleport pipeline run for a ghost player (queue depth + heap pressure + MemoryTracker churn on the chosen backend), no user-visible misbehavior. Under load (many players disconnecting mid-roundtrip during a server restart, client crash storm, or proxy stutter), this scales linearly. The lobby silent-acceptance half will mask the same shape of defect introduced by future transports (Redis, SQL `LISTEN/NOTIFY`).
+- **Suggested next step:** Bundle with Phase 2 A2 (atomic-claim Lua). In `DefaultRtpDispatcher.claimAfterSelect`, add a `sender.isConnected(...)` re-check immediately before `transport.claim(...)` mirroring the gate at line 225; on negative, emit `CANCELLED(PLAYER_GONE)` and return `DispatchOutcome.Failed(PLAYER_GONE)` without touching the queue. Separately, in `NetworkStatusCache.pollOnce` add a warn-level branch when `prev != null && !prev.nonTerminal() && s.nonTerminal()` so terminal-state resurrections surface as a protocol-violation warning instead of a normal `supplier:` line. Regression test alongside `ReqRtpNet015NetworkWaitlistTest` asserting a CANCELLED row never re-enters `nonTerminal()` via the supplier path.
 
 ### 2026-06-14 - claim `*Checker`s query third-party / Bukkit APIs from the async verification thread (Folia thread-safety caveat)
 
@@ -70,6 +63,30 @@ Append to the *Open* section below using the template. Keep entries short — on
 - **Impact:** Potential thread-safety races on Folia with claim plugins that mutate shared state during a lookup. No observed failure; functionally correct on Paper/Spigot today.
 - **Suggested next step:** Document the off-thread-lookup caveat in `EXTERNAL_HOOKS.md` (verifier threading row) and `ADR-019`; where a claim plugin exposes an async/region-safe query, prefer registering the checker via `addGlobalRegionVerifierAsync` and hop to the appropriate scheduler.
 
+### 2026-05-22 - locale TSV pipeline doubles backslash-heavy values on every round-trip
+
+- **Discovered during:** CHECKLIST-multiconfig-menu step 14. The `menuInfoBadPointsLabel` value in `messages.yml` had grown to ~2 MB at HEAD - a single line of `\\\\\\\\...\u2691 bad-points map`. The TSV round-trip (`locale-files-to-csv` -> `locale-files-from-csv`) re-escaped every `\` to `\\` on write, doubling the value's size each pass. This session's pipeline run pushed the value from 2 MB to 16.7 MB and broke snakeyaml's 3 MB document cap. The runaway seed value itself was replaced with a clean `"#9D7CD8&l# bad-points map"` in baseline and every locale; the underlying escape-doubling bug in the TSV scripts remains.
+- **Location:** `scripts/locale-files-to-csv.ps1` and `scripts/locale-files-from-csv.ps1` - their YAML-value escape rule for backslashes is not idempotent. Any string value containing a literal backslash will double in length on every full pipeline round-trip.
+- **Symptom / hypothesis:** The from-csv writer is emitting `\` -> `\\` (correct YAML double-quoted-string escape) but the to-csv reader is treating the resulting `\\` as a literal `\\` (two chars) rather than collapsing it back to `\` on the next read. After N round-trips a value with K backslashes becomes K * 2^N chars long. The `menuInfoBadPointsLabel` value almost certainly started as a single escape sequence that grew unnoticed across ~22 prior pipeline runs.
+- **Impact:** Any future baseline string containing a literal `\` (Windows paths in examples, regex patterns, etc.) will silently grow on every pipeline run. The 3 MB snakeyaml cap eventually hard-breaks `LocaleParityTest`. Current shipped values appear to be safe because no other key uses `\`.
+- **Suggested next step:** Decide whether the canonical TSV value column should hold (a) the YAML-encoded form (with `\\`) or (b) the decoded form (with `\`); fix one of the two scripts so they round-trip identically. Add a regression test that runs the pipeline twice and asserts byte-equality of the locale tree between passes.
+
+### 2026-06-14 - claim-integration `integrations.yml` reroll toggles are startup-only; `/rtp reload` does not (un)register verifiers
+
+- **Discovered during:** claim-plugin audit follow-up (this session). High-severity items (WorldGuard inversion, legacy Factions removal) and the sync-verifier fail-safe (#4) were fixed; this reload-toggle finding was reported and deliberately left for a separate pass.
+- **Location:** `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/tools/softdepends/claims/ClaimIntegrations.java` (`setup` -> `registerVerifiers`, called once at startup); the `Configs.onReload` hook only rebuilds the `ConfigParser`. There is no per-verifier unregister path on `GlobalRegionVerifiers` (only `clearGlobalRegionVerifiers()`).
+- **Symptom / hypothesis:** `ClaimIntegrations.setup` registers each enabled claim verifier exactly once. Turning an integration off in `integrations.yml` and running `/rtp reload` leaves its verifier active; turning one on after startup never registers it. The live-reload hook implies the toggles are dynamic, but they are effectively restart-only.
+- **Impact:** Operator confusion / config that silently does not take effect until a full restart. No safety regression (a stale-active verifier still rejects claimed land; a never-registered one only fails to add protection the operator just enabled).
+- **Suggested next step:** Either (a) document the `rerollX` keys as restart-only in the `integrations.yml` comments and the docs, or (b) add a targeted unregister/re-register path. Option (b) is non-trivial: a blanket `clearGlobalRegionVerifiers()` + re-register on reload would also drop any third-party verifiers registered via `RTPAPI.hooks().verifiers()`, so it needs a token/handle-based remove API on `GlobalRegionVerifiers` (and the `RegionVerifierRegistry` facade) so each `*Checker` removes only its own registration.
+
+### 2026-05-24 - `BukkitRTPWorld.getBiomes(world)` / `FoliaRTPWorld.getBiomes(world)` return empty set when the platform setter is null-returning instead of falling back to the world enumeration
+
+- **Discovered during:** /rtp biome=minecraft:BADLANDS namespace-parity fix (this session). User flagged the empty-set fallback explicitly.
+- **Location:** `platforms/rtp-bukkit/rtp-bukkit-common/.../bukkitplatform/world/BukkitRTPWorld.java` `getBiomes(RTPWorld<?>)` (line ~117), and the mirrored `platforms/rtp-folia/rtp-folia-common/.../folia/world/FoliaRTPWorld.java` `getBiomes(RTPWorld<?>)` (line ~99). Both do `Set<String> pre = getBiomes.apply(world); return (pre == null) ? new HashSet<>() : new HashSet<>(pre);`.
+- **Symptom / hypothesis:** If a custom platform adapter (or an addon that called `setBiomesGetter`) installs a getter that returns `null` for some worlds, the public static `getBiomes(world)` silently returns an empty set rather than falling back to the platform's full biome enumeration (`Biome.values()` / `Registry.BIOME`). Tab-completion, the menu's biome picker, and any caller using this surface to validate user input would then treat every biome as unknown for that world.
+- **Impact:** Latent: today's default lambda never returns null, so the empty-set branch is unreachable in shipped configurations. The hazard surfaces only when a third-party setter (test fixture, addon, or future platform-specific override) returns null. The visible failure mode would be /rtp biome=<x> rejected for every x in the affected world, with no log line.
+- **Suggested next step:** Replace the `new HashSet<>()` fallback with a call to the default platform enumeration (e.g. inline the `Biome.values()` / `Registry.BIOME` walk from the default lambda, or expose a `defaultBiomes(world)` helper next to `setBiomesGetter` and route the null branch through it). Add a regression test that installs a `setBiomesGetter(w -> null)` lambda and asserts `getBiomes(w)` is non-empty and contains a known vanilla biome.
+
 ### 2026-06-14 - claim `*Checker`s log "Critical architectural incompatibility" SEVERE on first absence/NPE rather than a benign not-initialized message
 
 - **Discovered during:** claim-plugin audit follow-up (this session).
@@ -77,6 +94,14 @@ Append to the *Open* section below using the template. Keep entries short — on
 - **Symptom / hypothesis:** When a checker's setup silently failed (swallowed `NoClassDefFoundError`/NPE), the first lookup NPEs and is reported as a "Critical architectural incompatibility" SEVERE line, rather than a benign "plugin not initialized" notice.
 - **Impact:** Misleading SEVERE log noise that looks like a serious defect to operators; the checker still fails-safe (disables itself), so no teleport-safety impact.
 - **Suggested next step:** Add an explicit null/initialization guard before the first API call in each checker (especially `LandsChecker`) and downgrade the "not initialized / plugin absent" path to a single INFO/FINE line, reserving SEVERE for a genuine unexpected `Throwable` from a present, initialized plugin.
+
+### 2026-06-14 - global `Semaphore(1)` serializes every per-attempt verification pass
+
+- **Discovered during:** claim-plugin audit follow-up (this session).
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/selection/region/GlobalRegionVerifiers.java` - `regionVerifiersLock` (`Semaphore(1)`) is held for the entire sync-verifier loop and while assembling the async chain in `checkGlobalRegionVerifiers`, on every candidate coordinate.
+- **Symptom / hypothesis:** Under a busy multi-region queue, every concurrent per-attempt verification serializes on the single permit, even though the common case is a read-only iteration of two small lists. This is a throughput bottleneck, not a correctness bug.
+- **Impact:** Reduced verification throughput under concurrent load (multiple regions / large queues). No functional defect.
+- **Suggested next step:** Replace the read-side lock with a copy-on-write snapshot of the two verifier lists (e.g. `CopyOnWriteArrayList`, or volatile immutable-list references swapped on register/clear) so `checkGlobalRegionVerifiers` runs lock-free and only the rare register/clear mutations synchronize.
 
 ### 2026-06-14 - GriefPrevention / Lands claim checks use chunk-resolution granularity (conservative, lowers candidate yield)
 
@@ -94,26 +119,6 @@ Append to the *Open* section below using the template. Keep entries short — on
 - **Impact:** None today (deprecation warning only). Future Lands API removal would break the `rtp-plugin` build until the checker is rewritten to the current factory/query API.
 - **Suggested next step:** Rewrite `LandsChecker` against the current `LandsIntegration.of(plugin)` factory and the non-deprecated land/area query API for 7.x, ideally with a precise (block-resolution) claim check (see the granularity entry above).
 
-### 2026-05-24 - `BukkitRTPWorld.getBiomes(world)` / `FoliaRTPWorld.getBiomes(world)` return empty set when the platform setter is null-returning instead of falling back to the world enumeration
-
-- **Discovered during:** /rtp biome=minecraft:BADLANDS namespace-parity fix (this session). User flagged the empty-set fallback explicitly.
-- **Location:** `platforms/rtp-bukkit/rtp-bukkit-common/.../bukkitplatform/world/BukkitRTPWorld.java` `getBiomes(RTPWorld<?>)` (line ~117), and the mirrored `platforms/rtp-folia/rtp-folia-common/.../folia/world/FoliaRTPWorld.java` `getBiomes(RTPWorld<?>)` (line ~99). Both do `Set<String> pre = getBiomes.apply(world); return (pre == null) ? new HashSet<>() : new HashSet<>(pre);`.
-- **Symptom / hypothesis:** If a custom platform adapter (or an addon that called `setBiomesGetter`) installs a getter that returns `null` for some worlds, the public static `getBiomes(world)` silently returns an empty set rather than falling back to the platform's full biome enumeration (`Biome.values()` / `Registry.BIOME`). Tab-completion, the menu's biome picker, and any caller using this surface to validate user input would then treat every biome as unknown for that world.
-- **Impact:** Latent: today's default lambda never returns null, so the empty-set branch is unreachable in shipped configurations. The hazard surfaces only when a third-party setter (test fixture, addon, or future platform-specific override) returns null. The visible failure mode would be /rtp biome=<x> rejected for every x in the affected world, with no log line.
-- **Suggested next step:** Replace the `new HashSet<>()` fallback with a call to the default platform enumeration (e.g. inline the `Biome.values()` / `Registry.BIOME` walk from the default lambda, or expose a `defaultBiomes(world)` helper next to `setBiomesGetter` and route the null branch through it). Add a regression test that installs a `setBiomesGetter(w -> null)` lambda and asserts `getBiomes(w)` is non-empty and contains a known vanilla biome.
-
-
-
-### 2026-05-24 - cross-server /rtp completes for a disconnected player (CANCELLED -> RESERVED -> COMPLETED resurrection)
-
-- **Discovered during:** verification of a `lobby-a` /rtp log trace (this session). The trace showed `terminal: ... newState=CANCELLED` fire on disconnect, then ~2s later `supplier: ... CANCELLED(pos=0) -> RESERVED(pos=0)`, then ~2s after that `terminal: ... newState=COMPLETED`. The user chose to defer the fix to bundle it with Phase 2 A2 (atomic-claim Lua); recording here so it is not lost.
-- **Location:** `platforms/rtp-proxy/rtp-proxy-common/src/main/java/io/github/dailystruggle/rtp/proxy/common/dispatch/DefaultRtpDispatcher.java` `claimAfterSelect` / `sendAfterClaim` (the only pre-claim `sender.isConnected(...)` gate is at line 225, before snapshot read; nothing re-checks before the reservation claim or before the final `COMPLETED` emission). Lobby-side silent acceptance: `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/network/NetworkStatusCache.java#pollOnce` lines 253-263 (the supplier-transition log path only checks `s.nonTerminal()` on the *new* state, not on `prev`).
-- **Symptom / hypothesis:** Two distinct defects. (a) The proxy dispatcher does not re-check `sender.isConnected(...)` between the early gate and the reservation-claim step, so a player who disconnects mid-dispatch still has a reservation token allocated and a `COMPLETED` emitted against them. The `PLAYER_DISCONNECTED` branch at `DefaultRtpDispatcher.java:429` exists but only fires on the transfer step, not on the claim step. (b) `NetworkStatusCache.pollOnce` logs any terminal -> non-terminal transition as if it were normal forward progress (`CANCELLED(pos=0) -> RESERVED(pos=0)`) instead of treating it as a protocol violation, swallowing the only signal a lobby has that something is wrong upstream. Terminal states (CANCELLED/COMPLETED/FAILED) are one-way per `QueueStatus.State` line 59 and `ReqRtpNet015NetworkWaitlistTest:87`.
-- **Impact:** Per-disconnect: one reservation token wasted, one backend teleport pipeline run for a ghost player (queue depth + heap pressure + MemoryTracker churn on the chosen backend), no user-visible misbehavior. Under load (many players disconnecting mid-roundtrip during a server restart, client crash storm, or proxy stutter), this scales linearly. The lobby silent-acceptance half will mask the same shape of defect introduced by future transports (Redis, SQL `LISTEN/NOTIFY`).
-- **Suggested next step:** Bundle with Phase 2 A2 (atomic-claim Lua). In `DefaultRtpDispatcher.claimAfterSelect`, add a `sender.isConnected(...)` re-check immediately before `transport.claim(...)` mirroring the gate at line 225; on negative, emit `CANCELLED(PLAYER_GONE)` and return `DispatchOutcome.Failed(PLAYER_GONE)` without touching the queue. Separately, in `NetworkStatusCache.pollOnce` add a warn-level branch when `prev != null && !prev.nonTerminal() && s.nonTerminal()` so terminal-state resurrections surface as a protocol-violation warning instead of a normal `supplier:` line. Regression test alongside `ReqRtpNet015NetworkWaitlistTest` asserting a CANCELLED row never re-enters `nonTerminal()` via the supplier path.
-
-
-
 ### 2026-05-23 - multi-config entry editor renders differently from built-in `default` (shape/vert stored as section vs FactoryValue)
 
 - **Discovered during:** menu nested-config editing fix (this session, route A). Resolved the nested-row editability symptom (clickable dotted `OpenConfigKey` + dotted-param registration in `SubConfigCmd`) but left the visual/UX divergence between built-in `default` and runtime-added entries (e.g. `default1234`) untouched.
@@ -121,19 +126,6 @@ Append to the *Open* section below using the template. Keep entries short — on
 - **Symptom / hypothesis:** For built-in `default`, `parser.getData().get(RegionKeys.shape)` returns a `Shape` `FactoryValue<?>` instance (set by `RegionConfigLoader.load` during the normal startup load), which renders as one clickable `shape: <toString>` row. For a freshly menu-added `default1234`, the same getter returns the raw `RtpYamlSection` from the seeded YAML because `MultiConfigParser.addParser` does NOT run the shape/vert factory-merge pass that `RegionConfigLoader.load` does, so `buildConfigFile` flattens it into many `shape.radius` / `shape.centerX` rows. Two visibly different editor styles for the same conceptual entry; only the rendering differs, not the underlying parser ability.
 - **Impact:** Cosmetic / UX inconsistency; admins see one editor for `default` and a different (flattened, longer, more granular) editor for any added entry. Both editors now allow value edits after this session's fix, but the difference is jarring and the flattened form lacks the shape/vert type-picker entry-point that `default` exposes.
 - **Suggested next step:** On `MultiConfigParser.addParser` (or in the menu's ADD branch at `MenuRedeemSubcommand.dispatchMultiConfigMutate`), after the new child `ConfigParser` is created, run the same shape/vert factory-merge pass that `RegionConfigLoader.load` performs so the stored `shape`/`vert` value is a `FactoryValue<?>` from the start. Then both built-in and runtime-added entries render through the same single-clickable-row branch. Separately, consider routing top-level `shape`/`vert` clicks through the existing `CommandTreeMenuBuilder.buildShapeVertTypePicker` -> `buildShapeVertSubParamPage` chain (already implemented at lines 969 / 1057) instead of opening an anvil for the whole shape param; this would make sub-param edits (`radius`) addressable without staging the entire shape value.
-
-
-
-### 2026-05-22 - locale TSV pipeline doubles backslash-heavy values on every round-trip
-
-- **Discovered during:** CHECKLIST-multiconfig-menu step 14. The `menuInfoBadPointsLabel` value in `messages.yml` had grown to ~2 MB at HEAD - a single line of `\\\\\\\\...\u2691 bad-points map`. The TSV round-trip (`locale-files-to-csv` -> `locale-files-from-csv`) re-escaped every `\` to `\\` on write, doubling the value's size each pass. This session's pipeline run pushed the value from 2 MB to 16.7 MB and broke snakeyaml's 3 MB document cap. The runaway seed value itself was replaced with a clean `"#9D7CD8&l# bad-points map"` in baseline and every locale; the underlying escape-doubling bug in the TSV scripts remains.
-- **Location:** `scripts/locale-files-to-csv.ps1` and `scripts/locale-files-from-csv.ps1` - their YAML-value escape rule for backslashes is not idempotent. Any string value containing a literal backslash will double in length on every full pipeline round-trip.
-- **Symptom / hypothesis:** The from-csv writer is emitting `\` -> `\\` (correct YAML double-quoted-string escape) but the to-csv reader is treating the resulting `\\` as a literal `\\` (two chars) rather than collapsing it back to `\` on the next read. After N round-trips a value with K backslashes becomes K * 2^N chars long. The `menuInfoBadPointsLabel` value almost certainly started as a single escape sequence that grew unnoticed across ~22 prior pipeline runs.
-- **Impact:** Any future baseline string containing a literal `\` (Windows paths in examples, regex patterns, etc.) will silently grow on every pipeline run. The 3 MB snakeyaml cap eventually hard-breaks `LocaleParityTest`. Current shipped values appear to be safe because no other key uses `\`.
-- **Suggested next step:** Decide whether the canonical TSV value column should hold (a) the YAML-encoded form (with `\\`) or (b) the decoded form (with `\`); fix one of the two scripts so they round-trip identically. Add a regression test that runs the pipeline twice and asserts byte-equality of the locale tree between passes.
-
-
-
 
 ### 2026-05-20 - `&c` color code leaks into console on `invalid command` dispatch failure
 
@@ -143,16 +135,6 @@ Append to the *Open* section below using the template. Keep entries short — on
 - **Impact:** Cosmetic / log-noise. Operators see a raw `&c` in their console on every dispatch failure, which both looks broken and makes log scraping for `invalid command` brittle. The duplicate line also makes audit grep return double-counts.
 - **Suggested next step:** Inspect `BukkitBaseRTPCmd.msgInvalidCommand` (and its `msgBadParameter` sibling, REQ-RTP-S-004 auditing surface): either run the message through `ChatColor.translateAlternateColorCodes('&', msg)` before `RTP.log`, or drop the `&c[P0]` prefix from the format and rely on the log handler to colorize. Then de-dupe the dual log path so only one line emits.
 
-
-
-### 2026-05-16 — `economy-isolation` Vault debit running on caller thread (real isolation breach)
-
-- **Discovered during:** Phase-M1 Paper devstack smoke for the B → C gate in `docs/dev/scratch/CHECKLIST-metrics-and-multiserver.md` (Paper 26.1.2, 23:01 transcript).
-- **Location:** the Vault economy adapter path exercised by `[RTP test/economy-isolation]` — likely `platforms/rtp-bukkit/rtp-bukkit-common/.../economy/` (Vault wrapper); subcommand at `rtp-plugin/.../bukkit/commands/test/EconomyIsolationTestCmd` (or equivalent under `commands/test/`).
-- **Symptom / hypothesis:** Live Paper run reports `debit ran on caller thread 'Craft Scheduler Thread - 2 - RTP'; Vault isolation breached (latency=49863us)`. Vault calls are expected to be dispatched via Global Region / Async Scheduler per Folia threading rules (mirrored on Paper for parity), but the debit is executing on the caller's async RTP scheduler thread instead of being hopped onto an isolated executor.
-- **Impact:** Vault implementations that touch non-thread-safe state (most of them) can be corrupted by RTP-initiated debits/credits; on Folia this would throw `ThreadAccessException`. On Paper it is a latent data-race risk. Predates this session.
-- **Suggested next step:** Audit the Vault wrapper for an explicit `RTP.scheduler.runAsync` / global-region hop around `economy.withdrawPlayer(...)`; if absent, add one and re-run `[RTP test/economy-isolation]`. Add a regression test that asserts the debit thread name differs from the caller's.
-
 ### 2026-05-16 — `disconnect-midflight` probe emits WARNING-level `[ENQUEUE_TRACE] ... DROPPED` for synthetic UUID
 
 - **Discovered during:** Phase-M1 Paper devstack smoke for the B → C gate in `docs/dev/scratch/CHECKLIST-metrics-and-multiserver.md` (Paper 26.1.2, 23:01 transcript).
@@ -161,17 +143,4 @@ Append to the *Open* section below using the template. Keep entries short — on
 - **Impact:** False FAIL in `/rtp test full` on every server (Paper devstack shows it cleanly); also pollutes the operator's WARN-level log on every synthetic probe. No runtime defect.
 - **Suggested next step:** Either (a) downgrade the `[ENQUEUE_TRACE] ... DROPPED` line to `Level.FINE` (it is a diagnostic, not a user-impacting warning), or (b) have the disconnect-midflight probe register its synthetic UUID with `SendMessage` so the drop is silenced for that one ID. (a) is the cleaner fix.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-<!-- Append new entries above this comment, newest first. Resolved entries are deleted, not archived. -->
+<!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

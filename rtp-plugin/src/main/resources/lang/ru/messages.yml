@@ -1,4 +1,6 @@
-# --- Сообщения RTP (Русский) ---
+# ###############################################################################
+# Section 0: Подстановочные значения
+# ###############################################################################
 # Перевод сообщений, видимых игроку и консоли.
 # ВАЖНО:
 # - Имена ключей в этом файле соответствуют правой колонке
@@ -12,7 +14,7 @@
   - "[RTP]"
 
 # ###############################################################################
-# Section 2: Teleportation
+# Section 1: Teleportation
 # ###############################################################################
 # when teleporting, say this
 ужеТелепортируется: "&7[P0] ⚡ вы уже телепортируетесь!"
@@ -25,6 +27,9 @@
 
 # if teleport is cancelled
 отменаТелепорта: "&7[P0] ⚡ Телепорт отменён!"
+
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] Нельзя телепортироваться случайно во время боя."
 
 # если после максимального числа попыток не найдено безопасных мест
 # подстановка: [attempts] - максимальное число попыток
@@ -49,7 +54,95 @@ lockedAfterUses: "&7[P0] ⌖ Вы достигли лимита случайны
 недостаточноДенег: "&7[P0] вам нужно как минимум $[money] для этого."
 
 # ###############################################################################
-# Section 3: Time Formatting
+# Section 2: Отклик команд
+# ###############################################################################
+# мир не существует в bukkit
+# подстановка: [world] - имя мира
+недопустимыйМир: "&7[P0] не удалось найти мир '[world]'"
+
+# плагин не содержит запрошенной команды
+# подстановка: [arg] - переданный аргумент
+неверныйАргумент: "&c[P0] недопустимый аргумент команды [arg]"
+
+# plugin doesn't have the subcommand or parameter the user requested
+# placeholder: [arg] - the argument attempted
+invalidCommand: "&c[P0] недопустимая команда - [arg]"
+
+# у пользователя нет прав на запрошенную команду
+нетПрав: "&7Извините, но у вас нет прав на выполнение этой команды. Свяжитесь с администраторами сервера, если считаете, что это ошибка."
+
+# plugin is busy reloading
+busy: "&c[P0] занят"
+
+# когда консоль пытается выполнить команду, доступную только игрокам
+командаКонсолиНеРазрешена: "&c[P0] Вы должны быть игроком в игре, чтобы выполнить эту команду."
+
+# ###############################################################################
+# Section 3: Межсерверная телепортация (сетевой режим)
+# ###############################################################################
+# Sent only when `network.enabled: true` and the player's `/rtp` is routed
+# across the cross-server wait queue (see network.yml `routing.mode`).
+# All keys are optional from the player's perspective - the L2 baseline
+# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
+# Sent when the request has been accepted into the cross-server wait queue
+# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
+# position from `pollStatus`; may be empty if the transport returns no
+# position.
+networkQueued: "&7[P0] в очереди на межсерверное назначение (позиция [position])..."
+# Sent when a player runs /rtp* while they already hold a non-terminal
+# cross-server enrolment (command-lock). Placeholder:
+# [position] - FIFO position when known; empty when the proxy has not yet
+# assigned one.
+alreadyQueued: "&cВы уже ожидаете в межсерверной очереди (позиция [position]). Пожалуйста, подождите."
+# Sent when a cross-server waitlist entry is reaped after exceeding its
+# configured TTL. No placeholders.
+networkTimedOut: "&c[P0] межсерверная телепортация истекла по времени в ожидании сервера."
+# Sent when a cross-server waitlist enrolment is rejected because the shared
+# waitlist has reached its configured maximum size (REJECTED_FULL).
+# No placeholders.
+waitlistFull: "&c[P0] межсерверная очередь заполнена; попробуйте снова чуть позже."
+# Sent when the queue has handed the request off to the proxy router and
+# a backend selection is in progress.
+networkRouting: "&7[P0] маршрутизация на сервер..."
+# Sent when a backend has reserved a coordinate for this player and the
+# proxy is about to initiate the cross-server hop. Placeholder: [server]
+# - the destination backend's serverId.
+networkReserved: "&a[P0] координата зарезервирована на [server]. Перенос..."
+# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+networkTransferring: "&a[P0] перенос на [server]..."
+# Sent when the cross-server path gave up and the request fell back to
+# the local backend. Placeholder: [reason] - one of the
+# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
+networkFallback: "&e[P0] межсерверный режим недоступен ([reason]); возврат к локальному."
+# Sent when the cross-server request failed terminally (no fallback was
+# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
+networkFailed: "&c[P0] межсерверная телепортация не удалась: [reason]."
+# Sent when the player asked for a specific region (`/rtp <region>`) but
+# no backend in the network is currently serving it. Placeholder:
+# [region] - the requested region name.
+networkRegionUnavailable: "&c[P0] сейчас ни один сервер не обслуживает регион '[region]'."
+# Sent when the requested region name resolves to two or more backends and
+# the operator-configured policy cannot pick one (only fires
+# under stronger policies than the default `warn`). Placeholder: [region].
+networkRegionAmbiguous: "&c[P0] регион '[region]' неоднозначен среди серверов; укажите сервер."
+
+# ###############################################################################
+# Section 4: Visuals
+# ###############################################################################
+# title settings
+# remove or set title to " to disable
+# PlaceholderAPI is recommended for coordinates"
+заголовок: "<rainbow>Телепортирован!</rainbow>"
+подзаголовок: "<gradient:#A78BFA:#E876A0>веселитесь!</gradient>"
+появление: 20
+оставаться: 20
+исчезновение: 20
+
+# actionbar setting
+панельДействий: ""
+
+# ###############################################################################
+# Section 5: Time Formatting
 # ###############################################################################
 # for time placeholders, what to call days, hours, minutes, seconds, and milliseconds
 дни: "д"
@@ -59,58 +152,23 @@ lockedAfterUses: "&7[P0] ⌖ Вы достигли лимита случайны
 миллисекунды: "мс"
 
 # ###############################################################################
-# Section 4: System & Management
+# Section 6: Command Descriptions
 # ###############################################################################
-# a configuration file 'version' is lower than the latest
-# placeholder: [filename] - name of file, including file extension
-старыйФайл: "&b[P0] обнаружен старый [filename]. Обновление"
-
-# обнаружен мир bukkit, отсутствующий в файле конфигурации
-# подстановка: [world] - обнаруженный мир
-новыйМир: "&b[P0] обнаружен новый мир '[world]'"
-
-# мир не существует в bukkit
-# подстановка: [world] - имя мира
-недопустимыйМир: "&7[P0] не удалось найти мир '[world]'"
-
-# текст перезагрузки / обновления плагина
-# подстановка: [filename] - имя файла
-перезагрузка: "&b[P0] загрузка [filename]..."
-перезагружено: "&b[P0] [filename] успешно загружен."
-обновление: "&a[P0] обновление [filename]..."
-обновлено: "&a[P0] [filename] успешно обновлён."
-
-# плагин не содержит запрошенной команды
-# подстановка: [arg] - переданный аргумент
-неверныйАргумент: "&c[P0] недопустимый аргумент команды [arg]"
-
-# когда консоль пытается выполнить команду, доступную только игрокам
-командаКонсолиНеРазрешена: "&c[P0] Вы должны быть игроком в игре, чтобы выполнить эту команду."
-
-# plugin is busy reloading
-busy: "&c[P0] занят"
-
-# Sent when the optional PvP combat check refuses /rtp because the player is in combat
-pvpInCombat: "&c[P0] Нельзя телепортироваться случайно во время боя."
-
-# plugin doesn't have the subcommand or parameter the user requested
-# placeholder: [arg] - the argument attempted
-invalidCommand: "&c[P0] недопустимая команда - [arg]"
-
-# у пользователя нет прав на запрошенную команду
-нетПрав: "&7Извините, но у вас нет прав на выполнение этой команды. Свяжитесь с администраторами сервера, если считаете, что это ошибка."
+# shown in help command
+rtp: "&b/rtp - телепортируйтесь в случайную локацию"
+rtp_описание: "телепортируйтесь в случайную локацию"
+помощь: "&b/rtp help - показать эту справку"
+помощь_описание: "описание команд"
+перезагрузить: "&b/rtp reload - перезагрузить файлы конфигурации"
+перезагрузить_описание: "перезагрузить файлы конфигурации"
+сканирование: "&b/rtp scan - проверить все возможные локации региона для улучшения времени загрузки"
+сканирование_описание: "удалить сохранённые данные и проверить все возможные локации региона"
+config_описание: "обновить файлы конфигурации во время выполнения"
+info_описание: "проверить текущее состояние плагина"
+test_описание: "тестирование функций RTP"
 
 # ###############################################################################
-# Section 5: Administrative Logs
-# ###############################################################################
-# logged when locations are saved/loaded from database
-# placeholder: [amount] - number of locations
-# placeholder: [region] - name of region
-локацияСохранена: "&7[P0] [amount] локаций успешно сохранены для [region]"
-локацияЗагружена: "&7[P0] [amount] локаций успешно загружены для [region]"
-
-# ###############################################################################
-# Section 6: Scan Command
+# Section 7: Scan Command
 # ###############################################################################
 # messages related to the scan command
 # placeholder: [scan_regions] - list of regions
@@ -126,10 +184,10 @@ invalidCommand: "&c[P0] недопустимая команда - [arg]"
 # Boss-bar title shown to players with rtp.scan permission while a world scan is running.
 # Set to empty string to disable the boss-bar.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+scanBossBar: "Сканирование [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% земли) ETA [scan_eta]"
 
 # ###############################################################################
-# Section 7: Info Command
+# Section 8: Info Command
 # ###############################################################################
 # messages related to the info command
 заголовокИнфо: "&2&l/rtp info"
@@ -143,13 +201,13 @@ scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_l
 infoQueueDepth: "&7Игроков в очередях регионов: #7E9CC8[queueDepth]"
 infoPendingTeleports: "&7Ожидающие конвейеры телепортации: #7E9CC8[pendingTeleports]"
 infoAvgPipelineMs: "&7Средняя задержка конвейера: #7E9CC8[avgPipelineMs] ms"
-# Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
+# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7Задержка конвейера (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-# Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
+# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7Медленные телепортации (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-# Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7Предупреждения о росте очереди (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7Куча JVM: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # Строка заголовка блока Health pipeline в /rtp info.
@@ -162,7 +220,7 @@ infoMSPTLive: "&7MSPT сервера: #7E9CC8[mspt] ms (&7бюджет тика:
 infoSoftCap: "&7Игроки: #7E9CC8[playerCount] / [softCap]"
 # Последняя задержка обращения к базе данных в мс. Подстановка: [databaseLatencyMs].
 infoDatabaseLatencyMs: "&7Задержка базы данных: #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics (ADR-052), sourced from the process-global RtpOutcomeStats.
+# Generation outcome metrics, sourced from the process-global RtpOutcomeStats.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Успех генерации: #7E9CC8[genSuccessRate]&7 (сбои #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
@@ -226,23 +284,7 @@ infoBiomeActivityEmpty: "&8--- &7заполнение биомов ещё не �
   - "#58CCED  - основная причина отказа: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
-# Section 8: Command Descriptions
-# ###############################################################################
-# shown in help command
-rtp: "&b/rtp - телепортируйтесь в случайную локацию"
-rtp_описание: "телепортируйтесь в случайную локацию"
-помощь: "&b/rtp help - показать эту справку"
-помощь_описание: "описание команд"
-перезагрузить: "&b/rtp reload - перезагрузить файлы конфигурации"
-перезагрузить_описание: "перезагрузить файлы конфигурации"
-сканирование: "&b/rtp scan - проверить все возможные локации региона для улучшения времени загрузки"
-сканирование_описание: "удалить сохранённые данные и проверить все возможные локации региона"
-config_описание: "обновить файлы конфигурации во время выполнения"
-info_описание: "проверить текущее состояние плагина"
-test_описание: "тестирование функций RTP"
-
-# ###############################################################################
-# Section 8b: Generalized Menu Framework
+# Section 9: Generalized Menu Framework
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 menuInvalid: "&c[P0] эта ссылка меню недействительна."
@@ -254,17 +296,17 @@ menuHoverFallbackType: "тип: [type]"
 # Hover-fallback template used by the menu reflector when a parameter exposes a
 # small curated value set. Placeholder: [values] - comma-joined accepted values.
 menuHoverFallbackBounds: "принято: [values]"
-# Label for the "go back one level" navigation row prepended to every non-root menu page.
+# Label for the "go back one level" navigation row prepended to every non-root menu page."
 menuBack: "&7« назад"
 # Label template for the "execute the assembled command" row prepended to every
-# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
+# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation."
 menuExecute: "&2▶ выполнить [command]"
 # Header row at the top of a parameter-value picker sub-page (Stage A.2).
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
 menuPickValue: "&7выберите значение для [param] (выполнит: /rtp [command] [param]:<value>)"
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
-# can type any value, including ones not in the suggestion list.
+# can type any value, including ones not in the suggestion list."
 menuTypeValue: "&7✎ введите своё значение..."
 # Non-clickable header row at the top of every non-root menu page (Stage A.4).
 # Surfaces the currently-constructed /rtp invocation including any staged
@@ -282,7 +324,7 @@ menuRootHint: "&7нажмите на опцию ниже, чтобы начат�
 menuPagePrev: "&7« предыдущая страница ([page])"
 menuPageNext: "&7следующая страница ([page]) »"
 # Section divider on the front page above teleport rows (player view).
-menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
+menuFrontPageSectionTeleport: "&8--- &7телепортация &8---"
 # Front-page rows. No placeholders.
 menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
 menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
@@ -297,16 +339,16 @@ menuFrontPageRowAdmin: "#9D7CD8▶ панель администратора &7-
 menuFrontPageHoverAdmin: "&7инструменты оператора: настройки, сканы, диагностика, перезагрузка"
 # --- Admin panel book page ---
 # Non-clickable title row at the top of the admin panel. No placeholders.
-menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+menuAdminPanelTitle: "#5FB3B3&l⚙ панель администратора"
 # Non-clickable hint row below menuAdminPanelTitle. No placeholders.
 menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
 # Section dividers on the admin panel. No placeholders.
-menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
-menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
-menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
-menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
+menuAdminPanelSectionConfig: "&8--- &7конфигурация &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7диагностика &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7жизненный цикл &8---"
+menuAdminPanelSectionBrowse: "&8--- &7обзор &8---"
 # Admin-panel rows + hovers. No placeholders.
-menuAdminPanelRowConfig: "&b▶ config editor"
+menuAdminPanelRowConfig: "&b▶ редактор конфигурации"
 menuAdminPanelHoverConfig: "&7открыть подобранный селектор настроек"
 menuAdminPanelRowRegions: "#5FB3B3▶ регионы"
 menuAdminPanelHoverRegions: "&7добавить, удалить или изменить настройки по регионам"
@@ -314,17 +356,17 @@ menuAdminPanelRowWorlds: "#5FB3B3▶ миры"
 menuAdminPanelHoverWorlds: "&7добавить, удалить или изменить настройки по мирам"
 menuAdminPanelRowEffects: "#5FB3B3▶ эффекты"
 menuAdminPanelHoverEffects: "&7добавить, удалить или изменить эффекты телепортации по группам"
-menuAdminPanelRowInfo: "&b▶ server info"
+menuAdminPanelRowInfo: "&b▶ информация о сервере"
 menuAdminPanelHoverInfo: "&7показать версию плагина, число регионов и состояние очередей"
 menuAdminPanelRowDiagnostics: "&c▶ полная диагностика"
 menuAdminPanelHoverDiagnostics: "&7запускает полный набор диагностики; может быть затратной"
-menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
+menuAdminPanelRowMemory: "&b▶ снимок трекера памяти"
 menuAdminPanelHoverMemory: "&7вывести активные тикеты чанков и выделения конвейера"
-menuAdminPanelRowScan: "&b▶ scan control"
+menuAdminPanelRowScan: "&b▶ управление сканированием"
 menuAdminPanelHoverScan: "&7открыть подменю сканирования (старт / пауза / отмена)"
 menuAdminPanelRowReload: "&c▶ перезагрузка"
 menuAdminPanelHoverReload: "&7перезагружает все файлы настроек; текущие телепортации могут пострадать"
-menuAdminPanelRowBrowse: "&b▶ browse all commands"
+menuAdminPanelRowBrowse: "&b▶ просмотреть все команды"
 menuAdminPanelHoverBrowse: "&7открыть отражённое дерево команд /rtp"
 menuAdminPanelRowBack: "&7« назад"
 # --- Visualizations submenu (admin map of bad locations per region) ---
@@ -390,14 +432,14 @@ infoBookOverflowFooter: "&7(содержимое обрезано - нажмит
 # milestone). Users may click the Refresh row to refresh manually.
 infoBookAutoRefreshDeferredNote: "&8(автообновление пока не поддерживается; нажмите Обновить)"
 # Non-clickable title row at the top of the config-file selector page (Stage C.1).
-# Shown when an admin clicks "/rtp config" from the front page.
+# Shown when an admin clicks "/rtp config" from the front page."
 configSelectorTitle: "#5FB3B3&l⚙ файлы настроек"
-# Label for the "back to /rtp menu root" navigation row on the config selector page.
+# Label for the "back to /rtp menu root" navigation row on the config selector page."
 configSelectorBackRow: "&7« назад в меню"
 # Non-clickable title row at the top of a single config-file page (Stage C.2).
-# Placeholder: [file] - the config file name (e.g. "performance", "safety").
-configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
-# Label for the "back to config selector" navigation row on a single config-file page.
+# Placeholder: [file] - the config file name (e.g. "performance", "safety")."
+configFileTitle: "#5FB3B3&l⚙ конфигурация: &7[file]"
+# Label for the "back to config selector" navigation row on a single config-file page."
 configFileBackRow: "&7« назад к файлам настроек"
 # Non-clickable hint row shown when a config file has no editable keys.
 configFileEmptyHint: "&7(в этом файле нет редактируемых ключей)"
@@ -406,13 +448,13 @@ configFileEmptyHint: "&7(в этом файле нет редактируемы�
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
 # Hover text for a per-key row on a config-file page. Placeholders:
 #   [key], [value], [type] - the config key name, current value, and declared type.
-configKeyHoverFormat: "&7click to edit &7[key] &7(type: [type])"
+configKeyHoverFormat: "&7нажмите для редактирования &7[key] &7(тип: [type])"
 # Non-clickable title row at the top of a shape/vert type-picker page (Stage C.3a).
-# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
-configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name."
+configTypePickerTitle: "#5FB3B3&l⚙ выберите тип [param] &7(текущий: &7[current]&7)"
 # Non-clickable title row at the top of a shape/vert sub-parameter page (Stage C.3b).
-# Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
-configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+# Placeholders: [param] - "shape" or "vert"; [type] - the active type name."
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7подпараметры"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
 # (no book renderer available on this platform).
 configViewRawHint: "&7[P0] просмотр в книге недоступен; откат к сырому дампу."
@@ -420,7 +462,7 @@ configViewRawHint: "&7[P0] просмотр в книге недоступен; 
 configValueUnsetPlaceholder: "&8(не задано)"
 # Non-clickable header row separating the "Changeable" list from the "Pending"
 # staging-cart list on a config-file page when the viewer has staged one or
-# more uncommitted edits. No placeholders.
+# more uncommitted edits. No placeholders."
 configPendingHeader: "&6&l-- pending changes --"
 # Per-row label for a staged (pending) key=value entry on a config-file page.
 # Clicking the row removes it from the cart. Placeholders: [key], [value].
@@ -429,13 +471,13 @@ configPendingRowFormat: "&9[key]&8 = &0[value]"
 # config-file page. No placeholders.
 configPendingRowHover: "нажмите, чтобы отменить"
 # Clickable label for the "apply staged changes" row on a config-file page.
-# Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
+# Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart."
 configApplyRow: "&2&l[apply]"
 # Clickable label for the "discard staged changes" row on a config-file page.
-# Clears the cart without applying.
+# Clears the cart without applying."
 configDiscardRow: "&c&l[discard]"
 
-# --- ADR-047 declarative chart composition bridge (REQ-RTP-MAP-006) ---
+# --- declarative chart composition bridge ---
 # Sent to the viewer when an OPEN_MAP menu action fires but no concrete
 # MapBinding is registered (NoopMapBinding is still active, e.g. on the
 # Lite assembly or before RTPHooks wires the platform binding).
@@ -452,58 +494,11 @@ mapUnavailable: "&e[P1] данные графика сейчас недосту�
 # (binding-defined back-pressure, e.g. per-viewer cap reached).
 mapBusy: "&e[P1] служба карт занята; повторите попытку чуть позже."
 # Label for the clickable "/rtp info" menu row that, on click, mints a
-# ChartSpec(BAD_POINTS_HEATMAP, ...) token and asks the active MapBinding
+# ChartSpec(BAD_POINTS_HEATMAP,...) token and asks the active MapBinding
 # to render a 128x128 heatmap of the current region's known bad-point
 # spiral indices. The row is omitted at render time when NoopMapBinding
-# is the installed binding (REQ-RTP-MAP-006 / ADR-047).
+# is the installed binding."
 menuInfoBadPointsLabel: "#9D7CD8&l# карта небезопасных точек"
-
-# --- Cross-server network mode messages ---
-# Sent only when `network.enabled: true` and the player's `/rtp` is routed
-# across the cross-server wait queue (see network.yml `routing.mode`).
-# All keys are optional from the player's perspective - the L2 baseline
-# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
-# Sent when the request has been accepted into the cross-server wait queue
-# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
-# position from `pollStatus`; may be empty if the transport returns no
-# position.
-networkQueued: "&7[P0] в очереди на межсерверное назначение (позиция [position])..."
-# Sent when a player runs /rtp* while they already hold a non-terminal
-# cross-server enrolment (ADR-015 / REQ-RTP-NET-015 command-lock). Placeholder:
-# [position] - FIFO position when known; empty when the proxy has not yet
-# assigned one.
-alreadyQueued: "&cВы уже ожидаете в межсерверной очереди (позиция [position]). Пожалуйста, подождите."
-# Sent when a cross-server waitlist entry is reaped after exceeding its
-# configured TTL (ADR-015). No placeholders.
-networkTimedOut: "&c[P0] межсерверная телепортация истекла по времени в ожидании сервера."
-# Sent when a cross-server waitlist enrolment is rejected because the shared
-# waitlist has reached its configured maximum size (ADR-015 REJECTED_FULL).
-# No placeholders.
-waitlistFull: "&c[P0] межсерверная очередь заполнена; попробуйте снова чуть позже."
-# Sent when the queue has handed the request off to the proxy router and
-# a backend selection is in progress.
-networkRouting: "&7[P0] маршрутизация на сервер..."
-# Sent when a backend has reserved a coordinate for this player and the
-# proxy is about to initiate the cross-server hop. Placeholder: [server]
-# - the destination backend's serverId.
-networkReserved: "&a[P0] координата зарезервирована на [server]. Перенос..."
-# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
-networkTransferring: "&a[P0] перенос на [server]..."
-# Sent when the cross-server path gave up and the request fell back to
-# the local backend. Placeholder: [reason] - one of the
-# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
-networkFallback: "&e[P0] межсерверный режим недоступен ([reason]); возврат к локальному."
-# Sent when the cross-server request failed terminally (no fallback was
-# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
-networkFailed: "&c[P0] межсерверная телепортация не удалась: [reason]."
-# Sent when the player asked for a specific region (`/rtp <region>`) but
-# no backend in the network is currently serving it. Placeholder:
-# [region] - the requested region name.
-networkRegionUnavailable: "&c[P0] сейчас ни один сервер не обслуживает регион '[region]'."
-# Sent when the requested region name resolves to two or more backends and
-# the operator-configured policy cannot pick one (only fires
-# under stronger policies than the default `warn`). Placeholder: [region].
-networkRegionAmbiguous: "&c[P0] регион '[region]' неоднозначен среди серверов; укажите сервер."
 
 # --- MultiConfig submenu ---
 # Header row fallback used when no per-kind header key is registered.
@@ -517,7 +512,7 @@ multiconfigHeaderWorlds: "#5FB3B3&l миры"
 multiconfigToggleRemoveModeOff: "&8[ ] режим удаления"
 # Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
 multiconfigToggleRemoveModeOn: "&c[x] режим удаления (нажмите на запись для удаления)"
-# Selector row label for the "+ Add new..." entry. No placeholders.
+# Selector row label for the "+ Add new..." entry. No placeholders."
 multiconfigRowAdd: "&2+ добавить новый..."
 # Hover text for the Add row. Placeholder: [name] - prefilled default name.
 multiconfigRowAddHover: "&7введите имя в окне наковальни; предзаполнено: &f[name]"
@@ -551,7 +546,34 @@ multiconfigResultNameInvalid: "&cимя '[name]' не разрешено; исп
 multiconfigResultNameTaken: "&cзапись с именем '[name]' уже существует."
 
 # ###############################################################################
-# Section 9: PlaceholderAPI Support
+# Section 10: System & Management
+# ###############################################################################
+# a configuration file 'version' is lower than the latest
+# placeholder: [filename] - name of file, including file extension
+старыйФайл: "&b[P0] обнаружен старый [filename]. Обновление"
+
+# обнаружен мир bukkit, отсутствующий в файле конфигурации
+# подстановка: [world] - обнаруженный мир
+новыйМир: "&b[P0] обнаружен новый мир '[world]'"
+
+# текст перезагрузки / обновления плагина
+# подстановка: [filename] - имя файла
+перезагрузка: "&b[P0] загрузка [filename]..."
+перезагружено: "&b[P0] [filename] успешно загружен."
+обновление: "&a[P0] обновление [filename]..."
+обновлено: "&a[P0] [filename] успешно обновлён."
+
+# ###############################################################################
+# Section 11: Administrative Logs
+# ###############################################################################
+# logged when locations are saved/loaded from database
+# placeholder: [amount] - number of locations
+# placeholder: [region] - name of region
+локацияСохранена: "&7[P0] [amount] локаций успешно сохранены для [region]"
+локацияЗагружена: "&7[P0] [amount] локаций успешно загружены для [region]"
+
+# ###############################################################################
+# Section 12: PlaceholderAPI Support
 # ###############################################################################
 # status placeholders for players
 ИГРОК_ДОСТУПЕН: "&aДОСТУПЕН"
@@ -561,28 +583,13 @@ multiconfigResultNameTaken: "&cзапись с именем '[name]' уже су
 ИГРОК_ТЕЛЕПОРТИРУЕТСЯ: "&bТЕЛЕПОРТАЦИЯ"
 
 # ###############################################################################
-# Section 10: Visuals
-# ###############################################################################
-# title settings
-# remove or set title to "" to disable
-# PlaceholderAPI is recommended for coordinates
-заголовок: "<rainbow>Телепортирован!</rainbow>"
-????????????: "<gradient:#A78BFA:#E876A0>веселитесь!</gradient>"
-появление: 20
-оставаться: 20
-исчезновение: 20
-
-# actionbar setting
-панельДействий: ""
-
-# ###############################################################################
-# Section 11: Metadata
+# Section 13: Metadata
 # ###############################################################################
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0
 
 # ###############################################################################
-# Section 12: Developer Options
+# Section 14: Developer Options
 # ###############################################################################
 # set to true to append a dev tag (e.g. §8(RTP:ClassName)) to every message
 показатьТэгРазработчика: false

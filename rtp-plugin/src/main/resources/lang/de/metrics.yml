@@ -1,7 +1,7 @@
 # --- RTP-Metrik-Einstellungen ---
 # Reine Reporting-Schalter für die Metrik-SPI. Drossel-/Tuning-
 # Schalter bleiben in performance.yml.
-# Füllt MetricsSnapshot.foliaRegions() auf Folia mit Details pro Region.
+# Füllt MetricsSnapshot.foliaRegions auf Folia mit Details pro Region.
 # Keine Wirkung auf Paper / Bukkit / Fabric (Single-Region-Runtimes geben
 # stets eine leere Liste zurück, was für diese Plattformen korrekt ist).
 # @type: boolean

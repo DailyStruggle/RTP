@@ -17,7 +17,7 @@
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
-# @default: 5
+# @default: 5"
 onkwetsbaarheidstijd: 5
 
 # Veiligheidscontrolestraal (blokken)
@@ -92,7 +92,7 @@ platformRestoreSeconds: -1
 # Accepts Bukkit Material names and "#minecraft:<tag>" tag references
 #.
 # @type: list<material>
-# @source: material
+# @source: material"
 luchtBlokken:
   - "AIR"
   - "CAVE_AIR"
@@ -166,7 +166,7 @@ luchtBlokken:
 # Accepts Bukkit Material names, "#minecraft:<tag>" tag references, and
 # state predicates such as "*[waterlogged=true]".
 # @type: list<material>
-# @source: material
+# @source: material"
 onveiligBlokken:
   - "WATER"
   - "LAVA"
@@ -243,7 +243,7 @@ pvpCheckEnabled: false
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
-# @default: 15
+# @default: 15"
 pvpCombatTagSeconds: 15
 
 # What to do when a combat-tagged player requests (or is mid-)/rtp.

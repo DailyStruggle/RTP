@@ -63,52 +63,6 @@ setRespawnOnTeleport: false
   # @type: list<string>
   - ""
 
-# --- データベース設定 ---
-# キャッシュされた位置やプレイヤーデータの保存先。
-データベース:
-  # 利用可能な type: yaml, sqlite, mysql, postgresql
-  # - yaml/sqlite: ローカルファイル（追加設定不要）
-  # - mysql/postgresql: リモートデータベース（下記の認証情報が必要）
-  # @type: enum
-  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
-  # @default: "sqlite"
-  type: "sqlite"
-  # ネットワークデータベースの認証情報（ローカルでは無視されます）
-  # @type: string
-  host: "127.0.0.1"
-  # データベースのポート。mysql/postgresql のみで使用されます。
-  # @type: integer
-  # @range: [1, 65535]
-  port: 3306
-  # データベース / スキーマ名。mysql/postgresql のみで使用されます。
-  # @type: string
-  name: "rtp"
-  # データベースのユーザー名。mysql/postgresql のみで使用されます。
-  # @type: string
-  username: "root"
-  # データベースのパスワード。mysql/postgresql のみで使用されます。
-  # @type: string
-  password: "password"
-
-# --- ネットワーク同期 ---
-# Redis は複数サーバー間でキャッシュされた位置を同期するために使われます。
-ネットワーク:
-  redis:
-    # Enable Redis-backed network state binding.
-    # @type: boolean
-    # @default: false
-    enabled: false
-    # Redis host.
-    # @type: string
-    host: "127.0.0.1"
-    # Redis port.
-    # @type: integer
-    # @range: [1, 65535]
-    port: 6379
-    # Redis password. Empty string disables auth.
-    # @type: string
-    password: ""
-
 # 汎用メニューフレームワーク。
 # `renderer` はレンダラ ID の優先順位付きリストです。例外発生時または
 # 該当アダプタが無い場合、フレームワークは順にリストを辿り次のエントリへ
@@ -131,4 +85,4 @@ menu:
     - "book"
 
 # バージョン番号は変更しないでください
-version: 3.0
+version: 3.1

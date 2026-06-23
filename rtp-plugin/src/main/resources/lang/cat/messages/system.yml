@@ -1,0 +1,42 @@
+# --- RTP mews (this kitty's tongue) ---
+# Player- and staff-facing mews for this language, grouped by what they're for.
+# Auto-copied from the baseline mews; do not paw-edit (it gets overwritten).
+
+# ###############################################################################
+# Section 4: System & Management
+# ###############################################################################
+# a config file 'version' is older than the latest
+# placeholder: [filename] - name of file, including file extension
+ancient_scroll: "&b[P0] dusty old [filename] sniffed out. grooming it fresh"
+
+# sniffed a new bukkit world not in the config file
+# placeholder: [world] - the world detected
+new_box: "&b[P0] sniffed a new box '[world]'"
+
+# tall-human reload / update text
+# placeholder: [filename] - name of file
+grooming: "&b[P0] grooming [filename]..."
+groomed_complete: "&b[P0] finished grooming [filename]."
+rearranging_whiskers: "&a[P0] rearranging [filename]..."
+groomed: "&a[P0] [filename] all tidy."
+
+# ###############################################################################
+# Section 5: Administrative Logs
+# ###############################################################################
+# logged when warm-spots are saved/loaded from the scratching post
+# placeholder: [amount] - number of locations
+# placeholder: [region] - name of region
+warm_spot_saved: "&7[P0] saved [amount] warm-spots for [region]"
+warm_spot_remembered: "&7[P0] remembered [amount] warm-spots for [region]"
+
+# ###############################################################################
+# Section 11: Metadata
+# ###############################################################################
+# Do not bite the version number, sacred catnip
+meowsion: 1.0
+
+# ###############################################################################
+# Section 12: Developer Options
+# ###############################################################################
+# set to true to append a kitten tag (e.g. §8(RTP:ClassName)) to every message
+show_kitten_tag: false

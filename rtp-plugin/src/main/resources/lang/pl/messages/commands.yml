@@ -1,0 +1,385 @@
+# --- Komunikaty RTP (ten jezyk) ---
+# Teksty komunikatow dla graczy i operatorow w tym jezyku, pogrupowane tematycznie.
+# Automatycznie wygenerowana kopia angielskich komunikatow; nie edytowac recznie (zostanie nadpisane).
+
+# ###############################################################################
+# Sekcja 6: Komenda skanowania
+# ###############################################################################
+# komunikaty zwiazane z komenda skanowania
+# zmienna: [scan_regions] - lista regionow
+scanStart: "&a[P0] zadanie skanowania uruchomione dla regionów: [scan_regions]"
+skanReset: "&7[P0] kolejka skanowania zresetowana dla regionów: [scan_regions]"
+skanAnuluj: "&7[P0] zadanie skanowania anulowane dla regionów: [scan_regions]"
+scanPause: "#A020F0[P0] zadanie skanowania wstrzymane dla regionów: [scan_regions]"
+skanWznow: "#10A5F5[P0] zadanie skanowania wznowione dla regionów: [scan_regions]"
+skanDziala: "&c[P0] zadanie skanowania już działa dla regionów: [scan_regions]"
+skanNieDziala: "&c[P0] zadanie skanowania nie działa dla regionów: [scan_regions]"
+# zmienne: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 ziemia &8| &7ETA #7E9CC8[scan_eta]"
+# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
+# Set to empty string to disable the boss-bar.
+# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+
+# ###############################################################################
+# Sekcja 7: Komenda info
+# ###############################################################################
+# komunikaty zwiazane z komenda info
+infoTytul: "&2&l/rtp info"
+infoTickets: "&7Globalne aktywne bilety chunków: #7E9CC8[tickets]"
+infoTeleports: "&7Aktywne maszyny stanów teleportacji: #7E9CC8[teleports]"
+infoMSPT: "&7Bieżący MSPT pluginu: #7E9CC8[mspt]"
+infoLadowaniaRazem: "&7Łącznie wczytanych chunków: #7E9CC8[loads]"
+infoLadowaniaWgZrodla: "&7Wczytania wg źródła: #7E9CC8[loadsByOrigin]"
+infoWspolczynnikWycieku: "&7Bieżący wskaźnik wycieku chunków: #7E9CC8[leakRate]"
+# --- Metrics SPI health block ---
+infoGlebokoscKolejki: "&7Gracze oczekujący w kolejkach regionów: #7E9CC8[queueDepth]"
+infoOczekujaceTeleporty: "&7Oczekujące potoki teleportacji: #7E9CC8[pendingTeleports]"
+infoSredniaPipelineMs: "&7Śr. opóźnienie potoku: #7E9CC8[avgPipelineMs] ms"
+# Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
+# [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
+infoPipelinePercentiles: "&7Opóźnienie potoku (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
+# Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
+# [slowPipelineCount] [slowPipelineThresholdMs].
+infoSlowPipeline: "&7Wolne teleportacje (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
+# Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+infoQueueGrowth: "&7Ostrzeżenia o wzroście kolejki (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
+infoHeap: "&7Sterta JVM: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
+# Wiersz nagłówka dla bloku Health pipeline w /rtp info.
+infoKondycjaPipelineNaglowek: "&7--- Kondycja: potok ---"
+# Odczyt TPS dla okien 1m / 5m / 15m. Zmienne: [tps1m] [tps5m] [tps15m].
+infoTps: "&7TPS (1m/5m/15m): #7E9CC8[tps1m] / [tps5m] / [tps15m]"
+# Bieżący MSPT serwera oraz wykorzystanie budżetu ticka. Zmienne: [mspt] [tickBudgetUtilisation].
+infoMSPTLive: "&7MSPT serwera: #7E9CC8[mspt] ms (&7budżet ticka: #7E9CC8[tickBudgetUtilisation]&7)"
+# Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
+infoMiekkiLimit: "&7Gracze: #7E9CC8[playerCount] / [softCap]"
+# Najnowsze opóźnienie tam i z powrotem bazy danych w ms. Zmienna: [databaseLatencyMs].
+infoOpoznienieBazyMs: "&7Opóźnienie bazy danych: #7E9CC8[databaseLatencyMs] ms"
+# Generation outcome metrics (ADR-052), sourced from the process-global RtpOutcomeStats.
+# Success/failure rate over all recorded generation attempts. Placeholders:
+# [genSuccessRate] [genFailureRate] [genOutcomeTotal].
+infoFailureRate: "&7Sukces generowania: #7E9CC8[genSuccessRate]&7 (błąd #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
+# Single most common rejection cause and its share of all failures. Placeholders:
+# [genTopRejectionCause] [genTopRejectionShare].
+infoTopRejectionCause: "&7Główna przyczyna odrzucenia: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
+# Per-cause rejection breakdown (the analogue of a competitor's /rtp unsafe-stats).
+# Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
+infoFailureBreakdown: "&7Odrzucenia wg przyczyny: #7E9CC8[genFailureBreakdown]"
+# Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
+# to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&7/&c.
+infoProgTpsZielony: 19.5
+infoProgTpsZolty: 18.0
+infoProgMsptZielony: 30.0
+infoProgMsptZolty: 45.0
+infoProgWypelnienieCacheZielony: 0.5
+infoProgWypelnienieCacheZolty: 0.25
+infoProgWiekSieciZolty: 5.0
+# Wiersz naglowka wprowadzajacy tabele per-region Folia (tylko srodowisko Folia).
+infoFoliaRegionyNaglowek: "&7--- Regiony Folia ---"
+# Szablon wiersza dla pojedynczego regionu Folia. Zmienne: [regionId] [tps1m]
+# [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
+infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
+infoZastrzezenieNaglowek: "&7--- Zastrzeżenie diagnostyczne ---"
+infoZastrzezenie: "&7Uwaga diagnostyczna: Jeśli całkowita liczba osieroconych chunków serwera przekracza łączną liczbę wczytań tego pluginu ([loads]), ten plugin nie jest jedynym źródłem wycieku pamięci."
+infoSwiatNaglowek: "#008080Światy:"
+infoKonsolaSwiatNaglowek: "&7--- Światy ---"
+infoSwiat: "#21ADA8[world]"
+infoRegionNaglowek: "#63C5DARegiony:"
+infoKonsolaRegionNaglowek: "&7--- Regiony ---"
+infoRegion: "#52B2BF[region]"
+# Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
+# players spend their time in, sampled over the server's uptime.
+# Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
+infoBiomeActivityHeader: "&8--- &3Zajętość biomów &8(&3[biomeTotalSamples]&8 próbek, &3[biomeDistinctCount]&8 biomów) ---"
+# Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
+infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
+# Shown when no occupancy has been sampled yet.
+infoBiomeActivityEmpty: "&8--- &7brak zmierzonej zajętości biomów &8---"
+
+# pod-listy info
+# zmienne: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
+swiatInfo:
+  - "#21ADA8[world]:"
+  - "#99EEBB  - region: [region]"
+  - "#99EEBB  - wymagane uprawnienie: [requirePermission]"
+  - "#99EEBB  - nadpisanie: [override]"
+
+regionInfo:
+  - "#52B2BF[region]:"
+  - "#58CCED  - świat: [world]"
+  - "#58CCED  - kształt: [shape]"
+  - "#58CCED  - wymagane uprawnienie: [requirePermission]"
+  - "#58CCED  - nadpisanie granicy świata: [worldBorderOverride]"
+  - "#58CCED  - limit pamięci podręcznej: [cacheCap]"
+  - "#58CCED  - pamięć utrzymywana (L1): [keptCache]"
+  - "#58CCED  - pamięć zwolniona (L2): [unkeptCache]"
+  - "#58CCED  - pamięć zaległości (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - w pamięci: [cached]"
+  - "#58CCED  - poznane pokrycie: [memCoveragePct] (złe: [memBadPct], [memBadCount] komórek)"
+  - "#58CCED  - główna przyczyna odrzucenia: [memTopCause] ([memTopCausePct])"
+
+# ###############################################################################
+# Sekcja 8b: Uogolniony framework menu
+# ###############################################################################
+# Wysylane, gdy konkretna komenda /rtp menu ... jest zniekształcona, wskazuje na
+# nieznana sciezke/parametr lub nie przechodzi bramki uprawnien po stronie serwera.
+# ADR-050: klikniecia w menu to konkretne komendy, wiec nie ma tokenu do wygasniecia.
+menuNieprawidlowe: "&c[P0] that menu link is invalid."
+# Wysyłane, gdy realizacja menu nie może rozpoznać UUID wywołującego gracza.
+menuNieznanyGracz: "&c[P0] menu links can only be used by in-game players."
+# Szablon zastepczy podpowiedzi uzywany przez reflektor menu, gdy dla parametru
+# nie ma komentarza blokowego w YAML. Zmienna: [type] - zadeklarowany typ parametru.
+menuHoverTypZastepczy: "typ: [type]"
+# Szablon zastepczy podpowiedzi uzywany przez reflektor menu, gdy parametr udostepnia
+# maly, wyselekcjonowany zbior wartosci. Zmienna: [values] - dozwolone wartosci rozdzielone przecinkami.
+menuHoverGraniceZastepcze: "akceptowane: [values]"
+# Etykieta wiersza nawigacji "cofnij o jeden poziom" dodawanego na poczatku kazdej nie-glownej strony menu.
+menuWstecz: "&7« wstecz"
+# Szablon etykiety wiersza "wykonaj zlozona komende" dodawanego na poczatku kazdej
+# uruchamialnej, nie-glownej strony menu. Zmienna: [command] - zlozone wywolanie /rtp ...
+menuWykonaj: "&2▶ uruchom [command]"
+# Wiersz naglowka na gorze podstrony wyboru wartosci parametru (Etap A.2).
+# Zmienne: [param] - nazwa parametru; [command] - zlozone wywolanie /rtp ...
+menuWybierzWartosc: "&7wybierz wartość dla [param] (uruchomi: /rtp [command] [param]:<value>)"
+# Etykieta zastepczego wiersza "wpisz wlasna wartosc" na stronie wyboru wartosci parametru.
+# Klikniecie wstepnie wypelnia czat zlozona komenda az do '<param>:', dzieki czemu gracz
+# moze wpisac dowolna wartosc, takze spoza listy sugestii.
+menuWpiszWartosc: "&7✎ wpisz własną wartość..."
+# Nieklikalny wiersz naglowka na gorze kazdej nie-glownej strony menu (Etap A.4).
+# Pokazuje aktualnie budowane wywolanie /rtp wraz z wszelkimi przypisanymi
+# parametrami (name:value). Zmienna: [command] - zlozone argumenty.
+menuZbudowane: "&7budowanie: #7E9CC8/rtp [command]"
+# Nieklikalny wiersz tytulu dodawany na poczatku glownej strony menu /rtp (Etap A.5).
+# Zapewnia powitalny naglowek, zanim gracz zejdzie do dowolnej podkomendy.
+menuGlownyTytul: "#5FB3B3&l⚡ menu RTP"
+# Nieklikalny wiersz podtytulu/podpowiedzi dodawany na glownej stronie menu /rtp pod
+# menuRootTitle (Etap A.5). Krotki tekst orientacyjny dla nowych uzytkownikow.
+menuGlownaWskazowka: "&7kliknij opcję poniżej, aby zacząć"
+# Wiersze nawigacji dodawane do stronicowanych stron menu (Etap A.6) - klikniecie
+# przenosi do poprzedniej/nastepnej strony tego samego modelu. Zmienna:
+# [page] - czytelny dla czlowieka numer strony docelowej liczony od 1.
+menuStronaPoprzednia: "&7« poprzednia strona ([page])"
+menuStronaNastepna: "&7następna strona ([page]) »"
+# Separator sekcji na stronie glownej nad wierszami teleportacji (widok gracza).
+menuStronaGlownaSekcjaTeleport: "&8--- &7teleport &8---"
+# Front-page rows. No placeholders.
+menuStronaGlownaWierszTeleport: "&2▶ /rtp &7- teleport to a random location"
+menuStronaGlownaWierszRegion: "&2▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- wybierz świat"
+menuStronaGlownaWierszBiom: "&2▶ /rtp biome:&7... &7- wybierz biom"
+menuStronaGlownaWierszPomoc: "#7A4FB8❓ lista poleceń &7- /rtp help"
+# Front-page admin entry row: the only inline
+# admin-visible row on the front page; click descends into the curated admin
+# panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
+menuStronaGlownaWierszAdmin: "#9D7CD8▶ panel administratora &7- narzędzia operatora"
+# Tekst podpowiedzi dla wiersza wejscia do panelu admina. Brak zmiennych.
+menuStronaGlownaHoverAdmin: "&7narzędzia operatora: konfiguracja, skany, diagnostyka, przeładowanie"
+# --- Strona ksiazki panelu admina ---
+# Nieklikalny wiersz tytulu na gorze panelu admina. Brak zmiennych.
+menuPanelAdminaTytul: "#5FB3B3&l⚙ admin panel"
+# Nieklikalny wiersz podpowiedzi pod menuAdminPanelTitle. Brak zmiennych.
+menuPanelAdminaWskazowka: "&7click an option; destructive actions show a warning hover"
+# Separatory sekcji w panelu admina. Brak zmiennych.
+menuPanelAdminaSekcjaKonfig: "&8--- &7configuration &8---"
+menuPanelAdminaSekcjaDiagnostyka: "&8--- &7diagnostics &8---"
+menuPanelAdminaSekcjaCyklZycia: "&8--- &7lifecycle &8---"
+menuPanelAdminaSekcjaPrzegladaj: "&8--- &7browse &8---"
+# Admin-panel rows + hovers. No placeholders.
+menuPanelAdminaWierszKonfig: "&b▶ config editor"
+menuPanelAdminaHoverKonfig: "&7otwórz wyselekcjonowany selektor konfiguracji"
+menuPanelAdminaWierszRegiony: "#5FB3B3▶ regiony"
+menuPanelAdminaHoverRegiony: "&7dodaj, usuń lub edytuj konfiguracje poszczególnych regionów"
+menuPanelAdminaWierszSwiaty: "#5FB3B3▶ światy"
+menuPanelAdminaHoverSwiaty: "&7dodaj, usuń lub edytuj konfiguracje poszczególnych światów"
+menuPanelAdminaWierszEfekty: "#5FB3B3▶ efekty"
+menuPanelAdminaHoverEfekty: "&7dodaj, usuń lub edytuj efekty teleportacji dla grup"
+menuPanelAdminaWierszInfo: "&b▶ server info"
+menuPanelAdminaHoverInfo: "&7pokaż wersję pluginu, liczbę regionów i stan kolejki"
+menuPanelAdminaWierszDiagnostyka: "&c▶ pełna diagnostyka"
+menuPanelAdminaHoverDiagnostyka: "&7uruchamia pełny zestaw diagnostyczny; może być kosztowne"
+menuPanelAdminaWierszPamiec: "&b▶ memory tracker snapshot"
+menuPanelAdminaHoverPamiec: "&7zrzuć aktywne bilety chunków i alokacje potoku"
+menuPanelAdminaWierszSkan: "&b▶ scan control"
+menuPanelAdminaHoverSkan: "&7otwórz podmenu skanowania (start / pauza / anuluj)"
+menuPanelAdminaWierszPrzeladuj: "&c▶ przeładuj"
+menuPanelAdminaHoverPrzeladuj: "&7przeładowuje wszystkie pliki konfiguracyjne; trwające teleportacje mogą zostać zakłócone"
+menuPanelAdminaWierszPrzegladaj: "&b▶ browse all commands"
+menuPanelAdminaHoverPrzegladaj: "&7otwórz odwzorowane drzewo poleceń /rtp"
+menuPanelAdminaWierszWstecz: "&7« wstecz"
+# --- Visualizations submenu (admin map of bad locations per region) ---
+# Admin-panel row: open the Visualizations submenu. No placeholders.
+menuPanelAdminaWierszWizualizacje: "#5FB3B3▶ wizualizacje"
+# Tekst podpowiedzi dla wiersza Wizualizacje w panelu admina. Brak zmiennych.
+menuPanelAdminaHoverWizualizacje: "&7otwórz mapy i inne wizualizacje dla operatora"
+# Separator sekcji nad blokiem Wizualizacje w panelu admina.
+menuPanelAdminaSekcjaWizualizacje: "&8» &7wizualizacje"
+# Nieklikalny wiersz tytulu na gorze podmenu Wizualizacje.
+menuWizualizacjeTytul: "#9D7CD8&l⌖ wizualizacje"
+# Nieklikalny wiersz podpowiedzi pod tytulem.
+menuWizualizacjeWskazowka: "&7wybierz region, aby zobaczyć jego mapę złych lokalizacji"
+# Visualizations row template; [region] - region name.
+menuWizualizacjeWierszRegion: "#5FB3B3▶ [region] &7- mapa kształtu regionu"
+# Tekst podpowiedzi dla wiersza regionu Wizualizacje; [region] - nazwa regionu.
+menuWizualizacjeHoverRegion: "&7otwórz mapę pokazującą złe lokalizacje w &b[region]"
+# Nieklikalny wiersz podpowiedzi pokazywany, gdy nie skonfigurowano zadnych regionow.
+menuWizualizacjePuste: "&7(brak skonfigurowanych regionów)"
+# Visualizations submenu back row (returns to the admin panel).
+menuWizualizacjeWierszWstecz: "&7« wstecz"
+# --- Sekcja Konfiguracja panelu admina: wyselekcjonowane prefaby ---
+# Separator sekcji nad blokiem Konfiguracja (szybki start) w panelu admina.
+menuPanelAdminaSekcjaKonfiguracja: "&8» &7konfiguracja (szybki start)"
+# Wiersz Konfiguracja + podpowiedz: nakladka tozsamosciowa survival-default (przywroc dostarczone domyslne).
+menuPrefabSurvivalDomyslnyWiersz: "#5FB3B3▶ survival-default"
+menuPrefabSurvivalDomyslnyHover: "&7przywróć dostarczone ustawienia domyślne (nakładka tożsamościowa)"
+# Wiersz Konfiguracja + podpowiedz: niska wydajnosc (dluzszy puls, mniejsze cache, login cache wyl.).
+menuPrefabNiskaWydajnoscWiersz: "#5FB3B3▶ low-performance"
+menuPrefabNiskaWydajnoscHover: "&7słabe hosty / współdzielone VPS-y z CPU: dłuższy puls, mniejsze pamięci podręczne, wyłączony cache logowania"
+# Wiersz Konfiguracja + podpowiedz: wysoka wydajnosc (krotki puls, duze cache, login cache wl.).
+menuPrefabWysokaWydajnoscWiersz: "#5FB3B3▶ high-performance"
+menuPrefabWysokaWydajnoscHover: "&7dedykowany sprzęt / duża liczba graczy: krótki puls, duże pamięci podręczne, włączony cache logowania"
+# Wiersz Konfiguracja + podpowiedz: dostrojone pod Folia (strojenie schedulera regionalnego).
+menuPrefabFoliaDostrojonyWiersz: "#5FB3B3▶ folia-tuned"
+menuPrefabFoliaDostrojonyHover: "&7regionalny harmonogram folia: szybsze pulsy na region, mniej równoczesnych biletów chunków"
+# Wiersz Konfiguracja + podpowiedz: wiele swiatow (jeden region na swiat z biezacego domyslnego).
+menuPrefabWieleSwiatowWiersz: "#5FB3B3▶ multi-world"
+menuPrefabWieleSwiatowHover: "&7utwórz jeden region na świat na podstawie bieżącego domyślnego"
+# Tytul menu potwierdzenia. Zmienna: [prefab] - id prefabu lub nazwa wyswietlana.
+menuPrefabPotwierdzTytul: "#9D7CD8&l⚙ potwierdź preset: #5FB3B3[prefab]"
+# Nieklikalny wiersz podpowiedzi menu potwierdzenia pod tytulem. Brak zmiennych.
+menuPrefabPotwierdzWskazowka: "&7przejrzyj zmiany poniżej, a następnie kliknij potwierdź lub anuluj"
+# Wiersz stopki menu potwierdzenia: potwierdz i zapisz prefab na dysk.
+menuPrefabPotwierdzWiersz: "&2&l[confirm]"
+# Wiersz stopki menu potwierdzenia: anuluj i wroc do panelu admina.
+menuPrefabAnulujWiersz: "&c&l[cancel]"
+# Etykieta klikalnego wiersza opcji Odswiez na dole ksiazki /rtp info.
+# Renderuje ponownie biezacy zakres na podstawie swiezego zrzutu metryk.
+infoKsiazkaOdswiezWiersz: "&2[Refresh]"
+# Tekst podpowiedzi dla wiersza odswiezania ksiazki info.
+infoKsiazkaOdswiezHover: "&7Ponownie wyrenderuj tę stronę na podstawie świeżej migawki metryk."
+# Etykieta klikalnego wiersza opcji Przelacz na czat na dole ksiazki
+# /rtp info. Uruchamia ponownie ten sam zakres przez klasyczna sciezke czatu.
+infoKsiazkaPrzelaczNaCzatWiersz: "&7[Switch to chat]"
+# Tekst podpowiedzi dla wiersza przelaczenia ksiazki info na czat.
+infoKsiazkaPrzelaczNaCzatHover: "&7Uruchom ponownie /rtp info na czacie zamiast w książce."
+# Wiersz stopki renderowany, gdy tresc ksiazki /rtp info przekracza limit
+# strony ksiazki. Klikniecie uruchamia ten sam zakres w trybie czatu, aby nie utracic danych.
+infoKsiazkaPrzepelnienieStopka: "&7(treść skrócona - kliknij, aby zobaczyć pełny wynik na czacie)"
+# Nieklikalny wiersz notatki informujacy, ze okresowe automatyczne odswiezanie ksiazki
+# info nie jest obecnie wspierane w tej kompilacji (odlozone do pozniejszego
+# kamienia milowego). Uzytkownicy moga kliknac wiersz Odswiez, aby odswiezyc recznie.
+infoKsiazkaAutoOdswiezNotatka: "&8(automatyczne odświeżanie nie jest jeszcze obsługiwane; kliknij Odśwież, aby zaktualizować)"
+# Nieklikalny wiersz tytulu na gorze strony wyboru pliku konfiguracji (Etap C.1).
+# Pokazywany, gdy admin klika "/rtp config" ze strony glownej.
+konfigSelektorTytul: "#5FB3B3&l⚙ pliki konfiguracji"
+# Etykieta wiersza nawigacji "powrot do glownego menu /rtp" na stronie wyboru konfiguracji.
+konfigSelektorWsteczWiersz: "&7« powrót do menu"
+# Nieklikalny wiersz tytulu na gorze strony pojedynczego pliku konfiguracji (Etap C.2).
+# Zmienna: [file] - nazwa pliku konfiguracji (np. "performance", "safety").
+konfigPlikTytul: "#5FB3B3&l⚙ config: &7[file]"
+# Etykieta wiersza nawigacji "powrot do wyboru konfiguracji" na stronie pojedynczego pliku konfiguracji.
+konfigPlikWsteczWiersz: "&7« powrót do plików konfiguracji"
+# Nieklikalny wiersz podpowiedzi pokazywany, gdy plik konfiguracji nie ma edytowalnych kluczy.
+konfigPlikPustyWskazowka: "&7(brak edytowalnych kluczy w tym pliku)"
+# Etykieta wiersza per-klucz na stronie pliku konfiguracji. Zmienne:
+#   [key]   - nazwa klucza konfiguracji; [value] - aktualnie zapisana wartosc.
+konfigKluczWierszFormat: "&7[key]&7: #7E9CC8[value]"
+# Tekst podpowiedzi dla wiersza per-klucz na stronie pliku konfiguracji. Zmienne:
+#   [key], [value], [type] - nazwa klucza, biezaca wartosc i zadeklarowany typ.
+konfigKluczHoverFormat: "&7click to edit &7[key] &7(type: [type])"
+# Nieklikalny wiersz tytulu na gorze strony wyboru typu shape/vert (Etap C.3a).
+# Zmienne: [param] - "shape" lub "vert"; [current] - nazwa aktualnie aktywnego typu.
+konfigTypWyborTytul: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+# Nieklikalny wiersz tytulu na gorze strony podparametru shape/vert (Etap C.3b).
+# Zmienne: [param] - "shape" lub "vert"; [type] - nazwa aktywnego typu.
+konfigPodparametrStronaTytul: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+# Hint sent when the book view falls back to the legacy raw-YAML chat dump
+# (no book renderer available on this platform).
+konfigPodgladSurowyWskazowka: "&7[P0] widok książki niedostępny; powrót do surowego zrzutu."
+# Tekst zastepczy renderowany w miejsce wartosci konfiguracji, ktora nie zostala ustawiona.
+konfigWartoscNieustawionaSymbol: "&8(nieustawione)"
+# Nieklikalny wiersz naglowka oddzielajacy liste "Zmienialne" od listy "Oczekujace"
+# (koszyk zmian) na stronie pliku konfiguracji, gdy ogladajacy ma przygotowane jedna lub
+# wiecej niezatwierdzonych zmian. Brak zmiennych. Unikaj zoltego (&e/&6) i bialego
+# (&f): pergamin ksiazki renderuje je wyblakle.
+konfigOczekujaceNaglowek: "&6&l-- pending changes --"
+# Etykieta wiersza dla przygotowanego (oczekujacego) wpisu klucz=wartosc na stronie konfiguracji.
+# Klikniecie wiersza usuwa go z koszyka. Zmienne: [key], [value].
+# Unikaj zoltego/bialego na pergaminie ksiazki.
+konfigOczekujaceWierszFormat: "&9[key]&8 = &0[value]"
+# Tekst podpowiedzi pokazywany, gdy ogladajacy najedzie na oczekujacy (przygotowany) wiersz
+# na stronie konfiguracji. Brak zmiennych.
+konfigOczekujaceWierszHover: "kliknij, aby wycofać"
+# Klikalna etykieta wiersza "zastosuj przygotowane zmiany" na stronie konfiguracji.
+# Uruchamia zlozona komende /rtp config <file> k1=v1 ... i czysci koszyk.
+konfigZastosujWiersz: "&2&l[apply]"
+# Klikalna etykieta wiersza "odrzuc przygotowane zmiany" na stronie konfiguracji.
+# Czysci koszyk bez zastosowania.
+konfigOdrzucWiersz: "&c&l[discard]"
+
+# --- Most deklaratywnej kompozycji wykresow ADR-047 (REQ-RTP-MAP-006) ---
+# Wysylane do ogladajacego, gdy uruchomi sie akcja menu OPEN_MAP, ale nie jest
+# zarejestrowane zadne konkretne MapBinding (NoopMapBinding nadal jest aktywne, np. na
+# kompilacji Lite lub zanim RTPHooks podlaczy powiazanie platformy).
+mapaPowiazanieBrak: "&c[P0] renderowanie map nie jest dostępne na tym serwerze."
+# Wysylane, gdy MapDispatch otrzyma ChartSpec, ktorego Kind nie ma zarejestrowanego
+# ChartSpecResolver (np. ogladajacy z Etapu 1 klika sparkline z Etapu 3, zanim
+# resolver zostanie dodany).
+mapaResolverBrak: "&c[P0] nie zarejestrowano resolvera wykresów dla tego żądania."
+# Wysylane, gdy resolver dziala, ale bazowe zrodlo danych jest niedostepne
+# dla zadanego celu (nieznany region, brak danych, swiat nie zaladowany).
+# Zmienna: [region] - zadana nazwa regionu (moze byc pusta).
+mapaNiedostepna: "&e[P1] dane wykresu nie są teraz dostępne."
+# Wysylane, gdy aktywne MapBinding nie moze teraz przydzielic uchwytu mapy
+# (przeciwcisnienie zdefiniowane przez powiazanie, np. osiagnieto limit per-ogladajacy).
+mapaZajeta: "&e[P1] usługa map jest zajęta; spróbuj ponownie za chwilę."
+# Etykieta klikalnego wiersza menu "/rtp info", ktory po kliknieciu tworzy
+# token ChartSpec(BAD_POINTS_HEATMAP, ...) i prosi aktywne MapBinding
+# o wyrenderowanie mapy cieplnej 128x128 znanych indeksow spirali zlych
+# punktow biezacego regionu. Wiersz jest pomijany przy renderowaniu, gdy zainstalowanym
+# powiazaniem jest NoopMapBinding (REQ-RTP-MAP-006 / ADR-047).
+menuInfoZlePunktyEtykieta: "#9D7CD8&l# mapa złych punktów"
+
+# --- Podmenu MultiConfig ---
+# Zastepczy wiersz naglowka uzywany, gdy nie zarejestrowano klucza naglowka per-rodzaj.
+# Zmienna: [parserKind] - surowa nazwa rodzaju multi-config.
+multikonfigNaglowekDomyslny: "#5FB3B3&l[parserKind]"
+# Etykieta wiersza naglowka strony wyboru multi-config dla regionow. Brak zmiennych.
+multikonfigNaglowekRegiony: "#5FB3B3&l regiony"
+# Etykieta wiersza naglowka strony wyboru multi-config dla swiatow. Brak zmiennych.
+multikonfigNaglowekSwiaty: "#5FB3B3&l światy"
+# Etykieta wiersza przelacznika, gdy tryb usuwania jest WYLACZONY. Brak zmiennych.
+multikonfigTrybUsuwaniaWyl: "&8[ ] tryb usuwania"
+# Etykieta wiersza przelacznika, gdy tryb usuwania jest WLACZONY. Klikniecia w wiersze wpisow usuwaja.
+multikonfigTrybUsuwaniaWl: "&c[x] tryb usuwania (kliknij wpis, aby usunąć)"
+# Etykieta wiersza wyboru dla wpisu "+ Dodaj nowy...". Brak zmiennych.
+multikonfigWierszDodaj: "&2+ dodaj nowy..."
+# Tekst podpowiedzi dla wiersza Dodaj. Zmienna: [name] - wstepnie wypelniona domyslna nazwa.
+multikonfigWierszDodajHover: "&7wpisz nazwę w oknie kowadła; wstępnie wypełnione: &f[name]"
+# Tekst podpowiedzi dla wiersza wpisu w trybie normalnym. Zmienna: [name].
+multikonfigWierszEdytujHover: "&7edytuj &f[name]"
+# Tekst podpowiedzi dla wiersza wpisu w trybie usuwania. Zmienna: [name].
+multikonfigWierszUsunHover: "&cusuń &f[name]"
+# Wiersz tytulu strony potwierdzenia usuniecia. Zmienna: [name].
+multikonfigPotwierdzTytul: "&c&lusunąć [name]?"
+# Etykieta wiersza Tak na stronie potwierdzenia usuniecia. Brak zmiennych.
+multikonfigPotwierdzTak: "&c&l[confirm delete]"
+# Etykieta wiersza Anuluj na stronie potwierdzenia usuniecia. Brak zmiennych.
+multikonfigPotwierdzNie: "&2&l[cancel]"
+# Tekst podpowiedzi na zablokowanym (wyszarzonym) wierszu regionu domyslnego. Brak zmiennych.
+multikonfigBlokadaRegionDomyslny: "&7domyślnego regionu nie można usunąć"
+# Tekst podpowiedzi na zablokowanym (wyszarzonym) wierszu swiata. Zmienna: [name].
+multikonfigBlokadaSwiatZaladowany: "&7świat '[name]' jest wczytany na serwerze; wyładuj go przed usunięciem jego konfiguracji"
+# Komunikat wyniku po pomyslnym DODANIU. Zmienna: [name].
+multikonfigWynikDodano: "&adodano '[name]'."
+# Komunikat wyniku po pomyslnym USUNIECIU. Zmienna: [name].
+multikonfigWynikUsunieto: "&ausunięto '[name]'."
+# Komunikat wyniku, gdy DODANIE sie nie powiodlo. Zmienne: [name], [reason].
+multikonfigWynikDodanieNieudane: "&cnie udało się dodać '[name]': [reason]"
+# Komunikat wyniku, gdy USUNIECIE sie nie powiodlo. Zmienne: [name], [reason].
+multikonfigWynikUsuniecieNieudane: "&cnie udało się usunąć '[name]': [reason]"
+# Komunikat wyniku, gdy proponowana nazwa wpisu zostaje odrzucona przez sanityzer.
+# Zmienna: [name].
+multikonfigWynikNazwaNieprawidlowa: "&cnazwa '[name]' jest niedozwolona; użyj liter, cyfr, '_', '-', '.'"
+# Komunikat wyniku, gdy DODANIE koliduje z istniejaca nazwa wpisu.
+# Zmienna: [name].
+multikonfigWynikNazwaZajeta: "&cwpis o nazwie '[name]' już istnieje."

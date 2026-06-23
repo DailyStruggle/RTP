@@ -1,0 +1,108 @@
+# --- RTP-berichten (deze taal) ---
+# Berichtteksten voor spelers en operators in deze taal, gegroepeerd per onderwerp.
+# Automatisch gegenereerde kopie van de Engelse berichten; niet met de hand bewerken (wordt overschreven).
+
+# ###############################################################################
+# Sectie 2: Teletransport
+# ###############################################################################
+alTeletransporteert: "&7[P0] ⚡ je wordt al geteletransporteerd!"
+
+# als de plugin momenteel wordt herladen
+teletransportGeweigerdHerladen: "&7[P0] teletransports zijn tijdelijk uitgeschakeld terwijl de plugin herlaadt. Probeer het over een ogenblik opnieuw."
+vertragingsBericht: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teletransporteren over [delay]. Beweeg niet.</gradient>"
+chunkLaden: "&7[P0] ⚙ Chunks laden, even geduld..."
+teletransportBericht: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Geteletransporteerd in [attempts] pogingen, in [processingTime]</gradient>"
+
+# if teleport is cancelled
+teletransportAnnuleren: "&7[P0] ⚡ Teletransport geannuleerd!"
+
+# als er na het maximum aantal pogingen geen veilige plek is
+# placeholder: [attempts] - het maximum aantal pogingen
+onveilig: "&7[P0] ⌖ geen veilige locatie gevonden in [attempts] pogingen"
+
+# wanneer de speler in cooldown is
+# placeholder: [remainingCooldown] - de resterende tijd
+wachttijdBericht: "&7[P0] ⚡ Je kunt pas weer teletransporteren over [remainingCooldown]"
+
+# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+lockedAfterUses: "&7[P0] ⌖ Je hebt je limiet voor willekeurige teleportatie bereikt. Probeer het over [remainingLockTime] opnieuw."
+
+# als de regio geen locaties in de wachtrij heeft en de speler geen rtp.unqueued-permissie heeft
+geenLocatiesInWachtrij: "#f5eb73[P0] ⌖ er zijn momenteel geen locaties beschikbaar"
+
+# wanneer de wachtrij opschuift
+# placeholder: [spot] - de huidige positie in de rij
+wachtrijUpdate: "#2636ef[P0] jouw positie in de wachtrij: [spot]"
+
+# als de speler niet genoeg geld heeft om in de regio te teleporteren
+# placeholder: [money] - hoeveel geld het commando vereist
+onvoldoendeSaldo: "&7[P0] je hebt minimaal $[money] nodig."
+
+# ###############################################################################
+# Sectie 3: Tijdnotatie
+# ###############################################################################
+dagen: "d"
+uren: "u"
+minuten: "m"
+seconden: "s"
+milliseconden: "ms"
+
+# wereld bestaat niet in bukkit
+# placeholder: [world] - de wereldnaam
+ongeldigeWereld: "&7[P0] wereld '[world]' kon niet worden gevonden"
+
+# de plugin heeft het gevraagde commando niet
+# placeholder: [arg] - het geprobeerde argument
+ongeldigArgument: "&c[P0] ongeldig opdrachtargument [arg]"
+
+# wanneer de console een spelers-only commando probeert uit te voeren
+consoleOpdrachNietToegestaan: "&c[P0] Je moet een speler in het spel zijn om dit commando uit te voeren."
+
+# plugin is busy reloading
+busy: "&c[P0] bezig"
+
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] Je kunt niet willekeurig teleporteren tijdens een gevecht."
+
+# plugin doesn't have the subcommand or parameter the user requested
+# placeholder: [arg] - the argument attempted
+invalidCommand: "&c[P0] ongeldig commando - [arg]"
+
+# gebruiker heeft geen permissie voor het gevraagde commando
+geenRechten: "&7Sorry, maar je hebt geen toestemming om dit commando uit te voeren. Neem contact op met de serverbeheerders als je denkt dat dit een fout is."
+
+# ###############################################################################
+# Sectie 8: Opdrachtbeschrijvingen
+# ###############################################################################
+rtp: "&b/rtp - teletransporteer naar een willekeurige locatie"
+rtp_beschrijving: "teletransporteer naar een willekeurige locatie"
+hulp: "&b/rtp help - deze hulp weergeven"
+hulp_beschrijving: "opdrachten beschrijven"
+herladen_opdracht: "&b/rtp reload - configuratiebestanden herladen"
+herladen_beschrijving: "configuratiebestanden herladen"
+scan: "&b/rtp scan - alle mogelijke regiolocaties testen om laadtijden te verbeteren"
+scan_beschrijving: "opgeslagen gegevens wissen en alle mogelijke regiolocaties testen"
+config_beschrijving: "configuratiebestanden tijdens uitvoering bijwerken"
+info_beschrijving: "huidige pluginstatus controleren"
+test_beschrijving: "RTP-functies testen"
+
+# ###############################################################################
+# Sectie 9: PlaceholderAPI-ondersteuning
+# ###############################################################################
+SPELER_BESCHIKBAAR: "&aBESCHIKBAAR"
+SPELER_WACHTTIJD: "&7WACHTTIJD"
+SPELER_INSTELLEN: "&bLOCATIE KIEZEN"
+SPELER_LAADT: "&bCHUNKS LADEN"
+SPELER_TELETRANSPORTEERT: "&bTELETRANSPORTEERT"
+
+# ###############################################################################
+# Sectie 10: Visuele elementen
+# ###############################################################################
+titel: "<rainbow>Geteleporteerd!</rainbow>"
+ondertitel: "<gradient:#A78BFA:#E876A0>veel plezier!</gradient>"
+infaden: 20
+blijven: 20
+uitfaden: 20
+
+# actionbar setting
+actiebalk: ""

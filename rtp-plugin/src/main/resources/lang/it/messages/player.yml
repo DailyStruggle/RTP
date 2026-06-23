@@ -1,0 +1,115 @@
+# --- Messaggi RTP (questa lingua) ---
+# Testi dei messaggi per giocatori e operatori in questa lingua, raggruppati per argomento.
+# Copia generata automaticamente dai messaggi inglesi; non modificare a mano (viene sovrascritto).
+
+# ###############################################################################
+# Sezione 2: Teletrasporto
+# ###############################################################################
+# durante il teletrasporto, mostra questo
+giàTeletrasporto: "&7[P0] ⚡ ti stai già teletrasportando!"
+
+# se il plugin si sta attualmente ricaricando
+teletrasportoNegatoRicaricamento: "&7[P0] i teletrasporti sono temporaneamente disattivati mentre il plugin si ricarica. Riprova tra poco."
+messaggioRitardo: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teletrasporto in [delay]. Non muoverti</gradient>"
+caricamentoChunk: "&7[P0] ⚙ Caricamento dei chunk! attendere..."
+messaggioTeletrasporto: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teletrasportato in [attempts] tentativi, in [processingTime]</gradient>"
+
+# se il teletrasporto viene annullato
+teletrasportoAnnullato: "&7[P0] ⚡ Teletrasporto annullato!"
+
+# se non ci sono posizioni sicure dopo aver raggiunto il numero massimo di tentativi
+# segnaposto: [attempts] - il numero massimo di tentativi
+nonSicuro: "&7[P0] ⌖ impossibile trovare una posizione sicura entro [attempts] tentativi"
+
+# quando il giocatore è in cooldown
+# segnaposto: [remainingCooldown] - il tempo rimanente
+messaggioRaffreddamento: "&7[P0] ⚡ Non puoi teletrasportarti di nuovo per [remainingCooldown]"
+
+# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+lockedAfterUses: "&7[P0] ⌖ Hai raggiunto il limite di teletrasporto casuale. Riprova tra [remainingLockTime]."
+
+# se la regione non ha posizioni in coda e il giocatore non ha il permesso rtp.unqueued
+nessunaPosizioneInCoda: "#f5eb73[P0] ⌖ nessuna posizione pronta in questo momento"
+
+# quando la fila in coda si sposta
+# segnaposto: [spot] - la posizione attuale in coda
+aggiornamentoCoda: "#2636ef[P0] il tuo posto in coda: [spot]"
+
+# se il giocatore non ha abbastanza denaro per teletrasportarsi nella regione
+# segnaposto: [money] - quanto denaro è richiesto per il comando
+denaroInsufficiente: "&7[P0] ti servono almeno $[money] per questo."
+
+# ###############################################################################
+# Sezione 3: Formattazione del tempo
+# ###############################################################################
+# per i segnaposto temporali, come chiamare giorni, ore, minuti, secondi e millisecondi
+giorni: "g"
+ore: "h"
+minuti: "m"
+secondi: "s"
+millisecondi: "ms"
+
+# il mondo non esiste in Bukkit
+# segnaposto: [world] - il nome del mondo
+mondoNonValido: "&7[P0] impossibile trovare il mondo '[world]'"
+
+# il plugin non ha il comando richiesto dall'utente
+# segnaposto: [arg] - l'argomento tentato
+argomentoNonValido: "&c[P0] argomento di comando non valido [arg]"
+
+# quando la console prova a eseguire un comando destinato solo ai giocatori
+comandoConsoleNonPermesso: "&c[P0] Devi essere un giocatore in gioco per eseguire questo comando."
+
+# il plugin è occupato a ricaricare
+busy: "&c[P0] occupato"
+
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] Non puoi teletrasportarti casualmente mentre sei in combattimento."
+
+# il plugin non ha il sottocomando o parametro richiesto dall'utente
+# segnaposto: [arg] - l'argomento tentato
+invalidCommand: "&c[P0] comando non valido - [arg]"
+
+# l'utente non ha il permesso per il comando richiesto
+senzaPermessi: "&7Mi dispiace, ma non hai il permesso di eseguire questo comando. Contatta gli amministratori del server se ritieni che sia un errore."
+
+# ###############################################################################
+# Sezione 8: Descrizioni dei comandi
+# ###############################################################################
+# mostrato nel comando help
+rtp: "&b/rtp - teletrasportati in una posizione casuale"
+rtp_descrizione: "teletrasportati in una posizione casuale"
+aiuto: "&b/rtp help - vedi questo"
+aiuto_descrizione: "descrivi i comandi"
+ricarica: "&b/rtp reload - ricarica i file di configurazione"
+ricarica_descrizione: "ricarica i file di configurazione"
+scansione: "&b/rtp scan - prova tutte le posizioni possibili della regione per migliorare i tempi di caricamento"
+scansione_descrizione: "cancella i dati memorizzati e prova tutte le posizioni possibili della regione"
+config_descrizione: "aggiorna i file di configurazione a runtime"
+info_descrizione: "controlla lo stato attuale del plugin"
+test_descrizione: "testa le funzioni di RTP"
+
+# ###############################################################################
+# Sezione 9: Supporto PlaceholderAPI
+# ###############################################################################
+# segnaposto di stato per i giocatori
+GIOCATORE_DISPONIBILE: "&aDISPONIBILE"
+GIOCATORE_RAFFREDDAMENTO: "&7IN ATTESA"
+GIOCATORE_PREPARAZIONE: "&bSCELTA DELLA POSIZIONE"
+GIOCATORE_CARICAMENTO: "&bCARICAMENTO CHUNK"
+GIOCATORE_TELETRASPORTO: "&bTELETRASPORTO IN CORSO"
+
+# ###############################################################################
+# Sezione 10: Elementi visivi
+# ###############################################################################
+# impostazioni del titolo
+# rimuovi o imposta title a " per disattivare
+# PlaceholderAPI è consigliato per le coordinate
+titolo: "<rainbow>Teletrasportato!</rainbow>"
+sottotitolo: "<gradient:#A78BFA:#E876A0>divertiti!</gradient>"
+dissolvenzaEntrata: 20
+rimani: 20
+dissolvenzaUscita: 20
+
+# impostazione actionbar
+barraAzione: ""

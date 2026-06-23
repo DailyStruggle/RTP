@@ -233,7 +233,7 @@ sogliaRiempimentoArretrato: 0.5
 # coda) viene controllato: viene registrato un WARN e il contatore cumulativo
 # slowPipelineCount (mostrato da /rtp info) viene incrementato. Solo i teletrasporti
 # immediati/non in coda vengono controllati; quelli in coda sono esclusi perché
-# il tempo misurato include l'attesa in coda. 0 o meno disabilita il controllo. Vedi ADR-053.
+# il tempo misurato include l'attesa in coda. 0 o meno disabilita il controllo.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
@@ -243,7 +243,7 @@ sogliaPipelineLentaMs: 5000
 # Profondità della coda pubblica di teletrasporto (giocatori in attesa) a partire
 # dalla quale la contropressione della coda viene controllata: viene registrato un
 # WARN sul fronte e il contatore cumulativo queueGrowthWarnCount (mostrato da /rtp info)
-# viene incrementato una volta per attraversamento. 0 o meno disabilita il controllo (opt-in). Vedi ADR-053.
+# viene incrementato una volta per attraversamento. 0 o meno disabilita il controllo (opt-in).
 # @type: integer
 # @range: [0, null]
 # @unit: players

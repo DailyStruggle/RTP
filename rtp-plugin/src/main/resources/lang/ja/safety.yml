@@ -37,7 +37,7 @@
 # デフォルト: 2。極めて積極的なチャンク GC を持つフォークでのみ増やしてください。
 # @type: integer
 # @range: [0, null]
-# @default: 2
+# @default: 2"
 staleChunkRetryLimit: 2
 
 # 読み取り専用 Anvil プリフィルタ（Vanilla Spigot のみ）
@@ -287,7 +287,7 @@ pvpCheckEnabled: false
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
-# @default: 15
+# @default: 15"
 pvpCombatTagSeconds: 15
 
 # What to do when a combat-tagged player requests (or is mid-)/rtp.

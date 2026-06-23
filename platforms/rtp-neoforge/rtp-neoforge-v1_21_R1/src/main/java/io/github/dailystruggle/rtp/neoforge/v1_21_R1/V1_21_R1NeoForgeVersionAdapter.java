@@ -185,28 +185,69 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         if (level == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("null ServerLevel"));
         }
+        MinecraftServer server = level.getServer();
+        ServerChunkCache cache = level.getChunkSource();
+
+        // Temporary load-ticket so the chunk holder reaches FULL-status
+        // generation (without it the future resolves to a loading failure
+        // -> null). Mirrors the Fabric carrier. Added here while still on the
+        // server tick thread (loadLiveChunk dispatches us via
+        // MinecraftServer#execute) and released on the tick thread once the
+        // generation future resolves.
+        final ChunkPos cp = new ChunkPos(cx, cz);
+        boolean ticketAdded = false;
         try {
-            ServerChunkCache cache = level.getChunkSource();
+            addRtpTicket(cache, cp);
+            ticketAdded = true;
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[RTP][NeoForge 1.21.1] temp load-ticket apply failed for chunk=("
+                            + cx + "," + cz + "): " + t.getClass().getSimpleName() + ": " + t.getMessage());
+        }
+        final boolean addedTicket = ticketAdded;
+
+        // The public getChunkFuture must be invoked OFF the server tick thread.
+        // Off-thread, vanilla takes its non-blocking branch:
+        //   supplyAsync(() -> getChunkFutureMainThread(...), mainThreadProcessor)
+        //     .thenCompose(f -> f)
+        // which enqueues the scheduling call on the chunk source's main-thread
+        // processor and lets the normal server tick pump generation to completion
+        // incrementally - no managedBlock, so the tick loop is never starved.
+        // Invoked ON the tick thread the public entry point parks on
+        // mainThreadProcessor.managedBlock(...) until generation finishes; with
+        // many concurrent requests that serially starves the tick loop and trips
+        // the 60s ServerWatchdog (the 26.1 carrier crash 2026-06-18). loadLiveChunk
+        // dispatches us via MinecraftServer#execute (tick thread), so hop to an RTP
+        // async worker before invoking vanilla. The persistent kept-cache ticket is
+        // applied separately after cold->hot promotion, so S-002 is unaffected.
+        if (server != null && server.isSameThread()) {
+            CompletableFuture<ChunkAccess> out = new CompletableFuture<>();
+            RTP.scheduler.runTaskAsynchronously(() ->
+                    invokeGetChunkFuture(level, cx, cz, cp, addedTicket).whenComplete((ca, ex) -> {
+                        if (ex != null) out.completeExceptionally(ex);
+                        else out.complete(ca);
+                    }));
+            return out;
+        }
+        return invokeGetChunkFuture(level, cx, cz, cp, addedTicket);
+    }
+
+    /**
+     * Invoke vanilla's public {@code getChunkFuture(cx, cz, FULL, true)} and adapt
+     * the result to a {@code CompletableFuture<ChunkAccess>}. MUST be called OFF
+     * the server tick thread (see {@link #requestFullChunkAsync}); off-thread the
+     * public entry point is non-blocking and self-pumping. The transient
+     * load-ticket (when added) is released on the server tick thread once the
+     * generation future resolves, and on any resolution/invocation failure.
+     */
+    private CompletableFuture<ChunkAccess> invokeGetChunkFuture(
+            ServerLevel level, int cx, int cz, ChunkPos cp, boolean addedTicket) {
+        ServerChunkCache cache = level.getChunkSource();
+        try {
             Method getter = resolveGetChunkFutureMethod(cache);
-
-            // Temporary load-ticket so the chunk holder reaches FULL-status
-            // generation (without it the future resolves to a loading failure
-            // -> null). Mirrors the Fabric carrier.
-            ChunkPos cp = new ChunkPos(cx, cz);
-            boolean ticketAdded = false;
-            try {
-                addRtpTicket(cache, cp);
-                ticketAdded = true;
-            } catch (Throwable t) {
-                RTP.log(Level.WARNING,
-                        "[RTP][NeoForge 1.21.1] temp load-ticket apply failed for chunk=("
-                                + cx + "," + cz + "): " + t.getClass().getSimpleName() + ": " + t.getMessage());
-            }
-            final boolean addedTicket = ticketAdded;
-
             Object raw = getter.invoke(cache, cx, cz, ChunkStatus.FULL, /*create=*/ true);
             if (!(raw instanceof CompletableFuture<?> cf)) {
-                if (addedTicket) tryRemoveLoadTicket(cache, cp);
+                if (addedTicket) scheduleTicketRemoval(level, cp);
                 return CompletableFuture.failedFuture(new IllegalStateException(
                         "getChunkFuture returned non-CompletableFuture: " + (raw == null ? "null" : raw.getClass())));
             }
@@ -214,10 +255,26 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
                 if (either == null) return null;
                 return unwrapEitherLeft(either);
             }).whenComplete((handle, ex) -> {
-                if (addedTicket) tryRemoveLoadTicket(cache, cp);
+                if (addedTicket) scheduleTicketRemoval(level, cp);
             });
         } catch (Throwable t) {
+            if (addedTicket) scheduleTicketRemoval(level, cp);
             return CompletableFuture.failedFuture(t);
+        }
+    }
+
+    /**
+     * Release the transient generation load-ticket for {@code cp} on the server
+     * tick thread (hops via {@link MinecraftServer#execute} when called off-thread,
+     * e.g. from the chunk-future completion on an RTP async worker).
+     */
+    private static void scheduleTicketRemoval(ServerLevel level, ChunkPos cp) {
+        MinecraftServer server = level.getServer();
+        Runnable remove = () -> tryRemoveLoadTicket(level.getChunkSource(), cp);
+        if (server != null && !server.isSameThread()) {
+            server.execute(remove);
+        } else {
+            remove.run();
         }
     }
 

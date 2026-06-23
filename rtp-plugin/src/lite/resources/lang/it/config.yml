@@ -69,11 +69,11 @@ comandiGiocatore:
 # book. (Il renderer chat arriva in un follow-up e sarà aggiunto alla lista
 # predefinita a quel punto.)
 menu:
-  # Lista ordinata di preferenze di id di renderer.
+  # Ordered preference list of renderer ids.
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:
     - "book"
 
 # NON MODIFICARE IL NUMERO DI VERSIONE
-versione: 3.0
+versione: 3.1

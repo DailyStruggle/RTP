@@ -1,0 +1,35 @@
+# --- Mensajes de RTP (este idioma) ---
+# Textos de mensajes para jugadores y operadores en este idioma, agrupados por tema.
+# Copia generada automaticamente de los mensajes en ingles; no editar a mano (se sobrescribe).
+
+# ###############################################################################
+# Sección 4: Sistema y administración
+# ###############################################################################
+archivoAntiguo: "&b[P0] se detectó un [filename] antiguo. Actualizando"
+
+# se detectó un mundo de bukkit que no está en el archivo de configuración
+# marcador: [world] - el mundo detectado
+mundoNuevo: "&b[P0] se detectó un nuevo mundo '[world]'"
+
+# texto de recarga / actualización del plugin
+# marcador: [filename] - nombre del archivo
+recargando: "&b[P0] cargando [filename]..."
+recargado: "&b[P0] [filename] cargado correctamente."
+actualizando: "&a[P0] actualizando [filename]..."
+actualizado: "&a[P0] [filename] actualizado correctamente."
+
+# ###############################################################################
+# Sección 5: Registros administrativos
+# ###############################################################################
+ubicacionGuardada: "&7[P0] Se guardaron correctamente [amount] ubicaciones para [region]"
+ubicacionCargada: "&7[P0] Se cargaron correctamente [amount] ubicaciones para [region]"
+
+# ###############################################################################
+# Sección 11: Metadatos
+# ###############################################################################
+version: 1.0
+
+# ###############################################################################
+# Sección 12: Opciones para desarrolladores
+# ###############################################################################
+mostrarEtiquetaDev: false

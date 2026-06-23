@@ -1,28 +1,80 @@
-# --- RTP-lite Core Configuration (ADR-024) ---
+# --- RTP-lite Core Configuration ---
+# Documentation: plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
 # Lite has no SQL/Redis backend, no economy hook, no claim integrations,
 # and no multilingual support. Locale is hardcoded to English.
 
-teleportDelay: 2          # Wait time (seconds) before teleport
-cancelDistance: 2         # Max move distance during delay before cancellation
-teleportCooldown: 300     # Wait time (seconds) between successful uses
-lockAfterUses: 0          # Usage cap per window before lockout (0 disables; bypass rtp.nolock)
-lockAfterResetSeconds: 0  # Rolling window (seconds) for lockAfterUses (0 = never resets)
-setRespawnOnTeleport: false # Set the landed location as the player's persistent spawn anchor
+# Wait time before a queued teleport executes.
+# 0 teleports immediately (skips the cancel-on-move window).
+# Interacts with cancelDistance below.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
+teleportDelay: 2
 
+# Maximum distance a player may move during teleportDelay before the queued teleport is cancelled.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+cancelDistance: 2
+
+# Wait time between successful uses of /rtp by the same player.
+# Bypassed by rtp.nocooldown.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
+teleportCooldown: 300
+
+# Maximum number of successful /rtp uses a player may make within the
+# lockAfterResetSeconds window before being locked out (BetterRTP LockAfter parity).
+# 0 disables the cap. Bypassed by rtp.nolock.
+# @type: integer
+# @range: [0, null]
+# @default: 0
+lockAfterUses: 0
+
+# Length of the rolling usage-cap window for lockAfterUses. The counter resets this
+# many seconds after the window's first use. 0 means the cap never resets (a hard
+# lifetime cap).
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 0
+lockAfterResetSeconds: 0
+
+# When true, a successful /rtp sets the landed location as the player's persistent
+# spawn anchor (BetterRTP SetAsRespawn parity).
+# @type: boolean
+# @default: false
+setRespawnOnTeleport: false
+
+# Console commands executed on successful teleport. Use [player] for the
+# target player's name. Empty string entries are ignored.
+# @type: list<string>
 consoleCommands:
   - "say [player] has just randomly teleported!"
+
+# Commands executed as the teleporting player on successful teleport.
+# Use [player] for the target player's name. Empty string entries are ignored.
+# @type: list<string>
 playerCommands:
   - ""
 
 # Lite intentionally OMITS the `database:` and `network:` blocks.
 # Persistence is yaml-only and there is no Redis client on the classpath.
 
-# Generalized menu framework (ADR-035 / ADR-044). Ordered preference list of
-# renderer ids; on exception or missing adapter the framework walks the list.
-# Lite ships book only.
+# Generalized menu framework.
+# `renderer` is an ordered preference list of renderer ids. On exception or
+# missing adapter the framework walks the list and falls back to the next
+# entry. Lite ships book only.
 menu:
+  # Ordered preference list of renderer ids.
+  # @type: list<enum>
+  # @options: ["book"]
   renderer:
-    - book
+    - "book"
 
 # DO NOT TOUCH VERSION NUMBER
-version: "3.0"
+version: "3.1"

@@ -68,8 +68,6 @@ platformMaterial: "GLASS"
 # @unit: seconds
 # @default: -1
 platformRestoreSeconds: -1
-
-# Blöcke, die bei Lande-Sicherheitsprüfungen als begehbare Luft behandelt werden.
 # Akzeptiert Bukkit-Material-Namen und "#minecraft:<tag>"-Tag-Referenzen.
 # @type: list<material>
 # @source: material
@@ -141,8 +139,6 @@ airBlocks:
   - "MOSS_CARPET"
   - "PALE_MOSS_CARPET"
   - "LEAF_LITTER"
-
-# Blöcke, die einen Landepunkt ungültig machen (Lava, Gefahren usw.).
 # Akzeptiert Bukkit-Material-Namen, "#minecraft:<tag>"-Tag-Referenzen und
 # Zustands-Prädikate wie "*[waterlogged=true]".
 # @type: list<material>
@@ -217,8 +213,6 @@ biomes:
 # @type: boolean
 # @default: false
 pvpCheckEnabled: false
-
-# Wie lange nach dem Austeilen oder Erleiden von PvP-Schaden ein Spieler vom nativen
 # RTP-Tracker als "im Kampf" gilt. Wird ignoriert, wenn ein externes Combat-Tag-Plugin gebunden ist.
 # @type: integer
 # @range: [0, null]
@@ -227,9 +221,9 @@ pvpCheckEnabled: false
 pvpCombatTagSeconds: 15
 
 # Was zu tun ist, wenn ein im Kampf markierter Spieler /rtp anfordert (oder mittendrin ist).
-# ALLOW  - erlauben, aber eine Prüfzeile protokollieren
-# DENY   - den Befehl mit der Beschäftigt-Meldung ablehnen
-# DELAY  - aufschieben, bis die Kampfmarkierung abläuft, dann fortfahren
+# ALLOW - erlauben, aber eine Prüfzeile protokollieren
+# DENY - den Befehl mit der Beschäftigt-Meldung ablehnen
+# DELAY - aufschieben, bis die Kampfmarkierung abläuft, dann fortfahren
 # CANCEL - einen laufenden / eingereihten Teleport abbrechen
 # Unbekannte Werte fallen sicher auf DENY zurück.
 # @type: enum
@@ -238,8 +232,8 @@ pvpCombatTagSeconds: 15
 pvpOnCombat: "DENY"
 
 # Bevorzugte Quelle des Kampfzustands.
-# AUTO     - externes Combat-Tag-Plugin, falls eines gebunden ist, sonst nativer Tracker
-# NATIVE   - immer den nativen Schadens-Tracker von RTP verwenden
+# AUTO - externes Combat-Tag-Plugin, falls eines gebunden ist, sonst nativer Tracker
+# NATIVE - immer den nativen Schadens-Tracker von RTP verwenden
 # EXTERNAL - nur ein gebundenes Combat-Tag-Plugin (kein nativer Rückfall)
 # @type: enum
 # @options: [AUTO, NATIVE, EXTERNAL]

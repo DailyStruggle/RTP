@@ -264,7 +264,7 @@ umbralRellenoBacklog: 0.5
 # servido de inmediato (sin cola): se registra un WARN y se incrementa el
 # contador acumulado slowPipelineCount (mostrado por /rtp info). Solo se auditan
 # los teletransportes inmediatos/sin cola; los encolados se excluyen porque su
-# tiempo medido incluye la espera en cola. 0 o menos desactiva la auditoría. Véase ADR-053.
+# tiempo medido incluye la espera en cola. 0 o menos desactiva la auditoría. Véase
 # @type: integer
 # @range: [0, null]
 # @unit: ms
@@ -274,7 +274,7 @@ umbralPipelineLentaMs: 5000
 # Profundidad de la cola pública de teletransporte (jugadores esperando) a partir
 # de la cual se audita la contrapresión de la cola: se registra un WARN por flanco
 # y el contador acumulado queueGrowthWarnCount (mostrado por /rtp info) se incrementa
-# una vez por cruce. 0 o menos desactiva la auditoría (opcional). Véase ADR-053.
+# una vez por cruce. 0 o menos desactiva la auditoría (opcional). Véase
 # @type: integer
 # @range: [0, null]
 # @unit: players

@@ -1,8 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.database;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.database.options.*;
 
 import java.io.File;
@@ -21,8 +19,7 @@ public class BukkitDatabaseHandler {
 
         RTP.configs.reloadConfigs();
 
-        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
-        Map<String, Object> databaseMap = configParser.getMap(ConfigKeys.database);
+        Map<String, Object> databaseMap = RTP.configs.getDatabaseConfig();
 
         String type = String.valueOf(databaseMap.getOrDefault("type", "sqlite"));
         String host = String.valueOf(databaseMap.getOrDefault("host", "127.0.0.1"));

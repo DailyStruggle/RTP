@@ -13,19 +13,19 @@ reembolsoAlCancelar: true
 # @default: 50.0
 precio: 50.0
 
-# Coste para teletransportar a otro jugador (/rtp <jugador>).
+# Coste para teletransportar a otro jugador (rtp <jugador>).
 # @type: number
 # @range: [0.0, null]
 # @default: 200.0
 precioOtro: 200.0
 
-# Coste por usar parámetros personalizados (/rtp region:<región>, etc.).
+# Coste por usar parámetros personalizados (rtp region:<región>, etc.).
 # @type: number
 # @range: [0.0, null]
 # @default: 1000000000.0
 precioParametros: 1000000000.0
 
-# Coste adicional por especificar un bioma (/rtp biome:<bioma>).
+# Coste adicional por especificar un bioma (rtp biome:<bioma>).
 # @type: number
 # @range: [0.0, null]
 # @default: 5000.0

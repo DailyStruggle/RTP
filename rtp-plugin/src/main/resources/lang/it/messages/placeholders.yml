@@ -1,0 +1,23 @@
+# --- Messaggi RTP (questa lingua) ---
+# Testi dei messaggi per giocatori e operatori in questa lingua, raggruppati per argomento.
+# Copia generata automaticamente dai messaggi inglesi; non modificare a mano (viene sovrascritto).
+
+# --- Messaggi visibili agli utenti di RTP ---
+# Tutte le stringhe visibili ai giocatori e alla console.
+# Formattazione:
+# - Codici colore legacy di Bukkit (es. &a, &7, &c)
+# - Codici colore esadecimali (es. #2636ef)
+# - Segnaposto di PlaceholderAPI (quando PAPI è installato)
+# Segnaposto:
+# - I segnaposto condivisi "[Pn]" sono definiti nella lista `placeholders` qui sotto.
+# [P0] è il prefisso RTP per impostazione predefinita.
+# - I segnaposto specifici per messaggio (es. [attempts], [world]) sono documentati
+# in linea sopra ogni messaggio che li usa.
+# ###############################################################################
+# Sezione 1: Configurazione generale
+# ###############################################################################
+# lista di segnaposto aggiuntivi
+# formato: Pn - dove n è l'indice in questa lista
+segnaposto:
+  # P0
+  - "[RTP]"

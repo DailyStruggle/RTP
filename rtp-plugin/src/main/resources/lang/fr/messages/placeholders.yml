@@ -1,0 +1,23 @@
+# --- Messages RTP (cette langue) ---
+# Textes des messages destines aux joueurs et aux operateurs dans cette langue, groupes par theme.
+# Copie generee automatiquement des messages anglais; ne pas editer a la main (sera ecrase).
+
+# --- RTP User-Facing Messages ---
+# All player- and console-visible strings.
+# Formatting:
+# - Bukkit legacy color codes (e.g. &a, &7, &c)
+# - Hex color codes (e.g. #2636ef)
+# - PlaceholderAPI placeholders (when PAPI is installed)
+# Placeholders:
+# - Shared "[Pn]" placeholders are defined in the `placeholders` list below.
+# [P0] is the RTP prefix by default.
+# - Per-message placeholders (e.g. [attempts], [world]) are documented inline
+# above each message that uses them.
+# ###############################################################################
+# Section 1: General Configuration
+# ###############################################################################
+# list of additional placeholders
+# format: Pn - where n is the index in this list
+placeholders:
+  # P0
+  - "[RTP]"

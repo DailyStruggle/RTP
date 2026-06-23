@@ -63,52 +63,6 @@ setRespawnOnTeleport: false
   # @type: list<string>
   - ""
 
-# --- Конфигурация базы данных ---
-# Где хранить кэшированные локации и данные игроков.
-базаДанных:
-  # Доступные типы: yaml, sqlite, mysql, postgresql
-  # - yaml/sqlite: локальные файлы (без дополнительной настройки)
-  # - mysql/postgresql: удалённая база данных (требуются учётные данные ниже)
-  # @type: enum
-  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
-  # @default: "sqlite"
-  type: "sqlite"
-  # Учётные данные сетевой базы данных (игнорируются для локальных типов)
-  # @type: string
-  host: "127.0.0.1"
-  # Порт базы данных. Используется только mysql/postgresql.
-  # @type: integer
-  # @range: [1, 65535]
-  port: 3306
-  # Имя базы данных / схемы. Используется только mysql/postgresql.
-  # @type: string
-  name: "rtp"
-  # Имя пользователя базы данных. Используется только mysql/postgresql.
-  # @type: string
-  username: "root"
-  # Пароль базы данных. Используется только mysql/postgresql.
-  # @type: string
-  password: "password"
-
-# --- Сеть и синхронизация ---
-# Redis используется для синхронизации кэшированных локаций между несколькими серверами.
-сеть:
-  redis:
-    # Enable Redis-backed network state binding.
-    # @type: boolean
-    # @default: false
-    enabled: false
-    # Redis host.
-    # @type: string
-    host: "127.0.0.1"
-    # Redis port.
-    # @type: integer
-    # @range: [1, 65535]
-    port: 6379
-    # Redis password. Empty string disables auth.
-    # @type: string
-    password: ""
-
 # Обобщённый каркас меню.
 # `renderer` — упорядоченный список предпочтений идентификаторов
 # рендереров. При исключении или отсутствии адаптера каркас перебирает
@@ -131,4 +85,4 @@ menu:
     - "book"
 
 # НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ
-version: 3.0
+version: 3.1

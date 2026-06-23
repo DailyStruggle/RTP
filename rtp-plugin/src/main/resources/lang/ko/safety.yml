@@ -15,7 +15,7 @@
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
-# @default: 5
+# @default: 5"
 무적시간: 5
 
 # 안전 검사 반경(블록)
@@ -38,7 +38,7 @@
 # 기본값: 2. 매우 공격적인 청크 GC 를 가진 포크에서만 증가시키세요.
 # @type: integer
 # @range: [0, null]
-# @default: 2
+# @default: 2"
 staleChunkRetryLimit: 2
 
 # 읽기 전용 Anvil 사전 필터 (Vanilla Spigot 만 해당)
@@ -289,7 +289,7 @@ pvpCheckEnabled: false
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
-# @default: 15
+# @default: 15"
 pvpCombatTagSeconds: 15
 
 # What to do when a combat-tagged player requests (or is mid-)/rtp.

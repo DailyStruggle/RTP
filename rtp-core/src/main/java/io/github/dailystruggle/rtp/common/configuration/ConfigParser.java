@@ -33,6 +33,18 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   public File pluginDirectory;
 
   /**
+   * ADR-071: relative sub-directory (below {@link #pluginDirectory}, '/'-normalized,
+   * no leading/trailing separator) carried by a subpathed parser {@code name} such as
+   * {@code "advanced/blocks.yml"} or {@code "messages/player.yml"}. Empty for a plain
+   * root-level config. Drives {@link #configDir()} (the on-disk directory and the
+   * sub-rooted file database) and {@link #jarPrefix()} (the JAR-resource and
+   * {@code lang/<locale>/} mirror prefix). {@link #name} always holds the bare leaf
+   * file name, so the file-database key and the {@code /rtp config} sub-command name
+   * stay unqualified.
+   */
+  public String subDir = "";
+
+  /**
    * Active locale for this parser (e.g. {@code "en"}, {@code "de"}). Drives the JAR resource
    * path used for first-extraction and the {@code .lang.yml} key-mapping path. See
    * {@link LanguageBootstrap}.
@@ -56,6 +68,74 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    * admin prefab pipeline so both honor the same retention cap.
    */
   public static int bakRetention = ConfigBackups.DEFAULT_BAK_RETENTION;
+
+  /**
+   * Member file names (relative to the {@code <pluginDir>/messages} directory,
+   * e.g. {@code "player.yml"}) when this parser operates in merged-directory
+   * mode, or {@code null} for a normal single-file parser. In merged mode the
+   * value data for a single enum schema ({@link io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys})
+   * is split across several physical files in a {@code messages/} directory;
+   * the parser loads and merges them, routing each key's write-back to the file
+   * that owns it. Only used for the English baseline (other locales keep the
+   * single {@code lang/<locale>/messages.yml}).
+   */
+  private List<String> mergedMembers = null;
+
+  /** The directory (relative to {@link #pluginDirectory}) that holds the merged member files. */
+  private String mergedDir = null;
+
+  /** Live member YAML configs in merged mode, keyed by member file name. */
+  private Map<String, RtpYamlConfig> mergedMemberConfigs = new LinkedHashMap<>();
+
+  /** Maps an on-disk top-level YAML key to the member file that owns it (merged mode). */
+  private Map<String, String> mergedKeyOwner = new HashMap<>();
+
+  /** Fallback owner member for keys not present in any member file (merged mode). */
+  private String mergedPrimaryMember = null;
+
+  /**
+   * Merged-directory constructor. Splits a single enum schema across several
+   * physical files under {@code <pluginDir>/<dir>/} (e.g. {@code messages/}),
+   * loading and merging them into one logical parser. Write-back (set/save) is
+   * routed to the member file that owns each key, and an existing single-file
+   * {@code <name>} left over from a previous version is migrated into the split
+   * tree on first load.
+   *
+   * @param eClass          the enum class for configuration keys
+   * @param name            the logical config name (e.g. {@code "messages.yml"}), used for the
+   *                        {@code .lang.yml} mapping and the {@code /rtp config} sub-command name
+   * @param version         the required version string
+   * @param pluginDirectory the plugin data directory
+   * @param fileDatabase    the file database
+   * @param locale          the locale code (merged mode is intended for the English baseline)
+   * @param dir             the sub-directory holding the member files (e.g. {@code "messages"})
+   * @param members         the member file names within {@code dir} (e.g. {@code ["player.yml", ...]})
+   */
+  public ConfigParser(
+      Class<E> eClass,
+      final String name,
+      final String version,
+      final File pluginDirectory,
+      YamlFileDatabase fileDatabase,
+      String locale,
+      String dir,
+      List<String> members) {
+    super(eClass, sanitizeName(name));
+    this.fileDatabase = fileDatabase;
+    String sn = sanitizeName(name);
+    this.name = (sn.endsWith(".yml")) ? sn : sn + ".yml";
+    this.version = version;
+    this.pluginDirectory = pluginDirectory;
+    this.locale = LanguageBootstrap.sanitize(locale);
+    this.mergedDir = dir;
+    this.mergedMembers = new ArrayList<>(members);
+    // Default ownership for unknown / brand-new keys: the last member (system.yml
+    // for messages), which also carries the version stamp.
+    this.mergedPrimaryMember = this.mergedMembers.isEmpty()
+        ? null
+        : this.mergedMembers.get(this.mergedMembers.size() - 1);
+    check(version, pluginDirectory, null);
+  }
 
   /**
    * Constructor for ConfigParser
@@ -101,12 +181,14 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       YamlFileDatabase fileDatabase,
       ClassLoader classLoader,
       String locale) {
-    super(eClass, sanitizeName(name));
-    this.fileDatabase = fileDatabase;
-    String sn = sanitizeName(name);
-    this.name = (sn.endsWith(".yml")) ? sn : sn + ".yml";
+    super(eClass, sanitizeName(leafName(name)));
     this.version = version;
     this.pluginDirectory = pluginDirectory;
+    this.name = resolveName(name);
+    // ADR-071: a subpathed parser reads/writes under pluginDirectory/<subDir>, so it
+    // operates against a file database rooted there (mirroring MultiConfigParser);
+    // a plain root-level parser keeps the shared, root-rooted database.
+    this.fileDatabase = subDir.isEmpty() ? fileDatabase : new YamlFileDatabase(configDir());
     this.classLoader = classLoader;
     this.locale = LanguageBootstrap.sanitize(locale);
     check(version, pluginDirectory, langFile);
@@ -152,12 +234,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       File langFile,
       YamlFileDatabase fileDatabase,
       String locale) {
-    super(eClass, sanitizeName(name));
-    this.fileDatabase = fileDatabase;
-    String sn = sanitizeName(name);
-    this.name = (sn.endsWith(".yml")) ? sn : sn + ".yml";
+    super(eClass, sanitizeName(leafName(name)));
     this.version = version;
     this.pluginDirectory = pluginDirectory;
+    this.name = resolveName(name);
+    this.fileDatabase = subDir.isEmpty() ? fileDatabase : new YamlFileDatabase(configDir());
     this.locale = LanguageBootstrap.sanitize(locale);
     check(version, pluginDirectory, langFile);
   }
@@ -197,12 +278,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       final File pluginDirectory,
       YamlFileDatabase fileDatabase,
       String locale) {
-    super(eClass, sanitizeName(name));
-    this.fileDatabase = fileDatabase;
-    String sn = sanitizeName(name);
-    this.name = (sn.endsWith(".yml")) ? sn : sn + ".yml";
+    super(eClass, sanitizeName(leafName(name)));
     this.version = version;
     this.pluginDirectory = pluginDirectory;
+    this.name = resolveName(name);
+    this.fileDatabase = subDir.isEmpty() ? fileDatabase : new YamlFileDatabase(configDir());
     this.locale = LanguageBootstrap.sanitize(locale);
     check(version, pluginDirectory, null);
   }
@@ -217,6 +297,65 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   static String sanitizeName(String name) {
     if (name == null) return null;
     return name.replaceAll("[:\\\\/*?\"<>|]", "_");
+  }
+
+  /**
+   * ADR-071: returns the bare leaf file-name component of a (possibly subpathed) parser
+   * {@code name}, dropping any {@code advanced/} / {@code messages/} relative prefix.
+   * Separators are normalized so both {@code /} and {@code \} are honored. Used for the
+   * {@link FactoryValue} name passed to {@code super(...)} so the {@code /rtp config}
+   * sub-command stays unqualified.
+   */
+  static String leafName(String name) {
+    if (name == null) return null;
+    String norm = name.replace('\\', '/');
+    int idx = norm.lastIndexOf('/');
+    return (idx >= 0) ? norm.substring(idx + 1) : norm;
+  }
+
+  /**
+   * ADR-071: parse a (possibly subpathed) raw parser {@code name}, set {@link #subDir} to
+   * the '/'-normalized, per-segment-sanitized relative directory (empty when none), and
+   * return the sanitized bare leaf file name (with a {@code .yml} suffix ensured).
+   *
+   * @param rawName the raw parser name, e.g. {@code "advanced/blocks.yml"} or {@code "config.yml"}
+   * @return the sanitized leaf file name ending in {@code .yml}
+   */
+  private String resolveName(String rawName) {
+    String norm = (rawName == null) ? "" : rawName.replace('\\', '/');
+    int idx = norm.lastIndexOf('/');
+    if (idx >= 0) {
+      StringBuilder sb = new StringBuilder();
+      for (String seg : norm.substring(0, idx).split("/")) {
+        if (seg.isEmpty()) continue;
+        if (sb.length() > 0) sb.append('/');
+        sb.append(sanitizeName(seg));
+      }
+      this.subDir = sb.toString();
+      norm = norm.substring(idx + 1);
+    } else {
+      this.subDir = "";
+    }
+    String sn = sanitizeName(norm);
+    return sn.endsWith(".yml") ? sn : sn + ".yml";
+  }
+
+  /**
+   * ADR-071: the on-disk directory holding this parser's YAML file - {@link #pluginDirectory}
+   * for a root-level config, or {@code pluginDirectory/<subDir>} for a subpathed one.
+   */
+  private File configDir() {
+    if (subDir == null || subDir.isEmpty()) return pluginDirectory;
+    return new File(pluginDirectory, subDir.replace('/', File.separatorChar));
+  }
+
+  /**
+   * ADR-071: the JAR-resource / {@code lang/<locale>/} mirror prefix for this parser -
+   * empty for a root-level config, or {@code "<subDir>/"} (always forward-slashed) for a
+   * subpathed one.
+   */
+  private String jarPrefix() {
+    return (subDir == null || subDir.isEmpty()) ? "" : subDir + "/";
   }
 
   private static void setSection(RtpYamlSection section, Map<?, ?> map) {
@@ -268,7 +407,10 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    */
   protected void loadLangFile(@Nullable File langFile) throws IOException {
     String localeDirName = isEnglish() ? "" : (locale + File.separator);
-    String langSubdir = "lang" + File.separator + localeDirName;
+    // ADR-071: a subpathed parser mirrors its lang map under lang/<locale>/<subDir>/.
+    String subPart =
+        (subDir == null || subDir.isEmpty()) ? "" : subDir.replace('/', File.separatorChar) + File.separator;
+    String langSubdir = "lang" + File.separator + localeDirName + subPart;
 
     if (langFile == null) {
       File langDir = new File(pluginDirectory, langSubdir);
@@ -283,13 +425,15 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     language_mapping.clear();
     reverse_language_mapping.clear();
     if (!langFile.exists()) {
-      // Try locale-specific JAR resource first, then English fallback.
-      String jarPath = "lang/" + localeDirName.replace(File.separatorChar, '/') + langFile.getName();
+      // Try locale-specific JAR resource first, then English fallback. The
+      // jarPrefix() carries any ADR-071 subdirectory (e.g. advanced/, messages/).
+      String jarPath =
+          "lang/" + localeDirName.replace(File.separatorChar, '/') + jarPrefix() + langFile.getName();
       try {
         java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream(jarPath);
         if (in == null && !isEnglish()) {
           // Fallback: English baseline mapping.
-          in = RTP.class.getClassLoader().getResourceAsStream("lang/" + langFile.getName());
+          in = RTP.class.getClassLoader().getResourceAsStream("lang/" + jarPrefix() + langFile.getName());
         }
         if (in != null) {
           File parent = langFile.getParentFile();
@@ -346,7 +490,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     // renameFiles() / saveResource(). The English baseline is the source of
     // truth, so if locale=="en" there is nothing to migrate towards.
     if (isEnglish()) return preserved;
-    File f = new File(pluginDirectory, this.name);
+    File f = new File(configDir(), this.name);
     if (!f.exists()) return preserved;
 
     // If the active locale's key mapping is entirely identity (every value
@@ -466,7 +610,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     // missing (e.g. test fixtures, addons that ship without lang/<locale>/
     // copies of every config), seed an empty file so the loader has something
     // to populate; preserved values will be written via set() afterwards.
-    File seeded = new File(pluginDirectory, this.name);
+    File seeded = new File(configDir(), this.name);
     if (!seeded.exists()) {
       try {
         File parent = seeded.getParentFile();
@@ -498,7 +642,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    */
   private Map<E, Object> loadEnglishBaselineDefaults() {
     Map<E, Object> defaults = new EnumMap<>(myClass);
-    java.io.InputStream in = getResourceFromJar(this.name);
+    java.io.InputStream in = getResourceFromJar(jarPrefix() + this.name);
     if (in == null) return defaults;
     File tmp = null;
     try {
@@ -555,7 +699,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     try {
       File quarantined =
           new File(
-              pluginDirectory, this.name + ".corrupt-" + System.currentTimeMillis());
+              configDir(), this.name + ".corrupt-" + System.currentTimeMillis());
       try {
         Files.move(corrupt.toPath(), quarantined.toPath());
       } catch (IOException moveEx) {
@@ -610,8 +754,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    * locale resource is absent (caller should fall back to the English baseline).
    */
   private boolean extractLocalizedResource(String name, boolean overwrite) {
-    String jarPath = "lang/" + locale + "/" + name.replace('\\', '/');
-    File target = new File(pluginDirectory, name);
+    String jarPath = "lang/" + locale + "/" + jarPrefix() + name.replace('\\', '/');
+    File target = new File(configDir(), name);
     if (target.exists() && !overwrite) return true;
     try (java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream(jarPath)) {
       if (in == null) return false;
@@ -636,10 +780,10 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   private java.io.InputStream getDefaultsFromJar() {
     if (!isEnglish()) {
       java.io.InputStream localized =
-          RTP.class.getClassLoader().getResourceAsStream("lang/" + locale + "/" + name);
+          RTP.class.getClassLoader().getResourceAsStream("lang/" + locale + "/" + jarPrefix() + name);
       if (localized != null) return localized;
     }
-    return getResourceFromJar(this.name);
+    return getResourceFromJar(jarPrefix() + this.name);
   }
 
   /**
@@ -650,6 +794,10 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    * @param langFile the language file
    */
   public void check(final String version, final File pluginDirectory, @Nullable File langFile) {
+    if (mergedMembers != null) {
+      checkMerged(pluginDirectory, langFile);
+      return;
+    }
     // construct language file from enum vals
     // todo: apply translation to loads and saves
     try {
@@ -664,7 +812,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     // re-emitting them under the new locale's key names.
     Map<E, Object> preservedValues = detectAndPreserveLocaleMismatch(pluginDirectory);
 
-    File f = new File(pluginDirectory + File.separator + this.name);
+    File f = new File(configDir(), this.name);
     if (!f.exists()) {
       try {
         saveResource(this.name, true);
@@ -682,7 +830,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       // The file-database failed to load this YAML (likely corrupt syntax).
       // Quarantine the file and re-extract defaults so the plugin self-heals
       // on the next reload, rather than silently running with empty data.
-      File corrupt = new File(pluginDirectory, this.name);
+      File corrupt = new File(configDir(), this.name);
       if (corrupt.exists()) {
         RTP.log(
             Level.WARNING,
@@ -763,12 +911,222 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     }
   }
 
+  /**
+   * Merged-directory variant of {@link #check}. Ensures the {@code <pluginDir>/<dir>}
+   * member files exist (extracting from the JAR when missing), migrates any legacy
+   * single-file {@code <name>} into the split tree, then loads and merges every
+   * member file into one logical {@link #data} map. An in-memory aggregate
+   * {@link RtpYamlConfig} is published under {@link #name} in the shared file-database
+   * cache so {@link #getYamlRoot()} (menu hover) keeps working unchanged.
+   */
+  private void checkMerged(File pluginDirectory, @Nullable File langFile) {
+    try {
+      loadLangFile(langFile);
+    } catch (IOException | IllegalArgumentException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
+    }
+
+    cachedLookup = fileDatabase.cachedLookup;
+    if (cachedLookup.get() == null) fileDatabase.connect();
+
+    File dir = new File(pluginDirectory, mergedDir);
+    if (!dir.exists() && !dir.mkdirs()) {
+      RTP.log(Level.WARNING, "[RTP] unable to create directory " + dir.getAbsolutePath());
+    }
+
+    // Extract any missing member from the JAR (English baseline at messages/<member>).
+    for (String member : mergedMembers) {
+      File f = new File(dir, member);
+      if (!f.exists()) extractMergedMember(member, f);
+    }
+
+    // Migrate a legacy single-file messages.yml (operator customizations) into the tree.
+    migrateLegacyMessages(pluginDirectory, dir);
+
+    // Load + merge members; build the aggregate and the key->owner map.
+    mergedMemberConfigs = new LinkedHashMap<>();
+    mergedKeyOwner = new HashMap<>();
+    RtpYamlConfig aggregate = new RtpYamlConfig(new File(pluginDirectory, this.name).getPath());
+    for (String member : mergedMembers) {
+      File f = new File(dir, member);
+      if (!f.exists()) continue;
+      RtpYamlConfig cfg = new RtpYamlConfig(f.getPath());
+      try {
+        cfg.loadWithComments();
+      } catch (IOException | RuntimeException e) {
+        RTP.log(Level.WARNING, "[RTP] failed to load merged member " + f + ": " + e.getMessage());
+        continue;
+      }
+      mergedMemberConfigs.put(member, cfg);
+      for (String key : cfg.getKeys(false)) {
+        mergedKeyOwner.put(key, member);
+        Object value = cfg.get(key);
+        aggregate.set(key, value);
+        String comment = cfg.getComment(key);
+        if (comment != null && !comment.isEmpty()) {
+          try {
+            aggregate.setComment(key, comment);
+          } catch (RuntimeException ignored) {
+          }
+        }
+      }
+    }
+    cachedLookup.get().put(this.name, aggregate);
+
+    // Populate the enum-keyed data map from the merged aggregate.
+    data.clear();
+    for (E v : myClass.getEnumConstants()) {
+      Object keyName = language_mapping.get(v.name());
+      if (keyName == null) keyName = v.name();
+      Object fromString = aggregate.get(keyName.toString());
+      if (fromString != null) data.put(v, fromString);
+    }
+  }
+
+  /** Extract a merged member ({@code <dir>/<member>}) from the JAR to {@code target}. */
+  private void extractMergedMember(String member, File target) {
+    String jarPath = mergedDir + "/" + member;
+    try (java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream(jarPath)) {
+      if (in == null) {
+        RTP.log(Level.WARNING, "[RTP] missing JAR resource for merged member " + jarPath);
+        return;
+      }
+      File parent = target.getParentFile();
+      if (parent != null && !parent.exists()) parent.mkdirs();
+      try (FileOutputStream out = new FileOutputStream(target)) {
+        byte[] buf = new byte[1024];
+        int len;
+        while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
+      }
+    } catch (IOException e) {
+      RTP.log(Level.WARNING, "[RTP] failed to extract merged member " + jarPath, e);
+    }
+  }
+
+  /**
+   * One-time migration of a legacy single-file {@code <pluginDir>/<name>} (e.g.
+   * {@code messages.yml}) into the merged member tree. Only operator-customized
+   * values (those differing from the shipped English baseline) are transferred,
+   * each into the member file that owns its key. The legacy file is then renamed
+   * to {@code <name>.migrated} (kept, not deleted) so nothing is lost.
+   */
+  private void migrateLegacyMessages(File pluginDirectory, File dir) {
+    File legacy = new File(pluginDirectory, this.name);
+    if (!legacy.exists() || !legacy.isFile()) return;
+
+    RtpYamlConfig old = new RtpYamlConfig(legacy.getPath());
+    try {
+      old.loadWithComments();
+    } catch (IOException | RuntimeException e) {
+      RTP.log(Level.WARNING,
+          "[RTP] legacy " + this.name + " could not be parsed for migration: " + e.getMessage());
+      return;
+    }
+
+    // Load live (on-disk) member configs to write the customized values into,
+    // and derive key ownership from them so migration works even when the JAR
+    // member resources are not on the classpath.
+    Map<String, String> keyToMember = new HashMap<>();
+    Map<String, RtpYamlConfig> live = new LinkedHashMap<>();
+    for (String member : mergedMembers) {
+      File f = new File(dir, member);
+      RtpYamlConfig cfg = new RtpYamlConfig(f.getPath());
+      try {
+        if (f.exists()) cfg.loadWithComments();
+      } catch (IOException | RuntimeException ignored) {
+        continue;
+      }
+      live.put(member, cfg);
+      if (f.exists()) {
+        for (String key : cfg.getKeys(false)) keyToMember.putIfAbsent(key, member);
+      }
+    }
+
+    // Shipped English baseline values (from the bundled member resources), used
+    // to skip transferring values the operator never actually changed.
+    Map<String, Object> baselineValues = new HashMap<>();
+    for (String member : mergedMembers) {
+      RtpYamlConfig jar = parseJarYaml(mergedDir + "/" + member);
+      if (jar == null) continue;
+      for (String key : jar.getKeys(false)) baselineValues.put(key, jar.get(key));
+    }
+
+    Set<String> changedMembers = new HashSet<>();
+    for (String key : old.getKeys(false)) {
+      if (key.equalsIgnoreCase("version")) continue;
+      String member = keyToMember.get(key);
+      if (member == null) continue; // unknown / removed key - drop
+      Object oldVal = old.get(key);
+      if (oldVal == null) continue;
+      if (valuesEqual(oldVal, baselineValues.get(key))) continue; // not customized
+      RtpYamlConfig cfg = live.get(member);
+      if (cfg == null) continue;
+      cfg.set(key, oldVal);
+      changedMembers.add(member);
+    }
+
+    for (String member : changedMembers) {
+      RtpYamlConfig cfg = live.get(member);
+      try {
+        cfg.save();
+      } catch (IOException e) {
+        RTP.log(Level.WARNING, "[RTP] migration: failed to save member " + member + ": " + e.getMessage());
+      }
+    }
+
+    // Archive the legacy file so it is not re-migrated and nothing is lost.
+    File archived = new File(pluginDirectory, this.name + ".migrated");
+    try {
+      Files.deleteIfExists(archived.toPath());
+      Files.move(legacy.toPath(), archived.toPath());
+      RTP.log(Level.INFO,
+          "[RTP] migrated legacy " + this.name + " into " + mergedDir + "/ (archived as "
+              + archived.getName() + ")");
+    } catch (IOException e) {
+      RTP.log(Level.WARNING, "[RTP] could not archive legacy " + this.name + ": " + e.getMessage());
+    }
+  }
+
+  /** Parse a bundled JAR YAML resource into a loaded {@link RtpYamlConfig}, or {@code null}. */
+  @Nullable
+  private RtpYamlConfig parseJarYaml(String jarPath) {
+    java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream(jarPath);
+    if (in == null) return null;
+    File tmp = null;
+    try {
+      tmp = File.createTempFile("rtp-merged-", "-" + jarPath.replace('/', '_'));
+      try (FileOutputStream out = new FileOutputStream(tmp)) {
+        byte[] buf = new byte[1024];
+        int len;
+        while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
+      }
+      RtpYamlConfig cfg = new RtpYamlConfig(tmp.getPath());
+      cfg.loadWithComments();
+      return cfg;
+    } catch (IOException | RuntimeException e) {
+      return null;
+    } finally {
+      try {
+        in.close();
+      } catch (IOException ignored) {
+      }
+      if (tmp != null) {
+        try {
+          Files.deleteIfExists(tmp.toPath());
+        } catch (IOException ignored) {
+        }
+      }
+    }
+  }
+
   /** Rename configuration files if necessary (e.g. on version upgrade) */
   public void renameFiles() {
+    // ADR-071: rename within the parser's own (possibly subpathed) directory.
+    String dir = configDir().getAbsolutePath();
     // load up a list of files to rename
     ArrayList<File> toRename = new ArrayList<>();
     for (int i = 1; i < 1000; i++) {
-      File file = new File(pluginDirectory.getAbsolutePath() + File.separator + name + ".old" + i);
+      File file = new File(dir + File.separator + name + ".old" + i);
       if (!file.exists()) break;
       toRename.add(file);
     }
@@ -779,7 +1137,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       int oldNum = i + 1;
       int newNum = oldNum + 1;
       String newFileName = fileName.replace(Integer.toString(oldNum), Integer.toString(newNum));
-      File newFile = new File(pluginDirectory.getAbsolutePath() + File.separator + newFileName);
+      File newFile = new File(dir + File.separator + newFileName);
       try { // ensure can place
         Files.deleteIfExists(newFile.toPath());
       } catch (IOException e) {
@@ -793,8 +1151,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     }
 
     // rename the last one
-    File oldFile = new File(pluginDirectory.getAbsolutePath() + File.separator + name);
-    File newFile = new File(pluginDirectory.getAbsolutePath() + File.separator + name + ".old1");
+    File oldFile = new File(dir + File.separator + name);
+    File newFile = new File(dir + File.separator + name + ".old1");
     try {
       Files.deleteIfExists(newFile.toPath());
     } catch (IOException e) {
@@ -804,7 +1162,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     if (!b) RTP.log(Level.WARNING, "RTP - unable to rename file:" + oldFile.getAbsoluteFile());
 
     if (isEnglish() || !extractLocalizedResource(this.name, true)) {
-      saveResourceFromJar(this.name, true);
+      saveResourceFromJar(jarPrefix() + this.name, true);
     }
   }
 
@@ -871,7 +1229,9 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       if (!isEnglish() && extractLocalizedResource(name, overwrite)) {
         return;
       }
-      saveResourceFromJar(name, overwrite);
+      // ADR-071: jarPrefix() carries any advanced/ or messages/ subdirectory so the
+      // resource is read from and written under <root>/<subDir>/.
+      saveResourceFromJar(jarPrefix() + name, overwrite);
     } else {
       String diff = myDirectory.substring(pDirectory.length() + 1);
       if (name.equals("default.yml")) {
@@ -900,7 +1260,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     if (RtpYamlConfig == null) return;
 
     // 1. Load existing config into memory to preserve it during rename
-    RtpYamlConfig oldYaml = new RtpYamlConfig(new File(pluginDirectory, name));
+    RtpYamlConfig oldYaml = new RtpYamlConfig(new File(configDir(), name));
     try {
       if (oldYaml.exists()) {
         oldYaml.loadWithComments();
@@ -976,6 +1336,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
     super.set(key, value);
 
+    if (mergedMembers != null) {
+      setMerged(key, value);
+      return;
+    }
+
     RtpYamlConfig RtpYamlConfig = cachedLookup.get().get(name);
     Object yamlKey = language_mapping.get(key.name());
     if (yamlKey == null) yamlKey = key.name();
@@ -1040,11 +1405,38 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   /**
+   * Merged-mode write-back: route the edited key to the member file that owns it
+   * (defaulting to the primary member for a brand-new key) and keep the in-memory
+   * aggregate in sync. {@link #data} was already updated by {@code super.set}.
+   */
+  private void setMerged(E key, Object value) {
+    Object yamlKey = language_mapping.get(key.name());
+    if (yamlKey == null) yamlKey = key.name();
+    String yamlKeyStr = yamlKey.toString();
+
+    String member = mergedKeyOwner.get(yamlKeyStr);
+    if (member == null) {
+      member = mergedPrimaryMember;
+      if (member != null) mergedKeyOwner.put(yamlKeyStr, member);
+    }
+    if (member != null) {
+      RtpYamlConfig cfg = mergedMemberConfigs.get(member);
+      if (cfg != null) cfg.set(yamlKeyStr, value);
+    }
+    RtpYamlConfig aggregate = cachedLookup.get().get(name);
+    if (aggregate != null) aggregate.set(yamlKeyStr, value);
+  }
+
+  /**
    * Save the configuration to disk
    *
    * @throws IOException if an I/O error occurs
    */
   public void save() throws IOException {
+    if (mergedMembers != null) {
+      saveMerged();
+      return;
+    }
     RtpYamlConfig RtpYamlConfig = cachedLookup.get().get(name);
     RtpYamlConfig.options().copyDefaults(true);
     RtpYamlConfig.options().indent(2);
@@ -1063,6 +1455,25 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
               + backupFailure.getMessage());
     }
     RtpYamlConfig.save();
+  }
+
+  /** Merged-mode save: back up and write every member file. */
+  private void saveMerged() throws IOException {
+    for (RtpYamlConfig cfg : mergedMemberConfigs.values()) {
+      cfg.options().copyDefaults(true);
+      cfg.options().indent(2);
+      try {
+        File configFile = cfg.getConfigurationFile();
+        if (configFile != null) {
+          ConfigBackups.backup(configFile, bakRetention);
+        }
+      } catch (IOException | RuntimeException backupFailure) {
+        RTP.log(Level.WARNING,
+            "[RTP] config backup failed for a " + name + " member - proceeding with save: "
+                + backupFailure.getMessage());
+      }
+      cfg.save();
+    }
   }
 
   @Override

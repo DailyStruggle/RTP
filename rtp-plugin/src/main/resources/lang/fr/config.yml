@@ -56,48 +56,6 @@ commandesJoueur:
   # @type: list<string>
   - ""
 
-# Configuration de la base de données
-baseDeDonnees:
-  # Backend type.
-  # @type: enum
-  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
-  # @default: "sqlite"
-  type: "sqlite"
-  # Database host. Used by mysql/postgresql only.
-  # @type: string
-  host: "127.0.0.1"
-  # Port de la base de données. Utilisé uniquement par mysql/postgresql.
-  # @type: integer
-  # @range: [1, 65535]
-  port: 3306
-  # Nom de la base de données / schéma. Utilisé uniquement par mysql/postgresql.
-  # @type: string
-  name: "rtp"
-  # Nom d'utilisateur de la base de données. Utilisé uniquement par mysql/postgresql.
-  # @type: string
-  username: "root"
-  # Mot de passe de la base de données. Utilisé uniquement par mysql/postgresql.
-  # @type: string
-  password: "password"
-
-# Configuration du réseau et de la synchronisation
-reseau:
-  redis:
-    # Enable Redis-backed network state binding.
-    # @type: boolean
-    # @default: false
-    enabled: false
-    # Redis host.
-    # @type: string
-    host: "127.0.0.1"
-    # Redis port.
-    # @type: integer
-    # @range: [1, 65535]
-    port: 6379
-    # Redis password. Empty string disables auth.
-    # @type: string
-    password: ""
-
 # Cadre de menu généralisé.
 # `renderer` est une liste ordonnée de préférences d'identifiants de
 # renderer. En cas d'exception ou d'adaptateur manquant, le framework
@@ -122,4 +80,4 @@ menu:
     - "book"
 
 # NE PAS MODIFIER LE NUMÉRO DE VERSION
-version: 3.0
+version: 3.1

@@ -1,10 +1,13 @@
+# ###############################################################################
+# 第 0: 占位符
+# ###############################################################################
 # P0
 占位符:
   # P0
   - "[RTP]"
 
 # ###############################################################################
-# 第 2 节: 传送
+# 第 1: 传送
 # ###############################################################################
 已在传送: "&7[P0] ⚡ 你已经在传送中！"
 
@@ -16,6 +19,9 @@
 
 # 传送被取消时
 取消传送: "&7[P0] ⚡ 传送已取消！"
+
+# 可选 PvP 战斗检测拒绝 /rtp 时发送（玩家处于战斗中）
+pvpInCombat: "&c[P0] 战斗中无法进行随机传送。"
 
 # 达到最大尝试次数后仍未找到安全位置时
 # 占位符: [attempts] - 最大尝试次数
@@ -40,46 +46,15 @@ lockedAfterUses: "&7[P0] ⌖ 你已达到随机传送次数上限，请在 [rema
 余额不足: "&7[P0] 你至少需要 $[money] 才能执行此操作。"
 
 # ###############################################################################
-# 第 3 节: 时间格式
+# 第 2: 命令反馈
 # ###############################################################################
-天: "天"
-小时: "时"
-分: "分"
-秒: "秒"
-毫秒: "毫秒"
-
-# ###############################################################################
-# 第 4 节: 系统与管理
-# ###############################################################################
-旧文件: "&b[P0] 检测到旧的 [filename]。正在更新"
-
-# 检测到配置文件中没有的 bukkit 世界
-# 占位符: [world] - 检测到的世界
-新世界: "&b[P0] 检测到新世界 '[world]'"
-
 # bukkit 中不存在该世界
 # 占位符: [world] - 世界名称
 无效世界: "&7[P0] 找不到世界 '[world]'"
 
-# 插件重载 / 更新提示
-# 占位符: [filename] - 文件名
-重载中: "&b[P0] 正在加载 [filename]……"
-已重载: "&b[P0] [filename] 已成功加载。"
-更新中: "&a[P0] 正在更新 [filename]……"
-已更新: "&a[P0] [filename] 已成功更新。"
-
 # 插件没有用户请求的命令
 # 占位符: [arg] - 尝试的参数
 参数错误: "&c[P0] 命令参数无效 [arg]"
-
-# 当控制台尝试运行仅限玩家的命令时
-控制台命令不允许: "&c[P0] 你必须以游戏内玩家身份执行此命令。"
-
-# busy 与 invalidCommand 未在 messages.lang.yml 中翻译 -> 使用英文键名（回退到基础英文）。
-繁忙: "&c[P0] 忙"
-
-# 可选 PvP 战斗检测拒绝 /rtp 时发送（玩家处于战斗中）
-pvpInCombat: "&c[P0] 战斗中无法进行随机传送。"
 
 # 插件没有用户请求的子命令或参数
 # 占位符: [arg] - 尝试的参数
@@ -88,14 +63,82 @@ pvpInCombat: "&c[P0] 战斗中无法进行随机传送。"
 # 用户没有所请求命令的权限
 无权限: "&7抱歉，你没有权限执行此命令。如果你认为这是错误，请联系服务器管理员。"
 
-# ###############################################################################
-# 第 5 节: 管理日志
-# ###############################################################################
-位置已保存: "&7[P0] 已成功保存 [amount] 个 [region] 的位置"
-位置已加载: "&7[P0] 已成功加载 [amount] 个 [region] 的位置"
+# busy 与 invalidCommand 未在 messages.lang.yml 中翻译 -> 使用英文键名（回退到基础英文）。
+繁忙: "&c[P0] 忙"
+
+# 当控制台尝试运行仅限玩家的命令时
+控制台命令不允许: "&c[P0] 你必须以游戏内玩家身份执行此命令。"
 
 # ###############################################################################
-# 第 6 节: 扫描命令
+# 第 3: 跨服务器传送（网络模式）
+# ###############################################################################
+# 请求已被接受进入跨服等待队列并等待后端认领时发送。
+# 占位符: [position] - 0 索引位置；传输未返回位置时可能为空。
+networkQueued: "&7[P0] 正在排队等待跨服目的地 (位置 [position])..."
+# 玩家在已持有非终态跨服注册时运行 /rtp* 时发送。
+# 占位符: [position] - 已知时的 FIFO 位置；代理尚未分配时为空。
+alreadyQueued: "&c你已经在跨服队列中等待 (位置 [position])。请稍候。"
+# 跨服等待列表条目超过配置的 TTL 被回收时发送。无占位符。
+networkTimedOut: "&c[P0] 等待后端时跨服传送已超时。"
+# 跨服等待列表注册因共享等待列表已达到最大大小而被拒绝时发送。无占位符。
+waitlistFull: "&c[P0] 跨服队列已满；请稍后再试。"
+# 队列将请求移交给代理路由器且后端选择正在进行时发送。
+networkRouting: "&7[P0] 正在路由到后端..."
+# 后端已为该玩家预留坐标且代理即将发起跨服跳转时发送。
+# 占位符: [server] - 目标后端的 serverId。
+networkReserved: "&a[P0] 已在 [server] 预留坐标。正在传送..."
+# 代理正在跳转中时发送。占位符: [server] - 目标服务器。
+networkTransferring: "&a[P0] 正在传送到 [server]..."
+# 跨服路径放弃并回退到本地后端时发送。
+# 占位符: [reason] - RoutingDecision.FallbackReason 的值之一。
+networkFallback: "&e[P0] 跨服不可用 ([reason])；回退到本地。"
+# 跨服请求终态失败（无法回退）时发送。
+# 占位符: [reason] - DispatchOutcome.Failed.Reason。
+networkFailed: "&c[P0] 跨服传送失败：[reason]。"
+# 玩家请求特定区域但网络中没有后端当前提供该区域时发送。
+# 占位符: [region] - 请求的区域名称。
+networkRegionUnavailable: "&c[P0] 当前没有后端在提供区域 '[region]'。"
+# 请求的区域名称解析到两个或多个后端且策略无法选择时发送。占位符: [region]。
+networkRegionAmbiguous: "&c[P0] 区域 '[region]' 在多个后端间不明确；请指定一个服务器。"
+
+# ###############################################################################
+# 第 4: 视觉元素
+# ###############################################################################
+标题: "<rainbow>已传送！</rainbow>"
+副标题: "<gradient:#A78BFA:#E876A0>玩得开心！</gradient>"
+淡入: 20
+停留: 20
+淡出: 20
+
+# actionbar 设置
+动作栏: ""
+
+# ###############################################################################
+# 第 5: 时间格式
+# ###############################################################################
+天: "天"
+小时: "时"
+分: "分"
+秒: "秒"
+毫秒: "毫秒"
+
+# ###############################################################################
+# 第 6: 命令说明
+# ###############################################################################
+rtp: "&b/rtp - 传送到一个随机位置"
+rtp_说明: "传送到一个随机位置"
+帮助: "&b/rtp help - 显示本帮助"
+帮助_说明: "命令说明"
+重载: "&b/rtp reload - 重新加载配置文件"
+重载_说明: "重新加载配置文件"
+扫描: "&b/rtp scan - 扫描区域内所有可能位置以提升加载速度"
+扫描_说明: "清理已保存数据并扫描区域内所有可能位置"
+配置_说明: "在运行时更新配置文件"
+信息_说明: "查看插件当前状态"
+测试_说明: "测试 RTP 功能"
+
+# ###############################################################################
+# 第 7: 扫描命令
 # ###############################################################################
 开始扫描: "&a[P0] 已为以下区域启动扫描任务: [scan_regions]"
 重置扫描: "&7[P0] 已重置以下区域的扫描队列: [scan_regions]"
@@ -109,10 +152,10 @@ pvpInCombat: "&c[P0] 战斗中无法进行随机传送。"
 # Boss-bar title shown to players with rtp.scan permission while a world scan is running.
 # Set to empty string to disable the boss-bar.
 # placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+scanBossBar: "正在扫描 [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% 陆地) ETA [scan_eta]"
 
 # ###############################################################################
-# 第 7 节: 信息命令
+# 第 8: 信息命令
 # ###############################################################################
 信息标题: "&2&l/rtp 信息"
 信息_票据: "&7全局活动区块票据: #7E9CC8[tickets]"
@@ -207,22 +250,7 @@ infoBiomeActivityEmpty: "&8--- &7暂无生物群系占用数据 &8---"
   - "#58CCED  - 主要拒绝原因: [memTopCause] ([memTopCausePct])"
 
 # ###############################################################################
-# 第 8 节: 命令说明
-# ###############################################################################
-rtp: "&b/rtp - 传送到一个随机位置"
-rtp_说明: "传送到一个随机位置"
-帮助: "&b/rtp help - 显示本帮助"
-帮助_说明: "命令说明"
-重载: "&b/rtp reload - 重新加载配置文件"
-重载_说明: "重新加载配置文件"
-扫描: "&b/rtp scan - 扫描区域内所有可能位置以提升加载速度"
-扫描_说明: "清理已保存数据并扫描区域内所有可能位置"
-配置_说明: "在运行时更新配置文件"
-信息_说明: "查看插件当前状态"
-测试_说明: "测试 RTP 功能"
-
-# ###############################################################################
-# Section 8b: Generalized Menu Framework
+# 第 9: Generalized Menu Framework
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 菜单_无效: "&c[P0] that menu link is invalid."
@@ -259,7 +287,7 @@ rtp_说明: "传送到一个随机位置"
 菜单_上一页: "&7« 上一页 ([page])"
 菜单_下一页: "&7下一页 ([page]) »"
 # 首页传送行上方的分区分隔符（玩家视图）。
-菜单_首页_传送分区: "&8--- &7teleport &8---"
+菜单_首页_传送分区: "&8--- &7传送 &8---"
 # 首页行。无占位符。
 菜单_首页_传送行: "&2» /rtp &7- 随机传送到一个位置"
 菜单_首页_区域行: "&2» /rtp region:&7... &7- 选择区域"
@@ -274,16 +302,16 @@ menuFrontPageRowAdmin: "#9D7CD8» 管理面板 &7- 管理员工具"
 menuFrontPageHoverAdmin: "&7管理员工具: 配置、扫描、诊断、重载"
 # --- 管理面板书本页面 ---
 # 管理面板顶部的不可点击标题行。无占位符。
-menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+menuAdminPanelTitle: "#5FB3B3&l⚙ 管理面板"
 # menuAdminPanelTitle 下方的不可点击提示行。无占位符。
 menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
 # 管理面板上的分区分隔符。无占位符。
-menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
-menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
-menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
-menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
+menuAdminPanelSectionConfig: "&8--- &7配置 &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7诊断 &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7生命周期 &8---"
+menuAdminPanelSectionBrowse: "&8--- &7浏览 &8---"
 # 管理面板行 + 悬停文字。无占位符。
-menuAdminPanelRowConfig: "&b▶ config editor"
+menuAdminPanelRowConfig: "&b▶ 配置编辑器"
 menuAdminPanelHoverConfig: "&7打开精选配置选择器"
 menuAdminPanelRowRegions: "#5FB3B3» 区域"
 menuAdminPanelHoverRegions: "&7添加、删除或编辑每区域配置"
@@ -291,17 +319,17 @@ menuAdminPanelRowWorlds: "#5FB3B3▶ 世界"
 menuAdminPanelHoverWorlds: "&7添加、删除或编辑每世界配置"
 menuAdminPanelRowEffects: "#5FB3B3» 效果"
 menuAdminPanelHoverEffects: "&7添加、删除或编辑每组传送效果"
-menuAdminPanelRowInfo: "&b▶ server info"
+menuAdminPanelRowInfo: "&b▶ 服务器信息"
 menuAdminPanelHoverInfo: "&7显示插件版本、区域数量和队列状态"
 menuAdminPanelRowDiagnostics: "&c» 完整诊断"
 menuAdminPanelHoverDiagnostics: "&7运行完整诊断套件; 可能较耗时"
-menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
+menuAdminPanelRowMemory: "&b▶ 内存追踪器快照"
 menuAdminPanelHoverMemory: "&7转储活跃的区块票据和管道分配"
-menuAdminPanelRowScan: "&b▶ scan control"
+menuAdminPanelRowScan: "&b▶ 扫描控制"
 menuAdminPanelHoverScan: "&7打开扫描子菜单 (开始 / 暂停 / 取消)"
 menuAdminPanelRowReload: "&c» 重载"
 menuAdminPanelHoverReload: "&7重载所有配置文件; 进行中的传送可能受影响"
-menuAdminPanelRowBrowse: "&b▶ browse all commands"
+menuAdminPanelRowBrowse: "&b▶ 浏览所有命令"
 menuAdminPanelHoverBrowse: "&7打开反射式 /rtp 命令树"
 menuAdminPanelRowBack: "&7« 返回"
 # --- 可视化子菜单（每区域坏点管理员地图）---
@@ -366,13 +394,13 @@ infoBookOverflowFooter: "&7(内容已截断 - 点击在聊天中查看完整输�
 # 用户可点击刷新行手动更新。
 infoBookAutoRefreshDeferredNote: "&8(暂不支持自动刷新; 点击刷新手动更新)"
 # 配置文件选择页面顶部的不可点击标题行。
-# 管理员点击 \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/rtp config\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ 时显示。
+# 管理员点击 /rtp config 时显示。
 configSelectorTitle: "#5FB3B3&l» 配置文件"
 # 配置选择页面上「返回 /rtp 菜单根」导航行的标签。
 configSelectorBackRow: "&7« 返回菜单"
 # 单个配置文件页面顶部的不可点击标题行。
-# 占位符: [file] - 配置文件名（如 \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\performance\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\、\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\safety\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\）。
-configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
+# 占位符: [file] - 配置文件名（如 performance、safety）。
+configFileTitle: "#5FB3B3&l⚙ 配置: &7[file]"
 # 单个配置文件页面上「返回配置文件列表」导航行的标签。
 configFileBackRow: "&7« 返回配置文件列表"
 # 配置文件中没有可编辑键时显示的不可点击提示行。
@@ -382,13 +410,13 @@ configFileEmptyHint: "&7(此文件中没有可编辑的键)"
 configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
 # 配置文件页面上每个键行的悬停文字。占位符:
 #   [key], [value], [type] - 配置键名、当前值和声明类型。
-configKeyHoverFormat: "&7click to edit &7[key] &7(type: [type])"
+configKeyHoverFormat: "&7点击编辑 &7[key] &7(类型: [type])"
 # 形状/vert 类型选择页面顶部的不可点击标题行。
-# 占位符: [param] - \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\shape\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ 或 \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\vert\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\; [current] - 当前激活的类型名称。
-configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+# 占位符: [param] - shape 或 vert; [current] - 当前激活的类型名称。
+configTypePickerTitle: "#5FB3B3&l⚙ 选择 [param] 类型 &7(当前: &7[current]&7)"
 # 形状/vert 子参数页面顶部的不可点击标题行。
-# 占位符: [param] - \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\shape\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ 或 \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\vert\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\; [type] - 激活的类型名称。
-configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+# 占位符: [param] - shape 或 vert; [type] - 激活的类型名称。
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7子参数"
 # 书本视图回退到旧版原始 YAML 聊天转储时发送的提示
 #（此平台上没有可用的书本渲染器）。
 configViewRawHint: "&7[P0] 书本视图不可用; 回退到原始转储。"
@@ -396,7 +424,7 @@ configViewRawHint: "&7[P0] 书本视图不可用; 回退到原始转储。"
 configValueUnsetPlaceholder: "&8(未设置)"
 # Non-clickable header row separating the "Changeable" list from the "Pending"
 # staging-cart list on a config-file page when the viewer has staged one or
-# more uncommitted edits. No placeholders.
+# more uncommitted edits. No placeholders."
 configPendingHeader: "&6&l-- pending changes --"
 # Per-row label for a staged (pending) key=value entry on a config-file page.
 # Clicking the row removes it from the cart. Placeholders: [key], [value].
@@ -410,7 +438,7 @@ configApplyRow: "&2&l[apply]"
 # 清空购物车但不应用更改。
 configDiscardRow: "&c&l[discard]"
 
-# --- ADR-047 声明式图表组合桥接 ---
+# --- 声明式图表组合桥接 ---
 # 当 OPEN_MAP 菜单动作触发但没有注册具体 MapBinding 时发送给查看者。
 mapBindingMissing: "&c[P0] 此服务器上地图渲染不可用。"
 # 当 MapDispatch 收到其 Kind 没有注册 ChartSpecResolver 的 ChartSpec 时发送。
@@ -420,39 +448,9 @@ mapResolverMissing: "&c[P0] 此请求未注册图表解析器。"
 mapUnavailable: "&e[P1] 图表数据当前不可用。"
 # 当活跃 MapBinding 当前无法分配地图句柄时发送。
 mapBusy: "&e[P1] 地图服务繁忙，请稍后再试。"
-# 可点击的 \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/rtp info\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ 菜单行的标签，点击后渲染当前区域坏点热力图。
+# 可点击的 /rtp info 菜单行的标签，点击后渲染当前区域坏点热力图。
 # 当 NoopMapBinding 为已安装绑定时，该行在渲染时被省略。
 menuInfoBadPointsLabel: "#9D7CD8&l# 坏点地图"
-
-# --- 跨服务器网络模式消息 ---
-# 请求已被接受进入跨服等待队列并等待后端认领时发送。
-# 占位符: [position] - 0 索引位置；传输未返回位置时可能为空。
-networkQueued: "&7[P0] 正在排队等待跨服目的地 (位置 [position])..."
-# 玩家在已持有非终态跨服注册时运行 /rtp* 时发送。
-# 占位符: [position] - 已知时的 FIFO 位置；代理尚未分配时为空。
-alreadyQueued: "&c你已经在跨服队列中等待 (位置 [position])。请稍候。"
-# 跨服等待列表条目超过配置的 TTL 被回收时发送。无占位符。
-networkTimedOut: "&c[P0] 等待后端时跨服传送已超时。"
-# 跨服等待列表注册因共享等待列表已达到最大大小而被拒绝时发送。无占位符。
-waitlistFull: "&c[P0] 跨服队列已满；请稍后再试。"
-# 队列将请求移交给代理路由器且后端选择正在进行时发送。
-networkRouting: "&7[P0] 正在路由到后端..."
-# 后端已为该玩家预留坐标且代理即将发起跨服跳转时发送。
-# 占位符: [server] - 目标后端的 serverId。
-networkReserved: "&a[P0] 已在 [server] 预留坐标。正在传送..."
-# 代理正在跳转中时发送。占位符: [server] - 目标服务器。
-networkTransferring: "&a[P0] 正在传送到 [server]..."
-# 跨服路径放弃并回退到本地后端时发送。
-# 占位符: [reason] - RoutingDecision.FallbackReason 的值之一。
-networkFallback: "&e[P0] 跨服不可用 ([reason])；回退到本地。"
-# 跨服请求终态失败（无法回退）时发送。
-# 占位符: [reason] - DispatchOutcome.Failed.Reason。
-networkFailed: "&c[P0] 跨服传送失败：[reason]。"
-# 玩家请求特定区域但网络中没有后端当前提供该区域时发送。
-# 占位符: [region] - 请求的区域名称。
-networkRegionUnavailable: "&c[P0] 当前没有后端在提供区域 '[region]'。"
-# 请求的区域名称解析到两个或多个后端且策略无法选择时发送。占位符: [region]。
-networkRegionAmbiguous: "&c[P0] 区域 '[region]' 在多个后端间不明确；请指定一个服务器。"
 
 # --- 多配置子菜单 ---
 # 未注册特定类型标题键时使用的默认标题行。
@@ -500,7 +498,29 @@ multiconfigResultNameInvalid: "&c名称 '[name]' 不合法; 请使用字母、�
 multiconfigResultNameTaken: "&c已存在名为 '[name]' 的条目。"
 
 # ###############################################################################
-# 第 9 节: PlaceholderAPI 支持
+# 第 10: 系统与管理
+# ###############################################################################
+旧文件: "&b[P0] 检测到旧的 [filename]。正在更新"
+
+# 检测到配置文件中没有的 bukkit 世界
+# 占位符: [world] - 检测到的世界
+新世界: "&b[P0] 检测到新世界 '[world]'"
+
+# 插件重载 / 更新提示
+# 占位符: [filename] - 文件名
+重载中: "&b[P0] 正在加载 [filename]……"
+已重载: "&b[P0] [filename] 已成功加载。"
+更新中: "&a[P0] 正在更新 [filename]……"
+已更新: "&a[P0] [filename] 已成功更新。"
+
+# ###############################################################################
+# 第 11: 管理日志
+# ###############################################################################
+位置已保存: "&7[P0] 已成功保存 [amount] 个 [region] 的位置"
+位置已加载: "&7[P0] 已成功加载 [amount] 个 [region] 的位置"
+
+# ###############################################################################
+# 第 12: PlaceholderAPI 支持
 # ###############################################################################
 玩家_可用: "&a可用"
 玩家_冷却中: "&7等待中"
@@ -509,23 +529,11 @@ multiconfigResultNameTaken: "&c已存在名为 '[name]' 的条目。"
 玩家_传送中: "&b正在传送"
 
 # ###############################################################################
-# 第 10 节: 视觉元素
-# ###############################################################################
-标题: "<rainbow>已传送！</rainbow>"
-???: "<gradient:#A78BFA:#E876A0>玩得开心！</gradient>"
-淡入: 20
-停留: 20
-淡出: 20
-
-# actionbar 设置
-动作栏: ""
-
-# ###############################################################################
-# 第 11 节: 元数据
+# 第 13: 元数据
 # ###############################################################################
 版本: 1.0
 
 # ###############################################################################
-# 第 12 节: 开发者选项
+# 第 14: 开发者选项
 # ###############################################################################
 显示开发者标签: false

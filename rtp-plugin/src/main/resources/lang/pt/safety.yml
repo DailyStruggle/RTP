@@ -18,7 +18,7 @@
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
-# @default: 5
+# @default: 5"
 tempoInvulnerabilidade: 5
 
 # Raio de verificação de segurança (blocos)
@@ -44,7 +44,7 @@ raioSeguranca: 0
 # Padrão: 2. Aumente apenas em forks com um GC de chunks muito agressivo.
 # @type: integer
 # @range: [0, null]
-# @default: 2
+# @default: 2"
 staleChunkRetryLimit: 2
 
 # Pre-filtro Anvil somente leitura (apenas Spigot vanilla)
@@ -301,7 +301,7 @@ pvpCheckEnabled: false
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
-# @default: 15
+# @default: 15"
 pvpCombatTagSeconds: 15
 
 # What to do when a combat-tagged player requests (or is mid-)/rtp.

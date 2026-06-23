@@ -56,48 +56,6 @@ spielerBefehle:
   # @type: list<string>
   - ""
 
-# Datenbankkonfiguration
-datenbank:
-  # Backend-Typ.
-  # @type: enum
-  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
-  # @default: "sqlite"
-  type: "sqlite"
-  # Datenbank-Host. Wird nur von mysql/postgresql verwendet.
-  # @type: string
-  host: "127.0.0.1"
-  # Datenbank-Port. Wird nur von mysql/postgresql verwendet.
-  # @type: integer
-  # @range: [1, 65535]
-  port: 3306
-  # Datenbank- / Schema-Name. Wird nur von mysql/postgresql verwendet.
-  # @type: string
-  name: "rtp"
-  # Datenbank-Benutzername. Wird nur von mysql/postgresql verwendet.
-  # @type: string
-  username: "root"
-  # Datenbank-Passwort. Wird nur von mysql/postgresql verwendet.
-  # @type: string
-  password: "password"
-
-# Netzwerk- und Synchronisationskonfiguration
-netzwerk:
-  redis:
-    # Enable Redis-backed network state binding.
-    # @type: boolean
-    # @default: false
-    enabled: false
-    # Redis host.
-    # @type: string
-    host: "127.0.0.1"
-    # Redis port.
-    # @type: integer
-    # @range: [1, 65535]
-    port: 6379
-    # Redis password. Empty string disables auth.
-    # @type: string
-    password: ""
-
 # Allgemeines Menü-Framework.
 # `renderer` ist eine geordnete Präferenzliste von Renderer-IDs. Bei einer
 # Ausnahme oder einem fehlenden Adapter geht das Framework die Liste durch
@@ -106,7 +64,7 @@ netzwerk:
 # zurück. Verfügbare IDs: book. (Der Chat-Renderer kommt im Folge-Release
 # und wird dann der Standardliste hinzugefügt.)
 menu:
-  # Geordnete Präferenzliste von Renderer-IDs.
+  # Ordered preference list of renderer ids.
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:
@@ -120,4 +78,4 @@ menu:
     - "book"
 
 # ÄNDERE NICHT DIE VERSIONSNUMMER
-version: 3.0
+version: 3.1

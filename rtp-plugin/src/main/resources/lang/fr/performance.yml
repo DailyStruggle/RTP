@@ -220,7 +220,7 @@ seuilRemplissageBacklog: 0.5
 # (non mise en file) est auditée : un WARN est journalisé et le compteur cumulé
 # slowPipelineCount (affiché par /rtp info) est incrémenté. Seules les
 # téléportations immédiates/non mises en file sont auditées ; celles en file
-# sont exclues car leur temps mesuré inclut l'attente. 0 ou moins désactive l'audit. Voir ADR-053.
+# sont exclues car leur temps mesuré inclut l'attente. 0 ou moins désactive l'audit.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
@@ -230,7 +230,7 @@ seuilPipelineLenteMs: 5000
 # Profondeur de la file publique de téléportation (joueurs en attente) à partir de
 # laquelle la contre-pression est auditée : un WARN déclenché sur front est journalisé
 # et le compteur cumulé queueGrowthWarnCount (affiché par /rtp info) est incrémenté
-# une fois par franchissement. 0 ou moins désactive l'audit (optionnel). Voir ADR-053.
+# une fois par franchissement. 0 ou moins désactive l'audit (optionnel).
 # @type: integer
 # @range: [0, null]
 # @unit: players

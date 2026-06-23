@@ -1,0 +1,14 @@
+detailed_reload: true
+detailed_region_init: false
+command: false
+teleport: false
+event_changeworld: false
+event_join: false
+event_respawn: false
+event_move: false
+event_teleport: false
+selection_failure: false
+system_memory_tracker: false
+system_database: false
+min_level: ALL
+version: 1.0

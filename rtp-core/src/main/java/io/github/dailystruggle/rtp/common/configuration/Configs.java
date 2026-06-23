@@ -5,6 +5,8 @@ import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -112,6 +114,158 @@ public class Configs {
     if (multiConfigParserMap.containsKey(parserEnumClass))
       return (FactoryValue<T>) multiConfigParserMap.get(parserEnumClass);
     return null;
+  }
+
+  /**
+   * Resolve the database/persistence settings map (ADR-071: served from
+   * database.yml, split out of config.yml). Returns an empty map when the
+   * database parser is absent (e.g. the rtp-lite assembly, ADR-024), letting
+   * callers fall back to the yaml/flat-file default.
+   *
+   * @return the {@code database:} settings map; never {@code null}
+   */
+  public Map<String, Object> getDatabaseConfig() {
+    Map<String, Object> newMap = new HashMap<>();
+    FactoryValue<DatabaseKeys> fv = getParser(DatabaseKeys.class);
+    if (fv instanceof ConfigParser<DatabaseKeys> parser) {
+      newMap = parser.getMap(DatabaseKeys.database);
+    }
+
+    // ADR-071 rule 4/5: read-legacy -> apply-new -> warn-once migration. Older
+    // installs carried the database settings inside config.yml's `database` block.
+    // Honor a still-present legacy block so an existing install keeps working on
+    // upgrade, with database.yml taking precedence for any key the operator has
+    // customized away from the bundled default there.
+    Map<String, Object> legacy = readLegacyConfigSection("database");
+    if (legacy.isEmpty()) {
+      return newMap;
+    }
+    Map<String, Object> merged =
+        mergeLegacyConfig(newMap, legacy, readBundledDatabaseDefaults());
+    warnLegacyDatabaseOnce();
+    return merged;
+  }
+
+  // ADR-071: warn-once latches so the deprecation log fires a single time per JVM
+  // rather than on every reload / database setup.
+  private static volatile boolean warnedLegacyDatabase = false;
+  private static volatile boolean warnedLegacyNetworkRedis = false;
+
+  /**
+   * Merges a deprecated legacy config block into the authoritative new map (ADR-071
+   * rule 4/5). A legacy value is applied only where the new map still holds the
+   * bundled default (i.e. the operator has not overridden it in the new file), so a
+   * customized new file always wins while an un-customized one inherits the legacy
+   * value, keeping existing installs working across the upgrade.
+   *
+   * @param newMap the authoritative new-file settings (never {@code null})
+   * @param legacy the deprecated legacy block read from config.yml
+   * @param defaults the bundled defaults of the new file
+   * @return the merged settings map
+   */
+  static Map<String, Object> mergeLegacyConfig(
+      Map<String, Object> newMap, Map<String, Object> legacy, Map<String, Object> defaults) {
+    Map<String, Object> merged = new LinkedHashMap<>(newMap);
+    for (Map.Entry<String, Object> e : legacy.entrySet()) {
+      Object current = merged.get(e.getKey());
+      Object def = defaults.get(e.getKey());
+      boolean newIsDefault =
+          current == null || Objects.equals(String.valueOf(current), String.valueOf(def));
+      if (newIsDefault) {
+        merged.put(e.getKey(), e.getValue());
+      }
+    }
+    return merged;
+  }
+
+  /**
+   * Reads a top-level section from the on-disk {@code config.yml} using the in-house
+   * YAML reader (runtime SnakeYAML is not bundled). Returns an empty map when the
+   * file or section is absent or unreadable.
+   *
+   * @param sectionKey the top-level section name
+   * @return the section as a flat map; never {@code null}
+   */
+  Map<String, Object> readLegacyConfigSection(String sectionKey) {
+    File configFile = new File(pluginDirectory, "config.yml");
+    if (!configFile.exists()) return new HashMap<>();
+    try {
+      RtpYamlConfig yaml = RtpYamlConfig.load(configFile);
+      RtpYamlSection section = yaml.getConfigurationSection(sectionKey);
+      if (section == null) return new HashMap<>();
+      return section.getMapValues(false);
+    } catch (Exception e) {
+      RTP.log(Level.FINER,
+          "[RTP] readLegacyConfigSection(" + sectionKey + ") failed: " + e.getMessage());
+      return new HashMap<>();
+    }
+  }
+
+  /**
+   * Reads the legacy nested {@code network.redis} block from the on-disk
+   * {@code config.yml}. Returns an empty map when absent.
+   *
+   * @return the {@code network.redis} settings; never {@code null}
+   */
+  Map<String, Object> readLegacyNetworkRedis() {
+    File configFile = new File(pluginDirectory, "config.yml");
+    if (!configFile.exists()) return new HashMap<>();
+    try {
+      RtpYamlConfig yaml = RtpYamlConfig.load(configFile);
+      RtpYamlSection network = yaml.getConfigurationSection("network");
+      if (network == null) return new HashMap<>();
+      RtpYamlSection redis = network.getConfigurationSection("redis");
+      if (redis == null) return new HashMap<>();
+      return redis.getMapValues(false);
+    } catch (Exception e) {
+      RTP.log(Level.FINER, "[RTP] readLegacyNetworkRedis() failed: " + e.getMessage());
+      return new HashMap<>();
+    }
+  }
+
+  /**
+   * Reads the bundled {@code database.yml} {@code database} defaults from the JAR
+   * resource. Returns an empty map for assemblies that ship no database.yml (lite).
+   *
+   * @return the bundled default settings; never {@code null}
+   */
+  private Map<String, Object> readBundledDatabaseDefaults() {
+    try (java.io.InputStream in =
+        RTP.class.getClassLoader().getResourceAsStream("database.yml")) {
+      if (in == null) return new HashMap<>();
+      RtpYamlConfig yaml = new RtpYamlConfig();
+      yaml.loadConfiguration(in, true);
+      RtpYamlSection section = yaml.getConfigurationSection("database");
+      if (section == null) return new HashMap<>();
+      return section.getMapValues(false);
+    } catch (Exception e) {
+      return new HashMap<>();
+    }
+  }
+
+  private void warnLegacyDatabaseOnce() {
+    if (warnedLegacyDatabase) return;
+    warnedLegacyDatabase = true;
+    RTP.log(Level.WARNING,
+        "[RTP] config.yml's 'database' block is deprecated and has moved to database.yml "
+            + "(ADR-071). Your existing values are still honored, but database.yml takes "
+            + "precedence; please move your settings into database.yml and remove the "
+            + "'database' block from config.yml.");
+  }
+
+  /**
+   * Emits a one-time deprecation warning when a legacy {@code network.redis} block is
+   * still present in {@code config.yml} (ADR-071 rule 5). The authoritative transport
+   * surface is network.yml; the legacy block carries no runtime effect.
+   */
+  public void warnLegacyNetworkRedisOnce() {
+    if (warnedLegacyNetworkRedis) return;
+    if (readLegacyNetworkRedis().isEmpty()) return;
+    warnedLegacyNetworkRedis = true;
+    RTP.log(Level.WARNING,
+        "[RTP] config.yml's 'network.redis' block is deprecated and has moved to network.yml "
+            + "(ADR-071); the network.yml transport settings are authoritative. Please remove "
+            + "the redundant 'network.redis' block from config.yml.");
   }
 
   /**
@@ -228,12 +382,46 @@ public class Configs {
 
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser config.yml");
     ConfigParser<ConfigKeys> config =
-            new ConfigParser<>(ConfigKeys.class, "config.yml", "3.0", pluginDirectory, fileDatabase, locale);
+            new ConfigParser<>(ConfigKeys.class, "config.yml", "3.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(ConfigKeys.class, config);
 
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages.yml");
-    ConfigParser<MessagesKeys> lang =
-            new ConfigParser<>(MessagesKeys.class, "messages.yml", "1.0", pluginDirectory, fileDatabase, locale);
+    // ADR-071: database/persistence settings live in their own database.yml,
+    // split out of config.yml so config.yml is purely teleport behavior. The
+    // parser is lite-tolerant: the rtp-lite assembly (ADR-024) ships no
+    // database.yml resource, so register it only when the bundled resource (or
+    // an on-disk copy) is present. When absent, the database handlers fall back
+    // to the yaml/flat-file default.
+    boolean databaseResourcePresent =
+            RTP.class.getClassLoader().getResource("database.yml") != null
+                    || new File(pluginDirectory, "database.yml").exists();
+    if (databaseResourcePresent) {
+      RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser database.yml");
+      ConfigParser<DatabaseKeys> database =
+              new ConfigParser<>(DatabaseKeys.class, "database.yml", "1.0", pluginDirectory, fileDatabase, locale);
+      newConfigParserMap.put(DatabaseKeys.class, database);
+    } else {
+      RTP.log(Level.FINER, "[RTP] reloadConfigs(): database.yml resource absent (lite); skipping parser");
+    }
+
+    // messages.yml is split, per concern, into a messages/ directory (player /
+    // network / commands / system, plus shared placeholders). The English
+    // baseline uses the merged-directory parser, which loads and merges those
+    // member files and migrates a legacy single-file messages.yml into the tree.
+    // Other locales keep their single lang/<locale>/messages.yml for now.
+    String sanitizedLocale = LanguageBootstrap.sanitize(locale);
+    boolean englishLocale = sanitizedLocale == null || sanitizedLocale.isEmpty()
+            || sanitizedLocale.equalsIgnoreCase(LanguageBootstrap.DEFAULT_LOCALE);
+    ConfigParser<MessagesKeys> lang;
+    if (englishLocale) {
+      RTP.log(Level.FINER, "[RTP] reloadConfigs(): building merged parser messages/");
+      lang = new ConfigParser<>(MessagesKeys.class, "messages.yml", "1.1", pluginDirectory,
+              fileDatabase, locale, "messages",
+              java.util.List.of("placeholders.yml", "player.yml", "network.yml",
+                      "commands.yml", "system.yml"));
+    } else {
+      RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages.yml");
+      lang = new ConfigParser<>(MessagesKeys.class, "messages.yml", "1.0", pluginDirectory, fileDatabase, locale);
+    }
     newConfigParserMap.put(MessagesKeys.class, lang);
 
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser economy.yml");
@@ -299,6 +487,10 @@ public class Configs {
     // records buffered during bootstrap so the configured threshold gates them
     // retroactively instead of leaking past the (previously unfiltered) sink.
     RTP.flushPendingLogs();
+    // ADR-071 rule 5: surface a one-time deprecation warning if the operator still
+    // carries the redundant network.redis block in config.yml (authoritative surface
+    // is network.yml).
+    warnLegacyNetworkRedisOnce();
     RTP.log(Level.FINE, "[RTP] reloadConfigs(): complete (in-flight tasks retain old snapshots)");
   }
 

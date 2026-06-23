@@ -264,7 +264,7 @@ limiteReabastecimentoBacklog: 0.5
 # (sem fila) é auditado: um WARN é registrado e o contador cumulativo
 # slowPipelineCount (exibido por /rtp info) é incrementado. Apenas teleportes
 # imediatos/sem fila são auditados; os enfileirados são excluídos porque seu
-# tempo medido inclui a espera na fila. 0 ou menos desativa a auditoria. Veja ADR-053.
+# tempo medido inclui a espera na fila. 0 ou menos desativa a auditoria. Veja
 # @type: integer
 # @range: [0, null]
 # @unit: ms
@@ -274,7 +274,7 @@ limitePipelineLentaMs: 5000
 # Profundidade da fila pública de teleporte (jogadores aguardando) a partir da qual
 # a contrapressão da fila é auditada: um WARN acionado por borda é registrado e o
 # contador cumulativo queueGrowthWarnCount (exibido por /rtp info) é incrementado
-# uma vez por cruzamento. 0 ou menos desativa a auditoria (opcional). Veja ADR-053.
+# uma vez por cruzamento. 0 ou menos desativa a auditoria (opcional). Veja
 # @type: integer
 # @range: [0, null]
 # @unit: players

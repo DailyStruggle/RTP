@@ -63,52 +63,6 @@ comandosJugador:
   # @type: list<string>
   - ""
 
-# --- Configuración de la base de datos ---
-# Dónde almacenar ubicaciones en caché y datos de los jugadores.
-baseDeDatos:
-  # Tipos disponibles: yaml, sqlite, mysql, postgresql
-  # - yaml/sqlite: archivos locales (sin configuración adicional)
-  # - mysql/postgresql: base de datos remota (requiere credenciales abajo)
-  # @type: enum
-  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
-  # @default: "sqlite"
-  type: "sqlite"
-  # Credenciales de base de datos en red (ignoradas para tipos locales)
-  # @type: string
-  host: "127.0.0.1"
-  # Puerto de la base de datos. Solo lo usan mysql/postgresql.
-  # @type: integer
-  # @range: [1, 65535]
-  port: 3306
-  # Nombre de la base de datos / esquema. Solo lo usan mysql/postgresql.
-  # @type: string
-  name: "rtp"
-  # Nombre de usuario de la base de datos. Solo lo usan mysql/postgresql.
-  # @type: string
-  username: "root"
-  # Contraseña de la base de datos. Solo la usan mysql/postgresql.
-  # @type: string
-  password: "password"
-
-# --- Red y sincronización ---
-# Redis se utiliza para sincronizar ubicaciones en caché entre varios servidores.
-red:
-  redis:
-    # Enable Redis-backed network state binding.
-    # @type: boolean
-    # @default: false
-    enabled: false
-    # Redis host.
-    # @type: string
-    host: "127.0.0.1"
-    # Redis port.
-    # @type: integer
-    # @range: [1, 65535]
-    port: 6379
-    # Redis password. Empty string disables auth.
-    # @type: string
-    password: ""
-
 # Marco de menús generalizado.
 # `renderer` es una lista ordenada de preferencia de ids de renderer. En
 # caso de excepción o de adaptador faltante, el framework recorre la lista
@@ -131,4 +85,4 @@ menu:
     - "book"
 
 # NO MODIFIQUES EL NÚMERO DE VERSIÓN
-version: 3.0
+version: 3.1
