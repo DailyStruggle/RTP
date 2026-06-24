@@ -67,7 +67,10 @@ public final class MenuActionToCommand {
             case MenuAction.ChangePage ignored -> null;
             case MenuAction.SuggestInput ignored -> null;
             case MenuAction.OpenExternalUrl ignored -> null;
-            case MenuAction.OpenConfigSelector ignored -> "/rtp menu config";
+            case MenuAction.OpenConfigSelector sel ->
+                    sel.subDir().isEmpty()
+                            ? "/rtp menu config"
+                            : "/rtp menu config dir=" + sel.subDir();
             case MenuAction.OpenConfigFile f ->
                     "/rtp menu config file=" + f.fileName();
             case MenuAction.OpenConfigKey k ->

@@ -146,6 +146,35 @@ Architecture placement:
 - **Negative / Trade-offs:** Adds a short-lived per-teleport scheduled task that must be
   reliably torn down on all exit paths to avoid a within-session clamp leak.
 
+## Addendum (2026-06-23): Send-View-Distance Pin to Eliminate the Arrival Flash
+
+The original decision clamped and ramped a single per-player distance via
+`setViewDistance(int)`. In practice that distance is the value the client is *told* to
+render, so every clamp and every ramp step sends the client a view-distance change; the
+client re-evaluates its render ring and fog each time, producing a visible "flash" on
+arrival and minor flicker during the ramp.
+
+The fix separates the two concerns the platform actually exposes:
+
+- The server-side **tracking** view distance (`setViewDistance(int)`) governs what the
+  server loads and tracks - this is what drives the arrival burst, so it is still what gets
+  clamped and ramped.
+- The per-player **send** view distance (`setSendViewDistance(int)`) governs what the client
+  is told to render. Immediately before clamping the tracking distance, the helper pins the
+  send distance to the captured pre-teleport value, so the client's negotiated render radius
+  never changes while the tracking ring shrinks and grows. The pin is released (reset to
+  follow the default, value `-1`) once the ramp reaches the target, defers to a larger
+  external value, or the read fails; it is left untouched on disconnect so an offline player
+  is never mutated.
+
+SPI: a new platform-neutral pair `getSendViewDistance()` / `setSendViewDistance(int)` was
+added to `RTPPlayer` (default no-op / `-1` = unsupported). Paper-family adapters call
+paper-api directly via a new `PaperRTPPlayer` (wired through an overridable `wrapPlayer`
+factory on the Bukkit `AbstractServerAccessor`), and `FoliaRTPPlayer` calls folia-api
+directly; both avoid reflection. On a platform without a separate send-view-distance API the
+pin is a no-op and the feature degrades to the original tracking-only clamp behaviour (still
+correct, just with the pre-fix flash).
+
 ## References
 
 - `rtp-core/.../configuration/enums/PerformanceKeys.java` - `viewDistanceTeleport`, `viewDistanceSelect`.

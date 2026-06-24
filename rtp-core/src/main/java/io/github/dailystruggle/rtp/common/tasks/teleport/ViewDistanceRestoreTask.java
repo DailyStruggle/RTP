@@ -21,6 +21,15 @@ import java.util.logging.Level;
  * and reschedules itself after a chunk-cost-weighted dwell, so the chunks-delivered-per-tick rate
  * stays roughly flat across the whole window rather than back-loading the heaviest increments.
  *
+ * <p>Only the server-side <i>tracking</i> view distance is clamped and ramped. Before clamping,
+ * the helper pins the player's <i>send</i> view distance to the captured value
+ * ({@link RTPPlayer#setSendViewDistance(int)}), so the client's negotiated render radius never
+ * changes and the player sees no view-distance "flash" while the tracking ring shrinks and grows.
+ * The send-distance pin is released (reset to follow the default) once the ramp reaches the target,
+ * defers to a larger external value, or the read fails; it is left untouched on disconnect so an
+ * offline player is never mutated. On a platform without a separate send-view-distance API the pin
+ * is a no-op and the feature degrades to mutating the tracking distance alone.
+ *
  * <p>The ramp is session-scoped and self-terminating: it stops (and releases its tracking) when the
  * target view distance is reached, when the player disconnects, or when another tool has already
  * raised the view distance to or beyond the restore target. Per-player view distance is never
@@ -86,11 +95,22 @@ public final class ViewDistanceRestoreTask extends RTPRunnable {
       return;
     }
 
+    // Pin the client's send view distance to the captured value FIRST, so shrinking the tracking
+    // distance below it never sends the client a view-distance change (the source of the flash).
+    // Platforms without a separate send API no-op here and fall back to clamping tracking alone.
+    try {
+      player.setSendViewDistance(captured);
+    } catch (Throwable t) {
+      RTP.log(Level.FINE, "[RTP] send-view-distance pin could not be applied", t);
+      // Non-fatal: continue with a tracking-only clamp (pre-flash-fix behaviour).
+    }
+
     // Apply the clamp before the teleport (caller guarantees we run before the teleport call).
     try {
       player.setViewDistance(clampValue);
     } catch (Throwable t) {
       RTP.log(Level.FINE, "[RTP] view-distance clamp could not be applied", t);
+      releaseSendPin(player);
       return;
     }
 
@@ -104,6 +124,18 @@ public final class ViewDistanceRestoreTask extends RTPRunnable {
     ViewDistanceRestoreTask task =
         new ViewDistanceRestoreTask(player, clampValue, captured, intervalTicks, totalMarginal);
     task.schedule(task.dwellFor(clampValue));
+  }
+
+  /**
+   * Releases the send-view-distance pin applied at clamp time, resetting it to follow the
+   * tracking/world default. Best-effort: never throws into the caller.
+   */
+  private static void releaseSendPin(RTPPlayer player) {
+    try {
+      player.setSendViewDistance(-1);
+    } catch (Throwable t) {
+      RTP.log(Level.FINE, "[RTP] send-view-distance pin could not be released", t);
+    }
   }
 
   /** Number of chunks delivered at view distance {@code r}: {@code (2r+1)^2}. */
@@ -138,16 +170,19 @@ public final class ViewDistanceRestoreTask extends RTPRunnable {
       current = player.getViewDistance();
     } catch (Throwable t) {
       RTP.log(Level.FINE, "[RTP] view-distance restore read failed; ending ramp", t);
+      releaseSendPin(player);
       finish();
       return;
     }
     if (current < 0) {
+      releaseSendPin(player);
       finish();
       return;
     }
 
     // Another tool may have raised the view distance in the meantime; never shrink it.
     if (current >= target) {
+      releaseSendPin(player);
       finish();
       return;
     }
@@ -167,6 +202,7 @@ public final class ViewDistanceRestoreTask extends RTPRunnable {
     rampValue = next;
 
     if (rampValue >= target) {
+      releaseSendPin(player);
       finish();
       return;
     }

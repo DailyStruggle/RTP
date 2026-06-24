@@ -1084,9 +1084,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       } else if (value instanceof Map) {
         setSection((RtpYamlSection) o, (Map<String, Object>) value);
       } else {
-        IllegalArgumentException exception = new IllegalArgumentException();
-        exception.printStackTrace();
-        throw exception;
+        throw new IllegalArgumentException(
+            "cannot set scalar value on section key '" + yamlKeyStr + "' in " + name);
       }
       RtpYamlConfig.set(yamlKeyStr, o);
     } else {

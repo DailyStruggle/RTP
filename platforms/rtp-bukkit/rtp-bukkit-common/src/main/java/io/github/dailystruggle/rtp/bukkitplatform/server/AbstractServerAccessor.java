@@ -257,13 +257,23 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         .collect(Collectors.toList());
   }
 
+  /**
+   * Wraps a live Bukkit {@link Player} in the platform's {@link RTPPlayer} implementation. The
+   * Bukkit base returns a {@link BukkitRTPPlayer}; Paper-family adapters override this to return a
+   * Paper-specific player that can call paper-api directly (e.g. the per-player send-view-distance
+   * pin used by ADR-072 to suppress the teleport view-distance flash).
+   */
+  protected RTPPlayer wrapPlayer(Player player) {
+    return new BukkitRTPPlayer(player);
+  }
+
   @Override
   public @Nullable RTPPlayer getPlayer(UUID uuid) {
     RTPPlayer mock = io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry.get(uuid);
     if (mock != null) return mock;
     Player player = Bukkit.getPlayer(uuid);
     if (player == null) return null;
-    return new BukkitRTPPlayer(player);
+    return wrapPlayer(player);
   }
 
   @Override
@@ -272,7 +282,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     if (mock != null) return mock;
     Player player = Bukkit.getPlayer(name);
     if (player == null) return null;
-    return new BukkitRTPPlayer(player);
+    return wrapPlayer(player);
   }
 
   @Override
@@ -287,7 +297,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     if (mock != null) return mock;
     Player player = Bukkit.getPlayer(uuid);
     if (player == null) return new BukkitRTPCommandSender(Bukkit.getConsoleSender());
-    return new BukkitRTPPlayer(player);
+    return wrapPlayer(player);
   }
 
   @Override

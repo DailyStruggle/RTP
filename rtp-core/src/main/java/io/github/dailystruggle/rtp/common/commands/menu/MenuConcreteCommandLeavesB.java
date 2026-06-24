@@ -42,6 +42,7 @@ final class MenuConcreteCommandLeavesB {
     static final String P_PARAM = "param";
     static final String P_N = "n";
     static final String P_FILE = "file";
+    static final String P_DIR = "dir";
     static final String P_KEY = "key";
     static final String P_TYPE = "type";
     static final String P_QUERY = "query";
@@ -264,6 +265,7 @@ final class MenuConcreteCommandLeavesB {
         ConfigCmd(MenuRedeemSubcommand owner) {
             super(owner);
             this.owner = owner;
+            addParameter(P_DIR, freeParam(MenuRedeemSubcommand.PERMISSION, "config sub-directory path"));
             addParameter(P_FILE, freeParam(MenuRedeemSubcommand.PERMISSION, "config file name"));
             addParameter(P_KEY, freeParam(MenuRedeemSubcommand.PERMISSION, "parameter key"));
             addParameter(P_TYPE, freeParam(MenuRedeemSubcommand.PERMISSION, "sub-parameter type"));
@@ -282,7 +284,11 @@ final class MenuConcreteCommandLeavesB {
             String file = first(p, P_FILE);
             String key = first(p, P_KEY);
             if (file == null || file.isEmpty()) {
-                return owner.dispatchOpenConfigSelector(c, m);
+                // ADR-071 rule 7: a bare `/rtp menu config` opens the root
+                // directory; `dir=<subPath>` recurses into that directory.
+                String dir = first(p, P_DIR);
+                return owner.dispatchOpenConfigSelector(c,
+                        new MenuAction.OpenConfigSelector(dir == null ? "" : dir), m);
             }
             // ADR-050: slash-bearing `file=<kind>/<entry>` is the synthetic
             // multi-config form (matches `MultiConfigMenuBuilder.buildEntry`
