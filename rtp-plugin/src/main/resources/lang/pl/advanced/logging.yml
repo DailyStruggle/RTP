@@ -1,14 +1,9 @@
-# --- Przełączniki logowania pluginu ---
-# Documentation: plugins/RTP/docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
-# Loguj wszystkie pliki przeładowane podczas /rtp reload
-# @type: boolean
-# @default: false
-szczegolowe_przeladowanie: false
-
-# Loguj szczegóły inicjalizacji regionu
-# @type: boolean
-# @default: false
-szczegolowa_inicjalizacjaRegionu: false
+# Minimalny poziom logowania (drobniejszy z tego i poziomu loggera serwera).
+# ALL zachowuje zachowanie identyczne z loggerem serwera.
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
+min_poziom: "INFO"
 
 # Loguj komendy RTP wykonane przez graczy
 # @type: boolean
@@ -19,6 +14,11 @@ polecenie: false
 # @type: boolean
 # @default: true
 teleportacja: true
+
+# Loguj informacje, gdy wybór lokalizacji się nie powiedzie
+# @type: boolean
+# @default: true
+niepowodzenie_wyboru: true
 
 # Loguj RTP wywołane zmianą świata
 # @type: boolean
@@ -45,10 +45,17 @@ zdarzenie_ruch: true
 # @default: true
 zdarzenie_teleportacja: true
 
-# Loguj informacje, gdy wybór lokalizacji się nie powiedzie
+# --- Przełączniki logowania pluginu ---
+# Documentation: plugins/RTP/docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# Loguj wszystkie pliki przeładowane podczas /rtp reload
 # @type: boolean
-# @default: true
-niepowodzenie_wyboru: true
+# @default: false
+szczegolowe_przeladowanie: false
+
+# Loguj szczegóły inicjalizacji regionu
+# @type: boolean
+# @default: false
+szczegolowa_inicjalizacjaRegionu: false
 
 # Logi debugowania aktywności pamięci
 # @type: boolean
@@ -59,13 +66,6 @@ system_sledzeniePamieci: false
 # @type: boolean
 # @default: false
 system_bazaDanych: false
-
-# Minimalny poziom logowania pluginu. Efektywny filtr to bardziej szczegółowy
-# z tego i loggera Bukkit. ALL zachowuje zachowanie identyczne z loggerem Bukkit.
-# @type: enum
-# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
-# @default: ALL
-min_poziom: "INFO"
 
 # NIE ZMIENIAJ NUMERU WERSJI
 version: 1.0

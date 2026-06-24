@@ -1,3 +1,19 @@
+# Minimale TPS-vereiste
+# Minimale server-TPS voordat een nieuwe locatie in de cache wordt geplaatst.
+# Bereik: 0.0 - 20.0.
+# Impact: LAAG — voorkomt dat de plugin lag toevoegt wanneer de server het moeilijk heeft.
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+minimaalTPS: 19.0
+
+# Max. JVM-heapgebruik (% van max) voordat het achtergrond-cachevullen pauzeert.
+# Reeds gecachte locaties worden nog bediend. 0 of 100 schakelt het uit.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapPercentage: 85.0
+
 # --- Prestatieconfiguratie van RTP ---
 # Stem de plugin af op de serverprestaties.
 # Maximaal aantal zoekpogingen
@@ -7,38 +23,6 @@
 # @range: [1, null]
 # @default: 32
 maximaalPogingen: 10
-
-# Voorlaadafstand bestemming (chunks)
-# Straal van chunks die rondom de bestemming worden voorgeladen.
-# Aantal geladen chunks = ( 1 + 2 * straal )^2.
-# Impact: HOOG — een te hoge waarde kan TPS-dalingen veroorzaken bij teletransport.
-# @type: integer
-# @range: [0, null]
-# @unit: chunks
-# @default: 0
-zichtafstandSelectie: 0
-
-# Chunkstraal die vlak vóór de teleport rond de eindlocatie wordt geladen.
-# 0 laadt alleen de bestemmingschunk.
-# @type: integer
-# @range: [0, null]
-# @unit: chunks
-# @default: 0
-zichtafstandTeletransport: 0
-
-# Totaal aantal ticks waarover de zichtafstand van een geteleporteerde
-# speler na aankomst gestaag wordt hersteld. Bij teleportatie wordt de
-# zichtafstand kort verlaagd naar de viewDistanceTeleport-straal (minimaal
-# 2), zodat de server bij het plaatsen maar een kleine ring chunks laadt,
-# en daarna over deze ticks weer opgehoogd. Dit vlakt de chunk-laadpiek af
-# die op zwakke hosts een tick kan blokkeren. 0 schakelt de begrenzing uit.
-# Heeft geen effect als viewDistanceTeleport al gelijk of groter is dan de
-# zichtafstand van de speler.
-# @type: integer
-# @range: [0, null]
-# @unit: ticks
-# @default: 200
-zichtafstandHerstelInterval: 200
 
 # Selectiefrequentie (spelticks)
 # Tijd tussen zoekopdrachten naar nieuwe locaties om regiocaches te vullen.
@@ -67,27 +51,31 @@ synchroonToegewezenTijd: 50
 # @default: 50
 asynchroonToegewezenTijd: 50
 
-# Minimale TPS-vereiste
-# Minimale server-TPS voordat een nieuwe locatie in de cache wordt geplaatst.
-# Bereik: 0.0 - 20.0.
-# Impact: LAAG — voorkomt dat de plugin lag toevoegt wanneer de server het moeilijk heeft.
-# @type: number
-# @range: [0.0, 20.0]
-# @default: 19.0
-minimaalTPS: 19.0
+# Voorlaadafstand bestemming (chunks)
+# Straal van chunks die rondom de bestemming worden voorgeladen.
+# Aantal geladen chunks = ( 1 + 2 * straal )^2.
+# Impact: HOOG — een te hoge waarde kan TPS-dalingen veroorzaken bij teletransport.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+zichtafstandSelectie: 0
 
-# Maximaal JVM-heapgebruik (percentage van de maximale heap) voordat het
-# genereren van de achtergrondcache pauzeert. Elke gecachte locatie vergrendelt
-# een chunk, dus een onbegrensde vulling op een server met een kleine heap kan
-# de JVM in een constante garbage collection drijven en de server zonder
-# consolefout onbereikbaar maken. Zolang het gebruik op of boven deze drempel
-# ligt, stopt RTP met het aanvullen van de locatiecache, maar blijft het reeds
-# gecachte locaties aan wachtende spelers leveren. 0 of 100 schakelt de grens
-# uit.
-# @type: number
-# @range: [0.0, 100.0]
-# @default: 85.0
-maxHeapPercentage: 85.0
+# Chunkstraal die vlak vóór de teleport rond de eindlocatie wordt geladen.
+# 0 laadt alleen de bestemmingschunk.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+zichtafstandTeletransport: 0
+
+# Ticks waarover de kijkafstand van een geteleporteerde speler na aankomst terug
+# naar normaal loopt, wat de chunk-laadpiek afvlakt. 0 schakelt de begrenzing uit.
+# @type: integer
+# @range: [0, null]
+# @unit: ticks
+# @default: 200
+zichtafstandHerstelInterval: 200
 
 # Wachtrij na teletransport
 # Als true probeert de plugin de locatiecache direct na een RTP te vullen.
@@ -96,24 +84,37 @@ maxHeapPercentage: 85.0
 # @default: false
 wachtrij_naTeletransport: false
 
-# Synchroon laden
-# Gebruik synchroon chunkladen voor locatieselectie.
-# Impact: HOOG — NIET AANBEVOLEN! Kan ernstige serverblokkades veroorzaken.
-# @type: boolean
-# @default: false
-synchroonLaden: false
-
-# Rechtenparsering (opstarten)
-# verwerking_bijGebeurtenis: Incompatibel met brede rechten zoals *.*.
-# Impact: GEMIDDELD (bijGebeurtenis) / LAAG (effect)
-# @type: boolean
-# @default: false
-verwerking_bijGebeurtenis: false
-
-# Effect-permissienodes bij het opstarten inlezen.
+# Registreert biomen van reeds geladen chunks in het ruimtelijke geheugen, wat
+# biome-recall / -weging voedt. Geen extra chunk-I/O.
 # @type: boolean
 # @default: true
-effectVerwerking: true
+controleer_bijChunkLaden: true
+
+# Fractie van de L3-backlogcapaciteit waarbij het bijvullen hervat (hysterese).
+# 0.5 = bijvullen na leeglopen tot 50%; 1.0 = continu bijvullen.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+backlogBijvulDrempel: 0.5
+
+# Kans om per poging een niet-gegenereerde chunk te weigeren.
+# 0.0 = geen bias, 1.0 = niet-gegenereerd land mijden. Gegenereerde chunks slagen altijd.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+voorgegenereerdVoorkeur: 0.0
+
+# Reserveert een cache van locaties voor teleportaties bij binnenkomst
+# (rtp.onevent.firstjoin / rtp.onevent.join).
+# @type: boolean
+# @default: false
+loginCacheIngeschakeld: false
+
+# Harde bovengrens voor de join-cache. 0 = automatisch (server max-players bij opstart).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+loginCacheLimiet: 0
 
 # Bioomselektiecache
 # bioomHerinnering: Eerder gevonden locaties per bioom hergebruiken.
@@ -123,30 +124,23 @@ effectVerwerking: true
 # @default: true
 bioomHerinnering: true
 
-# Indien ingesteld worden biome-gefilterde verzoeken alleen uit de cache bediend
-# (nooit nieuwe biome-zoekopdrachten). Vereist biomeRecall.
+# Bedient biome-gefilterde verzoeken alleen vanuit de cache (genereert nooit nieuwe
+# biome-zoekopdrachten). Vereist biomeRecall.
 # @type: boolean
 # @default: false
 bioomHerinnering_geforceerd: false
 
-# Beïnvloedt de biome-gefilterde selectie zo dat elk gevraagd biome met gelijke
-# kans wordt aangestuurd, in plaats van naar rato van hoeveel van de regio het
-# beslaat. Voorkomt dat veelvoorkomende biomes zeldzame verdringen wanneer er
-# meerdere worden gevraagd. Vereist biomeRecall; geen effect op ongefilterde
-# (standaardbiome-)teleports.
+# Stuurt elk gevraagd biome met gelijke kans aan in plaats van naar hoeveel regio
+# het beslaat. Vereist biomeRecall; geen effect op ongefilterde teleportaties.
 # @type: boolean
 # @default: false
 bioomGewogen: false
 
-# Per-biome relative selection weights for biome-filtered teleports.
-# Only consulted when biomeWeighted is true. Biomes not listed here use
-# weight 1.0, so an empty/all-equal map reproduces the equal-probability
-# behavior of biomeWeighted on its own. A biome given weight 2.0 is
-# steered toward roughly twice as often as a weight-1.0 biome among the
-# requested set (when both are present in biome-recall memory); 0.0
-# suppresses a biome. Requires biomeRecall; no effect on unfiltered
-# (default-biome) teleports. The shipped plains entry is a weight-1.0
-# no-op example - replace or extend it with the biomes you want to bias.
+# Relatieve biome-gewichten voor biome-gefilterde teleportaties. Alleen gebruikt
+# wanneer biomeWeighted true is. Niet-vermelde biomen gebruiken 1.0 (geen bias); 2.0 =
+# ~twee keer zo vaak gekozen, 0.0 = onderdrukt. De volledige vanilla-set staat vooraf
+# op 1.0 als bewerkbare referentie; voeg mod-biomen toe via hun platform-id
+# (bv. terralith:emerald_peaks). Vereist biomeRecall.
 # @type: map<string, number>
 bioomGewichten:
   # Relatieve selectieweging voor dit biome (1.0 = geen bias).
@@ -222,12 +216,40 @@ bioomGewichten:
   # --- Overig / technisch ---
   the_void: 1.0
 
-# Passieve chunkcontrole
-# Zoekt naar veilige locaties in alle geladen chunks binnen het bereik van een regio.
-# Impact: HOOG — kan de serverbelasting bij chunklaadgebeurtenissen aanzienlijk verhogen.
+# Latentiedrempel (ms) waarboven een direct bediende teleportatie wordt geaudit
+# (WARN gelogd, slowPipelineCount opgehoogd). 0 of minder schakelt uit.
+# @type: integer
+# @range: [0, null]
+# @unit: ms
+# @default: 5000
+traagPipelineDrempelMs: 5000
+
+# Wachtrijdiepte (wachtende spelers) waarbij tegendruk wordt geaudit
+# (WARN gelogd, queueGrowthWarnCount opgehoogd). 0 of minder schakelt uit.
+# @type: integer
+# @range: [0, null]
+# @unit: players
+# @default: 0
+wachtrijGroeiWaarschuwDrempel: 0
+
+# Synchroon laden
+# Gebruik synchroon chunkladen voor locatieselectie.
+# Impact: HOOG — NIET AANBEVOLEN! Kan ernstige serverblokkades veroorzaken.
+# @type: boolean
+# @default: false
+synchroonLaden: false
+
+# Rechtenparsering (opstarten)
+# verwerking_bijGebeurtenis: Incompatibel met brede rechten zoals *.*.
+# Impact: GEMIDDELD (bijGebeurtenis) / LAAG (effect)
+# @type: boolean
+# @default: false
+verwerking_bijGebeurtenis: false
+
+# Effect-permissienodes bij het opstarten inlezen.
 # @type: boolean
 # @default: true
-controleer_bijChunkLaden: true
+effectVerwerking: true
 
 # Achtergrondgegevensverzameling (Region Data Visitor)
 # Wanneer de voorgenereercache vol is, wordt per regio één observerende
@@ -246,57 +268,8 @@ controleer_bijChunkLaden: true
 # @default: false
 bezoeker_ingeschakeld: true
 
-# Houd een gereserveerde cache voor join-teleports (rtp.onevent.firstjoin / rtp.onevent.join). Grootte volgens de resterende vrije spelersslots. Zie
-# @type: boolean
-# @default: false
-loginCacheIngeschakeld: false
-
-# Harde bovengrens voor de join-cache. 0 = automatisch (server max-players bij opstart).
-# @type: integer
-# @range: [0, null]
-# @default: 0
-loginCacheLimiet: 0
-
-# WIJZIG HET VERSIENUMMER NIET
-# Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
-# @type: number
-# @range: [0.0, 1.0]
-# @default: 0.0
-voorgegenereerdVoorkeur: 0.0
-
-# Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
-# @type: number
-# @range: [0.0, 1.0]
-# @default: 0.5
-backlogBijvulDrempel: 0.5
-
-# Latentiedrempel (ms) waarboven een direct bediende (niet-gewachtrijde) teleport
-# wordt gecontroleerd: er wordt een WARN gelogd en de cumulatieve teller
-# slowPipelineCount (getoond door /rtp info) verhoogd. Alleen directe/niet-gewachtrijde
-# teleports worden gecontroleerd; gewachtrijde worden uitgesloten omdat hun gemeten
-# tijd de wachtrijtijd bevat. 0 of lager schakelt de controle uit.
-# @type: integer
-# @range: [0, null]
-# @unit: ms
-# @default: 5000
-traagPipelineDrempelMs: 5000
-
-# Diepte van de publieke teleportwachtrij (wachtende spelers) waarop of waarboven
-# de wachtrij-tegendruk wordt gecontroleerd: er wordt een flankgetriggerde WARN
-# gelogd en de cumulatieve teller queueGrowthWarnCount (getoond door /rtp info) wordt
-# eenmaal per overschrijding verhoogd. 0 of lager schakelt de controle uit (opt-in).
-# @type: integer
-# @range: [0, null]
-# @unit: players
-# @default: 0
-wachtrijGroeiWaarschuwDrempel: 0
-
-# Instellingen voor /rtp admin prefab. De apply -> confirm-stroom schrijft elk gewijzigd
-# configuratiebestand met een back-up genaamd <file>.yml.bak.<epochMillis>;
-# bakRetention beperkt hoeveel van zulke back-ups per bestand worden bewaard, oudste
-# eerst verwijderd. Zet op 1 om alleen de nieuwste te bewaren; waarden onder 1 worden
-# naar 1 bijgesteld. /rtp admin prefab rollback doorloopt back-ups nieuwste-eerst over
-# meerdere aanroepen.
+# Instellingen voor /rtp admin prefab. De apply -> confirm-stroom schrijft per
+# gewijzigd bestand een back-up; bakRetention beperkt hoeveel er bewaard blijven (oudste gesnoeid).
 voorgevormd:
   # Number of timestamped config backups kept per file before pruning.
   # @type: integer

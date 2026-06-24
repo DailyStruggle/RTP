@@ -1,3 +1,19 @@
+# 최소 TPS 요구치
+# 새 위치를 캐시에 추가하기 전에 필요한 최소 서버 TPS.
+# 범위: 0.0 - 20.0.
+# 영향: 낮음 — 서버가 이미 랙이 있을 때 플러그인이 부하를 가중시키는 것을 방지합니다.
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+최소TPS: 19.0
+
+# 백그라운드 캐시 채우기를 멈추는 JVM 힙 사용률 상한(최대의 %).
+# 이미 캐시된 위치는 계속 제공됩니다. 0 또는 100이면 비활성화.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeap백분율: 85.0
+
 # --- RTP 성능 설정 ---
 # 서버 성능에 맞춰 플러그인의 동작을 세밀하게 조정합니다.
 # 최대 검색 시도 횟수
@@ -7,36 +23,6 @@
 # @range: [1, null]
 # @default: 32
 최대시도횟수: 10
-
-# 목적지 사전 로드(청크)
-# 목적지 주변에서 미리 로드할 청크의 반경.
-# 로드되는 청크 수 = ( 1 + 2 * 반경 )^2.
-# 영향: 높음 — 너무 크면 텔레포트 시 TPS 저하를 일으킬 수 있습니다.
-# @type: integer
-# @range: [0, null]
-# @unit: chunks
-# @default: 0
-시야거리_선택: 0
-
-# 텔레포트 직전에 최종 위치 주변에서 불러올 청크 반경.
-# 0 은 목적지 청크만 불러옵니다.
-# @type: integer
-# @range: [0, null]
-# @unit: chunks
-# @default: 0
-시야거리_텔레포트: 0
-
-# 텔레포트한 플레이어의 시야 거리가 도착 후 점진적으로 복원되는 총 틱 수.
-# 텔레포트 시 시야 거리를 잠시 viewDistanceTeleport 반경(최소 2)으로 낮춰
-# 플레이어 배치 시 서버가 작은 청크 링만 불러오게 한 뒤, 이 틱 수에 걸쳐
-# 다시 올립니다. 약한 호스트에서 틱을 멈출 수 있는 청크 로드 급증을
-# 완만하게 합니다. 0 은 비활성화합니다. viewDistanceTeleport 가 이미
-# 플레이어 시야 거리 이상이면 효과가 없습니다.
-# @type: integer
-# @range: [0, null]
-# @unit: ticks
-# @default: 200
-시야거리_복원간격: 200
 
 # 선택 빈도(틱)
 # 각 리전의 위치 캐시를 백그라운드에서 보충하는 간격.
@@ -65,25 +51,31 @@
 # @default: 50
 할당시간_비동기: 50
 
-# 최소 TPS 요구치
-# 새 위치를 캐시에 추가하기 전에 필요한 최소 서버 TPS.
-# 범위: 0.0 - 20.0.
-# 영향: 낮음 — 서버가 이미 랙이 있을 때 플러그인이 부하를 가중시키는 것을 방지합니다.
-# @type: number
-# @range: [0.0, 20.0]
-# @default: 19.0
-최소TPS: 19.0
+# 목적지 사전 로드(청크)
+# 목적지 주변에서 미리 로드할 청크의 반경.
+# 로드되는 청크 수 = ( 1 + 2 * 반경 )^2.
+# 영향: 높음 — 너무 크면 텔레포트 시 TPS 저하를 일으킬 수 있습니다.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+시야거리_선택: 0
 
-# 백그라운드 캐시 생성이 일시 중지되기 전의 JVM 힙 최대 사용량(최대 힙에 대한
-# 백분율). 캐시된 각 위치는 청크를 고정하므로, 힙이 작은 서버에서 무제한으로
-# 채우면 JVM이 지속적인 가비지 컬렉션에 빠져 콘솔 오류 없이 서버가 응답하지
-# 않게 될 수 있습니다. 사용량이 이 임계값 이상인 동안 RTP는 위치 캐시 보충을
-# 중단하지만 대기 중인 플레이어에게는 이미 캐시된 위치를 계속 제공합니다.
-# 0 또는 100은 이 제한을 비활성화합니다.
-# @type: number
-# @range: [0.0, 100.0]
-# @default: 85.0
-maxHeap백분율: 85.0
+# 텔레포트 직전에 최종 위치 주변에서 불러올 청크 반경.
+# 0 은 목적지 청크만 불러옵니다.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+시야거리_텔레포트: 0
+
+# 텔레포트한 플레이어의 시야 거리가 도착 후 정상으로 회복되는 틱 수. 청크 로드
+# 급증을 완화합니다. 0이면 클램프를 비활성화합니다.
+# @type: integer
+# @range: [0, null]
+# @unit: ticks
+# @default: 200
+시야거리_복원간격: 200
 
 # 텔레포트 후 큐잉
 # true 인 경우 RTP 직후에 플러그인이 위치 캐시 보충을 시도합니다.
@@ -92,24 +84,37 @@ maxHeap백분율: 85.0
 # @default: false
 텔레포트후큐잉: false
 
-# 동기 로딩
-# 위치 선택 시 동기 청크 로드를 사용합니다.
-# 영향: 높음 — 권장하지 않습니다! 심각한 서버 랙을 유발할 수 있습니다.
-# @type: boolean
-# @default: false
-동기로딩: false
-
-# 시작 시 권한 파싱
-# onEventParsing: 와일드카드 권한 *.* 와 호환되지 않습니다.
-# 영향: 중간 (onEvent) / 낮음 (effect)
-# @type: boolean
-# @default: false
-이벤트시파싱: false
-
-# 시작 시 효과 권한 노드를 구문 분석합니다.
+# 이미 로드된 청크의 바이옴을 공간 메모리에 등록하여 바이옴 재호출 / 가중치에
+# 반영합니다. 추가 청크 I/O는 없습니다.
 # @type: boolean
 # @default: true
-이펙트파싱: true
+청크로드시검사: true
+
+# L3 백로그 용량 중 다시 채우기를 재개하는 비율(히스테리시스).
+# 0.5 = 50%까지 비운 뒤 채움; 1.0 = 계속 채움.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+백로그보충임계값: 0.5
+
+# 시도마다 미생성 청크를 거부할 확률.
+# 0.0 = 편향 없음, 1.0 = 미생성 지형 회피. 생성된 청크는 항상 통과합니다.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+사전생성선호도: 0.0
+
+# 접속 시 텔레포트를 위해 위치 캐시를 예약합니다
+# (rtp.onevent.firstjoin / rtp.onevent.join).
+# @type: boolean
+# @default: false
+로그인캐시활성화: false
+
+# 접속 캐시 상한. 0 = 자동 (시작 시 서버 max-players).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+로그인캐시상한: 0
 
 # 바이옴 선택 캐시
 # biomeRecall: 바이옴별로 과거에 찾은 위치를 재사용합니다.
@@ -119,29 +124,22 @@ maxHeap백분율: 85.0
 # @default: true
 바이옴기억: true
 
-# 설정하면 바이옴 필터 요청을 캐시에서만 제공합니다(새 바이옴 검색을 시작하지
-# 않음). biomeRecall 이 필요합니다.
+# 바이옴으로 필터된 요청을 캐시에서만 제공합니다(새 바이옴 검색은 생성하지
+# 않음). biomeRecall이 필요합니다.
 # @type: boolean
 # @default: false
 바이옴기억_강제: false
 
-# 바이옴 필터 선택에 가중치를 주어, 요청된 각 바이옴이 영역에서 차지하는 비율이
-# 아니라 동일한 확률로 선택되도록 합니다. 여러 바이옴을 요청할 때 흔한 바이옴이
-# 희귀한 바이옴을 밀어내는 것을 막습니다. biomeRecall 이 필요하며, 필터링되지
-# 않은(기본 바이옴) 텔레포트에는 영향이 없습니다.
+# 요청된 각 바이옴을 영역 점유 비율이 아니라 동일한 확률로 유도합니다.
+# biomeRecall이 필요합니다. 필터 없는 텔레포트에는 영향이 없습니다.
 # @type: boolean
 # @default: false
 바이옴가중치: false
 
-# Per-biome relative selection weights for biome-filtered teleports.
-# Only consulted when biomeWeighted is true. Biomes not listed here use
-# weight 1.0, so an empty/all-equal map reproduces the equal-probability
-# behavior of biomeWeighted on its own. A biome given weight 2.0 is
-# steered toward roughly twice as often as a weight-1.0 biome among the
-# requested set (when both are present in biome-recall memory); 0.0
-# suppresses a biome. Requires biomeRecall; no effect on unfiltered
-# (default-biome) teleports. The shipped plains entry is a weight-1.0
-# no-op example - replace or extend it with the biomes you want to bias.
+# 바이옴 필터 텔레포트의 바이옴별 상대 가중치. biomeWeighted가 true일 때만 사용.
+# 목록에 없는 바이옴은 1.0(편향 없음), 2.0 = 약 2배 자주 선택, 0.0 = 억제.
+# 전체 바닐라 세트는 편집 가능한 참고용으로 1.0으로 미리 나열됨; 모드 바이옴은
+# 플랫폼 id로 추가(예: terralith:emerald_peaks). biomeRecall이 필요합니다.
 # @type: map<string, number>
 바이옴가중치맵:
   # 이 바이옴의 상대 선택 가중치 (1.0 = 편향 없음).
@@ -217,12 +215,40 @@ maxHeap백분율: 85.0
   # --- 기타 / 기술적 ---
   the_void: 1.0
 
-# 청크 로드 시 패시브 검사
-# 리전 범위 내에서 로드된 모든 청크에서 안전한 위치를 찾습니다.
-# 영향: 높음 — 청크 로드 이벤트에서 서버 부하를 크게 증가시킬 수 있습니다.
+# 즉시 제공된 텔레포트가 감사되는 지연 임계값(ms).
+# (WARN 기록, slowPipelineCount 증가). 0 이하이면 비활성화.
+# @type: integer
+# @range: [0, null]
+# @unit: ms
+# @default: 5000
+느린파이프라인임계값Ms: 5000
+
+# 백프레셔가 감사되는 대기열 깊이(대기 중인 플레이어 수).
+# (WARN 기록, queueGrowthWarnCount 증가). 0 이하이면 비활성화.
+# @type: integer
+# @range: [0, null]
+# @unit: players
+# @default: 0
+대기열증가경고임계값: 0
+
+# 동기 로딩
+# 위치 선택 시 동기 청크 로드를 사용합니다.
+# 영향: 높음 — 권장하지 않습니다! 심각한 서버 랙을 유발할 수 있습니다.
+# @type: boolean
+# @default: false
+동기로딩: false
+
+# 시작 시 권한 파싱
+# onEventParsing: 와일드카드 권한 *.* 와 호환되지 않습니다.
+# 영향: 중간 (onEvent) / 낮음 (effect)
+# @type: boolean
+# @default: false
+이벤트시파싱: false
+
+# 시작 시 효과 권한 노드를 구문 분석합니다.
 # @type: boolean
 # @default: true
-청크로드시검사: true
+이펙트파싱: true
 
 # 관찰 모드 캐시 보충 (Region Data Visitor)
 # 사전 생성된 캐시가 가득 찬 경우, 동일한 `period` 주기로 각 리전에
@@ -241,58 +267,8 @@ maxHeap백분율: 85.0
 # @default: false
 방문자활성화: true
 
-# 접속 텔레포트 (rtp.onevent.firstjoin / rtp.onevent.join) 용 예약 캐시를 유지합니다. 남은 빈 슬롯 수로 크기가 결정됩니다. 참고.
-# @type: boolean
-# @default: false
-로그인캐시활성화: false
-
-# 접속 캐시 상한. 0 = 자동 (시작 시 서버 max-players).
-# @type: integer
-# @range: [0, null]
-# @default: 0
-로그인캐시상한: 0
-
-# 선택 시도마다 미생성 청크를 거부할 확률.
-# 0.0 = 편향 없음(기본값), 1.0 = 미생성 지형을 엄격히 회피.
-# 생성된 청크는 항상 통과합니다.
-# @type: number
-# @range: [0.0, 1.0]
-# @default: 0.0
-사전생성선호도: 0.0
-
-# 보충을 재개하는 L3 백로그 용량의 비율(히스테리시스).
-# 0.5 = L3 가 50%까지 줄어든 후에만 보충(기본값). 1.0 = 지속적으로 보충.
-# 값이 클수록 .mca 빈 검사를 묶어 CPU/메모리 효율이 좋아집니다.
-# @type: number
-# @range: [0.0, 1.0]
-# @default: 0.5
-백로그보충임계값: 0.5
-
-# 이 지연 임계값(ms)을 초과하면 즉시 제공된(큐 미경유) 텔레포트가 감사됩니다.
-# WARN 이 기록되고 누적 카운터 slowPipelineCount(rtp info 에 표시)가 증가합니다.
-# 즉시/큐 미경유 텔레포트만 감사하며, 큐를 거친 정속 텔레포트는 측정 시간에
-# 큐 대기 시간이 포함되어 제외됩니다. 0 이하이면 감사를 비활성화합니다.
-# @type: integer
-# @range: [0, null]
-# @unit: ms
-# @default: 5000
-느린파이프라인임계값Ms: 5000
-
-# 공개 텔레포트 큐 깊이(대기 중인 플레이어)가 이 값 이상이면 큐 배압이
-# 감사됩니다. 에지 트리거 WARN 이 기록되고 누적 카운터 queueGrowthWarnCount
-# (rtp info 에 표시)가 경계를 넘을 때마다 한 번 증가합니다.
-# 0 이하이면 감사를 비활성화합니다(옵트인).
-# @type: integer
-# @range: [0, null]
-# @unit: players
-# @default: 0
-대기열증가경고임계값: 0
-
-# /rtp admin prefab 설정. apply -> confirm 흐름은 변경된 각 설정 파일을
-# <file>.yml.bak.<epochMillis> 라는 백업과 함께 기록합니다.
-# bakRetention 은 파일당 보관하는 백업 개수의 상한이며 오래된 것부터 제거합니다.
-# 1 로 설정하면 가장 최근 백업만 보관하고, 1 미만 값은 1 로 보정됩니다.
-# /rtp admin prefab rollback 은 여러 번 호출에 걸쳐 백업을 최신 순으로 진행합니다.
+# /rtp admin prefab 설정. apply -> confirm 흐름은 변경된 파일마다 백업을 작성합니다;
+# bakRetention은 보관 개수를 제한합니다(오래된 것부터 삭제).
 프리셋:
   # Number of timestamped config backups kept per file before pruning.
   # @type: integer

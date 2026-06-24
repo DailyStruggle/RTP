@@ -1,11 +1,5 @@
 # --- Configuração econômica do RTP ---
 # Configura os custos do teletransporte aleatório usando a economia do servidor.
-# Política de reembolso
-# Indica se o preço é reembolsado e o cooldown reiniciado quando o teletransporte é cancelado.
-# @type: boolean
-# @default: true
-reembolsoAoCancelar: true
-
 # Custos do teletransporte
 # Custo base para um comando /rtp padrão.
 # @type: number
@@ -31,8 +25,13 @@ precoParametros: 1000000000.0
 # @default: 5000.0
 precoBioma: 5000.0
 
-# Saldo mínimo exigido.
-# Os jogadores não podem ficar abaixo desse saldo ao usar o RTP.
+# Reembolsa o custo se o teleporte for cancelado (o jogador se move, falha, etc.).
+# @type: boolean
+# @default: true
+reembolsoAoCancelar: true
+
+# Saldo mínimo que o jogador deve manter após pagar; o teleporte é rejeitado
+# se cair abaixo deste limite.
 # @type: number
 # @range: [0.0, null]
 # @default: 0.0

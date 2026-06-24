@@ -2,10 +2,10 @@
 # Maps internal baseline keys (left) to user-visible key names used in
 # economy.yml (right). Generated from the per-locale TSV; edit the TSV's
 # base_key/key columns and regenerate, do not hand-edit this file.
-refundOnCancel: "reembolsoAoCancelar"
 price: "preco"
 priceOther: "precoOutro"
 paramsPrice: "precoParametros"
 biomePrice: "precoBioma"
+refundOnCancel: "reembolsoAoCancelar"
 balanceFloor: "saldoMinimo"
 version: "version"

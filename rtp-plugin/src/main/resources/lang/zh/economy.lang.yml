@@ -2,10 +2,10 @@
 # Maps internal baseline keys (left) to user-visible key names used in
 # economy.yml (right). Generated from the per-locale TSV; edit the TSV's
 # base_key/key columns and regenerate, do not hand-edit this file.
-refundOnCancel: "取消时退款"
 price: "价格"
 priceOther: "价格其他"
 paramsPrice: "参数价格"
 biomePrice: "生物群系价格"
+refundOnCancel: "取消时退款"
 balanceFloor: "最低余额"
 version: "version"

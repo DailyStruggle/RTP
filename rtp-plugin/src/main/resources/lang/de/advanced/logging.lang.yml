@@ -2,17 +2,17 @@
 # Maps internal baseline keys (left) to user-visible key names used in
 # logging.yml (right). Generated from the per-locale TSV; edit the TSV's
 # base_key/key columns and regenerate, do not hand-edit this file.
-detailed_reload: "detailliertesNeuladen"
-detailed_region_init: "detaillierteRegionsInitialisierung"
+min_level: "minLevel"
 command: "befehl"
 teleport: "teleportierung"
+selection_failure: "auswahlFehlschlag"
 event_changeworld: "ereignisWeltwechsel"
 event_join: "ereignisBeitritt"
 event_respawn: "ereignisRespawn"
 event_move: "ereignisBewegung"
 event_teleport: "ereignisTeleport"
-selection_failure: "auswahlFehlschlag"
+detailed_reload: "detailliertesNeuladen"
+detailed_region_init: "detaillierteRegionsInitialisierung"
 system_memory_tracker: "systemSpeicherTracker"
 system_database: "systemDatenbank"
-min_level: "minLevel"
 version: "version"

@@ -25,32 +25,6 @@
 # @default: 0
 安全半径: 0
 
-# 陈旧区块重试上限（次数）
-# 中陈旧区块守护机制的有界重试预算。当一次异步
-# 区块加载完成后，后续的方块评估任务会被入队到一条 Count-Bound 的任务流水线
-# (Folia 的 Region Thread 调度器)。如果流水线饱和，原生的区块 GC 可能在该
-# 任务真正执行之前就把区块卸载，否则会触发 Region Thread 上的同步加载并
-# 唤醒 Folia 的 Watchdog。当守护机制检测到此竞争时，最多按本数值再次入队
-# 一个异步加载请求；用尽后该候选位置按常规“unsafe”路径拒绝（写入 WARN
-# 日志；不会静默丢弃）。
-# 默认值: 2。仅在区块 GC 极激进的分支上才需要调高。
-# @type: integer
-# @range: [0, null]
-# @default: 2
-staleChunkRetryLimit: 2
-
-# 只读 Anvil 预过滤器（仅原版 Spigot）
-# 一个线程外的安全探测器，分析持久化的区域文件 `r.X.Z.mca`，在请求加载实时
-# 权威区块之前直接拒绝明显不安全的候选（heightmap 表面为 lava/magma/fire）。
-# 减轻原版 Spigot 上 tick 线程的压力，因为其实时区块加载 API 并非真正异步。
-# 在 Paper 与 Folia 上无效（它们以原生异步 API 取代了区块加载路径，从不进入
-# 预过滤器）。chunk.isSafe(...) 的实时复检在 ACCEPT 时仍是权威依据；只有
-# REJECT 才是捷径。参见。
-# 默认值: true。设为 false 可关闭预过滤器（适用于使用奇异区域格式的修改版分支）。
-# @type: boolean
-# @default: true
-anvilPrefilterEnabled: true
-
 # 落地平台
 # 在传送目标处建造落地平台。中心方块依目标处的方块类型选择。
 # 将 platformRadius 设为 -1 可禁用平台。
@@ -84,198 +58,22 @@ anvilPrefilterEnabled: true
 # @default: GLASS
 平台材质: "GLASS"
 
-# 可选超时（秒），超时后紧急着陆平台的占地面积将恢复为建造前的方块。
-# -1 禁用恢复（平台永久存在，即原有行为）。
-# 0 在占地区块加载后立即恢复；正值在加载后经过该秒数后恢复。
-# 倒计时仅在占地区块已加载时推进（区域卸载时暂停），
-# 待处理的恢复在服务器重启后仍然有效。
+# 平台占地恢复为原始方块的秒数。-1 = 永不（永久），0 = 区块重新加载后立即恢复。
+# 倒计时仅在区块加载时推进；重启后仍保留。
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
 # @default: -1
 platformRestoreSeconds: -1
 
-# 空气方块
-# 视为可通行/不阻挡身体的材质。尽量使用原版方块标签以保留前向兼容性
-# (例如未来 MC 新增的花种会自动通过 #minecraft:small_flowers 被识别)。
-# @type: list<material>
-# @source: material
-空气方块:
-  # 真正的空气变体（没有任何标签同时涵盖它们）
-  - "AIR"
-  - "CAVE_AIR"
-  - "VOID_AIR"
-  - "LEGACY_AIR"
-  - "STRUCTURE_VOID"
-  - "LIGHT"
-  # 花朵 (覆盖蒲公英、虞美人、郁金香、眼花、火炬花……)
-  - "#minecraft:flowers"
-  - "#minecraft:small_flowers"
-  # 注意：#minecraft:tall_flowers 在原版中仅为物品标签；其成员
-  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) 已经被上方的
-  # #minecraft:flowers 涵盖。
-  - "#minecraft:tall_flowers"
-  # 类草植物与未被花标签包含的灌木
-  - "SHORT_GRASS"
-  - "TALL_GRASS"
-  - "SHORT_DRY_GRASS"
-  - "TALL_DRY_GRASS"
-  - "FERN"
-  - "LARGE_FERN"
-  - "DEAD_BUSH"
-  - "BUSH"
-  - "WILDFLOWERS"
-  - "FIREFLY_BUSH"
-  - "LEGACY_LONG_GRASS"
-  - "LEGACY_DEAD_BUSH"
-  # 树苗、繁殖芽与菌类
-  - "#minecraft:saplings"
-  - "BROWN_MUSHROOM"
-  - "RED_MUSHROOM"
-  - "CRIMSON_FUNGUS"
-  - "WARPED_FUNGUS"
-  # 农作物及无方便标签的地表植物
-  - "#minecraft:crops"
-  - "MELON_STEM"
-  - "PUMPKIN_STEM"
-  - "SUGAR_CANE"
-  - "BAMBOO_SAPLING"
-  # 藤蔓与挂壁植物
-  - "VINE"
-  - "GLOW_LICHEN"
-  - "WEEPING_VINES"
-  - "TWISTING_VINES"
-  - "HANGING_ROOTS"
-  - "PALE_HANGING_MOSS"
-  - "RESIN_CLUMP"
-  # 铁轨
-  - "#minecraft:rails"
-  # 红石与机械（无统一分组标签）
-  - "REDSTONE_WIRE"
-  - "COMPARATOR"
-  - "REPEATER"
-  - "LEVER"
-  - "STRING"
-  - "TRIPWIRE"
-  # 火把与照明（无分组标签）
-  - "TORCH"
-  - "WALL_TORCH"
-  - "SOUL_TORCH"
-  - "SOUL_WALL_TORCH"
-  - "REDSTONE_TORCH"
-  - "REDSTONE_WALL_TORCH"
-  - "END_ROD"
-  # 按钮（石头与木质变体）
-  - "#minecraft:buttons"
-  # 压力板
-  - "#minecraft:pressure_plates"
-  # 告示牌 -- 站立/壁挂/吊挂的全部变体共四个标签
-  - "#minecraft:standing_signs"
-  - "#minecraft:wall_signs"
-  - "#minecraft:ceiling_hanging_signs"
-  - "#minecraft:wall_hanging_signs"
-  - "LEGACY_SIGN"
-  - "LEGACY_WALL_SIGN"
-  # 地面覆盖物
-  - "SNOW"
-  - "MOSS_CARPET"
-  - "PALE_MOSS_CARPET"
-  - "LEAF_LITTER"
-
-# 不安全方块
-# 插件会拒绝作为落点的材质或方块状态，或在 `safetyRadius` 范围内若包含此类
-# 方块也会被拒绝。支持状态谓词与通配符（参见文件开头的语法说明）。
-# @type: list<material>
-# @source: material
-不安全方块:
-  # 流体
-  - "WATER"
-  - "LAVA"
-  - "BUBBLE_COLUMN"
-  # 任何含水方块（半砖/楼梯/栅栏/墙/告示牌/锁链/……）—— 替代旧的伪令牌
-  # 'WATERLOGGED'。使用 的通配符。
-  - "*[waterlogged=true]"
-  # 火焰与高温危险
-  - "#minecraft:fire"
-  - "POWDER_SNOW"
-  - "MAGMA_BLOCK"
-  # 营火（点燃和熄灭都不安全 -- 玩家会陷进去）
-  - "#minecraft:campfires"
-  # 接触伤害 / 卡住
-  - "CACTUS"
-  - "SWEET_BERRY_BUSH"
-  - "WITHER_ROSE"
-  - "CHORUS_PLANT"
-  - "CHORUS_FLOWER"
-  - "POINTED_DRIPSTONE"
-  - "COBWEB"
-  - "CREAKING_HEART"
-  # 虚空 / 传送门 / 不可移动
-  - "BEDROCK"
-  - "NETHER_PORTAL"
-  - "END_PORTAL"
-  - "END_GATEWAY"
-  # 爆炸物
-  - "TNT"
-  - "END_CRYSTAL"
-  - "RESPAWN_ANCHOR"
-  # 水生植物（窒息风险）
-  - "SEAGRASS"
-  - "TALL_SEAGRASS"
-  - "KELP"
-  - "KELP_PLANT"
-  - "#minecraft:logs"
-
-# 生物群系筛选
-# biomeWhitelist: false -> `biomes` 列表为黑名单（跳过这些群系）
-#                  true  -> `biomes` 列表为白名单（仅允许这些群系）
-# 默认黑名单排除海洋、河流、虚空以及其他难以或无法获得稳固安全落点的群系。
-# @type: boolean
-# @default: false
-生物群系白名单: false
-
-# 根据 biomeWhitelist 被视为白名单或黑名单成员的生物群系。
-# @type: list<biome>
-# @source: biome
-生物群系:
-  # 海洋类
-  - "OCEAN"
-  - "DEEP_OCEAN"
-  - "WARM_OCEAN"
-  - "LUKEWARM_OCEAN"
-  - "DEEP_LUKEWARM_OCEAN"
-  - "COLD_OCEAN"
-  - "DEEP_COLD_OCEAN"
-  - "FROZEN_OCEAN"
-  - "DEEP_FROZEN_OCEAN"
-  # 河流类
-  - "RIVER"
-  - "FROZEN_RIVER"
-  # 邻接与海岸群系
-  - "BEACH"
-  - "SNOWY_BEACH"
-  - "STONY_SHORE"
-  - "SWAMP"
-  - "MANGROVE_SWAMP"
-  # 末地群系（无固体落点 / 邻接虚空）
-  - "SMALL_END_ISLANDS"
-  # 下界群系（地形危险/崎岖）
-  - "BASALT_DELTAS"
-  # 技术性群系
-  - "THE_VOID"
-  - "LUSH_CAVES"
-  - "DEEP_DARK"
-  - "THE_VOID"
-
 # --- 可选 PvP / 战斗标记预检门 ---
-# 主开关。为 true 时，/rtp 在注册玩家前和应用目标前咨询活跃的战斗状态权威，
-# 并应用下方的 pvpOnCombat。默认关闭。
+# 总开关。为 true 时，/rtp 在排队前和传送前检查战斗状态并应用下方的 pvpOnCombat。
 # @type: boolean
 # @default: false
 pvpCheckEnabled: false
 
-# 玩家在造成或受到 PvP 伤害后被 RTP 原生追踪器视为「战斗中」的时长。
-# 绑定了外部战斗标记插件时忽略此值。
+# 玩家受到 PvP 伤害后保持"战斗中"的秒数（仅原生跟踪器；若绑定了外部 combat-tag
+# 插件则忽略）。
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -311,6 +109,32 @@ pvpTagVictim: true
 # @type: boolean
 # @default: true
 pvpTagAggressor: true
+
+# 陈旧区块重试上限（次数）
+# 中陈旧区块守护机制的有界重试预算。当一次异步
+# 区块加载完成后，后续的方块评估任务会被入队到一条 Count-Bound 的任务流水线
+# (Folia 的 Region Thread 调度器)。如果流水线饱和，原生的区块 GC 可能在该
+# 任务真正执行之前就把区块卸载，否则会触发 Region Thread 上的同步加载并
+# 唤醒 Folia 的 Watchdog。当守护机制检测到此竞争时，最多按本数值再次入队
+# 一个异步加载请求；用尽后该候选位置按常规“unsafe”路径拒绝（写入 WARN
+# 日志；不会静默丢弃）。
+# 默认值: 2。仅在区块 GC 极激进的分支上才需要调高。
+# @type: integer
+# @range: [0, null]
+# @default: 2
+staleChunkRetryLimit: 2
+
+# 只读 Anvil 预过滤器（仅原版 Spigot）
+# 一个线程外的安全探测器，分析持久化的区域文件 `r.X.Z.mca`，在请求加载实时
+# 权威区块之前直接拒绝明显不安全的候选（heightmap 表面为 lava/magma/fire）。
+# 减轻原版 Spigot 上 tick 线程的压力，因为其实时区块加载 API 并非真正异步。
+# 在 Paper 与 Folia 上无效（它们以原生异步 API 取代了区块加载路径，从不进入
+# 预过滤器）。chunk.isSafe(...) 的实时复检在 ACCEPT 时仍是权威依据；只有
+# REJECT 才是捷径。参见。
+# 默认值: true。设为 false 可关闭预过滤器（适用于使用奇异区域格式的修改版分支）。
+# @type: boolean
+# @default: true
+anvilPrefilterEnabled: true
 
 # 请勿修改版本号
 version: 1.0

@@ -14,17 +14,6 @@ invulnerabilityTime: 5
 # @default: 0
 safetyRadius: 0
 
-# Max retries for stale-chunk guard
-# @type: integer
-# @range: [0, null]
-# @default: 2
-staleChunkRetryLimit: 2
-
-# Off-thread anvil prefilter
-# @type: boolean
-# @default: true
-anvilPrefilterEnabled: true
-
 # Radius of emergency platform (-1 to disable)
 # @type: integer
 # @range: [-1, null]
@@ -52,170 +41,24 @@ platformAirHeight: 2
 # @default: GLASS
 platformMaterial: "GLASS"
 
-# Optional timeout, in seconds, after which the emergency landing platform's
-# footprint is restored to the blocks that were there before it was built.
-# -1 disables restoration (the platform is permanent, the previous behaviour).
-# 0 restores as soon as the footprint chunk is loaded again; a positive value
-# restores after that many seconds of loaded time. The countdown only advances
-# while the footprint chunk is loaded (it pauses while the area is unloaded),
-# and pending restores survive a server restart.
+# Secondes après lesquelles l'empreinte de la plateforme est restaurée à ses blocs
+# d'origine. -1 = jamais (permanent), 0 = dès que le chunk se recharge. Le compte
+# à rebours n'avance que si le chunk est chargé ; survit aux redémarrages.
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
 # @default: -1
 platformRestoreSeconds: -1
 
-# Blocks treated as passable air for landing-safety checks.
-# Accepts Bukkit Material names and "#minecraft:<tag>" tag references
-#.
-# @type: list<material>
-# @source: material"
-airBlocks:
-  - "AIR"
-  - "CAVE_AIR"
-  - "VOID_AIR"
-  - "LEGACY_AIR"
-  - "STRUCTURE_VOID"
-  - "LIGHT"
-  - "#minecraft:flowers"
-  - "#minecraft:small_flowers"
-  # Note: #minecraft:tall_flowers est un tag uniquement d'objet en vanilla; ses membres
-  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) sont deja couverts par
-  # #minecraft:flowers ci-dessus.
-  - "#minecraft:tall_flowers"
-  - "SHORT_GRASS"
-  - "TALL_GRASS"
-  - "SHORT_DRY_GRASS"
-  - "TALL_DRY_GRASS"
-  - "FERN"
-  - "LARGE_FERN"
-  - "DEAD_BUSH"
-  - "BUSH"
-  - "WILDFLOWERS"
-  - "FIREFLY_BUSH"
-  - "LEGACY_LONG_GRASS"
-  - "LEGACY_DEAD_BUSH"
-  - "#minecraft:saplings"
-  - "BROWN_MUSHROOM"
-  - "RED_MUSHROOM"
-  - "CRIMSON_FUNGUS"
-  - "WARPED_FUNGUS"
-  - "#minecraft:crops"
-  - "MELON_STEM"
-  - "PUMPKIN_STEM"
-  - "SUGAR_CANE"
-  - "BAMBOO_SAPLING"
-  - "VINE"
-  - "GLOW_LICHEN"
-  - "WEEPING_VINES"
-  - "TWISTING_VINES"
-  - "HANGING_ROOTS"
-  - "PALE_HANGING_MOSS"
-  - "RESIN_CLUMP"
-  - "#minecraft:rails"
-  - "REDSTONE_WIRE"
-  - "COMPARATOR"
-  - "REPEATER"
-  - "LEVER"
-  - "STRING"
-  - "TRIPWIRE"
-  - "TORCH"
-  - "WALL_TORCH"
-  - "SOUL_TORCH"
-  - "SOUL_WALL_TORCH"
-  - "REDSTONE_TORCH"
-  - "REDSTONE_WALL_TORCH"
-  - "END_ROD"
-  - "#minecraft:buttons"
-  - "#minecraft:pressure_plates"
-  - "#minecraft:standing_signs"
-  - "#minecraft:wall_signs"
-  - "#minecraft:ceiling_hanging_signs"
-  - "#minecraft:wall_hanging_signs"
-  - "LEGACY_SIGN"
-  - "LEGACY_WALL_SIGN"
-  - "SNOW"
-  - "MOSS_CARPET"
-  - "PALE_MOSS_CARPET"
-  - "LEAF_LITTER"
-
-# Blocks that disqualify a landing spot (lava, hazards, etc.).
-# Accepts Bukkit Material names, "#minecraft:<tag>" tag references, and
-# state predicates such as "*[waterlogged=true]".
-# @type: list<material>
-# @source: material"
-unsafeBlocks:
-  - "WATER"
-  - "LAVA"
-  - "BUBBLE_COLUMN"
-  - "*[waterlogged=true]"
-  - "#minecraft:fire"
-  - "POWDER_SNOW"
-  - "MAGMA_BLOCK"
-  - "#minecraft:campfires"
-  - "CACTUS"
-  - "SWEET_BERRY_BUSH"
-  - "WITHER_ROSE"
-  - "CHORUS_PLANT"
-  - "CHORUS_FLOWER"
-  - "POINTED_DRIPSTONE"
-  - "COBWEB"
-  - "CREAKING_HEART"
-  - "BEDROCK"
-  - "NETHER_PORTAL"
-  - "END_PORTAL"
-  - "END_GATEWAY"
-  - "TNT"
-  - "END_CRYSTAL"
-  - "RESPAWN_ANCHOR"
-  - "SEAGRASS"
-  - "TALL_SEAGRASS"
-  - "KELP"
-  - "KELP_PLANT"
-  - "#minecraft:logs"
-
-# If true, 'biomes' is a whitelist; otherwise a blacklist
-# @type: boolean
-# @default: false
-biomeWhitelist: false
-
-# Biomes treated as whitelist or blacklist members per biomeWhitelist.
-# @type: list<biome>
-# @source: biome
-biomes:
-  - "OCEAN"
-  - "DEEP_OCEAN"
-  - "WARM_OCEAN"
-  - "LUKEWARM_OCEAN"
-  - "DEEP_LUKEWARM_OCEAN"
-  - "COLD_OCEAN"
-  - "DEEP_COLD_OCEAN"
-  - "FROZEN_OCEAN"
-  - "DEEP_FROZEN_OCEAN"
-  - "RIVER"
-  - "FROZEN_RIVER"
-  - "BEACH"
-  - "SNOWY_BEACH"
-  - "STONY_SHORE"
-  - "SWAMP"
-  - "MANGROVE_SWAMP"
-  - "SMALL_END_ISLANDS"
-  - "BASALT_DELTAS"
-  - "DRIPSTONE_CAVES"
-  - "LUSH_CAVES"
-  - "DEEP_DARK"
-  - "THE_VOID"
-
 # --- Optional PvP / combat-tag pre-flight gate ---
-# Master toggle. When true, /rtp consults the active combat-state authority
-# before enrolling a player and again before applying the destination, and
-# applies pvpOnCombat below. Off by default.
+# Interrupteur principal. Si true, /rtp vérifie l'état de combat et applique
+# pvpOnCombat (ci-dessous) avant la mise en file et avant la téléportation.
 # @type: boolean
 # @default: false
 pvpCheckEnabled: false
 
-# How long after dealing or taking PvP damage a player is considered "in combat"
-# by RTP's native tracker. Ignored when an external combat-tag plugin is bound.
+# Secondes pendant lesquelles un joueur reste "en combat" après des dégâts PvP
+# (traqueur natif uniquement ; ignoré si un plugin de combat-tag externe est lié).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -251,6 +94,17 @@ pvpTagVictim: true
 # @type: boolean
 # @default: true
 pvpTagAggressor: true
+
+# Max retries for stale-chunk guard
+# @type: integer
+# @range: [0, null]
+# @default: 2
+staleChunkRetryLimit: 2
+
+# Off-thread anvil prefilter
+# @type: boolean
+# @default: true
+anvilPrefilterEnabled: true
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

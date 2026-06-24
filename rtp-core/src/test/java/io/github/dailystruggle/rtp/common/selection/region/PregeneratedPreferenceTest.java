@@ -47,10 +47,10 @@ class PregeneratedPreferenceTest {
 
     @Test
     void shippedYamlDeclaresDefaultZero() throws IOException {
-        Path yml = Path.of("..", "rtp-plugin", "src", "main", "resources", "performance.yml");
+        Path yml = Path.of("..", "rtp-plugin", "src", "main", "resources", "advanced", "performance.yml");
         if (!Files.exists(yml)) {
             // Working dir may be the repo root when run via gradle wrapper.
-            yml = Path.of("rtp-plugin", "src", "main", "resources", "performance.yml");
+            yml = Path.of("rtp-plugin", "src", "main", "resources", "advanced", "performance.yml");
         }
         assertTrue(Files.exists(yml), "performance.yml not found at " + yml.toAbsolutePath());
         String content = Files.readString(yml);

@@ -1,3 +1,19 @@
+# 最低 TPS 要件
+# 新しい位置をキャッシュに追加する前に必要な最低サーバー TPS。
+# 範囲: 0.0 - 20.0。
+# 影響: 低 — サーバーが既にラグっているときにプラグインが負荷を増やすのを防ぎます。
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+最低TPS: 19.0
+
+# バックグラウンドのキャッシュ補充を一時停止する JVM ヒープ使用率の上限（最大の%）。
+# キャッシュ済みの場所は引き続き提供されます。0 または 100 で無効。
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapパーセント: 85.0
+
 # --- RTP パフォーマンス設定 ---
 # サーバーパフォーマンスに合わせてプラグインの挙動を細かく調整します。
 # 最大検索試行回数
@@ -7,36 +23,6 @@
 # @range: [1, null]
 # @default: 32
 最大試行回数: 10
-
-# 目的地のプリロード（チャンク）
-# 目的地周辺で事前にロードするチャンクの半径。
-# ロードされるチャンク数 = ( 1 + 2 * 半径 )^2。
-# 影響: 高 — 大きすぎるとテレポート時に TPS 低下を引き起こすことがあります。
-# @type: integer
-# @range: [0, null]
-# @unit: chunks
-# @default: 0
-視距離_選択: 0
-
-# テレポート直前に最終地点の周囲で読み込むチャンク半径。
-# 0 は目的地のチャンクのみを読み込みます。
-# @type: integer
-# @range: [0, null]
-# @unit: chunks
-# @default: 0
-視距離_テレポート: 0
-
-# テレポートしたプレイヤーの視距離が到着後に徐々に復元される合計ティック数。
-# テレポート時に視距離を一時的に viewDistanceTeleport の半径(最小2)まで
-# 下げ、配置時にサーバーが読み込む区画のリングを小さくし、その後このティック
-# 数をかけて元に戻します。これにより、弱いホストでティックを停止させかねない
-# 区画読み込みのスパイクが平滑化されます。0 で無効。viewDistanceTeleport が
-# すでにプレイヤーの視距離以上の場合は効果がありません。
-# @type: integer
-# @range: [0, null]
-# @unit: ticks
-# @default: 200
-視距離_復元間隔: 200
 
 # 選択頻度（tick）
 # 各リージョンの位置キャッシュをバックグラウンドで補充する間隔。
@@ -65,26 +51,31 @@
 # @default: 50
 割当時間_非同期: 50
 
-# 最低 TPS 要件
-# 新しい位置をキャッシュに追加する前に必要な最低サーバー TPS。
-# 範囲: 0.0 - 20.0。
-# 影響: 低 — サーバーが既にラグっているときにプラグインが負荷を増やすのを防ぎます。
-# @type: number
-# @range: [0.0, 20.0]
-# @default: 19.0
-最低TPS: 19.0
+# 目的地のプリロード（チャンク）
+# 目的地周辺で事前にロードするチャンクの半径。
+# ロードされるチャンク数 = ( 1 + 2 * 半径 )^2。
+# 影響: 高 — 大きすぎるとテレポート時に TPS 低下を引き起こすことがあります。
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+視距離_選択: 0
 
-# バックグラウンドキャッシュの生成を一時停止する前のJVMヒープの最大使用率
-# (最大ヒープに対する割合)。キャッシュされた各位置はチャンクを固定するため、
-# ヒープの小さいサーバーで無制限に埋めると、JVMが絶え間ないガベージコレクション
-# に陥り、コンソールエラーもなくサーバーが応答しなくなることがあります。
-# 使用率がこのしきい値以上の間、RTPは位置キャッシュの補充を停止しますが、
-# 待機中のプレイヤーには既にキャッシュされた位置を提供し続けます。
-# 0または100でこの制限を無効にします。
-# @type: number
-# @range: [0.0, 100.0]
-# @default: 85.0
-maxHeapパーセント: 85.0
+# テレポート直前に最終地点の周囲で読み込むチャンク半径。
+# 0 は目的地のチャンクのみを読み込みます。
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+視距離_テレポート: 0
+
+# テレポート後にプレイヤーの視距離が通常に戻るまでのティック数。チャンク読み込みの
+# 急増を緩和します。0 でクランプを無効化します。
+# @type: integer
+# @range: [0, null]
+# @unit: ticks
+# @default: 200
+視距離_復元間隔: 200
 
 # テレポート後キューイング
 # true の場合、RTP の直後にプラグインが位置キャッシュの補充を試みます。
@@ -93,24 +84,37 @@ maxHeapパーセント: 85.0
 # @default: false
 テレポート後キューイング: false
 
-# 同期ロード
-# 位置選択時に同期チャンクロードを使用します。
-# 影響: 高 — 推奨しません！深刻なサーバーラグを引き起こす可能性があります。
-# @type: boolean
-# @default: false
-同期ロード: false
-
-# 起動時パーミッション解析
-# onEventParsing: ワイルドカード権限 *.* と互換性がありません。
-# 影響: 中 (onEvent) / 低 (effect)
-# @type: boolean
-# @default: false
-イベント時解析: false
-
-# 起動時にエフェクトの権限ノードを解析します。
+# 既に読み込まれているチャンクのバイオームを空間メモリに登録し、バイオームの
+# 再利用 / 重み付けに反映します。追加のチャンク I/O はありません。
 # @type: boolean
 # @default: true
-エフェクト解析: true
+チャンクロード時チェック: true
+
+# L3 バックログ容量のうち補充を再開する割合（ヒステリシス）。
+# 0.5=50% まで減ってから補充、1.0=継続的に補充。
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+バックログ補充しきい値: 0.5
+
+# 試行ごとに未生成チャンクを拒否する確率。
+# 0.0=偏りなし、1.0=未生成の土地を回避。生成済みチャンクは常に通過します。
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+事前生成優先度: 0.0
+
+# 参加時のテレポート用に場所のキャッシュを確保します
+# （rtp.onevent.firstjoin / rtp.onevent.join）。
+# @type: boolean
+# @default: false
+ログインキャッシュ有効: false
+
+# 参加キャッシュの上限。0 = 自動 (起動時のサーバー max-players)。
+# @type: integer
+# @range: [0, null]
+# @default: 0
+ログインキャッシュ上限: 0
 
 # バイオーム選択キャッシュ
 # biomeRecall: バイオームごとに過去に見つけた位置を再利用します。
@@ -120,29 +124,23 @@ maxHeapパーセント: 85.0
 # @default: true
 バイオーム記憶: true
 
-# 設定すると、バイオーム絞り込み要求をキャッシュからのみ提供します（新たな
-# バイオーム検索は行いません）。biomeRecall が必要です。
+# バイオームでフィルタした要求をキャッシュからのみ提供します（新しいバイオーム
+# 検索は生成しません）。biomeRecall が必要です。
 # @type: boolean
 # @default: false
 バイオーム記憶_強制: false
 
-# バイオームで絞り込んだ選択に偏りを与え、要求された各バイオームが領域内で
-# 占める広さに比例するのではなく、等しい確率で選ばれるようにします。複数の
-# バイオームを要求したとき、よくあるバイオームが希少なものを押しのけるのを防ぎます。
-# biomeRecall が必要です。絞り込みなし（既定バイオーム）のテレポートには影響しません。
+# 要求された各バイオームを、領域に占める割合ではなく等確率で誘導します。
+# biomeRecall が必要です。フィルタなしのテレポートには影響しません。
 # @type: boolean
 # @default: false
 バイオーム重み付け: false
 
-# Per-biome relative selection weights for biome-filtered teleports.
-# Only consulted when biomeWeighted is true. Biomes not listed here use
-# weight 1.0, so an empty/all-equal map reproduces the equal-probability
-# behavior of biomeWeighted on its own. A biome given weight 2.0 is
-# steered toward roughly twice as often as a weight-1.0 biome among the
-# requested set (when both are present in biome-recall memory); 0.0
-# suppresses a biome. Requires biomeRecall; no effect on unfiltered
-# (default-biome) teleports. The shipped plains entry is a weight-1.0
-# no-op example - replace or extend it with the biomes you want to bias.
+# バイオームでフィルタしたテレポートの、バイオームごとの相対重み。biomeWeighted が
+# true のときのみ使用。未掲載のバイオームは 1.0（偏りなし）、2.0=約2倍選ばれ、
+# 0.0=抑制。バニラの全バイオームが編集可能な参考として 1.0 で事前掲載済み。
+# Mod のバイオームはプラットフォーム ID で追加（例: terralith:emerald_peaks）。
+# biomeRecall が必要です。
 # @type: map<string, number>
 バイオーム重み:
   # このバイオームの相対的な選択ウェイト（1.0 = 偏りなし）。
@@ -218,12 +216,40 @@ maxHeapパーセント: 85.0
   # --- その他 / 技術的 ---
   the_void: 1.0
 
-# チャンクロード時のパッシブチェック
-# リージョン範囲内でロードされたすべてのチャンクから安全な位置を探します。
-# 影響: 高 — チャンクロードイベントでサーバー負荷を大きく増やす可能性があります。
+# 即時提供されたテレポートが監査されるレイテンシしきい値（ミリ秒）。
+# （WARN を記録し slowPipelineCount を加算）。0 以下で無効。
+# @type: integer
+# @range: [0, null]
+# @unit: ms
+# @default: 5000
+低速パイプラインしきい値Ms: 5000
+
+# バックプレッシャーが監査されるキュー深さ（待機中のプレイヤー数）。
+# （WARN を記録し queueGrowthWarnCount を加算）。0 以下で無効。
+# @type: integer
+# @range: [0, null]
+# @unit: players
+# @default: 0
+キュー増加警告しきい値: 0
+
+# 同期ロード
+# 位置選択時に同期チャンクロードを使用します。
+# 影響: 高 — 推奨しません！深刻なサーバーラグを引き起こす可能性があります。
+# @type: boolean
+# @default: false
+同期ロード: false
+
+# 起動時パーミッション解析
+# onEventParsing: ワイルドカード権限 *.* と互換性がありません。
+# 影響: 中 (onEvent) / 低 (effect)
+# @type: boolean
+# @default: false
+イベント時解析: false
+
+# 起動時にエフェクトの権限ノードを解析します。
 # @type: boolean
 # @default: true
-チャンクロード時チェック: true
+エフェクト解析: true
 
 # 観察モードキャッシュ補充 (Region Data Visitor)
 # プリジェネレーション済みキャッシュが満杯の場合、同じ `period` 周期で
@@ -242,59 +268,8 @@ maxHeapパーセント: 85.0
 # @default: false
 ビジター有効: true
 
-# 参加時テレポート (rtp.onevent.firstjoin / rtp.onevent.join) 用に予約位置キャッシュを維持します。残りの空きスロット数でサイズが決まります。 参照。
-# @type: boolean
-# @default: false
-ログインキャッシュ有効: false
-
-# 参加キャッシュの上限。0 = 自動 (起動時のサーバー max-players)。
-# @type: integer
-# @range: [0, null]
-# @default: 0
-ログインキャッシュ上限: 0
-
-# 選択試行ごとに未生成チャンクを拒否する確率。
-# 0.0 = 偏りなし（既定）、1.0 = 未生成の土地を厳密に避ける。
-# 生成済みチャンクは常に通過します。
-# @type: number
-# @range: [0.0, 1.0]
-# @default: 0.0
-事前生成優先度: 0.0
-
-# L3 バックログ容量のどの割合で補充を再開するか（ヒステリシス）。
-# 0.5 = L3 が 50% まで減ってから補充（既定）。1.0 = 継続的に補充。
-# 値を大きくすると .mca ビンの確認がまとめられ、CPU/メモリ効率が向上します。
-# @type: number
-# @range: [0.0, 1.0]
-# @default: 0.5
-バックログ補充しきい値: 0.5
-
-# この遅延しきい値（ミリ秒）を超えると、即時提供（キュー未経由）のテレポートが
-# 監査されます。WARN が記録され、累積カウンタ slowPipelineCount（/rtp info で表示）
-# が増加します。監査対象は即時/キュー未経由のテレポートのみで、キュー経由の
-# 一定レートのテレポートは測定時間にキュー待ちを含むため除外されます。
-# 0 以下で監査を無効化します。
-# @type: integer
-# @range: [0, null]
-# @unit: ms
-# @default: 5000
-低速パイプラインしきい値Ms: 5000
-
-# 公開テレポートキューの深さ（待機中のプレイヤー数）がこの値以上になると、
-# キューの背圧が監査されます。エッジトリガーで WARN が記録され、累積カウンタ
-# queueGrowthWarnCount（/rtp info で表示）が境界の通過ごとに 1 回増加します。
-# 0 以下で監査を無効化します（オプトイン）。
-# @type: integer
-# @range: [0, null]
-# @unit: players
-# @default: 0
-キュー増加警告しきい値: 0
-
-# /rtp admin prefab の設定。apply -> confirm の流れで、変更した各設定ファイルを
-# <file>.yml.bak.<epochMillis> という名前のバックアップとともに書き込みます。
-# bakRetention はファイルごとに保持するバックアップ数の上限で、古いものから削除します。
-# 1 にすると最新のバックアップのみ保持。1 未満の値は 1 に切り上げられます。
-# /rtp admin prefab rollback は複数回の呼び出しでバックアップを新しい順にたどります。
+# /rtp admin prefab の設定。apply -> confirm の流れで変更した各ファイルに
+# 予備バックアップを書き込みます。bakRetention は保持数を制限します（古いものから削除）。
 プリセット:
   # Number of timestamped config backups kept per file before pruning.
   # @type: integer

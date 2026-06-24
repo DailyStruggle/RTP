@@ -1,5 +1,5 @@
 # --- RTP Safety Configuration ---
-# Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
+# Documentation: https://github.com/DailyStruggle/RTP/wiki/Safety
 # Seconds of invulnerability granted after a teleport completes.
 # 0 disables the post-teleport invulnerability window.
 # @type: integer
@@ -15,18 +15,6 @@ invulnerabilityTime: 5
 # @unit: blocks
 # @default: 0
 safetyRadius: 0
-
-# Maximum retries for the stale-chunk guard before failing the attempt.
-# @type: integer
-# @range: [0, null]
-# @default: 2
-staleChunkRetryLimit: 2
-
-# Use the off-thread anvil NBT prefilter to reject candidates without
-# loading their chunks.
-# @type: boolean
-# @default: true
-anvilPrefilterEnabled: true
 
 # Radius of the emergency landing platform built at the destination.
 # -1 disables the platform entirely.
@@ -56,13 +44,9 @@ platformAirHeight: 2
 # @default: GLASS
 platformMaterial: "GLASS"
 
-# Optional timeout, in seconds, after which the emergency landing platform's
-# footprint is restored to the blocks that were there before it was built.
-# -1 disables restoration (the platform is permanent, the previous behaviour).
-# 0 restores as soon as the footprint chunk is loaded again; a positive value
-# restores after that many seconds of loaded time. The countdown only advances
-# while the footprint chunk is loaded (it pauses while the area is unloaded),
-# and pending restores survive a server restart.
+# Seconds after which the platform's footprint is restored to its original
+# blocks. -1 = never (permanent), 0 = as soon as the chunk reloads. The
+# countdown only advances while the chunk is loaded; survives restarts.
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
@@ -70,15 +54,14 @@ platformMaterial: "GLASS"
 platformRestoreSeconds: -1
 
 # --- Optional PvP / combat-tag pre-flight gate ---
-# Master toggle. When true, /rtp consults the active combat-state authority
-# before enrolling a player and again before applying the destination, and
-# applies pvpOnCombat below. Off by default.
+# Master toggle. When true, /rtp checks combat state and applies pvpOnCombat
+# below before enrolling and before teleporting.
 # @type: boolean
 # @default: false
 pvpCheckEnabled: false
 
-# How long after dealing or taking PvP damage a player is considered "in combat"
-# by RTP's native tracker. Ignored when an external combat-tag plugin is bound.
+# Seconds a player stays "in combat" after PvP damage (native tracker only;
+# ignored when an external combat-tag plugin is bound).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -114,6 +97,19 @@ pvpTagVictim: true
 # @type: boolean
 # @default: true
 pvpTagAggressor: true
+
+# --- Advanced (internal hazard-scan tuning; most servers never change these) ---
+# Maximum retries for the stale-chunk guard before failing the attempt.
+# @type: integer
+# @range: [0, null]
+# @default: 2
+staleChunkRetryLimit: 2
+
+# Use the off-thread anvil NBT prefilter to reject candidates without
+# loading their chunks.
+# @type: boolean
+# @default: true
+anvilPrefilterEnabled: true
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.1
