@@ -1,19 +1,14 @@
 # --- RTP Region Configuration ---
-# Documentation: plugins/RTP/docs/admin/configuration/REGIONS.md
+# Documentation: https://github.com/DailyStruggle/RTP/wiki/Regions
 
-# Optional cosmetic display name shown in user-facing surfaces (the /rtp info
-# [displayName] placeholder and the RTP GUI menu). Does NOT change the region's
-# identity: commands, permissions (rtp.regions.<name>) and config still use the
-# file/region name. Supports color/gradient codes (e.g. &#55ff55 or &a). When
-# omitted, the region name is used. On a network it is advertised to lobbies so
-# a cross-server destination shows this server's chosen words.
-# displayName: "&#55ff55Wild Overworld"
-
-# Target world. [0] = main world.
+# Target world name (e.g. "world", "world_nether").
+# "[0]" = main world, "[1]" = 2nd loaded world, etc.
 world: "[0]"
-# Use vanilla /worldborder radius if true
+# Use the world's /worldborder as the bound instead of the shape radius below.
 worldBorderOverride: false
 
+# Spawn area shape and size. radius/centerRadius set how far out players land;
+# centerX/centerZ recenter the ring.
 shape:
   name: "CIRCLE"
   mode: "ACCUMULATE"
@@ -27,6 +22,7 @@ shape:
   uniquePlacements: 0
   expand: false
 
+# Vertical landing window.
 vert:
   name: "LINEAR"
   minY: 32
@@ -40,16 +36,23 @@ vert:
 requirePermission: false
 # Region to redirect to if no permission
 override: "default"
+# Economy cost override for this region
+price: 0.0
+
+# Optional cosmetic display name shown in /rtp info and the GUI menu. Does NOT
+# change the region's identity (commands/permissions still use the file name).
+# Supports color codes (e.g. &#55ff55 or &a). Defaults to the region name.
+# displayName: "&#55ff55Wild Overworld"
+
+# --- Advanced (cache/precision tuning; defaults suit most servers) ---
 # Max pre-calculated safe locations
 cacheCap: 50
 # L3 backlog cache capacity; unverified candidates pre-filtered by anvil one .mca-bin per pulse. 0 disables L3.
 backlogCacheCap: 1000
 # Max chunks kept loaded for zero-latency
 activeChunkCap: 10
-# Economy cost override for this region
-price: 0.0
 # Precision for bad-location tracking (1-5)
 spatialResolution: 3
 
 # DO NOT TOUCH VERSION NUMBER
-version: "1.0"
+version: "1.1"

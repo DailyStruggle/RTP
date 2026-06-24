@@ -16,18 +16,6 @@ invulnerabilityTime: 5
 # @default: 0
 safetyRadius: 0
 
-# Maximale Wiederholungen des Stale-Chunk-Schutzes, bevor der Versuch fehlschlägt.
-# @type: integer
-# @range: [0, null]
-# @default: 2
-staleChunkRetryLimit: 2
-
-# Den Off-Thread-Anvil-NBT-Vorfilter verwenden, um Kandidaten zu verwerfen,
-# ohne ihre Chunks zu laden.
-# @type: boolean
-# @default: true
-anvilPrefilterEnabled: true
-
 # Radius der Notfall-Landeplattform am Zielort.
 # -1 deaktiviert die Plattform vollständig.
 # @type: integer
@@ -56,164 +44,24 @@ platformAirHeight: 2
 # @default: GLASS
 platformMaterial: "GLASS"
 
-# Optionaler Timeout in Sekunden, nach dem der Fußabdruck der Notfall-Landeplattform
-# wieder auf die Blöcke zurückgesetzt wird, die vorher dort waren.
-# -1 deaktiviert die Wiederherstellung (die Plattform ist dauerhaft, das bisherige Verhalten).
-# 0 stellt wieder her, sobald der Plattform-Chunk erneut geladen ist; ein positiver Wert
-# stellt nach so vielen Sekunden geladener Zeit wieder her. Der Countdown läuft nur weiter,
-# während der Plattform-Chunk geladen ist (er pausiert, solange der Bereich entladen ist),
-# und ausstehende Wiederherstellungen überstehen einen Server-Neustart.
+# Sekunden, nach denen der Abdruck der Plattform auf die ursprünglichen Blöcke
+# zurückgesetzt wird. -1 = nie (dauerhaft), 0 = sobald der Chunk neu lädt. Der
+# Countdown läuft nur bei geladenem Chunk; übersteht Neustarts.
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
 # @default: -1
 platformRestoreSeconds: -1
-# Akzeptiert Bukkit-Material-Namen und "#minecraft:<tag>"-Tag-Referenzen.
-# @type: list<material>
-# @source: material
-airBlocks:
-  - "AIR"
-  - "CAVE_AIR"
-  - "VOID_AIR"
-  - "LEGACY_AIR"
-  - "STRUCTURE_VOID"
-  - "LIGHT"
-  - "#minecraft:flowers"
-  - "#minecraft:small_flowers"
-  # Hinweis: #minecraft:tall_flowers ist im Vanilla nur ein Item-Tag; seine Mitglieder
-  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) sind bereits durch
-  # #minecraft:flowers oben abgedeckt.
-  - "#minecraft:tall_flowers"
-  - "SHORT_GRASS"
-  - "TALL_GRASS"
-  - "SHORT_DRY_GRASS"
-  - "TALL_DRY_GRASS"
-  - "FERN"
-  - "LARGE_FERN"
-  - "DEAD_BUSH"
-  - "BUSH"
-  - "WILDFLOWERS"
-  - "FIREFLY_BUSH"
-  - "LEGACY_LONG_GRASS"
-  - "LEGACY_DEAD_BUSH"
-  - "#minecraft:saplings"
-  - "BROWN_MUSHROOM"
-  - "RED_MUSHROOM"
-  - "CRIMSON_FUNGUS"
-  - "WARPED_FUNGUS"
-  - "#minecraft:crops"
-  - "MELON_STEM"
-  - "PUMPKIN_STEM"
-  - "SUGAR_CANE"
-  - "BAMBOO_SAPLING"
-  - "VINE"
-  - "GLOW_LICHEN"
-  - "WEEPING_VINES"
-  - "TWISTING_VINES"
-  - "HANGING_ROOTS"
-  - "PALE_HANGING_MOSS"
-  - "RESIN_CLUMP"
-  - "#minecraft:rails"
-  - "REDSTONE_WIRE"
-  - "COMPARATOR"
-  - "REPEATER"
-  - "LEVER"
-  - "STRING"
-  - "TRIPWIRE"
-  - "TORCH"
-  - "WALL_TORCH"
-  - "SOUL_TORCH"
-  - "SOUL_WALL_TORCH"
-  - "REDSTONE_TORCH"
-  - "REDSTONE_WALL_TORCH"
-  - "END_ROD"
-  - "#minecraft:buttons"
-  - "#minecraft:pressure_plates"
-  - "#minecraft:standing_signs"
-  - "#minecraft:wall_signs"
-  - "#minecraft:ceiling_hanging_signs"
-  - "#minecraft:wall_hanging_signs"
-  - "LEGACY_SIGN"
-  - "LEGACY_WALL_SIGN"
-  - "SNOW"
-  - "MOSS_CARPET"
-  - "PALE_MOSS_CARPET"
-  - "LEAF_LITTER"
-# Akzeptiert Bukkit-Material-Namen, "#minecraft:<tag>"-Tag-Referenzen und
-# Zustands-Prädikate wie "*[waterlogged=true]".
-# @type: list<material>
-# @source: material
-unsafeBlocks:
-  - "WATER"
-  - "LAVA"
-  - "BUBBLE_COLUMN"
-  - "*[waterlogged=true]"
-  - "#minecraft:fire"
-  - "POWDER_SNOW"
-  - "MAGMA_BLOCK"
-  - "#minecraft:campfires"
-  - "CACTUS"
-  - "SWEET_BERRY_BUSH"
-  - "WITHER_ROSE"
-  - "CHORUS_PLANT"
-  - "CHORUS_FLOWER"
-  - "POINTED_DRIPSTONE"
-  - "COBWEB"
-  - "CREAKING_HEART"
-  - "BEDROCK"
-  - "NETHER_PORTAL"
-  - "END_PORTAL"
-  - "END_GATEWAY"
-  - "TNT"
-  - "END_CRYSTAL"
-  - "RESPAWN_ANCHOR"
-  - "SEAGRASS"
-  - "TALL_SEAGRASS"
-  - "KELP"
-  - "KELP_PLANT"
-  - "#minecraft:logs"
-
-# Wenn true, ist die biomes-Liste eine Whitelist (nur diese Biome sind
-# erlaubt). Wenn false, ist sie eine Blacklist (diese Biome werden ausgeschlossen).
-# @type: boolean
-# @default: false
-biomeWhitelist: false
-
-# Biome, die gemäß biomeWhitelist als Whitelist- oder Blacklist-Mitglieder behandelt werden.
-# @type: list<biome>
-# @source: biome
-biomes:
-  - "OCEAN"
-  - "DEEP_OCEAN"
-  - "WARM_OCEAN"
-  - "LUKEWARM_OCEAN"
-  - "DEEP_LUKEWARM_OCEAN"
-  - "COLD_OCEAN"
-  - "DEEP_COLD_OCEAN"
-  - "FROZEN_OCEAN"
-  - "DEEP_FROZEN_OCEAN"
-  - "RIVER"
-  - "FROZEN_RIVER"
-  - "BEACH"
-  - "SNOWY_BEACH"
-  - "STONY_SHORE"
-  - "SWAMP"
-  - "MANGROVE_SWAMP"
-  - "SMALL_END_ISLANDS"
-  - "BASALT_DELTAS"
-  - "DRIPSTONE_CAVES"
-  - "LUSH_CAVES"
-  - "DEEP_DARK"
-  - "THE_VOID"
 
 # --- Optionale PvP-/Combat-Tag-Vorabprüfung ---
-# Hauptschalter. Wenn true, fragt /rtp die aktive Kampfzustands-Autorität ab,
-# bevor ein Spieler angemeldet wird, und erneut, bevor das Ziel angewendet wird, und
-# wendet pvpOnCombat unten an. Standardmäßig aus.
+# Hauptschalter. Bei true prüft /rtp den Kampfstatus und wendet pvpOnCombat
+# (unten) vor dem Einreihen und vor dem Teleport an.
 # @type: boolean
 # @default: false
 pvpCheckEnabled: false
-# RTP-Tracker als "im Kampf" gilt. Wird ignoriert, wenn ein externes Combat-Tag-Plugin gebunden ist.
+
+# Sekunden, die ein Spieler nach PvP-Schaden "im Kampf" bleibt (nur nativer
+# Tracker; ignoriert, wenn ein externes Combat-Tag-Plugin gebunden ist).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -249,6 +97,18 @@ pvpTagVictim: true
 # @type: boolean
 # @default: true
 pvpTagAggressor: true
+
+# Maximale Wiederholungen des Stale-Chunk-Schutzes, bevor der Versuch fehlschlägt.
+# @type: integer
+# @range: [0, null]
+# @default: 2
+staleChunkRetryLimit: 2
+
+# Den Off-Thread-Anvil-NBT-Vorfilter verwenden, um Kandidaten zu verwerfen,
+# ohne ihre Chunks zu laden.
+# @type: boolean
+# @default: true
+anvilPrefilterEnabled: true
 
 # ÄNDERE NICHT DIE VERSIONSNUMMER
 version: 1.0

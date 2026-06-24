@@ -1,16 +1,9 @@
-# --- 플러그인 로그 토글 ---
-# 플러그인의 다양한 활동에 대한 로그를 활성화/비활성화합니다.
-# 상세 시스템 로그
-# detailed_reload: 리로드된 모든 파일/섹션을 로그
-# detailed_region_init: 각 리전의 초기화를 로그
-# @type: boolean
-# @default: false
-상세_리로드: false
-
-# 영역 초기화 세부 정보를 기록
-# @type: boolean
-# @default: false
-상세_리전초기화: false
+# 최소 로그 레벨(이 값과 서버 로거 자체 레벨 중 더 세밀한 쪽).
+# ALL은 서버 로거와 동일하게 동작합니다.
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
+최소레벨: "INFO"
 
 # 기본 활동 로그
 # command: 플레이어가 실행한 RTP 명령어를 로그
@@ -23,6 +16,12 @@
 # @type: boolean
 # @default: true
 텔레포트: true
+
+# 선택 실패 디버그
+# 안전한 위치를 찾지 못했을 때의 세부 정보를 로그에 남깁니다. 실패율과 검색 매개변수를 포함합니다.
+# @type: boolean
+# @default: true
+선택실패: true
 
 # 플레이어가 월드를 변경할 때
 # @type: boolean
@@ -49,11 +48,19 @@
 # @default: true
 이벤트_텔레포트: true
 
-# 선택 실패 디버그
-# 안전한 위치를 찾지 못했을 때의 세부 정보를 로그에 남깁니다. 실패율과 검색 매개변수를 포함합니다.
+# --- 플러그인 로그 토글 ---
+# 플러그인의 다양한 활동에 대한 로그를 활성화/비활성화합니다.
+# 상세 시스템 로그
+# detailed_reload: 리로드된 모든 파일/섹션을 로그
+# detailed_region_init: 각 리전의 초기화를 로그
 # @type: boolean
-# @default: true
-선택실패: true
+# @default: false
+상세_리로드: false
+
+# 영역 초기화 세부 정보를 기록
+# @type: boolean
+# @default: false
+상세_리전초기화: false
 
 # 시스템 로그
 # 백그라운드 작업과 데이터베이스 작업에 관련됩니다.
@@ -65,13 +72,6 @@
 # @type: boolean
 # @default: false
 시스템_데이터베이스: false
-
-# 플러그인 범위의 최소 로그 레벨. 유효 필터는 이 값과 Bukkit logger 중
-# 더 세밀한 쪽입니다. ALL 은 Bukkit logger 와 동일하게 동작합니다.
-# @type: enum
-# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
-# @default: ALL
-최소레벨: "INFO"
 
 # 버전 번호는 변경하지 마세요
 version: 1.0

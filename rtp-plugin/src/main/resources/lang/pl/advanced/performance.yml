@@ -1,3 +1,17 @@
+# Minimalny TPS serwera wymagany do kontynuowania kolejkowania w tle.
+# Praca w tle wstrzymuje się, gdy TPS spadnie poniżej tego progu.
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+minTPS: 19.0
+
+# Maks. użycie sterty JVM (% maksimum), zanim wstrzymane zostanie wypełnianie
+# bufora w tle. Już zbuforowane lokacje są nadal serwowane. 0 lub 100 wyłącza.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapProcent: 85.0
+
 # --- Ustawienia wydajności RTP ---
 # Documentation: plugins/RTP/docs/admin/configuration/PERFORMANCE.md
 # Maksymalna liczba prób wyszukiwania na wywołanie /rtp przed rezygnacją.
@@ -5,36 +19,6 @@
 # @range: [1, null]
 # @default: 32
 maksProby: 32
-
-# Promień chunków ładowanych wokół kandydującej lokalizacji podczas wyboru.
-# 0 ładuje tylko chunk kandydata.
-# @type: integer
-# @range: [0, null]
-# @unit: chunks
-# @default: 0
-zasiegWidokuWybor: 0
-
-# Promień chunków ładowanych wokół końcowej lokalizacji tuż przed teleportacją.
-# 0 ładuje tylko chunk docelowy.
-# @type: integer
-# @range: [0, null]
-# @unit: chunks
-# @default: 0
-zasiegWidokuTeleport: 0
-
-# Laczna liczba tickow, w ciagu ktorych zasieg widzenia teleportowanego
-# gracza jest stopniowo przywracany po przybyciu. Przy teleportacji zasieg
-# widzenia jest na chwile obnizany do promienia viewDistanceTeleport
-# (minimum 2), aby serwer przy umieszczaniu gracza ladowal tylko maly
-# pierscien chunkow, a potem zwiekszany z powrotem przez te ticki. Wygladza
-# to skok ladowania chunkow, ktory na slabych hostach moze zablokowac tick.
-# 0 wylacza ograniczenie. Bez efektu, gdy viewDistanceTeleport jest juz
-# rowny lub wiekszy niz zasieg widzenia gracza.
-# @type: integer
-# @range: [0, null]
-# @unit: ticks
-# @default: 200
-zasiegWidokuPrzywracanieInterwal: 200
 
 # Ticki między cyklami pamięci podręcznej w tle (wstępne wypełnianie regionu, uzupełnianie kolejki).
 # @type: integer
@@ -57,76 +41,89 @@ przydzielonyCzasSync: 50
 # @default: 50
 przydzielonyCzasAsync: 50
 
-# Minimalny TPS serwera wymagany do kontynuowania kolejkowania w tle.
-# Praca w tle wstrzymuje się, gdy TPS spadnie poniżej tego progu.
-# @type: number
-# @range: [0.0, 20.0]
-# @default: 19.0
-minTPS: 19.0
+# Promień chunków ładowanych wokół kandydującej lokalizacji podczas wyboru.
+# 0 ładuje tylko chunk kandydata.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+zasiegWidokuWybor: 0
 
-# Maksymalne wykorzystanie sterty JVM (procent maksymalnej sterty) przed
-# wstrzymaniem generowania pamięci podręcznej w tle. Każda zapisana w pamięci
-# podręcznej lokalizacja blokuje chunk, więc nieograniczone wypełnianie na
-# serwerze z małą stertą może wpędzić JVM w ciągłe odśmiecanie pamięci i
-# sprawić, że serwer przestanie odpowiadać bez żadnego błędu w konsoli.
-# Dopóki użycie jest równe lub przekracza ten próg, RTP przestaje uzupełniać
-# pamięć podręczną lokalizacji, ale nadal udostępnia już zapisane lokalizacje
-# oczekującym graczom. 0 lub 100 wyłącza ten limit.
-# @type: number
-# @range: [0.0, 100.0]
-# @default: 85.0
-maxHeapProcent: 85.0
+# Promień chunków ładowanych wokół końcowej lokalizacji tuż przed teleportacją.
+# 0 ładuje tylko chunk docelowy.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+zasiegWidokuTeleport: 0
+
+# Ticki, w trakcie których zasięg widzenia teleportowanego gracza wraca do normy
+# po przybyciu, wygładzając skok ładowania chunków. 0 wyłącza ograniczenie.
+# @type: integer
+# @range: [0, null]
+# @unit: ticks
+# @default: 200
+zasiegWidokuPrzywracanieInterwal: 200
 
 # Uzupełnij pamięć podręczną regionu natychmiast po udanej teleportacji.
 # @type: boolean
 # @default: false
 kolejkowaniePoTeleporcie: false
 
-# Użyj synchronicznego ładowania chunków. NIEZALECANE. Narusza ducha S-005
-# na Folii i zablokuje główny wątek na Paper/Spigot.
-# @type: boolean
-# @default: false
-ladowanieSync: false
-
-# Ponownie parsuj węzły uprawnień przy każdym zdarzeniu zamiast buforowania.
-# @type: boolean
-# @default: false
-analizaPrzyZdarzeniu: false
-
-# Parsuj węzły uprawnień efektów przy starcie.
+# Rejestruje biomy z już załadowanych chunków w pamięci przestrzennej, zasilając
+# przypominanie / ważenie biomów. Bez dodatkowego I/O chunków.
 # @type: boolean
 # @default: true
-analizaEfektow: true
+sprawdzPrzyZaladowaniuChunka: true
+
+# Ułamek pojemności backlogu L3, przy którym wznawiane jest uzupełnianie (histereza).
+# 0.5 = uzupełniaj po opróżnieniu do 50%; 1.0 = uzupełniaj ciągle.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+progUzupelnieniaBacklog: 0.5
+
+# Prawdopodobieństwo odrzucenia niewygenerowanego chunku na próbę.
+# 0.0 = bez stronniczości, 1.0 = unikaj niewygenerowanego terenu. Wygenerowane chunki zawsze przechodzą.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+preferencjaPregenerowane: 0.0
+
+# Rezerwuje bufor lokacji dla teleportacji przy dołączeniu
+# (rtp.onevent.firstjoin / rtp.onevent.join).
+# @type: boolean
+# @default: false
+cacheLogowaniaWlaczona: false
+
+# Twardy limit pamięci podręcznej dołączania. 0 = automatycznie (max-players serwera przy starcie).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+limitCacheLogowania: 0
 
 # Ponownie wykorzystuj z pamięci podręcznej wcześniej znalezione lokalizacje dopasowane do biomu.
 # @type: boolean
 # @default: true
 pamiecBiomu: true
 
-# Gdy włączone, żądania filtrowane po biomie obsługiwane są tylko z pamięci
-# podręcznej (bez nowych wyszukiwań biomów). Wymaga biomeRecall.
+# Obsługuje żądania filtrowane biomem tylko z bufora (nigdy nie generuje nowych
+# wyszukiwań biomu). Wymaga biomeRecall.
 # @type: boolean
 # @default: false
 pamiecBiomuWymuszona: false
 
-# Modyfikuje wybór filtrowany po biomie tak, by każdy żądany biom był wybierany
-# z równym prawdopodobieństwem, a nie proporcjonalnie do tego, jaką część regionu
-# zajmuje. Zapobiega zagłuszaniu rzadkich biomów przez pospolite, gdy żądanych
-# jest kilka biomów. Wymaga biomeRecall; bez wpływu na teleportacje bez filtra
-# (domyślny biom).
+# Kieruje do każdego żądanego biomu z równym prawdopodobieństwem zamiast wedle
+# pokrycia regionu. Wymaga biomeRecall; bez wpływu na niefiltrowane teleportacje.
 # @type: boolean
 # @default: false
 biomWazony: false
 
-# Per-biome relative selection weights for biome-filtered teleports.
-# Only consulted when biomeWeighted is true. Biomes not listed here use
-# weight 1.0, so an empty/all-equal map reproduces the equal-probability
-# behavior of biomeWeighted on its own. A biome given weight 2.0 is
-# steered toward roughly twice as often as a weight-1.0 biome among the
-# requested set (when both are present in biome-recall memory); 0.0
-# suppresses a biome. Requires biomeRecall; no effect on unfiltered
-# (default-biome) teleports. The shipped plains entry is a weight-1.0
-# no-op example - replace or extend it with the biomes you want to bias.
+# Względne wagi biomów dla teleportacji filtrowanych biomem. Używane tylko gdy
+# biomeWeighted to true. Biomy spoza listy używają 1.0 (bez stronniczości); 2.0 =
+# wybierany ~dwa razy częściej, 0.0 = stłumiony. Pełny zestaw vanilla jest wstępnie
+# wypisany przy 1.0 jako edytowalna referencja; dodaj biomy z modów po ich id
+# platformy (np. terralith:emerald_peaks). Wymaga biomeRecall.
 # @type: map<string, number>
 wagiBiomu:
   # Względna waga wyboru dla tego biomu (1.0 = brak preferencji).
@@ -202,71 +199,45 @@ wagiBiomu:
   # --- Różne / techniczne ---
   the_void: 1.0
 
-# Skanuj w poszukiwaniu bezpiecznych miejsc lądowania we wszystkich załadowanych
-# chunkach (oportunistyczne wstępne wypełnianie).
-# @type: boolean
-# @default: true
-sprawdzPrzyZaladowaniuChunka: true
-
-# Włącz gromadzenie danych w tle na potrzeby analityki odwiedzających.
-# @type: boolean
-# @default: false
-goscWlaczony: false
-
-# Zachowuj zarezerwowaną pamięć podręczną dla teleportów przy dołączaniu (rtp.onevent.firstjoin / rtp.onevent.join). Rozmiar według wolnych slotów. Zobacz
-# @type: boolean
-# @default: false
-cacheLogowaniaWlaczona: false
-
-# Twardy limit pamięci podręcznej dołączania. 0 = automatycznie (max-players serwera przy starcie).
-# @type: integer
-# @range: [0, null]
-# @default: 0
-limitCacheLogowania: 0
-
-# Szansa odrzucenia niewygenerowanego chunku na każdą próbę wyboru.
-# 0.0 = brak preferencji (domyślnie), 1.0 = ściśle unikaj niewygenerowanego terenu.
-# Wygenerowane chunki zawsze przechodzą.
-# @type: number
-# @range: [0.0, 1.0]
-# @default: 0.0
-preferencjaPregenerowane: 0.0
-
-# Ułamek pojemności zaległości L3, przy którym wznawia się uzupełnianie
-# (histereza). 0.5 = uzupełniaj dopiero, gdy L3 spadnie do 50% (domyślnie).
-# 1.0 = uzupełniaj ciągle. Wyższe wartości grupują sprawdzenia binów .mca
-# dla lepszej wydajności CPU/pamięci.
-# @type: number
-# @range: [0.0, 1.0]
-# @default: 0.5
-progUzupelnieniaBacklog: 0.5
-
-# Próg opóźnienia (ms), powyżej którego natychmiast obsłużona (bez kolejki)
-# teleportacja jest audytowana: zapisywane jest WARN, a skumulowany licznik
-# slowPipelineCount (pokazywany przez /rtp info) jest zwiększany. Audytowane są
-# tylko teleportacje natychmiastowe/bez kolejki; te z kolejki są wyłączone, bo ich
-# zmierzony czas obejmuje oczekiwanie w kolejce. 0 lub mniej wyłącza audyt. Zob.
+# Próg opóźnienia (ms), powyżej którego natychmiast obsłużona teleportacja jest
+# audytowana (WARN w logu, slowPipelineCount zwiększony). 0 lub mniej wyłącza.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
 progWolnegoPipelineMs: 5000
 
-# Głębokość publicznej kolejki teleportacji (oczekujący gracze), przy której
-# audytowane jest spiętrzenie kolejki: zapisywane jest WARN wyzwalane zboczem,
-# a skumulowany licznik queueGrowthWarnCount (pokazywany przez /rtp info) jest
-# zwiększany raz na przekroczenie. 0 lub mniej wyłącza audyt (opcjonalny). Zob.
+# Głębokość kolejki (oczekujący gracze), przy której audytowane jest ciśnienie zwrotne
+# (WARN w logu, queueGrowthWarnCount zwiększony). 0 lub mniej wyłącza.
 # @type: integer
 # @range: [0, null]
 # @unit: players
 # @default: 0
 progOstrzezeniaWzrostuKolejki: 0
 
-# Ustawienia /rtp admin prefab. Przepływ apply -> confirm zapisuje każdy zmieniony plik
-# konfiguracji z kopią zapasową o nazwie <file>.yml.bak.<epochMillis>;
-# bakRetention ogranicza liczbę takich kopii przechowywanych na plik, usuwając najpierw
-# najstarsze. Ustaw 1, aby zachować tylko najnowszą; wartości poniżej 1 są podnoszone do 1.
-# /rtp admin prefab rollback przechodzi kopie od najnowszej w wielu wywołaniach.
+# Użyj synchronicznego ładowania chunków. NIEZALECANE. Narusza ducha S-005
+# na Folii i zablokuje główny wątek na Paper/Spigot.
+# @type: boolean
+# @default: false
+ladowanieSync: false
+
+# Ponownie parsuj węzły uprawnień przy każdym zdarzeniu zamiast buforowania.
+# @type: boolean
+# @default: false
+analizaPrzyZdarzeniu: false
+
+# Parsuj węzły uprawnień efektów przy starcie.
+# @type: boolean
+# @default: true
+analizaEfektow: true
+
+# Włącz gromadzenie danych w tle na potrzeby analityki odwiedzających.
+# @type: boolean
+# @default: false
+goscWlaczony: false
+
+# Ustawienia /rtp admin prefab. Przepływ apply -> confirm zapisuje kopię zapasową
+# dla każdego zmienionego pliku; bakRetention ogranicza liczbę (najstarsze usuwane).
 prefabrykat:
   # Number of timestamped config backups kept per file before pruning.
   # @type: integer

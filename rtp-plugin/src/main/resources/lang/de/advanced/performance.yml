@@ -1,3 +1,17 @@
+# Mindest-Server-TPS, die zum Fortführen der Hintergrund-Warteschlange nötig ist.
+# Hintergrundarbeit pausiert, wenn die TPS unter diesen Schwellenwert fallen.
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+minimaleTPS: 19.0
+
+# Max. JVM-Heap-Nutzung (% des Maximums), bevor das Hintergrund-Cache-Füllen
+# pausiert. Bereits gecachte Orte werden weiter bedient. 0 oder 100 deaktiviert es.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapProzent: 85.0
+
 # --- RTP Leistungseinstellungen ---
 # Dokumentation: plugins/RTP/docs/admin/configuration/PERFORMANCE.md
 # Maximale Suchversuche pro /rtp-Aufruf, bevor aufgegeben wird.
@@ -5,36 +19,6 @@
 # @range: [1, null]
 # @default: 32
 maxVersuche: 32
-
-# Chunk-Radius, der während der Auswahl rund um einen Kandidatenort geladen wird.
-# 0 lädt nur den Kandidaten-Chunk.
-# @type: integer
-# @range: [0, null]
-# @unit: chunks
-# @default: 0
-sichtweiteAuswahl: 0
-
-# Chunk-Radius, der unmittelbar vor dem Teleport rund um den endgültigen Ort
-# geladen wird. 0 lädt nur den Ziel-Chunk.
-# @type: integer
-# @range: [0, null]
-# @unit: chunks
-# @default: 0
-sichtweiteTeleport: 0
-
-# Gesamtanzahl Ticks, ueber die die Sichtweite eines teleportierten
-# Spielers nach der Ankunft stetig wiederhergestellt wird. Beim Teleport
-# wird die Sichtweite kurz auf den viewDistanceTeleport-Radius gesenkt
-# (mindestens 2), damit der Server beim Platzieren nur einen kleinen Ring
-# Chunks laedt, und dann ueber diese Ticks wieder hochgefahren. Das glaettet
-# die Chunk-Last-Spitze, die auf schwachen Hosts einen Tick blockieren kann.
-# 0 deaktiviert die Klammer. Wirkungslos, wenn viewDistanceTeleport bereits
-# gleich oder groesser als die Sichtweite des Spielers ist.
-# @type: integer
-# @range: [0, null]
-# @unit: ticks
-# @default: 200
-sichtweiteWiederherstellungsIntervall: 200
 
 # Ticks zwischen Hintergrund-Cache-Zyklen (Regions-Vorbefüllung, Warteschlangen-Auffüllung).
 # @type: integer
@@ -57,77 +41,89 @@ syncZugeteilteZeit: 50
 # @default: 50
 asyncZugeteilteZeit: 50
 
-# Mindest-Server-TPS, die zum Fortführen der Hintergrund-Warteschlange nötig ist.
-# Hintergrundarbeit pausiert, wenn die TPS unter diesen Schwellenwert fallen.
-# @type: number
-# @range: [0.0, 20.0]
-# @default: 19.0
-minimaleTPS: 19.0
+# Chunk-Radius, der während der Auswahl rund um einen Kandidatenort geladen wird.
+# 0 lädt nur den Kandidaten-Chunk.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+sichtweiteAuswahl: 0
 
-# Maximale JVM-Heap-Auslastung (Prozent des maximalen Heaps), bevor das
-# Auffüllen des Hintergrund-Caches pausiert. Jede zwischengespeicherte
-# Position hält einen Chunk fest, daher kann ein unbegrenztes Auffüllen auf
-# einem Server mit kleinem Heap die JVM in eine ständige Garbage Collection
-# treiben und den Server ohne Konsolenfehler nicht mehr reagieren lassen.
-# Solange die Auslastung auf oder über diesem Schwellenwert liegt, füllt RTP
-# den Positions-Cache nicht mehr auf, liefert aber weiterhin bereits
-# zwischengespeicherte Positionen an wartende Spieler. 0 oder 100 deaktiviert
-# die Sperre.
-# @type: number
-# @range: [0.0, 100.0]
-# @default: 85.0
-maxHeapProzent: 85.0
+# Chunk-Radius, der unmittelbar vor dem Teleport rund um den endgültigen Ort
+# geladen wird. 0 lädt nur den Ziel-Chunk.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+sichtweiteTeleport: 0
+
+# Ticks, über die die Sichtweite eines teleportierten Spielers nach der Ankunft
+# wieder normal wird und so die Chunk-Lade-Spitze glättet. 0 deaktiviert die Begrenzung.
+# @type: integer
+# @range: [0, null]
+# @unit: ticks
+# @default: 200
+sichtweiteWiederherstellungsIntervall: 200
 
 # Den Regions-Cache unmittelbar nach einem erfolgreichen Teleport auffüllen.
 # @type: boolean
 # @default: false
 nachTeleportEinreihung: false
 
-# Synchrones Chunk-Laden verwenden. NICHT EMPFOHLEN. Verletzt den Geist von S-005
-# auf Folia und blockiert den Haupt-Thread auf Paper/Spigot.
-# @type: boolean
-# @default: false
-syncLaden: false
-
-# Berechtigungsknoten bei jedem Ereignis neu auswerten, statt sie zu cachen.
-# @type: boolean
-# @default: false
-ereignisAuswertung: false
-
-# Effekt-Berechtigungsknoten beim Start auswerten.
+# Erfasst Biome aus bereits geladenen Chunks im räumlichen Speicher und speist so
+# Biom-Recall / -Gewichtung. Keine zusätzliche Chunk-E/A.
 # @type: boolean
 # @default: true
-effektAuswertung: true
+beiChunkLadenPruefen: true
+
+# Anteil der L3-Backlog-Kapazität, bei dem das Nachfüllen wieder einsetzt (Hysterese).
+# 0.5 = Nachfüllen nach Leeren auf 50%; 1.0 = kontinuierlich nachfüllen.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+rueckstauAuffuellSchwelle: 0.5
+
+# Wahrscheinlichkeit, einen ungenerierten Chunk pro Versuch abzulehnen.
+# 0.0 = kein Bias, 1.0 = ungeneriertes Land meiden. Generierte Chunks passieren immer.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+vorgeneriertBevorzugung: 0.0
+
+# Reserviert einen Cache von Orten für Teleports beim Beitritt
+# (rtp.onevent.firstjoin / rtp.onevent.join).
+# @type: boolean
+# @default: false
+loginCacheAktiviert: false
+
+# Harte Obergrenze für den Beitritts-Cache. 0 = automatisch (max-players des Servers beim Start).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+loginCacheObergrenze: 0
 
 # Zuvor gefundene biom-passende Orte aus dem Cache wiederverwenden.
 # @type: boolean
 # @default: true
 biomWiederverwendung: true
 
-# Wenn gesetzt, biom-gefilterte Anfragen nur aus dem Cache bedienen (niemals
-# neue Biom-Suchen erzeugen). Erfordert biomeRecall.
+# Bedient biomgefilterte Anfragen nur aus dem Cache (erzeugt nie neue Biom-Suchen).
+# Erfordert biomeRecall.
 # @type: boolean
 # @default: false
 biomWiederverwendungErzwungen: false
 
-# Verzerrt die biomgefilterte Auswahl so, dass jedes angeforderte Biom mit
-# gleicher Wahrscheinlichkeit angesteuert wird, statt anteilig zu seiner Fläche
-# in der Region. Verhindert, dass häufige Biome seltene verdrängen, wenn mehrere
-# Biome angefordert werden. Erfordert biomeRecall; keine Wirkung auf
-# ungefilterte (Standardbiom-)Teleports.
+# Steuert jedes angeforderte Biom mit gleicher Wahrscheinlichkeit an, statt nach
+# Flächenanteil. Erfordert biomeRecall; keine Wirkung bei ungefilterten Teleports.
 # @type: boolean
 # @default: false
 biomGewichtet: false
 
-# Per-biome relative selection weights for biome-filtered teleports.
-# Only consulted when biomeWeighted is true. Biomes not listed here use
-# weight 1.0, so an empty/all-equal map reproduces the equal-probability
-# behavior of biomeWeighted on its own. A biome given weight 2.0 is
-# steered toward roughly twice as often as a weight-1.0 biome among the
-# requested set (when both are present in biome-recall memory); 0.0
-# suppresses a biome. Requires biomeRecall; no effect on unfiltered
-# (default-biome) teleports. The shipped plains entry is a weight-1.0
-# no-op example - replace or extend it with the biomes you want to bias.
+# Relative Biom-Gewichte für biomgefilterte Teleports. Nur verwendet, wenn
+# biomeWeighted true ist. Nicht gelistete Biome nutzen 1.0 (keine Gewichtung); 2.0 =
+# etwa doppelt so oft gewählt, 0.0 = unterdrückt. Der volle Vanilla-Satz ist bei 1.0
+# als editierbare Referenz vorgelistet; Mod-Biome per Plattform-ID hinzufügen
+# (z. B. terralith:emerald_peaks). Erfordert biomeRecall.
 # @type: map<string, number>
 biomGewichte:
   # Relative Auswahlgewichtung für dieses Biom (1.0 = keine Gewichtung).
@@ -203,72 +199,45 @@ biomGewichte:
   # --- Sonstiges / technisch ---
   the_void: 1.0
 
-# In allen geladenen Chunks nach sicheren Landeplätzen suchen (opportunistische
-# Vorbefüllung).
-# @type: boolean
-# @default: true
-beiChunkLadenPruefen: true
-
-# Hintergrund-Datenerfassung für Besucher-Analysen aktivieren.
-# @type: boolean
-# @default: false
-besucherAktiviert: true
-
-# Reservierten Cache für Beitritts-Teleports vorhalten (rtp.onevent.firstjoin / rtp.onevent.join). Größe richtet sich nach verbleibenden freien Spieler-Slots.
-# @type: boolean
-# @default: false
-loginCacheAktiviert: false
-
-# Harte Obergrenze für den Beitritts-Cache. 0 = automatisch (max-players des Servers beim Start).
-# @type: integer
-# @range: [0, null]
-# @default: 0
-loginCacheObergrenze: 0
-
-# Wahrscheinlichkeit, einen nicht generierten Chunk pro Auswahlversuch abzulehnen.
-# 0.0 = keine Bevorzugung (Standard), 1.0 = nicht generiertes Land strikt meiden.
-# Generierte Chunks bestehen immer.
-# @type: number
-# @range: [0.0, 1.0]
-# @default: 0.0
-vorgeneriertBevorzugung: 0.0
-
-# Anteil der L3-Backlog-Kapazität, bei dem das Auffüllen wieder einsetzt (Hysterese).
-# 0.5 = erst auffüllen, wenn L3 auf 50% geleert ist (Standard). 1.0 = kontinuierlich
-# auffüllen. Höhere Werte gruppieren.mca-Bin-Prüfungen für bessere
-# CPU-/Speichereffizienz.
-# @type: number
-# @range: [0.0, 1.0]
-# @default: 0.5
-rueckstauAuffuellSchwelle: 0.5
-
-# Latenzschwelle (ms), oberhalb der ein sofort bedienter (nicht eingereihter) Teleport
-# geprüft wird: eine WARN wird protokolliert und der kumulative slowPipelineCount-Zähler
-# (angezeigt von /rtp info) wird erhöht. Nur sofortige/nicht eingereihte Teleports werden
-# geprüft; eingereihte at-rate-Teleports werden ausgeschlossen, da ihre gemessene Zeit
-# die Warteschlangen-Wartezeit enthält. 0 oder darunter deaktiviert die Prüfung.
+# Latenzschwelle (ms), oberhalb der ein sofort bedienter Teleport auditiert wird
+# (WARN protokolliert, slowPipelineCount erhöht). 0 oder weniger deaktiviert.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
 langsamePipelineSchwelleMs: 5000
 
-# Tiefe der öffentlichen Teleport-Warteschlange (wartende Spieler), ab der die
-# Warteschlangen-Rückstauprüfung erfolgt: eine flankengesteuerte WARN wird protokolliert und der
-# kumulative queueGrowthWarnCount-Zähler (angezeigt von /rtp info) wird einmal pro
-# überschreitung erhöht. 0 oder darunter deaktiviert die Prüfung (Opt-in).
+# Warteschlangentiefe (wartende Spieler), ab der Gegendruck auditiert wird
+# (WARN protokolliert, queueGrowthWarnCount erhöht). 0 oder weniger deaktiviert.
 # @type: integer
 # @range: [0, null]
 # @unit: players
 # @default: 0
 warteschlangenWachstumWarnSchwelle: 0
 
-# Einstellungen für /rtp admin prefab. Der `apply` -> `confirm`-Ablauf schreibt
-# jede berührte Konfigurationsdatei mit einem gleichnamigen Backup
-# <file>.yml.bak.<epochMillis>; `bakRetention` begrenzt, wie viele solcher
-# Backups je Datei behalten werden, älteste zuerst entfernt. Auf 1 setzen, um nur
-# das neueste Backup zu behalten; Werte unter 1 werden auf 1 angehoben. /rtp admin
-# prefab rollback geht Backups über mehrere Aufrufe vom neuesten zum ältesten durch.
+# Synchrones Chunk-Laden verwenden. NICHT EMPFOHLEN. Verletzt den Geist von S-005
+# auf Folia und blockiert den Haupt-Thread auf Paper/Spigot.
+# @type: boolean
+# @default: false
+syncLaden: false
+
+# Berechtigungsknoten bei jedem Ereignis neu auswerten, statt sie zu cachen.
+# @type: boolean
+# @default: false
+ereignisAuswertung: false
+
+# Effekt-Berechtigungsknoten beim Start auswerten.
+# @type: boolean
+# @default: true
+effektAuswertung: true
+
+# Hintergrund-Datenerfassung für Besucher-Analysen aktivieren.
+# @type: boolean
+# @default: false
+besucherAktiviert: true
+
+# Einstellungen für /rtp admin prefab. Der apply -> confirm-Ablauf schreibt pro
+# geänderter Datei eine Sicherung; bakRetention begrenzt die Anzahl (älteste zuerst gelöscht).
 vorlage:
   # Number of timestamped config backups kept per file before pruning.
   # @type: integer

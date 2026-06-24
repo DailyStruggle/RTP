@@ -1,16 +1,9 @@
-# --- プラグインログ切り替え ---
-# プラグインの各種アクティビティのログを有効/無効にします。
-# 詳細システムログ
-# detailed_reload: リロードされたすべてのファイル/セクションをログ
-# detailed_region_init: 各リージョンの初期化をログ
-# @type: boolean
-# @default: false
-詳細_リロード: false
-
-# 領域の初期化の詳細をログに記録
-# @type: boolean
-# @default: false
-詳細_リージョン初期化: false
+# 最小ログレベル（この値とサーバーロガー自身のレベルのうち細かい方）。
+# ALL はサーバーロガーと同じ動作を保ちます。
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
+最低レベル: "INFO"
 
 # 基本アクティビティログ
 # command: プレイヤーが実行した RTP コマンドをログ
@@ -23,6 +16,12 @@
 # @type: boolean
 # @default: true
 テレポート: true
+
+# 選択失敗デバッグ
+# 安全な位置を見つけられなかったときの詳細をログに残します。失敗率や検索パラメータを含みます。
+# @type: boolean
+# @default: true
+選択失敗: true
 
 # プレイヤーがワールドを切り替えたとき
 # @type: boolean
@@ -49,11 +48,19 @@
 # @default: true
 イベント_テレポート: true
 
-# 選択失敗デバッグ
-# 安全な位置を見つけられなかったときの詳細をログに残します。失敗率や検索パラメータを含みます。
+# --- プラグインログ切り替え ---
+# プラグインの各種アクティビティのログを有効/無効にします。
+# 詳細システムログ
+# detailed_reload: リロードされたすべてのファイル/セクションをログ
+# detailed_region_init: 各リージョンの初期化をログ
 # @type: boolean
-# @default: true
-選択失敗: true
+# @default: false
+詳細_リロード: false
+
+# 領域の初期化の詳細をログに記録
+# @type: boolean
+# @default: false
+詳細_リージョン初期化: false
 
 # システムログ
 # バックグラウンドタスクとデータベース操作に関連します。
@@ -65,13 +72,6 @@
 # @type: boolean
 # @default: false
 システム_データベース: false
-
-# プラグイン固有の最小ログレベル。有効なフィルターはこれと Bukkit logger の
-# うち細かい方です。ALL は Bukkit logger と同じ動作を維持します。
-# @type: enum
-# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
-# @default: ALL
-最低レベル: "INFO"
 
 # バージョン番号は変更しないでください
 version: 1.0

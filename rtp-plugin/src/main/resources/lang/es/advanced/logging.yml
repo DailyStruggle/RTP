@@ -1,16 +1,9 @@
-# --- Registros del plugin ---
-# Activa o desactiva los registros de las distintas actividades del plugin.
-# Registros detallados del sistema
-# detailed_reload: registrar todos los archivos/secciones recargados
-# detailed_region_init: registrar la inicialización de cada región
-# @type: boolean
-# @default: false
-recarga_detallada: false
-
-# Registrar detalles de inicialización de región
-# @type: boolean
-# @default: false
-inicio_region_detallado: false
+# Nivel mínimo de registro (el más fino entre este y el del logger del servidor).
+# ALL mantiene el comportamiento idéntico al del logger del servidor.
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
+nivel_minimo: "INFO"
 
 # Registros de actividad básica
 # command: registrar los comandos de RTP ejecutados por los jugadores
@@ -23,6 +16,13 @@ comando: false
 # @type: boolean
 # @default: true
 teletransporte: true
+
+# Depuración de fallos de selección
+# Registra información detallada cuando la selección de una ubicación segura falla,
+# incluyendo las tasas de fallo y los parámetros de búsqueda.
+# @type: boolean
+# @default: true
+fallo_seleccion: true
 
 # Cuando el jugador cambia de mundo
 # @type: boolean
@@ -49,12 +49,19 @@ evento_movimiento: true
 # @default: true
 evento_teletransporte: true
 
-# Depuración de fallos de selección
-# Registra información detallada cuando la selección de una ubicación segura falla,
-# incluyendo las tasas de fallo y los parámetros de búsqueda.
+# --- Registros del plugin ---
+# Activa o desactiva los registros de las distintas actividades del plugin.
+# Registros detallados del sistema
+# detailed_reload: registrar todos los archivos/secciones recargados
+# detailed_region_init: registrar la inicialización de cada región
 # @type: boolean
-# @default: true
-fallo_seleccion: true
+# @default: false
+recarga_detallada: false
+
+# Registrar detalles de inicialización de región
+# @type: boolean
+# @default: false
+inicio_region_detallado: false
 
 # Registros del sistema
 # Relacionados con tareas en segundo plano y operaciones de base de datos.
@@ -66,13 +73,6 @@ sistema_rastreoMemoria: false
 # @type: boolean
 # @default: false
 sistema_baseDeDatos: false
-
-# Nivel mínimo de registro del plugin. El filtro efectivo es el más fino
-# entre este y el del logger de Bukkit. ALL mantiene el comportamiento idéntico.
-# @type: enum
-# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
-# @default: ALL
-nivel_minimo: "INFO"
 
 # NO MODIFIQUES EL NÚMERO DE VERSIÓN
 version: 1.0

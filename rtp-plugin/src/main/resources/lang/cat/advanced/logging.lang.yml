@@ -2,17 +2,17 @@
 # Maps internal baseline keys (left) to user-visible key names used in
 # logging.yml (right). Generated from the per-locale TSV; edit the TSV's
 # base_key/key columns and regenerate, do not hand-edit this file.
-detailed_reload: "long_grooming_session"
-detailed_region_init: "territory_marking"
+min_level: "minimum_meow_volume"
 command: "human_trick"
 teleport: "pounce"
+selection_failure: "missed_the_pounce"
 event_changeworld: "hopped_to_new_box"
 event_join: "new_kitty_arrived"
 event_respawn: "nine_lives_used"
 event_move: "prowl"
 event_teleport: "pounce_event"
-selection_failure: "missed_the_pounce"
+detailed_reload: "long_grooming_session"
+detailed_region_init: "territory_marking"
 system_memory_tracker: "snack_inventory"
 system_database: "scratching_post"
-min_level: "minimum_meow_volume"
 version: "meowsion"

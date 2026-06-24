@@ -1,11 +1,5 @@
 # --- RTP Economy Settings ---
-# Documentation: plugins/RTP/docs/admin/configuration/ECONOMY.md
-# Refund the deducted cost if the teleport is cancelled (move during
-# teleportDelay, pipeline failure, etc.).
-# @type: boolean
-# @default: true
-refundOnCancel: true
-
+# Documentation: https://github.com/DailyStruggle/RTP/wiki/Economy
 # Base cost charged for a successful /rtp.
 # @type: number
 # @range: [0.0, null]
@@ -30,12 +24,17 @@ paramsPrice: 1000000000.0
 # @default: 5000.0
 biomePrice: 5000.0
 
-# Minimum balance the player must retain after paying. The teleport is
-# rejected if the resulting balance would drop below this floor.
+# Refund the cost if the teleport is cancelled (player moves, failure, etc.).
+# @type: boolean
+# @default: true
+refundOnCancel: true
+
+# Minimum balance the player must retain after paying; teleport is rejected
+# if it would drop below this floor.
 # @type: number
 # @range: [0.0, null]
 # @default: 0.0
 balanceFloor: 0.0
 
 # DO NOT TOUCH VERSION NUMBER
-version: 1.0
+version: 1.1

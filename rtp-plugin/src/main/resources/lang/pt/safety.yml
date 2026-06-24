@@ -30,39 +30,6 @@ tempoInvulnerabilidade: 5
 # @default: 0
 raioSeguranca: 0
 
-# Limite de tentativas por chunk obsoleto (contagem)
-# Orçamento limitado de retentativas para o guardião de chunks obsoletos
-# . Após uma carga assíncrona de chunk se resolver,
-# a tarefa subsequente de avaliação de bloco é enfileirada em uma pipeline de
-# tarefas Count-Bound (agendador de Region Thread do Folia). Se a pipeline
-# estiver saturada, o GC nativo de chunks pode descarregar o chunk antes que a
-# tarefa execute, o que de outro modo dispararia uma carga síncrona no Region
-# Thread e ativaria o Watchdog do Folia. Quando o guardião detecta essa corrida,
-# reenfileira uma carga assíncrona até este número de vezes por candidato. Ao
-# esgotar, o candidato é rejeitado pela rota "unsafe" habitual (registra-se
-# um WARN; nada é descartado silenciosamente).
-# Padrão: 2. Aumente apenas em forks com um GC de chunks muito agressivo.
-# @type: integer
-# @range: [0, null]
-# @default: 2"
-staleChunkRetryLimit: 2
-
-# Pre-filtro Anvil somente leitura (apenas Spigot vanilla)
-# Sonda de segurança fora da thread que analisa o arquivo de região persistido
-# `r.X.Z.mca` e rejeita candidatos claramente inseguros (lava/magma/fogo na
-# superfície do heightmap) antes de solicitar a carga autoritativa do chunk
-# ao vivo. Reduz a pressão sobre a thread de tick no Spigot vanilla, onde a
-# API de carregamento de chunks ao vivo não é realmente assíncrona.
-# Não tem efeito no Paper nem no Folia (substituem a rota de carga de chunks
-# por APIs assíncronas nativas e nunca entram no pre-filtro).
-# A reverificação ao vivo chunk.isSafe(...) continua sendo a fonte autoritativa
-# em caso de ACCEPT; REJECT é o único atalho. Veja
-# Padrão: true. Defina como false para desativar a sonda (útil em forks
-# modificados com formatos de região exóticos).
-# @type: boolean
-# @default: true
-anvilPrefilterEnabled: true
-
 # Plataformas de aterrissagem
 # Cria uma plataforma de aterrissagem no destino do teletransporte.
 # O bloco central é escolhido conforme o tipo de bloco na localização.
@@ -100,204 +67,24 @@ alturaArPlataforma: 2
 # @default: GLASS
 materialPlataforma: "GLASS"
 
-# Optional timeout, in seconds, after which the emergency landing platform's
-# footprint is restored to the blocks that were there before it was built.
-# -1 disables restoration (the platform is permanent, the previous behaviour).
-# 0 restores as soon as the footprint chunk is loaded again; a positive value
-# restores after that many seconds of loaded time. The countdown only advances
-# while the footprint chunk is loaded (it pauses while the area is unloaded),
-# and pending restores survive a server restart.
+# Segundos após os quais a marca da plataforma é restaurada aos blocos originais.
+# -1 = nunca (permanente), 0 = assim que o chunk recarregar. A contagem só avança
+# enquanto o chunk está carregado; sobrevive a reinícios.
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
 # @default: -1
 platformRestoreSeconds: -1
 
-# Blocos de ar
-# Tipos de materiais considerados como espaço transitável/não bloqueante acima da aterrissagem.
-# Use tags de blocos vanilla sempre que possível para manter compatibilidade futura
-# com novas adições da Mojang.
-# @type: list<material>
-# @source: material
-blocosAr:
-  # Variantes reais de ar (nenhuma tag as cobre todas de uma vez)
-  - "AIR"
-  - "CAVE_AIR"
-  - "VOID_AIR"
-  - "LEGACY_AIR"
-  - "STRUCTURE_VOID"
-  - "LIGHT"
-  # Flores
-  - "#minecraft:flowers"
-  - "#minecraft:small_flowers"
-  # Nota: #minecraft:tall_flowers e uma tag apenas de itens no vanilla; seus membros
-  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) ja estao cobertos por
-  # #minecraft:flowers acima.
-  - "#minecraft:tall_flowers"
-  # Plantas similares à grama e arbustos não cobertos pelas tags de flores
-  - "SHORT_GRASS"
-  - "TALL_GRASS"
-  - "SHORT_DRY_GRASS"
-  - "TALL_DRY_GRASS"
-  - "FERN"
-  - "LARGE_FERN"
-  - "DEAD_BUSH"
-  - "BUSH"
-  - "WILDFLOWERS"
-  - "FIREFLY_BUSH"
-  - "LEGACY_LONG_GRASS"
-  - "LEGACY_DEAD_BUSH"
-  # Mudas, propágulos e fungos
-  - "#minecraft:saplings"
-  - "BROWN_MUSHROOM"
-  - "RED_MUSHROOM"
-  - "CRIMSON_FUNGUS"
-  - "WARPED_FUNGUS"
-  # Cultivos e flora de superfície sem uma tag conveniente
-  - "#minecraft:crops"
-  - "MELON_STEM"
-  - "PUMPKIN_STEM"
-  - "SUGAR_CANE"
-  - "BAMBOO_SAPLING"
-  # Trepadeiras e flora montada em paredes
-  - "VINE"
-  - "GLOW_LICHEN"
-  - "WEEPING_VINES"
-  - "TWISTING_VINES"
-  - "HANGING_ROOTS"
-  - "PALE_HANGING_MOSS"
-  - "RESIN_CLUMP"
-  # Trilhos
-  - "#minecraft:rails"
-  # Redstone e mecanismos (não há tag que os agrupe)
-  - "REDSTONE_WIRE"
-  - "COMPARATOR"
-  - "REPEATER"
-  - "LEVER"
-  - "STRING"
-  - "TRIPWIRE"
-  # Tochas e iluminação (não há tag de grupo)
-  - "TORCH"
-  - "WALL_TORCH"
-  - "SOUL_TORCH"
-  - "SOUL_WALL_TORCH"
-  - "REDSTONE_TORCH"
-  - "REDSTONE_WALL_TORCH"
-  - "END_ROD"
-  # Botões (variantes de pedra e madeira)
-  - "#minecraft:buttons"
-  # Placas de pressão
-  - "#minecraft:pressure_plates"
-  # Placas -- todas as variantes de pé/parede/penduradas em quatro tags
-  - "#minecraft:standing_signs"
-  - "#minecraft:wall_signs"
-  - "#minecraft:ceiling_hanging_signs"
-  - "#minecraft:wall_hanging_signs"
-  - "LEGACY_SIGN"
-  - "LEGACY_WALL_SIGN"
-  # Cobertura do chão
-  - "SNOW"
-  - "MOSS_CARPET"
-  - "PALE_MOSS_CARPET"
-  - "LEAF_LITTER"
-
-# Blocos inseguros
-# Materiais ou estados de bloco que o plugin rejeitará como destino de aterrissagem,
-# ou qualquer bloco dentro de `safetyRadius` do alvo. Aceita predicados de estado
-# e coringas (veja a gramática no início do arquivo).
-# @type: list<material>
-# @source: material
-blocosInseguros:
-  # Fluidos
-  - "WATER"
-  - "LAVA"
-  - "BUBBLE_COLUMN"
-  # Qualquer bloco waterlogged (lajes/escadas/cercas/muros/placas/correntes/...) --
-  # substitui o antigo pseudo-token 'WATERLOGGED'. Use o coringa do
-  - "*[waterlogged=true]"
-  # Fogo e perigos de calor
-  - "#minecraft:fire"
-  - "POWDER_SNOW"
-  - "MAGMA_BLOCK"
-  # Fogueiras (tanto acesas quanto apagadas são inseguras -- jogadores afundam nelas)
-  - "#minecraft:campfires"
-  # Dano por contato / aprisionamento
-  - "CACTUS"
-  - "SWEET_BERRY_BUSH"
-  - "WITHER_ROSE"
-  - "CHORUS_PLANT"
-  - "CHORUS_FLOWER"
-  - "POINTED_DRIPSTONE"
-  - "COBWEB"
-  - "CREAKING_HEART"
-  # Void / portal / inamovível
-  - "BEDROCK"
-  - "NETHER_PORTAL"
-  - "END_PORTAL"
-  - "END_GATEWAY"
-  # Explosivos
-  - "TNT"
-  - "END_CRYSTAL"
-  - "RESPAWN_ANCHOR"
-  # Flora aquática (risco de afogamento)
-  - "SEAGRASS"
-  - "TALL_SEAGRASS"
-  - "KELP"
-  - "KELP_PLANT"
-  - "#minecraft:logs"
-
-# Filtro de biomas
-# biomeWhitelist: false -> a lista `biomes` é uma lista negra (omite estes biomas)
-#                  true  -> a lista `biomes` é uma lista branca (permite apenas estes biomas)
-# A lista negra padrão exclui oceanos, rios, void e outros biomas onde
-# uma aterrissagem firme e segura é improvável ou impossível.
-# @type: boolean
-# @default: false
-listaPermitidaBiomas: false
-
-# Biomes treated as whitelist or blacklist members per biomeWhitelist.
-# @type: list<biome>
-# @source: biome
-biomas:
-  # BIOMAS OCEANICOS
-  - "OCEAN"
-  - "DEEP_OCEAN"
-  - "WARM_OCEAN"
-  - "LUKEWARM_OCEAN"
-  - "DEEP_LUKEWARM_OCEAN"
-  - "COLD_OCEAN"
-  - "DEEP_COLD_OCEAN"
-  - "FROZEN_OCEAN"
-  - "DEEP_FROZEN_OCEAN"
-  # BIOMAS FLUVIAIS
-  - "RIVER"
-  - "FROZEN_RIVER"
-  # BIOMAS ADJACENTES E COSTEIROS
-  - "BEACH"
-  - "SNOWY_BEACH"
-  - "STONY_SHORE"
-  - "SWAMP"
-  - "MANGROVE_SWAMP"
-  # BIOMAS DO END (sem aterrissagem solida / adjacentes ao void)
-  - "SMALL_END_ISLANDS"
-  # BIOMAS DO NETHER (terreno perigoso/irregular)
-  - "BASALT_DELTAS"
-  # BIOMAS TECNICOS
-  - "THE_VOID"
-  - "LUSH_CAVES"
-  - "DEEP_DARK"
-  - "THE_VOID"
-
 # --- Optional PvP / combat-tag pre-flight gate ---
-# Master toggle. When true, /rtp consults the active combat-state authority
-# before enrolling a player and again before applying the destination, and
-# applies pvpOnCombat below. Off by default.
+# Interruptor principal. Se true, /rtp verifica o estado de combate e aplica
+# pvpOnCombat (abaixo) antes de enfileirar e antes de teleportar.
 # @type: boolean
 # @default: false
 pvpCheckEnabled: false
 
-# How long after dealing or taking PvP damage a player is considered "in combat"
-# by RTP's native tracker. Ignored when an external combat-tag plugin is bound.
+# Segundos em que um jogador permanece "em combate" após dano PvP (apenas o
+# rastreador nativo; ignorado quando um plugin de combat-tag externo está ligado).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -333,6 +120,39 @@ pvpTagVictim: true
 # @type: boolean
 # @default: true
 pvpTagAggressor: true
+
+# Limite de tentativas por chunk obsoleto (contagem)
+# Orçamento limitado de retentativas para o guardião de chunks obsoletos
+# . Após uma carga assíncrona de chunk se resolver,
+# a tarefa subsequente de avaliação de bloco é enfileirada em uma pipeline de
+# tarefas Count-Bound (agendador de Region Thread do Folia). Se a pipeline
+# estiver saturada, o GC nativo de chunks pode descarregar o chunk antes que a
+# tarefa execute, o que de outro modo dispararia uma carga síncrona no Region
+# Thread e ativaria o Watchdog do Folia. Quando o guardião detecta essa corrida,
+# reenfileira uma carga assíncrona até este número de vezes por candidato. Ao
+# esgotar, o candidato é rejeitado pela rota "unsafe" habitual (registra-se
+# um WARN; nada é descartado silenciosamente).
+# Padrão: 2. Aumente apenas em forks com um GC de chunks muito agressivo.
+# @type: integer
+# @range: [0, null]
+# @default: 2"
+staleChunkRetryLimit: 2
+
+# Pre-filtro Anvil somente leitura (apenas Spigot vanilla)
+# Sonda de segurança fora da thread que analisa o arquivo de região persistido
+# `r.X.Z.mca` e rejeita candidatos claramente inseguros (lava/magma/fogo na
+# superfície do heightmap) antes de solicitar a carga autoritativa do chunk
+# ao vivo. Reduz a pressão sobre a thread de tick no Spigot vanilla, onde a
+# API de carregamento de chunks ao vivo não é realmente assíncrona.
+# Não tem efeito no Paper nem no Folia (substituem a rota de carga de chunks
+# por APIs assíncronas nativas e nunca entram no pre-filtro).
+# A reverificação ao vivo chunk.isSafe(...) continua sendo a fonte autoritativa
+# em caso de ACCEPT; REJECT é o único atalho. Veja
+# Padrão: true. Defina como false para desativar a sonda (útil em forks
+# modificados com formatos de região exóticos).
+# @type: boolean
+# @default: true
+anvilPrefilterEnabled: true
 
 # NAO MODIFIQUE O NUMERO DE VERSAO
 version: 1.0

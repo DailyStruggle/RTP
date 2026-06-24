@@ -1,14 +1,9 @@
-# --- Interruttori di logging del plugin ---
-# Documentazione: plugins/RTP/docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
-# Registra tutti i file ricaricati durante /rtp reload
-# @type: boolean
-# @default: false
-ricarica_dettagliata: false
-
-# Registra i dettagli di inizializzazione della regione
-# @type: boolean
-# @default: false
-init_regione_dettagliato: false
+# Livello di log minimo (il più fine tra questo e quello del logger del server).
+# ALL mantiene il comportamento identico a quello del logger del server.
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
+livello_minimo: "INFO"
 
 # Registra i comandi RTP eseguiti dai giocatori
 # @type: boolean
@@ -19,6 +14,11 @@ comando: false
 # @type: boolean
 # @default: true
 teletrasporto: true
+
+# Registra informazioni quando la selezione della posizione fallisce
+# @type: boolean
+# @default: true
+fallimento_selezione: true
 
 # Registra RTP attivato da cambi di mondo
 # @type: boolean
@@ -45,10 +45,17 @@ evento_movimento: true
 # @default: true
 evento_teletrasporto: true
 
-# Registra informazioni quando la selezione della posizione fallisce
+# --- Interruttori di logging del plugin ---
+# Documentazione: plugins/RTP/docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# Registra tutti i file ricaricati durante /rtp reload
 # @type: boolean
-# @default: true
-fallimento_selezione: true
+# @default: false
+ricarica_dettagliata: false
+
+# Registra i dettagli di inizializzazione della regione
+# @type: boolean
+# @default: false
+init_regione_dettagliato: false
 
 # Log di debug per l'attività di memoria
 # @type: boolean
@@ -59,13 +66,6 @@ sistema_tracciamentoMemoria: false
 # @type: boolean
 # @default: false
 sistema_database: false
-
-# Livello minimo di log del plugin. Il filtro effettivo è il più restrittivo
-# tra questo e quello del logger di Bukkit. ALL mantiene il comportamento identico.
-# @type: enum
-# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
-# @default: ALL
-livello_minimo: "INFO"
 
 # NON MODIFICARE IL NUMERO DI VERSIONE
 versione: 1.0

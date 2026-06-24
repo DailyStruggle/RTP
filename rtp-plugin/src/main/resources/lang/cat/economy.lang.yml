@@ -2,10 +2,10 @@
 # Maps internal baseline keys (left) to user-visible key names used in
 # economy.yml (right). Generated from the per-locale TSV; edit the TSV's
 # base_key/key columns and regenerate, do not hand-edit this file.
-refundOnCancel: "treats_back_if_napping"
 price: "treat_cost"
 priceOther: "treat_cost_for_friend"
 paramsPrice: "fancy_treat_cost"
 biomePrice: "territory_treat_cost"
+refundOnCancel: "treats_back_if_napping"
 balanceFloor: "empty_bowl"
 version: "meowsion"

@@ -1,11 +1,5 @@
 # --- Economieconfiguratie van RTP ---
 # Configureert de kosten van willekeurig teletransporteren via de servereconomie.
-# Terugbetalingsbeleid
-# Geeft aan of de prijs wordt terugbetaald en de wachttijd wordt gereset bij annulering.
-# @type: boolean
-# @default: true
-terugbetalingBijAnnulering: true
-
 # Teletransportkosten
 # Basiskosten voor een standaard /rtp-opdracht.
 # @type: number
@@ -31,8 +25,13 @@ parametersPrijs: 1000000000.0
 # @default: 5000.0
 bioomPrijs: 5000.0
 
-# Verplicht minimumsaldo.
-# Spelers kunnen hun saldo niet onder dit bedrag brengen met RTP.
+# Betaalt de kosten terug als de teleportatie wordt geannuleerd (speler beweegt, fout, enz.).
+# @type: boolean
+# @default: true
+terugbetalingBijAnnulering: true
+
+# Minimumsaldo dat de speler na betaling moet behouden; de teleportatie wordt
+# geweigerd als het hieronder zou zakken.
 # @type: number
 # @range: [0.0, null]
 # @default: 0.0

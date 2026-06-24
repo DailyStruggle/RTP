@@ -40,9 +40,9 @@ class BacklogRefillThresholdTest {
 
     @Test
     void shippedYamlDeclaresDefaultHalf() throws IOException {
-        Path yml = Path.of("..", "rtp-plugin", "src", "main", "resources", "performance.yml");
+        Path yml = Path.of("..", "rtp-plugin", "src", "main", "resources", "advanced", "performance.yml");
         if (!Files.exists(yml)) {
-            yml = Path.of("rtp-plugin", "src", "main", "resources", "performance.yml");
+            yml = Path.of("rtp-plugin", "src", "main", "resources", "advanced", "performance.yml");
         }
         assertTrue(Files.exists(yml), "performance.yml not found at " + yml.toAbsolutePath());
         String content = Files.readString(yml);

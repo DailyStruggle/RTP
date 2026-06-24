@@ -1,16 +1,9 @@
-# --- Plugin-logboeken ---
-# Schakelt logboekregistratie van verschillende pluginactiviteiten in of uit.
-# Gedetailleerde systeemlogboeken
-# gedetailleerd_herladen: alle herladen bestanden/secties registreren
-# gedetailleerd_regioInit: initialisatie van elke regio registreren
-# @type: boolean
-# @default: false
-gedetailleerd_herladen: false
-
-# Details van regio-initialisatie loggen
-# @type: boolean
-# @default: false
-gedetailleerd_regioInit: false
+# Minimaal logniveau (het fijnste van dit en dat van de server-logger).
+# ALL houdt het gedrag identiek aan de server-logger.
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
+min_niveau: "INFO"
 
 # Basisactiviteitslogboeken
 # opdracht: RTP-opdrachten uitgevoerd door spelers registreren
@@ -23,6 +16,13 @@ opdracht: false
 # @type: boolean
 # @default: true
 teletransport: true
+
+# Foutopsporing bij selectiemislukkingen
+# Registreert gedetailleerde informatie wanneer het selecteren van een veilige locatie mislukt,
+# inclusief mislukkingspercentages en zoekparameters.
+# @type: boolean
+# @default: true
+selectie_mislukking: true
 
 # Automatische of gebeurtenisgestuurde RTP-logboeken
 # Logboeken voor door gebeurtenissen geactiveerde RTP:
@@ -51,12 +51,19 @@ gebeurtenis_bewegen: true
 # @default: true
 gebeurtenis_teletransport: true
 
-# Foutopsporing bij selectiemislukkingen
-# Registreert gedetailleerde informatie wanneer het selecteren van een veilige locatie mislukt,
-# inclusief mislukkingspercentages en zoekparameters.
+# --- Plugin-logboeken ---
+# Schakelt logboekregistratie van verschillende pluginactiviteiten in of uit.
+# Gedetailleerde systeemlogboeken
+# gedetailleerd_herladen: alle herladen bestanden/secties registreren
+# gedetailleerd_regioInit: initialisatie van elke regio registreren
 # @type: boolean
-# @default: true
-selectie_mislukking: true
+# @default: false
+gedetailleerd_herladen: false
+
+# Details van regio-initialisatie loggen
+# @type: boolean
+# @default: false
+gedetailleerd_regioInit: false
 
 # Systeemlogboeken
 # Gerelateerd aan achtergrondtaken en databasebewerkingen.
@@ -68,13 +75,6 @@ systeem_geheugenTracker: false
 # @type: boolean
 # @default: false
 systeem_database: false
-
-# Minimaal logniveau van de plugin. Het effectieve filter is het fijnste van
-# dit niveau en dat van de Bukkit-logger. ALL behoudt hetzelfde gedrag.
-# @type: enum
-# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
-# @default: ALL
-min_niveau: "INFO"
 
 # WIJZIG HET VERSIENUMMER NIET
 version: 1.0

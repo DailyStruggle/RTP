@@ -1,3 +1,19 @@
+# 最低 TPS 要求
+# 在向缓存中追加新位置之前要求的最低服务器 TPS。
+# 范围: 0.0 - 20.0。
+# 影响: 低 — 防止插件在服务器卡顿时进一步加重负担。
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+最低TPS: 19.0
+
+# 暂停后台缓存填充的 JVM 堆使用率上限（最大值的 %）。
+# 已缓存的位置仍会提供。0 或 100 表示禁用。
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeap百分比: 85.0
+
 # --- RTP 性能设置 ---
 # 针对服务器性能精细调节插件行为。
 # 最大查找尝试次数
@@ -7,34 +23,6 @@
 # @range: [1, null]
 # @default: 32
 最大尝试次数: 10
-
-# 目标位置预加载（区块）
-# 在目标周围预加载的区块半径。
-# 加载的区块数 = ( 1 + 2 * 半径 )^2。
-# 影响: 高 — 数值过大可能在传送时导致 TPS 下降。
-# @type: integer
-# @range: [0, null]
-# @unit: chunks
-# @default: 0
-视距_选择: 0
-
-# 传送前在最终位置周围加载的区块半径。
-# 0 仅加载目标区块。
-# @type: integer
-# @range: [0, null]
-# @unit: chunks
-# @default: 0
-视距_传送: 0
-
-# 传送玩家到达后视距稳定恢复所经历的总刻数。传送时会先把视距临时降到
-# viewDistanceTeleport 半径(最小为 2),使服务器在放置玩家时只加载一小圈
-# 区块,然后在这么多刻内逐步升回。这能平滑可能在弱主机上卡住一刻的区块加载
-# 峰值。0 表示关闭该限制。当 viewDistanceTeleport 已大于等于玩家视距时无效。
-# @type: integer
-# @range: [0, null]
-# @unit: ticks
-# @default: 200
-视距_恢复间隔: 200
 
 # 选择频率（游戏刻）
 # 后台为各区域缓存补充新位置的间隔时间。
@@ -63,24 +51,30 @@
 # @default: 50
 分配时间_异步: 50
 
-# 最低 TPS 要求
-# 在向缓存中追加新位置之前要求的最低服务器 TPS。
-# 范围: 0.0 - 20.0。
-# 影响: 低 — 防止插件在服务器卡顿时进一步加重负担。
-# @type: number
-# @range: [0.0, 20.0]
-# @default: 19.0
-最低TPS: 19.0
+# 目标位置预加载（区块）
+# 在目标周围预加载的区块半径。
+# 加载的区块数 = ( 1 + 2 * 半径 )^2。
+# 影响: 高 — 数值过大可能在传送时导致 TPS 下降。
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+视距_选择: 0
 
-# 后台缓存生成暂停前的 JVM 堆最大使用率(占最大堆的百分比)。每个缓存的位置
-# 都会固定一个区块，因此在堆较小的服务器上无限制地填充可能会使 JVM 陷入持续的
-# 垃圾回收，并在没有任何控制台错误的情况下导致服务器无响应。当使用率达到或
-# 超过此阈值时，RTP 会停止补充位置缓存，但仍会继续向等待中的玩家提供已缓存的
-# 位置。0 或 100 可禁用此限制。
-# @type: number
-# @range: [0.0, 100.0]
-# @default: 85.0
-maxHeap百分比: 85.0
+# 传送前在最终位置周围加载的区块半径。
+# 0 仅加载目标区块。
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+视距_传送: 0
+
+# 传送后玩家视距恢复正常所经历的刻数，用于平滑区块加载峰值。0 表示禁用钳制。
+# @type: integer
+# @range: [0, null]
+# @unit: ticks
+# @default: 200
+视距_恢复间隔: 200
 
 # 传送后排队
 # 若为 true，则插件会在一次 RTP 之后立即尝试补充位置缓存。
@@ -89,24 +83,36 @@ maxHeap百分比: 85.0
 # @default: false
 传送后排队: false
 
-# 同步加载
-# 在选择位置时使用同步区块加载。
-# 影响: 高 — 不推荐！可能造成严重的服务器卡顿。
-# @type: boolean
-# @default: false
-同步加载: false
-
-# 权限解析（启动时）
-# onEventParsing: 与通配符权限 *.* 不兼容。
-# 影响: 中 (onEvent) / 低 (effect)
-# @type: boolean
-# @default: false
-事件时解析: false
-
-# 在启动时解析效果权限节点。
+# 将已加载区块的生物群系记录到空间内存，供生物群系召回 / 加权使用。无额外区块 I/O。
 # @type: boolean
 # @default: true
-效果解析: true
+区块加载时检查: true
+
+# 恢复填充时 L3 积压容量的比例（滞后）。
+# 0.5 = 排空至 50% 后填充；1.0 = 持续填充。
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+积压补充阈值: 0.5
+
+# 每次尝试拒绝未生成区块的概率。
+# 0.0 = 无偏向，1.0 = 避开未生成的地块。已生成的区块始终通过。
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+预生成偏好: 0.0
+
+# 为加入时的传送预留一份位置缓存
+# (rtp.onevent.firstjoin / rtp.onevent.join)。
+# @type: boolean
+# @default: false
+登录缓存启用: false
+
+# 加入缓存的硬上限。0 = 自动 (服务器启动时的 max-players)。
+# @type: integer
+# @range: [0, null]
+# @default: 0
+登录缓存上限: 0
 
 # 生物群系选择缓存
 # biomeRecall: 复用按生物群系曾经找到过的位置。
@@ -116,28 +122,21 @@ maxHeap百分比: 85.0
 # @default: true
 生物群系记忆: true
 
-# 启用后，仅从缓存中处理按生物群系筛选的请求（绝不发起新的生物群系搜索）。
-# 需要 biomeRecall。
+# 仅从缓存提供按生物群系过滤的请求（绝不生成新的生物群系搜索）。需要 biomeRecall。
 # @type: boolean
 # @default: false
 生物群系记忆_强制: false
 
-# 对按生物群系筛选的选择进行加权，使每个请求的生物群系以相同概率被选中，
-# 而不是按其在区域中所占比例选中。当请求多个生物群系时，可防止常见生物群系
-# 淹没稀有生物群系。需要 biomeRecall；对未筛选（默认生物群系）的传送无效。
+# 以相等概率引导每个请求的生物群系，而非按其覆盖区域的比例。需要 biomeRecall；
+# 对无过滤的传送无效。
 # @type: boolean
 # @default: false
 生物群系加权: false
 
-# Per-biome relative selection weights for biome-filtered teleports.
-# Only consulted when biomeWeighted is true. Biomes not listed here use
-# weight 1.0, so an empty/all-equal map reproduces the equal-probability
-# behavior of biomeWeighted on its own. A biome given weight 2.0 is
-# steered toward roughly twice as often as a weight-1.0 biome among the
-# requested set (when both are present in biome-recall memory); 0.0
-# suppresses a biome. Requires biomeRecall; no effect on unfiltered
-# (default-biome) teleports. The shipped plains entry is a weight-1.0
-# no-op example - replace or extend it with the biomes you want to bias.
+# 按生物群系过滤传送的各生物群系相对权重。仅当 biomeWeighted 为 true 时使用。
+# 未列出的生物群系使用 1.0（无偏向）；2.0 = 被选中约两倍频率，0.0 = 抑制。
+# 完整的原版生物群系集已按 1.0 预先列出作为可编辑参考；用平台 id 添加模组生物
+# 群系（如 terralith:emerald_peaks）。需要 biomeRecall。
 # @type: map<string, number>
 生物群系权重:
   # 该生物群系的相对选择权重（1.0 = 无偏向）。
@@ -213,12 +212,40 @@ maxHeap百分比: 85.0
   # --- 杂项 / 技术 ---
   the_void: 1.0
 
-# 区块加载时被动检查
-# 在区域范围内的所有已加载区块中查找安全位置。
-# 影响: 高 — 可能在区块加载事件中显著增加服务器负担。
+# 延迟阈值（毫秒），超过此值的即时传送将被审计
+# （记录 WARN，slowPipelineCount 递增）。0 或更小表示禁用。
+# @type: integer
+# @range: [0, null]
+# @unit: ms
+# @default: 5000
+慢管线阈值Ms: 5000
+
+# 审计背压的队列深度（等待中的玩家数）
+# （记录 WARN，queueGrowthWarnCount 递增）。0 或更小表示禁用。
+# @type: integer
+# @range: [0, null]
+# @unit: players
+# @default: 0
+队列增长警告阈值: 0
+
+# 同步加载
+# 在选择位置时使用同步区块加载。
+# 影响: 高 — 不推荐！可能造成严重的服务器卡顿。
+# @type: boolean
+# @default: false
+同步加载: false
+
+# 权限解析（启动时）
+# onEventParsing: 与通配符权限 *.* 不兼容。
+# 影响: 中 (onEvent) / 低 (effect)
+# @type: boolean
+# @default: false
+事件时解析: false
+
+# 在启动时解析效果权限节点。
 # @type: boolean
 # @default: true
-区块加载时检查: true
+效果解析: true
 
 # 观察者模式缓存填充（Region Data Visitor）
 # 当预生成缓存已满时，按相同的 `period` 周期为每个区域调度一个观察类型的
@@ -235,57 +262,8 @@ maxHeap百分比: 85.0
 # @default: false
 访客启用: true
 
-# 为加入时传送 (rtp.onevent.firstjoin / rtp.onevent.join) 保留缓存。容量由剩余空闲槽位决定。参见。
-# @type: boolean
-# @default: false
-登录缓存启用: false
-
-# 加入缓存的硬上限。0 = 自动 (服务器启动时的 max-players)。
-# @type: integer
-# @range: [0, null]
-# @default: 0
-登录缓存上限: 0
-
-# 每次选择尝试拒绝未生成区块的概率。
-# 0.0 = 无偏向（默认），1.0 = 严格避开未生成的地块。
-# 已生成的区块始终通过。
-# @type: number
-# @range: [0.0, 1.0]
-# @default: 0.0
-预生成偏好: 0.0
-
-# 恢复补充时 L3 积压容量所占的比例（迟滞）。
-# 0.5 = 仅在 L3 降至 50% 后才补充（默认）。1.0 = 持续补充。
-# 数值越大，越会合并 .mca 分箱检查，以提升 CPU/内存效率。
-# @type: number
-# @range: [0.0, 1.0]
-# @default: 0.5
-积压补充阈值: 0.5
-
-# 延迟阈值（毫秒），超过该值的即时处理（未排队）传送将被审计：
-# 记录一条 WARN 并递增累计计数器 slowPipelineCount（由 /rtp info 显示）。
-# 仅审计即时/未排队的传送；排队的限速传送会被排除，因为其测得时间
-# 包含排队等待。设为 0 或更小可禁用审计。
-# @type: integer
-# @range: [0, null]
-# @unit: ms
-# @default: 5000
-慢管线阈值Ms: 5000
-
-# 公共传送队列深度（等待的玩家数）达到或超过该值时，将审计队列背压：
-# 记录一条边沿触发的 WARN，并在每次越过阈值时将累计计数器
-# queueGrowthWarnCount（由 /rtp info 显示）递增一次。
-# 设为 0 或更小可禁用审计（需手动开启）。
-# @type: integer
-# @range: [0, null]
-# @unit: players
-# @default: 0
-队列增长警告阈值: 0
-
-# /rtp admin prefab 的设置。apply -> confirm 流程会为每个改动的配置文件写入一个
-# 名为 <file>.yml.bak.<epochMillis> 的备份；bakRetention 限制每个文件保留的此类
-# 备份数量，最旧的先被清除。设为 1 仅保留最新备份；小于 1 的值会被钳制为 1。
-# /rtp admin prefab rollback 会在多次调用中按从新到旧的顺序遍历备份。
+# /rtp admin prefab 的设置。apply -> confirm 流程会为每个改动的文件写入一份备份；
+# bakRetention 限制保留数量（最旧的先清除）。
 预设:
   # 每个文件在修剪前保留的带时间戳配置备份数量。
   # @type: integer

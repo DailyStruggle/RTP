@@ -1,11 +1,5 @@
 # --- Impostazioni economiche di RTP ---
 # Documentazione: plugins/RTP/docs/admin/configuration/ECONOMY.md
-# Rimborsa il costo detratto se il teletrasporto viene annullato (movimento durante
-# teleportDelay, fallimento della pipeline, ecc.).
-# @type: boolean
-# @default: true
-rimborsoAnnullamento: true
-
 # Costo base addebitato per un /rtp riuscito.
 # @type: number
 # @range: [0.0, null]
@@ -30,8 +24,13 @@ prezzoParametri: 1000000000.0
 # @default: 5000.0
 prezzoBioma: 5000.0
 
-# Saldo minimo che il giocatore deve mantenere dopo aver pagato. Il teletrasporto
-# viene rifiutato se il saldo risultante scenderebbe sotto questa soglia.
+# Rimborsa il costo se il teletrasporto viene annullato (il giocatore si muove, errore, ecc.).
+# @type: boolean
+# @default: true
+rimborsoAnnullamento: true
+
+# Saldo minimo che il giocatore deve mantenere dopo il pagamento; il teletrasporto
+# viene rifiutato se scenderebbe sotto questa soglia.
 # @type: number
 # @range: [0.0, null]
 # @default: 0.0

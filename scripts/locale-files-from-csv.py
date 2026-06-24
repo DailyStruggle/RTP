@@ -200,10 +200,16 @@ def main() -> int:
         if not test_in_scope(relpath, only):
             continue
         d = relpath.rsplit("/", 1)[0] if "/" in relpath else ""
-        if d == "":
+        if relpath.startswith("lang/"):
+            # Locale value file: the lang map is its direct sibling.
+            lang_rel = f"{d}/{stem}.lang.yml"
+        elif d == "":
+            # Baseline root value file: lang map lives at lang/<stem>.lang.yml.
             lang_rel = f"lang/{stem}.lang.yml"
         else:
-            lang_rel = f"{d}/{stem}.lang.yml"
+            # Baseline sub-tier value file (e.g. advanced/<file>.yml): the lang map
+            # lives under lang/<subdir>/, not in the value file's own directory.
+            lang_rel = f"lang/{d}/{stem}.lang.yml"
 
         pairs: dict[str, str] = {}
         for r in grouped[relpath]:

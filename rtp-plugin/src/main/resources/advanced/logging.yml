@@ -1,14 +1,11 @@
 # --- Plugin Logging Toggles ---
-# Documentation: plugins/RTP/docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
-# Log all files reloaded during /rtp reload
-# @type: boolean
-# @default: false
-detailed_reload: false
-
-# Log region initialization details
-# @type: boolean
-# @default: false
-detailed_region_init: false
+# Documentation: https://github.com/DailyStruggle/RTP/wiki/Logging
+# Minimum log level (finer of this and the server logger's own level).
+# ALL keeps behavior identical to the server logger.
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
+min_level: "INFO"
 
 # Log player-executed RTP commands
 # @type: boolean
@@ -20,6 +17,12 @@ command: false
 # @default: true
 teleport: true
 
+# Log info when location selection fails
+# @type: boolean
+# @default: true
+selection_failure: true
+
+# --- Event logging ---
 # Log RTP triggered by world changes
 # @type: boolean
 # @default: true
@@ -45,10 +48,16 @@ event_move: true
 # @default: true
 event_teleport: true
 
-# Log info when location selection fails
+# --- Debug (verbose) ---
+# Log all files reloaded during /rtp reload
 # @type: boolean
-# @default: true
-selection_failure: true
+# @default: false
+detailed_reload: false
+
+# Log region initialization details
+# @type: boolean
+# @default: false
+detailed_region_init: false
 
 # Debug logs for memory activity
 # @type: boolean
@@ -59,13 +68,6 @@ system_memory_tracker: false
 # @type: boolean
 # @default: false
 system_database: false
-
-# Plugin-scoped minimum log level. Effective filter is the finer of this and the
-# Bukkit logger's own level. ALL keeps behavior identical to the Bukkit logger.
-# @type: enum
-# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
-# @default: ALL
-min_level: "INFO"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.1

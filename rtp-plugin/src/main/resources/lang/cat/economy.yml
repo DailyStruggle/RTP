@@ -1,10 +1,5 @@
 # --- RTP Treats (economy, cat dialect) ---
 # Treats! Mrrow! How many kibbles a pounce costs.
-# Refund treats if the pounce is cancelled (tummy too rumbly)
-# @type: boolean
-# @default: true
-treats_back_if_napping: true
-
 # Base treat cost for /rtp
 # @type: number
 # @range: [0.0, null]
@@ -29,7 +24,13 @@ fancy_treat_cost: 1000000000.0
 # @default: 5000.0
 territory_treat_cost: 5000.0
 
-# Empty bowl: minimum treats to keep after paying
+# Give the treats back if the zoomies get cancelled (kitty wandered off, oopsie, etc.).
+# @type: boolean
+# @default: true
+treats_back_if_napping: true
+
+# Smallest treat-pile kitty must keep after paying; the zoomies are denied
+# if it would drop below this floor.
 # @type: number
 # @range: [0.0, null]
 # @default: 0.0

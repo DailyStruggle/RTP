@@ -193,12 +193,15 @@ def main() -> int:
         p for p in resources_root.glob("*.yml")
         if p.is_file() and p.name not in ("plugin.yml", "language.yml")
     ]
-    # ADR-071: the advanced/ tier holds ordinary single-file baseline parsers under
-    # a subdirectory. Fold them in with their relpath ("advanced/<file>.yml") so the
-    # locale TSVs (which scan lang/<locale>/ recursively) have a baseline counterpart.
-    advanced_dir = resources_root / "advanced"
-    if advanced_dir.is_dir():
-        baseline_files.extend(p for p in advanced_dir.glob("*.yml") if p.is_file())
+    # ADR-071 sub-tier directories whose single-file parsers live under a
+    # subdirectory but ship per-locale value copies under lang/<locale>/<sub>/.
+    # Fold them into the baseline with their "<sub>/<file>.yml" relpath so the
+    # locale TSVs (scanned recursively below) have a baseline counterpart and
+    # reconcile does not drop their rows.
+    for sub in ("advanced", "messages"):
+        sub_dir = resources_root / sub
+        if sub_dir.is_dir():
+            baseline_files.extend(p for p in sub_dir.glob("*.yml") if p.is_file())
     for f in sorted(baseline_files, key=lambda p: str(p.relative_to(resources_root)).replace("\\", "/")):
         rel = str(f.relative_to(resources_root)).replace("\\", "/")
         baseline_file_count += 1

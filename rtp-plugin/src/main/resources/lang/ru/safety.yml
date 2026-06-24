@@ -30,39 +30,6 @@
 # @default: 0
 радиусБезопасности: 0
 
-# Лимит повторов на устаревший чанк (число)
-# Ограниченный бюджет повторов для стража устаревших чанков
-# . После разрешения асинхронной загрузки чанка
-# следующая задача оценки блока ставится в очередь конвейера задач
-# Count-Bound (планировщик Region Thread Folia). Если конвейер перегружен,
-# нативный GC чанков может выгрузить чанк до выполнения задачи, что иначе
-# вызвало бы синхронную загрузку в Region Thread и сработал бы Folia
-# Watchdog. Когда страж обнаруживает эту гонку, он переставляет асинхронную
-# загрузку в очередь до этого числа раз на кандидата. При исчерпании
-# кандидат отклоняется обычным маршрутом "unsafe" (логируется WARN; ничего
-# не отбрасывается молча).
-# По умолчанию: 2. Увеличивайте только в форках с очень агрессивным GC чанков.
-# @type: integer
-# @range: [0, null]
-# @default: 2"
-staleChunkRetryLimit: 2
-
-# Anvil-префильтр только для чтения (только Spigot vanilla)
-# Внепотоковая проба безопасности, которая анализирует сохранённый файл
-# региона `r.X.Z.mca` и отклоняет явно небезопасных кандидатов (лава/магма/
-# огонь на поверхности heightmap) до запроса авторитетной загрузки чанка
-# вживую. Снижает нагрузку на тик-поток в Spigot vanilla, где API живой
-# загрузки чанков не является по-настоящему асинхронным.
-# Не действует на Paper и Folia (они заменяют маршрут загрузки чанков
-# нативными асинхронными API и никогда не входят в префильтр).
-# Живая перепроверка chunk.isSafe(...) остаётся авторитетным источником при
-# ACCEPT; REJECT - единственный короткий путь. См.
-# По умолчанию: true. Установите false, чтобы отключить пробу (полезно в
-# модифицированных форках с экзотическими форматами региона).
-# @type: boolean
-# @default: true
-anvilPrefilterEnabled: true
-
 # Платформы приземления
 # Создаёт платформу приземления в месте назначения телепорта.
 # Центральный блок выбирается по типу блока в локации.
@@ -99,204 +66,24 @@ anvilPrefilterEnabled: true
 # @default: GLASS
 материалПлатформы: "GLASS"
 
-# Optional timeout, in seconds, after which the emergency landing platform's
-# footprint is restored to the blocks that were there before it was built.
-# -1 disables restoration (the platform is permanent, the previous behaviour).
-# 0 restores as soon as the footprint chunk is loaded again; a positive value
-# restores after that many seconds of loaded time. The countdown only advances
-# while the footprint chunk is loaded (it pauses while the area is unloaded),
-# and pending restores survive a server restart.
+# Секунды, после которых след платформы восстанавливается до исходных блоков.
+# -1 = никогда (постоянно), 0 = как только чанк перезагрузится. Отсчёт идёт
+# только при загруженном чанке; сохраняется после перезапусков.
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
 # @default: -1
 platformRestoreSeconds: -1
 
-# Блоки воздуха
-# Типы материалов, считающиеся проходимым/неблокирующим пространством над приземлением.
-# По возможности используйте теги блоков vanilla для совместимости с будущими
-# добавлениями Mojang.
-# @type: list<material>
-# @source: material
-блокиВоздуха:
-  # Настоящие варианты воздуха (ни один тег не покрывает все сразу)
-  - "AIR"
-  - "CAVE_AIR"
-  - "VOID_AIR"
-  - "LEGACY_AIR"
-  - "STRUCTURE_VOID"
-  - "LIGHT"
-  # Цветы
-  - "#minecraft:flowers"
-  - "#minecraft:small_flowers"
-  # Примечание: #minecraft:tall_flowers в ванилле является тегом только для предметов; его члены
-  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) уже охвачены тегом
-  # #minecraft:flowers выше.
-  - "#minecraft:tall_flowers"
-  # Растения вроде травы и кусты, не покрытые тегами цветов
-  - "SHORT_GRASS"
-  - "TALL_GRASS"
-  - "SHORT_DRY_GRASS"
-  - "TALL_DRY_GRASS"
-  - "FERN"
-  - "LARGE_FERN"
-  - "DEAD_BUSH"
-  - "BUSH"
-  - "WILDFLOWERS"
-  - "FIREFLY_BUSH"
-  - "LEGACY_LONG_GRASS"
-  - "LEGACY_DEAD_BUSH"
-  # Саженцы, побеги и грибы
-  - "#minecraft:saplings"
-  - "BROWN_MUSHROOM"
-  - "RED_MUSHROOM"
-  - "CRIMSON_FUNGUS"
-  - "WARPED_FUNGUS"
-  # Посевы и поверхностная флора без удобного тега
-  - "#minecraft:crops"
-  - "MELON_STEM"
-  - "PUMPKIN_STEM"
-  - "SUGAR_CANE"
-  - "BAMBOO_SAPLING"
-  # Лианы и настенная флора
-  - "VINE"
-  - "GLOW_LICHEN"
-  - "WEEPING_VINES"
-  - "TWISTING_VINES"
-  - "HANGING_ROOTS"
-  - "PALE_HANGING_MOSS"
-  - "RESIN_CLUMP"
-  # Рельсы
-  - "#minecraft:rails"
-  # Редстоун и механизмы (нет общего тега)
-  - "REDSTONE_WIRE"
-  - "COMPARATOR"
-  - "REPEATER"
-  - "LEVER"
-  - "STRING"
-  - "TRIPWIRE"
-  # Факелы и освещение (нет тега группы)
-  - "TORCH"
-  - "WALL_TORCH"
-  - "SOUL_TORCH"
-  - "SOUL_WALL_TORCH"
-  - "REDSTONE_TORCH"
-  - "REDSTONE_WALL_TORCH"
-  - "END_ROD"
-  # Кнопки (каменные и деревянные варианты)
-  - "#minecraft:buttons"
-  # Нажимные плиты
-  - "#minecraft:pressure_plates"
-  # Таблички -- все варианты стоящих/настенных/висящих в четырёх тегах
-  - "#minecraft:standing_signs"
-  - "#minecraft:wall_signs"
-  - "#minecraft:ceiling_hanging_signs"
-  - "#minecraft:wall_hanging_signs"
-  - "LEGACY_SIGN"
-  - "LEGACY_WALL_SIGN"
-  # Покрытие пола
-  - "SNOW"
-  - "MOSS_CARPET"
-  - "PALE_MOSS_CARPET"
-  - "LEAF_LITTER"
-
-# Небезопасные блоки
-# Материалы или состояния блоков, которые плагин отклонит как пункт назначения,
-# или любой блок в пределах `safetyRadius` от цели. Поддерживает предикаты
-# состояний и джокеры (см. грамматику в начале файла).
-# @type: list<material>
-# @source: material
-небезопасныеБлоки:
-  # Жидкости
-  - "WATER"
-  - "LAVA"
-  - "BUBBLE_COLUMN"
-  # Любой waterlogged-блок (плиты/лестницы/заборы/стены/таблички/цепи/...) --
-  # заменяет старый псевдотокен 'WATERLOGGED'. Используется джокер из
-  - "*[waterlogged=true]"
-  # Огонь и тепловые опасности
-  - "#minecraft:fire"
-  - "POWDER_SNOW"
-  - "MAGMA_BLOCK"
-  # Костры (как горящие, так и потушенные небезопасны -- игроки проваливаются в них)
-  - "#minecraft:campfires"
-  # Контактный урон / ловушки
-  - "CACTUS"
-  - "SWEET_BERRY_BUSH"
-  - "WITHER_ROSE"
-  - "CHORUS_PLANT"
-  - "CHORUS_FLOWER"
-  - "POINTED_DRIPSTONE"
-  - "COBWEB"
-  - "CREAKING_HEART"
-  # Void / портал / непереносимое
-  - "BEDROCK"
-  - "NETHER_PORTAL"
-  - "END_PORTAL"
-  - "END_GATEWAY"
-  # Взрывоопасное
-  - "TNT"
-  - "END_CRYSTAL"
-  - "RESPAWN_ANCHOR"
-  # Водная флора (риск утопления)
-  - "SEAGRASS"
-  - "TALL_SEAGRASS"
-  - "KELP"
-  - "KELP_PLANT"
-  - "#minecraft:logs"
-
-# Фильтр биомов
-# biomeWhitelist: false -> список `biomes` это чёрный список (пропускает эти биомы)
-#                  true  -> список `biomes` это белый список (разрешает только эти биомы)
-# Чёрный список по умолчанию исключает океаны, реки, void и другие биомы, где
-# твёрдое и безопасное приземление маловероятно или невозможно.
-# @type: boolean
-# @default: false
-белыйСписокБиомов: false
-
-# Biomes treated as whitelist or blacklist members per biomeWhitelist.
-# @type: list<biome>
-# @source: biome
-биомы:
-  # БИОМЫ ОКЕАНОВ
-  - "OCEAN"
-  - "DEEP_OCEAN"
-  - "WARM_OCEAN"
-  - "LUKEWARM_OCEAN"
-  - "DEEP_LUKEWARM_OCEAN"
-  - "COLD_OCEAN"
-  - "DEEP_COLD_OCEAN"
-  - "FROZEN_OCEAN"
-  - "DEEP_FROZEN_OCEAN"
-  # БИОМЫ РЕК
-  - "RIVER"
-  - "FROZEN_RIVER"
-  # СОПУТСТВУЮЩИЕ И ПРИБРЕЖНЫЕ БИОМЫ
-  - "BEACH"
-  - "SNOWY_BEACH"
-  - "STONY_SHORE"
-  - "SWAMP"
-  - "MANGROVE_SWAMP"
-  # БИОМЫ ENDа (без твёрдого приземления / рядом с void)
-  - "SMALL_END_ISLANDS"
-  # БИОМЫ NETHERа (опасный/неровный рельеф)
-  - "BASALT_DELTAS"
-  # ТЕХНИЧЕСКИЕ БИОМЫ
-  - "THE_VOID"
-  - "LUSH_CAVES"
-  - "DEEP_DARK"
-  - "THE_VOID"
-
 # --- Optional PvP / combat-tag pre-flight gate ---
-# Master toggle. When true, /rtp consults the active combat-state authority
-# before enrolling a player and again before applying the destination, and
-# applies pvpOnCombat below. Off by default.
+# Главный переключатель. Если true, /rtp проверяет боевое состояние и применяет
+# pvpOnCombat (ниже) перед постановкой в очередь и перед телепортацией.
 # @type: boolean
 # @default: false
 pvpCheckEnabled: false
 
-# How long after dealing or taking PvP damage a player is considered "in combat"
-# by RTP's native tracker. Ignored when an external combat-tag plugin is bound.
+# Секунды, в течение которых игрок считается "в бою" после урона PvP (только
+# встроенный трекер; игнорируется при подключённом внешнем combat-tag плагине).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -332,6 +119,39 @@ pvpTagVictim: true
 # @type: boolean
 # @default: true
 pvpTagAggressor: true
+
+# Лимит повторов на устаревший чанк (число)
+# Ограниченный бюджет повторов для стража устаревших чанков
+# . После разрешения асинхронной загрузки чанка
+# следующая задача оценки блока ставится в очередь конвейера задач
+# Count-Bound (планировщик Region Thread Folia). Если конвейер перегружен,
+# нативный GC чанков может выгрузить чанк до выполнения задачи, что иначе
+# вызвало бы синхронную загрузку в Region Thread и сработал бы Folia
+# Watchdog. Когда страж обнаруживает эту гонку, он переставляет асинхронную
+# загрузку в очередь до этого числа раз на кандидата. При исчерпании
+# кандидат отклоняется обычным маршрутом "unsafe" (логируется WARN; ничего
+# не отбрасывается молча).
+# По умолчанию: 2. Увеличивайте только в форках с очень агрессивным GC чанков.
+# @type: integer
+# @range: [0, null]
+# @default: 2"
+staleChunkRetryLimit: 2
+
+# Anvil-префильтр только для чтения (только Spigot vanilla)
+# Внепотоковая проба безопасности, которая анализирует сохранённый файл
+# региона `r.X.Z.mca` и отклоняет явно небезопасных кандидатов (лава/магма/
+# огонь на поверхности heightmap) до запроса авторитетной загрузки чанка
+# вживую. Снижает нагрузку на тик-поток в Spigot vanilla, где API живой
+# загрузки чанков не является по-настоящему асинхронным.
+# Не действует на Paper и Folia (они заменяют маршрут загрузки чанков
+# нативными асинхронными API и никогда не входят в префильтр).
+# Живая перепроверка chunk.isSafe(...) остаётся авторитетным источником при
+# ACCEPT; REJECT - единственный короткий путь. См.
+# По умолчанию: true. Установите false, чтобы отключить пробу (полезно в
+# модифицированных форках с экзотическими форматами региона).
+# @type: boolean
+# @default: true
+anvilPrefilterEnabled: true
 
 # НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ
 version: 1.0
