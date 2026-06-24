@@ -324,13 +324,37 @@ public sealed interface MenuAction
     }
 
     /**
-     * Open the curated config-selector page (page 1 of the 3-page config
-     * subtree: selector -> per-file key list -> per-key picker).
-     * Server-resolved by {@code MenuRedeemSubcommand.dispatchOpenConfigSelector};
-     * rows list every known config file. Permission-gated by
-     * {@code rtp.config.view}. See PROPOSAL-config-view-as-book.md v3.7.
+     * Open the curated config-selector page for a directory in the config tree
+     * (ADR-071 rule 7: the editor is a single recursive directory walker). The
+     * {@code subDir} is a forward-slashed relative path under the plugin config
+     * root; the empty string is the root directory. A directory page lists its
+     * child directories (each emitting a fresh {@code OpenConfigSelector} for
+     * the deeper path) and its member files (each emitting an
+     * {@link OpenConfigFile}), so the same action and the same builder walk
+     * every level uniformly.
+     *
+     * <p>Server-resolved by {@code MenuRedeemSubcommand.dispatchOpenConfigSelector};
+     * permission-gated by {@code rtp.config.view}. See
+     * PROPOSAL-config-view-as-book.md v3.7 and ADR-071.
      */
-    record OpenConfigSelector() implements MenuAction {
+    record OpenConfigSelector(String subDir) implements MenuAction {
+        public OpenConfigSelector {
+            // Normalize: null/blank -> root (""); strip leading/trailing
+            // slashes so "advanced", "/advanced", "advanced/" all canonicalize
+            // to the same forward-slashed relative path.
+            if (subDir == null) {
+                subDir = "";
+            } else {
+                subDir = subDir.replace('\\', '/').trim();
+                while (subDir.startsWith("/")) subDir = subDir.substring(1);
+                while (subDir.endsWith("/")) subDir = subDir.substring(0, subDir.length() - 1);
+            }
+        }
+
+        /** Convenience root-directory constructor (the empty subpath). */
+        public OpenConfigSelector() {
+            this("");
+        }
     }
 
     /**

@@ -139,6 +139,34 @@ class ReqRtpAdr072ViewDistanceClampTest {
   }
 
   @Test
+  @DisplayName("send view distance is pinned to the captured value during the clamp and released when restored")
+  void sendViewDistancePinnedThenReleased() {
+    MockRTPPlayer player = playerWithViewDistance(12);
+
+    ViewDistanceRestoreTask.clampAndSchedule(player, 2, 200L);
+
+    // The client send distance is pinned to the captured value before the tracking clamp, so the
+    // client never sees a view-distance change (no flash) even though tracking drops to 2.
+    assertEquals(2, player.getViewDistance(), "tracking view distance should be clamped");
+    assertEquals(12, player.getSendViewDistance(), "send view distance should be pinned to captured");
+
+    // The pin holds for the whole ramp...
+    for (int t = 0; t < 200; t++) {
+      scheduler.tick(1);
+      if (player.getViewDistance() < 12) {
+        assertEquals(12, player.getSendViewDistance(),
+            "send view distance must stay pinned while the tracking ramp is in flight");
+      }
+    }
+    // run a few more ticks to guarantee completion
+    scheduler.tick(60);
+
+    assertEquals(12, player.getViewDistance(), "tracking view distance should be fully restored");
+    assertEquals(-1, player.getSendViewDistance(),
+        "send view distance pin should be released (follow default) once the ramp completes");
+  }
+
+  @Test
   @DisplayName("ramp tears down on disconnect and never mutates an offline player")
   void teardownOnDisconnect() {
     MockRTPPlayer player = playerWithViewDistance(12);

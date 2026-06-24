@@ -24,7 +24,7 @@ import org.bukkit.block.BlockState;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
 
-public final class BukkitRTPPlayer implements RTPPlayer {
+public class BukkitRTPPlayer implements RTPPlayer {
   private final Player player;
 
   public BukkitRTPPlayer(Player player) {

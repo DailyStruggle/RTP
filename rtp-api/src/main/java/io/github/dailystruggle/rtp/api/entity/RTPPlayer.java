@@ -226,4 +226,48 @@ public interface RTPPlayer extends RTPCommandSender {
   default void setViewDistance(int viewDistance) {
     // no-op by default; platform adapters override with the native per-player view-distance call
   }
+
+  /**
+   * Returns this player's current per-player <i>send</i> view distance in chunks (the radius of
+   * chunks actually streamed to and rendered by the client), or a non-positive value when the
+   * platform exposes no separate send-view-distance API.
+   *
+   * <p>This is distinct from {@link #getViewDistance()}: the send distance governs what the client
+   * is told to render, while the (tracking) view distance governs what the server loads and tracks.
+   * On platforms that do not separate the two, this returns {@code -1} ("unsupported").
+   *
+   * <p>Must be called from the thread that owns the player (the main server thread, or the owning
+   * region thread on Folia).
+   *
+   * @return the current per-player send view distance in chunks, or {@code -1} if unsupported
+   */
+  default int getSendViewDistance() {
+    return -1;
+  }
+
+  /**
+   * Sets this player's per-player <i>send</i> view distance in chunks (the radius of chunks the
+   * client is told to render), independently of the server-side tracking view distance set by
+   * {@link #setViewDistance(int)}.
+   *
+   * <p>Pinning the send distance to the player's pre-teleport value lets the teleport view-distance
+   * clamp and steady restore (ADR-072) shrink and ramp the server-side <i>tracking</i> distance to
+   * cap the arrival chunk-load burst, without the client ever receiving a view-distance change. That
+   * removes the visible render-ring "flash" the client would otherwise show when its negotiated view
+   * distance is lowered and raised again.
+   *
+   * <p>Passing a negative value resets the send distance to "follow the tracking/world default".
+   * The value is runtime-only and never persisted. On a platform with no separate send-view-distance
+   * API the default implementation is a no-op, so the clamp feature degrades to mutating the tracking
+   * distance alone (the pre-ADR-072 behaviour).
+   *
+   * <p>Must be called from the thread that owns the player (the main server thread, or the owning
+   * region thread on Folia).
+   *
+   * @param viewDistance the desired per-player send view distance in chunks, or a negative value to
+   *                     reset to the platform default
+   */
+  default void setSendViewDistance(int viewDistance) {
+    // no-op by default; platform adapters override with the native per-player send-view-distance call
+  }
 }

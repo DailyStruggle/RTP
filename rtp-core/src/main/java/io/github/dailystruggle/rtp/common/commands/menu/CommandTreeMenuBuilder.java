@@ -650,63 +650,103 @@ public final class CommandTreeMenuBuilder {
      * @return the assembled {@link MenuModel}
      */
     public MenuModel buildConfigSelector(UUID callerId, List<String> fileNames) {
+        return buildConfigSelector(callerId, "", Collections.emptyList(), fileNames);
+    }
+
+    /**
+     * Build the recursive config-directory selector page (ADR-071 rule 7).
+     *
+     * <p>A directory page is the uniform primitive the editor walks at every
+     * level: it lists the directory's child directories (each descending via a
+     * fresh {@link MenuAction.OpenConfigSelector} for the deeper path) and its
+     * member files (each opening the per-file key page via
+     * {@link MenuAction.OpenConfigFile}). The root page ({@code subDir == ""})
+     * additionally carries the cross-config search row and the
+     * {@code regions}/{@code worlds}/{@code effects} {@code MultiConfigParser}
+     * directory nodes; a nested page's Back row returns to its parent
+     * directory instead of the {@code /rtp menu} root.
+     *
+     * <p>The caller supplies the child-directory and file-name lists explicitly
+     * (rather than the builder reaching into {@link RTP#configs}) so this method
+     * stays unit-testable. Both lists are rendered in encounter order — the
+     * caller is responsible for stable ordering.
+     *
+     * @param callerId  UUID of the viewing player
+     * @param subDir    forward-slashed relative directory path; {@code ""} is root
+     * @param childDirs immediate child directory names under {@code subDir}
+     * @param fileNames config file names directly in {@code subDir}
+     * @return the assembled {@link MenuModel}
+     */
+    public MenuModel buildConfigSelector(UUID callerId, String subDir,
+                                         List<String> childDirs, List<String> fileNames) {
         Objects.requireNonNull(callerId, "callerId");
         Objects.requireNonNull(fileNames, "fileNames");
+        if (subDir == null) subDir = "";
+        if (childDirs == null) childDirs = Collections.emptyList();
+        boolean root = subDir.isEmpty();
 
         List<MenuLine> lines = new ArrayList<>();
 
-        // Back row → /rtp menu root page (empty path).
+        // Back row. At root → /rtp menu root page (empty path); in a nested
+        // directory → up one level to the parent directory selector.
         String backLabel = lookupMsg(CommandMessages.menuBack, "« back");
-        lines.add(MenuLine.of(new MenuFragment(backLabel, null,
-                new MenuAction.OpenMenu(new String[0]))));
+        MenuAction backAction = root
+                ? new MenuAction.OpenMenu(new String[0])
+                : new MenuAction.OpenConfigSelector(parentDir(subDir));
+        lines.add(MenuLine.of(new MenuFragment(backLabel, null, backAction)));
 
-        // Search row — opens an anvil-input prompt for a cross-config substring
-        // search (PROPOSAL-rtp-menu-config-search.md §10 item 6). English-only
-        // fallback label; locale lift deferred to checklist step 7.
-        lines.add(MenuLine.of(new MenuFragment("&b&l⚲ search configs", null,
-                new MenuAction.OpenConfigSearchPrompt())));
+        if (root) {
+            // Search row — opens an anvil-input prompt for a cross-config
+            // substring search (PROPOSAL-rtp-menu-config-search.md §10 item 6).
+            // Only meaningful at the root since search spans all configs.
+            lines.add(MenuLine.of(new MenuFragment("&b&l⚲ search configs", null,
+                    new MenuAction.OpenConfigSearchPrompt())));
+        }
 
-        // Header — non-clickable orientation row. Locale key deferred to
-        // checklist step 8 (locale TSV pipeline); use a sensible English
-        // fallback in the meantime.
-        lines.add(MenuLine.of(new MenuFragment("&1&lconfig files", null, null)));
+        // Header — non-clickable orientation row.
+        String headerText = root ? "&1&lconfig files" : "&1&l" + subDir + "/";
+        lines.add(MenuLine.of(new MenuFragment(headerText, null, null)));
 
-        // CHECKLIST-multiconfig-menu: Regions / Worlds submenu entry points.
-        // These belong on the config selector page rather than the admin
-        // panel; the per-kind selector pages handle Add/Remove/Edit of
-        // individual entries via MultiConfigMenuBuilder.
-        String regionsLabel = lookupMsg(
-                CommandMessages.menuAdminPanelRowRegions, "&b\u2699 Regions");
-        String regionsHover = lookupMsg(
-                CommandMessages.menuAdminPanelHoverRegions,
-                "Add, remove, or edit per-region configs.");
-        lines.add(MenuLine.of(new MenuFragment(regionsLabel, regionsHover,
-                new MenuAction.OpenMultiConfigSelector("regions"))));
-        String worldsLabel = lookupMsg(
-                CommandMessages.menuAdminPanelRowWorlds, "&b\u2699 Worlds");
-        String worldsHover = lookupMsg(
-                CommandMessages.menuAdminPanelHoverWorlds,
-                "Add, remove, or edit per-world configs.");
-        lines.add(MenuLine.of(new MenuFragment(worldsLabel, worldsHover,
-                new MenuAction.OpenMultiConfigSelector("worlds"))));
-        // Effects multi-config selector entry point. Mirrors the Regions /
-        // Worlds rows above: opens the per-group effects multi-config
-        // editor (effects/<group>.yml, parsed via EffectsGroupKeys; see
-        // effects-api-ADR-005 and Configs.reloadConfigs() lines 278-281
-        // where the parser is registered under name="effects").
-        String effectsLabel = lookupMsg(
-                CommandMessages.menuAdminPanelRowEffects, "&b\u2699 Effects");
-        String effectsHover = lookupMsg(
-                CommandMessages.menuAdminPanelHoverEffects,
-                "Add, remove, or edit per-group teleport effects.");
-        lines.add(MenuLine.of(new MenuFragment(effectsLabel, effectsHover,
-                new MenuAction.OpenMultiConfigSelector("effects"))));
+        if (root) {
+            // CHECKLIST-multiconfig-menu: Regions / Worlds / Effects submenu
+            // entry points. These per-kind MultiConfigParser selectors are
+            // directory nodes in the recursive walk (ADR-071 rule 7) and are
+            // handled by MultiConfigMenuBuilder.
+            String regionsLabel = lookupMsg(
+                    CommandMessages.menuAdminPanelRowRegions, "&b\u2699 Regions");
+            String regionsHover = lookupMsg(
+                    CommandMessages.menuAdminPanelHoverRegions,
+                    "Add, remove, or edit per-region configs.");
+            lines.add(MenuLine.of(new MenuFragment(regionsLabel, regionsHover,
+                    new MenuAction.OpenMultiConfigSelector("regions"))));
+            String worldsLabel = lookupMsg(
+                    CommandMessages.menuAdminPanelRowWorlds, "&b\u2699 Worlds");
+            String worldsHover = lookupMsg(
+                    CommandMessages.menuAdminPanelHoverWorlds,
+                    "Add, remove, or edit per-world configs.");
+            lines.add(MenuLine.of(new MenuFragment(worldsLabel, worldsHover,
+                    new MenuAction.OpenMultiConfigSelector("worlds"))));
+            String effectsLabel = lookupMsg(
+                    CommandMessages.menuAdminPanelRowEffects, "&b\u2699 Effects");
+            String effectsHover = lookupMsg(
+                    CommandMessages.menuAdminPanelHoverEffects,
+                    "Add, remove, or edit per-group teleport effects.");
+            lines.add(MenuLine.of(new MenuFragment(effectsLabel, effectsHover,
+                    new MenuAction.OpenMultiConfigSelector("effects"))));
+        }
 
-        // One row per known config file. Hover surfaces an "edit <file>"
-        // affordance hint so clicking the row reads as an edit entry-point
-        // rather than a bare navigation jump. English-only fallback for now;
-        // locale lift is deferred to the locale TSV pipeline pass (mirrors
-        // the "config files" header above).
+        // Child-directory folder nodes (e.g. advanced/, messages/). Selecting
+        // one recurses into that directory via a deeper OpenConfigSelector.
+        for (String child : childDirs) {
+            if (child == null || child.isEmpty()) continue;
+            String childPath = root ? child : subDir + "/" + child;
+            String hover = "open " + child + "/";
+            lines.add(MenuLine.of(new MenuFragment("&3\u2699 " + child + "/", hover,
+                    new MenuAction.OpenConfigSelector(childPath))));
+        }
+
+        // One row per config file directly in this directory. Hover surfaces an
+        // "edit <file>" affordance hint.
         for (String fileName : fileNames) {
             if (fileName == null || fileName.isEmpty()) continue;
             String hover = "edit " + fileName;
@@ -714,11 +754,18 @@ public final class CommandTreeMenuBuilder {
                     new MenuAction.OpenConfigFile(fileName))));
         }
 
-        // Mint a token per clickable action (mirrors buildParamPicker).
         MenuPage page = new MenuPage(lines);
-        // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop collapsed.
+        return new MenuModel(root ? "config" : subDir, List.of(page));
+    }
 
-        return new MenuModel("config", List.of(page));
+    /**
+     * Parent directory of a forward-slashed relative path, or {@code ""} when
+     * {@code subDir} has no parent (a top-level directory under the config root).
+     */
+    private static String parentDir(String subDir) {
+        if (subDir == null) return "";
+        int slash = subDir.lastIndexOf('/');
+        return slash <= 0 ? "" : subDir.substring(0, slash);
     }
 
     /**

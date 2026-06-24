@@ -167,23 +167,49 @@ final class MenuWiringSupportInstaller {
         return new MenuRedeemSubcommand.MenuConfigSubtreeBuilder() {
             @Override
             public MenuModel buildSelector(UUID viewer) {
-                List<String> fileNames = new ArrayList<>();
+                return buildSelector(viewer, "");
+            }
+
+            @Override
+            public MenuModel buildSelector(UUID viewer, String subDir) {
+                // ADR-071 rule 7: recursive directory walk. Group the live
+                // single-file parsers by their subDir (advanced/, messages/,
+                // ...); a directory page lists the files directly in it plus a
+                // folder node for each immediate child directory. The
+                // regions/worlds/effects MultiConfigParser nodes are added by
+                // the builder at the root level only.
+                String dir = (subDir == null) ? "" : subDir;
+                java.util.TreeSet<String> fileNames = new java.util.TreeSet<>();
+                java.util.TreeSet<String> childDirs = new java.util.TreeSet<>();
+                String prefix = dir.isEmpty() ? "" : dir + "/";
                 try {
                     for (ConfigParser<?> parser : RTP.configs.configParserMap.values()) {
                         if (parser == null || parser.name == null) continue;
-                        String n = parser.name;
-                        if (n.toLowerCase(Locale.ROOT).endsWith(".yml")) {
-                            n = n.substring(0, n.length() - 4);
+                        String leaf = parser.name;
+                        if (leaf.toLowerCase(Locale.ROOT).endsWith(".yml")) {
+                            leaf = leaf.substring(0, leaf.length() - 4);
                         }
-                        if (!n.isEmpty()) fileNames.add(n);
+                        if (leaf.isEmpty()) continue;
+                        String pSub = parser.subDir == null ? "" : parser.subDir;
+                        if (pSub.equals(dir)) {
+                            // File lives directly in the requested directory.
+                            fileNames.add(leaf);
+                        } else if (dir.isEmpty() || pSub.startsWith(prefix)) {
+                            // Parser lives in a (deeper) directory under the
+                            // requested one; surface its immediate child segment.
+                            String rest = pSub.substring(prefix.length());
+                            int slash = rest.indexOf('/');
+                            String child = (slash < 0) ? rest : rest.substring(0, slash);
+                            if (!child.isEmpty()) childDirs.add(child);
+                        }
                     }
                 } catch (RuntimeException e) {
                     RTP.log(Level.WARNING,
                             "menu config-selector: failed to enumerate parsers: " + e.getMessage(), e);
                 }
-                java.util.Collections.sort(fileNames);
                 return new CommandTreeMenuBuilder()
-                        .buildConfigSelector(viewer, fileNames);
+                        .buildConfigSelector(viewer, dir,
+                                new ArrayList<>(childDirs), new ArrayList<>(fileNames));
             }
 
             @Override

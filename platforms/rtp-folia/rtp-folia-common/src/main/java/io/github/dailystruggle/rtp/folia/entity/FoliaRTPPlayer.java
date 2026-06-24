@@ -393,6 +393,22 @@ public final class FoliaRTPPlayer implements RTPPlayer {
     }
   }
 
+  @Override
+  @RegionThread
+  public int getSendViewDistance() {
+    // folia-api carries the paper-api surface, so call the per-player send-view-distance getter
+    // directly (no reflection needed).
+    return player.getSendViewDistance();
+  }
+
+  @Override
+  @RegionThread
+  public void setSendViewDistance(int viewDistance) {
+    // Pinning the client send distance (ADR-072) lets the tracking view distance clamp/ramp
+    // without the client ever seeing a view-distance change, removing the arrival "flash".
+    player.setSendViewDistance(viewDistance);
+  }
+
   @RegionThread
   Player player() {
     return player;

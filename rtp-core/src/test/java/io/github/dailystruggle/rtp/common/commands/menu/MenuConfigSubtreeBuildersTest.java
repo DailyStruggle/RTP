@@ -163,6 +163,78 @@ class MenuConfigSubtreeBuildersTest {
     }
 
     // ------------------------------------------------------------------------
+    // buildConfigSelector — recursive directory walk (ADR-071 rule 7)
+    // ------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("buildConfigSelector(root): child-dir folder nodes recurse via OpenConfigSelector(subDir)")
+    void buildConfigSelector_rootListsChildDirs() {
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
+
+        MenuModel model = builder.buildConfigSelector(UUID.randomUUID(), "",
+                List.of("advanced", "messages"), List.of("config.yml", "safety.yml"));
+        List<MenuLine> lines = model.pages().get(0).lines();
+        // back + search + header + regions + worlds + effects + 2 dir nodes + 2 file rows = 10
+        assertEquals(10, lines.size());
+
+        // Rows 6..7 → folder nodes that recurse into the named sub-directory.
+        MenuAction advAction = lines.get(6).fragments().get(0).action();
+        assertInstanceOf(MenuAction.OpenConfigSelector.class, advAction,
+                "child-dir row must recurse via OpenConfigSelector");
+        assertEquals("advanced",
+                ((MenuAction.OpenConfigSelector) advAction).subDir());
+        MenuAction msgAction = lines.get(7).fragments().get(0).action();
+        assertEquals("messages",
+                ((MenuAction.OpenConfigSelector) msgAction).subDir());
+
+        // Rows 8..9 → root files.
+        assertEquals("config.yml",
+                ((MenuAction.OpenConfigFile) lines.get(8).fragments().get(0).action()).fileName());
+        assertEquals("safety.yml",
+                ((MenuAction.OpenConfigFile) lines.get(9).fragments().get(0).action()).fileName());
+    }
+
+    @Test
+    @DisplayName("buildConfigSelector(subDir): Back returns to parent; no search/multiconfig rows; files open")
+    void buildConfigSelector_nestedDirectory() {
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
+
+        MenuModel model = builder.buildConfigSelector(UUID.randomUUID(), "advanced",
+                List.of(), List.of("performance.yml", "logging.yml"));
+        List<MenuLine> lines = model.pages().get(0).lines();
+        // back + header + 2 file rows = 4 (no search, no regions/worlds/effects)
+        assertEquals(4, lines.size());
+
+        // Row 0 → Back to the parent directory (root) via OpenConfigSelector("").
+        MenuAction back = lines.get(0).fragments().get(0).action();
+        assertInstanceOf(MenuAction.OpenConfigSelector.class, back,
+                "nested page Back must return to the parent directory selector");
+        assertEquals("", ((MenuAction.OpenConfigSelector) back).subDir());
+
+        // Row 1 → non-clickable header naming the directory.
+        assertEquals(null, lines.get(1).fragments().get(0).action());
+
+        // Rows 2..3 → the directory's files.
+        assertEquals("performance.yml",
+                ((MenuAction.OpenConfigFile) lines.get(2).fragments().get(0).action()).fileName());
+        assertEquals("logging.yml",
+                ((MenuAction.OpenConfigFile) lines.get(3).fragments().get(0).action()).fileName());
+    }
+
+    @Test
+    @DisplayName("buildConfigSelector(deep subDir): Back returns up one level, not to root")
+    void buildConfigSelector_deepDirectoryBackToParent() {
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
+
+        MenuModel model = builder.buildConfigSelector(UUID.randomUUID(), "advanced/sub",
+                List.of(), List.of("x.yml"));
+        MenuAction back = model.pages().get(0).lines().get(0).fragments().get(0).action();
+        assertEquals("advanced",
+                ((MenuAction.OpenConfigSelector) back).subDir(),
+                "Back from a two-level directory must go up exactly one level");
+    }
+
+    // ------------------------------------------------------------------------
     // buildConfigFile
     // ------------------------------------------------------------------------
 

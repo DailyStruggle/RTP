@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.paper_v26_1_R1.server;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.paper_v26_1_R1.world.PaperRTPWorld;
-import io.github.dailystruggle.rtp.bukkitplatform.server.AbstractServerAccessor;
+import io.github.dailystruggle.rtp.paperplatform.server.PaperServerAccessor;
 import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
 import org.bukkit.Bukkit;
@@ -15,7 +15,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
-public class ServerAccessorImpl extends AbstractServerAccessor {
+public class ServerAccessorImpl extends PaperServerAccessor {
   @Override
   public void releaseAllChunkTickets() {
     Object plugin = getPlugin();

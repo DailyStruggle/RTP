@@ -506,8 +506,21 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * arms apply {@link #CONFIG_VIEW_PERMISSION} before invoking the builder.
      */
     public interface MenuConfigSubtreeBuilder {
-        /** Build the config-file selector page (v3.7 §3.1). */
+        /** Build the config-file selector page for the root directory (v3.7 §3.1). */
         MenuModel buildSelector(UUID viewer);
+
+        /**
+         * Build the config-file selector page for the directory at
+         * {@code subDir} (a forward-slashed relative path under the config
+         * root; {@code ""} is the root). ADR-071 rule 7: a directory page
+         * lists its child directories and its member files, so the same
+         * builder walks every level. Defaults to the root
+         * {@link #buildSelector(UUID)} so legacy/test scaffolds compile and
+         * behave unchanged.
+         */
+        default MenuModel buildSelector(UUID viewer, String subDir) {
+            return buildSelector(viewer);
+        }
 
         /**
          * Build the per-file key list page for {@code fileName} (v3.7 §3.2).
@@ -1553,6 +1566,20 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
     // ADR-050 Stage 1b: package-private.
     boolean dispatchOpenConfigSelector(UUID senderId,
                                                @Nullable Consumer<String> messageMethod) {
+        return dispatchOpenConfigSelector(senderId,
+                new MenuAction.OpenConfigSelector(""), messageMethod);
+    }
+
+    /**
+     * Directory-aware dispatch for {@link MenuAction.OpenConfigSelector}
+     * (ADR-071 rule 7). Routes through {@link #configSubtreeBuilder}'s
+     * {@code buildSelector(viewer, subDir)} so the same recursive walk renders
+     * the root and every nested config directory.
+     */
+    boolean dispatchOpenConfigSelector(UUID senderId,
+                                               MenuAction.OpenConfigSelector open,
+                                               @Nullable Consumer<String> messageMethod) {
+        String subDir = (open == null) ? "" : open.subDir();
         // Staging-cart contract: returning to the file-selector page silently
         // drops any pending edits the player had staged for a previously-open
         // file. The cart is single-file-scoped; navigating up to the selector
@@ -1579,11 +1606,11 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         }
         MenuModel model;
         try {
-            model = configSubtreeBuilder.buildSelector(senderId);
+            model = configSubtreeBuilder.buildSelector(senderId, subDir);
         } catch (RuntimeException e) {
             RTP.log(Level.WARNING,
                     "menu config-selector builder failed for " + senderId
-                            + ": " + e.getMessage(), e);
+                            + " dir='" + subDir + "': " + e.getMessage(), e);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu config-selector rejected: builder failure", messageMethod);
             return false;
