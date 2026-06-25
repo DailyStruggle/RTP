@@ -8,7 +8,9 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -145,19 +147,27 @@ public final class AddonRegistry {
    *
    * <p>RTP ships demo/companion addons (e.g. the GUI destination picker and the
    * claim-plugin integrations) as ordinary jars embedded on its own classpath under
-   * {@code bundled-addons/}. On first run - detected by the caller as the
-   * {@code addons/} folder not yet existing - these are unpacked here so the operator
-   * gets them out of the box without a second download, while still being able to opt
-   * out simply by deleting the extracted jar (the folder then exists, so it is never
-   * re-extracted) or by deleting the addon.
+   * {@code bundled-addons/}. These are unpacked here so the operator gets them out of
+   * the box without a second download, while still being able to opt out simply by
+   * deleting the extracted jar (the deletion is recorded so the addon is not
+   * re-installed on a later run).
    *
    * <p>The set of bundled jars is listed, one resource name per line, in the
    * classpath resource {@code bundled-addons/index}. A missing index, a missing jar
    * resource, or an unwritable target is logged and skipped; extraction never aborts
-   * startup. Re-extraction is avoided per-file: a jar already present in
-   * {@code directory} is left untouched.
+   * startup.
    *
-   * @param directory the {@code addons/} folder to populate (created by the caller)
+   * <p>Extraction is idempotent and update-aware via a hidden {@code .bundled-addons}
+   * manifest (name + content hash of the last copy RTP wrote). On a later run an
+   * unmodified extracted jar whose bundled content has changed (i.e. the RTP jar was
+   * updated) is refreshed in place, so a fix shipped in a newer RTP build actually
+   * reaches the server instead of the first-extracted jar being loaded forever. A jar
+   * the operator has edited (its bytes differ from what RTP last wrote) is never
+   * clobbered, and a jar the operator has deleted stays deleted (a deliberate opt-out
+   * recorded in the manifest). A pre-manifest extracted jar (from a build before this
+   * mechanism) is treated as unmodified and refreshed once when its content differs.
+   *
+   * @param directory the {@code addons/} folder to populate (created here if absent)
    */
   public void extractBundledAddons(File directory) {
     extractBundledAddons(directory, AddonRegistry.class.getClassLoader());
@@ -194,19 +204,111 @@ public final class AddonRegistry {
           "[RTP] could not create addons folder for bundled addons: " + directory.getAbsolutePath());
       return;
     }
+    // Hidden manifest of name -> hash of the copy RTP last wrote. It distinguishes an
+    // unmodified RTP-managed jar (safe to refresh when the bundled content changes)
+    // from one the operator edited (never clobber) and remembers a deliberate deletion
+    // (opt-out). It is not a .jar, so discoverFromDirectory ignores it.
+    File manifest = new File(directory, ".bundled-addons");
+    Map<String, String> recorded = new LinkedHashMap<>();
+    if (manifest.isFile()) {
+      try {
+        for (String l :
+            java.nio.file.Files.readAllLines(
+                manifest.toPath(), java.nio.charset.StandardCharsets.UTF_8)) {
+          String t = l.trim();
+          if (t.isEmpty() || t.startsWith("#")) continue;
+          int tab = t.indexOf('\t');
+          if (tab > 0) recorded.put(t.substring(0, tab), t.substring(tab + 1));
+        }
+      } catch (java.io.IOException e) {
+        RTP.log(Level.FINE, "[RTP] could not read bundled-addons manifest; treating as empty", e);
+      }
+    }
+
+    Map<String, String> updated = new LinkedHashMap<>(recorded);
     for (String name : names) {
-      File target = new File(directory, name);
-      if (target.exists()) continue; // never overwrite an operator's copy
+      byte[] bundled;
       try (java.io.InputStream in = loader.getResourceAsStream("bundled-addons/" + name)) {
         if (in == null) {
           RTP.log(Level.WARNING, "[RTP] bundled addon resource missing: " + name);
           continue;
         }
-        java.nio.file.Files.copy(in, target.toPath());
-        RTP.log(Level.INFO, "[RTP] extracted bundled resource: " + name);
+        bundled = in.readAllBytes();
       } catch (java.io.IOException e) {
-        RTP.log(Level.WARNING, "[RTP] failed to extract bundled resource: " + name, e);
+        RTP.log(Level.WARNING, "[RTP] failed to read bundled resource: " + name, e);
+        continue;
       }
+      String bundledHash = sha256(bundled);
+
+      File target = new File(directory, name);
+      if (!target.exists()) {
+        if (recorded.containsKey(name)) {
+          // Previously extracted and since removed: a deliberate opt-out. Keep the
+          // record so it is never silently re-installed on a later run.
+          continue;
+        }
+        try {
+          java.nio.file.Files.write(target.toPath(), bundled);
+          updated.put(name, bundledHash);
+          RTP.log(Level.INFO, "[RTP] extracted bundled resource: " + name);
+        } catch (java.io.IOException e) {
+          RTP.log(Level.WARNING, "[RTP] failed to extract bundled resource: " + name, e);
+        }
+        continue;
+      }
+
+      String currentHash;
+      try {
+        currentHash = sha256(java.nio.file.Files.readAllBytes(target.toPath()));
+      } catch (java.io.IOException e) {
+        RTP.log(Level.FINE, "[RTP] could not read extracted addon for refresh check: " + name, e);
+        continue;
+      }
+      String priorHash = recorded.get(name);
+      boolean operatorEdited = priorHash != null && !priorHash.equals(currentHash);
+      if (operatorEdited) {
+        // The on-disk jar differs from what RTP last wrote: the operator customised it.
+        // Never clobber that, but keep tracking the name so it stays managed.
+        updated.putIfAbsent(name, priorHash);
+        continue;
+      }
+      if (!currentHash.equals(bundledHash)) {
+        // Unmodified RTP copy (or a pre-manifest extraction) that lags the current
+        // bundled version: refresh it so this RTP build's addon reaches the server.
+        try {
+          java.nio.file.Files.write(target.toPath(), bundled);
+          updated.put(name, bundledHash);
+          RTP.log(Level.INFO, "[RTP] refreshed bundled addon to this RTP version: " + name);
+        } catch (java.io.IOException e) {
+          RTP.log(Level.WARNING, "[RTP] failed to refresh bundled addon: " + name, e);
+        }
+      } else {
+        updated.put(name, bundledHash);
+      }
+    }
+
+    try {
+      List<String> out = new ArrayList<>();
+      out.add("# Bundled addons RTP has installed here (name<TAB>content-hash).");
+      out.add("# Deleting an addon jar opts out of it; this record keeps it from returning.");
+      for (Map.Entry<String, String> e : updated.entrySet()) out.add(e.getKey() + '\t' + e.getValue());
+      java.nio.file.Files.write(
+          manifest.toPath(), out, java.nio.charset.StandardCharsets.UTF_8);
+    } catch (java.io.IOException e) {
+      RTP.log(Level.FINE, "[RTP] could not write bundled-addons manifest", e);
+    }
+  }
+
+  /** SHA-256 hex of {@code data}, used to detect operator edits and version drift. */
+  private static String sha256(byte[] data) {
+    try {
+      byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(data);
+      StringBuilder sb = new StringBuilder(digest.length * 2);
+      for (byte b : digest) sb.append(Character.forDigit((b >> 4) & 0xF, 16)).append(Character.forDigit(b & 0xF, 16));
+      return sb.toString();
+    } catch (java.security.NoSuchAlgorithmException impossible) {
+      // SHA-256 is required by every JVM; fall back to a length+hashCode tag.
+      return data.length + ":" + java.util.Arrays.hashCode(data);
     }
   }
 

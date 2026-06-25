@@ -39,6 +39,14 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 
 ## Open
 
+### 2026-06-24 - `ConfigParser.update()` drops top-level scalar values on a version-mismatch migration
+
+- **Discovered during:** investigation of "Shape for region default was invalid. Falling back to SQUARE." + "null vert" on a fresh run (this session). Primary fix was aligning the regions `MultiConfigParser` version with the bundled `regions/default.yml` (`1.0` -> `1.1`) so the migration no longer fires on fresh installs; the underlying `update()` defect was left in place.
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/configuration/ConfigParser.java#update` (lines ~994-1056), reached from `check(...)` (lines ~789-815) whenever the on-disk file version differs from the parser's declared version.
+- **Symptom / hypothesis:** When `update()` runs against a freshly extracted file (e.g. bundled `regions/default.yml` at `version: "1.1"` loaded by a parser declaring `"1.0"`), the merge pass lost the top-level scalar `shape: "@config"` / `vert: "@config"` keys - after `update()` the reloaded parser `data` had no `shape`/`vert` entry at all (verified: region raw `shape` was `null` pre-fix, `@config` post-fix). The `getDefaultsFromJar()` overlay + oldYaml scalar re-apply (lines 1018-1052) does not reliably preserve these keys.
+- **Impact:** Any region/world file whose on-disk version differs from the code-declared parser version silently loses its `@config` shape/vert inheritance on load, forcing the SQUARE/null-vert fallback and breaking location generation until the file is regenerated. Latent for every future version bump of a `MultiConfigParser`-managed file.
+- **Suggested next step:** Add a focused test that loads a `version`-mismatched region file through a real `ConfigParser` and asserts every top-level scalar (including `@config` tokens) survives `update()`; then fix the overlay so scalar keys present in the old file are always re-applied (the `!oldYaml.isConfigurationSection(key)` branch at line 1046 appears correct, so the loss likely happens earlier in the rename/reload sequence - instrument `renameFiles()` + the `cachedLookup` reload).
+
 ### 2026-05-16 — `economy-isolation` Vault debit running on caller thread (real isolation breach)
 
 - **Discovered during:** Phase-M1 Paper devstack smoke for the B → C gate in `docs/dev/scratch/CHECKLIST-metrics-and-multiserver.md` (Paper 26.1.2, 23:01 transcript).

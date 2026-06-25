@@ -122,18 +122,23 @@ public class SubConfigCmdTest {
         assertNotNull(cmd.description());
     }
 
-    // ── onCommand delegates to nextCommand when non-null ─────────────────────
+    // ── onCommand does NOT run nextCommand (library handles sub-command dispatch) ──
 
     @Test
-    void subConfigCmd_onCommand_delegatesToNextCommandWhenNonNull() {
+    void subConfigCmd_onCommand_returnsTrueAndDoesNotManuallyRunNextCommand() {
+        // When this node is an intermediate in the command path, TreeCommand
+        // runs it with the matched child as `nextCommand` AND separately
+        // re-runs that child through its recursive walk. Running the child
+        // here as well executed the update+reload twice (duplicate console /
+        // chat output). The corrected contract mirrors ConfigCmd: return true
+        // and let the recursive walk run the child exactly once.
         SubConfigCmd cmd = new SubConfigCmd(null, "performance", performanceConfig);
         CommandsAPICommand next = mock(CommandsAPICommand.class);
-        when(next.onCommand(any(), any(), any())).thenReturn(true);
 
         boolean result = cmd.onCommand(UUID.randomUUID(), new HashMap<>(), next);
 
         assertTrue(result);
-        verify(next).onCommand(any(), any(), isNull());
+        verify(next, never()).onCommand(any(), any(), any());
     }
 
     // ── addParameters — integer type registers IntegerParameter ──────────────
@@ -317,22 +322,24 @@ public class SubConfigCmdTest {
         verify(mockReload, times(1)).onCommand(any(), any(), isNull());
     }
 
-    // ── onCommand — reload NOT fired when delegating to nextCommand (help) ────
+    // ── onCommand — reload NOT fired when acting as an intermediate node ──────
 
     @Test
-    void subConfigCmd_onCommand_reloadNotFiredWhenDelegatingToNextCommand() throws InterruptedException {
+    void subConfigCmd_onCommand_reloadNotFiredWhenNextCommandNonNull() throws InterruptedException {
         SubConfigCmd cmd = new SubConfigCmd(null, "performance", performanceConfig);
 
         CommandsAPICommand mockReload = mock(CommandsAPICommand.class);
         RTP.baseCommand.getCommandLookup().put("reload", mockReload);
 
-        CommandsAPICommand mockHelp = mock(CommandsAPICommand.class);
-        when(mockHelp.onCommand(any(), any(), any())).thenReturn(true);
+        CommandsAPICommand mockChild = mock(CommandsAPICommand.class);
 
-        cmd.onCommand(UUID.randomUUID(), new HashMap<>(), mockHelp);
+        cmd.onCommand(UUID.randomUUID(), new HashMap<>(), mockChild);
         Thread.sleep(200);
 
+        // No update/save/reload work when this node is an intermediate, and the
+        // child must not be invoked here (the recursive walk runs it once).
         verify(mockReload, never()).onCommand(any(), any(), any());
+        verify(mockChild, never()).onCommand(any(), any(), any());
     }
 
     // ── ConfigCmd — name / permission / description ───────────────────────────
@@ -405,5 +412,58 @@ public class SubConfigCmdTest {
             cmd.addCommands();
             cmd.addCommands();
         });
+    }
+
+    // ── dotted leaf edit over a "@config" scalar parent must keep the full block ──
+
+    @Test
+    void materializeSectionParent_expandsAtConfigScalarIntoFullBlock() {
+        // Region file ships `shape: "@config"`; the menu emits a dotted edit
+        // `shape.radius`. Without materialization, set("shape.radius", ...)
+        // would clobber the scalar with a one-key mapping (the reported bug).
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig yaml =
+                io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig.parse(
+                        "shape: \"@config\"\n");
+
+        // Loaded, resolved shape value: a FactoryValue with name + sub-params.
+        io.github.dailystruggle.rtp.common.factory.FactoryValue<?> shapeValue =
+                mock(io.github.dailystruggle.rtp.common.factory.FactoryValue.class);
+        shapeValue.name = "CIRCLE";
+        EnumMap<PerformanceKeys, Object> shapeData = new EnumMap<>(PerformanceKeys.class);
+        shapeData.put(PerformanceKeys.viewDistanceSelect, 256L);
+        doReturn(shapeData).when(shapeValue).getData();
+
+        ConfigParser regionConfig = mock(ConfigParser.class);
+        EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys, Object> regionData =
+                new EnumMap<>(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class);
+        regionData.put(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.shape, shapeValue);
+        doReturn(regionData).when(regionConfig).getData();
+
+        SubConfigCmd.materializeSectionParentIfScalar(regionConfig, yaml, "shape.radius");
+
+        Object parent = yaml.get("shape");
+        assertTrue(parent instanceof RtpYamlSection,
+                "shape must be materialized into a nested section, not left as a scalar");
+        RtpYamlSection section = (RtpYamlSection) parent;
+        assertEquals("CIRCLE", String.valueOf(section.get("name")),
+                "materialized block must keep the type discriminator 'name'");
+        assertTrue(section.getKeys(false).contains("viewDistanceSelect"),
+                "materialized block must keep sibling keys from the resolved value");
+    }
+
+    @Test
+    void materializeSectionParent_noOpWhenParentAlreadySection() {
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig yaml =
+                io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig.parse(
+                        "shape:\n  name: SQUARE\n  radius: 100\n");
+
+        ConfigParser regionConfig = mock(ConfigParser.class);
+        // getData must not be consulted for an already-nested parent.
+        SubConfigCmd.materializeSectionParentIfScalar(regionConfig, yaml, "shape.radius");
+
+        Object parent = yaml.get("shape");
+        assertTrue(parent instanceof RtpYamlSection);
+        assertEquals("SQUARE", String.valueOf(((RtpYamlSection) parent).get("name")));
+        verify(regionConfig, never()).getData();
     }
 }

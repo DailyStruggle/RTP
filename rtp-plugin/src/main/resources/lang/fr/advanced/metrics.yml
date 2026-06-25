@@ -1,4 +1,5 @@
 # --- Paramètres des métriques RTP ---
+
 # Réglages purement de reporting pour la SPI de métriques. Les
 # réglages de régulation / réglage restent dans performance.yml.
 # Remplit MetricsSnapshot.foliaRegions() avec le détail par région sur Folia.

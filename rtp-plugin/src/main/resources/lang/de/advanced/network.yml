@@ -1,4 +1,5 @@
 # RTP Netzwerkmodus (Multi-Server / Multi-Proxy) Standardmäßig deaktiviert; das Umstellen von `network.enabled: true` nimmt dieses Backend in das serverübergreifende Netzwerk auf.
+
 network:
   # When false this file is read and validated, then ignored - no threads, tables, or transport open.
   # @type: boolean

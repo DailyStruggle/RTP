@@ -1,4 +1,5 @@
 # --- RTP Metrics Settings (cat dialect) ---
+
 # Reporting-only knobs for the metrics SPI. Throttle / tuning
 # knobs keep napping in performance.yml.
 # Fill MetricsSnapshot.foliaRegions with per-region detail on Folia.

@@ -1,5 +1,6 @@
 # --- RTP Biome Filter (advanced) ---
 # Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
+
 # Split out of safety.yml so the common safety knobs stay uncluttered.
 #
 # If true, the biomes list is a whitelist (only these biomes are
@@ -34,6 +35,91 @@
   - "LUSH_CAVES"
   - "DEEP_DARK"
   - "THE_VOID"
+
+# 以相等概率引导每个请求的生物群系，而非按其覆盖区域的比例。需要 biomeRecall；
+# 对无过滤的传送无效。
+# @type: boolean
+# @default: false
+生物群系加权: false
+
+# 按生物群系过滤传送的各生物群系相对权重。仅当 biomeWeighted 为 true 时使用。
+# 未列出的生物群系使用 1.0（无偏向）；2.0 = 被选中约两倍频率，0.0 = 抑制。
+# 完整的原版生物群系集已按 1.0 预先列出作为可编辑参考；用平台 id 添加模组生物
+# 群系（如 terralith:emerald_peaks）。需要 biomeRecall。
+# @type: map<string, number>
+生物群系权重:
+  # 该生物群系的相对选择权重（1.0 = 无偏向）。
+  # @type: number
+  # @range: [0.0, null]
+  # @default: 1.0
+  plains: 1.0
+  sunflower_plains: 1.0
+  snowy_plains: 1.0
+  ice_spikes: 1.0
+  desert: 1.0
+  swamp: 1.0
+  mangrove_swamp: 1.0
+  forest: 1.0
+  flower_forest: 1.0
+  birch_forest: 1.0
+  dark_forest: 1.0
+  old_growth_birch_forest: 1.0
+  old_growth_pine_taiga: 1.0
+  old_growth_spruce_taiga: 1.0
+  taiga: 1.0
+  snowy_taiga: 1.0
+  savanna: 1.0
+  savanna_plateau: 1.0
+  windswept_hills: 1.0
+  windswept_gravelly_hills: 1.0
+  windswept_forest: 1.0
+  windswept_savanna: 1.0
+  jungle: 1.0
+  sparse_jungle: 1.0
+  bamboo_jungle: 1.0
+  badlands: 1.0
+  eroded_badlands: 1.0
+  wooded_badlands: 1.0
+  meadow: 1.0
+  cherry_grove: 1.0
+  pale_garden: 1.0
+  grove: 1.0
+  snowy_slopes: 1.0
+  frozen_peaks: 1.0
+  jagged_peaks: 1.0
+  stony_peaks: 1.0
+  river: 1.0
+  frozen_river: 1.0
+  beach: 1.0
+  snowy_beach: 1.0
+  stony_shore: 1.0
+  warm_ocean: 1.0
+  lukewarm_ocean: 1.0
+  deep_lukewarm_ocean: 1.0
+  ocean: 1.0
+  deep_ocean: 1.0
+  cold_ocean: 1.0
+  deep_cold_ocean: 1.0
+  frozen_ocean: 1.0
+  deep_frozen_ocean: 1.0
+  mushroom_fields: 1.0
+  dripstone_caves: 1.0
+  lush_caves: 1.0
+  deep_dark: 1.0
+  # --- 下界 ---
+  nether_wastes: 1.0
+  warped_forest: 1.0
+  crimson_forest: 1.0
+  soul_sand_valley: 1.0
+  basalt_deltas: 1.0
+  # --- 末地 ---
+  the_end: 1.0
+  end_highlands: 1.0
+  end_midlands: 1.0
+  small_end_islands: 1.0
+  end_barrens: 1.0
+  # --- 杂项 / 技术 ---
+  the_void: 1.0
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

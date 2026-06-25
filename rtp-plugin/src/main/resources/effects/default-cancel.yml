@@ -1,11 +1,9 @@
-# --- effects/default-cancel.yml — fallback for the cancel stage ---
-# See effects/default.yml for full schema documentation.
+# --- effects/default-cancel.yml: plays when a teleport is cancelled ---
+# Docs: https://github.com/DailyStruggle/RTP/wiki/Effects (see effects/default.yml too)
 
 when: cancel
 effects:
-  # VOLUME / PITCH are integer percent (0..100), not decimals — the
-  # `.` is also the token separator, so `1.0` would tokenize as two
-  # tokens and leave volume at 1% (silent). Use whole numbers.
+  # Use whole numbers. Volume/pitch are percent (100 = full).
   - SOUND.BLOCK_NOTE_BLOCK_BASS.100.50.0.0.0
 
 version: "1.0"

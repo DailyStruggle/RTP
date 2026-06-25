@@ -1,5 +1,6 @@
 # --- RTP Safety Configuration ---
 # Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
+
 # Seconds of invulnerability after teleport
 # @type: integer
 # @range: [0, null]

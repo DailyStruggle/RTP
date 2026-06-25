@@ -90,6 +90,14 @@ public final class RtpYamlReader {
         // own blockComments. parseMappingBody fills pendingComments with
         // whatever it sees before the first key; we transfer it here.
         r.parseMappingBody(root, 0);
+        // Lift a document/file header off the first key. parseMappingBody
+        // attaches the whole leading comment run to the first entry; when the
+        // author separated a leading block from the first key's own comment
+        // with a blank line (a BLANK_LINE_SENTINEL, not a "#"-only line), the
+        // portion above that blank is a file-level header and belongs on the
+        // root mapping, not glued to the first value (where it would leak into
+        // that value's hover/metadata text).
+        liftDocumentHeader(root);
         // Any pending comments left after parsing the root mapping (e.g.,
         // a trailing block separated from the last entry by a blank line)
         // become root trailing comments.
@@ -130,6 +138,34 @@ public final class RtpYamlReader {
         while (!list.isEmpty() && BLANK_LINE_SENTINEL.equals(list.get(0))) {
             list.remove(0);
         }
+    }
+
+    /**
+     * Move the leading comment paragraph off the first mapping entry and onto
+     * the root mapping itself, when the source separated that paragraph from
+     * the first key's own comment with a blank line. The header is everything
+     * before the first {@link #BLANK_LINE_SENTINEL} in the first entry's block
+     * comments; the remainder (with leading sentinels trimmed) stays on the
+     * key. No-op when the first entry has no detached leading block, so files
+     * whose first comment is glued directly to the first key (no blank line)
+     * are unaffected and round-trip unchanged.
+     */
+    private static void liftDocumentHeader(RtpYamlMapping root) {
+        if (root.entries().isEmpty()) return;
+        RtpYamlNode first = root.entries().values().iterator().next();
+        List<String> comments = first.blockComments();
+        if (comments == null || comments.isEmpty()) return;
+        int sentinel = comments.indexOf(BLANK_LINE_SENTINEL);
+        // A header exists only when there is renderable content before the
+        // blank line (sentinel index > 0). Leading sentinels were already
+        // trimmed by parseMappingBody, so index 0 should not occur, but the
+        // guard keeps the split well-defined regardless.
+        if (sentinel <= 0) return;
+        List<String> header = new ArrayList<>(comments.subList(0, sentinel));
+        List<String> remainder = new ArrayList<>(comments.subList(sentinel + 1, comments.size()));
+        trimSentinels(remainder);
+        root.setBlockComments(header);
+        first.setBlockComments(remainder);
     }
 
     public static RtpYamlMapping parse(Reader reader) throws IOException {

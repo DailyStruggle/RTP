@@ -4,4 +4,6 @@
 # so the translated key names survive the ADR-071 advanced/ relocation.
 biomeWhitelist: "バイオームホワイトリスト"
 biomes: "バイオーム"
+biomeWeighted: "バイオーム重み付け"
+biomeWeights: "バイオーム重み"
 version: "version"

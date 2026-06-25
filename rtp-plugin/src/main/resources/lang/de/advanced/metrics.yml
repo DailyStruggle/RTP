@@ -1,4 +1,5 @@
 # --- RTP-Metrik-Einstellungen ---
+
 # Reine Reporting-Schalter für die Metrik-SPI. Drossel-/Tuning-
 # Schalter bleiben in performance.yml.
 # Füllt MetricsSnapshot.foliaRegions auf Folia mit Details pro Region.

@@ -235,7 +235,7 @@ class AddonRegistryTest {
   }
 
   @Test
-  @DisplayName("extractBundledAddons copies indexed jars from the classpath and never overwrites")
+  @DisplayName("extractBundledAddons copies indexed jars and never clobbers an operator-edited copy")
   void extractBundledAddons_copies_indexed_jars(@TempDir File tempDir) throws Exception {
     // Stage a fake "RTP jar" classpath root holding the bundled-addons index + payload.
     File classpathRoot = new File(tempDir, "cp");
@@ -264,13 +264,68 @@ class AddonRegistryTest {
           new File(addonsDir, "Missing.jar").exists(),
           "an indexed-but-absent resource is skipped, not created");
 
-      // Re-extraction never clobbers an operator's edited copy.
+      // Re-extraction never clobbers an operator's edited copy (its bytes no longer
+      // match what RTP last wrote, so it is recognised as a customisation).
       Files.writeString(extracted.toPath(), "edited-by-operator", StandardCharsets.UTF_8);
       registry.extractBundledAddons(addonsDir, loader);
       assertEquals(
           "edited-by-operator",
           Files.readString(extracted.toPath()),
-          "an already-present jar must be left untouched on a second pass");
+          "an operator-edited jar must be left untouched on a second pass");
+    }
+  }
+
+  @Test
+  @DisplayName("extractBundledAddons refreshes an unmodified stale jar when the RTP jar updates")
+  void extractBundledAddons_refreshes_stale_unmodified_jar(@TempDir File tempDir) throws Exception {
+    File classpathRoot = new File(tempDir, "cp");
+    File bundleDir = new File(classpathRoot, "bundled-addons");
+    assertTrue(bundleDir.mkdirs());
+    Files.writeString(
+        new File(bundleDir, "index").toPath(), "DemoAddon.jar\n", StandardCharsets.UTF_8);
+    Files.write(new File(bundleDir, "DemoAddon.jar").toPath(), "v1".getBytes(StandardCharsets.UTF_8));
+
+    File addonsDir = new File(tempDir, "addons");
+    File extracted = new File(addonsDir, "DemoAddon.jar");
+    try (java.net.URLClassLoader loader =
+        new java.net.URLClassLoader(new java.net.URL[] {classpathRoot.toURI().toURL()}, null)) {
+      AddonRegistry registry = new AddonRegistry();
+      registry.extractBundledAddons(addonsDir, loader);
+      assertEquals("v1", Files.readString(extracted.toPath()));
+
+      // Simulate an RTP update: the bundled resource now carries new content. An
+      // unmodified extracted copy must be refreshed to match.
+      Files.write(new File(bundleDir, "DemoAddon.jar").toPath(), "v2".getBytes(StandardCharsets.UTF_8));
+      registry.extractBundledAddons(addonsDir, loader);
+      assertEquals(
+          "v2",
+          Files.readString(extracted.toPath()),
+          "an unmodified extracted jar must be refreshed to the updated bundled version");
+    }
+  }
+
+  @Test
+  @DisplayName("extractBundledAddons treats a deleted jar as a permanent opt-out")
+  void extractBundledAddons_deleted_jar_stays_opted_out(@TempDir File tempDir) throws Exception {
+    File classpathRoot = new File(tempDir, "cp");
+    File bundleDir = new File(classpathRoot, "bundled-addons");
+    assertTrue(bundleDir.mkdirs());
+    Files.writeString(
+        new File(bundleDir, "index").toPath(), "DemoAddon.jar\n", StandardCharsets.UTF_8);
+    Files.write(new File(bundleDir, "DemoAddon.jar").toPath(), "v1".getBytes(StandardCharsets.UTF_8));
+
+    File addonsDir = new File(tempDir, "addons");
+    File extracted = new File(addonsDir, "DemoAddon.jar");
+    try (java.net.URLClassLoader loader =
+        new java.net.URLClassLoader(new java.net.URL[] {classpathRoot.toURI().toURL()}, null)) {
+      AddonRegistry registry = new AddonRegistry();
+      registry.extractBundledAddons(addonsDir, loader);
+      assertTrue(extracted.isFile());
+
+      // Operator opts out by deleting the extracted jar; a later run must not bring it back.
+      assertTrue(extracted.delete());
+      registry.extractBundledAddons(addonsDir, loader);
+      assertFalse(extracted.exists(), "a deleted bundled addon must stay opted out");
     }
   }
 

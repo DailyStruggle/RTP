@@ -1,4 +1,5 @@
 # RTP Network Mode (multi-server / multi-proxy) Disabled by default; flipping `network.enabled: true` opts this backend into the cross-server network.
+
 network:
   # Gdy false, ten plik jest odczytywany i sprawdzany, a nastepnie ignorowany: nie otwiera sie zaden watek, tabela ani transport.
   # @type: boolean

@@ -1,4 +1,5 @@
 # --- Configuración económica de RTP ---
+
 # Configura los costes del teletransporte aleatorio usando la economía del servidor.
 # Costes del teletransporte
 # Coste base para un comando /rtp estándar.

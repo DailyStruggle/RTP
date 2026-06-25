@@ -1,4 +1,5 @@
 # --- RTP-metrics-instellingen ---
+
 # Alleen rapportage-knoppen voor de metrics-SPI. Throttle-/tuning-
 # knoppen blijven in performance.yml staan.
 # Vult MetricsSnapshot.foliaRegions() met regio-detail op Folia.

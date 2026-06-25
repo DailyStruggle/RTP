@@ -36,6 +36,13 @@ public enum ConfigKeys {
   network,
   /** Generalized menu framework configuration (ADR-035 / ADR-044). */
   menu,
+  /**
+   * Global default templates and scalars that region/world settings may inherit via an
+   * {@code @config} reference token (ADR-073). Holds the {@code shape}/{@code vert}
+   * named blocks plus the config-owned scalars ({@code cacheCap}, {@code backlogCacheCap},
+   * {@code activeChunkCap}, {@code spatialResolution}, {@code requirePermission}).
+   */
+  defaults,
   /** Configuration version */
   version
 }

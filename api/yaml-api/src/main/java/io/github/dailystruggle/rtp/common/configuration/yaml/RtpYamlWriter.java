@@ -30,6 +30,13 @@ public final class RtpYamlWriter {
 
     public static String emit(RtpYamlMapping root) {
         RtpYamlWriter w = new RtpYamlWriter();
+        // Emit a document/file header (the root mapping's own block comments)
+        // ahead of the first entry, separated by a blank line so a reload
+        // re-attaches it to the root rather than gluing it to the first key.
+        if (startsWithRenderableComment(root.blockComments())) {
+            w.writeBlockComments(root.blockComments(), 0);
+            w.out.append(NL);
+        }
         w.writeMapping(root, 0, true);
         if (!root.trailingComments().isEmpty()) {
             // Separate trailing comments from the last entry with a blank
@@ -47,6 +54,28 @@ public final class RtpYamlWriter {
         for (Map.Entry<String, RtpYamlNode> e : entries.entrySet()) {
             String key = e.getKey();
             RtpYamlNode value = e.getValue();
+            // Visually separate a commented scalar entry from the preceding
+            // entry with a blank line. Source files that were round-tripped
+            // through the parser carry an explicit BLANK_LINE_SENTINEL for
+            // this, but nodes rebuilt programmatically (e.g. a menu Apply or an
+            // "@config" materialization) attach their comment block with no
+            // leading sentinel, so emitting them produces a cramped layout with
+            // the comment jammed against the previous value. Insert the
+            // separator here when one is not already present so the written
+            // YAML keeps the one-blank-line-before-each-comment-block style of
+            // the shipped resources.
+            //
+            // Section-valued entries (nested mappings/sequences such as
+            // "network:") are deliberately excluded: their own indented block
+            // already provides clear visual separation, and forcing an extra
+            // blank line above every sub-tree header reads as noise.
+            if (!first
+                    && startsWithRenderableComment(value.blockComments())
+                    && !(value instanceof RtpYamlMapping)
+                    && !(value instanceof RtpYamlSequence)
+                    && !endsWithBlankLine()) {
+                out.append(NL);
+            }
             // Emit block comments above this entry.
             writeBlockComments(value.blockComments(), indent);
             // Emit the key line.
@@ -149,6 +178,25 @@ public final class RtpYamlWriter {
 
     private void writeIndent(int n) {
         for (int i = 0; i < n; i++) out.append(' ');
+    }
+
+    /**
+     * True when the comment list begins with an actual comment line (i.e. its
+     * first element is not a {@link RtpYamlReader#BLANK_LINE_SENTINEL}). A list
+     * that already starts with a sentinel will emit its own separating blank
+     * line, so no extra separator is needed in that case.
+     */
+    private static boolean startsWithRenderableComment(List<String> comments) {
+        return !comments.isEmpty()
+                && !RtpYamlReader.BLANK_LINE_SENTINEL.equals(comments.get(0));
+    }
+
+    /** True when the emitted output already ends with a blank line (or is empty). */
+    private boolean endsWithBlankLine() {
+        int len = out.length();
+        if (len == 0) return true;
+        if (out.charAt(len - 1) != '\n') return false;
+        return len < 2 || out.charAt(len - 2) == '\n';
     }
 
     private static boolean isEmptyScalar(RtpYamlScalar sc) {

@@ -972,6 +972,14 @@ public final class CommandTreeMenuBuilder {
                             + predictVisualLines(fileName);
                 }
             }
+            // Hover text source: each key's YAML block comment (the
+            // operator-facing documentation written above the key in the
+            // shipped .yml). Resolved once from the parser's loaded YAML root
+            // and attached to every editable row so hovering a config entry
+            // surfaces its description. May be null when the file has not been
+            // cached or the key carries no comment.
+            io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection yamlRoot =
+                    parser.getYamlRoot();
             for (E key : visibleKeys) {
                 Object current = loaded.get(key);
                 // Nested config values (e.g. database/network/menu under
@@ -994,7 +1002,8 @@ public final class CommandTreeMenuBuilder {
                         String dottedKey = key.name() + "." + kv[0];
                         String nestedLabel = "&2" + dottedKey
                                 + "&7: &0" + kv[1];
-                        lines.add(MenuLine.of(new MenuFragment(nestedLabel, null,
+                        String nestedHover = resolveConfigHover(yamlRoot, dottedKey);
+                        lines.add(MenuLine.of(new MenuFragment(nestedLabel, nestedHover,
                                 new MenuAction.OpenConfigKey(fileName, dottedKey))));
                         visualLinesUsed += predictVisualLines(nestedLabel);
                         if (visualLinesUsed >= visualLinesPerPage) {
@@ -1012,7 +1021,8 @@ public final class CommandTreeMenuBuilder {
                         ? "&8(unset)"
                         : String.valueOf(current);
                 String label = "&2" + key.name() + "&7: &0" + currentStr;
-                lines.add(MenuLine.of(new MenuFragment(label, null,
+                String hover = resolveConfigHover(yamlRoot, key.name());
+                lines.add(MenuLine.of(new MenuFragment(label, hover,
                         new MenuAction.OpenConfigKey(fileName, key.name()))));
                 visualLinesUsed += predictVisualLines(label);
                 if (visualLinesUsed >= visualLinesPerPage) {
@@ -1376,6 +1386,45 @@ public final class CommandTreeMenuBuilder {
             }
         }
         return out;
+    }
+
+    /**
+     * Resolve hover text for a config row from the key's YAML block comment.
+     * Returns the comment with leading {@code #} markers stripped (one optional
+     * space after each {@code #} removed), joined with {@code \n}, or
+     * {@code null} when {@code yamlRoot} is {@code null}, the key has no
+     * comment, or the stripped result is blank. Dotted keys (e.g.
+     * {@code database.dbType}) are accepted by
+     * {@link io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection#getComment(String)}.
+     *
+     * @param yamlRoot the loaded YAML document root, or {@code null}
+     * @param key      the (possibly dotted) config key
+     * @return the cleaned comment text, or {@code null} when unavailable
+     */
+    private static String resolveConfigHover(
+            io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection yamlRoot,
+            String key) {
+        if (yamlRoot == null || key == null || key.isEmpty()) return null;
+        String raw;
+        try {
+            raw = yamlRoot.getComment(key);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+        if (raw == null || raw.isEmpty()) return null;
+        String[] commentLines = raw.split("\\R", -1);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < commentLines.length; i++) {
+            String trimmed = commentLines[i].stripLeading();
+            if (trimmed.startsWith("#")) {
+                trimmed = trimmed.substring(1);
+                if (trimmed.startsWith(" ")) trimmed = trimmed.substring(1);
+            }
+            if (i > 0) sb.append('\n');
+            sb.append(trimmed);
+        }
+        String cleaned = sb.toString();
+        return cleaned.isBlank() ? null : cleaned;
     }
 
     private static String lookupMsg(Enum<?> key, String fallback) {

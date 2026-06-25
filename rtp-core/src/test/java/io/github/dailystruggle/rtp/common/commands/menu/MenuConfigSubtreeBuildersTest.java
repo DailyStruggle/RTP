@@ -359,6 +359,53 @@ class MenuConfigSubtreeBuildersTest {
                 () -> builder.buildConfigFile(UUID.randomUUID(), "", parser));
     }
 
+    @Test
+    @DisplayName("buildConfigFile: each key row carries its YAML block comment as hover text")
+    void buildConfigFile_hoverFromYamlComment() throws Exception {
+        CommandTreeMenuBuilder builder = new CommandTreeMenuBuilder();
+
+        // Stand up a self-contained parser over an on-disk YAML carrying a
+        // known block comment, so the hover assertion is deterministic and
+        // independent of the shared test fixture's file IO. The version stamp
+        // matches the parser's so no update()/re-extract pass runs (which
+        // could overlay the shipped jar comments).
+        Path file = tempDir.resolve("performance.yml");
+        java.nio.file.Files.writeString(file,
+                "version: 1.0\n"
+                        + "# how many tries before giving up\n"
+                        + "maxAttempts: 5\n"
+                        + "period: 2\n");
+        io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase db =
+                new io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase(tempDir.toFile());
+        ConfigParser<PerformanceKeys> parser = new ConfigParser<>(
+                PerformanceKeys.class, "performance.yml", "1.0",
+                tempDir.toFile(), tempDir.toFile(), db);
+
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection root =
+                parser.getYamlRoot();
+        assertNotNull(root, "parser must have a loaded YAML root");
+        assertNotNull(root.getComment("maxAttempts"),
+                "fixture YAML must carry the maxAttempts comment");
+
+        MenuModel model = builder.buildConfigFile(
+                UUID.randomUUID(), "performance.yml", parser);
+
+        String hover = null;
+        for (MenuPage page : model.pages()) {
+            List<MenuLine> ls = page.lines();
+            for (int i = 2; i < ls.size(); i++) {
+                MenuFragment f = ls.get(i).fragments().get(0);
+                if (f.action() instanceof MenuAction.OpenConfigKey ock
+                        && "maxAttempts".equals(ock.paramName())) {
+                    hover = f.hover();
+                }
+            }
+        }
+        assertNotNull(hover, "maxAttempts row must carry hover text from its comment");
+        assertEquals("how many tries before giving up", hover,
+                "hover must be the comment with the leading '#' marker stripped");
+    }
+
     /** Empty-enum fixture for the v3.7.4 empty-file degradation test. */
     private enum EmptyKeys { }
 

@@ -24,25 +24,25 @@ annuleerAfstand: 2
 # @default: 300
 teletransportWachttijd: 300
 
-# Maximum number of successful /rtp uses a player may make within the
-# lockAfterResetSeconds window before being locked out (BetterRTP LockAfter parity).
-# 0 disables the cap. Bypassed by rtp.nolock.
+# Maximaal aantal geslaagde /rtp-gebruiken dat een speler binnen het
+# lockAfterResetSeconds-venster mag doen voordat hij wordt vergrendeld (BetterRTP LockAfter-pariteit).
+# 0 schakelt de limiet uit. Omzeild door rtp.nolock.
 # @type: integer
 # @range: [0, null]
 # @default: 0
 lockAfterUses: 0
 
-# Length of the rolling usage-cap window for lockAfterUses. The counter resets this
-# many seconds after the window's first use. 0 means the cap never resets (a hard
-# lifetime cap).
+# Lengte van het voortschrijdende gebruikslimietvenster voor lockAfterUses. De teller wordt zoveel
+# seconden na het eerste gebruik van het venster gereset. 0 betekent dat de limiet nooit wordt
+# gereset (een harde levenslange limiet).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
 # @default: 0
 lockAfterResetSeconds: 0
 
-# When true, a successful /rtp sets the landed location as the player's persistent
-# spawn anchor (BetterRTP SetAsRespawn parity).
+# Indien true stelt een geslaagde /rtp de landingsplek in als het permanente
+# spawn-anker van de speler (BetterRTP SetAsRespawn-pariteit).
 # @type: boolean
 # @default: false
 setRespawnOnTeleport: false
@@ -83,6 +83,39 @@ menu:
     # Beschikbare ids: book. (De chat-renderer komt in een vervolg-release en
     # wordt dan aan de standaardlijst toegevoegd.)
     - "book"
+
+# Globale standaardwaarden die via het "@config"-token worden overgenomen door regio-/wereldbestanden (ADR-073).
+defaults:
+  # Standaardvorm en -grootte van het gebied. radius/centerRadius = hoe ver weg je landt, gemeten in chunks.
+  shape:
+    name: "CIRCLE"
+    mode: "ACCUMULATE"
+    radius: 256
+    centerRadius: 64
+    centerX: 0
+    centerZ: 0
+    weight: 1.0
+    # Keep spots from being reused. 0 = off, 1 = the landing chunk, N = bigger square.
+    uniquePlacements: 0
+    expand: false
+  # Default high/low landing window.
+  vert:
+    name: "LINEAR"
+    minY: 32
+    maxY: 255
+    # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
+    direction: 2
+    requireSkyLight: true
+  # How many safe spots to pre-calculate.
+  cacheCap: 50
+  # Extra unverified spots kept ready. 0 = off.
+  backlogCacheCap: 1000
+  # Max chunks kept loaded for instant teleports.
+  activeChunkCap: 10
+  # Bad-spot tracking precision (1-5).
+  spatialResolution: 3
+  # Whether regions/worlds need permission.
+  requirePermission: false
 
 # WIJZIG HET VERSIENUMMER NIET
 version: 3.1

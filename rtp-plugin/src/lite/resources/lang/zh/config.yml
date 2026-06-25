@@ -77,5 +77,38 @@ menu:
     # 渲染器将在后续版本中提供，届时会加入默认列表。)
     - "book"
 
+# 通过 "@config" 令牌由区域/世界文件继承的全局默认值 (ADR-073)。
+defaults:
+  # 默认区域的形状和大小。radius/centerRadius = 你落地的距离，以区块为单位。
+  shape:
+    name: "CIRCLE"
+    mode: "ACCUMULATE"
+    radius: 256
+    centerRadius: 64
+    centerX: 0
+    centerZ: 0
+    weight: 1.0
+    # Keep spots from being reused. 0 = off, 1 = the landing chunk, N = bigger square.
+    uniquePlacements: 0
+    expand: false
+  # Default high/low landing window.
+  vert:
+    name: "LINEAR"
+    minY: 32
+    maxY: 255
+    # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
+    direction: 2
+    requireSkyLight: true
+  # How many safe spots to pre-calculate.
+  cacheCap: 50
+  # Extra unverified spots kept ready. 0 = off.
+  backlogCacheCap: 1000
+  # Max chunks kept loaded for instant teleports.
+  activeChunkCap: 10
+  # Bad-spot tracking precision (1-5).
+  spatialResolution: 3
+  # Whether regions/worlds need permission.
+  requirePermission: false
+
 # 请勿修改版本号
 version: 3.1

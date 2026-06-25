@@ -7,36 +7,25 @@ world: "[0]"
 # Use the world's /worldborder as the bound instead of the shape radius below.
 worldBorderOverride: false
 
-# Spawn area shape and size. radius/centerRadius set how far out players land;
-# centerX/centerZ recenter the ring.
-shape:
-  name: "CIRCLE"
-  mode: "ACCUMULATE"
-  radius: 256
-  centerRadius: 64
-  centerX: 0
-  centerZ: 0
-  weight: 1.0
-  # Chunk radius cleared around each used spot so it is never reused.
-  # 0 = off, 1 = the landing chunk only, N = an (2N-1)x(2N-1) chunk square.
-  uniquePlacements: 0
-  expand: false
+# Spawn area shape and size. radius/centerRadius are measured in chunks. "@config" inherits
+# the whole `defaults.shape` block from config.yml (ADR-073), so a single-world server sets
+# radius/centerRadius once there.
+# Replace with an inline block to override per-region, e.g.:
+#   shape:
+#     name: "CIRCLE"
+#     radius: 256
+#     centerRadius: 64
+shape: "@config"
 
-# Vertical landing window.
-vert:
-  name: "LINEAR"
-  minY: 32
-  maxY: 255
-  # Scan order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in,
-  # any other value = random order.
-  direction: 2
-  requireSkyLight: true
+# Vertical landing window. "@config" inherits the whole `defaults.vert` block from
+# config.yml (ADR-073). Replace with an inline block to override per-region.
+vert: "@config"
 
-# If true, rtp.regions.<name> is required
-requirePermission: false
+# If true, rtp.regions.<name> is required. "@config" inherits defaults.requirePermission.
+requirePermission: "@config"
 # Region to redirect to if no permission
 override: "default"
-# Economy cost override for this region
+# Economy cost override for this region (added on top of the economy.yml base price).
 price: 0.0
 
 # Optional cosmetic display name shown in /rtp info and the GUI menu. Does NOT
@@ -45,14 +34,16 @@ price: 0.0
 # displayName: "&#55ff55Wild Overworld"
 
 # --- Advanced (cache/precision tuning; defaults suit most servers) ---
+# Each "@config" inherits the matching defaults.<key> value from config.yml (ADR-073);
+# replace with a number to override per-region.
 # Max pre-calculated safe locations
-cacheCap: 50
+cacheCap: "@config"
 # L3 backlog cache capacity; unverified candidates pre-filtered by anvil one .mca-bin per pulse. 0 disables L3.
-backlogCacheCap: 1000
+backlogCacheCap: "@config"
 # Max chunks kept loaded for zero-latency
-activeChunkCap: 10
+activeChunkCap: "@config"
 # Precision for bad-location tracking (1-5)
-spatialResolution: 3
+spatialResolution: "@config"
 
 # DO NOT TOUCH VERSION NUMBER
 version: "1.1"

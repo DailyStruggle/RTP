@@ -1,29 +1,24 @@
 # --- RTP Metrics Settings ---
-# Reporting-only knobs for the metrics SPI. Throttle / tuning
-# knobs continue to live in performance.yml.
-# Populate MetricsSnapshot.foliaRegions() with per-region detail on Folia.
-# Has no effect on Paper / Bukkit / Fabric (single-region runtimes always
-# return an empty list, which is the correct answer for those platforms).
+# Documentation: https://github.com/DailyStruggle/RTP/wiki/Metrics
+
+# Report per-region detail on Folia. Does nothing on other platforms.
 # @type: boolean
 # @default: true
 foliaIncludeRegions: true
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# tps{1,5,15}m fields of MetricsSnapshot on Folia.
+# How to combine per-region TPS on Folia.
 # @type: enum
 # @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# mspt field of MetricsSnapshot on Folia.
+# How to combine per-region MSPT on Folia.
 # @type: enum
 # @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# tickBudgetUtilisation field of MetricsSnapshot on Folia.
+# How to combine per-region tick budget on Folia.
 # @type: enum
 # @options: [mean, max]
 # @default: max

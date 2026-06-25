@@ -1,5 +1,6 @@
 # --- RTP Landing Block Lists (advanced) ---
 # Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
+
 # Split out of safety.yml so the common safety knobs stay uncluttered.
 #
 # Blocks treated as passable air for landing-safety checks.

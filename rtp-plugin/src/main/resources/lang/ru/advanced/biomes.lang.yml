@@ -4,4 +4,6 @@
 # so the translated key names survive the ADR-071 advanced/ relocation.
 biomeWhitelist: "белыйСписокБиомов"
 biomes: "биомы"
+biomeWeighted: "взвешиваниеБиома"
+biomeWeights: "весаБиома"
 version: "version"

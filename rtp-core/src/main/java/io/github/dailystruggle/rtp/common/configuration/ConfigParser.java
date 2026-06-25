@@ -57,6 +57,15 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   /** Reverse map for language translations */
   public Map<String, String> reverse_language_mapping = new ConcurrentHashMap<>();
 
+  /**
+   * ADR-073: records the raw {@code @<file>} reference token a key was configured with,
+   * when its value inherits a global default rather than being a literal. Populated as
+   * settings are resolved (e.g. by {@code RegionConfigLoader}); used by the menu to show
+   * an "inheriting from &lt;file&gt;" state and to offer the inherit/override toggle. A key
+   * absent from this map is a local literal (or was never resolved).
+   */
+  public final Map<E, String> defaultReferences = new ConcurrentHashMap<>();
+
   /** Cached lookup for YAML files */
   AtomicReference<Map<String, RtpYamlConfig>> cachedLookup;
 
@@ -894,7 +903,14 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    * @return the configuration value
    */
   public Object getConfigValue(E key, Object def) {
-    return data.getOrDefault(key, def);
+    Object value = data.getOrDefault(key, def);
+    // ADR-073: a value may be an @<file> reference token that inherits a global default.
+    // Resolve at read time so every caller transparently sees the inherited value; the
+    // raw token remains in data (and is recorded in defaultReferences) for the menu.
+    if (ConfigDefaultResolver.isReference(value)) {
+      return ConfigDefaultResolver.resolve(value, key.name(), def);
+    }
+    return value;
   }
 
   /**
@@ -1088,6 +1104,34 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
             "cannot set scalar value on section key '" + yamlKeyStr + "' in " + name);
       }
       RtpYamlConfig.set(yamlKeyStr, o);
+    } else if (value instanceof FactoryValue<?> || value instanceof Map) {
+      // The new value is a type-bearing block (shape/vert FactoryValue or its
+      // map form) but the on-disk slot is not yet a nested section. This is the
+      // ADR-073 load path: a region/world file ships `vert: "@config"` (an
+      // inheritance reference token) and RegionConfigLoader resolves it, then
+      // calls set(...) with the resolved VerticalAdjustor. Writing that object
+      // as a raw scalar would serialize it to a mangled single-line string such
+      // as `vert: "\nminY: 32\nmaxY: 255\n..."`, destroying both the block and
+      // the `@config` inheritance.
+      if (ConfigDefaultResolver.isReference(o)) {
+        // Preserve the inheritance token verbatim so it keeps inheriting from
+        // the global default and is re-resolved cleanly on every load.
+        RtpYamlConfig.set(yamlKeyStr, o);
+      } else {
+        // Otherwise materialize a proper nested section from the block instead
+        // of writing the object as a scalar.
+        Map<String, Object> map = new LinkedHashMap<>();
+        if (value instanceof FactoryValue<?>) {
+          FactoryValue<?> fv = (FactoryValue<?>) value;
+          map.put("name", fv.name);
+          for (Map.Entry<? extends Enum<?>, Object> d : fv.getData().entrySet())
+            map.put(d.getKey().name(), d.getValue());
+        } else {
+          //noinspection unchecked
+          map.putAll((Map<String, Object>) value);
+        }
+        RtpYamlConfig.set(yamlKeyStr, map);
+      }
     } else {
       RtpYamlConfig.set(yamlKeyStr, value);
     }

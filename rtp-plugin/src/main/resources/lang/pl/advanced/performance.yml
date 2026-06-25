@@ -59,11 +59,13 @@ zasiegWidokuTeleport: 0
 
 # Ticki, w trakcie których zasięg widzenia teleportowanego gracza wraca do normy
 # po przybyciu, wygładzając skok ładowania chunków. 0 wyłącza ograniczenie.
+# UWAGA: Tymczasowo wymuszone na 0. Stopniowe przywracanie powoduje migotanie /
+# ponowne renderowanie po stronie klienta przy przybyciu. Pozostaw 0 do odwołania.
 # @type: integer
 # @range: [0, null]
 # @unit: ticks
 # @default: 200
-zasiegWidokuPrzywracanieInterwal: 200
+zasiegWidokuPrzywracanieInterwal: 0
 
 # Uzupełnij pamięć podręczną regionu natychmiast po udanej teleportacji.
 # @type: boolean
@@ -112,92 +114,6 @@ pamiecBiomu: true
 # @type: boolean
 # @default: false
 pamiecBiomuWymuszona: false
-
-# Kieruje do każdego żądanego biomu z równym prawdopodobieństwem zamiast wedle
-# pokrycia regionu. Wymaga biomeRecall; bez wpływu na niefiltrowane teleportacje.
-# @type: boolean
-# @default: false
-biomWazony: false
-
-# Względne wagi biomów dla teleportacji filtrowanych biomem. Używane tylko gdy
-# biomeWeighted to true. Biomy spoza listy używają 1.0 (bez stronniczości); 2.0 =
-# wybierany ~dwa razy częściej, 0.0 = stłumiony. Pełny zestaw vanilla jest wstępnie
-# wypisany przy 1.0 jako edytowalna referencja; dodaj biomy z modów po ich id
-# platformy (np. terralith:emerald_peaks). Wymaga biomeRecall.
-# @type: map<string, number>
-wagiBiomu:
-  # Względna waga wyboru dla tego biomu (1.0 = brak preferencji).
-  # @type: number
-  # @range: [0.0, null]
-  # @default: 1.0
-  plains: 1.0
-  sunflower_plains: 1.0
-  snowy_plains: 1.0
-  ice_spikes: 1.0
-  desert: 1.0
-  swamp: 1.0
-  mangrove_swamp: 1.0
-  forest: 1.0
-  flower_forest: 1.0
-  birch_forest: 1.0
-  dark_forest: 1.0
-  old_growth_birch_forest: 1.0
-  old_growth_pine_taiga: 1.0
-  old_growth_spruce_taiga: 1.0
-  taiga: 1.0
-  snowy_taiga: 1.0
-  savanna: 1.0
-  savanna_plateau: 1.0
-  windswept_hills: 1.0
-  windswept_gravelly_hills: 1.0
-  windswept_forest: 1.0
-  windswept_savanna: 1.0
-  jungle: 1.0
-  sparse_jungle: 1.0
-  bamboo_jungle: 1.0
-  badlands: 1.0
-  eroded_badlands: 1.0
-  wooded_badlands: 1.0
-  meadow: 1.0
-  cherry_grove: 1.0
-  pale_garden: 1.0
-  grove: 1.0
-  snowy_slopes: 1.0
-  frozen_peaks: 1.0
-  jagged_peaks: 1.0
-  stony_peaks: 1.0
-  river: 1.0
-  frozen_river: 1.0
-  beach: 1.0
-  snowy_beach: 1.0
-  stony_shore: 1.0
-  warm_ocean: 1.0
-  lukewarm_ocean: 1.0
-  deep_lukewarm_ocean: 1.0
-  ocean: 1.0
-  deep_ocean: 1.0
-  cold_ocean: 1.0
-  deep_cold_ocean: 1.0
-  frozen_ocean: 1.0
-  deep_frozen_ocean: 1.0
-  mushroom_fields: 1.0
-  dripstone_caves: 1.0
-  lush_caves: 1.0
-  deep_dark: 1.0
-  # --- Nether ---
-  nether_wastes: 1.0
-  warped_forest: 1.0
-  crimson_forest: 1.0
-  soul_sand_valley: 1.0
-  basalt_deltas: 1.0
-  # --- The End ---
-  the_end: 1.0
-  end_highlands: 1.0
-  end_midlands: 1.0
-  small_end_islands: 1.0
-  end_barrens: 1.0
-  # --- Różne / techniczne ---
-  the_void: 1.0
 
 # Próg opóźnienia (ms), powyżej którego natychmiast obsłużona teleportacja jest
 # audytowana (WARN w logu, slowPipelineCount zwiększony). 0 lub mniej wyłącza.

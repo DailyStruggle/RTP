@@ -1,4 +1,5 @@
 # --- Configuración de métricas de RTP ---
+
 # Ajustes solo de reporte para la SPI de métricas de la Fase M2. Los ajustes
 # de regulación / afinado siguen en performance.yml.
 # Rellena MetricsSnapshot.foliaRegions() con detalle por región en Folia.

@@ -56,11 +56,13 @@ pounce_distance: 0
 
 # Ticks over which a teleported kitty's view distance creeps back to normal after
 # landing, smoothing the chunk-load pounce. 0 turns the clamp off.
+# MEOW: Pawsed at 0 for now. The slow creep-back makes the kitty's screen flicker /
+# re-paint on landing. Leave it at 0 until the hooman says otherwise.
 # @type: integer
 # @range: [0, null]
 # @unit: ticks
 # @default: 200
-pounce_recovery_naps: 200
+pounce_recovery_naps: 0
 
 # Refill the warm-spot pile right after a pounce
 # @type: boolean
@@ -109,91 +111,6 @@ smell_memory: true
 # @type: boolean
 # @default: false
 forced_smell_memory: false
-
-# Steers each requested biome with equal odds instead of by how much turf it
-# covers. Needs biomeRecall; no effect on unfiltered zoomies.
-# @type: boolean
-# @default: false
-biome_favoritism: false
-
-# Per-biome relative weights for biome-picky zoomies. Only used when biomeWeighted
-# is true. Unlisted biomes use 1.0 (no bias); 2.0 = pounced ~twice as often, 0.0 =
-# hushed. The whole vanilla set is pre-listed at 1.0 as an editable scratch-pad; add
-# modded biomes by their platform id (e.g. terralith:emerald_peaks). Needs biomeRecall.
-# @type: map<string, number>
-biome_favor_amounts:
-  # How strongly this biome gets pounced toward (1.0 = no favoritism).
-  # @type: number
-  # @range: [0.0, null]
-  # @default: 1.0
-  plains: 1.0
-  sunflower_plains: 1.0
-  snowy_plains: 1.0
-  ice_spikes: 1.0
-  desert: 1.0
-  swamp: 1.0
-  mangrove_swamp: 1.0
-  forest: 1.0
-  flower_forest: 1.0
-  birch_forest: 1.0
-  dark_forest: 1.0
-  old_growth_birch_forest: 1.0
-  old_growth_pine_taiga: 1.0
-  old_growth_spruce_taiga: 1.0
-  taiga: 1.0
-  snowy_taiga: 1.0
-  savanna: 1.0
-  savanna_plateau: 1.0
-  windswept_hills: 1.0
-  windswept_gravelly_hills: 1.0
-  windswept_forest: 1.0
-  windswept_savanna: 1.0
-  jungle: 1.0
-  sparse_jungle: 1.0
-  bamboo_jungle: 1.0
-  badlands: 1.0
-  eroded_badlands: 1.0
-  wooded_badlands: 1.0
-  meadow: 1.0
-  cherry_grove: 1.0
-  pale_garden: 1.0
-  grove: 1.0
-  snowy_slopes: 1.0
-  frozen_peaks: 1.0
-  jagged_peaks: 1.0
-  stony_peaks: 1.0
-  river: 1.0
-  frozen_river: 1.0
-  beach: 1.0
-  snowy_beach: 1.0
-  stony_shore: 1.0
-  warm_ocean: 1.0
-  lukewarm_ocean: 1.0
-  deep_lukewarm_ocean: 1.0
-  ocean: 1.0
-  deep_ocean: 1.0
-  cold_ocean: 1.0
-  deep_cold_ocean: 1.0
-  frozen_ocean: 1.0
-  deep_frozen_ocean: 1.0
-  mushroom_fields: 1.0
-  dripstone_caves: 1.0
-  lush_caves: 1.0
-  deep_dark: 1.0
-  # --- Nether ---
-  nether_wastes: 1.0
-  warped_forest: 1.0
-  crimson_forest: 1.0
-  soul_sand_valley: 1.0
-  basalt_deltas: 1.0
-  # --- The End ---
-  the_end: 1.0
-  end_highlands: 1.0
-  end_midlands: 1.0
-  small_end_islands: 1.0
-  end_barrens: 1.0
-  # --- Odds & ends / techy ---
-  the_void: 1.0
 
 # Lag threshold (ms) above which an instantly-served zoomie gets audited
 # (WARN logged, slowPipelineCount bumped). 0 or below turns it off.

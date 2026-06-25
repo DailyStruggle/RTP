@@ -1,4 +1,5 @@
 # --- Veiligheidsconfiguratie van RTP ---
+
 # Configureert hoe de plugin bepaalt of een teletransportlocatie "veilig" is.
 # Token-grammatica:
 # MATERIAAL -- enkel materiaal, bijv. LAVA

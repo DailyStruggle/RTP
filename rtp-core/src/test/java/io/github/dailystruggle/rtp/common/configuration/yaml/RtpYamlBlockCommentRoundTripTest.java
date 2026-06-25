@@ -67,7 +67,42 @@ class RtpYamlBlockCommentRoundTripTest {
     }
 
     @Test
-    @DisplayName("ADR-025: quoted-value containing '#' is not split")
+    @DisplayName("file header (blank-line-separated leading block) lifts off the first key onto the root")
+    void documentHeaderLiftsOffFirstKey() {
+        String src = ""
+                + "# --- RTP Core Configuration ---\n"
+                + "# Pick your language in language.yml.\n"
+                + "\n"
+                + "# Seconds to wait before teleporting. 0 = right away.\n"
+                + "teleportDelay: 2\n";
+        RtpYamlMapping root = RtpYamlReader.parse(src);
+        // Header lands on the root mapping, not on the first key.
+        assertEquals(java.util.List.of(
+                        "--- RTP Core Configuration ---",
+                        "Pick your language in language.yml."),
+                root.blockComments());
+        // The first key keeps only its own comment (what hover text would show).
+        RtpYamlSection section = new RtpYamlSection(root);
+        assertEquals("Seconds to wait before teleporting. 0 = right away.",
+                section.getComment("teleportDelay"));
+        // And the layout round-trips byte-for-byte.
+        assertEquals(src, RtpYamlWriter.emit(root));
+    }
+
+    @Test
+    @DisplayName("a leading comment glued to the first key (no blank line) is NOT treated as a file header")
+    void gluedLeadingCommentStaysOnFirstKey() {
+        String src = ""
+                + "# Seconds to wait before teleporting. 0 = right away.\n"
+                + "teleportDelay: 2\n";
+        RtpYamlMapping root = RtpYamlReader.parse(src);
+        assertTrue(root.blockComments().isEmpty(), "no file header expected");
+        String out = RtpYamlWriter.emit(root);
+        assertEquals(src, out);
+    }
+
+    @Test
+    @DisplayName("quoted-value containing '#' is not split")
     void hexColorInQuotedString() {
         String src = ""
                 + "# above the message key\n"

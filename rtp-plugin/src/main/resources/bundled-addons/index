@@ -1,12 +1,12 @@
 # Resources bundled inside the RTP jar, one resource name per line.
 # AddonRegistry#extractBundledAddons copies each listed resource from the
-# classpath resource bundled-addons/<name> into <pluginDir>/addons/ on
-# first run (when the addons/ folder does not yet exist), so the bundled
-# addons work out of the box. This is mostly addon jars, plus README.md so
-# operators get an explanation of the folder alongside them. Deleting an
-# extracted jar while keeping the folder is a permanent opt-out for that
-# addon; deleting the whole folder instead makes RTP re-extract everything
-# on the next run. Lines starting with '#' and blank lines are ignored.
+# classpath resource bundled-addons/<name> into <pluginDir>/addons/, so the
+# bundled addons work out of the box. This is mostly addon jars, plus README.md
+# so operators get an explanation of the folder alongside them. Extraction is
+# update-aware (tracked in the hidden .bundled-addons manifest): when the RTP
+# jar is updated an unmodified extracted jar is refreshed to the new version,
+# an operator-edited jar is never overwritten, and a deleted jar stays deleted
+# (a deliberate opt-out). Lines starting with '#' and blank lines are ignored.
 LeafRTPGuiAddon.jar
 LeafRTPClaimAddon.jar
 LeafRTPCountdownAddon.jar

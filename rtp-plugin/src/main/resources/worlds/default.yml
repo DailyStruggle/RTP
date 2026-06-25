@@ -1,11 +1,12 @@
 # --- RTP World Configuration ---
-# Documentation: plugins/RTP/docs/admin/configuration/WORLDS.md
+# Documentation: https://github.com/DailyStruggle/RTP/wiki/Worlds
 
-# Default region for this world
+# Region used for this world
 region: "default"
-# If true, rtp.worlds.<worldname> is required
-requirePermission: false
-# World to redirect to if no permission
+# true = need permission rtp.worlds.<worldname>. "@config" inherits
+# defaults.requirePermission from config.yml (ADR-073); replace with true/false to override.
+requirePermission: "@config"
+# World to send to if no permission
 override: "[0]"
 
 # DO NOT TOUCH VERSION NUMBER
