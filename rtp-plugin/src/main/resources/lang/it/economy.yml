@@ -1,5 +1,6 @@
 # --- Impostazioni economiche di RTP ---
 # Documentazione: plugins/RTP/docs/admin/configuration/ECONOMY.md
+
 # Costo base addebitato per un /rtp riuscito.
 # @type: number
 # @range: [0.0, null]

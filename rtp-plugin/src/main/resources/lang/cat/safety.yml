@@ -1,4 +1,5 @@
 # --- RTP Safety Configuration (cat dialect) ---
+
 # Where it is safe to land on four paws after a pounce.
 # Tail flicks (seconds) of invulnerability after pouncing
 # @type: integer

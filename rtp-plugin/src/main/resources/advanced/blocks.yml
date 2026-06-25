@@ -1,9 +1,7 @@
 # --- RTP Landing Block Lists (advanced) ---
-# Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
-# Split out of safety.yml so the common safety knobs stay uncluttered.
-#
-# Blocks treated as passable air for landing-safety checks.
-# Accepts Bukkit Material names and "#minecraft:<tag>" tag references.
+# Documentation: https://github.com/DailyStruggle/RTP/wiki/Safety
+
+# Blocks you can stand in (counted as air). Use names or #minecraft:<tag>.
 # @type: list<material>
 # @source: material
 airBlocks:
@@ -75,12 +73,8 @@ airBlocks:
   - "LEAF_LITTER"
   - "#minecraft:leaves"
 
-# Blocks that disqualify a landing spot (lava, hazards, etc.).
-# Accepts Bukkit Material names, "#minecraft:<tag>" tag references,
-# state predicates such as "*[waterlogged=true]", and numeric range
-# predicates on integer block-state properties using >=, <=, >, < (for
-# example "LAVA[level<=3]" or "FIRE[age>=10]"). Multiple predicates inside
-# one [ ... ] are combined with AND.
+# Blocks that make a spot unsafe (lava, hazards). Names, #minecraft:<tag>,
+# or state checks like "LAVA[level<=3]". See the wiki for the full syntax.
 # @type: list<material>
 # @source: material
 unsafeBlocks:

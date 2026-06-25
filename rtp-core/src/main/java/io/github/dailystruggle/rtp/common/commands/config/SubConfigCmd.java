@@ -120,7 +120,16 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
   @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-    if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
+    // When this node is an intermediate in the command path (e.g. the
+    // `regions` node while resolving `/rtp config regions default ...`),
+    // TreeCommand invokes us with the matched child as `nextCommand` to give
+    // the current command a chance at its own independent functionality, and
+    // separately re-runs that child through its recursive walk. Running the
+    // child here as well would execute the leaf (update + save + reload)
+    // twice, producing every "updating/updated/loading configs" line in
+    // duplicate. Mirror ConfigCmd#onCommand: do nothing and return true so the
+    // recursive walk runs the child exactly once.
+    if (nextCommand != null) return true;
 
     String updateMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updating, ""));
     if (updateMsg != null) updateMsg = updateMsg.replace("[filename]", factoryValue.name);
@@ -251,7 +260,18 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
 
         if (key.contains(".")) {
           RtpYamlConfig RtpYamlConfig = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
-          if (RtpYamlConfig != null) RtpYamlConfig.set(key, value);
+          if (RtpYamlConfig != null) {
+            // A dotted leaf edit (e.g. `shape.radius`) must not clobber the
+            // parent block. When the on-disk parent is still a scalar (the
+            // `"@config"` inheritance token shipped in region/world files) or
+            // is missing, a bare `set("shape.radius", v)` would build a fresh
+            // single-key mapping, discarding `name` and every sibling key (and
+            // breaking `@config` inheritance). Materialize the full effective
+            // parent block from the loaded FactoryValue first, then overlay the
+            // edited leaf so the saved YAML stays a complete nested block.
+            materializeSectionParentIfScalar(configParser, RtpYamlConfig, key);
+            RtpYamlConfig.set(key, value);
+          }
         } else {
           configParser.set(key, value);
         }
@@ -330,6 +350,48 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       @NotNull String[] args) {
     addParameters();
     return super.onTabComplete(callerId, permissionCheckMethod, args);
+  }
+
+  /**
+   * Materialize the parent block of a dotted leaf key (e.g. the {@code shape}
+   * block for {@code shape.radius}) when the on-disk parent is not already a
+   * nested section. Region/world files ship inheritance tokens such as
+   * {@code shape: "@config"}; a bare {@code set("shape.radius", v)} against
+   * that scalar would create a one-key mapping and silently drop {@code name}
+   * plus every sibling key. This resolves the full effective block from the
+   * parser's loaded {@link FactoryValue} (which already has {@code @config}
+   * expanded against {@code config.yml} defaults) and writes it as the parent
+   * mapping, so the subsequent leaf write only overrides a single value.
+   *
+   * <p>No-op when the key is not dotted, the parent is already a section, or no
+   * matching FactoryValue is loaded.</p>
+   */
+  static void materializeSectionParentIfScalar(
+      ConfigParser<?> configParser, RtpYamlConfig yaml, String dottedKey) {
+    int dot = dottedKey.indexOf('.');
+    if (dot <= 0) return;
+    String parentKey = dottedKey.substring(0, dot);
+
+    Object existing = yaml.get(parentKey);
+    if (existing instanceof RtpYamlSection) return; // already a nested block
+
+    // Find the loaded, resolved value for the parent key by enum name.
+    Object resolved = null;
+    for (Map.Entry<? extends Enum<?>, Object> entry : configParser.getData().entrySet()) {
+      if (entry.getKey().name().equalsIgnoreCase(parentKey)) {
+        resolved = entry.getValue();
+        break;
+      }
+    }
+    if (!(resolved instanceof FactoryValue<?>)) return;
+
+    FactoryValue<?> fv = (FactoryValue<?>) resolved;
+    Map<String, Object> block = new LinkedHashMap<>();
+    block.put("name", fv.name);
+    for (Map.Entry<? extends Enum<?>, Object> d : fv.getData().entrySet()) {
+      block.put(d.getKey().name(), d.getValue());
+    }
+    yaml.set(parentKey, block);
   }
 
   /**

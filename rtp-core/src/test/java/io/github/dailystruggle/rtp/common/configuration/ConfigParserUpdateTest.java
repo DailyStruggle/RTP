@@ -43,6 +43,53 @@ class ConfigParserUpdateTest {
         version
     }
 
+    enum VertKeys {
+        vert,
+        version
+    }
+
+    @Test
+    void set_preservesAtConfigReferenceTokenInsteadOfMangledScalar() throws IOException {
+        // Region/world files ship `vert: "@config"` (ADR-073 inheritance token).
+        // At load time RegionConfigLoader resolves it and calls set(vert, <resolved
+        // VerticalAdjustor>). Writing that object as a raw scalar used to serialize
+        // to a mangled single-line string `vert: "\nminY: 32\n..."`, which then read
+        // back as null ("had no readable vert"). The token must be preserved.
+        File configFile = new File(pluginDir, "config.yml");
+        Files.writeString(configFile.toPath(), "version: \"2.0\"\nvert: \"@config\"\n");
+
+        ConfigParser<VertKeys> parser = new ConfigParser<VertKeys>(
+                VertKeys.class,
+                "config",
+                "2.0",
+                pluginDir,
+                db
+        ) {
+            @Override
+            public java.io.InputStream getResourceFromJar(String filename) {
+                if (filename.endsWith("config.yml")) {
+                    return new java.io.ByteArrayInputStream(
+                            "version: \"2.0\"\nvert: \"@config\"\n".getBytes());
+                }
+                return null;
+            }
+        };
+
+        // A FactoryValue whose toString()/getData() would produce the mangled block.
+        io.github.dailystruggle.rtp.common.factory.FactoryValue<?> resolvedVert =
+                mock(io.github.dailystruggle.rtp.common.factory.FactoryValue.class);
+
+        parser.set(VertKeys.vert, resolvedVert);
+        parser.save();
+
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig reloaded =
+                new io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig(configFile);
+        reloaded.load();
+
+        assertEquals("@config", reloaded.getString("vert"),
+                "the @config inheritance token must be preserved, not overwritten by a mangled scalar");
+    }
+
     @Test
     void update_preservesPreexistingValues() throws IOException {
         // 1. Create a config file with version 1.0 and a custom value

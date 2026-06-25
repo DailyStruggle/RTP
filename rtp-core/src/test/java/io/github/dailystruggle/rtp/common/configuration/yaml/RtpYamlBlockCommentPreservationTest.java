@@ -39,7 +39,7 @@ class RtpYamlBlockCommentPreservationTest {
     }
 
     @Test
-    @DisplayName("block comment at 3-level-deep nesting survives re-emit")
+    @DisplayName("block comment at 3-level-deep nesting survives re-emit (with separator blank)")
     void deeplyNestedBlockCommentRoundTrip() {
         String src = ""
                 + "network:\n"
@@ -48,8 +48,18 @@ class RtpYamlBlockCommentPreservationTest {
                 + "    enabled: false\n"
                 + "    # redis server hostname\n"
                 + "    host: \"127.0.0.1\"\n";
+        // The second commented entry (host) gains a blank-line separator from
+        // the preceding value, matching the airy shipped-resource layout.
+        String expected = ""
+                + "network:\n"
+                + "  redis:\n"
+                + "    # whether redis sync is enabled\n"
+                + "    enabled: false\n"
+                + "\n"
+                + "    # redis server hostname\n"
+                + "    host: \"127.0.0.1\"\n";
         String out = RtpYamlWriter.emit(RtpYamlReader.parse(src));
-        assertEquals(src, out);
+        assertEquals(expected, out);
     }
 
     @Test
@@ -127,7 +137,7 @@ class RtpYamlBlockCommentPreservationTest {
     }
 
     @Test
-    @DisplayName("mixed nested + sibling comments preserved across full re-emit")
+    @DisplayName("mixed nested + sibling comments get a blank-line separator before each commented entry")
     void mixedNestedAndSiblingComments() {
         String src = ""
                 + "# A\n"
@@ -140,7 +150,25 @@ class RtpYamlBlockCommentPreservationTest {
                 + "  y: 20\n"
                 + "# C\n"
                 + "gamma: 3\n";
+        // The writer separates a commented scalar entry from the preceding
+        // entry with a blank line (the airy layout style of the shipped
+        // resources). The first entry in each mapping scope (alpha at root, x
+        // in beta) keeps no leading blank, and section-valued entries (the
+        // "beta:" mapping) are excluded; every later commented scalar gains one.
+        String expected = ""
+                + "# A\n"
+                + "alpha: 1\n"
+                + "# B-parent\n"
+                + "beta:\n"
+                + "  # B.x\n"
+                + "  x: 10\n"
+                + "\n"
+                + "  # B.y\n"
+                + "  y: 20\n"
+                + "\n"
+                + "# C\n"
+                + "gamma: 3\n";
         String out = RtpYamlWriter.emit(RtpYamlReader.parse(src));
-        assertEquals(src, out);
+        assertEquals(expected, out);
     }
 }

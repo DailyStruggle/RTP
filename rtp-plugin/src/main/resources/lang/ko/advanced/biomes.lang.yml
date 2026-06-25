@@ -4,4 +4,6 @@
 # so the translated key names survive the ADR-071 advanced/ relocation.
 biomeWhitelist: "바이옥화이트리스트"
 biomes: "바이옥"
+biomeWeighted: "바이옴가중치"
+biomeWeights: "바이옴가중치맵"
 version: "version"

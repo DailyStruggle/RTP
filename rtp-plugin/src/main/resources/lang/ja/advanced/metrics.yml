@@ -1,4 +1,5 @@
 # --- RTP メトリクス設定 ---
+
 # メトリクス SPI のレポート専用つまみ。スロットル / チューニング
 # つまみは引き続き performance.yml に置かれます。
 # Folia で MetricsSnapshot.foliaRegions() にリージョン別詳細を格納します。

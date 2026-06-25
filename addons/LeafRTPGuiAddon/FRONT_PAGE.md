@@ -78,7 +78,7 @@ the picker is built entirely on LeafRTP's public `rtp-api`:
 3. start the server.
 4. type `/rtp` (or `/rtpgui`) and the picker opens.
 
-tune `plugins/RTP/guimenu.yml` later if you want; `/rtp reload` applies changes live, no restart.
+tune `plugins/RTP/addons/guimenu.yml` later if you want; `/rtp reload` applies changes live, no restart.
 
 ---
 

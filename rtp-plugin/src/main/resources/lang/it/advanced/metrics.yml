@@ -1,4 +1,5 @@
 # --- Impostazioni delle metriche di RTP ---
+
 # Manopole di solo reporting per il SPI metriche della Fase M2. Le manopole di
 # throttling / tuning continuano a vivere in performance.yml.
 # Popola MetricsSnapshot.foliaRegions() con il dettaglio per-regione su Folia.

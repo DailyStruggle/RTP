@@ -1,4 +1,5 @@
 # --- Ustawienia metryk RTP ---
+
 # Pokrętła wyłącznie raportowe dla SPI metryk z Fazy M2. Pokrętła
 # ograniczania / strojenia pozostają w performance.yml.
 # Wypełnia MetricsSnapshot.foliaRegions() szczegółami per-region w Folii.

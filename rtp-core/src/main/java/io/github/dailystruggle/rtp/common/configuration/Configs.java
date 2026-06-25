@@ -689,7 +689,7 @@ public class Configs {
 
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser regions/*.yml");
     MultiConfigParser<RegionKeys> regions =
-            new MultiConfigParser<>(RegionKeys.class, "regions", "1.0", pluginDirectory);
+            new MultiConfigParser<>(RegionKeys.class, "regions", "1.1", pluginDirectory);
     newMultiConfigParserMap.put(RegionKeys.class, regions);
 
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser worlds/*.yml");

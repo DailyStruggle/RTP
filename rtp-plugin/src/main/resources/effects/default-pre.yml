@@ -1,5 +1,5 @@
-# --- effects/default-pre.yml — fallback for the preteleport stage ---
-# See effects/default.yml for full schema documentation.
+# --- effects/default-pre.yml: plays just before a teleport ---
+# Docs: https://github.com/DailyStruggle/RTP/wiki/Effects (see effects/default.yml too)
 
 when: preteleport
 effects:

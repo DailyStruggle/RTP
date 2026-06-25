@@ -72,6 +72,15 @@ public final class FabricMenuRenderer implements MenuRenderer {
     if (lifecycleHooked) {
       return;
     }
+    // Touching ServerLifecycleEvents/ServerTickEvents links Fabric API classes that
+    // do not exist off a Fabric runtime. The SPI/bundled-in-jar load path constructs
+    // this renderer on every platform (Bukkit, NeoForge, ...) before isAvailable()
+    // is consulted, so guard the wiring on the loader being present. Without this
+    // gate a fresh Paper start logs an alarming NoClassDefFoundError WARN even though
+    // the renderer is correctly skipped as unavailable afterwards.
+    if (!isFabricRuntime()) {
+      return;
+    }
     lifecycleHooked = true;
     try {
       ServerLifecycleEvents.SERVER_STARTED.register(s -> capturedServer = s);

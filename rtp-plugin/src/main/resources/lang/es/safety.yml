@@ -1,4 +1,5 @@
 # --- Configuración de seguridad de RTP ---
+
 # Configura cómo el plugin determina si una ubicación de teletransporte es "segura".
 # Gramática de tokens:
 # MATERIAL -- material simple, p. ej. LAVA

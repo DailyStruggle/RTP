@@ -1,5 +1,6 @@
 # --- RTP Database / Persistence Configuration ---
 # Documentation: plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
+
 # Backend used to persist teleport data and cached locations. The sql network
 # transport (network.yml) reuses this same accessor pool.
 database:

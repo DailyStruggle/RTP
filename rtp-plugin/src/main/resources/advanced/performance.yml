@@ -2,41 +2,39 @@
 # Documentation: https://github.com/DailyStruggle/RTP/wiki/Performance
 
 # --- Server health ---
-# Minimum server TPS required to continue background queueing.
-# Background work pauses when TPS drops below this threshold.
+# Pause background work when server TPS drops below this.
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
 minTPS: 19.0
 
-# Max JVM heap usage (% of max) before background cache fill pauses.
-# Already-cached locations are still served. 0 or 100 disables the gate.
+# Pause cache filling when memory use passes this %. 0/100 = off.
 # @type: number
 # @range: [0.0, 100.0]
 # @default: 85.0
 maxHeapPercent: 85.0
 
-# Maximum search attempts per /rtp invocation before giving up.
+# How many spots to try per /rtp before giving up.
 # @type: integer
 # @range: [1, null]
 # @default: 32
 maxAttempts: 32
 
-# Ticks between background cache cycles (region pre-fill, queue refill).
+# Ticks between background cache refills.
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
 period: 20
 
-# Maximum milliseconds per tick spent in synchronous tasks.
+# Max ms per tick for main-thread work.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
 # @default: 50
 syncAllottedTime: 50
 
-# Maximum milliseconds per tick spent in asynchronous tasks.
+# Max ms per tick for background work.
 # @type: integer
 # @range: [1, null]
 # @unit: ms
@@ -44,180 +42,83 @@ syncAllottedTime: 50
 asyncAllottedTime: 50
 
 # --- View-distance smoothing ---
-# Chunk radius loaded around a candidate location during selection.
-# 0 loads only the candidate chunk.
+# Chunks loaded around a spot while searching. 0 = just the spot.
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
 viewDistanceSelect: 0
 
-# Chunk radius loaded around the final location immediately before
-# teleport. 0 loads only the destination chunk.
+# Chunks loaded around the final spot before teleport. 0 = just the spot.
 # @type: integer
 # @range: [0, null]
 # @unit: chunks
 # @default: 0
 viewDistanceTeleport: 0
 
-# Ticks over which a teleported player's view distance ramps back to normal
-# after arrival, smoothing the chunk-load spike. 0 disables the clamp.
+# Ticks to ease view distance back to normal after arrival. 0 = off.
+# NOTE: Temporarily forced to 0. The gradual restore causes client-side
+# flashing / re-rendering on arrival. Leave at 0 until further notice.
 # @type: integer
 # @range: [0, null]
 # @unit: ticks
 # @default: 200
-viewDistanceRestoreInterval: 200
+viewDistanceRestoreInterval: 0
 
 # --- Caching / pre-fill ---
-# Refill the region cache immediately after a successful teleport.
+# Refill the cache right after a teleport.
 # @type: boolean
 # @default: false
 postTeleportQueueing: false
 
-# Register biomes from already-loaded chunks into spatial memory, feeding
-# biome recall / weighting. No extra chunk I/O.
+# Learn biomes from chunks already loaded (no extra work).
 # @type: boolean
 # @default: true
 checkOnChunkLoads: true
 
-# Fraction of L3 backlog capacity at which refill resumes (hysteresis).
-# 0.5 = refill after draining to 50%; 1.0 = refill continuously.
+# Refill the backlog when it drops to this fraction. 0.5 = at 50%.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5
 backlogRefillThreshold: 0.5
 
-# Probability of rejecting an ungenerated chunk per attempt.
-# 0.0 = no bias, 1.0 = avoid ungenerated land. Generated chunks always pass.
+# Chance to skip new (ungenerated) land. 0 = don't care, 1 = avoid it.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.0
 pregeneratedPreference: 0.0
 
-# Reserve a cache of locations for join-time teleports
-# (rtp.onevent.firstjoin / rtp.onevent.join).
+# Keep spare spots ready for players joining the server.
 # @type: boolean
 # @default: false
 loginCacheEnabled: false
 
-# Hard cap for the login cache. 0 = auto (server max-players,
-# snapshotted at startup).
+# Max size of the join-spot cache. 0 = auto (max players).
 # @type: integer
 # @range: [0, null]
 # @default: 0
 loginCacheCap: 0
 
-# --- Biome recall / weighting ---
-# Reuse previously-found biome-matched locations from cache.
+# --- Biome recall ---
+# Reuse saved biome spots from the cache.
 # @type: boolean
 # @default: true
 biomeRecall: true
 
-# Only serve biome-filtered requests from cache (never generate new biome
-# searches). Requires biomeRecall.
+# Only use cached biome spots, never search for new ones. Needs biomeRecall.
 # @type: boolean
 # @default: false
 biomeRecallForced: false
 
-# Steer each requested biome with equal probability instead of by how much
-# of the region it covers. Requires biomeRecall; no effect on unfiltered
-# teleports.
-# @type: boolean
-# @default: false
-biomeWeighted: false
-
-# Per-biome relative weights for biome-filtered teleports. Only used when
-# biomeWeighted is true. Unlisted biomes use 1.0 (no bias); 2.0 = picked
-# ~twice as often, 0.0 = suppressed. The full vanilla set is pre-listed at
-# 1.0 as an editable reference; add modded biomes by their platform id
-# (e.g. terralith:emerald_peaks). Requires biomeRecall.
-# @type: map<string, number>
-biomeWeights:
-  # Relative selection weight for this biome (1.0 = no bias).
-  # @type: number
-  # @range: [0.0, null]
-  # @default: 1.0
-  # --- Overworld ---
-  plains: 1.0
-  sunflower_plains: 1.0
-  snowy_plains: 1.0
-  ice_spikes: 1.0
-  desert: 1.0
-  swamp: 1.0
-  mangrove_swamp: 1.0
-  forest: 1.0
-  flower_forest: 1.0
-  birch_forest: 1.0
-  dark_forest: 1.0
-  old_growth_birch_forest: 1.0
-  old_growth_pine_taiga: 1.0
-  old_growth_spruce_taiga: 1.0
-  taiga: 1.0
-  snowy_taiga: 1.0
-  savanna: 1.0
-  savanna_plateau: 1.0
-  windswept_hills: 1.0
-  windswept_gravelly_hills: 1.0
-  windswept_forest: 1.0
-  windswept_savanna: 1.0
-  jungle: 1.0
-  sparse_jungle: 1.0
-  bamboo_jungle: 1.0
-  badlands: 1.0
-  eroded_badlands: 1.0
-  wooded_badlands: 1.0
-  meadow: 1.0
-  cherry_grove: 1.0
-  pale_garden: 1.0
-  grove: 1.0
-  snowy_slopes: 1.0
-  frozen_peaks: 1.0
-  jagged_peaks: 1.0
-  stony_peaks: 1.0
-  river: 1.0
-  frozen_river: 1.0
-  beach: 1.0
-  snowy_beach: 1.0
-  stony_shore: 1.0
-  warm_ocean: 1.0
-  lukewarm_ocean: 1.0
-  deep_lukewarm_ocean: 1.0
-  ocean: 1.0
-  deep_ocean: 1.0
-  cold_ocean: 1.0
-  deep_cold_ocean: 1.0
-  frozen_ocean: 1.0
-  deep_frozen_ocean: 1.0
-  mushroom_fields: 1.0
-  dripstone_caves: 1.0
-  lush_caves: 1.0
-  deep_dark: 1.0
-  # --- Nether ---
-  nether_wastes: 1.0
-  warped_forest: 1.0
-  crimson_forest: 1.0
-  soul_sand_valley: 1.0
-  basalt_deltas: 1.0
-  # --- The End ---
-  the_end: 1.0
-  end_highlands: 1.0
-  end_midlands: 1.0
-  small_end_islands: 1.0
-  end_barrens: 1.0
-  # --- Misc / technical ---
-  the_void: 1.0
-
 # --- Auditing counters ---
-# Latency threshold (ms) above which an immediately-served teleport is audited
-# (WARN logged, slowPipelineCount incremented). 0 or below disables.
+# Warn when a teleport takes longer than this (ms). 0 or less = off.
 # @type: integer
 # @range: [0, null]
 # @unit: ms
 # @default: 5000
 slowPipelineThresholdMs: 5000
 
-# Queue depth (players waiting) at or above which backpressure is audited
-# (WARN logged, queueGrowthWarnCount incremented). 0 or below disables.
+# Warn when this many players are waiting. 0 or less = off.
 # @type: integer
 # @range: [0, null]
 # @unit: players
@@ -225,13 +126,12 @@ slowPipelineThresholdMs: 5000
 queueGrowthWarnThreshold: 0
 
 # --- Advanced (rarely touched) ---
-# Use synchronous chunk loading. NOT RECOMMENDED. Violates S-005 spirit
-# on Folia and will block the main thread on Paper/Spigot.
+# Load chunks on the main thread. NOT RECOMMENDED (causes lag).
 # @type: boolean
 # @default: false
 syncLoading: false
 
-# Re-parse permission nodes on every event instead of caching.
+# Re-read permissions every event instead of caching them.
 # @type: boolean
 # @default: false
 onEventParsing: false
@@ -246,10 +146,9 @@ effectParsing: true
 # @default: false
 visitorEnabled: false
 
-# Settings for /rtp admin prefab. The apply -> confirm flow writes a sibling
-# backup per touched file; bakRetention caps how many are kept (oldest pruned).
+# Settings for /rtp admin prefab. Keeps backups of changed files.
 prefab:
-  # Number of timestamped config backups kept per file before pruning.
+  # How many backups to keep per file.
   # @type: integer
   # @range: [1, null]
   # @default: 3

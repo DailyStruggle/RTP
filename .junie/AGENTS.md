@@ -401,91 +401,17 @@ Hard rules:
 
 ---
 
-## Locale Config TSV Pipeline (translate before regenerating)
-
-> **Scope gate (read first): the TSV pipeline is ONLY for *additive* locale work** - introducing a new baseline key, adding a new locale, or (re)translating values/comments/key-names across every locale. It is **not** the tool for *non-additive* edits to existing config files: removing a key or block, reordering keys, deleting/de-duplicating a section, or editing existing comment text (e.g. stripping an ADR / dev-doc reference out of a comment). For those, **edit the affected YAML files directly** - the English baseline under `rtp-plugin/src/main/resources/<file>.yml` **and** each `lang/<locale>/<file>.yml` (plus lite `src/lite/resources/...`) - then run `LocaleParityTest` + the full build to verify. Round-tripping a non-additive edit through `locale-files-to-csv` -> `from-csv` is unnecessary, rewrites the whole locale tree (huge noisy diffs), and has corrupted the tree in practice: a comment-only edit driven through Python's `csv` module double-quoted every comment cell and `from-csv` then wrote leading-`"` / `""""` mojibake into all 12 locales. Do not reach for the pipeline reflexively just because a change "touches config"; first ask whether the change is additive.
-
-The per-locale YAML tree under `rtp-plugin/src/main/resources/` is **derived output**. The editable source of truth for locale maintenance is a set of tab-separated files under `scripts/out/` (one `baseline.tsv` + one `locale-<lang>.tsv` per shipped locale). Each `locale-<lang>.tsv` is the **single source of truth** for that locale's translated keys, values, **and** comments — there is no separate overlay file. Whenever you add, rename, or remove a user-facing config key (or touch a baseline value or comment), the workflow is:
-
-> **Intent (read first): the TSV is a consolidation surface, not an auto-translator.** Its purpose is to gather a whole set of locale changes into one file per locale (`scripts/out/locale-<lang>.tsv`) so the translation work happens in a single place, instead of hopping across dozens of scattered `lang/<locale>/<file>.yml` files. The scripts only move text and enforce structural parity; **the agent is still the translator.** `reconcile-locale-csvs.py` seeds new or changed rows with the *English* baseline text as a placeholder - those English cells are a to-do list to translate inside the TSV (step 4), not a finished result. Skipping step 4 and regenerating ships English under every locale's translated key.
-
-1. **Edit the baseline only.** Add or update the key in `rtp-plugin/src/main/resources/<file>.yml` with its English value and leading comment block. Do not hand-edit any `lang/<locale>/*.yml` or `lang/<locale>/*.lang.yml` file — they will be regenerated.
-2. **Export the tree to TSV.**
-   ```bash
-   python scripts/locale-files-to-csv.py
-   ```
-   This rewrites `scripts/out/baseline.tsv` and every `scripts/out/locale-<lang>.tsv` from the on-disk YAML. Existing native translations of values **and comments** are preserved in the locale TSVs at this stage.
-3. **Reconcile to enforce structural parity.**
-   ```bash
-   python scripts/reconcile-locale-csvs.py
-   ```
-   Every locale TSV is forced to match baseline's `(relpath, base_key, index)` sequence: new baseline keys seed from English (value AND comment) under the locale's translated key name, stale keys are dropped, and stale-placeholder drift is healed.
-4. **Translate before regenerating.** This is the step that is easy to skip and must not be. Any locale row whose `value` or `preceding_comment` column is still English after step 3 is a freshly-seeded placeholder. Translate all three columns directly in `scripts/out/locale-<lang>.tsv`:
-   - `key` column: the per-locale translated key name (mirrored into the synthesized `<file>.lang.yml` on regen). Translate from the English baseline (`base_key` column) — **do not pivot through another locale's translated key**, that is a double-translation hazard.
-   - `value` column: the player-visible / config string.
-   - `preceding_comment` column: the leading comment block for that row. Embed newlines as `\n` and tabs as `\t` (same escape rules as `baseline.tsv`). Include the leading `#` on every comment line. Empty cells fall through to baseline English on regen, so partial passes are safe.
-   - Mask `[placeholders]`, `&a` / `#hex` color codes, `Â§` section markers, and `@type`/`@range`/`@unit`/`@default`/`@options` doc-tags to sentinels before machine-translating; unmask after. Doc-tags, URLs, and version banners stay verbatim regardless.
-   - Per [`TRANSLATION_GUIDE.md`](../docs/dev/TRANSLATION_GUIDE.md) Â§8: prefer native-speaker review one locale at a time over machine-translating ten languages in one shot. Mark known-stale rows with a `# TODO(i18n):` comment block so contributors can replace them.
-5. **Regenerate the YAML tree.**
-   ```bash
-   python scripts/locale-files-from-csv.py
-   ```
-   This rewrites every `lang/<locale>/<file>.yml` and synthesizes every `<file>.lang.yml` from the TSV's `(base_key, key)` columns. Never edit a `.lang.yml` by hand.
-6. **Verify.**
-   ```bash
-   ./gradlew :rtp-plugin:test --tests "*LocaleParityTest*"
-   ./gradlew build
-   ```
-
-Notes:
-
-- The TSV is the **only** place that mass renames, mass comment edits, or mass translations are tractable; hand-editing dozens of locale YAMLs is forbidden because the next reconcile pass will overwrite undocumented hand-edits.
-- New baseline files are picked up automatically (the to-csv scanner globs `*.yml`). No script change is needed when adding a `network.yml` or similar.
-- The `shape/<x>.lang.yml` and `vert/<x>.lang.yml` rename-map files have no sibling value file and are **not** synthesized — their rows live in each locale TSV directly.
-- **Adding a new locale**: do not copy an existing `lang/<other-locale>/` directory as a seed — that carries the other locale's translated keys/values/comments into the new TSV and forces a double-translation. Instead, add an empty `lang/<new-locale>/` directory (or just add the locale name to `reconcile-locale-csvs.py`'s known list if it iterates a fixed list), run the pipeline once so `reconcile` seeds every row from English baseline, then translate the resulting `scripts/out/locale-<new>.tsv` directly.
-- Skipping step 4 (translation) is the documented anti-pattern: it ships English values under every locale's translated key name. That passes `LocaleParityTest` but degrades the user experience and is not the intended endpoint of a config change.
-
-### Secondary "changeset" workflow (translate a finite set of changes across every locale)
-
-The full per-locale TSV above is the right surface when you want to translate or re-review one whole language. It is the wrong surface for the **other** common case: you added one option to the English baseline, or reworded a description, and now the **same finite set of keys** needs translating across **every** language. Editing a dozen `locale-<lang>.tsv` files by hand for two changed keys is tedious and error-prone.
-
-For that case use the changeset scripts (a secondary component layered on top of the same TSVs):
-
-1. **Edit the English baseline** under `rtp-plugin/src/main/resources/<file>.yml` (add/reword keys). Optionally run the primary pipeline through reconcile so the exported changeset shows each locale's current value/comment/key as context:
-   ```bash
-   python scripts/locale-files-to-csv.py
-   python scripts/reconcile-locale-csvs.py
-   ```
-   This is now an **optimization, not a hard prerequisite**: if a key has no row in a locale's TSV when the changeset is imported (step 4), `locale-changeset-from-csv.py` seeds the row automatically (exactly what reconcile would have produced), so a skipped reconcile no longer silently drops translations.
-2. **Export a changeset** - a single, wide, spreadsheet-friendly **comma-separated** `scripts/out/changeset.csv` with one row per changed key and one column per language:
-   ```bash
-   # only the keys you changed:
-   python scripts/locale-changeset-to-csv.py --keys "messages.yml:alreadyTeleporting" "messages.yml:teleportSuccess"
-   # or a whole file, or (default) every row still untranslated in some locale:
-   python scripts/locale-changeset-to-csv.py --keys "messages.yml"
-   python scripts/locale-changeset-to-csv.py                 # --untranslated-only (default)
-   python scripts/locale-changeset-to-csv.py --all           # every translatable value row
-   ```
-   Columns: `relpath, parent_path, base_key, index, english, english_comment`, then a **triple** of columns per language - `<loc>` (the translated value), `<loc>_comment` (its leading comment block), and `<loc>_key` (the localized key name). This mirrors the per-locale TSV's `value` / `preceding_comment` / `key` triple, so a single changeset can carry the value, the operator-facing comment, AND the config key name in one row. Each locale cell is prefilled with that locale's current value/comment/key (often the English placeholder) for context. Comment cells embed newlines as `\n` and tabs as `\t` (same escaping as the TSV's `preceding_comment` column) so a multi-line comment block round-trips on one CSV line. Unlike the internal `.tsv`, this is a real RFC-4180 `.csv` (UTF-8 no BOM) so it opens cleanly in a spreadsheet.
-3. **Translate the per-language columns** for just those rows (same masking rules as step 4 above: preserve `[placeholders]`, `&a`/`#hex`, doc-tags). Fill `<loc>` (value), `<loc>_comment` (comment), and/or `<loc>_key` (localized key name) as needed. A value cell empty or equal to `english`, a comment cell empty or equal to `english_comment`, or a key cell empty or equal to `base_key` all mean "not translated yet" for that field and are left alone on import. Each field is applied independently, so you can translate just the comment, just the key, or all three.
-4. **Import** the filled changeset back into every `locale-<lang>.tsv` (matched by the same langmap logic reconcile uses, so translated key names resolve correctly):
-   ```bash
-   python scripts/locale-changeset-from-csv.py
-   ```
-   For each row the value, comment, and key are applied independently: a cell that differs from its English column (or all, with `--include-english`) overwrites the locale TSV's `value` / `preceding_comment` / `key`; the `<loc>_key` cell feeds the synthesized `<file>.lang.yml` rename map and renames the key in that locale's YAML. Use `--untranslated-only` to protect existing human translations from an old/partial changeset. Rows that have no row yet in a locale's TSV are **seeded automatically** (relpath, localized key, value/comment with English fallback) instead of being skipped, so the changeset import never silently drops a translation even if `reconcile` was not run in step 1.
-5. **Regenerate and verify** exactly as the primary pipeline (`locale-files-from-csv.py`, then `LocaleParityTest` + full build).
-
-The changeset never bypasses the TSVs - it is a focused editing surface that reads and writes them. `scripts/locale_common.py` holds the shared TSV/CSV/langmap helpers for both changeset scripts.
-
-**Encoding-safe translation (no inline-literal trap).** Edit non-ASCII translations directly in `scripts/out/changeset.csv` (it is UTF-8 no-BOM and the `read_csv`/`write_csv` helpers in `scripts/locale_common.py` read/write UTF-8). The pipeline scripts are Python 3.12 (stdlib only) and run identically on Windows, Linux, and macOS; invoke them with `python scripts/<name>.py`. **Never** paste CJK/Cyrillic/accented translations as inline string literals into a script body to bulk-fill the CSV: keep the translations in a UTF-8 **data** file and read it explicitly as UTF-8 (e.g. `Path(p).read_text(encoding="utf-8")`), so an editor or shell with a non-UTF-8 default encoding cannot silently corrupt them into bytes that snakeyaml later rejects at load time with `special characters are not allowed` (a green `LocaleParityTest` will still fail). Do not leave throwaway helper scripts or staging files behind; the two changeset scripts are the only repeatable surface.
-
-**Localizing the key name is required for pattern maintenance.** The `<loc>_key` column localizes the config key itself (e.g. `maxHeapPercent` -> `maxHeapProzent`), and parity stays correct because it resolves through the `<file>.lang.yml` rename map. Translate the `<loc>_key` cell for every locale in the **same** changeset pass that translates the value and comment - do not leave it identity-mapped as an afterthought. Treating the key as a first-class translated field keeps the three-column triple (`<loc>` / `<loc>_comment` / `<loc>_key`) uniformly populated across the whole locale tree, which is what makes the changeset round-trip predictable and the per-locale TSVs self-consistent; a half-localized row (translated value/comment but identity key) is the drift this pipeline exists to prevent. The localized key still resolves through the rename map, so the English docs/support threads remain cross-referenceable via `base_key`. Apply the same encoding discipline and masking rules to the `<loc>_key` cell as to the value and comment.
-
----
-
 ## Environment & Execution
 
 - **Gradle**: run through the wrapper (`./gradlew`). Run one command per line; do not rely on a specific shell's command-chaining operator.
+- **Build & test invocation (copy-paste ready)**:
+  - **Windows / PowerShell (this dev box)**: invoke the wrapper as `.\gradlew.bat`. The bare `./gradlew` form is a POSIX shell idiom; in PowerShell use `.\gradlew.bat` (or `& .\gradlew.bat`). Examples:
+    - Full multi-module build (the mandatory final step, see *Final Full Build*): `.\gradlew.bat build`
+    - One module build: `.\gradlew.bat :<module>:build` (e.g. `.\gradlew.bat :rtp-core:build`)
+    - Targeted tests: `.\gradlew.bat :<module>:test --tests "<pattern>"` (e.g. `.\gradlew.bat :rtp-core:test --tests "*MenuConfigSubtreeBuildersTest*"`)
+    - Clean rebuild when stale state is suspected: `.\gradlew.bat clean build`
+  - **Linux / macOS / other boxes**: the POSIX form `./gradlew build`, `./gradlew :<module>:build`, `./gradlew :<module>:test --tests "<pattern>"` is correct.
+  - Run one Gradle command per line; do not chain with `&&` / `;`. Use `--no-daemon` if a daemon/JDK mismatch is suspected (see `LESSONS_LEARNED.md`).
 - **Multi-module Gradle**:
   - One module build: `./gradlew :<module>:build`
   - Targeted tests: `./gradlew :<module>:test --tests "<pattern>"`
@@ -606,7 +532,7 @@ When you discover something durable, record it in the **correct** file:
 | New reflection / soft-depend / hook that accommodates a third-party plugin | [`docs/dev/EXTERNAL_HOOKS.md`](../docs/dev/EXTERNAL_HOOKS.md) (catalog row + `RTPHooks` registry; ADR-026) |
 | New mojibake pattern observed in AI-generated diffs | this file (*Markdown Encoding Hygiene* section, mojibake-marker list) |
 | New voice trait / register cue learned from maintainer-authored promo, forum, or front-page copy | this file (*Prose Mirroring* section, voice profile) |
-| New baseline user-facing key (or new locale) | run the [*Locale Config TSV Pipeline*](#locale-config-tsv-pipeline-translate-before-regenerating): edit baseline, `locale-files-to-csv` -> `reconcile-locale-csvs` -> translate keys/values/comments in `scripts/out/locale-<lang>.tsv` -> `locale-files-from-csv` -> `LocaleParityTest` + full build. Never hand-edit `lang/<locale>/*.yml` or `*.lang.yml` (see [`TRANSLATION_GUIDE.md`](../docs/dev/TRANSLATION_GUIDE.md)) |
+| New baseline user-facing key (or new locale) | follow *Locale Parity Maintenance* above: add the key to the English baseline and mirror it into every `lang/<locale>/<file>.yml` (+ `<file>.lang.yml`), then run `LocaleParityTest` + full build (see [`TRANSLATION_GUIDE.md`](../docs/dev/TRANSLATION_GUIDE.md)) |
 
 Do **not** add code-level optimizations, algorithm explanations, or per-feature narratives to this file — those belong in code comments, ADRs, or `CHANGELOG.md`.
 

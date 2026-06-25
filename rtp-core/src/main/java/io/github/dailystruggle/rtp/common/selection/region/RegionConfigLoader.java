@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigDefaultResolver;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
@@ -13,6 +14,7 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 
 public class RegionConfigLoader {
 
@@ -60,6 +62,9 @@ public class RegionConfigLoader {
         }
 
         // 2. Deserializing the Shape
+        // ADR-073: record an @<file> reference so the menu can show the inherit state; the
+        // getConfigValue call below resolves the token to the inherited default block.
+        recordReferenceIfAny(regionParser, RegionKeys.shape);
         Object rawShape = regionParser.getConfigValue(RegionKeys.shape, null);
 //        System.out.println("[RTP-DEBUG] RegionLoader: Raw Shape Object Type: " + (rawShape == null ? "null" : rawShape.getClass().getSimpleName()));
 
@@ -77,10 +82,22 @@ public class RegionConfigLoader {
         }
 
         if (shape == null) {
-//            System.out.println("[RTP-DEBUG] RegionLoader: WARNING - SHAPE IS NULL! Region '" + name + "' cannot generate locations.");
+            // ADR-073: shape could not be read (e.g. a stale config.yml whose `defaults`
+            // block predates ADR-073 and lacks `shape`, so the region's `@config` token
+            // resolves to null). Never leave a region without a shape - it would surface as
+            // "Shape for region <name> was invalid. Falling back to SQUARE." in the Region
+            // constructor and break location generation. Recover here with the documented
+            // default shape so the value is always read as something valid.
+            shape = deserializeShape(new java.util.HashMap<>());
+            if (shape != null) {
+                regionParser.set(RegionKeys.shape, shape);
+                RTP.log(Level.WARNING, "[RTP] Region '" + name
+                        + "' had no readable shape; falling back to the default " + shape.name + ".");
+            }
         }
 
         // 3. Deserializing the Vertical Adjustor
+        recordReferenceIfAny(regionParser, RegionKeys.vert);
         Object rawVert = regionParser.getConfigValue(RegionKeys.vert, null);
 //        System.out.println("[RTP-DEBUG] RegionLoader: Raw Vert Object Type: " + (rawVert == null ? "null" : rawVert.getClass().getSimpleName()));
 
@@ -98,17 +115,28 @@ public class RegionConfigLoader {
         }
 
         if (vert == null) {
-//            System.out.println("[RTP-DEBUG] RegionLoader: WARNING - VERT IS NULL! Region '" + name + "' lacks a vertical adjustor.");
+            // ADR-073: vert could not be read (same stale-config cause as the shape branch
+            // above). A null vert previously slipped through to PregenState.build and threw a
+            // repeated "invalid state, null vert" IllegalStateException. Recover here with the
+            // documented default vertical adjustor so the value is always read as valid.
+            java.util.Map<String, Object> vertDefault = new java.util.HashMap<>();
+            vertDefault.put("name", "LINEAR");
+            vert = deserializeVert(vertDefault);
+            if (vert != null) {
+                regionParser.set(RegionKeys.vert, vert);
+                RTP.log(Level.WARNING, "[RTP] Region '" + name
+                        + "' had no readable vert; falling back to the default " + vert.name + ".");
+            }
         }
 
-        boolean worldBorderOverride = getBoolean(regionParser.getConfigValue(RegionKeys.worldBorderOverride, false));
-        boolean requirePermission = getBoolean(regionParser.getConfigValue(RegionKeys.requirePermission, false));
-        long cacheCap = getNumber(regionParser.getConfigValue(RegionKeys.cacheCap, 10L)).longValue();
-        long backlogCacheCap = getNumber(regionParser.getConfigValue(RegionKeys.backlogCacheCap, 0L)).longValue();
-        long networkReserveSize = getNumber(regionParser.getConfigValue(RegionKeys.networkReserveSize, 0L)).longValue();
-        int activeChunkCap = getNumber(regionParser.getConfigValue(RegionKeys.activeChunkCap, 3)).intValue();
-        double price = getNumber(regionParser.getConfigValue(RegionKeys.price, 0.0)).doubleValue();
-        long spatialResolution = getNumber(regionParser.getConfigValue(RegionKeys.spatialResolution, 1L)).longValue();
+        boolean worldBorderOverride = getBoolean(resolveScalar(regionParser, RegionKeys.worldBorderOverride, false));
+        boolean requirePermission = getBoolean(resolveScalar(regionParser, RegionKeys.requirePermission, false));
+        long cacheCap = getNumber(resolveScalar(regionParser, RegionKeys.cacheCap, 10L)).longValue();
+        long backlogCacheCap = getNumber(resolveScalar(regionParser, RegionKeys.backlogCacheCap, 0L)).longValue();
+        long networkReserveSize = getNumber(resolveScalar(regionParser, RegionKeys.networkReserveSize, 0L)).longValue();
+        int activeChunkCap = getNumber(resolveScalar(regionParser, RegionKeys.activeChunkCap, 3)).intValue();
+        double price = getNumber(resolveScalar(regionParser, RegionKeys.price, 0.0)).doubleValue();
+        long spatialResolution = getNumber(resolveScalar(regionParser, RegionKeys.spatialResolution, 1L)).longValue();
 
         if (shape != null && shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = spatialResolution;
         String override = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
@@ -141,6 +169,36 @@ public class RegionConfigLoader {
                 override,
                 detailedRegionInit
         );
+    }
+
+    /**
+     * ADR-073: when {@code key} is configured with an {@code @<file>} reference token,
+     * record the raw token in {@code parser.defaultReferences} so the menu can render the
+     * inherit/override state. No-op for a literal value.
+     */
+    private static void recordReferenceIfAny(ConfigParser<RegionKeys> parser, RegionKeys key) {
+        Object raw = parser.getData(key);
+        if (ConfigDefaultResolver.isReference(raw)) {
+            parser.defaultReferences.put(key, ((String) raw).trim());
+        }
+    }
+
+    /**
+     * ADR-073: resolve a scalar setting, honoring an {@code @<file>} reference token. When
+     * the stored value is a reference, the token is recorded for the menu and the resolved
+     * literal is written back into the parser so direct {@code getNumber}/{@code getData}
+     * callers (e.g. {@code RTPCmd}, {@code ScanStartCmd}) observe a concrete value rather
+     * than the unresolvable token.
+     */
+    private static Object resolveScalar(ConfigParser<RegionKeys> parser, RegionKeys key, Object fallback) {
+        Object raw = parser.getData(key);
+        if (ConfigDefaultResolver.isReference(raw)) {
+            parser.defaultReferences.put(key, ((String) raw).trim());
+            Object resolved = ConfigDefaultResolver.resolve(raw, key.name(), fallback);
+            if (resolved != null) parser.set(key, resolved);
+            return resolved;
+        }
+        return parser.getConfigValue(key, fallback);
     }
 
     private static Shape<?> deserializeShape(Map<String, Object> map) {

@@ -1,4 +1,5 @@
 # RTP Network Mode (multi-server / multi-proxy) Disabled by default; flipping `network.enabled: true` opts this backend into the cross-server network.
+
 network:
   # when false, kitty sniffs n checks dis file den ignores it - no yarn-threads, no scratching-post tables, no tunnel opens.
   # @type: boolean

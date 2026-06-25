@@ -113,13 +113,54 @@ public final class RtpYamlConfig extends RtpYamlSection {
                 ".tmp");
         try {
             Files.write(tmp, content.getBytes(StandardCharsets.UTF_8));
-            try {
-                Files.move(tmp, finalPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
-                Files.move(tmp, finalPath, StandardCopyOption.REPLACE_EXISTING);
-            }
+            replaceFile(tmp, finalPath, content);
         } finally {
             try { Files.deleteIfExists(tmp); } catch (IOException ignored) { /* best effort */ }
+        }
+    }
+
+    /**
+     * Move {@code tmp} over {@code finalPath}, tolerating the transient
+     * {@link java.nio.file.AccessDeniedException} that Windows raises when the
+     * target (or the temp file) is briefly held open by another process such
+     * as antivirus, a file indexer, or a search/backup scanner. The move is
+     * retried a handful of times with a short back-off; if every move attempt
+     * still fails, the content is written in place as a last resort so the
+     * save is not silently lost.
+     */
+    private static void replaceFile(Path tmp, Path finalPath, String content) throws IOException {
+        final int maxAttempts = 5;
+        IOException last = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                try {
+                    Files.move(tmp, finalPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                    Files.move(tmp, finalPath, StandardCopyOption.REPLACE_EXISTING);
+                }
+                return;
+            } catch (java.nio.file.AccessDeniedException e) {
+                last = e;
+                if (attempt < maxAttempts) {
+                    try {
+                        Thread.sleep(20L * attempt);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        }
+        // Last resort: the target is locked against rename but may still be
+        // writable in place. Overwrite its contents directly.
+        try {
+            Files.write(finalPath, content.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException writeFailure) {
+            if (last != null) {
+                last.addSuppressed(writeFailure);
+                throw last;
+            }
+            throw writeFailure;
         }
     }
 

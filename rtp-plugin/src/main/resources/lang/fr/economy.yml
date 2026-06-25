@@ -1,4 +1,5 @@
 # --- Paramètres de l'économie RTP ---
+
 # Configurez les coûts de la téléportation aléatoire en utilisant l'économie du serveur.
 # Coûts de la téléportation
 # Coût de base pour une commande /rtp standard.

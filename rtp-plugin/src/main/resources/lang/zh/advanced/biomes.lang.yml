@@ -4,4 +4,6 @@
 # so the translated key names survive the ADR-071 advanced/ relocation.
 biomeWhitelist: "生物群系白名单"
 biomes: "生物群系"
+biomeWeighted: "生物群系加权"
+biomeWeights: "生物群系权重"
 version: "version"

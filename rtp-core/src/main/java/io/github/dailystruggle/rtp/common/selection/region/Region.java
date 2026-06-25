@@ -121,14 +121,32 @@ public class Region extends FactoryValue<RegionKeys> {
     this.miscPipeline = (RTPTaskPipe) RTP.serverAccessor.createTaskPipe();
 
     this.shape = settings.shape();
+    VerticalAdjustor<?> vert = settings.vert();
+
+    // Self-heal a missing shape/vert so a misconfigured (or stale, pre-ADR-073)
+    // config can never leave the region with a null shape/vert. A null shape was
+    // already recovered to SQUARE here; a null vert previously slipped through and
+    // surfaced downstream as a repeated "invalid state, null vert"
+    // IllegalStateException in PregenState.build (and a region that could never
+    // produce a location). Recover both, in one settings rebuild.
+    boolean shapeRecovered = false;
+    boolean vertRecovered = false;
     if (this.shape == null) {
       this.shape = (Shape<?>) RTP.selectionAPI.shapeFactory.get("SQUARE");
       RTP.log(Level.WARNING, "Shape for region " + name + " was invalid. Falling back to SQUARE.");
+      shapeRecovered = true;
+    }
+    if (vert == null) {
+      vert = (VerticalAdjustor<?>) RTP.factoryMap.get(RTP.factoryNames.vert).get("LINEAR");
+      RTP.log(Level.WARNING, "Vert for region " + name + " was invalid. Falling back to LINEAR.");
+      vertRecovered = true;
+    }
+    if (shapeRecovered || vertRecovered) {
       this.settings = new RegionSettings(
           settings.name(),
           settings.world(),
           this.shape,
-          settings.vert(),
+          vert,
           settings.worldBorderOverride(),
           settings.requirePermission(),
           settings.cacheCap(),
@@ -140,6 +158,7 @@ public class Region extends FactoryValue<RegionKeys> {
           settings.override(),
           settings.detailedRegionInit()
       );
+      settings = this.settings;
     }
 
     if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = settings.spatialResolution();

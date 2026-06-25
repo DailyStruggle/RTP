@@ -24,25 +24,24 @@ too_far_to_chase: 2
 # @default: 300
 nap_time: 300
 
-# Maximum number of successful /rtp uses a player may make within the
-# lockAfterResetSeconds window before being locked out (BetterRTP LockAfter parity).
-# 0 disables the cap. Bypassed by rtp.nolock.
+# Most pounces a kitty may land within the lockAfterResetSeconds nap-window
+# before being shut in the carrier (BetterRTP LockAfter parity).
+# 0 lets the kitty pounce forever. Skipped by rtp.nolock.
 # @type: integer
 # @range: [0, null]
 # @default: 0
 lockAfterUses: 0
 
-# Length of the rolling usage-cap window for lockAfterUses. The counter resets this
-# many seconds after the window's first use. 0 means the cap never resets (a hard
-# lifetime cap).
+# How long the rolling pounce-counting nap-window lasts for lockAfterUses. The tally resets this
+# many tail-flicks after the window's first pounce. 0 means the tally never resets (a forever cap).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
 # @default: 0
 lockAfterResetSeconds: 0
 
-# When true, a successful /rtp sets the landed location as the player's persistent
-# spawn anchor (BetterRTP SetAsRespawn parity).
+# When true, a happy pounce makes the landing spot the kitty's forever-bed
+# (BetterRTP SetAsRespawn parity).
 # @type: boolean
 # @default: false
 setRespawnOnTeleport: false
@@ -83,6 +82,39 @@ menu:
     # renderer ships in a follow-up and will be added to the default list at
     # that point.)
     - "book"
+
+# Big-house defaults that every den/world scratch-file inherits through the "@config" treat-token (ADR-073).
+defaults:
+  # Default pounce-ground shape and size. radius/centerRadius = how far the kitty pounces, measured in chunks.
+  shape:
+    name: "CIRCLE"
+    mode: "ACCUMULATE"
+    radius: 256
+    centerRadius: 64
+    centerX: 0
+    centerZ: 0
+    weight: 1.0
+    # Keep spots from being reused. 0 = off, 1 = the landing chunk, N = bigger square.
+    uniquePlacements: 0
+    expand: false
+  # Default high/low landing window.
+  vert:
+    name: "LINEAR"
+    minY: 32
+    maxY: 255
+    # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
+    direction: 2
+    requireSkyLight: true
+  # How many safe spots to pre-calculate.
+  cacheCap: 50
+  # Extra unverified spots kept ready. 0 = off.
+  backlogCacheCap: 1000
+  # Max chunks kept loaded for instant teleports.
+  activeChunkCap: 10
+  # Bad-spot tracking precision (1-5).
+  spatialResolution: 3
+  # Whether regions/worlds need permission.
+  requirePermission: false
 
 # Do not bite the version number, sacred catnip
 meowsion: 3.1

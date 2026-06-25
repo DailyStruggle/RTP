@@ -14,5 +14,12 @@ public enum BiomesKeys {
   biomeWhitelist,
   /** Biomes treated as whitelist or blacklist members per {@link #biomeWhitelist}. */
   biomes,
+  /**
+   * If true, biome-filtered selection steers each requested biome with equal
+   * probability rather than in proportion to its area coverage (ADR-062).
+   */
+  biomeWeighted,
+  /** Per-biome relative weights for biome-weighted selection (ADR-062). */
+  biomeWeights,
   version
 }

@@ -1,112 +1,99 @@
 # --- RTP Safety Configuration ---
 # Documentation: https://github.com/DailyStruggle/RTP/wiki/Safety
-# Seconds of invulnerability granted after a teleport completes.
-# 0 disables the post-teleport invulnerability window.
+
+# Seconds you can't be hurt after teleporting. 0 = off.
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
 # @default: 5
 invulnerabilityTime: 5
 
-# Block radius around the landing spot scanned for hazards.
-# 0 checks only the landing block + immediate vertical.
+# How many blocks around you we check for danger. 0 = just the spot.
 # @type: integer
 # @range: [0, null]
 # @unit: blocks
 # @default: 0
 safetyRadius: 0
 
-# Radius of the emergency landing platform built at the destination.
-# -1 disables the platform entirely.
+# Size of the safety platform built under you. -1 = off.
 # @type: integer
 # @range: [-1, null]
 # @unit: blocks
 # @default: -1
 platformRadius: -1
 
-# Depth (vertical thickness) of the emergency platform.
+# How thick the safety platform is.
 # @type: integer
 # @range: [1, null]
 # @unit: blocks
 # @default: 1
 platformDepth: 1
 
-# Air-space height cleared above the emergency platform.
+# How much air is cleared above the platform.
 # @type: integer
 # @range: [0, null]
 # @unit: blocks
 # @default: 2
 platformAirHeight: 2
 
-# Material used for the emergency landing platform.
+# Block the platform is made of.
 # @type: material
 # @source: material
 # @default: GLASS
 platformMaterial: "GLASS"
 
-# Seconds after which the platform's footprint is restored to its original
-# blocks. -1 = never (permanent), 0 = as soon as the chunk reloads. The
-# countdown only advances while the chunk is loaded; survives restarts.
+# Seconds until the platform turns back into the old blocks. -1 = never, 0 = on reload.
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
 # @default: -1
 platformRestoreSeconds: -1
 
-# --- Optional PvP / combat-tag pre-flight gate ---
-# Master toggle. When true, /rtp checks combat state and applies pvpOnCombat
-# below before enrolling and before teleporting.
+# --- Optional PvP / combat-tag check ---
+# true = check if you're fighting before teleporting.
 # @type: boolean
 # @default: false
 pvpCheckEnabled: false
 
-# Seconds a player stays "in combat" after PvP damage (native tracker only;
-# ignored when an external combat-tag plugin is bound).
+# Seconds you stay "in combat" after a PvP hit (built-in tracker only).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
 # @default: 15
 pvpCombatTagSeconds: 15
 
-# What to do when a combat-tagged player requests (or is mid-)/rtp.
-# ALLOW  - permit, but log an audit line
-# DENY   - refuse the command with the busy message
-# DELAY  - postpone until the combat tag expires, then proceed
-# CANCEL - abort an in-progress / queued teleport
-# Unknown values fail safe to DENY.
+# What to do if you /rtp while fighting.
+# ALLOW = let it, DENY = block it, DELAY = wait, CANCEL = stop it.
 # @type: enum
 # @options: [ALLOW, DENY, DELAY, CANCEL]
 # @default: DENY
 pvpOnCombat: "DENY"
 
-# Combat-state source preference.
-# AUTO     - external combat-tag plugin if one is bound, else native tracker
-# NATIVE   - always use RTP's native damage tracker
-# EXTERNAL - only a bound combat-tag plugin (no native fallback)
+# Where to read combat state from.
+# AUTO = plugin if present else built-in, NATIVE = built-in, EXTERNAL = plugin only.
 # @type: enum
 # @options: [AUTO, NATIVE, EXTERNAL]
 # @default: AUTO
 pvpSource: "AUTO"
 
-# Native tracker: tag a player who TAKES PvP damage.
+# Built-in tracker: tag the player who gets hit.
 # @type: boolean
 # @default: true
 pvpTagVictim: true
 
-# Native tracker: tag a player who DEALS PvP damage.
+# Built-in tracker: tag the player who hits.
 # @type: boolean
 # @default: true
 pvpTagAggressor: true
 
-# --- Advanced (internal hazard-scan tuning; most servers never change these) ---
-# Maximum retries for the stale-chunk guard before failing the attempt.
+# --- Advanced (most servers leave these alone) ---
+# How many retries before a chunk check gives up.
 # @type: integer
 # @range: [0, null]
 # @default: 2
 staleChunkRetryLimit: 2
 
-# Use the off-thread anvil NBT prefilter to reject candidates without
-# loading their chunks.
+# Skip bad spots without loading chunks (faster).
 # @type: boolean
 # @default: true
 anvilPrefilterEnabled: true

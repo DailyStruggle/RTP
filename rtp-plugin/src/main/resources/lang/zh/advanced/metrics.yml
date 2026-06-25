@@ -1,4 +1,5 @@
 # --- RTP 指标设置 ---
+
 # 指标 SPI 的仅报告类开关。节流 / 调优开关仍位于
 # performance.yml 中。
 # 在 Folia 上以每区域明细填充 MetricsSnapshot.foliaRegions()。

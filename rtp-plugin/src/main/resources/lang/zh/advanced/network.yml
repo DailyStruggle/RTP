@@ -1,4 +1,5 @@
 # RTP 网络模式（多服务器 / 多代理） 默认禁用；将 network.enabled: true 翻转后，此后端加入跨服网络。 REQ-RTP-NET-002（禁用时的行为一致性）：当 enabled: false 时， 此文件被读取和验证，但其他方面被忽略 - 不启动线程， 不创建数据库表，不打开传输。后端行为与不含网络模式的构建完全相同。
+
 network:
   # When false this file is read and validated, then ignored - no threads, tables, or transport open.
   # @type: boolean

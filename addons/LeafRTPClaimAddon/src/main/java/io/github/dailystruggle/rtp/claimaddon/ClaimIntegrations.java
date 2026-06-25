@@ -44,15 +44,36 @@ public final class ClaimIntegrations {
 
   private static ConfigParser<IntegrationsKeys> buildParser(ClassLoader resourceLoader) {
     String locale = LanguageBootstrap.resolve(RTP.serverAccessor.getPluginDirectory());
+    migrateLegacyRoot(RTP.serverAccessor.getPluginDirectory(), "integrations.yml");
     return new ConfigParser<>(
         IntegrationsKeys.class,
-        "integrations",
+        "addons/integrations",
         "1.0",
         RTP.serverAccessor.getPluginDirectory(),
         null,
         RTP.configs.fileDatabase,
         resourceLoader,
         locale);
+  }
+
+  /**
+   * Relocate a pre-existing root-level {@code <fileName>} (from an older install) into the
+   * {@code addons/} subfolder, preserving operator customizations. No-op when the legacy file is
+   * absent or the new file already exists.
+   */
+  private static void migrateLegacyRoot(java.io.File pluginDirectory, String fileName) {
+    try {
+      java.io.File legacy = new java.io.File(pluginDirectory, fileName);
+      java.io.File moved = new java.io.File(new java.io.File(pluginDirectory, "addons"), fileName);
+      if (legacy.isFile() && !moved.exists()) {
+        java.io.File parent = moved.getParentFile();
+        if (parent != null && !parent.exists()) parent.mkdirs();
+        java.nio.file.Files.move(legacy.toPath(), moved.toPath());
+      }
+    } catch (Exception e) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP] failed to migrate legacy " + fileName + " into addons/", e);
+    }
   }
 
   @SuppressWarnings("unchecked")

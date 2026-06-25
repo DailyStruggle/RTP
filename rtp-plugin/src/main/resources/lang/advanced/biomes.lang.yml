@@ -5,4 +5,6 @@
 # under lang/advanced/ and keep the config loader's path uniform.
 biomeWhitelist: "biomeWhitelist"
 biomes: "biomes"
+biomeWeighted: "biomeWeighted"
+biomeWeights: "biomeWeights"
 version: "version"

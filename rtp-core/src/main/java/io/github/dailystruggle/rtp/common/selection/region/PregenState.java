@@ -188,6 +188,8 @@ final class PregenState {
                 (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
         ConfigParser<LoggingKeys> logging =
                 (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+        ConfigParser<BiomesKeys> biomes =
+                (ConfigParser<BiomesKeys>) RTP.configs.getParser(BiomesKeys.class);
 
         boolean defaultBiomes = false;
         boolean biomeWhitelist;
@@ -263,8 +265,8 @@ final class PregenState {
         boolean biomeRecallForced = Boolean.parseBoolean(
                 performance.getConfigValue(PerformanceKeys.biomeRecallForced, false).toString());
         boolean biomeWeighted = Boolean.parseBoolean(
-                performance.getConfigValue(PerformanceKeys.biomeWeighted, false).toString());
-        Map<String, Double> biomeWeights = parseBiomeWeights(performance);
+                RTP.configs.getConfigValue(BiomesKeys.biomeWeighted, false).toString());
+        Map<String, Double> biomeWeights = parseBiomeWeights(biomes);
 
         // ADR-062 Phase 3: resolve the world's biome registry and sampling
         // capability once per invocation (like the weights above). Both feed the
@@ -320,17 +322,17 @@ final class PregenState {
     }
 
     /**
-     * Parse the {@code performance.yml#biomeWeights} map into an upper-cased,
+     * Parse the {@code biomes.yml#biomeWeights} map into an upper-cased,
      * non-negative weight table (ADR-062 Phase 2). Non-numeric or negative
      * values are dropped (negative weights are meaningless for a probability
      * draw); a malformed or absent map yields an empty table, which the draw
      * treats as "all biomes equal" (Phase 1 behavior).
      */
-    private static Map<String, Double> parseBiomeWeights(ConfigParser<PerformanceKeys> performance) {
+    private static Map<String, Double> parseBiomeWeights(ConfigParser<BiomesKeys> biomes) {
         Map<String, Double> result = new HashMap<>();
         Map<String, Object> raw;
         try {
-            raw = performance.getMap(PerformanceKeys.biomeWeights);
+            raw = biomes.getMap(BiomesKeys.biomeWeights);
         } catch (RuntimeException re) {
             return result;
         }

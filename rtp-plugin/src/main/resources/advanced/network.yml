@@ -1,118 +1,120 @@
-# RTP Network Mode (multi-server / multi-proxy). Disabled by default; flip network.enabled true to opt in.
+# RTP Network Mode (multi-server / proxy). Documentation: https://github.com/DailyStruggle/RTP/wiki/Network
+
+# Off by default. Set network.enabled true to use it.
 network:
-  # When false this file is read and validated, then ignored - no threads, tables, or transport open.
+  # false = this file is ignored (no network).
   # @type: boolean
   # @default: false
   enabled: false
-  # Stable backend identity, required when enabled; two backends sharing a serverId overwrite each other's heartbeat.
+  # This server's unique name. Needed when enabled. Don't reuse it.
   # @type: string
   # @default: ""
   serverId: ""
-  # Environment variable holding the shared HMAC secret; required when enabled with transport.type redis.
+  # Env var that holds the shared secret. Needed for redis.
   # @type: string
   # @default: "RTP_NET_SECRET"
   secretEnv: "RTP_NET_SECRET"
 
 # Backing store for cross-process state.
 transport:
-  # Transport backing store.
+  # How servers share data.
   # @type: enum
   # @options: ["auto", "plugin-message", "in-memory", "sql", "redis"]
   # @default: "auto"
   type: "auto"
   pluginMessage:
-    # Proxy plugin-messaging channel; leave default unless your proxy uses a non-standard name.
+    # Proxy message channel. Leave as-is unless your proxy differs.
     # @type: string
     # @default: "bungeecord:main"
     channel: "bungeecord:main"
   redis:
-    # Hostname or IP of the Redis instance shared by every backend and proxy (required when type redis).
+    # Redis address shared by all servers (needed for redis).
     # @type: string
     # @default: "localhost"
     host: "localhost"
-    # Redis port; override for non-standard deployments.
+    # Redis port.
     # @type: integer
     # @default: 6379
     port: 6379
-    # Redis password; leave empty for unauthenticated Redis, set when ACL/requirepass is configured.
+    # Redis password. Empty = none.
     # @type: string
     # @default: ""
     password: ""
 
-# Backend heartbeat / peer-staleness cadence (shared by every transport tier).
+# How servers tell each other they're alive.
 heartbeat:
-  # How often this backend publishes its state row (ms).
+  # How often to report this server (ms).
   # @type: integer
   # @default: 1000
   intervalMs: 1000
-  # How long a peer's last-seen state stays trusted before it is treated as unknown (ms); keep above intervalMs.
+  # How long a server is trusted after its last report (ms). Keep above intervalMs.
   # @type: integer
   # @default: 5000
   staleAfterMs: 5000
 
-# Backend-side router.
+# How /rtp picks a server.
 routing:
-  # Router mode: local (local pipeline only), auto (local-first, else wait queue), or always (always enrol).
+  # local = this server, auto = here first then others, always = always others.
   # @type: enum
   # @options: ["local", "auto", "always"]
   # @default: "local"
   mode: "local"
-  # Lobby mode: make this backend a pure dispatch node that auto-routes bare /rtp to the most-kept peer region.
+  # true = this server only sends players to other servers.
   # @type: boolean
   # @default: false
   lobbyMode: false
 
-# Cross-server wait queue; all keys ignored when network disabled or routing.mode local.
+# Line of players waiting for a cross-server teleport.
 queue:
-  # Maximum locally-buffered enrolments before backpressure rejects new /rtp calls (QUEUE_FULL).
+  # Most players that can wait before new /rtp is refused.
   # @type: integer
   # @default: 50
   maxDepth: 50
-  # Backend dirty-write flush cadence (ms); lower = lower latency, higher = fewer transport round trips.
+  # How often to send updates (ms).
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
-  # Backend status-cache poll cadence (ms); how often per-player progress is refreshed.
+  # How often to refresh each player's progress (ms).
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
-  # Optional passive TTL aging of envelope HASHes (ms); 0 disables.
+  # Auto-clean old entries after this long (ms). 0 = off.
   # @type: integer
   # @default: 0
   entryTtlMs: 0
-  # Cross-server /rtp enrolment rate limit (token bucket): sustained requests per second.
+  # Max cross-server /rtp per second.
   # @type: number
   # @default: 5
   crossServerRequestsPerSecond: 5
-  # Cross-server /rtp enrolment rate limit: burst size.
+  # Short burst allowance on top of the rate above.
   # @type: number
   # @default: 10
   crossServerRequestsBurst: 10
-  # Proxy-side BLPOP worker count; increase only when a single worker saturates.
+  # Proxy worker threads. Raise only if one is too busy.
   # @type: integer
   # @default: 1
   workerThreads: 1
 
-# Reservation-token lifecycle.
+# Held spots for traveling players.
 reservation:
-  # Proxy-side TTL reaper cadence (ms); sweeps expired tokens and releases their coordinates.
+  # How often to clean up expired holds (ms).
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
-  # Per-token TTL (ms); a claimed-but-unconsumed reservation older than this is released as abandoned.
+  # How long a held spot lasts before it's freed (ms).
   # @type: integer
   # @default: 60000
   ttlMs: 60000
 
-# Region-collision policy; only `warn` is shipped, unknown values degrade to warn.
+# What to do if two servers share a region name. Only `warn` works.
 regionCollision:
-  # Collision policy applied at startup.
+  # Action at startup.
   # @type: enum
   # @options: ["warn", "rename-local", "reject-startup"]
   # @default: "warn"
   policy: "warn"
 
-# Optional per-destination policy overlay (matched by serverId); leave commented for the common case.
+# Optional per-server rules (matched by serverId). Leave commented for most setups.
 #servers:
 #  example-backend:
 #    # Permission required to target this destination (empty = none).
@@ -131,13 +133,13 @@ regionCollision:
 #    # @type: boolean
 #    # @default: true
 #    allow-when-unavailable: true
-# Load balancer scoring for blank-/rtp region selection; lowest score wins, ties break by serverId then region.
+# Picks the best server for a plain /rtp. Lowest score wins. Documentation: https://github.com/DailyStruggle/RTP/wiki/Network
 loadBalancer:
-  # Weight of the built-in region-scarcity term; 0 because the explicit `region` term below owns that signal.
+  # Weight of the built-in scarcity term. 0 = the `region` term handles it.
   # @type: number
   # @default: 0
   regionScarcityWeight: 0
-  # Scoring terms, one per metric; each has an input, a weight, and a curve. Defaults gate overloaded backends.
+  # One scoring rule per metric (input + weight + curve).
   terms:
     # Tick pressure; sigmoid knee at 0.6.
     mspt:

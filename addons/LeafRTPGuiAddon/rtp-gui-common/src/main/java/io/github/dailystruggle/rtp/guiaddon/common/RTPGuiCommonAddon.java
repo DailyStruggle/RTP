@@ -18,8 +18,9 @@ import java.util.logging.Level;
  *
  * <ul>
  *   <li><b>Config</b>: registers a {@link ConfigParser} for {@link GuiMenuKeys}
- *       ({@code guimenu.yml}), so the file is created on first boot, lives in the RTP
- *       data folder, and reloads on {@code /rtp reload} - no manual pasting.</li>
+ *       ({@code guimenu.yml}), so the file is created on first boot under the
+ *       {@code addons/} subfolder of the RTP data folder, and reloads on
+ *       {@code /rtp reload} - no manual pasting.</li>
  *   <li><b>Bare {@code /rtp}</b>: binds the {@link RTPAPI#hooks()} root action to open
  *       the menu via whatever {@link MenuRenderer} the platform module installed
  *       (ADR-056). With no renderer installed, it defers to the classic teleport.</li>
@@ -44,7 +45,7 @@ public final class RTPGuiCommonAddon implements RTPAddon {
 
   @Override
   public void onLoad() {
-    // Register guimenu.yml with RTP's config system (first-boot create + /rtp reload).
+    // Register addons/guimenu.yml with RTP's config system (first-boot create + /rtp reload).
     RTP.configs.putParser(registerParser());
     Configs.onReload(() -> RTP.configs.putParser(registerParser()));
 
@@ -202,13 +203,34 @@ public final class RTPGuiCommonAddon implements RTPAddon {
   }
 
   private ConfigParser<GuiMenuKeys> registerParser() {
+    migrateLegacyRoot(RTP.serverAccessor.getPluginDirectory(), "guimenu.yml");
     return new ConfigParser<>(
         GuiMenuKeys.class,
-        "guimenu",
+        "addons/guimenu",
         "1.0",
         RTP.serverAccessor.getPluginDirectory(),
         null,
         RTP.configs.fileDatabase,
         this.getClass().getClassLoader());
+  }
+
+  /**
+   * Relocate a pre-existing root-level {@code <fileName>} (from an older install) into the
+   * {@code addons/} subfolder, preserving operator customizations. No-op when the legacy file is
+   * absent or the new file already exists.
+   */
+  private static void migrateLegacyRoot(java.io.File pluginDirectory, String fileName) {
+    try {
+      java.io.File legacy = new java.io.File(pluginDirectory, fileName);
+      java.io.File moved = new java.io.File(new java.io.File(pluginDirectory, "addons"), fileName);
+      if (legacy.isFile() && !moved.exists()) {
+        java.io.File parent = moved.getParentFile();
+        if (parent != null && !parent.exists()) parent.mkdirs();
+        java.nio.file.Files.move(legacy.toPath(), moved.toPath());
+      }
+    } catch (Exception e) {
+      RTP.log(Level.WARNING,
+          "[RTP-GUI] failed to migrate legacy " + fileName + " into addons/", e);
+    }
   }
 }

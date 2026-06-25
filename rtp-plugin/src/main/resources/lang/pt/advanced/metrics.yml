@@ -1,4 +1,5 @@
 # --- Configurações de métricas do RTP ---
+
 # Botões somente de relatório para a SPI de métricas da Fase M2. Botões de
 # limitação / ajuste fino continuam em performance.yml.
 # Preenche MetricsSnapshot.foliaRegions() com detalhe por região no Folia.
