@@ -26,7 +26,23 @@ This record is a meta document: how a developer ought to work in this repository
 
 ## Decision
 
-Record the development workflow as actually practiced, end to end. The lifecycle below is a walk through its stages; each stage names the artifacts it produces and the reason the stage exists.
+Record the development workflow as actually practiced, end to end - the stages below are this repository's software development lifecycle (SDLC), descriptive of a common non-corporate development cycle (no agile "points", no performance tracking, no artificial task division). The chart identifies the lifecycle; the stage walk after it names the artifacts each stage produces and the reason the stage exists.
+
+```mermaid
+flowchart TD
+    A[1. Intake] --> B[2. Planning tier - mutable]
+    B --> C[3. Read, document, modify]
+    C --> D[4. Design records - ADRs]
+    C --> E[5. Implementation + verification]
+    D <--> E
+    E --> F[6. Divergence handling]
+    F -->|supersede / amend| D
+    F -->|refine| A
+    E --> G[7. Communication surfaces]
+    H[8. Self-maintenance] -.-> B & D & E
+```
+
+The chart is illustrative; the stage prose below is authoritative.
 
 ### 1. Intake
 
@@ -109,3 +125,16 @@ AI tooling (agentic LLM assistants) is an *optional* executor of human-directed 
 - [`.junie/AGENTS.md`](../../.junie/AGENTS.md) - agent-operational guide (Self-Updating Protocol, D-005 gate restatement).
 - [ADR-018](ADR-018-agents-md-public-release-structure.md) - precedent for meta-level ADRs.
 - [ADR-TEMPLATE.md](ADR-TEMPLATE.md) - the record format this workflow produces.
+
+### Prior art
+
+Where a stage or constraint has a named preexisting practice, credit belongs to its first origin; none of these were invented here:
+
+- **Architecture Decision Records** - Michael Nygard, "Documenting Architecture Decisions" (blog post, 2011), which also established the lightweight context/decision/consequences format this repository's template descends from.
+- **Never-delete / supersede-instead records** - the IETF RFC series (Steve Crocker, RFC 1, 1969): published RFCs are never edited, only obsoleted by successors.
+- **`shall` / `shall not` requirement language** - long-standing systems-engineering specification practice, standardized in US defense specifications (MIL-STD-490, 1968) and carried into IEEE 830 / ISO-IEC-IEEE 29148 requirement-writing standards.
+- **Requirements traceability matrices** - aerospace / safety-critical certification practice, notably RTCA DO-178 (1982) and its successors, which require every requirement to trace to design, code, and test.
+- **Single source of truth** - the DRY principle, Andy Hunt and Dave Thomas, *The Pragmatic Programmer* (1999), generalized from code to knowledge.
+- **Documentation weight proportional to the change** - Alistair Cockburn's methodology-weight principle (Crystal family, *Agile Software Development*, 2001): ceremony scales with criticality and size, not uniformly.
+- **Capture existing behavior before modifying** - closest named prior art is characterization testing, Michael Feathers, *Working Effectively with Legacy Code* (2004); the same capture-first idea applied here at the documentation layer.
+- **Record incidental findings instead of chasing them** - a scope-discipline commonplace with no single origin; the fence-before-removal rationale traces to G. K. Chesterton, *The Thing* (1929, "The Drift from Domesticity").
