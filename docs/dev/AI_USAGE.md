@@ -49,5 +49,3 @@ What AI is *not* used for, as a rule:
 - **System design.** Design happens in human brainstorming sessions and AI formats the result. The other direction is how you end up with a codebase nobody understands.
 - **Agentic troubleshooting.** AI gets used for investigation - reading the relevant files, summarizing what they do, listing where a bug might live - but it frequently misattributes the error source. It can advise. It does not jump to execution. Bug fixes are directed by humans and commanded explicitly.
 - **Independent system docs.** This document is the example. Every paragraph is human-directed prose that an LLM then helped format. The substance is mine. If you see an AI-written ADR or requirement in this repo that drifts from that, file an issue. It's a defect.
-
-That's the writeup. If you want to continue the conversation - push back on something here, ask why a specific thing is on the "not used for" list, or share a workflow of your own - open an issue or catch me on the subreddit.
