@@ -44,7 +44,7 @@ lockAfterUses: 0
 lockAfterResetSeconds: 0
 
 # Gdy true, udane /rtp ustawia miejsce lądowania jako trwały
-# punkt odrodzenia gracza (parytet z SetAsRespawn z BetterRTP).
+# punkt odrodzenia gracza (parytet z BetterRTP).
 # @type: boolean
 # @default: false
 setRespawnOnTeleport: false
@@ -85,7 +85,7 @@ menu:
     # zostanie dodany do listy domyślnej.)
     - "book"
 
-# Globalne wartości domyślne dziedziczone przez pliki regionów/światów za pomocą tokenu "@config" (ADR-073).
+# Globalne wartości domyślne dziedziczone przez pliki regionów/światów za pomocą tokenu "@config".
 defaults:
   # Domyślny kształt i rozmiar obszaru. radius/centerRadius określają, jak daleko
   # lądują gracze, mierzone w chunkach.

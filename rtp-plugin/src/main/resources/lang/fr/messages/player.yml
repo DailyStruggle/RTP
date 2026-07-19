@@ -112,3 +112,6 @@ fadeOut: 20
 
 # actionbar setting
 actionbar: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

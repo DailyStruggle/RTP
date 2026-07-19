@@ -39,7 +39,7 @@ lockAfterUses: 0
 lockAfterResetSeconds: 0
 
 # 为 true 时，成功的 /rtp 将着陆位置设为玩家的持久重生锚点
-#（BetterRTP SetAsRespawn 兼容）。
+#（BetterRTP 兼容）。
 # @type: boolean
 # @default: false
 setRespawnOnTeleport: false
@@ -77,7 +77,7 @@ menu:
     # 渲染器将在后续版本中提供，届时会加入默认列表。)
     - "book"
 
-# 通过 "@config" 令牌由区域/世界文件继承的全局默认值 (ADR-073)。
+# 通过 "@config" 令牌由区域/世界文件继承的全局默认值。
 defaults:
   # 默认区域的形状和大小。radius/centerRadius = 你落地的距离，以区块为单位。
   shape:

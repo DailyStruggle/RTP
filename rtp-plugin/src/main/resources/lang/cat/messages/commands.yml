@@ -32,17 +32,17 @@ meows_per_tick: "&7Current plugin meows-per-tick: #7E9CC8[mspt]"
 total_naps_disturbed: "&7Lifetime kibble loaded: #7E9CC8[loads]"
 kibble_loads_by_origin: "&7Kibble loads by paw: #7E9CC8[loadsByOrigin]"
 drool_rate: "&7Current drool (chunk leak) rate: #7E9CC8[leakRate]"
-# --- Metrics SPI health block ---
+# --- Health metrics block ---
 kitties_in_territory_lines: "&7Kitties waiting in territory lines: #7E9CC8[queueDepth]"
 pending_pounces: "&7Pending pounce pipelines: #7E9CC8[pendingTeleports]"
 average_pounce_lag: "&7Average pounce lag: #7E9CC8[avgPipelineMs] ms"
-# Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
+# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7Pounce-pipe lag (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-# Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
+# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7Slow pounces (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-# Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7Line-growth hisses (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 tall_human_brain_jar: "&7Tall-human brain-jar: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # Header line for the Health pipeline labelled block in /rtp info.
@@ -55,18 +55,18 @@ box_purr_rate: "&7Box purr-rate (mspt): #7E9CC8[mspt] ms (&7whisker budget: #7E9
 kitties_in_the_box: "&7Kitties: #7E9CC8[playerCount] / [softCap]"
 # Latest kibble-stash round-trip latency in ms. Placeholder: [databaseLatencyMs].
 scratching_post_lag: "&7Scratching-post lag: #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics (ADR-052), sourced from the process-global RtpOutcomeStats.
+# Generation outcome metrics.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Hunt success: #7E9CC8[genSuccessRate]&7 (flop #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
 # Single most common rejection cause and its share of all failures. Placeholders:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7Top hiss reason: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
-# Per-cause rejection breakdown (the analogue of a competitor's /rtp unsafe-stats).
+# Per-cause rejection breakdown.
 # Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
 infoFailureBreakdown: "&7Hisses by reason: #7E9CC8[genFailureBreakdown]"
-# Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
-# to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&7/&c.
+# Health colour-band thresholds. Used to colour the coloured-variant
+# placeholders (e.g. [tps1mColoured]) green/yellow/red.
 infoThresholdTpsGreen: 19.5
 infoThresholdTpsYellow: 18.0
 infoThresholdMsptGreen: 30.0
@@ -136,24 +136,24 @@ menuBack: "&7« scamper back"
 # Label template for the "execute the assembled command" row prepended to every
 # runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
 menuExecute: "&2▶ pounce [command]"
-# Header row at the top of a parameter-value picker sub-page (Stage A.2).
+# Header row at the top of a parameter-value picker sub-page.
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
 pick_a_flavour: "&7pick a flavour for [param] (will pounce: /rtp [command] [param]:<value>)"
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list.
 menuTypeValue: "&7✎ type a custom flavour..."
-# Non-clickable header row at the top of every non-root menu page (Stage A.4).
+# Non-clickable header row at the top of every non-root menu page.
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
 kneading: "&7kneading: #7E9CC8/rtp [command]"
-# Non-clickable title row prepended to the root /rtp menu page (Stage A.5).
+# Non-clickable title row prepended to the root /rtp menu page.
 # Provides a welcoming header before the player descends into any subcommand.
 menuRootTitle: "#5FB3B3&l⚡ RTP meow menu"
 # Non-clickable subtitle/hint row prepended to the root /rtp menu page below
-# menuRootTitle (Stage A.5). Short orientation text for first-time users.
+# menuRootTitle. Short orientation text for first-time users.
 paw_an_option: "&7paw an option below to begin"
-# Navigation rows appended to paginated menu pages (Stage A.6) - clicking
+# Navigation rows appended to paginated menu pages - clicking
 # them moves to the previous/next page of the same model. Placeholder:
 # [page] - the 1-based human-readable target page number.
 menuPagePrev: "&7« earlier page ([page])"
@@ -166,9 +166,9 @@ menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- sniff a territory"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- sniff a box"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- sniff a flavour of land"
 menuFrontPageRowHelp: "#7A4FB8❓ list meows &7- /rtp help"
-# Front-page admin entry row: the only inline
-# admin-visible row on the front page; click descends into the curated admin
-# panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
+# Front-page admin entry row: the only inline admin-visible row on the
+# front page; click descends into the admin panel. Hidden when the viewer
+# lacks rtp.menu.admin.
 menuFrontPageRowAdmin: "#9D7CD8▶ head-kitty panel &7- staff tools"
 # Hover text for the admin-panel entry row. No placeholders.
 menuFrontPageHoverAdmin: "&7staff tools: setup, sniffing, hairball checks, grooming"
@@ -266,12 +266,12 @@ infoBookOverflowFooter: "&7(too many meows for one page - paw to see the rest in
 # book is not currently supported on this build (deferred to a later
 # milestone). Users may click the Refresh row to refresh manually.
 infoBookAutoRefreshDeferredNote: "&8(auto-grooming not yet supported; paw re-sniff to update)"
-# Non-clickable title row at the top of the config-file selector page (Stage C.1).
+# Non-clickable title row at the top of the config-file selector page.
 # Shown when an admin clicks "/rtp config" from the front page.
 configSelectorTitle: "#5FB3B3&l⚙ setup files"
 # Label for the "back to /rtp menu root" navigation row on the config selector page.
 configSelectorBackRow: "&7« back to the meow menu"
-# Non-clickable title row at the top of a single config-file page (Stage C.2).
+# Non-clickable title row at the top of a single config-file page.
 # Placeholder: [file] - the config file name (e.g. "performance", "safety").
 configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
 # Label for the "back to config selector" navigation row on a single config-file page.
@@ -284,10 +284,10 @@ configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
 # Hover text for a per-key row on a config-file page. Placeholders:
 #   [key], [value], [type] - the config key name, current value, and declared type.
 configKeyHoverFormat: "&7paw to groom &7[key] &7(flavour: [type])"
-# Non-clickable title row at the top of a shape/vert type-picker page (Stage C.3a).
+# Non-clickable title row at the top of a shape/vert type-picker page.
 # Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
 configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
-# Non-clickable title row at the top of a shape/vert sub-parameter page (Stage C.3b).
+# Non-clickable title row at the top of a shape/vert sub-parameter page.
 # Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
 configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
@@ -312,27 +312,23 @@ configApplyRow: "&2&l[apply]"
 # Clears the cart without applying.
 configDiscardRow: "&c&l[discard]"
 
-# --- ADR-047 declarative chart composition bridge (REQ-RTP-MAP-006) ---
-# Sent to the viewer when an OPEN_MAP menu action fires but no concrete
-# MapBinding is registered (NoopMapBinding is still active, e.g. on the
-# Lite assembly or before RTPHooks wires the platform binding).
+# --- Map / chart rendering ---
+# Sent when a map row is clicked but map rendering is not available on this
+# server (e.g. the Lite assembly, or no map provider installed).
 mapBindingMissing: "&c[P0] map rendering is not available on this box."
-# Sent when MapDispatch receives a ChartSpec whose Kind has no registered
-# ChartSpecResolver (e.g. Stage 1 viewer clicks a Stage 3 sparkline before
-# the resolver lands).
+# Sent when a chart is requested but no renderer is registered for that
+# chart type.
 mapResolverMissing: "&c[P0] no chart-sniffer registered for this request."
 # Sent when a resolver runs but the underlying data source is unavailable
 # for the requested target (unknown region, no data yet, world unloaded).
 # Placeholder: [region] - the requested region name (may be empty).
 mapUnavailable: "&e[P1] chart kibble is not available right now."
-# Sent when the active MapBinding cannot allocate a map handle right now
-# (binding-defined back-pressure, e.g. per-viewer cap reached).
+# Sent when the map service cannot allocate a map right now (e.g. a
+# per-viewer cap has been reached).
 mapBusy: "&e[P1] the map-sniffer is busy; try again in a few licks."
-# Label for the clickable "/rtp info" menu row that, on click, mints a
-# ChartSpec(BAD_POINTS_HEATMAP, ...) token and asks the active MapBinding
-# to render a 128x128 heatmap of the current region's known bad-point
-# spiral indices. The row is omitted at render time when NoopMapBinding
-# is the installed binding (REQ-RTP-MAP-006 / ADR-047).
+# Label for the clickable "/rtp info" menu row that renders a heatmap of
+# the current region's known bad locations. Hidden when map rendering is
+# not available on this server.
 menuInfoBadPointsLabel: "#9D7CD8&l# bad-spots map"
 
 # --- MultiConfig submenu ---
@@ -379,3 +375,6 @@ multiconfigResultNameInvalid: "&cname '[name]' is hiss-worthy; use letters, digi
 # Result message when an ADD collides with an existing entry name.
 # Placeholder: [name].
 multiconfigResultNameTaken: "&can entry named '[name]' already lives here."
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

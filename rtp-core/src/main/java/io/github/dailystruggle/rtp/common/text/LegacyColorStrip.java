@@ -112,6 +112,96 @@ public final class LegacyColorStrip {
         return new StripResult(out.toString(), trimmed);
     }
 
+    /**
+     * Zero-width space inserted between a color introducer and its code by
+     * {@link #escape(String)} so the downstream render pipeline
+     * ({@code translateAlternateColorCodes}, the section-sign deserializer, and
+     * the {@code #RRGGBB} hex pass) no longer recognizes the sequence and the
+     * code is shown to the reader as literal text.
+     */
+    private static final char ZERO_WIDTH_SPACE = '\u200B';
+
+    /**
+     * Neutralize legacy color/format codes in {@code raw} so they render as
+     * <em>literal text</em> rather than being consumed (and applied) by a
+     * color-translating renderer.
+     *
+     * <p>Unlike {@link #strip(String)} - which deletes the codes entirely -
+     * this keeps every original character visible. It is the right tool for
+     * surfacing operator-authored config <em>comments</em> (which routinely
+     * contain {@code &e}/{@code &6}/{@code §a}/{@code #RRGGBB} examples) as menu
+     * hover text: the menu renderers run the hover string through the standard
+     * {@code &}-to-{@code §} translation and section/hex deserialization, which
+     * would otherwise paint the description or swallow the example codes.
+     *
+     * <p>The neutralization inserts a zero-width space immediately after each
+     * color introducer ({@code &}, {@code §}, or the {@code #}/{@code &#} of a
+     * hex literal). The introducer then no longer abuts a recognized code
+     * character, so no renderer in the pipeline matches it, while the visible
+     * glyphs (e.g. {@code &e}) remain intact.
+     *
+     * @param raw the text to escape (may be {@code null})
+     * @return the escaped text, or {@code raw} when it is {@code null}/empty or
+     *         carries no color codes
+     */
+    public static String escape(String raw) {
+        if (raw == null || raw.isEmpty()) return raw;
+        StringBuilder out = new StringBuilder(raw.length() + 8);
+        int i = 0;
+        int n = raw.length();
+        boolean changed = false;
+        while (i < n) {
+            char c = raw.charAt(i);
+
+            // 1) Bukkit-style §x§R§R§G§G§B§B run (14 chars).
+            if (c == SECTION && i + 13 < n) {
+                char next = raw.charAt(i + 1);
+                if ((next == 'x' || next == 'X') && isHexRun(raw, i + 2)) {
+                    out.append(c).append(ZERO_WIDTH_SPACE);
+                    out.append(raw, i + 1, i + 14);
+                    i += 14;
+                    changed = true;
+                    continue;
+                }
+            }
+            // 2) §<code>
+            if (c == SECTION && i + 1 < n && isLegacyCode(raw.charAt(i + 1))) {
+                out.append(c).append(ZERO_WIDTH_SPACE).append(raw.charAt(i + 1));
+                i += 2;
+                changed = true;
+                continue;
+            }
+            // 3) &<code>
+            if (c == '&' && i + 1 < n && isLegacyCode(raw.charAt(i + 1))) {
+                out.append(c).append(ZERO_WIDTH_SPACE).append(raw.charAt(i + 1));
+                i += 2;
+                changed = true;
+                continue;
+            }
+            // 4) &#RRGGBB
+            if (c == '&' && i + 7 < n && raw.charAt(i + 1) == '#'
+                    && isHex6(raw, i + 2)) {
+                out.append(c).append(ZERO_WIDTH_SPACE);
+                out.append(raw, i + 1, i + 8);
+                i += 8;
+                changed = true;
+                continue;
+            }
+            // 5) #RRGGBB
+            if (c == '#' && i + 6 < n && isHex6(raw, i + 1)) {
+                out.append(c).append(ZERO_WIDTH_SPACE);
+                out.append(raw, i + 1, i + 7);
+                i += 7;
+                changed = true;
+                continue;
+            }
+            // Plain character - keep.
+            out.append(c);
+            i++;
+        }
+        return changed ? out.toString() : raw;
+    }
+
     private static boolean isLegacyCode(char c) {
         return LEGACY_CODES.indexOf(c) >= 0;
     }

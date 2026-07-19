@@ -4,7 +4,10 @@
 # Region used for this world
 region: "default"
 # true = need permission rtp.worlds.<worldname>. "@config" inherits
-# defaults.requirePermission from config.yml (ADR-073); replace with true/false to override.
+# defaults.requirePermission from config.yml.
+# See https://github.com/DailyStruggle/RTP/wiki/Config-yml
+# Replace with a literal to override per-world, e.g.:
+#   requirePermission: true
 requirePermission: "@config"
 # World to send to if no permission
 override: "[0]"

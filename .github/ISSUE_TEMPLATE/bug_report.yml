@@ -1,0 +1,138 @@
+name: Bug report
+description: Technical report for Spigot, Paper, Folia, Fabric, or NeoForge
+title: "[BUG] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > **Solo Developer Disclaimer:** I maintain this project alone with limited time. Reports that are missing logs, version info, or were clearly answered in the Wiki/FAQ will be closed without a response. Before filing, read [`SUPPORT.md`](../../SUPPORT.md). By participating you agree to the [Code of Conduct](../../CODE_OF_CONDUCT.md).
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight (required)
+      description: Every box must be checked. Unchecked boxes = auto-close.
+      options:
+        - label: I read `SUPPORT.md` and this is a **bug**, not a question or config help.
+          required: true
+        - label: I searched **open *and* closed** issues for duplicates.
+          required: true
+        - label: I reproduced on the latest RTP release.
+          required: true
+        - label: I reproduced with RTP alone (no other plugins), or I explain below why that was not possible.
+          required: true
+        - label: I agree to the [Code of Conduct](../../CODE_OF_CONDUCT.md).
+          required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Which server software are you running?
+      options:
+        - Spigot
+        - Paper (or fork)
+        - Folia
+        - Fabric
+        - NeoForge
+        - Other (explain in description)
+    validations:
+      required: true
+
+  - type: input
+    id: server-version
+    attributes:
+      label: Server version
+      description: Output of `/version`.
+      placeholder: "e.g. git-Paper-1.21.1-123 (MC: 1.21.1)"
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: Output of `/rtp version`.
+      placeholder: "e.g. 3.0.0-beta.1"
+    validations:
+      required: true
+
+  - type: input
+    id: heap
+    attributes:
+      label: Allocated heap memory
+      description: >
+        Your JVM heap allocation (the `-Xmx` flag, or allocated RAM from your host panel).
+        Heap starvation is the single most common cause of "it doesn't work" reports - the
+        pre-warmed queue and caches trade memory for tick time. See the Minimum Operational
+        Requirements in the README before filing.
+      placeholder: "e.g. -Xmx8G  (8 GB)"
+    validations:
+      required: true
+
+  - type: input
+    id: profiler
+    attributes:
+      label: Profiler link (spark)
+      description: >
+        A [spark](https://spark.lucko.me/) profile link covering the problem window
+        (`/spark profiler --timeout 60`, then paste the upload URL). Required for any
+        performance, lag, TPS/MSPT, or "server hangs" report so the cost can be attributed
+        to a real frame (RTP tasks appear as `rtp_pipeline_attempt`, `rtp_cache_generator`,
+        `rtp_scan_crawler`, etc.). Put `N/A - not a performance issue` if this is a purely
+        functional bug.
+      placeholder: "https://spark.lucko.me/..."
+    validations:
+      required: true
+
+  - type: input
+    id: log
+    attributes:
+      label: Link to full latest.log
+      description: Upload to mclo.gs or pastebin and paste the link. **Required.**
+      placeholder: "https://mclo.gs/..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: describe
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+      placeholder: "e.g. The player should teleport without stalling the region thread."
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: validation
+    attributes:
+      label: Required validation
+      options:
+        - label: I have read the Wiki and FAQ.
+          required: true
+        - label: I have verified this is not a configuration mismatch.
+          required: true
+        - label: I have confirmed this issue persists on the latest build of RTP.
+          required: true
+        - label: I understand that incomplete reports will be closed immediately.
+          required: true

@@ -159,3 +159,9 @@ docs/dev/scratch/
 
 # GitHub wiki working clone (separate RTP.wiki.git repo; edited alongside source, not part of this repo)
 /wiki/
+.junie/memory/tasks.md
+.junie/memory/memory.version
+.junie/memory/language.json
+.junie/memory/feedback.md
+.junie/memory/errors.md
+/scripts/__pycache__

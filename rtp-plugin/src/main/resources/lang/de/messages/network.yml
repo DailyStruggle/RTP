@@ -13,15 +13,15 @@
 # Position zurückgibt.
 netzwerkInWarteschlange: "&7[P0] für ein serverübergreifendes Ziel eingereiht (Position [position])..."
 # Wird gesendet, wenn ein Spieler /rtp* ausführt, während er bereits eine nicht abgeschlossene
-# serverübergreifende Anmeldung hält (ADR-015 / REQ-RTP-NET-015 Befehlssperre). Platzhalter:
+# serverübergreifende Anmeldung hält. Platzhalter:
 # [position] - FIFO-Position, falls bekannt; leer, wenn der Proxy noch keine
 # zugewiesen hat.
 bereitsInWarteschlange: "&cDu wartest bereits in der serverübergreifenden Warteschlange (Position [position]). Bitte warte."
 # Wird gesendet, wenn ein serverübergreifender Warteschlangeneintrag nach Überschreiten seiner
-# konfigurierten TTL entfernt wird (ADR-015). Keine Platzhalter.
+# konfigurierten TTL entfernt wird. Keine Platzhalter.
 netzwerkZeitueberschreitung: "&c[P0] serverübergreifender Teleport hat beim Warten auf ein Backend das Zeitlimit überschritten."
 # Wird gesendet, wenn eine serverübergreifende Warteschlangenanmeldung abgelehnt wird, weil die gemeinsame
-# Warteschlange ihre konfigurierte Maximalgröße erreicht hat (ADR-015 REJECTED_FULL).
+# Warteschlange ihre konfigurierte Maximalgröße erreicht hat ( REJECTED_FULL).
 # Keine Platzhalter.
 warteschlangeVoll: "&c[P0] serverübergreifende Warteschlange ist voll; bitte versuche es gleich erneut."
 # Wird gesendet, wenn die Warteschlange die Anfrage an den Proxy-Router übergeben hat und
@@ -33,12 +33,11 @@ netzwerkWeiterleitung: "&7[P0] leite zu einem Backend weiter..."
 netzwerkReserviert: "&a[P0] Koordinate auf [server] reserviert. Übertrage..."
 # Wird gesendet, während der Proxy den Sprung ausführt. Platzhalter: [server] - Ziel.
 netzwerkUebertragung: "&a[P0] übertrage zu [server]..."
-# Wird gesendet, wenn der serverübergreifende Pfad aufgegeben hat und die Anfrage auf
-# das lokale Backend zurückgefallen ist. Platzhalter: [reason] - einer der
-# `RoutingDecision.FallbackReason`-Werte (z. B. NO_LIVE_PEER, QUEUE_FULL).
+# Wird gesendet, wenn der serverübergreifende Pfad aufgegeben hat und die Anfrage
+# auf den lokalen Server zurückgefallen ist. Platzhalter: [reason] - der Grund für den Rückfall.
 netzwerkRueckfall: "&e[P0] serverübergreifend nicht verfügbar ([reason]); greife lokal zurück."
-# Wird gesendet, wenn die serverübergreifende Anfrage endgültig fehlgeschlagen ist (kein Rückfall war
-# möglich). Platzhalter: [reason] - der `DispatchOutcome.Failed.Reason`.
+# Wird gesendet, wenn die serverübergreifende Anfrage fehlgeschlagen ist und kein
+# Rückfall möglich war. Platzhalter: [reason] - der Fehlergrund.
 netzwerkFehlgeschlagen: "&c[P0] serverübergreifender Teleport fehlgeschlagen: [reason]."
 # Wird gesendet, wenn der Spieler eine bestimmte Region angefordert hat (`/rtp <region>`), aber
 # derzeit kein Backend im Netzwerk sie bedient. Platzhalter:
@@ -48,3 +47,6 @@ netzwerkRegionNichtVerfuegbar: "&c[P0] derzeit bedient kein Backend die Region '
 # die vom Operator konfigurierte Richtlinie keines auswählen kann (wird nur
 # unter strengeren Richtlinien als dem Standard `warn` ausgelöst). Platzhalter: [region].
 netzwerkRegionMehrdeutig: "&c[P0] Region '[region]' ist über mehrere Backends mehrdeutig; bitte einen Server festlegen."
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

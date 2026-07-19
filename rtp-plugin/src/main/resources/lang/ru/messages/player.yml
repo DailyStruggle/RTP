@@ -113,3 +113,6 @@ test_описание: "тестирование функций RTP"
 
 # actionbar setting
 панельДействий: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

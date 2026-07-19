@@ -94,7 +94,7 @@ queue:
   # @default: 1
   workerThreads: 1
 
-# Reservation-token lifecycle (REQ-RTP-NET-011).
+# Reservation-token lifecycle.
 reservation:
   # 프록시 측 TTL 수거기 주기(ms). 만료된 토큰을 정리하고 좌표를 해제합니다.
   # @type: integer

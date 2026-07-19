@@ -106,3 +106,6 @@ desvanecer: 20
 
 # actionbar setting
 barraAccion: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

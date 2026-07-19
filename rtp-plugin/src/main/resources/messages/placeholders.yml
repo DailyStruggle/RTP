@@ -12,3 +12,6 @@ placeholders:
   # P0 - plugin prefix shown in every message. Uses a rainbow gradient on
   # Paper/Folia and per-character hex codes on Spigot.
   - "<rainbow>[RTP]</rainbow>"
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

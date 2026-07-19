@@ -111,12 +111,11 @@ networkRouting: "&7[P0] enrutando a un servidor..."
 networkReserved: "&a[P0] coordenada reservada en [server]. Transfiriendo..."
 # Sent when the proxy is mid-hop. Placeholder: [server] - destination.
 networkTransferring: "&a[P0] transfiriendo a [server]..."
-# Sent when the cross-server path gave up and the request fell back to
-# the local backend. Placeholder: [reason] - one of the
-# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
+# Sent when the cross-server path gave up and fell back to the local server.
+# Placeholder: [reason] - the reason for falling back.
 networkFallback: "&e[P0] entre servidores no disponible ([reason]); volviendo a local."
-# Sent when the cross-server request failed terminally (no fallback was
-# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
+# Sent when the cross-server request failed and no fallback was possible.
+# Placeholder: [reason] - the failure reason.
 networkFailed: "&c[P0] el teletransporte entre servidores falló: [reason]."
 # Sent when the player asked for a specific region (`/rtp <region>`) but
 # no backend in the network is currently serving it. Placeholder:
@@ -190,7 +189,7 @@ infoMSPT: "&7MSPT actual del plugin: #7E9CC8[mspt]"
 infoCargasTotales: "&7Chunks cargados de por vida: #7E9CC8[loads]"
 infoCargasPorOrigen: "&7Cargas por origen: #7E9CC8[loadsByOrigin]"
 infoTasaFuga: "&7Tasa actual de fuga de chunks: #7E9CC8[leakRate]"
-# --- Metrics SPI health block ---
+# --- Health metrics block ---
 infoQueueDepth: "&7Jugadores esperando en colas de región: #7E9CC8[queueDepth]"
 infoPendingTeleports: "&7Tuberías de teletransporte pendientes: #7E9CC8[pendingTeleports]"
 infoAvgPipelineMs: "&7Latencia media de la tubería: #7E9CC8[avgPipelineMs] ms"
@@ -213,18 +212,18 @@ infoMSPTLive: "&7MSPT del servidor: #7E9CC8[mspt] ms (&7presupuesto de tick: #7E
 infoSoftCap: "&7Jugadores: #7E9CC8[playerCount] / [softCap]"
 # Latencia de ida y vuelta más reciente de la base de datos en ms. Marcador: [databaseLatencyMs].
 infoDatabaseLatencyMs: "&7Latencia de base de datos: #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics, sourced from the process-global RtpOutcomeStats.
+# Generation outcome metrics.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Éxito de generación: #7E9CC8[genSuccessRate]&7 (fallos #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
 # Single most common rejection cause and its share of all failures. Placeholders:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7Causa principal de rechazo: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
-# Per-cause rejection breakdown (the analogue of a competitor's /rtp unsafe-stats).
+# Per-cause rejection breakdown.
 # Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
 infoFailureBreakdown: "&7Rechazos por causa: #7E9CC8[genFailureBreakdown]"
-# Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
-# to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&7/&c.
+# Health colour-band thresholds. Used to colour the coloured-variant
+# placeholders (e.g. [tps1mColoured]) green/yellow/red.
 infoThresholdTpsGreen: 19.5
 infoThresholdTpsYellow: 18.0
 infoThresholdMsptGreen: 30.0
@@ -290,7 +289,7 @@ menuHoverFallbackType: "tipo: [type]"
 menuHoverFallbackBounds: "aceptados: [values]"
 menuBack: "&7« atrás"
 # Plantilla de la fila "ejecutar el comando ensamblado" en cada página de menú ejecutable no raíz. Marcador: "[command] - la invocación /rtp ... ensamblada."
-# Non-clickable header row at the top of every non-root menu page (Stage A.4).
+# Non-clickable header row at the top of every non-root menu page.
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
 menuConstructed: "&7construyendo: #7E9CC8/rtp [command]"
@@ -310,9 +309,9 @@ menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- elige un mundo"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- elige un bioma"
 menuFrontPageRowHelp: "#7A4FB8❓ listar comandos &7- /rtp help"
-# Front-page admin entry row: the only inline
-# admin-visible row on the front page; click descends into the curated admin
-# panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
+# Front-page admin entry row: the only inline admin-visible row on the
+# front page; click descends into the admin panel. Hidden when the viewer
+# lacks rtp.menu.admin.
 menuFrontPageRowAdmin: "#9D7CD8▶ panel de administración &7- herramientas de operador"
 # Hover text for the admin-panel entry row. No placeholders.
 menuFrontPageHoverAdmin: "&7herramientas de operador: configuración, escaneos, diagnósticos, recarga"
@@ -447,26 +446,23 @@ configApplyRow: "&2&l[apply]"
 # Clears the cart without applying.
 configDiscardRow: "&c&l[discard]"
 
-# --- declarative chart composition bridge ---
-# Sent to the viewer when an OPEN_MAP menu action fires but no concrete
-# MapBinding is registered (NoopMapBinding is still active, e.g. on the
-# Lite assembly or before RTPHooks wires the platform binding).
+# --- Map / chart rendering ---
+# Sent when a map row is clicked but map rendering is not available on this
+# server (e.g. the Lite assembly, or no map provider installed).
 mapBindingMissing: "&c[P0] el renderizado de mapas no está disponible en este servidor."
-# Sent when MapDispatch receives a ChartSpec whose Kind has no registered
-# ChartSpecResolver (e.g. Stage 1 viewer clicks a Stage 3 sparkline before
-# the resolver lands).
+# Sent when a chart is requested but no renderer is registered for that
+# chart type.
 mapResolverMissing: "&c[P0] no hay ningún resolutor de gráficos registrado para esta solicitud."
 # Sent when a resolver runs but the underlying data source is unavailable
 # for the requested target (unknown region, no data yet, world unloaded).
 # Placeholder: [region] - the requested region name (may be empty).
 mapUnavailable: "&e[P1] los datos del gráfico no están disponibles ahora mismo."
-# Sent when the active MapBinding cannot allocate a map handle right now
-# (binding-defined back-pressure, e.g. per-viewer cap reached).
+# Sent when the map service cannot allocate a map right now (e.g. a
+# per-viewer cap has been reached).
 mapBusy: "&e[P1] el servicio de mapas está ocupado; inténtalo de nuevo en breve."
-# ChartSpec(BAD_POINTS_HEATMAP,...) token and asks the active MapBinding
-# to render a 128x128 heatmap of the current region's known bad-point
-# spiral indices. The row is omitted at render time when NoopMapBinding
-# is the installed binding.
+# Label for the clickable "/rtp info" menu row that renders a heatmap of
+# the current region's known bad locations. Hidden when map rendering is
+# not available on this server.
 menuInfoBadPointsLabel: "#9D7CD8&l# mapa de puntos inseguros"
 
 # --- MultiConfig submenu ---

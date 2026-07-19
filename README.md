@@ -58,6 +58,17 @@ Legacy random-teleport plugins reroll random coordinates until one lands somewhe
 
 ---
 
+## Minimum Operational Requirements
+
+RTP trades memory for tick time: the pre-warmed location queue, per-region spatial memory, and the Anvil pre-filter caches all cost heap in exchange for teleports that resolve without on-demand chunk loading. On a heap-starved host the JVM will spend its time in garbage collection and the server will appear to hang; that is a deployment-environment limit, not a plugin fault.
+
+- **Java 21+** (hard requirement).
+- **Headroom for the caches.** The queue is bounded by `cacheCap` (per region) and the ticket pool by `activeChunkCap`. Both are *absolute* per-region caps: their heap cost is fixed per region (roughly `cacheCap + activeChunkCap` entries) and scales with your region count, not with radius. Radius affects only the size of the per-region spatial memory (the `MemoryShape` land/bad-sector map), not the queue or ticket pool. RTP includes a built-in heap-pressure gate (`performance.yml` -> `maxHeapPercent`, default 85%) that pauses *background cache generation* while the heap is under pressure and logs a warning, so serving already-cached locations keeps working; a persistently-tripped gate means the host is under-provisioned for the configured `cacheCap`.
+
+**Reference environment (measured, not a certified minimum).** The in-repo devstack and stress harness run on a **Ryzen 9 3900X with 16 GiB allocated to the server**. Treat this as a known-good baseline, not a floor - a single small region needs far less. A properly-sourced minimum (heap per region at a given `cacheCap`) is planned once opt-in telemetry lands to measure real deployments; until then, provision generously and watch for `maxHeapPercent` warnings.
+
+---
+
 ## Pregenerate First
 
 For best results, pregenerate each RTP world (Chunky / WorldBorder) sized to your region radius before going live. RTP's pipeline is bounded by your server's chunk-generation throughput on first touch; pregeneration removes that bottleneck. See [QUICK_START Step 0](docs/admin/QUICK_START.md#step-0--prerequisites--pregenerate-the-world).

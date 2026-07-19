@@ -106,3 +106,6 @@ rtp_说明: "传送到一个随机位置"
 
 # actionbar 设置
 动作栏: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

@@ -42,7 +42,7 @@ lockAfterUses: 0
 lockAfterResetSeconds: 0
 
 # true の場合、/rtp の成功時に着地地点をプレイヤーの永続的な
-# リスポーン地点として設定します (BetterRTP の SetAsRespawn と同等)。
+# リスポーン地点として設定します (BetterRTP と同等)。
 # @type: boolean
 # @default: false
 setRespawnOnTeleport: false
@@ -84,7 +84,7 @@ menu:
     # デフォルトリストに加わります。)
     - "book"
 
-# "@config" トークンを介してリージョン/ワールドのファイルに継承されるグローバルな既定値です (ADR-073)。
+# "@config" トークンを介してリージョン/ワールドのファイルに継承されるグローバルな既定値です。
 defaults:
   # デフォルトのエリアの形状とサイズ。radius/centerRadius = どれだけ遠くに着地するか（チャンク単位）。
   shape:

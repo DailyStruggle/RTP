@@ -80,19 +80,21 @@ Each capability below is paired with the part of that architecture that makes it
 |                                                                                                                  | Free LeafRTP | **LeafRTP-Pro** |
 |------------------------------------------------------------------------------------------------------------------|----------|-------------|
 | **Folia** (tuned Region Scheduler + off-tick pre-filter, no 1-tick stalls)                                       | Basic    | **Tuned**   |
-| **Multi-server / proxy** (Velocity)                                                                              | No       | **Yes**     |
+| **Multi-server / proxy** (Velocity, BungeeCord, plugin-messaging)                                                | Basic*   | **Full**    |
 | **SQL / Redis** shared-state backends (H2, SQLite, MySQL, PostgreSQL, Jedis)                                     | No       | **Yes**     |
-| **Vault** economy (charge for `/rtp`)                                                                            | No       | **Yes**     |
-| Multilingual `lang/**`, login-reserve cache, visitor mode                                                        | No       | **Yes**     |
-| **`safety.yml` token grammar** - vanilla block tags, state predicates, wildcards                                 | No       | **Yes**     |
+| **Vault** economy (charge for `/rtp`)                                                                            | **Yes**  | **Yes**     |
+| Multilingual `lang/**`, login-reserve cache, visitor mode                                                        | **Yes**  | **Yes**     |
+| **`safety.yml` token grammar** - vanilla block tags, state predicates, wildcards                                 | **Yes**  | **Yes**     |
 | Earliest release on each MC version + first access to new platforms/features + priority support                  | No       | **Yes**     |
 | *Spigot + Paper engine, queues, spiral, Anvil pre-filter*                                                        | *Yes*    | *Yes*       |
 | *8 claim plugins bundled (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect)* | *Yes*    | *Yes*       |
 | *`effects-api`, `rtp-api`, PlaceholderAPI, ProtocolLib*                                                          | *Yes*    | *Yes*       |
-
-Pro is the early-access tier: the tuned, throughput-optimized versions of new platforms and scaling backends land here first, because each one carries a real hands-on support burden that is only guaranteed on the paid tier. The free build still *runs* on Folia (basic regionized scheduling + async teleport); Pro's tuned Folia adapter is what graduates to the free build once stabilized. Same configuration, same data files, same commands as the free build - **upgrade is drop-in.**
-
+ 
+Pro is the early-access tier: the tuned, throughput-optimized versions of new platforms and scaling backends land here first, because each one carries a real hands-on support burden that is only guaranteed on the paid tier. The free build still *runs* on Folia (basic regionized scheduling + async teleport) and supports cross-server moves via plugin-messaging (backends behind a proxy); Pro's tuned Folia adapter and durable (SQL/Redis) transports are what graduates to the free build once stabilized. Same configuration, same data files, same commands as the free build - **upgrade is drop-in.**
+ 
 ---
+ 
+*(*) BungeeCord proxy adapter is planned; currently supported via plugin-messaging on the backend.*
 
 ## Built for
 

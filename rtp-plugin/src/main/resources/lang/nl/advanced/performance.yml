@@ -168,9 +168,9 @@ verwerking_bijGebeurtenis: false
 effectVerwerking: true
 
 # Achtergrondgegevensverzameling (Region Data Visitor)
-# Wanneer de voorgenereercache vol is, wordt per regio één observerende
-# RegionCacheTask gepland met dezelfde `periode`. Hergebruikt dezelfde
-# LocationGenerator-pipeline maar verwerpt de veilige kandidaat in plaats van
+# Wanneer de voorgenereercache vol is, wordt per regio één observerende taak
+# gepland met dezelfde `periode`. Hergebruikt dezelfde
+# pipeline maar verwerpt de veilige kandidaat in plaats van
 # hem in de wachtrij te plaatsen, zodat bijeffecten (registratie van slechte
 # locaties, bioomoogst) op de achtergrond worden opgebouwd zonder dat de
 # wachtrij boven zijn limiet groeit. Genereert NOOIT wereldgeneratie: chunks

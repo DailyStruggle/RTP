@@ -106,3 +106,6 @@ rtp_説明: "ランダムな場所にテレポートする"
 
 # actionbar setting
 アクションバー: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

@@ -37,7 +37,7 @@ lockAfterUses: 0
 lockAfterResetSeconds: 0
 
 # Wenn true, legt ein erfolgreiches /rtp den Landeort als dauerhaften
-# Spawn-Anker des Spielers fest (BetterRTP-SetAsRespawn-Parität).
+# Spawn-Anker des Spielers fest (BetterRTP-Parität).
 # @type: boolean
 # @default: false
 setRespawnOnTeleport: false
@@ -77,7 +77,7 @@ menu:
     # und wird dann der Standardliste hinzugefügt.)
     - "book"
 
-# Globale Standardwerte, die von Regions-/Welt-Dateien über den "@config"-Token geerbt werden (ADR-073).
+# Globale Standardwerte, die von Regions-/Welt-Dateien über den "@config"-Token geerbt werden.
 defaults:
   # Standardform und -größe des Gebiets. radius/centerRadius = wie weit entfernt du landest, gemessen in Chunks.
   shape:

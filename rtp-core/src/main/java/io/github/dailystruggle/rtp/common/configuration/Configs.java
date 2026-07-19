@@ -614,16 +614,16 @@ public class Configs {
     // (one enum, one file, one parser) - no merge-loader.
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/placeholders.yml");
     newConfigParserMap.put(PlaceholderMessages.class,
-            new ConfigParser<>(PlaceholderMessages.class, "messages/placeholders.yml", "1.1", pluginDirectory, fileDatabase, locale));
+            new ConfigParser<>(PlaceholderMessages.class, "messages/placeholders.yml", "1.0", pluginDirectory, fileDatabase, locale));
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/player.yml");
     newConfigParserMap.put(PlayerMessages.class,
-            new ConfigParser<>(PlayerMessages.class, "messages/player.yml", "1.1", pluginDirectory, fileDatabase, locale));
+            new ConfigParser<>(PlayerMessages.class, "messages/player.yml", "1.0", pluginDirectory, fileDatabase, locale));
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/network.yml");
     newConfigParserMap.put(NetworkMessages.class,
-            new ConfigParser<>(NetworkMessages.class, "messages/network.yml", "1.1", pluginDirectory, fileDatabase, locale));
+            new ConfigParser<>(NetworkMessages.class, "messages/network.yml", "1.0", pluginDirectory, fileDatabase, locale));
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/commands.yml");
     newConfigParserMap.put(CommandMessages.class,
-            new ConfigParser<>(CommandMessages.class, "messages/commands.yml", "1.1", pluginDirectory, fileDatabase, locale));
+            new ConfigParser<>(CommandMessages.class, "messages/commands.yml", "1.0", pluginDirectory, fileDatabase, locale));
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/system.yml");
     newConfigParserMap.put(SystemMessages.class,
             new ConfigParser<>(SystemMessages.class, "messages/system.yml", "1.1", pluginDirectory, fileDatabase, locale));
@@ -634,7 +634,7 @@ public class Configs {
 
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser economy.yml");
     ConfigParser<EconomyKeys> economy =
-            new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory, fileDatabase, locale);
+            new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(EconomyKeys.class, economy);
 
     // ADR-071: performance.yml is advanced tuning, relocated under advanced/. A legacy

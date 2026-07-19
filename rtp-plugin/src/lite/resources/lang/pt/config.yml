@@ -42,7 +42,7 @@ lockAfterUses: 0
 lockAfterResetSeconds: 0
 
 # Quando true, um /rtp bem-sucedido define o local de pouso como ponto de
-# renascimento persistente do jogador (paridade com SetAsRespawn do BetterRTP).
+# renascimento persistente do jogador (paridade com BetterRTP).
 # @type: boolean
 # @default: false
 setRespawnOnTeleport: false
@@ -84,7 +84,7 @@ menu:
     # adicionado à lista padrão nesse momento.)
     - "book"
 
-# Valores padrão globais herdados pelos arquivos de região/mundo por meio do token "@config" (ADR-073).
+# Valores padrão globais herdados pelos arquivos de região/mundo por meio do token "@config".
 defaults:
   # Forma e tamanho padrão da área. radius/centerRadius = quão longe você cai, medido em chunks.
   shape:

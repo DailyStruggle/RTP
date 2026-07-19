@@ -12,16 +12,13 @@
 # position from `pollStatus`; may be empty if the transport returns no
 # position.
 networkQueued: "&7[P0] サーバー間の目的地を待機中です (順番 [position])..."
-# Sent when a player runs /rtp* while they already hold a non-terminal
-# cross-server enrolment (ADR-015 / REQ-RTP-NET-015 command-lock). Placeholder:
-# [position] - FIFO position when known; empty when the proxy has not yet
-# assigned one.
+# Sent when a player runs /rtp while already waiting in the cross-server queue.
+# Placeholder: [position] - position in line; may be empty.
 alreadyQueued: "&cすでにサーバー間キューで待機中です (順番 [position])。お待ちください。"
-# Sent when a cross-server waitlist entry is reaped after exceeding its
-# configured TTL (ADR-015). No placeholders.
+# Sent when a cross-server queue entry waited too long and was dropped.
+# No placeholders.
 networkTimedOut: "&c[P0] バックエンドの待機中にサーバー間テレポートがタイムアウトしました。"
-# Sent when a cross-server waitlist enrolment is rejected because the shared
-# waitlist has reached its configured maximum size (ADR-015 REJECTED_FULL).
+# Sent when the cross-server queue is full and the request is rejected.
 # No placeholders.
 waitlistFull: "&c[P0] サーバー間キューが満杯です。しばらくしてからもう一度お試しください。"
 # Sent when the queue has handed the request off to the proxy router and
@@ -33,12 +30,11 @@ networkRouting: "&7[P0] バックエンドへルーティング中..."
 networkReserved: "&a[P0] [server] に座標を予約しました。転送中..."
 # Sent when the proxy is mid-hop. Placeholder: [server] - destination.
 networkTransferring: "&a[P0] [server] へ転送中..."
-# Sent when the cross-server path gave up and the request fell back to
-# the local backend. Placeholder: [reason] - one of the
-# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
+# Sent when the cross-server path gave up and fell back to the local server.
+# Placeholder: [reason] - the reason for falling back.
 networkFallback: "&e[P0] サーバー間が利用できません ([reason])。ローカルに切り替えます。"
-# Sent when the cross-server request failed terminally (no fallback was
-# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
+# Sent when the cross-server request failed and no fallback was possible.
+# Placeholder: [reason] - the failure reason.
 networkFailed: "&c[P0] サーバー間テレポートに失敗しました: [reason]。"
 # Sent when the player asked for a specific region (`/rtp <region>`) but
 # no backend in the network is currently serving it. Placeholder:
@@ -48,3 +44,6 @@ networkRegionUnavailable: "&c[P0] 現在リージョン '[region]' を提供し�
 # the operator-configured policy cannot pick one (only fires
 # under stronger policies than the default `warn`). Placeholder: [region].
 networkRegionAmbiguous: "&c[P0] リージョン '[region]' は複数のバックエンドで曖昧です。サーバーを指定してください。"
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

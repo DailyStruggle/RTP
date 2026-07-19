@@ -94,7 +94,7 @@ queue:
   # @default: 1
   workerThreads: 1
 
-# Reservation-token lifecycle (REQ-RTP-NET-011).
+# Reservation-token lifecycle.
 reservation:
   # Czestotliwosc czyszczenia TTL po stronie proxy (ms); usuwa wygasle tokeny i zwalnia ich wspolrzedne.
   # @type: integer

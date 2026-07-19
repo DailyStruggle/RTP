@@ -115,12 +115,11 @@ networkRouting: "&7[P0] routage vers un serveur..."
 networkReserved: "&a[P0] coordonnée réservée sur [server]. Transfert..."
 # Sent when the proxy is mid-hop. Placeholder: [server] - destination.
 networkTransferring: "&a[P0] transfert vers [server]..."
-# Sent when the cross-server path gave up and the request fell back to
-# the local backend. Placeholder: [reason] - one of the
-# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
+# Sent when the cross-server path gave up and fell back to the local server.
+# Placeholder: [reason] - the reason for falling back.
 networkFallback: "&e[P0] inter-serveurs indisponible ([reason]) ; retour au serveur local."
-# Sent when the cross-server request failed terminally (no fallback was
-# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
+# Sent when the cross-server request failed and no fallback was possible.
+# Placeholder: [reason] - the failure reason.
 networkFailed: "&c[P0] la téléportation inter-serveurs a échoué : [reason]."
 # Sent when the player asked for a specific region (`/rtp <region>`) but
 # no backend in the network is currently serving it. Placeholder:
@@ -201,7 +200,7 @@ infoMSPT: "&7MSPT actuel du plugin : #7E9CC8[mspt]"
 infoTotalLoads: "&7Chunks chargés au total : #7E9CC8[loads]"
 infoLoadsByOrigin: "&7Chargements par origine : #7E9CC8[loadsByOrigin]"
 infoLeakRate: "&7Taux de fuite de chunks actuel : #7E9CC8[leakRate]"
-# --- Metrics SPI health block ---
+# --- Health metrics block ---
 infoQueueDepth: "&7Joueurs en attente dans les files de région : #7E9CC8[queueDepth]"
 infoPendingTeleports: "&7Pipelines de téléportation en attente : #7E9CC8[pendingTeleports]"
 infoAvgPipelineMs: "&7Latence moyenne du pipeline : #7E9CC8[avgPipelineMs] ms"
@@ -224,18 +223,18 @@ infoMSPTLive: "&7MSPT du serveur : #7E9CC8[mspt] ms (&7budget de tick : #7E9CC8[
 infoSoftCap: "&7Joueurs : #7E9CC8[playerCount] / [softCap]"
 # Dernière latence aller-retour de la base de données en ms. Espace réservé : [databaseLatencyMs].
 infoDatabaseLatencyMs: "&7Latence de la base de données : #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics, sourced from the process-global RtpOutcomeStats.
+# Generation outcome metrics.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Réussite de génération : #7E9CC8[genSuccessRate]&7 (échecs #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
 # Single most common rejection cause and its share of all failures. Placeholders:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7Principale cause de rejet : #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
-# Per-cause rejection breakdown (the analogue of a competitor's /rtp unsafe-stats).
+# Per-cause rejection breakdown.
 # Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
 infoFailureBreakdown: "&7Rejets par cause : #7E9CC8[genFailureBreakdown]"
-# Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
-# to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&7/&c.
+# Health colour-band thresholds. Used to colour the coloured-variant
+# placeholders (e.g. [tps1mColoured]) green/yellow/red.
 infoThresholdTpsGreen: 19.5
 infoThresholdTpsYellow: 18.0
 infoThresholdMsptGreen: 30.0
@@ -305,24 +304,24 @@ menuBack: "&7« retour"
 # Label template for the "execute the assembled command" row prepended to every
 # runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation."
 menuExecute: "&2▶ exécuter [command]"
-# Header row at the top of a parameter-value picker sub-page (Stage A.2).
+# Header row at the top of a parameter-value picker sub-page.
 # Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
 menuPickValue: "&7choisissez une valeur pour [param] (exécutera : /rtp [command] [param]:<value>)"
 # Label for the "type a custom value" fallback row on a parameter-value picker page.
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list."
 menuTypeValue: "&7✎ saisir une valeur personnalisée..."
-# Non-clickable header row at the top of every non-root menu page (Stage A.4).
+# Non-clickable header row at the top of every non-root menu page.
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
 menuConstructed: "&7construction : #7E9CC8/rtp [command]"
-# Non-clickable title row prepended to the root /rtp menu page (Stage A.5).
+# Non-clickable title row prepended to the root /rtp menu page.
 # Provides a welcoming header before the player descends into any subcommand.
 menuRootTitle: "#5FB3B3&l⚡ menu RTP"
 # Non-clickable subtitle/hint row prepended to the root /rtp menu page below
-# menuRootTitle (Stage A.5). Short orientation text for first-time users.
+# menuRootTitle. Short orientation text for first-time users.
 menuRootHint: "&7cliquez sur une option ci-dessous pour commencer"
-# Navigation rows appended to paginated menu pages (Stage A.6) — clicking
+# Navigation rows appended to paginated menu pages — clicking
 # them moves to the previous/next page of the same model. Placeholder:
 # [page] - the 1-based human-readable target page number.
 menuPagePrev: "&7« page précédente ([page])"
@@ -335,9 +334,9 @@ menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- choisir un monde"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- choisir un biome"
 menuFrontPageRowHelp: "#7A4FB8❓ liste des commandes &7- /rtp help"
-# Front-page admin entry row: the only inline
-# admin-visible row on the front page; click descends into the curated admin
-# panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
+# Front-page admin entry row: the only inline admin-visible row on the
+# front page; click descends into the admin panel. Hidden when the viewer
+# lacks rtp.menu.admin.
 menuFrontPageRowAdmin: "#9D7CD8▶ panneau d'administration &7- outils d'opérateur"
 # Hover text for the admin-panel entry row. No placeholders.
 menuFrontPageHoverAdmin: "&7outils d'opérateur : config, scans, diagnostics, rechargement"
@@ -435,12 +434,12 @@ infoBookOverflowFooter: "&7(contenu tronqué - cliquez pour voir la sortie compl
 # book is not currently supported on this build (deferred to a later
 # milestone). Users may click the Refresh row to refresh manually.
 infoBookAutoRefreshDeferredNote: "&8(actualisation automatique pas encore prise en charge ; cliquez sur Actualiser)"
-# Non-clickable title row at the top of the config-file selector page (Stage C.1).
+# Non-clickable title row at the top of the config-file selector page.
 # Shown when an admin clicks "/rtp config" from the front page."
 configSelectorTitle: "#5FB3B3&l⚙ fichiers de configuration"
 # Label for the "back to /rtp menu root" navigation row on the config selector page."
 configSelectorBackRow: "&7« retour au menu"
-# Non-clickable title row at the top of a single config-file page (Stage C.2).
+# Non-clickable title row at the top of a single config-file page.
 # Placeholder: [file] - the config file name (e.g. "performance", "safety")."
 configFileTitle: "#5FB3B3&l⚙ configuration : &7[file]"
 # Label for the "back to config selector" navigation row on a single config-file page."
@@ -453,10 +452,10 @@ configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
 # Hover text for a per-key row on a config-file page. Placeholders:
 #   [key], [value], [type] - the config key name, current value, and declared type.
 configKeyHoverFormat: "&7cliquer pour modifier &7[key] &7(type : [type])"
-# Non-clickable title row at the top of a shape/vert type-picker page (Stage C.3a).
+# Non-clickable title row at the top of a shape/vert type-picker page.
 # Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name."
 configTypePickerTitle: "#5FB3B3&l⚙ choisir le type de [param] &7(actuel : &7[current]&7)"
-# Non-clickable title row at the top of a shape/vert sub-parameter page (Stage C.3b).
+# Non-clickable title row at the top of a shape/vert sub-parameter page.
 # Placeholders: [param] - "shape" or "vert"; [type] - the active type name."
 configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sous-paramètres"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
@@ -481,27 +480,23 @@ configApplyRow: "&2&l[apply]"
 # Clears the cart without applying."
 configDiscardRow: "&c&l[discard]"
 
-# --- declarative chart composition bridge ---
-# Sent to the viewer when an OPEN_MAP menu action fires but no concrete
-# MapBinding is registered (NoopMapBinding is still active, e.g. on the
-# Lite assembly or before RTPHooks wires the platform binding).
+# --- Map / chart rendering ---
+# Sent when a map row is clicked but map rendering is not available on this
+# server (e.g. the Lite assembly, or no map provider installed).
 mapBindingMissing: "&c[P0] le rendu de carte n'est pas disponible sur ce serveur."
-# Sent when MapDispatch receives a ChartSpec whose Kind has no registered
-# ChartSpecResolver (e.g. Stage 1 viewer clicks a Stage 3 sparkline before
-# the resolver lands).
+# Sent when a chart is requested but no renderer is registered for that
+# chart type.
 mapResolverMissing: "&c[P0] aucun résolveur de graphique enregistré pour cette requête."
 # Sent when a resolver runs but the underlying data source is unavailable
 # for the requested target (unknown region, no data yet, world unloaded).
 # Placeholder: [region] - the requested region name (may be empty).
 mapUnavailable: "&e[P1] les données du graphique ne sont pas disponibles pour le moment."
-# Sent when the active MapBinding cannot allocate a map handle right now
-# (binding-defined back-pressure, e.g. per-viewer cap reached).
+# Sent when the map service cannot allocate a map right now (e.g. a
+# per-viewer cap has been reached).
 mapBusy: "&e[P1] le service de cartes est occupé ; veuillez réessayer sous peu."
-# Label for the clickable "/rtp info" menu row that, on click, mints a
-# ChartSpec(BAD_POINTS_HEATMAP,...) token and asks the active MapBinding
-# to render a 128x128 heatmap of the current region's known bad-point
-# spiral indices. The row is omitted at render time when NoopMapBinding
-# is the installed binding."
+# Label for the clickable "/rtp info" menu row that renders a heatmap of
+# the current region's known bad locations. Hidden when map rendering is
+# not available on this server.
 menuInfoBadPointsLabel: "#9D7CD8&l# carte des points dangereux"
 
 # --- MultiConfig submenu ---

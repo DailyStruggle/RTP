@@ -168,9 +168,9 @@ analisisAlEvento: false
 analisisEfectos: true
 
 # Modo de relleno de caché por observación (Region Data Visitor)
-# Cuando la caché de pregeneración está llena, se programa una única RegionCacheTask
-# de observación por región según el mismo `period` de relleno de caché. Reutiliza
-# el mismo pipeline de LocationGenerator que el relleno de caché predeterminado,
+# Cuando la caché de pregeneración está llena, se programa una única
+# tarea de observación por región según el mismo `period` de relleno de caché. Reutiliza
+# el mismo pipeline que el relleno de caché predeterminado,
 # pero descarta el candidato seguro resultante en vez de encolarlo, de modo que
 # los efectos colaterales (registro de malas ubicaciones, cosecha de biomas
 # observados) se acumulan en segundo plano sin que la cola crezca más allá de su

@@ -1,8 +1,8 @@
 # --- Paramètres des métriques RTP ---
 
-# Réglages purement de reporting pour la SPI de métriques. Les
+# Réglages purement de reporting des métriques. Les
 # réglages de régulation / réglage restent dans performance.yml.
-# Remplit MetricsSnapshot.foliaRegions() avec le détail par région sur Folia.
+# Remplit avec le détail par région sur Folia.
 # Sans effet sur Paper / Bukkit / Fabric (les runtimes mono-région renvoient
 # toujours une liste vide, ce qui est la bonne réponse pour ces plateformes).
 # @type: boolean
@@ -10,21 +10,21 @@
 foliaIncludeRegions: true
 
 # Stratégie d'agrégation pour fusionner les échantillons par région dans
-# les champs scalaires tps{1,5,15}m de MetricsSnapshot sur Folia.
+# les champs scalaires tps{1,5,15}m sur Folia.
 # @type: enum
 # @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
 # Stratégie d'agrégation pour fusionner les échantillons par région dans
-# le champ scalaire mspt de MetricsSnapshot sur Folia.
+# le champ scalaire mspt sur Folia.
 # @type: enum
 # @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
 # Stratégie d'agrégation pour fusionner les échantillons par région dans
-# le champ scalaire tickBudgetUtilisation de MetricsSnapshot sur Folia.
+# le champ scalaire tickBudgetUtilisation sur Folia.
 # @type: enum
 # @options: [mean, max]
 # @default: max

@@ -39,3 +39,6 @@ networkRegionUnavailable: "&c[P0] no backend is currently serving region '[regio
 # Sent when the requested region name matches more than one server.
 # Placeholder: [region] - the requested region name.
 networkRegionAmbiguous: "&c[P0] region '[region]' is ambiguous across backends; please pin a server."
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0
