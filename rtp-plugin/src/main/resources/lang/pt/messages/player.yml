@@ -106,3 +106,6 @@ desaparecer: 20
 
 # actionbar setting
 barraAcao: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

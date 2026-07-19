@@ -41,7 +41,7 @@ lockAfterUses: 0
 lockAfterResetSeconds: 0
 
 # When true, a happy pounce makes the landing spot the kitty's forever-bed
-# (BetterRTP SetAsRespawn parity).
+# (BetterRTP parity).
 # @type: boolean
 # @default: false
 setRespawnOnTeleport: false
@@ -83,7 +83,7 @@ menu:
     # that point.)
     - "book"
 
-# Big-house defaults that every den/world scratch-file inherits through the "@config" treat-token (ADR-073).
+# Big-house defaults that every den/world scratch-file inherits through the "@config" treat-token.
 defaults:
   # Default pounce-ground shape and size. radius/centerRadius = how far the kitty pounces, measured in chunks.
   shape:

@@ -94,7 +94,7 @@ queue:
   # @default: 1
   workerThreads: 1
 
-# Reservation-token lifecycle (REQ-RTP-NET-011).
+# Reservation-token lifecycle.
 reservation:
   # Cadans van de TTL-opruimer aan de proxykant (ms); veegt verlopen tokens op en geeft hun coordinaten vrij.
   # @type: integer

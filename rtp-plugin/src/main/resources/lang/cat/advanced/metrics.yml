@@ -1,8 +1,8 @@
 # --- RTP Metrics Settings (cat dialect) ---
 
-# Reporting-only knobs for the metrics SPI. Throttle / tuning
+# Reporting-only knobs for the metrics. Throttle / tuning
 # knobs keep napping in performance.yml.
-# Fill MetricsSnapshot.foliaRegions with per-region detail on Folia.
+# Fill with per-region detail on Folia.
 # No effect on Paper / Bukkit / Fabric (single-region runtimes always
 # hand back an empty list, the right answer for those platforms).
 # @type: boolean
@@ -10,21 +10,21 @@
 foliaIncludeRegions: true
 
 # How per-region purr-samples are folded into the single
-# tps{1,5,15}m numbers of MetricsSnapshot on Folia.
+# tps{1,5,15}m numbers of on Folia.
 # @type: enum
 # @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
 # How per-region purr-samples are folded into the single
-# mspt number of MetricsSnapshot on Folia.
+# mspt number of on Folia.
 # @type: enum
 # @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
 # How per-region purr-samples are folded into the single
-# tickBudgetUtilisation number of MetricsSnapshot on Folia.
+# tickBudgetUtilisation number of on Folia.
 # @type: enum
 # @options: [mean, max]
 # @default: max

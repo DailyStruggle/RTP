@@ -116,12 +116,11 @@ sniffing_for_a_neighbour: "&7[P0] sniffing out a neighbour box..."
 warm_spot_claimed_next_door: "&a[P0] warm spot claimed on [server]. leaping over the fence..."
 # Sent when the proxy is mid-hop. Placeholder: [server] - destination.
 leaping_to_neighbour: "&a[P0] leaping over to [server]..."
-# Sent when the cross-server path gave up and the request fell back to
-# the local backend. Placeholder: [reason] - one of the
-# `RoutingDecision.FallbackReason` values (e.g. NO_LIVE_PEER, QUEUE_FULL).
+# Sent when the cross-server path gave up and fell back to the local server.
+# Placeholder: [reason] - the reason for falling back.
 no_neighbour_pouncing_home: "&e[P0] no neighbour boxes available ([reason]); pouncing back to the home box."
-# Sent when the cross-server request failed terminally (no fallback was
-# possible). Placeholder: [reason] - the `DispatchOutcome.Failed.Reason`.
+# Sent when the cross-server request failed and no fallback was possible.
+# Placeholder: [reason] - the failure reason.
 neighbour_pounce_flopped: "&c[P0] the neighbour-box pounce flopped: [reason]."
 # Sent when the player asked for a specific region (`/rtp <region>`) but
 # no backend in the network is currently serving it. Placeholder:
@@ -201,7 +200,7 @@ meows_per_tick: "&7Current plugin meows-per-tick: #7E9CC8[mspt]"
 total_naps_disturbed: "&7Lifetime kibble loaded: #7E9CC8[loads]"
 kibble_loads_by_origin: "&7Kibble loads by paw: #7E9CC8[loadsByOrigin]"
 drool_rate: "&7Current drool (chunk leak) rate: #7E9CC8[leakRate]"
-# --- Metrics SPI health block ---
+# --- Health metrics block ---
 kitties_in_territory_lines: "&7Kitties waiting in territory lines: #7E9CC8[queueDepth]"
 pending_pounces: "&7Pending pounce pipelines: #7E9CC8[pendingTeleports]"
 average_pounce_lag: "&7Average pounce lag: #7E9CC8[avgPipelineMs] ms"
@@ -224,18 +223,18 @@ box_purr_rate: "&7Box purr-rate (mspt): #7E9CC8[mspt] ms (&7whisker budget: #7E9
 kitties_in_the_box: "&7Kitties: #7E9CC8[playerCount] / [softCap]"
 # Latest kibble-stash round-trip latency in ms. Placeholder: [databaseLatencyMs].
 scratching_post_lag: "&7Scratching-post lag: #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics, sourced from the process-global RtpOutcomeStats.
+# Generation outcome metrics.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Hunt success: #7E9CC8[genSuccessRate]&7 (flop #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
 # Single most common rejection cause and its share of all failures. Placeholders:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7Top hiss reason: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
-# Per-cause rejection breakdown (the analogue of a competitor's /rtp unsafe-stats).
+# Per-cause rejection breakdown.
 # Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
 infoFailureBreakdown: "&7Hisses by reason: #7E9CC8[genFailureBreakdown]"
-# Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
-# to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&7/&c.
+# Health colour-band thresholds. Used to colour the coloured-variant
+# placeholders (e.g. [tps1mColoured]) green/yellow/red.
 infoThresholdTpsGreen: 19.5
 infoThresholdTpsYellow: 18.0
 infoThresholdMsptGreen: 30.0
@@ -303,23 +302,23 @@ menuHoverFallbackBounds: "accepted flavours: [values]"
 menuBack: "&7« scamper back"
 # runnable non-root menu page. Placeholder: [command] - the assembled /rtp... invocation.
 menuExecute: "&2▶ pounce [command]"
-# Header row at the top of a parameter-value picker sub-page (Stage A.2).
+# Header row at the top of a parameter-value picker sub-page.
 # Placeholders: [param] - parameter name; [command] - assembled /rtp... invocation.
 pick_a_flavour: "&7pick a flavour for [param] (will pounce: /rtp [command] [param]:<value>)"
 # Clicking it prefills chat with the assembled command up to '<param>:' so the player
 # can type any value, including ones not in the suggestion list.
 menuTypeValue: "&7✎ type a custom flavour..."
-# Non-clickable header row at the top of every non-root menu page (Stage A.4).
+# Non-clickable header row at the top of every non-root menu page.
 # Surfaces the currently-constructed /rtp invocation including any staged
 # parameter assignments (name:value). Placeholder: [command] - assembled args.
 kneading: "&7kneading: #7E9CC8/rtp [command]"
-# Non-clickable title row prepended to the root /rtp menu page (Stage A.5).
+# Non-clickable title row prepended to the root /rtp menu page.
 # Provides a welcoming header before the player descends into any subcommand.
 menuRootTitle: "#5FB3B3&l⚡ RTP meow menu"
 # Non-clickable subtitle/hint row prepended to the root /rtp menu page below
-# menuRootTitle (Stage A.5). Short orientation text for first-time users.
+# menuRootTitle. Short orientation text for first-time users.
 paw_an_option: "&7paw an option below to begin"
-# Navigation rows appended to paginated menu pages (Stage A.6) - clicking
+# Navigation rows appended to paginated menu pages - clicking
 # them moves to the previous/next page of the same model. Placeholder:
 # [page] - the 1-based human-readable target page number.
 menuPagePrev: "&7« earlier page ([page])"
@@ -332,9 +331,9 @@ menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- sniff a territory"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- sniff a box"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- sniff a flavour of land"
 menuFrontPageRowHelp: "#7A4FB8❓ list meows &7- /rtp help"
-# Front-page admin entry row: the only inline
-# admin-visible row on the front page; click descends into the curated admin
-# panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
+# Front-page admin entry row: the only inline admin-visible row on the
+# front page; click descends into the admin panel. Hidden when the viewer
+# lacks rtp.menu.admin.
 menuFrontPageRowAdmin: "#9D7CD8▶ head-kitty panel &7- staff tools"
 # Hover text for the admin-panel entry row. No placeholders.
 menuFrontPageHoverAdmin: "&7staff tools: setup, sniffing, hairball checks, grooming"
@@ -469,26 +468,23 @@ configApplyRow: "&2&l[apply]"
 # Clears the cart without applying.
 configDiscardRow: "&c&l[discard]"
 
-# --- declarative chart composition bridge ---
-# Sent to the viewer when an OPEN_MAP menu action fires but no concrete
-# MapBinding is registered (NoopMapBinding is still active, e.g. on the
-# Lite assembly or before RTPHooks wires the platform binding).
+# --- Map / chart rendering ---
+# Sent when a map row is clicked but map rendering is not available on this
+# server (e.g. the Lite assembly, or no map provider installed).
 mapBindingMissing: "&c[P0] map rendering is not available on this box."
-# Sent when MapDispatch receives a ChartSpec whose Kind has no registered
-# ChartSpecResolver (e.g. Stage 1 viewer clicks a Stage 3 sparkline before
-# the resolver lands).
+# Sent when a chart is requested but no renderer is registered for that
+# chart type.
 mapResolverMissing: "&c[P0] no chart-sniffer registered for this request."
 # Sent when a resolver runs but the underlying data source is unavailable
 # for the requested target (unknown region, no data yet, world unloaded).
 # Placeholder: [region] - the requested region name (may be empty).
 mapUnavailable: "&e[P1] chart kibble is not available right now."
-# Sent when the active MapBinding cannot allocate a map handle right now
-# (binding-defined back-pressure, e.g. per-viewer cap reached).
+# Sent when the map service cannot allocate a map right now (e.g. a
+# per-viewer cap has been reached).
 mapBusy: "&e[P1] the map-sniffer is busy; try again in a few licks."
-# ChartSpec(BAD_POINTS_HEATMAP,...) token and asks the active MapBinding
-# to render a 128x128 heatmap of the current region's known bad-point
-# spiral indices. The row is omitted at render time when NoopMapBinding
-# is the installed binding.
+# Label for the clickable "/rtp info" menu row that renders a heatmap of
+# the current region's known bad locations. Hidden when map rendering is
+# not available on this server.
 menuInfoBadPointsLabel: "#9D7CD8&l# bad-spots map"
 
 # --- MultiConfig submenu ---

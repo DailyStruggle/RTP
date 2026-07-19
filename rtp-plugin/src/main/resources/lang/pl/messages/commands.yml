@@ -32,17 +32,17 @@ infoMSPT: "&7Bieżący MSPT pluginu: #7E9CC8[mspt]"
 infoLadowaniaRazem: "&7Łącznie wczytanych chunków: #7E9CC8[loads]"
 infoLadowaniaWgZrodla: "&7Wczytania wg źródła: #7E9CC8[loadsByOrigin]"
 infoWspolczynnikWycieku: "&7Bieżący wskaźnik wycieku chunków: #7E9CC8[leakRate]"
-# --- Metrics SPI health block ---
+# --- Health metrics block ---
 infoGlebokoscKolejki: "&7Gracze oczekujący w kolejkach regionów: #7E9CC8[queueDepth]"
 infoOczekujaceTeleporty: "&7Oczekujące potoki teleportacji: #7E9CC8[pendingTeleports]"
 infoSredniaPipelineMs: "&7Śr. opóźnienie potoku: #7E9CC8[avgPipelineMs] ms"
-# Pipeline-latency percentiles (ADR-053). Placeholders: [pipelineMsP50] [pipelineMsP75]
+# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7Opóźnienie potoku (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-# Slow-teleport audit (ADR-053, immediate/unqueued teleports only). Placeholders:
+# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7Wolne teleportacje (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-# Queue-growth audit (ADR-053). Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7Ostrzeżenia o wzroście kolejki (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7Sterta JVM: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # Wiersz nagłówka dla bloku Health pipeline w /rtp info.
@@ -55,18 +55,18 @@ infoMSPTLive: "&7MSPT serwera: #7E9CC8[mspt] ms (&7budżet ticka: #7E9CC8[tickBu
 infoMiekkiLimit: "&7Gracze: #7E9CC8[playerCount] / [softCap]"
 # Najnowsze opóźnienie tam i z powrotem bazy danych w ms. Zmienna: [databaseLatencyMs].
 infoOpoznienieBazyMs: "&7Opóźnienie bazy danych: #7E9CC8[databaseLatencyMs] ms"
-# Generation outcome metrics (ADR-052), sourced from the process-global RtpOutcomeStats.
+# Generation outcome metrics.
 # Success/failure rate over all recorded generation attempts. Placeholders:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Sukces generowania: #7E9CC8[genSuccessRate]&7 (błąd #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
 # Single most common rejection cause and its share of all failures. Placeholders:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7Główna przyczyna odrzucenia: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
-# Per-cause rejection breakdown (the analogue of a competitor's /rtp unsafe-stats).
+# Per-cause rejection breakdown.
 # Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
 infoFailureBreakdown: "&7Odrzucenia wg przyczyny: #7E9CC8[genFailureBreakdown]"
-# Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
-# to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&7/&c.
+# Health colour-band thresholds. Used to colour the coloured-variant
+# placeholders (e.g. [tps1mColoured]) green/yellow/red.
 infoProgTpsZielony: 19.5
 infoProgTpsZolty: 18.0
 infoProgMsptZielony: 30.0
@@ -123,7 +123,7 @@ regionInfo:
 # ###############################################################################
 # Wysylane, gdy konkretna komenda /rtp menu ... jest zniekształcona, wskazuje na
 # nieznana sciezke/parametr lub nie przechodzi bramki uprawnien po stronie serwera.
-# ADR-050: klikniecia w menu to konkretne komendy, wiec nie ma tokenu do wygasniecia.
+# klikniecia w menu to konkretne komendy, wiec nie ma tokenu do wygasniecia.
 menuNieprawidlowe: "&c[P0] that menu link is invalid."
 # Wysyłane, gdy realizacja menu nie może rozpoznać UUID wywołującego gracza.
 menuNieznanyGracz: "&c[P0] menu links can only be used by in-game players."
@@ -138,24 +138,24 @@ menuWstecz: "&7« wstecz"
 # Szablon etykiety wiersza "wykonaj zlozona komende" dodawanego na poczatku kazdej
 # uruchamialnej, nie-glownej strony menu. Zmienna: [command] - zlozone wywolanie /rtp ...
 menuWykonaj: "&2▶ uruchom [command]"
-# Wiersz naglowka na gorze podstrony wyboru wartosci parametru (Etap A.2).
+# Wiersz naglowka na gorze podstrony wyboru wartosci parametru.
 # Zmienne: [param] - nazwa parametru; [command] - zlozone wywolanie /rtp ...
 menuWybierzWartosc: "&7wybierz wartość dla [param] (uruchomi: /rtp [command] [param]:<value>)"
 # Etykieta zastepczego wiersza "wpisz wlasna wartosc" na stronie wyboru wartosci parametru.
 # Klikniecie wstepnie wypelnia czat zlozona komenda az do '<param>:', dzieki czemu gracz
 # moze wpisac dowolna wartosc, takze spoza listy sugestii.
 menuWpiszWartosc: "&7✎ wpisz własną wartość..."
-# Nieklikalny wiersz naglowka na gorze kazdej nie-glownej strony menu (Etap A.4).
+# Nieklikalny wiersz naglowka na gorze kazdej nie-glownej strony menu.
 # Pokazuje aktualnie budowane wywolanie /rtp wraz z wszelkimi przypisanymi
 # parametrami (name:value). Zmienna: [command] - zlozone argumenty.
 menuZbudowane: "&7budowanie: #7E9CC8/rtp [command]"
-# Nieklikalny wiersz tytulu dodawany na poczatku glownej strony menu /rtp (Etap A.5).
+# Nieklikalny wiersz tytulu dodawany na poczatku glownej strony menu /rtp.
 # Zapewnia powitalny naglowek, zanim gracz zejdzie do dowolnej podkomendy.
 menuGlownyTytul: "#5FB3B3&l⚡ menu RTP"
 # Nieklikalny wiersz podtytulu/podpowiedzi dodawany na glownej stronie menu /rtp pod
-# menuRootTitle (Etap A.5). Krotki tekst orientacyjny dla nowych uzytkownikow.
+# menuRootTitle. Krotki tekst orientacyjny dla nowych uzytkownikow.
 menuGlownaWskazowka: "&7kliknij opcję poniżej, aby zacząć"
-# Wiersze nawigacji dodawane do stronicowanych stron menu (Etap A.6) - klikniecie
+# Wiersze nawigacji dodawane do stronicowanych stron menu - klikniecie
 # przenosi do poprzedniej/nastepnej strony tego samego modelu. Zmienna:
 # [page] - czytelny dla czlowieka numer strony docelowej liczony od 1.
 menuStronaPoprzednia: "&7« poprzednia strona ([page])"
@@ -168,9 +168,9 @@ menuStronaGlownaWierszRegion: "&2▶ /rtp region:&7... &7- pick a region"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- wybierz świat"
 menuStronaGlownaWierszBiom: "&2▶ /rtp biome:&7... &7- wybierz biom"
 menuStronaGlownaWierszPomoc: "#7A4FB8❓ lista poleceń &7- /rtp help"
-# Front-page admin entry row: the only inline
-# admin-visible row on the front page; click descends into the curated admin
-# panel built by AdminPanelBuilder. Hidden when the viewer lacks rtp.menu.admin.
+# Front-page admin entry row: the only inline admin-visible row on the
+# front page; click descends into the admin panel. Hidden when the viewer
+# lacks rtp.menu.admin.
 menuStronaGlownaWierszAdmin: "#9D7CD8▶ panel administratora &7- narzędzia operatora"
 # Tekst podpowiedzi dla wiersza wejscia do panelu admina. Brak zmiennych.
 menuStronaGlownaHoverAdmin: "&7narzędzia operatora: konfiguracja, skany, diagnostyka, przeładowanie"
@@ -268,12 +268,12 @@ infoKsiazkaPrzepelnienieStopka: "&7(treść skrócona - kliknij, aby zobaczyć p
 # info nie jest obecnie wspierane w tej kompilacji (odlozone do pozniejszego
 # kamienia milowego). Uzytkownicy moga kliknac wiersz Odswiez, aby odswiezyc recznie.
 infoKsiazkaAutoOdswiezNotatka: "&8(automatyczne odświeżanie nie jest jeszcze obsługiwane; kliknij Odśwież, aby zaktualizować)"
-# Nieklikalny wiersz tytulu na gorze strony wyboru pliku konfiguracji (Etap C.1).
+# Nieklikalny wiersz tytulu na gorze strony wyboru pliku konfiguracji.
 # Pokazywany, gdy admin klika "/rtp config" ze strony glownej.
 konfigSelektorTytul: "#5FB3B3&l⚙ pliki konfiguracji"
 # Etykieta wiersza nawigacji "powrot do glownego menu /rtp" na stronie wyboru konfiguracji.
 konfigSelektorWsteczWiersz: "&7« powrót do menu"
-# Nieklikalny wiersz tytulu na gorze strony pojedynczego pliku konfiguracji (Etap C.2).
+# Nieklikalny wiersz tytulu na gorze strony pojedynczego pliku konfiguracji.
 # Zmienna: [file] - nazwa pliku konfiguracji (np. "performance", "safety").
 konfigPlikTytul: "#5FB3B3&l⚙ config: &7[file]"
 # Etykieta wiersza nawigacji "powrot do wyboru konfiguracji" na stronie pojedynczego pliku konfiguracji.
@@ -286,10 +286,10 @@ konfigKluczWierszFormat: "&7[key]&7: #7E9CC8[value]"
 # Tekst podpowiedzi dla wiersza per-klucz na stronie pliku konfiguracji. Zmienne:
 #   [key], [value], [type] - nazwa klucza, biezaca wartosc i zadeklarowany typ.
 konfigKluczHoverFormat: "&7click to edit &7[key] &7(type: [type])"
-# Nieklikalny wiersz tytulu na gorze strony wyboru typu shape/vert (Etap C.3a).
+# Nieklikalny wiersz tytulu na gorze strony wyboru typu shape/vert.
 # Zmienne: [param] - "shape" lub "vert"; [current] - nazwa aktualnie aktywnego typu.
 konfigTypWyborTytul: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
-# Nieklikalny wiersz tytulu na gorze strony podparametru shape/vert (Etap C.3b).
+# Nieklikalny wiersz tytulu na gorze strony podparametru shape/vert.
 # Zmienne: [param] - "shape" lub "vert"; [type] - nazwa aktywnego typu.
 konfigPodparametrStronaTytul: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
 # Hint sent when the book view falls back to the legacy raw-YAML chat dump
@@ -316,27 +316,23 @@ konfigZastosujWiersz: "&2&l[apply]"
 # Czysci koszyk bez zastosowania.
 konfigOdrzucWiersz: "&c&l[discard]"
 
-# --- Most deklaratywnej kompozycji wykresow ADR-047 (REQ-RTP-MAP-006) ---
-# Wysylane do ogladajacego, gdy uruchomi sie akcja menu OPEN_MAP, ale nie jest
-# zarejestrowane zadne konkretne MapBinding (NoopMapBinding nadal jest aktywne, np. na
-# kompilacji Lite lub zanim RTPHooks podlaczy powiazanie platformy).
+# --- Renderowanie map/wykresow ---
+# Wysylane, gdy klikniety zostanie wiersz mapy, ale renderowanie map nie jest
+# dostepne na tym serwerze (np. kompilacja Lite lub brak dostawcy map).
 mapaPowiazanieBrak: "&c[P0] renderowanie map nie jest dostępne na tym serwerze."
-# Wysylane, gdy MapDispatch otrzyma ChartSpec, ktorego Kind nie ma zarejestrowanego
-# ChartSpecResolver (np. ogladajacy z Etapu 1 klika sparkline z Etapu 3, zanim
-# resolver zostanie dodany).
+# Wysylane, gdy zazadano wykresu, ale dla tego typu wykresu nie zarejestrowano
+# zadnego renderera.
 mapaResolverBrak: "&c[P0] nie zarejestrowano resolvera wykresów dla tego żądania."
 # Wysylane, gdy resolver dziala, ale bazowe zrodlo danych jest niedostepne
 # dla zadanego celu (nieznany region, brak danych, swiat nie zaladowany).
 # Zmienna: [region] - zadana nazwa regionu (moze byc pusta).
 mapaNiedostepna: "&e[P1] dane wykresu nie są teraz dostępne."
-# Wysylane, gdy aktywne MapBinding nie moze teraz przydzielic uchwytu mapy
-# (przeciwcisnienie zdefiniowane przez powiazanie, np. osiagnieto limit per-ogladajacy).
+# Wysylane, gdy usluga map nie moze teraz przydzielic mapy
+# (np. osiagnieto limit na ogladajacego).
 mapaZajeta: "&e[P1] usługa map jest zajęta; spróbuj ponownie za chwilę."
-# Etykieta klikalnego wiersza menu "/rtp info", ktory po kliknieciu tworzy
-# token ChartSpec(BAD_POINTS_HEATMAP, ...) i prosi aktywne MapBinding
-# o wyrenderowanie mapy cieplnej 128x128 znanych indeksow spirali zlych
-# punktow biezacego regionu. Wiersz jest pomijany przy renderowaniu, gdy zainstalowanym
-# powiazaniem jest NoopMapBinding (REQ-RTP-MAP-006 / ADR-047).
+# Etykieta klikalnego wiersza menu "/rtp info", ktory renderuje mape cieplna
+# znanych zlych punktow biezacego regionu. Ukrywany, gdy renderowanie map
+# nie jest dostepne na tym serwerze.
 menuInfoZlePunktyEtykieta: "#9D7CD8&l# mapa złych punktów"
 
 # --- Podmenu MultiConfig ---
@@ -383,3 +379,6 @@ multikonfigWynikNazwaNieprawidlowa: "&cnazwa '[name]' jest niedozwolona; użyj l
 # Komunikat wyniku, gdy DODANIE koliduje z istniejaca nazwa wpisu.
 # Zmienna: [name].
 multikonfigWynikNazwaZajeta: "&cwpis o nazwie '[name]' już istnieje."
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

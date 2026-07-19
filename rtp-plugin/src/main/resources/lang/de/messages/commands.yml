@@ -32,17 +32,17 @@ infoMSPT: "&7Aktuelles Plugin-MSPT: #7E9CC8[mspt]"
 infoLadevorgaengeGesamt: "&7Insgesamt geladene Chunks: #7E9CC8[loads]"
 infoLadevorgaengeNachUrsprung: "&7Ladevorgänge nach Ursprung: #7E9CC8[loadsByOrigin]"
 infoLeckRate: "&7Aktuelle Chunk-Leak-Rate: #7E9CC8[leakRate]"
-# --- Metrik-SPI-Zustandsblock ---
+# --- Zustands-Metrikblock ---
 infoWarteschlangenTiefe: "&7Spieler in Regions-Warteschlangen: #7E9CC8[queueDepth]"
 infoAusstehendeTeleports: "&7Ausstehende Teleport-Pipelines: #7E9CC8[pendingTeleports]"
 infoDurchschnittPipelineMs: "&7Durchschnittliche Pipeline-Latenz: #7E9CC8[avgPipelineMs] ms"
-# Perzentile der Pipeline-Latenz (ADR-053). Platzhalter: [pipelineMsP50] [pipelineMsP75]
+# Perzentile der Pipeline-Latenz. Platzhalter: [pipelineMsP50] [pipelineMsP75]
 # [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
 infoPipelinePercentiles: "&7Pipeline-Latenz (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
-# Prüfung langsamer Teleports (ADR-053, nur sofortige/nicht eingereihte Teleports). Platzhalter:
+# Prüfung langsamer Teleports (nur sofortige/nicht eingereihte Teleports). Platzhalter:
 # [slowPipelineCount] [slowPipelineThresholdMs].
 infoSlowPipeline: "&7Langsame Teleports (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
-# Prüfung des Warteschlangen-Wachstums (ADR-053). Platzhalter: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+# Prüfung des Warteschlangen-Wachstums. Platzhalter: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
 infoQueueGrowth: "&7Warteschlangen-Wachstumswarnungen (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
 infoHeap: "&7JVM-Heap: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
 # Kopfzeile für den als Pipeline gekennzeichneten Block in /rtp info.
@@ -55,18 +55,18 @@ infoMSPTLive: "&7Server-MSPT: #7E9CC8[mspt] ms (&7Tick-Budget: #7E9CC8[tickBudge
 infoSoftLimit: "&7Spieler: #7E9CC8[playerCount] / [softCap]"
 # Aktuelle Round-Trip-Latenz der Datenbank in ms. Platzhalter: [databaseLatencyMs].
 infoDatenbankLatenzMs: "&7Datenbank-Latenz: #7E9CC8[databaseLatencyMs] ms"
-# Metriken zum Generierungsergebnis (ADR-052), aus den prozessweiten RtpOutcomeStats.
+# Metriken zum Generierungsergebnis.
 # Erfolgs-/Fehlerrate über alle erfassten Generierungsversuche. Platzhalter:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Generierungserfolg: #7E9CC8[genSuccessRate]&7 (Fehler #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
 # Häufigste einzelne Ablehnungsursache und ihr Anteil an allen Fehlern. Platzhalter:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7Häufigste Ablehnungsursache: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
-# Aufschlüsselung der Ablehnungen nach Ursache (das Pendant zum /rtp unsafe-stats eines Mitbewerbers).
+# Aufschlüsselung der Ablehnungen nach Ursache.
 # Platzhalter: [genFailureBreakdown] - kommagetrennte Liste Ursache=N, häufigste zuerst.
 infoFailureBreakdown: "&7Ablehnungen nach Ursache: #7E9CC8[genFailureBreakdown]"
-# Schwellenwerte der Zustands-Farbbänder. Fließkommawerte, die von ColourBands in rtp-core
-# genutzt werden, um farbige Platzhalter-Varianten (z. B. [tps1mColoured]) mit &a/&7/&c zu umschließen.
+# Schwellenwerte der Zustands-Farbbänder. Werden verwendet, um farbige Platzhalter-
+# Varianten (z. B. [tps1mColoured]) grün/gelb/rot einzufärben.
 infoSchwelleTpsGruen: 19.5
 infoSchwelleTpsGelb: 18.0
 infoSchwelleMsptGruen: 30.0
@@ -136,24 +136,24 @@ menueZurueck: "&7« zurück"
 # Bezeichnungsvorlage für die Zeile "zusammengebauten Befehl ausführen", die jeder
 # ausführbaren Nicht-Wurzel-Menüseite vorangestellt wird. Platzhalter: [command] - der zusammengebaute /rtp ...-Aufruf.
 menueAusfuehren: "&2▶ [command] ausführen"
-# Kopfzeile oben auf einer Unterseite zur Parameterwertauswahl (Stufe A.2).
+# Kopfzeile oben auf einer Unterseite zur Parameterwertauswahl.
 # Platzhalter: [param] - Parametername; [command] - zusammengebauter /rtp ...-Aufruf.
 menueWertWaehlen: "&7wähle einen Wert für [param] (führt aus: /rtp [command] [param]:<value>)"
 # Bezeichnung der Ersatzzeile "eigenen Wert eingeben" auf einer Parameterwert-Auswahlseite.
 # Ein Klick füllt den Chat mit dem zusammengebauten Befehl bis '<param>:' vor, sodass der Spieler
 # einen beliebigen Wert eingeben kann, auch solche, die nicht in der Vorschlagsliste stehen.
 menueWertEingeben: "&7✎ eigenen Wert eingeben..."
-# Nicht anklickbare Kopfzeile oben auf jeder Nicht-Wurzel-Menüseite (Stufe A.4).
+# Nicht anklickbare Kopfzeile oben auf jeder Nicht-Wurzel-Menüseite.
 # Zeigt den aktuell zusammengebauten /rtp-Aufruf einschließlich aller vorgemerkten
 # Parameterzuweisungen (name:value). Platzhalter: [command] - zusammengebaute Argumente.
 menueZusammengebaut: "&7baue zusammen: #7E9CC8/rtp [command]"
-# Nicht anklickbare Titelzeile, die der Wurzel-/rtp-Menüseite vorangestellt wird (Stufe A.5).
+# Nicht anklickbare Titelzeile, die der Wurzel-/rtp-Menüseite vorangestellt wird.
 # Bietet eine einladende Kopfzeile, bevor der Spieler in einen Unterbefehl absteigt.
 menueHauptTitel: "#5FB3B3&l⚡ RTP-Menü"
 # Nicht anklickbare Untertitel-/Hinweiszeile, die der Wurzel-/rtp-Menüseite unterhalb von
-# menuRootTitle vorangestellt wird (Stufe A.5). Kurzer Orientierungstext für Erstnutzer.
+# menuRootTitle vorangestellt wird. Kurzer Orientierungstext für Erstnutzer.
 menueHauptHinweis: "&7klicke unten auf eine Option, um zu beginnen"
-# Navigationszeilen, die paginierten Menüseiten angehängt werden (Stufe A.6) - ein Klick
+# Navigationszeilen, die paginierten Menüseiten angehängt werden - ein Klick
 # wechselt zur vorherigen/nächsten Seite desselben Modells. Platzhalter:
 # [page] - die 1-basierte, menschenlesbare Zielseitennummer.
 menueSeiteZurueck: "&7« vorherige Seite ([page])"
@@ -166,9 +166,9 @@ menueStartseiteZeileRegion: "&2▶ /rtp region:&7... &7- eine Region wählen"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- eine Welt wählen"
 menueStartseiteZeileBiom: "&2▶ /rtp biome:&7... &7- ein Biom wählen"
 menueStartseiteZeileHilfe: "&2▶ /rtp help &7- Befehle auflisten"
-# Admin-Einstiegszeile der Startseite: die einzige inline
-# admin-sichtbare Zeile auf der Startseite; ein Klick steigt in das kuratierte Admin-
-# Panel ab, das vom AdminPanelBuilder erstellt wird. Ausgeblendet, wenn dem Betrachter rtp.menu.admin fehlt.
+# Admin-Einstiegszeile der Startseite: die einzige inline admin-sichtbare Zeile
+# auf der Startseite; ein Klick steigt in das Admin-Panel ab. Ausgeblendet, wenn
+# dem Betrachter rtp.menu.admin fehlt.
 menueStartseiteZeileAdmin: "#9D7CD8▶ Admin-Panel &7- Operator-Werkzeuge"
 # Hover-Text für die Admin-Panel-Einstiegszeile. Keine Platzhalter.
 menueStartseiteHoverAdmin: "&7Operator-Werkzeuge: Konfiguration, Scans, Diagnose, Neuladen"
@@ -266,12 +266,12 @@ infoBuchUeberlaufFusszeile: "&7(Inhalt gekürzt - klicke, um die vollständige A
 # Buchs in diesem Build derzeit nicht unterstützt wird (auf einen späteren
 # Meilenstein verschoben). Nutzer können die Aktualisieren-Zeile anklicken, um manuell zu aktualisieren.
 infoBuchAutoAktualisierenHinweis: "&8(automatisches Aktualisieren noch nicht unterstützt; klicke auf Aktualisieren)"
-# Nicht anklickbare Titelzeile oben auf der Auswahlseite der Konfigurationsdateien (Stufe C.1).
+# Nicht anklickbare Titelzeile oben auf der Auswahlseite der Konfigurationsdateien.
 # Wird angezeigt, wenn ein Admin auf der Startseite "/rtp config" anklickt.
 konfigSelektorTitel: "#5FB3B3&l⚙ Konfigurationsdateien"
 # Bezeichnung der Navigationszeile "zurück zur /rtp-Menüwurzel" auf der Konfigurationsauswahlseite.
 konfigSelektorZurueckZeile: "&7« zurück zum Menü"
-# Nicht anklickbare Titelzeile oben auf einer einzelnen Konfigurationsdateiseite (Stufe C.2).
+# Nicht anklickbare Titelzeile oben auf einer einzelnen Konfigurationsdateiseite.
 # Platzhalter: [file] - der Name der Konfigurationsdatei (z. B. "performance", "safety").
 konfigDateiTitel: "#5FB3B3&l⚙ Konfiguration: &7[file]"
 # Bezeichnung der Navigationszeile "zurück zur Konfigurationsauswahl" auf einer einzelnen Konfigurationsdateiseite.
@@ -284,10 +284,10 @@ konfigSchluesselZeilenFormat: "&7[key]&7: #7E9CC8[value]"
 # Hover-Text für eine Zeile pro Schlüssel auf einer Konfigurationsdateiseite. Platzhalter:
 #   [key], [value], [type] - der Konfigurationsschlüsselname, aktueller Wert und deklarierter Typ.
 konfigSchluesselHoverFormat: "&7zum Bearbeiten klicken &7[key] &7(Typ: [type])"
-# Nicht anklickbare Titelzeile oben auf einer shape/vert-Typauswahlseite (Stufe C.3a).
+# Nicht anklickbare Titelzeile oben auf einer shape/vert-Typauswahlseite.
 # Platzhalter: [param] - "shape" oder "vert"; [current] - aktuell aktiver Typname.
 konfigTypAuswahlTitel: "#5FB3B3&l⚙ [param]-Typ wählen &7(aktuell: &7[current]&7)"
-# Nicht anklickbare Titelzeile oben auf einer shape/vert-Unterparameterseite (Stufe C.3b).
+# Nicht anklickbare Titelzeile oben auf einer shape/vert-Unterparameterseite.
 # Platzhalter: [param] - "shape" oder "vert"; [type] - der aktive Typname.
 konfigUnterparameterSeitenTitel: "#5FB3B3&l⚙ [param] &7- &7[type] &7Unterparameter"
 # Hinweis, der gesendet wird, wenn die Buchansicht auf den alten Roh-YAML-Chat-Auszug zurückgreift
@@ -312,27 +312,23 @@ konfigAnwendenZeile: "&2&l[apply]"
 # Leert den Warenkorb, ohne zu übernehmen.
 konfigVerwerfenZeile: "&c&l[discard]"
 
-# --- ADR-047 deklarative Diagramm-Kompositionsbrücke (REQ-RTP-MAP-006) ---
-# Wird an den Betrachter gesendet, wenn eine OPEN_MAP-Menüaktion ausgelöst wird, aber kein konkretes
-# MapBinding registriert ist (NoopMapBinding ist noch aktiv, z. B. bei der
-# Lite-Assembly oder bevor RTPHooks das Plattform-Binding verdrahtet).
+# --- Karten-/Diagrammdarstellung ---
+# Wird gesendet, wenn eine Kartenzeile angeklickt wird, aber die Kartendarstellung
+# auf diesem Server nicht verfügbar ist (z. B. bei der Lite-Assembly oder ohne Kartenanbieter).
 karteBindungFehlt: "&c[P0] Kartendarstellung ist auf diesem Server nicht verfügbar."
-# Wird gesendet, wenn MapDispatch eine ChartSpec erhält, deren Kind keinen registrierten
-# ChartSpecResolver hat (z. B. Stufe-1-Betrachter klickt eine Stufe-3-Sparkline an, bevor
-# der Resolver vorhanden ist).
+# Wird gesendet, wenn ein Diagramm angefordert wird, aber kein Renderer für
+# diesen Diagrammtyp registriert ist.
 karteResolverFehlt: "&c[P0] für diese Anfrage ist kein Karten-Resolver registriert."
 # Wird gesendet, wenn ein Resolver läuft, aber die zugrunde liegende Datenquelle für
 # das angeforderte Ziel nicht verfügbar ist (unbekannte Region, noch keine Daten, Welt entladen).
 # Platzhalter: [region] - der angeforderte Regionsname (kann leer sein).
 karteNichtVerfuegbar: "&e[P1] Kartendaten sind derzeit nicht verfügbar."
-# Wird gesendet, wenn das aktive MapBinding derzeit keinen Karten-Handle zuweisen kann
-# (vom Binding definierter Gegendruck, z. B. Obergrenze pro Betrachter erreicht).
+# Wird gesendet, wenn der Kartendienst derzeit keine Karte zuweisen kann
+# (z. B. Obergrenze pro Betrachter erreicht).
 karteBeschaeftigt: "&e[P1] der Kartendienst ist beschäftigt; bitte versuche es gleich erneut."
-# Bezeichnung der anklickbaren "/rtp info"-Menüzeile, die beim Klick einen
-# ChartSpec(BAD_POINTS_HEATMAP, ...)-Token erzeugt und das aktive MapBinding bittet,
-# eine 128x128-Heatmap der bekannten Schlecht-Punkt-Spiralindizes der aktuellen
-# Region zu rendern. Die Zeile wird beim Rendern ausgelassen, wenn NoopMapBinding
-# das installierte Binding ist (REQ-RTP-MAP-006 / ADR-047).
+# Bezeichnung der anklickbaren "/rtp info"-Menüzeile, die eine Heatmap der
+# bekannten schlechten Orte der aktuellen Region rendert. Ausgeblendet, wenn die
+# Kartendarstellung auf diesem Server nicht verfügbar ist.
 menueInfoSchlechteOrteBezeichnung: "#9D7CD8&l# Karte schlechter Orte"
 
 # --- MultiConfig-Untermenü ---
@@ -379,3 +375,6 @@ multikonfigErgebnisNameUngueltig: "&cName '[name]' ist nicht erlaubt; verwende B
 # Ergebnisnachricht, wenn ein HINZUFÜGEN mit einem bestehenden Eintragsnamen kollidiert.
 # Platzhalter: [name].
 multikonfigErgebnisNameVergeben: "&cein Eintrag mit dem Namen '[name]' existiert bereits."
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

@@ -1,29 +1,29 @@
 # --- RTP 메트릭 설정 ---
 
-# 메트릭 SPI 의 보고 전용 노브. 스로틀 / 튜닝 노브는 계속
+# 메트릭 보고 전용 노브. 스로틀 / 튜닝 노브는 계속
 # performance.yml 에 있습니다.
-# Folia 에서 MetricsSnapshot.foliaRegions() 에 리전별 상세를 채웁니다.
+# Folia 에서 에 리전별 상세를 채웁니다.
 # Paper / Bukkit / Fabric 에서는 효과 없음 (단일 리전 런타임은 항상 빈
 # 목록을 반환하며, 이는 해당 플랫폼에서 올바른 동작입니다).
 # @type: boolean
 # @default: true
 foliaIncludeRegions: true
 
-# Folia 에서 MetricsSnapshot 의 스칼라 tps{1,5,15}m 필드로
+# Folia 에서 스칼라 tps{1,5,15}m 필드로
 # 리전별 샘플을 집계하는 방식.
 # @type: enum
 # @options: [mean, max]
 # @default: mean
 foliaAggregationTps: "mean"
 
-# Folia 에서 MetricsSnapshot 의 스칼라 mspt 필드로 리전별 샘플을
+# Folia 에서 스칼라 mspt 필드로 리전별 샘플을
 # 집계하는 방식.
 # @type: enum
 # @options: [mean, max]
 # @default: max
 foliaAggregationMspt: "max"
 
-# Folia 에서 MetricsSnapshot 의 스칼라 tickBudgetUtilisation
+# Folia 에서 스칼라 tickBudgetUtilisation
 # 필드로 리전별 샘플을 집계하는 방식.
 # @type: enum
 # @options: [mean, max]

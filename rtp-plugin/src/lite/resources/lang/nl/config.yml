@@ -42,7 +42,7 @@ lockAfterUses: 0
 lockAfterResetSeconds: 0
 
 # Indien true stelt een geslaagde /rtp de landingsplek in als het permanente
-# spawn-anker van de speler (BetterRTP SetAsRespawn-pariteit).
+# spawn-anker van de speler (BetterRTP-pariteit).
 # @type: boolean
 # @default: false
 setRespawnOnTeleport: false
@@ -84,7 +84,7 @@ menu:
     # wordt dan aan de standaardlijst toegevoegd.)
     - "book"
 
-# Globale standaardwaarden die via het "@config"-token worden overgenomen door regio-/wereldbestanden (ADR-073).
+# Globale standaardwaarden die via het "@config"-token worden overgenomen door regio-/wereldbestanden.
 defaults:
   # Standaardvorm en -grootte van het gebied. radius/centerRadius = hoe ver weg je landt, gemeten in chunks.
   shape:

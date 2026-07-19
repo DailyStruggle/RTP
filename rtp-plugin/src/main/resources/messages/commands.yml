@@ -385,3 +385,6 @@ multiconfigResultNameInvalid: "&cname '[name]' is not allowed; use letters, digi
 # Result message when an ADD collides with an existing entry name.
 # Placeholder: [name].
 multiconfigResultNameTaken: "&can entry named '[name]' already exists."
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

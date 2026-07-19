@@ -1424,7 +1424,12 @@ public final class CommandTreeMenuBuilder {
             sb.append(trimmed);
         }
         String cleaned = sb.toString();
-        return cleaned.isBlank() ? null : cleaned;
+        if (cleaned.isBlank()) return null;
+        // Comments routinely document color codes (e.g. "use &e/&6") as examples.
+        // The menu renderers run hover text through the standard &-to-§ color
+        // translation, which would otherwise paint the description or swallow
+        // the example codes. Escape them so they render as literal text.
+        return io.github.dailystruggle.rtp.common.text.LegacyColorStrip.escape(cleaned);
     }
 
     private static String lookupMsg(Enum<?> key, String fallback) {

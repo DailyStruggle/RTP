@@ -94,7 +94,7 @@ queue:
   # @default: 1
   workerThreads: 1
 
-# Reservation-token lifecycle (REQ-RTP-NET-011).
+# Reservation-token lifecycle.
 reservation:
   # プロキシ側の TTL リーパー間隔（ms）。期限切れトークンを一掃し、その座標を解放します。
   # @type: integer

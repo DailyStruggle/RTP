@@ -23,3 +23,6 @@
 empty_bowls:
   # P0
   - "[RTP]"
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

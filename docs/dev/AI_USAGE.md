@@ -6,7 +6,7 @@ This is a writeup of how and why AI tooling is used on RTP. It's for two audienc
 
 ## A. The "why"
 
-My background is academic. The part that matters here isn't the credential, it's that I've worked on modeled hardware and statistical models for machine learning. So when I look at an LLM I'm not looking at magic. I'm looking at a thing producing tokens, and I have a pretty good idea what it's doing and what it isn't.
+My background is academic. The part that matters here isn't the credential, it's that I studied this in college and designed tensor processing units alongside peers - modeled hardware and statistical models for machine learning. So when I look at an LLM I'm not looking at magic. I'm looking at compression and retrieval over an n-dimensional table (one that could run a lot leaner than the way it's currently served), and I have a pretty good idea what it's doing and what it isn't.
 
 LLMs are designed to sound like the people who produced them. The training corpus is human-written text and the objective is to produce text another human would find plausible. They talk like me only because I'm one of the humans in the pile. More accurately they talk like the aggregate of every author whose work landed in the training set, weighted by how the data was curated.
 

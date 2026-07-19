@@ -106,6 +106,69 @@ class LegacyColorStripTest {
         assertEquals('e', raw.charAt(rawEnd));
     }
 
+    private static final char ZWSP = '\u200B';
+
+    @Test
+    void escapeNullAndEmpty() {
+        assertEquals(null, LegacyColorStrip.escape(null));
+        assertEquals("", LegacyColorStrip.escape(""));
+    }
+
+    @Test
+    void escapeLeavesPlainTextUntouched() {
+        String s = "how many tries before giving up";
+        assertEquals(s, LegacyColorStrip.escape(s));
+    }
+
+    @Test
+    void escapeAmpersandLegacyCode() {
+        // & followed by a code gets a zero-width space inserted so the renderer
+        // no longer translates it; the visible glyphs "&a" are preserved.
+        assertEquals("&" + ZWSP + "aHi", LegacyColorStrip.escape("&aHi"));
+    }
+
+    @Test
+    void escapeSectionLegacyCode() {
+        assertEquals(S + "" + ZWSP + "aHi", LegacyColorStrip.escape(S + "aHi"));
+    }
+
+    @Test
+    void escapeAmpersandHexLiteral() {
+        assertEquals("&" + ZWSP + "#aabbccX", LegacyColorStrip.escape("&#aabbccX"));
+    }
+
+    @Test
+    void escapeBareHashHexLiteral() {
+        assertEquals("#" + ZWSP + "aabbccX", LegacyColorStrip.escape("#aabbccX"));
+    }
+
+    @Test
+    void escapeBukkitHexRun() {
+        String hex = S + "x" + S + "1" + S + "2" + S + "3" + S + "4" + S + "5" + S + "6";
+        assertEquals(S + "" + ZWSP + hex.substring(1) + "hi",
+                LegacyColorStrip.escape(hex + "hi"));
+    }
+
+    @Test
+    void escapeLeavesLoneAmpersandOrHashUntouched() {
+        String s = "A&z C#z not-hex";
+        assertEquals(s, LegacyColorStrip.escape(s));
+    }
+
+    @Test
+    void escapedCodesNoLongerStripAsColor() {
+        // After escaping, the original code characters are visible literal text:
+        // stripping the escaped form must not delete the 'a'/'6' glyphs.
+        String escaped = LegacyColorStrip.escape("avoid yellow (&e/&6) here");
+        String stripped = LegacyColorStrip.strip(escaped);
+        org.junit.jupiter.api.Assertions.assertTrue(stripped.contains("&"),
+                "ampersand must survive: " + stripped);
+        org.junit.jupiter.api.Assertions.assertTrue(stripped.contains("e/"),
+                "code letters must survive: " + stripped);
+        org.junit.jupiter.api.Assertions.assertTrue(stripped.contains("6)"),
+                "code letters must survive: " + stripped);
+    }
+
     @Test
     void strippedToRawIsStrictlyMonotonic() {
         String raw = "&a&l&#112233ABC" + S + "xyz"; // §xyz is *not* a hex run (only 2 hex chars after x)

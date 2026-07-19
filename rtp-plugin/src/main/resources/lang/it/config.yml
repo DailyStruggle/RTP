@@ -44,7 +44,7 @@ lockAfterUses: 0
 lockAfterResetSeconds: 0
 
 # Se true, un /rtp riuscito imposta il luogo di atterraggio come punto di
-# rinascita persistente del giocatore (parità con SetAsRespawn di BetterRTP).
+# rinascita persistente del giocatore (parità con BetterRTP).
 # @type: boolean
 # @default: false
 setRespawnOnTeleport: false
@@ -75,7 +75,7 @@ menu:
   renderer:
     - "book"
 
-# Valori predefiniti globali ereditati dai file di regione/mondo tramite il token "@config" (ADR-073).
+# Valori predefiniti globali ereditati dai file di regione/mondo tramite il token "@config".
 defaults:
   # Forma e dimensione predefinite dell'area. radius/centerRadius = quanto lontano atterri, misurato in chunk.
   shape:

@@ -113,3 +113,6 @@ zanik: 20
 
 # actionbar setting
 pasekAkcji: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

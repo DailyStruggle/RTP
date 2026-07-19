@@ -107,3 +107,6 @@ rtp_설명: "무작위 위치로 텔레포트합니다"
 
 # actionbar setting
 액션바: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

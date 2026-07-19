@@ -113,3 +113,6 @@ dissolvenzaUscita: 20
 
 # impostazione actionbar
 barraAzione: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

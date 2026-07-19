@@ -25,6 +25,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Requirement-authoring style (`shall`, no temporal framing) | [`RULES.md`](RULES.md) |
 | Commenting an option in a shipped YAML config | [`CONFIG_COMMENT_STYLE.md`](CONFIG_COMMENT_STYLE.md) |
 | A decision (why something is the way it is) | [`../adr/README.md`](../adr/README.md) |
+| How a developer ought to work in this repo, and why (full lifecycle: intake, planning, read-document-modify, design records, verification, divergence handling, communication, self-maintenance, optional AI tooling) | [`../adr/ADR-000-development-workflow.md`](../adr/ADR-000-development-workflow.md) |
 | Fabric status / blockers | [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) |
 | Multi-server / proxy (Velocity, BungeeCord) plan | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) (D-005 gated; admin stub: [`../admin/proxies/INDEX.md`](../admin/proxies/INDEX.md)) |
 | Why network mode (multi-server, multi-proxy) is in scope | [`../adr/ADR-036-network-mode-multi-server-multi-proxy.md`](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (umbrella; subproject refinements under [`../../platforms/rtp-proxy/docs/adr/`](../../platforms/rtp-proxy/docs/adr/)) |

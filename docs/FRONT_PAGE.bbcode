@@ -125,9 +125,9 @@ Each capability below is paired with the part of that architecture that makes it
 [TD][B]Tuned[/B][/TD]
 [/TR]
 [TR]
-[TD][B]Multi-server / proxy[/B] (Velocity)[/TD]
-[TD]No[/TD]
-[TD][B]Yes[/B][/TD]
+[TD][B]Multi-server / proxy[/B] (Velocity, BungeeCord, plugin-messaging)[/TD]
+[TD]Basic*[/TD]
+[TD][B]Full[/B][/TD]
 [/TR]
 [TR]
 [TD][B]SQL / Redis[/B] shared-state backends (H2, SQLite, MySQL, PostgreSQL, Jedis)[/TD]
@@ -136,17 +136,17 @@ Each capability below is paired with the part of that architecture that makes it
 [/TR]
 [TR]
 [TD][B]Vault[/B] economy (charge for [I]/rtp[/I])[/TD]
-[TD]No[/TD]
+[TD][B]Yes[/B][/TD]
 [TD][B]Yes[/B][/TD]
 [/TR]
 [TR]
 [TD]Multilingual [I]lang/**[/I], login-reserve cache, visitor mode[/TD]
-[TD]No[/TD]
+[TD][B]Yes[/B][/TD]
 [TD][B]Yes[/B][/TD]
 [/TR]
 [TR]
 [TD][B][I]safety.yml[/I] token grammar[/B] - vanilla block tags, state predicates, wildcards[/TD]
-[TD]No[/TD]
+[TD][B]Yes[/B][/TD]
 [TD][B]Yes[/B][/TD]
 [/TR]
 [TR]
@@ -171,8 +171,10 @@ Each capability below is paired with the part of that architecture that makes it
 [/TR]
 [/TABLE]
 
-Pro is the early-access tier: the tuned, throughput-optimized versions of new platforms and scaling backends land here first, because each one carries a real hands-on support burden that is only guaranteed on the paid tier. The free build still [I]runs[/I] on Folia (basic regionized scheduling + async teleport); Pro's tuned Folia adapter is what graduates to the free build once stabilized. Same configuration, same data files, same commands as the free build - [B]upgrade is drop-in.[/B]
-
+Pro is the early-access tier: the tuned, throughput-optimized versions of new platforms and scaling backends land here first, because each one carries a real hands-on support burden that is only guaranteed on the paid tier. The free build still [I]runs[/I] on Folia (basic regionized scheduling + async teleport) and supports cross-server moves via plugin-messaging (backends behind a proxy); Pro's tuned Folia adapter and durable (SQL/Redis) transports are what graduates to the free build once stabilized. Same configuration, same data files, same commands as the free build - [B]upgrade is drop-in.[/B]
+ 
+[SIZE=2][I]* BungeeCord proxy adapter is planned; currently supported via plugin-messaging on the backend.[/I][/SIZE]
+ 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#27AE60]Built for[/COLOR][/B][/SIZE]
@@ -191,7 +193,7 @@ LeafRTP-Pro works on any server out of the box. It also shines for the setups th
 
 [CENTER][COLOR=#A0A0A0]------------------------------------------------------------[/COLOR][/CENTER]
 
-[SPOILER='Feature preview']
+[SPOILER="Feature preview"]
 [CENTER][IMG]https://github.com/dailystruggle/RTP/raw/V3/docs/assets/img/menu_1.png[/IMG][/CENTER]
 [CENTER][I]In-game /rtp menu - clickable book UI for worlds, regions, and configuration.[/I][/CENTER]
 
@@ -199,7 +201,7 @@ LeafRTP-Pro works on any server out of the box. It also shines for the setups th
 [CENTER][I]Per-file config view and edit, straight from the menu.[/I][/CENTER]
 [/SPOILER]
 
-[SPOILER='Commands & permissions reference']
+[SPOILER="Commands & permissions reference"]
 [B]Commands[/B] (registered aliases: [I]/rtp[/I], [I]/wild[/I]):
 [TABLE]
 [TR]
@@ -314,7 +316,7 @@ LeafRTP-Pro works on any server out of the box. It also shines for the setups th
 [/TABLE]
 [/SPOILER]
 
-[SPOILER='Configuration files at a glance']
+[SPOILER="Configuration files at a glance"]
 LeafRTP-Pro splits configuration by concern under [I]plugins/RTP/[/I]. Every file is hot-reloadable ([I]/rtp reload <file>[/I]) and editable in-game via [I]/rtp config <file>[/I].
 [TABLE]
 [TR]
@@ -395,7 +397,7 @@ LeafRTP-Pro splits configuration by concern under [I]plugins/RTP/[/I]. Every fil
 [/TABLE]
 [/SPOILER]
 
-[SPOILER='Full benchmark - Paper, Spigot, Folia head-to-head']
+[SPOILER="Full benchmark - Paper, Spigot, Folia head-to-head"]
 [B]Confidence:[/B] measured; from plugin docs; inferred from architecture.
 
 [B]Metrics:[/B] Throughput (TP/s, higher better) - MSPT p99 (worst 1-in-100 main-thread tick in ms; <~50 ms = no dropped tick) - Min TPS (20.00 = no hiccup) - CPU / TP (main-thread CPU per successful teleport).
@@ -619,7 +621,7 @@ LeafRTP-Pro splits configuration by concern under [I]plugins/RTP/[/I]. Every fil
 Full methodology, raw CSVs, per-run analyses: [URL='https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP'][I]helpers/StressTestRTP/[/I][/URL]. Video benchmark of [I]/rtp[/I] on a custom world generator: [URL='https://youtu.be/V0NyNK9JydM']youtu.be/V0NyNK9JydM[/URL].
 [/SPOILER]
 
-[SPOILER='Architecture - five pillars + chunk-loading by platform']
+[SPOILER="Architecture - five pillars + chunk-loading by platform"]
 [B]Five pillars:[/B]
 [LIST]
 [*][B]Deterministic spiral selection.[/B] Bounded math, uniform player distribution even on massive worlds; no unbounded re-roll loops.
@@ -646,7 +648,7 @@ Full methodology, raw CSVs, per-run analyses: [URL='https://github.com/dailystru
 [B]Operator takeaway:[/B] Paper and Folia run chunk I/O fully off-tick. On vanilla Spigot the Anvil pre-filter covers the common case; rare main-thread fallback is bounded by your configured tick-budget; no platform silently blocks the tick loop without reporting it.
 [/SPOILER]
 
-[SPOILER='Spatial memory - why the longer it runs, the faster it gets']
+[SPOILER="Spatial memory - why the longer it runs, the faster it gets"]
 Without spatial indexing, teleportation is a guessing game and the numbers are ugly. A typical Overworld is only [B]~45% safely teleportable[/B]- (oceans, rivers, ravines, steep terrain eat the rest); the Nether is dominated by lava seas and wall-to-wall stone; the End is [I]almost entirely[/I] void. Standard RTPs pay full chunk-load cost to rediscover this one candidate at a time, forever.
 
 LeafRTP-Pro plots your world's geometry as it evaluates candidates. When it hits a massive ocean or unsafe biome, it remembers that sector and shrinks the searchable area, so known bad sectors never get loaded again. The longer it runs, the faster it gets - and [I]/rtp scan[/I] keeps the learning going during idle periods.
@@ -658,31 +660,31 @@ Watch the background scan crawl the spiral and accumulate spatial memory in real
 [SIZE=2][I]- Local-profile estimate from a vanilla 1.21 seed set; Nether and End are still qualitative. Anonymous opt-in telemetry is on the roadmap to source this number properly.[/I][/SIZE]
 [/SPOILER]
 
-[SPOILER='safety.yml token grammar - Pro exclusive']
+[SPOILER="safety.yml token grammar"]
 [I]safety.yml[/I] has a first-class token grammar. Six shapes can be mixed freely in [I]unsafeBlocks[/I] and [I]airBlocks[/I]:
 
 [LIST]
-[*][B]Plain material:[/B] [I]LAVA[/I], [I]MAGMA_BLOCK[/I].
-[*][B]Material + state predicate:[/B] [I]OAK_SLAB[waterlogged=true][/I]. Multiple predicates AND together: [I]OAK_SLAB[waterlogged=true,type=top][/I].
-[*][B]Numeric range predicate:[/B] [I]WATER[level>=5][/I], [I]LIGHT[level<8][/I]. Operators >= / <= / > / < bound fluid levels, light levels, and any integer block-state property; fail-open on an absent or non-numeric value.
-[*][B]Vanilla block tag:[/B] [I]#minecraft:leaves[/I], [I]#minecraft:fire[/I], [I]#minecraft:campfires[/I]. Live-registry expansion at config-load lands in [I]3.0.0[/I] final - use explicit names alongside tag tokens during the beta.
-[*][B]Tag + state predicate:[/B] [I]#minecraft:slabs[waterlogged=true][/I] - "any slab, but only when waterlogged".
-[*][B]Wildcard + state predicate:[/B] [I]*[waterlogged=true][/I] - "any block, matched when waterlogged". One line replaces the entire waterloggable enumeration.
+[*] [B]Plain material:[/B] [I]LAVA[/I], [I]MAGMA_BLOCK[/I].
+[*] [B]Material + state predicate:[/B] [I]OAK_SLAB[waterlogged=true][/I]. Multiple predicates AND together: [I]OAK_SLAB[waterlogged=true,type=top][/I].
+[*] [B]Numeric range predicate:[/B] [I]WATER[level>=5][/I], [I]LIGHT[level<8][/I]. Operators >= / <= / > / < bound fluid levels, light levels, and any integer block-state property; fail-open on an absent or non-numeric value.
+[*] [B]Vanilla block tag:[/B] [I]#minecraft:leaves[/I], [I]#minecraft:fire[/I], [I]#minecraft:campfires[/I]. Live-registry expansion at config-load lands in [I]3.0.0[/I] final - use explicit names alongside tag tokens during the beta.
+[*] [B]Tag + state predicate:[/B] [I]#minecraft:slabs[waterlogged=true][/I] - "any slab, but only when waterlogged".
+[*] [B]Wildcard + state predicate:[/B] [I]*[waterlogged=true][/I] - "any block, matched when waterlogged". One line replaces the entire waterloggable enumeration.
 [/LIST]
 
 [B]Properties:[/B]
 [LIST]
-[*][B]Fail-open on unknown tags/properties[/B] - missing tags on older MC versions silently reduce coverage rather than breaking startup. Configs stay portable.
-[*][B]Never silent on malformed tokens[/B] - typos like [I]OAK_SLAB[waterlogged=true[/I] surface as [I][WARNING] [safety.yml] rejected token '<token>': <reason>[/I].
-[*][B]Zero hot-path cost when unused[/B] - block-state extraction only fires when a token actually needs it; plain-material configs pay nothing.
-[*][B]Platform-portable tag resolution[/B] - Bukkit reads from [I]Bukkit.getTag[/I]; the standalone [I]rtp-tags[/I] module parses tag JSON directly from data packs and jars for future non-Bukkit platforms.[/I]
+[*] [B]Fail-open on unknown tags/properties[/B] - missing tags on older MC versions silently reduce coverage rather than breaking startup. Configs stay portable.
+[*] [B]Never silent on malformed tokens[/B] - typos like [I]OAK_SLAB[waterlogged=true[/I] surface as [I][WARNING] [safety.yml] rejected token '<token>': <reason>[/I].
+[*] [B]Zero hot-path cost when unused[/B] - block-state extraction only fires when a token actually needs it; plain-material configs pay nothing.
+[*] [B]Platform-portable tag resolution[/B] - Bukkit reads from [I]Bukkit.getTag[/I]; the standalone [I]rtp-tags[/I] module parses tag JSON directly from data packs and jars for future non-Bukkit platforms.[/I]
 [/LIST]
 
 
 [I][B]Default safety.yml is ~25% shorter:[/B] [I]FIRE[/I]+[I]SOUL_FIRE[/I] -> [I]#minecraft:fire[/I]; every waterloggable block -> [I]*[waterlogged=true][/I]; dozens of decorative plants -> [I]#minecraft:flowers[/I], [I]#minecraft:saplings[/I], [I]#minecraft:crops[/I], etc.[/I]
 [/SPOILER]
 
-[SPOILER='Full feature suite & integrations']
+[SPOILER="Full feature suite & integrations"]
 [B]Engine:[/B]
 [LIST]
 [*][I]Any number of teleport regions per world; per-region shape (Square, Circle, Rectangle), radius, center, curve weighting, vertical bounds, world override, permission gates.[/I]
@@ -719,10 +721,10 @@ Watch the background scan crawl the spiral and accumulate spatial memory in real
 
 For those interested in writing their own: every one of these ships as a worked coding example, with full source under [I]addons/[/I] in the repo. The Rift and Countdown demos are pure [I]rtp-api[/I] / [I]effects-api[/I] addons with zero platform imports, so the same jar runs on Spigot, Paper, Folia, Fabric, and NeoForge - they double as copy-paste starting points for your own addon.
 
-[B]Pro-only configuration:[/B] Vault per-region pricing, complete localization ([I]lang/**[/I]), login-reserve cache, visitor mode.
+[B]Configuration:[/B] Vault per-region pricing.
 [/SPOILER]
 
-[SPOILER='Roadmap - active development']
+[SPOILER="Roadmap - active development"]
 What's on deck, with direction:
 
 [LIST]

@@ -20,14 +20,17 @@ networkRouting: "&7[P0] 正在路由到后端..."
 networkReserved: "&a[P0] 已在 [server] 预留坐标。正在传送..."
 # 代理正在跳转中时发送。占位符: [server] - 目标服务器。
 networkTransferring: "&a[P0] 正在传送到 [server]..."
-# 跨服路径放弃并回退到本地后端时发送。
-# 占位符: [reason] - RoutingDecision.FallbackReason 的值之一。
+# 跨服路径放弃并回退到本地服务器时发送。
+# 占位符: [reason] - 回退原因。
 networkFallback: "&e[P0] 跨服不可用 ([reason])；回退到本地。"
-# 跨服请求终态失败（无法回退）时发送。
-# 占位符: [reason] - DispatchOutcome.Failed.Reason。
+# 跨服请求失败且无法回退时发送。
+# 占位符: [reason] - 失败原因。
 networkFailed: "&c[P0] 跨服传送失败：[reason]。"
 # 玩家请求特定区域但网络中没有后端当前提供该区域时发送。
 # 占位符: [region] - 请求的区域名称。
 networkRegionUnavailable: "&c[P0] 当前没有后端在提供区域 '[region]'。"
 # 请求的区域名称解析到两个或多个后端且策略无法选择时发送。占位符: [region]。
 networkRegionAmbiguous: "&c[P0] 区域 '[region]' 在多个后端间不明确；请指定一个服务器。"
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

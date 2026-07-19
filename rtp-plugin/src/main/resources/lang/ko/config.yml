@@ -42,7 +42,7 @@ lockAfterUses: 0
 lockAfterResetSeconds: 0
 
 # true이면 성공한 /rtp가 착지 위치를 플레이어의 영구
-# 리스폰 지점으로 설정합니다 (BetterRTP SetAsRespawn 동등 기능).
+# 리스폰 지점으로 설정합니다 (BetterRTP 동등 기능).
 # @type: boolean
 # @default: false
 setRespawnOnTeleport: false
@@ -84,7 +84,7 @@ menu:
     # 포함될 예정입니다.)
     - "book"
 
-# "@config" 토큰을 통해 지역/월드 파일에 상속되는 전역 기본값입니다 (ADR-073).
+# "@config" 토큰을 통해 지역/월드 파일에 상속되는 전역 기본값입니다.
 defaults:
   # 기본 영역의 모양과 크기. radius/centerRadius = 얼마나 멀리 착지하는지 (청크 단위).
   shape:

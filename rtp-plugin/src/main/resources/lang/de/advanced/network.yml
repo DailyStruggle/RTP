@@ -65,7 +65,7 @@ routing:
 
 # Serverübergreifende Warteschlange.
 queue:
-  # Maximale Anzahl lokal gepufferter Eintragungen, bevor der Gegendruck neue `/rtp`-Aufrufe mit `RoutingDecision.FallbackReason.QUEUE_FULL` ablehnt.
+ # Maximale Anzahl lokal gepufferter Eintragungen, bevor der Gegendruck neue `/rtp`-Aufrufe ablehnt.
   # @type: integer
   # @default: 50
   maxDepth: 50
@@ -94,9 +94,9 @@ queue:
   # @default: 1
   workerThreads: 1
 
-# Lebenszyklus der Reservierungs-Tokens (REQ-RTP-NET-011).
+# Lebenszyklus der Reservierungs-Tokens.
 reservation:
-  # Takt des TTL-Reapers auf Proxy-Seite (ms). Der Reaper räumt abgelaufene Tokens auf und löst `ReleaseSink.onRelease(tokenId, TTL_EXPIRED)` aus, damit am selben Ort liegende Backends die Koordinate an `networkKeptLocations` zurückgeben können.
+ # Takt des TTL-Reapers auf Proxy-Seite (ms). Der Reaper räumt abgelaufene Tokens auf, damit am selben Ort liegende Backends die Koordinate an `networkKeptLocations` zurückgeben können.
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000

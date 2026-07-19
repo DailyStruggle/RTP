@@ -112,3 +112,6 @@ ausblenden: 20
 
 # Aktionsleisten-Einstellung
 aktionsleiste: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

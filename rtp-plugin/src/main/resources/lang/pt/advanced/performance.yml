@@ -168,9 +168,9 @@ analiseAoEvento: false
 analiseEfeitos: true
 
 # Modo de preenchimento de cache por observação (Region Data Visitor)
-# Quando o cache de pré-geração está cheio, uma única RegionCacheTask de
-# observação é agendada por região segundo o mesmo `period` de preenchimento de
-# cache. Reutiliza o mesmo pipeline do LocationGenerator que o preenchimento de
+# Quando o cache de pré-geração está cheio, uma única de
+# tarefa de observação é agendada por região segundo o mesmo `period` de preenchimento de
+# cache. Reutiliza o mesmo pipeline que o preenchimento de
 # cache padrão, mas descarta o candidato seguro resultante em vez de enfileirá-lo,
 # de modo que os efeitos colaterais (registro de localizações ruins, coleta de
 # biomas observados) se acumulam em segundo plano sem que a fila cresça além do

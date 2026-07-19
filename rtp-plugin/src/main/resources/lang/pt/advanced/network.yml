@@ -94,7 +94,7 @@ queue:
   # @default: 1
   workerThreads: 1
 
-# Reservation-token lifecycle (REQ-RTP-NET-011).
+# Reservation-token lifecycle.
 reservation:
   # Cadencia do coletor por TTL no lado do proxy (ms); varre tokens expirados e libera suas coordenadas.
   # @type: integer

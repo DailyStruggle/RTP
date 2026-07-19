@@ -114,12 +114,11 @@ netzwerkWeiterleitung: "&7[P0] leite zu einem Backend weiter..."
 netzwerkReserviert: "&a[P0] Koordinate auf [server] reserviert. Übertrage..."
 # Wird gesendet, während der Proxy den Sprung ausführt. Platzhalter: [server] - Ziel.
 netzwerkUebertragung: "&a[P0] übertrage zu [server]..."
-# Wird gesendet, wenn der serverübergreifende Pfad aufgegeben hat und die Anfrage auf
-# das lokale Backend zurückgefallen ist. Platzhalter: [reason] - einer der
-# `RoutingDecision.FallbackReason`-Werte (z. B. NO_LIVE_PEER, QUEUE_FULL).
+# Wird gesendet, wenn der serverübergreifende Pfad aufgegeben hat und die Anfrage
+# auf den lokalen Server zurückgefallen ist. Platzhalter: [reason] - der Grund für den Rückfall.
 netzwerkRueckfall: "&e[P0] serverübergreifend nicht verfügbar ([reason]); greife lokal zurück."
-# Wird gesendet, wenn die serverübergreifende Anfrage endgültig fehlgeschlagen ist (kein Rückfall war
-# möglich). Platzhalter: [reason] - der `DispatchOutcome.Failed.Reason`.
+# Wird gesendet, wenn die serverübergreifende Anfrage fehlgeschlagen ist und kein
+# Rückfall möglich war. Platzhalter: [reason] - der Fehlergrund.
 netzwerkFehlgeschlagen: "&c[P0] serverübergreifender Teleport fehlgeschlagen: [reason]."
 # Wird gesendet, wenn der Spieler eine bestimmte Region angefordert hat (`/rtp <region>`), aber
 # derzeit kein Backend im Netzwerk sie bedient. Platzhalter:
@@ -198,7 +197,7 @@ infoMSPT: "&7Aktuelles Plugin-MSPT: #7E9CC8[mspt]"
 infoLadevorgaengeGesamt: "&7Insgesamt geladene Chunks: #7E9CC8[loads]"
 infoLadevorgaengeNachUrsprung: "&7Ladevorgänge nach Ursprung: #7E9CC8[loadsByOrigin]"
 infoLeckRate: "&7Aktuelle Chunk-Leak-Rate: #7E9CC8[leakRate]"
-# --- Metrik-SPI-Zustandsblock ---
+# --- Zustands-Metrikblock ---
 infoWarteschlangenTiefe: "&7Spieler in Regions-Warteschlangen: #7E9CC8[queueDepth]"
 infoAusstehendeTeleports: "&7Ausstehende Teleport-Pipelines: #7E9CC8[pendingTeleports]"
 infoDurchschnittPipelineMs: "&7Durchschnittliche Pipeline-Latenz: #7E9CC8[avgPipelineMs] ms"
@@ -221,18 +220,18 @@ infoMSPTLive: "&7Server-MSPT: #7E9CC8[mspt] ms (&7Tick-Budget: #7E9CC8[tickBudge
 infoSoftLimit: "&7Spieler: #7E9CC8[playerCount] / [softCap]"
 # Aktuelle Round-Trip-Latenz der Datenbank in ms. Platzhalter: [databaseLatencyMs].
 infoDatenbankLatenzMs: "&7Datenbank-Latenz: #7E9CC8[databaseLatencyMs] ms"
-# Metriken zum Generierungsergebnis, aus den prozessweiten RtpOutcomeStats.
+# Metriken zum Generierungsergebnis.
 # Erfolgs-/Fehlerrate über alle erfassten Generierungsversuche. Platzhalter:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal].
 infoFailureRate: "&7Generierungserfolg: #7E9CC8[genSuccessRate]&7 (Fehler #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
 # Häufigste einzelne Ablehnungsursache und ihr Anteil an allen Fehlern. Platzhalter:
 # [genTopRejectionCause] [genTopRejectionShare].
 infoTopRejectionCause: "&7Häufigste Ablehnungsursache: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
-# Aufschlüsselung der Ablehnungen nach Ursache (das Pendant zum /rtp unsafe-stats eines Mitbewerbers).
+# Aufschlüsselung der Ablehnungen nach Ursache.
 # Platzhalter: [genFailureBreakdown] - kommagetrennte Liste Ursache=N, häufigste zuerst.
 infoFailureBreakdown: "&7Ablehnungen nach Ursache: #7E9CC8[genFailureBreakdown]"
-# Schwellenwerte der Zustands-Farbbänder. Fließkommawerte, die von ColourBands in rtp-core
-# genutzt werden, um farbige Platzhalter-Varianten (z. B. [tps1mColoured]) mit &a/&7/&c zu umschließen.
+# Schwellenwerte der Zustands-Farbbänder. Werden verwendet, um farbige Platzhalter-
+# Varianten (z. B. [tps1mColoured]) grün/gelb/rot einzufärben.
 infoSchwelleTpsGruen: 19.5
 infoSchwelleTpsGelb: 18.0
 infoSchwelleMsptGruen: 30.0
@@ -300,23 +299,23 @@ menueHoverGrenzenFallback: "akzeptiert: [values]"
 menueZurueck: "&7« zurück"
 # ausführbaren Nicht-Wurzel-Menüseite vorangestellt wird. Platzhalter: [command] - der zusammengebaute /rtp...-Aufruf.
 menueAusfuehren: "&2▶ [command] ausführen"
-# Kopfzeile oben auf einer Unterseite zur Parameterwertauswahl (Stufe A.2).
+# Kopfzeile oben auf einer Unterseite zur Parameterwertauswahl.
 # Platzhalter: [param] - Parametername; [command] - zusammengebauter /rtp...-Aufruf.
 menueWertWaehlen: "&7wähle einen Wert für [param] (führt aus: /rtp [command] [param]:<value>)"
 # Ein Klick füllt den Chat mit dem zusammengebauten Befehl bis '<param>:' vor, sodass der Spieler
 # einen beliebigen Wert eingeben kann, auch solche, die nicht in der Vorschlagsliste stehen.
 menueWertEingeben: "&7✎ eigenen Wert eingeben..."
-# Nicht anklickbare Kopfzeile oben auf jeder Nicht-Wurzel-Menüseite (Stufe A.4).
+# Nicht anklickbare Kopfzeile oben auf jeder Nicht-Wurzel-Menüseite.
 # Zeigt den aktuell zusammengebauten /rtp-Aufruf einschließlich aller vorgemerkten
 # Parameterzuweisungen (name:value). Platzhalter: [command] - zusammengebaute Argumente.
 menueZusammengebaut: "&7baue zusammen: #7E9CC8/rtp [command]"
-# Nicht anklickbare Titelzeile, die der Wurzel-/rtp-Menüseite vorangestellt wird (Stufe A.5).
+# Nicht anklickbare Titelzeile, die der Wurzel-/rtp-Menüseite vorangestellt wird.
 # Bietet eine einladende Kopfzeile, bevor der Spieler in einen Unterbefehl absteigt.
 menueHauptTitel: "#5FB3B3&l⚡ RTP-Menü"
 # Nicht anklickbare Untertitel-/Hinweiszeile, die der Wurzel-/rtp-Menüseite unterhalb von
-# menuRootTitle vorangestellt wird (Stufe A.5). Kurzer Orientierungstext für Erstnutzer.
+# menuRootTitle vorangestellt wird. Kurzer Orientierungstext für Erstnutzer.
 menueHauptHinweis: "&7klicke unten auf eine Option, um zu beginnen"
-# Navigationszeilen, die paginierten Menüseiten angehängt werden (Stufe A.6) - ein Klick
+# Navigationszeilen, die paginierten Menüseiten angehängt werden - ein Klick
 # wechselt zur vorherigen/nächsten Seite desselben Modells. Platzhalter:
 # [page] - die 1-basierte, menschenlesbare Zielseitennummer.
 menueSeiteZurueck: "&7« vorherige Seite ([page])"
@@ -329,9 +328,9 @@ menueStartseiteZeileRegion: "&2▶ /rtp region:&7... &7- eine Region wählen"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- eine Welt wählen"
 menueStartseiteZeileBiom: "&2▶ /rtp biome:&7... &7- ein Biom wählen"
 menueStartseiteZeileHilfe: "&2▶ /rtp help &7- Befehle auflisten"
-# Admin-Einstiegszeile der Startseite: die einzige inline
-# admin-sichtbare Zeile auf der Startseite; ein Klick steigt in das kuratierte Admin-
-# Panel ab, das vom AdminPanelBuilder erstellt wird. Ausgeblendet, wenn dem Betrachter rtp.menu.admin fehlt.
+# Admin-Einstiegszeile der Startseite: die einzige inline admin-sichtbare Zeile
+# auf der Startseite; ein Klick steigt in das Admin-Panel ab. Ausgeblendet, wenn
+# dem Betrachter rtp.menu.admin fehlt.
 menueStartseiteZeileAdmin: "#9D7CD8▶ Admin-Panel &7- Operator-Werkzeuge"
 # Hover-Text für die Admin-Panel-Einstiegszeile. Keine Platzhalter.
 menueStartseiteHoverAdmin: "&7Operator-Werkzeuge: Konfiguration, Scans, Diagnose, Neuladen"
@@ -466,26 +465,23 @@ konfigAnwendenZeile: "&2&l[apply]"
 # Leert den Warenkorb, ohne zu übernehmen.
 konfigVerwerfenZeile: "&c&l[discard]"
 
-# --- deklarative Diagramm-Kompositionsbrücke ---
-# Wird an den Betrachter gesendet, wenn eine OPEN_MAP-Menüaktion ausgelöst wird, aber kein konkretes
-# MapBinding registriert ist (NoopMapBinding ist noch aktiv, z. B. bei der
-# Lite-Assembly oder bevor RTPHooks das Plattform-Binding verdrahtet).
+# --- Karten-/Diagrammdarstellung ---
+# Wird gesendet, wenn eine Kartenzeile angeklickt wird, aber die Kartendarstellung
+# auf diesem Server nicht verfügbar ist (z. B. bei der Lite-Assembly oder ohne Kartenanbieter).
 karteBindungFehlt: "&c[P0] Kartendarstellung ist auf diesem Server nicht verfügbar."
-# Wird gesendet, wenn MapDispatch eine ChartSpec erhält, deren Kind keinen registrierten
-# ChartSpecResolver hat (z. B. Stufe-1-Betrachter klickt eine Stufe-3-Sparkline an, bevor
-# der Resolver vorhanden ist).
+# Wird gesendet, wenn ein Diagramm angefordert wird, aber kein Renderer für
+# diesen Diagrammtyp registriert ist.
 karteResolverFehlt: "&c[P0] für diese Anfrage ist kein Karten-Resolver registriert."
 # Wird gesendet, wenn ein Resolver läuft, aber die zugrunde liegende Datenquelle für
 # das angeforderte Ziel nicht verfügbar ist (unbekannte Region, noch keine Daten, Welt entladen).
 # Platzhalter: [region] - der angeforderte Regionsname (kann leer sein).
 karteNichtVerfuegbar: "&e[P1] Kartendaten sind derzeit nicht verfügbar."
-# Wird gesendet, wenn das aktive MapBinding derzeit keinen Karten-Handle zuweisen kann
-# (vom Binding definierter Gegendruck, z. B. Obergrenze pro Betrachter erreicht).
+# Wird gesendet, wenn der Kartendienst derzeit keine Karte zuweisen kann
+# (z. B. Obergrenze pro Betrachter erreicht).
 karteBeschaeftigt: "&e[P1] der Kartendienst ist beschäftigt; bitte versuche es gleich erneut."
-# ChartSpec(BAD_POINTS_HEATMAP,...)-Token erzeugt und das aktive MapBinding bittet,
-# eine 128x128-Heatmap der bekannten Schlecht-Punkt-Spiralindizes der aktuellen
-# Region zu rendern. Die Zeile wird beim Rendern ausgelassen, wenn NoopMapBinding
-# das installierte Binding ist.
+# Bezeichnung der anklickbaren "/rtp info"-Menüzeile, die eine Heatmap der
+# bekannten schlechten Orte der aktuellen Region rendert. Ausgeblendet, wenn die
+# Kartendarstellung auf diesem Server nicht verfügbar ist.
 menueInfoSchlechteOrteBezeichnung: "#9D7CD8&l# Karte schlechter Orte"
 
 # --- MultiConfig-Untermenü ---

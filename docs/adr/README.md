@@ -8,6 +8,7 @@ An ADR captures a significant architectural decision: the context that forced it
 
 | # | Title | Status |
 |---|-------|--------|
+| [ADR-000](ADR-000-development-workflow.md) | Development Workflow (meta: how a developer ought to work in this repo and why - full lifecycle from intake through self-maintenance, D-005 guard rail, divergence handling, optional AI tooling) | Accepted |
 | [ADR-001](ADR-001-archimedean-spiral-1d-mapping.md) | Archimedean Spiral 1D Mapping for Location Selection | Accepted |
 | [ADR-002](ADR-002-h2-sqlite-over-flat-file-cache.md) | H2/SQLite for Spatial Memory Persistence Over Flat-File Cache | Accepted |
 | [ADR-003](ADR-003-rtp-plugin-bridge-module.md) | rtp-plugin as a Separate Bridge Module from rtp-core | Accepted |

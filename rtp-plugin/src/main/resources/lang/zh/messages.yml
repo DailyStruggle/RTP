@@ -89,11 +89,11 @@ networkRouting: "&7[P0] 正在路由到后端..."
 networkReserved: "&a[P0] 已在 [server] 预留坐标。正在传送..."
 # 代理正在跳转中时发送。占位符: [server] - 目标服务器。
 networkTransferring: "&a[P0] 正在传送到 [server]..."
-# 跨服路径放弃并回退到本地后端时发送。
-# 占位符: [reason] - RoutingDecision.FallbackReason 的值之一。
+# 跨服路径放弃并回退到本地服务器时发送。
+# 占位符: [reason] - 回退原因。
 networkFallback: "&e[P0] 跨服不可用 ([reason])；回退到本地。"
-# 跨服请求终态失败（无法回退）时发送。
-# 占位符: [reason] - DispatchOutcome.Failed.Reason。
+# 跨服请求失败且无法回退时发送。
+# 占位符: [reason] - 失败原因。
 networkFailed: "&c[P0] 跨服传送失败：[reason]。"
 # 玩家请求特定区域但网络中没有后端当前提供该区域时发送。
 # 占位符: [region] - 请求的区域名称。
@@ -164,7 +164,7 @@ scanBossBar: "正在扫描 [scan_regions]: [scan_chunks]/[scan_totalChunks] ([sc
 信息_总加载次数: "&7累计加载区块数: #7E9CC8[loads]"
 信息_按来源加载: "&7按来源加载: #7E9CC8[loadsByOrigin]"
 信息_泄漏率: "&7当前区块泄漏率: #7E9CC8[leakRate]"
-# --- 指标 SPI 健康状态块 ---
+# --- 指标 健康状态块 ---
 信息_队列深度: "&7区域队列中等待的玩家: #7E9CC8[queueDepth]"
 信息_等待传送: "&7待处理传送管道: #7E9CC8[pendingTeleports]"
 信息_平均管道毫秒: "&7平均管道延迟: #7E9CC8[avgPipelineMs] ms"
@@ -187,7 +187,7 @@ infoQueueGrowth: "&7队列增长警告 (>= #7E9CC8[queueGrowthWarnThreshold]&7):
 信息_软上限: "&7玩家数: #7E9CC8[playerCount] / [softCap]"
 # 最近一次数据库往返延迟（毫秒）。占位符: [databaseLatencyMs]。
 信息_数据库延迟毫秒: "&7数据库延迟: #7E9CC8[databaseLatencyMs] ms"
-# 生成结果指标，来源于进程全局 RtpOutcomeStats。
+# 生成结果指标。
 # 所有已记录生成尝试的成功/失败率。占位符:
 # [genSuccessRate] [genFailureRate] [genOutcomeTotal]。
 infoFailureRate: "&7生成成功率: #7E9CC8[genSuccessRate]&7 (失败 #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
@@ -197,8 +197,8 @@ infoTopRejectionCause: "&7主要拒绝原因: #7E9CC8[genTopRejectionCause]&7 (#
 # 按原因分类的拒绝明细。
 # 占位符: [genFailureBreakdown] - 以逗号分隔的 cause=N 列表，最忙的排在前面。
 infoFailureBreakdown: "&7按原因分类的拒绝: #7E9CC8[genFailureBreakdown]"
-# Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
-# to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&7/&c.
+# Health colour-band thresholds. Used to colour the coloured-variant
+# placeholders (e.g. [tps1mColoured]) green/yellow/red.
 信息_TPS阈值_绿: 19.5
 信息_TPS阈值_黄: 18.0
 信息_MSPT阈值_绿: 30.0
@@ -295,7 +295,7 @@ menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- 选择世界"
 菜单_首页_生物群系行: "&2▶ /rtp biome:&7... &7- 选择生物群系"
 菜单_首页_帮助行: "&2» /rtp help &7- 列出命令"
 # 首页管理员入口行: 首页上唯一的内联管理员可见行；
-# 点击后进入由 AdminPanelBuilder 构建的精选管理面板。
+# 点击后进入管理面板。
 # 当查看者缺少 rtp.menu.admin 权限时隐藏。
 menuFrontPageRowAdmin: "#9D7CD8» 管理面板 &7- 管理员工具"
 # 管理面板入口行的悬停文字。无占位符。
@@ -438,18 +438,18 @@ configApplyRow: "&2&l[apply]"
 # 清空购物车但不应用更改。
 configDiscardRow: "&c&l[discard]"
 
-# --- 声明式图表组合桥接 ---
-# 当 OPEN_MAP 菜单动作触发但没有注册具体 MapBinding 时发送给查看者。
+# --- 地图/图表渲染 ---
+# 当点击地图行但此服务器上地图渲染不可用时发送（例如 Lite 版本或未安装地图提供者）。
 mapBindingMissing: "&c[P0] 此服务器上地图渲染不可用。"
-# 当 MapDispatch 收到其 Kind 没有注册 ChartSpecResolver 的 ChartSpec 时发送。
+# 当请求图表但未为该图表类型注册渲染器时发送。
 mapResolverMissing: "&c[P0] 此请求未注册图表解析器。"
 # 当解析器运行但底层数据源对请求目标不可用时发送。
 # 占位符: [region] - 请求的区域名称（可能为空）。
 mapUnavailable: "&e[P1] 图表数据当前不可用。"
-# 当活跃 MapBinding 当前无法分配地图句柄时发送。
+# 当地图服务当前无法分配地图时发送（例如已达到每个查看者的上限）。
 mapBusy: "&e[P1] 地图服务繁忙，请稍后再试。"
-# 可点击的 /rtp info 菜单行的标签，点击后渲染当前区域坏点热力图。
-# 当 NoopMapBinding 为已安装绑定时，该行在渲染时被省略。
+# 可点击的 /rtp info 菜单行的标签，渲染当前区域已知坏点的热力图。
+# 当此服务器上地图渲染不可用时，该行被隐藏。
 menuInfoBadPointsLabel: "#9D7CD8&l# 坏点地图"
 
 # --- 多配置子菜单 ---

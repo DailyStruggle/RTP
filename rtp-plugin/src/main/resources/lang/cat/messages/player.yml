@@ -113,3 +113,6 @@ slow_blink_out: 20
 
 # tummy_strip (actionbar) setting
 tummy_strip: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

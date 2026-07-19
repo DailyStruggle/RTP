@@ -8,8 +8,8 @@ world: "[0]"
 worldBorderOverride: false
 
 # Spawn area shape and size. radius/centerRadius are measured in chunks. "@config" inherits
-# the whole `defaults.shape` block from config.yml (ADR-073), so a single-world server sets
-# radius/centerRadius once there.
+# the whole `defaults.shape` block from config.yml, so a single-world server sets
+# radius/centerRadius once there. See https://github.com/DailyStruggle/RTP/wiki/Config-yml
 # Replace with an inline block to override per-region, e.g.:
 #   shape:
 #     name: "CIRCLE"
@@ -18,14 +18,29 @@ worldBorderOverride: false
 shape: "@config"
 
 # Vertical landing window. "@config" inherits the whole `defaults.vert` block from
-# config.yml (ADR-073). Replace with an inline block to override per-region.
+# config.yml. See https://github.com/DailyStruggle/RTP/wiki/Config-yml
+# Replace with an inline block to override per-region, e.g.:
+#   vert:
+#     name: "LINEAR"
+#     minY: 32
+#     maxY: 128
+#     step: 8
+#     requireSkyLight: false
 vert: "@config"
 
-# If true, rtp.regions.<name> is required. "@config" inherits defaults.requirePermission.
+# If true, rtp.regions.<name> is required. "@config" inherits defaults.requirePermission
+# from config.yml. See https://github.com/DailyStruggle/RTP/wiki/Config-yml
+# Replace with a literal to override per-region, e.g.:
+#   requirePermission: true
 requirePermission: "@config"
 # Region to redirect to if no permission
 override: "default"
 # Economy cost override for this region (added on top of the economy.yml base price).
+# Use "@economy" to inherit the base price from economy.yml instead of a literal.
+# See https://github.com/DailyStruggle/RTP/wiki/Economy
+# Replace with a number or the inheritance token to override per-region, e.g.:
+#   price: 100.0
+#   price: "@economy"
 price: 0.0
 
 # Optional cosmetic display name shown in /rtp info and the GUI menu. Does NOT
@@ -34,15 +49,22 @@ price: 0.0
 # displayName: "&#55ff55Wild Overworld"
 
 # --- Advanced (cache/precision tuning; defaults suit most servers) ---
-# Each "@config" inherits the matching defaults.<key> value from config.yml (ADR-073);
-# replace with a number to override per-region.
-# Max pre-calculated safe locations
+# Each "@config" inherits the matching defaults.<key> value from config.yml;
+# replace with a number to override per-region. See:
+#   https://github.com/DailyStruggle/RTP/wiki/Config-yml
+#   https://github.com/DailyStruggle/RTP/wiki/Regions
+# Max pre-calculated safe locations. Example override:
+#   cacheCap: 10
 cacheCap: "@config"
-# L3 backlog cache capacity; unverified candidates pre-filtered by anvil one .mca-bin per pulse. 0 disables L3.
+# Backlog cache capacity for candidate locations pre-filtered before full safety checks. 0 disables it.
+# Example override:
+#   backlogCacheCap: 1000
 backlogCacheCap: "@config"
-# Max chunks kept loaded for zero-latency
+# Max chunks kept loaded for zero-latency. Example override:
+#   activeChunkCap: 64
 activeChunkCap: "@config"
-# Precision for bad-location tracking (1-5)
+# Precision for bad-location tracking (1-5). Example override:
+#   spatialResolution: 3
 spatialResolution: "@config"
 
 # DO NOT TOUCH VERSION NUMBER
