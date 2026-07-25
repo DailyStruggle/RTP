@@ -7,12 +7,20 @@ world: "[0]"
 # Use the world's /worldborder as the bound instead of the shape radius below.
 worldBorderOverride: false
 
-# Spawn area shape and size. radius/centerRadius are measured in chunks. "@config" inherits
-# the whole `defaults.shape` block from config.yml, so a single-world server sets
-# radius/centerRadius once there. See https://github.com/DailyStruggle/RTP/wiki/Config-yml
-# Replace with an inline block to override per-region, e.g.:
+# Spawn area shape and size. radius/centerRadius are measured in chunks.
+#
+# The teleport radius can be set in two places; pick ONE:
+#   1. Shared default (most servers): edit `defaults.shape.radius` in config.yml.
+#      Leaving the value below as "@config" inherits that whole `defaults.shape`
+#      block, so a single-world server sets radius/centerRadius once, there.
+#   2. Per-region override (this region only): replace "@config" with an inline
+#      `shape:` block here. An inline block wins over the config.yml default.
+#
+# See https://github.com/DailyStruggle/RTP/wiki/Config-yml
+# Example per-region override (mirrors the defaults.shape block in config.yml):
 #   shape:
 #     name: "CIRCLE"
+#     mode: "ACCUMULATE"
 #     radius: 256
 #     centerRadius: 64
 shape: "@config"
@@ -24,7 +32,7 @@ shape: "@config"
 #     name: "LINEAR"
 #     minY: 32
 #     maxY: 128
-#     step: 8
+#     direction: 2
 #     requireSkyLight: false
 vert: "@config"
 
