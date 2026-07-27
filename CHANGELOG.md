@@ -45,6 +45,8 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 - **Color codes in config comments now show as literal text in the `/rtp config` menu hover instead of being rendered as colors.** Operator-facing config comments routinely document legacy color codes as examples (e.g. "avoid yellow (`&e`/`&6`)"), but the menu surfaces a key's block comment as hover text through the standard render pipeline (`&`-to-`§` translation, hex, and section deserialization), which painted the description and swallowed the example codes. The comment-to-hover conversion (`resolveConfigHover` and `ConfigMenuConsumerProfile`) now escapes color introducers (`&`, `§`, `&#RRGGBB`, `#RRGGBB`, and the `§x` hex run) via a new `LegacyColorStrip.escape(...)`, so the codes render verbatim. Covered by new `LegacyColorStripTest` cases.
 
+- **NeoForge on MC 26.2 no longer crashes the server the moment a colored `/rtp` message is sent (e.g. clicking a GUI destination).** `NeoForgeLegacyText.applyFormatting` classified color-vs-format via `net.minecraft.ChatFormatting.isColor()`, a public introspection method MC 26.2 removed; the single wide-range `rtp-neoforge-common` carrier compiled against an older MC where it exists, so the call linked at build time but threw `NoSuchMethodError` at runtime, taking down the tick thread. Color detection now uses a static `EnumSet<ChatFormatting>` of the 16 named colors, whose enum constants are stable from 1.21.1 through 26.2, so the carrier stays linkage-safe across the whole supported runtime range (mirroring the Fabric `V26_2_R1FabricLegacyText` fix).
+
 ---
 
 ## [3.2.0] - 2026-06-21

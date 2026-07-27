@@ -471,8 +471,21 @@ public final class NeoForgeLegacyText {
         } catch (Throwable ignored) { /* best-effort */ }
     }
 
+    // MC 26.2 trimmed ChatFormatting's public introspection (no isColor() /
+    // getColor()), so color-vs-format is decided here from the enum constant
+    // set: the 16 named colors versus the formatting / RESET codes. The enum
+    // constants themselves are stable from 1.21.1 through 26.2, so this keeps
+    // the single wide-range carrier linkage-safe across the whole runtime range.
+    private static final java.util.EnumSet<ChatFormatting> COLORS = java.util.EnumSet.of(
+            ChatFormatting.BLACK, ChatFormatting.DARK_BLUE, ChatFormatting.DARK_GREEN,
+            ChatFormatting.DARK_AQUA, ChatFormatting.DARK_RED, ChatFormatting.DARK_PURPLE,
+            ChatFormatting.GOLD, ChatFormatting.GRAY, ChatFormatting.DARK_GRAY,
+            ChatFormatting.BLUE, ChatFormatting.GREEN, ChatFormatting.AQUA,
+            ChatFormatting.RED, ChatFormatting.LIGHT_PURPLE, ChatFormatting.YELLOW,
+            ChatFormatting.WHITE);
+
     private static Style applyFormatting(Style style, ChatFormatting fmt) {
-        if (fmt.isColor()) {
+        if (COLORS.contains(fmt)) {
             return Style.EMPTY.withColor(fmt);
         }
         switch (fmt) {

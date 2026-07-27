@@ -3,6 +3,8 @@ package io.github.dailystruggle.rtp.api;
 import io.github.dailystruggle.metrics.api.FoliaRegionSample;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.rtp.api.annotations.PublicApi;
+import io.github.dailystruggle.rtp.api.event.PlayerMoveDispatcher;
+import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
 import io.github.dailystruggle.rtp.api.event.PrefabAppliedEvent;
 import io.github.dailystruggle.rtp.api.event.PrefabEventDispatcher;
 import io.github.dailystruggle.rtp.api.hooks.RTPHooks;
@@ -139,6 +141,18 @@ public class RTPAPI {
    */
   public static final PrefabEventDispatcher prefabEvents = new PrefabEventDispatcher();
 
+  /**
+   * Eagerly-created, opt-in, per-player dispatcher for {@link PlayerMoveEvent}
+   * notifications (ADR-075). Like {@link #prefabEvents} it is always available so
+   * consumers may register before {@code rtp-core} has loaded. Each platform
+   * adapter fires block-granularity move events through it for players in the
+   * watched set, and gates its per-player movement work on
+   * {@link PlayerMoveDispatcher#isWatched(UUID)}. Use
+   * {@link #watchPlayerMove(UUID, java.util.function.Consumer)} to register
+   * rather than reading this field directly.
+   */
+  public static final PlayerMoveDispatcher playerMoveEvents = new PlayerMoveDispatcher();
+
 
   /**
    * Sets the platform-specific server accessor.
@@ -234,6 +248,41 @@ public class RTPAPI {
   @PublicApi
   public static AutoCloseable onPrefabApplied(java.util.function.Consumer<PrefabAppliedEvent> subscriber) {
     return prefabEvents.subscribe(subscriber);
+  }
+
+  /**
+   * Registers interest in a specific player's block-granularity movement and
+   * receives a {@link PlayerMoveEvent} whenever that player crosses into a new
+   * block (ADR-075).
+   *
+   * <p>This is the platform-neutral movement primitive: adapters produce the
+   * normalized signal from whatever their runtime offers and fire it only for
+   * watched players, so per-move cost scales with the number of watched players
+   * rather than the total online count. Withdraw interest by closing the
+   * returned handle (or on disconnect); the player leaves the watched set once
+   * its last handler is closed.
+   *
+   * <p>Unlike most {@code RTPAPI} entry points, this is safe to call before
+   * {@code rtp-core} has loaded; the dispatcher is created eagerly so an addon
+   * may subscribe during its own {@code onEnable}.
+   *
+   * <p><b>Threading:</b> the handler is invoked on the platform's natural thread
+   * for that player (e.g. the moving entity's region thread on Folia). A handler
+   * that touches the world must re-schedule onto the RTP scheduler itself.
+   * Exceptions thrown by a handler are isolated so a single faulty consumer
+   * cannot break delivery to the others. The event path performs no chunk I/O.
+   *
+   * @param player  the player to watch; must not be {@code null}.
+   * @param handler the handler to notify on each block change; must not be
+   *                {@code null}.
+   * @return an {@link AutoCloseable} that withdraws this handler when closed.
+   * @throws IllegalArgumentException if {@code player} or {@code handler} is
+   *                                  {@code null}.
+   */
+  @PublicApi
+  public static AutoCloseable watchPlayerMove(
+      UUID player, java.util.function.Consumer<PlayerMoveEvent> handler) {
+    return playerMoveEvents.watch(player, handler);
   }
 
   /**

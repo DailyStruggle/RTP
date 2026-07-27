@@ -61,6 +61,13 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`architecture/09-configuration-load-and-reload.md`](architecture/09-configuration-load-and-reload.md)
 - [`architecture/10-shutdown-and-flush-lifecycle.md`](architecture/10-shutdown-and-flush-lifecycle.md)
 
+## Public site - narrative pages (`site/`)
+- [`site/README.md`](site/README.md) — purpose + conventions for the narrative/non-functional page set.
+- [`site/index.md`](site/index.md) — home / landing page.
+- [`site/why.md`](site/why.md) — motivation and the distribution algorithm.
+- [`site/intended-usage.md`](site/intended-usage.md) — the region mental model and recommended workflow.
+- [`site/what-not-to-do.md`](site/what-not-to-do.md) — anti-patterns (break-entirely vs. slow).
+
 ## Operator-facing (`admin/`)
 - [`admin/proxies/INDEX.md`](admin/proxies/INDEX.md) — proxy-mode admin docs (stub; populated as multi-server plan lands).
 - [`admin/QUICK_START.md`](admin/QUICK_START.md)

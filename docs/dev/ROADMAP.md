@@ -124,6 +124,40 @@ reproducible by readers".
 
 ## Tier 2 — Upcoming features (not caveat-driven)
 
+- [ ] **Party/group teleport addon (`LeafRTPPartyAddon`).** Module skeleton landed as a
+  platform-neutral `RTPAddon` (config + lifecycle only; loads as a safe no-op). Remaining work:
+  party detection, coordinate reservation, and grouped teleport dispatch (serve one prepared
+  coordinate to N members, or draw a small adjacent cluster) - all consuming the existing supply
+  pipeline rather than searching per member. Specified in
+  [`addons/LeafRTPPartyAddon/REQUIREMENTS.md`](../../addons/LeafRTPPartyAddon/REQUIREMENTS.md) and
+  [leafrtp-party-addon-ADR-001](../../addons/LeafRTPPartyAddon/docs/adr/leafrtp-party-addon-ADR-001-party-teleport-shared-destination.md)
+  (Proposed).
+- [ ] **Region-confinement (tether) addon (`LeafRTPTetherAddon`).** Module skeleton landed as a
+  platform-neutral `RTPAddon` (config + lifecycle only; loads as a safe no-op). Replaces the earlier
+  "named-zone" framing: a "zone" is ~90% just an existing RTP region, so the non-redundant capability
+  is keeping a player *inside* the region they were teleported into - a cross-platform "tether". It
+  uses RTP's own region geometry (chunk-free containment) and teleport events for membership, enforces
+  by safe pull-back (never movement-veto), and optionally persists via the core database. Remaining
+  work is gated on a new core primitive - a platform-neutral player-move event SPI - proposed under
+  D-005 (see below). Any WorldGuard/claim-mod bound stays optional via the rtp-api hook surface
+  (ADR-026), never required. Specified in
+  [`addons/LeafRTPTetherAddon/REQUIREMENTS.md`](../../addons/LeafRTPTetherAddon/REQUIREMENTS.md) and
+  [leafrtp-tether-addon-ADR-001](../../addons/LeafRTPTetherAddon/docs/adr/leafrtp-tether-addon-ADR-001-cross-platform-region-confinement.md)
+  (Proposed).
+- [ ] **Platform-neutral player-move event SPI (core, D-005 gated).** A normalized block-granularity
+  move signal in `rtp-api`, dispatched by `rtp-core`, implemented per adapter (Bukkit `PlayerMoveEvent`,
+  Fabric/NeoForge server-tick position diff), with opt-in per-player subscription so cost scales with
+  watched players rather than total. Unblocks the tether addon above and is a reusable primitive for
+  future move-driven features, with no WorldGuard dependency. Proposed in
+  [`docs/dev/PROPOSAL-tether-and-move-event-spi.md`](PROPOSAL-tether-and-move-event-spi.md) and
+  [ADR-075](../adr/ADR-075-platform-neutral-player-move-event-spi.md) (Proposed) - awaiting approval
+  before any core code lands.
+- [ ] **Investigate: spectator-during-wait (deferred, low priority).** Some competitor plugins place
+  a player in spectator mode while a destination is resolved. This is a poor architectural fit here -
+  the default model is search-and-serve-else-queue (destinations are prepared ahead of time, so there
+  is no command-then-search "limbo" window to paper over) - and forced spectator carries real risk
+  (fall-through, exploit windows, gamemode restoration on disconnect/crash). Kept as a future
+  investigation only; if pursued at all it belongs as an optional effect, not a core behavior.
 - [ ] **Config-file organization + discoverability (operator feedback).** Recurring operator
   feedback (e.g. the public thread where a user who praised the plugin's performance still found the
   config "could use some work - there are a lot of different files and it can get confusing"): the

@@ -151,4 +151,12 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** False FAIL in `/rtp test full` on every server (Paper devstack shows it cleanly); also pollutes the operator's WARN-level log on every synthetic probe. No runtime defect.
 - **Suggested next step:** Either (a) downgrade the `[ENQUEUE_TRACE] ... DROPPED` line to `Level.FINE` (it is a diagnostic, not a user-impacting warning), or (b) have the disconnect-midflight probe register its synthetic UUID with `SendMessage` so the drop is silenced for that one ID. (a) is the cleaner fix.
 
+### 2026-07-26 - NeoForge never unpacks the `docs/` folder (missing `extractDocs` call in the mod lifecycle)
+
+- **Discovered during:** config-folder reduction discussion (this session). User noticed no `docs/` directory appears in the NeoForge runtime data dir; docs are non-functional so were excluded from the layout redesign, but the "why" was investigated.
+- **Location:** `platforms/rtp-neoforge/rtp-neoforge-common/src/main/java/io/github/dailystruggle/rtp/neoforge/RTPNeoForgeMod.java` server-start lifecycle - no `extractDocs`/`JarUtils` equivalent is called anywhere in the module. Compare Bukkit `rtp-plugin/.../bukkit/utils/JarUtils.extractDocs` (invoked from `RTPBukkitPlugin.onEnable`) and Fabric `rtp-plugin/.../fabric/utils/FabricJarUtils.extractDocs` (invoked from `RTPFabricMod`), both run at startup.
+- **Symptom / hypothesis:** NeoForge ships inside the same unified `LeafRTP-Pro` jar as Bukkit/Fabric (CHANGELOG confirms), so the `docs/` resources are already bundled - there is content to extract. The only gap is that the NeoForge entry point never invokes a docs-extraction routine, so nothing is written to the data dir.
+- **Impact:** Operators on NeoForge get no on-disk `docs/` reference tree. Non-functional (reference material only; in-game docs menu + wiki still exist). No teleport/safety impact.
+- **Suggested next step:** Add a docs-extraction call to `RTPNeoForgeMod`'s server-start path, reusing the existing extraction logic against the NeoForge data dir (`NeoForgeServerAccessor#getPluginDirectory` / config dir), mirroring `FabricJarUtils.extractDocs`. Track under the NeoForge Phase in `MULTI_PLATFORM_PLAN.md` if adopted.
+
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

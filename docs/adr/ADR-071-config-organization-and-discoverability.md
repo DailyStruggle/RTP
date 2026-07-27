@@ -1,6 +1,6 @@
 # ADR-071 - Config Organization and Discoverability
 
-**Status:** Proposed
+**Status:** Proposed (top-level directory layout in rule 1 superseded by [ADR-076](ADR-076-config-folder-consolidation.md); all other rules remain in force)
 **Date:** 2026-06-22
 
 ## Context
