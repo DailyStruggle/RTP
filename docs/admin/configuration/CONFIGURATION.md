@@ -1,8 +1,8 @@
 # Configuration Reference
 
-**Applies to Plugin Version:** `3.0.0-beta.1`
+One jar covers every platform. Configuration is generated on first server start and lives under `plugins/RTP/` on the Bukkit family (Paper, Spigot, Folia and their forks, Arclight, Mohist) or under `config/rtp/` on Fabric / NeoForge. Edit the files directly and run `/rtp reload` to apply changes without a server restart, or change an individual key at runtime with `/rtp config <file> <key>=<value>` (atomic write + auto-reload).
 
-All configuration files live in `plugins/RTP/` after the first server start. Edit them directly and run `/rtp reload` to apply changes, as this will update settings without a server restart.
+> **Inheritance:** to avoid repeating the same value across many region/world files, a region/world setting can inherit a global default with an `@<file>` token (e.g. `@config`, `@economy`). See [CORE_CONFIG.md → Defaults (inheritance)](CORE_CONFIG.md#defaults-inheritance).
 
 > 📎 **How RTP loads, reloads, and upgrades these files** (including what the `.old1`/`.old2` files are, and how your customizations are preserved across version bumps and locale switches): see [CONFIG_LIFECYCLE.md](CONFIG_LIFECYCLE.md).
 
@@ -235,12 +235,6 @@ Requires **Vault** and a compatible economy plugin. If Vault is absent, all econ
 All five built-in shape engines (`CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `RECTANGLE`) are configured inline inside each region's `shape:` block, as there are no separate per-shape config files.
 
 Custom shapes can be registered at runtime via `rtp-api`. See [`addons/`](../../addons/) for examples. A registered custom shape appears as a valid `shape.name` value in any region config.
-
----
-
-## `worlds/<name>.yml` — World Configuration
-
-See [WORLDS.md](WORLDS.md) for a full breakdown of the world configuration.
 
 ---
 

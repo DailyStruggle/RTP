@@ -374,6 +374,20 @@ include 'addons:LeafRTPRiftAddon'
 // verifiers. Single Bukkit-only module (every checker is org.bukkit.*-based);
 // self-gates on PlatformFamily.BUKKIT so it is a no-op on Fabric/NeoForge.
 include 'addons:LeafRTPClaimAddon'
+// LeafRTPPartyAddon - party/group teleport. Consumes destinations already
+// prepared by the core supply pipeline (serve one verified coordinate to N
+// members, or draw a small adjacent cluster) rather than searching per member.
+// Platform-neutral RTPAddon (ADR-057); config + lifecycle only at present, the
+// grouped-teleport orchestration is specified in its REQUIREMENTS/ADR.
+include 'addons:LeafRTPPartyAddon'
+// LeafRTPTetherAddon - keep a player inside the RTP region they were teleported
+// into ("tether" = cross-platform region confinement). Uses RTP's own region
+// geometry + move signal instead of a WorldGuard trap, so it works on
+// Bukkit/Paper/Folia and Fabric/NeoForge with no third-party plugin.
+// Platform-neutral RTPAddon (ADR-057); config + lifecycle only at present -
+// enforcement depends on the proposed core move-event SPI (ADR-075, D-005
+// gated), so it loads as a safe no-op until that lands. See its REQUIREMENTS/ADR.
+include 'addons:LeafRTPTetherAddon'
 // LeafRTPGuiAddon - DonutSMP-style destination picker, split on the project platform
 // model. rtp-gui-common is platform-neutral (menu model, config via RTP's
 // ConfigParser, the MenuRenderer render seam, and the teleport submit through

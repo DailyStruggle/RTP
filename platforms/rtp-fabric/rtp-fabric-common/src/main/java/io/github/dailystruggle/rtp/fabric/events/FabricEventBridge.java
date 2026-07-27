@@ -28,6 +28,12 @@ public final class FabricEventBridge {
 
     private final FabricServerAccessor accessor;
 
+    /**
+     * ADR-075 tick-sampled player-move producer. Driven from
+     * {@link #onEndServerTick}; cost is bounded to the watched set.
+     */
+    private final FabricPlayerMoveProducer playerMoveProducer = new FabricPlayerMoveProducer();
+
     public FabricEventBridge(FabricServerAccessor accessor) {
         this.accessor = accessor;
     }
@@ -574,6 +580,7 @@ public final class FabricEventBridge {
         } catch (Throwable t) {
             RTP.log(Level.WARNING, "[RTP] FabricEventBridge.onServerStopping: RTP.stop() raised", t);
         } finally {
+            playerMoveProducer.clear();
             accessor.unbindServer();
         }
     }
@@ -586,6 +593,16 @@ public final class FabricEventBridge {
             ((FabricScheduler) accessor.getScheduler()).tick(server);
         } catch (Throwable t) {
             RTP.log(Level.WARNING, "[RTP] FabricEventBridge tick raised", t);
+        }
+        // ADR-075 — sample watched players' block positions and fire
+        // PlayerMoveEvents for block changes. Best-effort; a failure here must
+        // not break the tick loop.
+        try {
+            playerMoveProducer.tick();
+        } catch (Throwable t) {
+            RTP.log(Level.FINER,
+                    "[RTP] FabricEventBridge player-move tick raised "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
         }
         // Section C, C2 — drive the metrics sampler if a FabricMetricsBinding
         // is installed. Best-effort; failures must not break the tick loop

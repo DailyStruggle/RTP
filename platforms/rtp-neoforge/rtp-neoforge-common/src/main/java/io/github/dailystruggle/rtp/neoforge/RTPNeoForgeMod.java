@@ -90,6 +90,15 @@ public final class RTPNeoForgeMod {
   private NeoForgeEventBridge eventBridge;
 
   /**
+   * ADR-075 tick-sampled player-move producer. Driven from {@link #onServerTick};
+   * cost is bounded to the watched set (a single has-watchers check per tick when
+   * nothing is watched).
+   */
+  private final io.github.dailystruggle.rtp.neoforge.events.NeoForgePlayerMoveProducer
+      playerMoveProducer =
+          new io.github.dailystruggle.rtp.neoforge.events.NeoForgePlayerMoveProducer();
+
+  /**
    * NeoForge invokes this constructor during mod loading, injecting the
    * mod-bus event bus. We register game-bus listeners for the server
    * lifecycle, per-tick scheduler drain, and command registration.
@@ -421,6 +430,7 @@ public final class RTPNeoForgeMod {
       } catch (Throwable ignored) {
         // effects-api absent or already unbound; nothing to do.
       }
+      playerMoveProducer.clear();
       if (accessor != null) {
         accessor.unbindServer();
       }
@@ -438,6 +448,14 @@ public final class RTPNeoForgeMod {
     NeoForgeVersionAdapter adapter = NeoForgeVersionAdapterRegistry.peek();
     if (adapter != null) {
       adapter.tickRefresh();
+    }
+    // ADR-075 - sample watched players' block positions and fire
+    // PlayerMoveEvents for block changes. Best-effort; never break the tick.
+    try {
+      playerMoveProducer.tick();
+    } catch (Throwable t) {
+      RTP.log(Level.FINER, "[RTP][NeoForge] player-move tick raised "
+          + t.getClass().getSimpleName() + ": " + t.getMessage());
     }
     // N2.6 - drive the metrics sampler EMA once per tick if a
     // NeoForgeMetricsBinding is installed. Best-effort; never break the tick.

@@ -1,0 +1,25 @@
+# LeafRTPTetherAddon configuration. Edit values here; RTP's ConfigParser will
+# pick up changes on /rtp reload through the Configs.onReload hook.
+#
+# A "tether" keeps a player inside the RTP region they were teleported into. It
+# is the cross-platform replacement for a WorldGuard-style region trap: it uses
+# RTP's own region geometry and move signal, so it works the same on
+# Bukkit/Paper/Folia and Fabric/NeoForge with no third-party plugin.
+
+# Master on/off switch for the tether addon.
+enabled: true
+
+# What happens when a tethered player crosses the region boundary:
+#   PULL_BACK - teleport the player back to a fresh safe destination inside the
+#               region (drawn from the core supply pipeline, so it passes the
+#               same safety checks as any RTP). This is the only cross-platform
+#               enforcement; vetoing the movement is Bukkit-only and is not used.
+# Unknown values fall back to PULL_BACK.
+onExit: PULL_BACK
+
+# When true, active tethers are stored through RTP's database interface so a
+# player stays tethered across a restart or relog. When false, a tether lasts
+# only for the current session.
+persistState: true
+
+version: "1.0"
