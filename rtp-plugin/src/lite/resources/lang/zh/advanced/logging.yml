@@ -1,0 +1,77 @@
+# 最低日志级别（此值与服务器日志器自身级别中更精细的一个）。
+# ALL 保持与服务器日志器完全相同的行为。
+# @type: enum
+# @options: [SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL, OFF]
+# @default: ALL
+最低级别: "INFO"
+
+# 基础活动日志
+# command: 记录玩家执行的 RTP 命令
+# teleport: 记录实际的传送事件
+# @type: boolean
+# @default: false
+命令: false
+
+# 记录成功的传送事件
+# @type: boolean
+# @default: true
+传送: true
+
+# 选择失败调试
+# 当查找安全位置失败时记录详细信息，包括失败率与查询参数。
+# @type: boolean
+# @default: true
+选择失败: true
+
+# 玩家切换世界时
+# @type: boolean
+# @default: true
+事件_切换世界: true
+
+# 玩家加入服务器时
+# @type: boolean
+# @default: true
+事件_加入: true
+
+# 玩家重生时
+# @type: boolean
+# @default: true
+事件_重生: true
+
+# 玩家移动时（若启用按移动触发的 RTP）
+# @type: boolean
+# @default: true
+事件_移动: true
+
+# 玩家传送时（若启用按传送触发的 RTP）
+# @type: boolean
+# @default: true
+事件_传送: true
+
+# --- 插件日志开关 ---
+# 启用或禁用插件各类活动的日志记录。
+# 系统详细日志
+# detailed_reload: 记录所有被重新加载的文件/配置段
+# detailed_region_init: 记录每个区域的初始化过程
+# @type: boolean
+# @default: false
+详细_重载: false
+
+# 记录区域初始化详情
+# @type: boolean
+# @default: false
+详细_区域初始化: false
+
+# 系统日志
+# 与后台任务和数据库操作相关。
+# @type: boolean
+# @default: false
+系统_内存追踪: false
+
+# 数据库活动的调试日志
+# @type: boolean
+# @default: false
+系统_数据库: false
+
+# 请勿修改版本号
+version: 1.0

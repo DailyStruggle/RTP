@@ -70,6 +70,13 @@ public final class RTPResult {
      * This is an accepted (non-failure) outcome - see {@link #isQueued()}.
      */
     QUEUED,
+    /**
+     * The player could not afford the teleport (and/or region) price, or paying
+     * it would drop them below the configured balance floor, so the request was
+     * rejected without moving them. Mirrors the {@code /rtp} command's
+     * {@code notEnoughMoney} guard for the addon-facing API.
+     */
+    INSUFFICIENT_FUNDS,
     /** An unexpected error aborted the request; see {@link #message()}. */
     ERROR
   }

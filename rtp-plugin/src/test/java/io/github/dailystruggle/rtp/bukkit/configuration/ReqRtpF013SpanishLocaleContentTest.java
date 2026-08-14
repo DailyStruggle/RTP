@@ -42,13 +42,17 @@ public class ReqRtpF013SpanishLocaleContentTest {
      * {@link #loadBaseline()}.
      */
     private static final Path BASELINE_DIR =
-            Paths.get("src", "main", "resources", "messages");
-    private static final Path BASELINE_LANG_MAP_PATH =
-            Paths.get("src", "main", "resources", "lang", "messages.lang.yml");
+            Paths.get("src", "main", "resources", "advanced", "messages");
+    /**
+     * ADR-076: the baseline / Spanish rename maps are per-file co-located dotfile
+     * siblings ({@code .<file>.lang.yml}) under the messages directory; the
+     * effective map is the union of those members.
+     */
+    private static final Path BASELINE_LANG_MAP_DIR = BASELINE_DIR;
     private static final Path SPANISH_PATH =
             Paths.get("src", "main", "resources", "lang", "es", "messages.yml");
-    private static final Path SPANISH_LANG_MAP_PATH =
-            Paths.get("src", "main", "resources", "lang", "es", "messages.lang.yml");
+    private static final Path SPANISH_LANG_MAP_DIR =
+            Paths.get("src", "main", "resources", "lang", "es", "advanced", "messages");
 
     /** Bracket placeholders like {@code [P0]}, {@code [arg]}, {@code [scan_regions]}. */
     private static final Pattern PLACEHOLDER = Pattern.compile("\\[[A-Za-z0-9_]+]");
@@ -118,6 +122,19 @@ public class ReqRtpF013SpanishLocaleContentTest {
     }
 
     /**
+     * ADR-076: union of every co-located dotfile rename map
+     * ({@code .<file>.lang.yml}) in a messages directory.
+     */
+    private static Map<String, String> mergedLangMap(Path messagesDir) throws IOException {
+        Map<String, String> merged = new LinkedHashMap<>();
+        try (java.nio.file.DirectoryStream<Path> maps =
+                     Files.newDirectoryStream(messagesDir, "*.lang.yml")) {
+            for (Path p : maps) merged.putAll(loadLangMap(p));
+        }
+        return merged;
+    }
+
+    /**
      * ADR-020 effective key-name map resolution: locale {@code messages.lang.yml}
      * wins, baseline {@code messages.lang.yml} fills gaps, and any enum entry
      * missing from both falls back to the enum name itself (identity).
@@ -140,8 +157,8 @@ public class ReqRtpF013SpanishLocaleContentTest {
     void spanishLocaleHasNoMissingEntries() throws IOException {
         Map<String, Object> en = loadBaseline();
         Map<String, Object> es = load(SPANISH_PATH);
-        Map<String, String> esLangMap = loadLangMap(SPANISH_LANG_MAP_PATH);
-        Map<String, String> enLangMap = loadLangMap(BASELINE_LANG_MAP_PATH);
+        Map<String, String> esLangMap = mergedLangMap(SPANISH_LANG_MAP_DIR);
+        Map<String, String> enLangMap = mergedLangMap(BASELINE_LANG_MAP_DIR);
         Map<Enum<?>, String> resolved = effectiveKeyMap(esLangMap, enLangMap);
 
         // For every key the English baseline ships, the Spanish locale must
@@ -171,8 +188,8 @@ public class ReqRtpF013SpanishLocaleContentTest {
     @DisplayName("every key in lang/es/messages.yml resolves back to a Enum<?> via messages.lang.yml")
     void spanishLocaleHasNoUnknownKeys() throws IOException {
         Map<String, Object> es = load(SPANISH_PATH);
-        Map<String, String> esLangMap = loadLangMap(SPANISH_LANG_MAP_PATH);
-        Map<String, String> enLangMap = loadLangMap(BASELINE_LANG_MAP_PATH);
+        Map<String, String> esLangMap = mergedLangMap(SPANISH_LANG_MAP_DIR);
+        Map<String, String> enLangMap = mergedLangMap(BASELINE_LANG_MAP_DIR);
         Map<Enum<?>, String> resolved = effectiveKeyMap(esLangMap, enLangMap);
 
         // Build the inverse of the effective map: translatedName -> enumKey.
@@ -218,7 +235,7 @@ public class ReqRtpF013SpanishLocaleContentTest {
         Map<String, Object> en = loadBaseline();
         Map<String, Object> es = load(SPANISH_PATH);
         Map<Enum<?>, String> resolved = effectiveKeyMap(
-                loadLangMap(SPANISH_LANG_MAP_PATH), loadLangMap(BASELINE_LANG_MAP_PATH));
+                mergedLangMap(SPANISH_LANG_MAP_DIR), mergedLangMap(BASELINE_LANG_MAP_DIR));
 
         List<String> mismatches = new ArrayList<>();
         for (Enum<?> key : allMessageKeys()) {
@@ -243,7 +260,7 @@ public class ReqRtpF013SpanishLocaleContentTest {
         Map<String, Object> en = loadBaseline();
         Map<String, Object> es = load(SPANISH_PATH);
         Map<Enum<?>, String> resolved = effectiveKeyMap(
-                loadLangMap(SPANISH_LANG_MAP_PATH), loadLangMap(BASELINE_LANG_MAP_PATH));
+                mergedLangMap(SPANISH_LANG_MAP_DIR), mergedLangMap(BASELINE_LANG_MAP_DIR));
 
         List<String> lost = new ArrayList<>();
         for (Enum<?> key : allMessageKeys()) {
@@ -273,7 +290,7 @@ public class ReqRtpF013SpanishLocaleContentTest {
         Map<String, Object> en = loadBaseline();
         Map<String, Object> es = load(SPANISH_PATH);
         Map<Enum<?>, String> resolved = effectiveKeyMap(
-                loadLangMap(SPANISH_LANG_MAP_PATH), loadLangMap(BASELINE_LANG_MAP_PATH));
+                mergedLangMap(SPANISH_LANG_MAP_DIR), mergedLangMap(BASELINE_LANG_MAP_DIR));
 
         List<String> offenders = new ArrayList<>();
         for (Enum<?> key : allMessageKeys()) {
@@ -300,7 +317,7 @@ public class ReqRtpF013SpanishLocaleContentTest {
         Map<String, Object> en = loadBaseline();
         Map<String, Object> es = load(SPANISH_PATH);
         Map<Enum<?>, String> resolved = effectiveKeyMap(
-                loadLangMap(SPANISH_LANG_MAP_PATH), loadLangMap(BASELINE_LANG_MAP_PATH));
+                mergedLangMap(SPANISH_LANG_MAP_DIR), mergedLangMap(BASELINE_LANG_MAP_DIR));
 
         for (Enum<?> key : LIST_KEYS) {
             assertTrue(en.get(key.name()) instanceof List,

@@ -1,0 +1,11 @@
+# --- Mapeo de Idioma: worlds/*.yml ---
+# Asigna las claves internas de mundo (izquierda) a los nombres visibles
+# para el usuario utilizados en todos los archivos bajo `worlds/` (derecha).
+# Modifica únicamente el lado derecho para renombrar o traducir una opción;
+# el lado izquierdo es una constante de código y no debe cambiarse.
+# Si este archivo falta, el plugin lo regenera con pares idénticos
+# izquierda/derecha (los valores por defecto en inglés).
+region: "region"
+requirePermission: "requerirPermiso"
+override: "sobrescribir"
+version: "version"

@@ -1,0 +1,259 @@
+# RTP Network Mode (multi-server / multi-proxy) Disabled by default; flipping `network.enabled: true` opts this backend into the cross-server network.
+
+network:
+  # Если false, этот файл читается и проверяется, затем игнорируется: не открываются ни потоки, ни таблицы, ни транспорт.
+  # @type: boolean
+  # @default: false
+  enabled: false
+  # Стабильная идентичность бэкенда, обязательна при включении; два бэкенда с одинаковым serverId перезаписывают heartbeat друг друга.
+  # @type: string
+  # @default: ""
+  serverId: ""
+  # Переменная окружения с общим секретом HMAC; обязательна при включении с transport.type redis.
+  # @type: string
+  # @default: "RTP_NET_SECRET"
+  secretEnv: "RTP_NET_SECRET"
+
+# Backing store for cross-process state.
+transport:
+  # Хранилище транспорта.
+  # @type: enum
+  # @options: ["auto", "plugin-message", "in-memory", "sql", "redis"]
+  # @default: "auto"
+  type: "auto"
+  pluginMessage:
+    # Канал обмена сообщениями плагинов прокси; оставьте по умолчанию, если ваш прокси не использует нестандартное имя.
+    # @type: string
+    # @default: "bungeecord:main"
+    channel: "bungeecord:main"
+  redis:
+    # Имя хоста или IP экземпляра Redis, общего для каждого бэкенда и прокси (обязательно, когда type равен redis).
+    # @type: string
+    # @default: "localhost"
+    host: "localhost"
+    # Порт Redis; измените для нестандартных развёртываний.
+    # @type: integer
+    # @default: 6379
+    port: 6379
+    # Пароль Redis; оставьте пустым для Redis без аутентификации, задайте при настройке ACL/requirepass.
+    # @type: string
+    # @default: ""
+    password: ""
+
+# Backend heartbeat / peer-staleness cadence (shared by every transport tier).
+heartbeat:
+  # Как часто этот бэкенд публикует свою строку состояния (мс).
+  # @type: integer
+  # @default: 1000
+  intervalMs: 1000
+  # Как долго последнее известное состояние узла остаётся доверенным, прежде чем считаться неизвестным (мс); держите выше intervalMs.
+  # @type: integer
+  # @default: 5000
+  staleAfterMs: 5000
+
+# Backend-side router.
+routing:
+  # Режим маршрутизатора: local (только локальный конвейер), auto (сначала локально, иначе очередь ожидания) или always (всегда записывать).
+  # @type: enum
+  # @options: ["local", "auto", "always"]
+  # @default: "local"
+  mode: "local"
+  # Режим лобби: делает этот бэкенд чистым узлом диспетчеризации, который автоматически направляет простой /rtp в регион узла с наибольшим запасом.
+  # @type: boolean
+  # @default: false
+  lobbyMode: false
+
+# Cross-server wait queue.
+queue:
+  # Максимум локально буферизованных записей до того, как противодавление отклонит новые вызовы /rtp (QUEUE_FULL).
+  # @type: integer
+  # @default: 50
+  maxDepth: 50
+  # Частота сброса отложенных записей бэкенда (мс); ниже = меньше задержка, выше = меньше обращений к транспорту.
+  # @type: integer
+  # @default: 250
+  flushIntervalMs: 250
+  # Частота опроса кэша состояния бэкенда (мс); как часто обновляется прогресс по каждому игроку.
+  # @type: integer
+  # @default: 1000
+  pollIntervalMs: 1000
+  # Необязательное пассивное устаревание по TTL для HASH-ей конвертов (мс); 0 отключает.
+  # @type: integer
+  # @default: 0
+  entryTtlMs: 0
+  # Ограничение скорости межсерверных записей /rtp (token bucket): устойчивые запросы в секунду.
+  # @type: number
+  # @default: 5
+  crossServerRequestsPerSecond: 5
+  # Ограничение скорости межсерверных записей /rtp: размер всплеска.
+  # @type: number
+  # @default: 10
+  crossServerRequestsBurst: 10
+  # Число обработчиков BLPOP на стороне прокси; увеличивайте только когда один обработчик перегружается.
+  # @type: integer
+  # @default: 1
+  workerThreads: 1
+
+# Reservation-token lifecycle.
+reservation:
+  # Частота очистки по TTL на стороне прокси (мс); удаляет истёкшие токены и освобождает их координаты.
+  # @type: integer
+  # @default: 30000
+  reapIntervalMs: 30000
+  # TTL на токен (мс); запрошенная, но не использованная бронь старше этого значения освобождается как брошенная.
+  # @type: integer
+  # @default: 60000
+  ttlMs: 60000
+
+# Region-collision policy.
+regionCollision:
+  # Политика коллизий, применяемая при запуске.
+  # @type: enum
+  # @options: ["warn", "rename-local", "reject-startup"]
+  # @default: "warn"
+  policy: "warn"
+
+# Optional per-destination policy overlay (matched by serverId); leave commented for the common case.
+#servers:
+#  example-backend:
+#    # Permission required to target this destination (empty = none).
+#    # @type: string
+#    # @default: "
+#    permission: "
+#    # Label shown in menus / suggestions (default: serverId).
+#    # @type: string
+#    # @default: "
+#    display-name: "Example"
+#    # Hide from tab-completion when it has no servable region.
+#    # @type: boolean
+#    # @default: false
+#    hide-when-unavailable: false
+#    # Allow targeting it even when it reports no servable region.
+#    # @type: boolean
+#    # @default: true
+#    allow-when-unavailable: true
+# Load balancer scoring table.
+loadBalancer:
+  # Вес встроенного слагаемого дефицита регионов; 0, потому что явное слагаемое `region` ниже владеет этим сигналом.
+  # @type: number
+  # @default: 0
+  regionScarcityWeight: 0
+  # Scoring terms, one per metric.
+  terms:
+    # Tick pressure; sigmoid knee at 0.6.
+    mspt:
+      # Входная метрика.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "mspt"
+      input: "mspt"
+      # Вес слагаемого.
+      # @type: number
+      # @default: 1.0
+      weight: 1.0
+      curve:
+        # Тип кривой.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "sigmoid"
+        type: "sigmoid"
+        # Крутизна.
+        # @type: number
+        # @range: [0.1, 20]
+        # @default: 8.0
+        k: 8.0
+        # Средняя точка.
+        # @type: number
+        # @range: [0, 1]
+        # @default: 0.6
+        x0: 0.6
+    # Queue depth; small queues silent, large ones explode.
+    queue:
+      # Входная метрика.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "queueDepth"
+      input: "queueDepth"
+      # Вес слагаемого.
+      # @type: number
+      # @default: 1.0
+      weight: 1.0
+      curve:
+        # Тип кривой.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "exponential"
+        type: "exponential"
+        # Крутизна.
+        # @type: number
+        # @range: [0.1, 20]
+        # @default: 3.0
+        k: 3.0
+    # Heap gate; fires at >= 85% used.
+    heap:
+      # Входная метрика.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "heapUsed"
+      input: "heapUsed"
+      # Вес слагаемого.
+      # @type: number
+      # @default: 5.0
+      weight: 5.0
+      curve:
+        # Тип кривой.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "step"
+        type: "step"
+        # Порог ступени.
+        # @type: number
+        # @range: [0, 1]
+        # @default: 0.85
+        threshold: 0.85
+    # Region gate; fires when the kept pool is >= 95% full.
+    region:
+      # Входная метрика.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "keptRegion"
+      input: "keptRegion"
+      # Вес слагаемого.
+      # @type: number
+      # @default: 5.0
+      weight: 5.0
+      curve:
+        # Тип кривой.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "step"
+        type: "step"
+        # Порог ступени.
+        # @type: number
+        # @range: [0, 1]
+        # @default: 0.95
+        threshold: 0.95
+    # Gentle tie-breaker on kept count.
+    kept:
+      # Входная метрика.
+      # @type: enum
+      # @options: ["mspt", "queueDepth", "heapUsed", "heapFree", "playerCount", "keptCount", "tps", "keptRegion"]
+      # @default: "keptCount"
+      input: "keptCount"
+      # Вес слагаемого.
+      # @type: number
+      # @default: 0.25
+      weight: 0.25
+      curve:
+        # Тип кривой.
+        # @type: enum
+        # @options: ["linear", "exponential", "logarithmic", "sigmoid", "step", "power"]
+        # @default: "logarithmic"
+        type: "logarithmic"
+        # Крутизна.
+        # @type: number
+        # @range: [0.1, 20]
+        # @default: 9.0
+        k: 9.0
+
+version: 1.1

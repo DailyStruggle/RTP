@@ -1,0 +1,118 @@
+# --- RTP mews (this kitty's tongue) ---
+# Player- and staff-facing mews for this language, grouped by what they're for.
+# Auto-copied from the baseline mews; do not paw-edit (it gets overwritten).
+
+# ###############################################################################
+# Section 2: Pouncing
+# ###############################################################################
+# already mid-pounce
+already_pouncing: "&7[P0] ⚡ mrrp! you're already pouncing!"
+
+# plugin is grooming itself
+pounce_denied_grooming: "&7[P0] pounces are paused while the kitty grooms. try again after a few licks."
+hold_paw_message: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Pouncing in [delay]. Don't twitch your tail</gradient>"
+kibble_loading: "&7[P0] ⚙ Loading kibble! please wait..."
+pounce_message: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Pounced in [attempts] attempts, in [processingTime]</gradient>"
+
+# pounce cancelled
+pounce_cancelled: "&7[P0] ⚡ Pounce cancelled! mrow."
+
+# no safe spots after max attempts
+# placeholder: [attempts] - the maximum number of attempts
+spooky: "&7[P0] ⌖ could not find a safe paw-spot within [attempts] attempts"
+
+# the kitty is on cooldown nap
+# placeholder: [remainingCooldown] - the remaining time
+nap_message: "&7[P0] ⚡ you can't pounce again for [remainingCooldown]. nap first."
+
+# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+lockedAfterUses: "&7[P0] ⌖ Out of zoomies! Nap [remainingLockTime] and pounce again."
+
+# no warm spots ready
+no_warm_spots_left: "#f5eb73[P0] ⌖ no warm spots ready at this time"
+
+# the line of waiting kitties shifted
+# placeholder: [spot] - the current position in line
+line_of_kitties_shuffled: "#2636ef[P0] your spot in the line of kitties: [spot]"
+
+# kitty does not have enough treats to pounce in this region
+# placeholder: [money] - how much money is required for the command
+not_enough_treats: "&7[P0] you need at least $[money] treats for that."
+
+# ###############################################################################
+# Section 3: Time Formatting
+# ###############################################################################
+# for time placeholders: how a kitty counts time
+many_naps: "d"
+long_naps: "h"
+yawns: "m"
+tail_flicks: "s"
+whisker_twitches: "ms"
+
+# bukkit-box has no such world
+# placeholder: [world] - the world name
+not_a_real_box: "&7[P0] could not find box '[world]'"
+
+# tall-human asked for a trick the kitty does not know
+# placeholder: [arg] - the argument attempted
+silly_word: "&c[P0] silly word, kitty: [arg]"
+
+# the tall-human terminal is trying a kitty-only trick
+tall_human_forbidden: "&c[P0] only an in-game kitty can do that, tall human."
+
+# kitty is grooming and busy
+busy: "&c[P0] busy grooming"
+
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] no pouncing away while you're scrapping, kitty."
+
+# unknown subcommand
+# placeholder: [arg] - the argument attempted
+silly_meow: "&c[P0] silly meow, kitty - [arg]"
+
+# no permission
+no_treats_for_you: "&7I'm sorry, but no treats for you. please ask the head kitty if you think this is wrong."
+
+# ###############################################################################
+# Section 8: Command Descriptions
+# ###############################################################################
+# shown in the help (ask-for-pets) command
+pounce: "&b/rtp - pounce to a random spot"
+pounce_description: "pounce to a random spot"
+ask_for_pets: "&b/rtp help - mrrp, see this list"
+ask_for_pets_description: "describe what each meow does"
+groom: "&b/rtp reload - re-lick config files"
+groom_description: "re-lick config files"
+sniff: "&b/rtp scan - try every territory placement to make pouncing faster"
+sniff_description: "forget stored data and try every territory placement"
+setup_description: "update config files at runtime"
+meow_info_description: "check the kitty's current state"
+practice_pounce_description: "practice-test RTP functions"
+
+# ###############################################################################
+# Section 9: PlaceholderAPI Support
+# ###############################################################################
+# kitty status placeholders
+KITTY_READY: "&aREADY TO POUNCE"
+KITTY_NAP: "&7NAPPING"
+KITTY_PREP: "&bPICKING A WARM SPOT"
+KITTY_WAKING_UP: "&bLOADING KIBBLE"
+KITTY_POUNCING: "&bPOUNCING"
+
+# ###############################################################################
+# Section 10: Visuals
+# ###############################################################################
+# title settings
+# remove or set big_meow to " to disable
+# PlaceholderAPI is recommended for coordinates
+big_meow: "<rainbow>Teletransportat!</rainbow>"
+little_meow: "<gradient:#A78BFA:#E876A0>purr-fect fun!</gradient>"
+slow_blink_in: 20
+stay_visible: 20
+slow_blink_out: 20
+
+# tummy_strip (actionbar) setting
+tummy_strip: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

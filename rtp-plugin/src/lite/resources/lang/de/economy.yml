@@ -1,0 +1,42 @@
+# --- RTP Wirtschaftseinstellungen ---
+
+# Konfiguriere die Kosten für zufällige Teleports unter Verwendung der Serverwirtschaft.
+# Teleportationskosten
+# Basiskosten für einen Standard /rtp Befehl.
+# @type: number
+# @range: [0.0, null]
+# @default: 50.0
+preis: 50.0
+
+# Kosten für die Teleportation eines anderen Spielers (rtp <Spieler>).
+# @type: number
+# @range: [0.0, null]
+# @default: 200.0
+preisAnderer: 200.0
+
+# Kosten für die Verwendung benutzerdefinierter Parameter (rtp region:<Region>, etc.).
+# @type: number
+# @range: [0.0, null]
+# @default: 1000000000.0
+preisParameter: 1000000000.0
+
+# Zusätzliche Kosten für die Angabe eines Bioms (rtp biome:<Biom>).
+# @type: number
+# @range: [0.0, null]
+# @default: 5000.0
+preisBiom: 5000.0
+
+# Erstattet die Kosten, wenn der Teleport abgebrochen wird (Spieler bewegt sich, Fehler usw.).
+# @type: boolean
+# @default: true
+erstattungBeiAbbruch: true
+
+# Mindestguthaben, das der Spieler nach dem Bezahlen behalten muss; der Teleport
+# wird abgelehnt, wenn es darunter fallen würde.
+# @type: number
+# @range: [0.0, null]
+# @default: 0.0
+mindestKontostand: 0.0
+
+# ÄNDERE NICHT DIE VERSIONSNUMMER
+version: 1.0

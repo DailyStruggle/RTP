@@ -1,0 +1,5 @@
+# --- Language Mapping: placeholders.yml ---
+# Maps internal baseline keys (left) to user-visible key names (right)
+# used in placeholders.yml. Co-located dotfile sibling (ADR-076).
+placeholders: "placeholders"
+version: "version"

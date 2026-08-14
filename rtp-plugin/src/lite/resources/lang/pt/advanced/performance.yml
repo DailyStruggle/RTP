@@ -1,0 +1,197 @@
+# Requisito mínimo de TPS
+# TPS mínimo do servidor antes de enfileirar uma nova localização para o cache.
+# Faixa: 0.0 - 20.0.
+# Impacto: BAIXO - evita que o plugin adicione lag quando o servidor está com problemas.
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+tpsMinimo: 19.0
+
+# Uso máximo do heap da JVM (% do máximo) antes de pausar o preenchimento do
+# cache em segundo plano. Locais já em cache continuam servidos. 0 ou 100 desativa.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapPorcentagem: 85.0
+
+# --- Configuração de desempenho do RTP ---
+# Ajuste fino do plugin para o desempenho do servidor.
+# Tentativas máximas de busca
+# Quantas vezes o plugin buscará uma localização segura antes de desistir.
+# Impacto: ALTO - valores altos podem aumentar muito o uso de CPU por requisição.
+# @type: integer
+# @range: [1, null]
+# @default: 32
+tentativasMaximas: 10
+
+# Frequência de seleção (ticks do jogo)
+# Tempo entre buscas por novas localizações para preencher os caches de região.
+# ( 20 ticks = 1 segundo ).
+# Impacto: MÉDIO - valores menores preenchem o cache mais rápido mas usam mais CPU.
+# @type: integer
+# @range: [1, null]
+# @unit: ticks
+# @default: 20
+periodo: 20
+
+# Tempo alocado por tarefa (milissegundos)
+# Tempo máximo (ms) dedicado a tarefas do RTP por tick.
+# Faixa: 0 - 50.
+# Impacto: MÉDIO - valores altos permitem processar mais rápido, ao custo do tempo de tick.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+tempoAlocadoSincrono: 50
+
+# Milissegundos máximos por tick gastos em tarefas assíncronas.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+tempoAlocadoAssincrono: 50
+
+# Pré-carregamento de destino (chunks)
+# Raio de chunks a pré-carregar ao redor do destino.
+# Número de chunks carregados = ( 1 + 2 * raio )^2.
+# Impacto: ALTO - um valor muito alto pode causar quedas de TPS ao teletransportar.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+distanciaVisaoSelecao: 0
+
+# Raio de chunks carregado ao redor da localização final logo antes do
+# teleporte. 0 carrega apenas o chunk de destino.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+distanciaVisaoTeletransporte: 0
+
+# Ticks ao longo dos quais a distância de visão de um jogador teleportado volta ao
+# normal após chegar, suavizando o pico de carga de chunks. 0 desativa o limite.
+# NOTA: Forçado temporariamente para 0. A restauração gradual causa cintilação /
+# re-renderização no lado do cliente ao chegar. Deixe em 0 até novo aviso.
+# @type: integer
+# @range: [0, null]
+# @unit: ticks
+# @default: 200
+intervaloRestauracaoVisao: 0
+
+# Enfileiramento pós-teletransporte
+# Se true, o plugin tentará preencher o cache de localizações imediatamente após um RTP.
+# Impacto: MÉDIO
+# @type: boolean
+# @default: false
+enfileirarPosTeletransporte: false
+
+# Registra os biomas de chunks já carregados na memória espacial, alimentando o
+# recall / a ponderação de biomas. Sem I/O de chunk adicional.
+# @type: boolean
+# @default: true
+verificarNoCarregamentoChunk: true
+
+# Fração da capacidade do backlog L3 na qual o reabastecimento recomeça (histerese).
+# 0.5 = reabastecer após esvaziar a 50%; 1.0 = reabastecer continuamente.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+limiteReabastecimentoBacklog: 0.5
+
+# Probabilidade de rejeitar um chunk não gerado por tentativa.
+# 0.0 = sem viés, 1.0 = evitar terreno não gerado. Chunks gerados sempre passam.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+preferenciaPregerado: 0.0
+
+# Reserva um cache de locais para teleportes ao entrar
+# (rtp.onevent.firstjoin / rtp.onevent.join).
+# @type: boolean
+# @default: false
+cacheLoginAtivado: false
+
+# Limite rígido do cache de entrada. 0 = automático (max-players do servidor na inicialização).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+limiteCacheLogin: 0
+
+# Cache de seleção de biomas
+# biomeRecall: Reutilizar localizações previamente encontradas por bioma.
+# biomeRecallForced: Usar apenas biomas já descobertos e armazenados em cache.
+# Impacto: BAIXO a MÉDIO
+# @type: boolean
+# @default: true
+lembrancaBioma: true
+
+# Atende solicitações filtradas por bioma apenas do cache (nunca gera novas
+# buscas de bioma). Requer biomeRecall.
+# @type: boolean
+# @default: false
+lembrancaBiomaForcada: false
+
+# Limite de latência (ms) acima do qual um teleporte servido imediatamente é
+# auditado (WARN registrado, slowPipelineCount incrementado). 0 ou menos desativa.
+# @type: integer
+# @range: [0, null]
+# @unit: ms
+# @default: 5000
+limitePipelineLentaMs: 5000
+
+# Profundidade da fila (jogadores esperando) na qual a contrapressão é auditada
+# (WARN registrado, queueGrowthWarnCount incrementado). 0 ou menos desativa.
+# @type: integer
+# @range: [0, null]
+# @unit: players
+# @default: 0
+limiteAvisoCrescimentoFila: 0
+
+# Carregamento síncrono
+# Usar carregamento síncrono de chunks para a seleção de localizações.
+# Impacto: ALTO - NÃO RECOMENDADO! Pode provocar travamentos sérios do servidor.
+# @type: boolean
+# @default: false
+carregamentoSincrono: false
+
+# Análise de permissões (inicialização)
+# onEventParsing: Incompatível com permissões amplas tipo *.*.
+# Impacto: MÉDIO (onEvent) / BAIXO (effect)
+# @type: boolean
+# @default: false
+analiseAoEvento: false
+
+# Analisar os nós de permissão de efeitos na inicialização.
+# @type: boolean
+# @default: true
+analiseEfeitos: true
+
+# Modo de preenchimento de cache por observação (Region Data Visitor)
+# Quando o cache de pré-geração está cheio, uma única de
+# tarefa de observação é agendada por região segundo o mesmo `period` de preenchimento de
+# cache. Reutiliza o mesmo pipeline que o preenchimento de
+# cache padrão, mas descarta o candidato seguro resultante em vez de enfileirá-lo,
+# de modo que os efeitos colaterais (registro de localizações ruins, coleta de
+# biomas observados) se acumulam em segundo plano sem que a fila cresça além do
+# seu limite. NUNCA aciona a geração de mundo: chunks que não estão em disco são
+# omitidos pelo pre-filtro Anvil do com veredicto UNKNOWN.
+# visitorEnabled: interruptor mestre (true ativa o modo observação).
+# A cadência é herdada do ajuste `period` acima; não há um parâmetro de taxa
+# separado.
+# Impacto: BAIXO - limitado pelo `period` existente; só há trabalho quando o
+# cache não tem margem para preenchimentos no modo padrão.
+# @type: boolean
+# @default: false
+visitanteAtivado: true
+
+# Configurações de /rtp admin prefab. O fluxo apply -> confirm grava um backup
+# por arquivo alterado; bakRetention limita quantos são mantidos (os mais antigos podados).
+prefabricado:
+  # Number of timestamped config backups kept per file before pruning.
+  # @type: integer
+  # @range: [1, null]
+  # @default: 3
+  bakRetention: 3
+# NÃO ALTERE O NÚMERO DA VERSÃO
+version: 1.0

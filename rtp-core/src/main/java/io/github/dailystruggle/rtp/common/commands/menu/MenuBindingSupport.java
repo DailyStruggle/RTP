@@ -66,10 +66,16 @@ public final class MenuBindingSupport {
       try {
         MenuRenderer r = provider.create();
         if (r != null) return r;
-      } catch (RuntimeException ex) {
+      } catch (RuntimeException | LinkageError ex) {
+        // A universal / lite jar may carry a platform provider whose renderer
+        // class hard-references a runtime type absent on this server (e.g. the
+        // Paper Adventure-Book renderer referencing net.kyori...Component on
+        // plain Spigot). That surfaces as a LinkageError (NoClassDefFoundError),
+        // not a RuntimeException; catch both so discovery degrades to the
+        // configurable menuInvalid fallback rather than aborting plugin enable.
         RTP.log(
             Level.WARNING,
-            "failed to instantiate menu.renderer '" + id + "': " + ex.getMessage(),
+            "failed to instantiate menu.renderer '" + id + "': " + ex,
             ex);
       }
     }
@@ -97,10 +103,13 @@ public final class MenuBindingSupport {
       try {
         MenuRedeemSubcommand.AnvilInputOpener opener = provider.create();
         if (opener != null) return opener;
-      } catch (RuntimeException ex) {
+      } catch (RuntimeException | LinkageError ex) {
+        // See discoverRenderer: a platform opener may link a runtime type absent
+        // on this server (LinkageError / NoClassDefFoundError), which is not a
+        // RuntimeException. Catch both so discovery degrades gracefully.
         RTP.log(
             Level.WARNING,
-            "failed to instantiate menu anvil-input opener: " + ex.getMessage(),
+            "failed to instantiate menu anvil-input opener: " + ex,
             ex);
       }
     }

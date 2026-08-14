@@ -33,6 +33,18 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   public File pluginDirectory;
 
   /**
+   * ADR-076: the rename-map file this parser reads/writes. For a {@link MultiConfigParser}
+   * child this is the shared, folder-similar sibling map (e.g. {@code definitions/.worlds.lang.yml})
+   * passed in at construction; for a standalone parser it is the co-located per-file sibling
+   * {@code .<name>.lang.yml} auto-resolved by {@link #loadLangFile(File)}. It is retained here so
+   * {@link #clone()} and the {@code Factory} construct/clone paths can pass the same map back into
+   * {@link #check(String, File, File)} instead of {@code null}; passing {@code null} would make a
+   * cloned {@link MultiConfigParser} child re-auto-resolve to a stray per-file map inside the folder,
+   * duplicating the shared one.
+   */
+  public File langFile;
+
+  /**
    * ADR-071: relative sub-directory (below {@link #pluginDirectory}, '/'-normalized,
    * no leading/trailing separator) carried by a subpathed parser {@code name} such as
    * {@code "advanced/blocks.yml"} or {@code "messages/player.yml"}. Empty for a plain
@@ -347,62 +359,120 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    * @throws IOException if an I/O error occurs
    */
   protected void loadLangFile(@Nullable File langFile) throws IOException {
-    String localeDirName = isEnglish() ? "" : (locale + File.separator);
-    // ADR-071: a subpathed parser mirrors its lang map under lang/<locale>/<subDir>/.
-    String subPart =
-        (subDir == null || subDir.isEmpty()) ? "" : subDir.replace('/', File.separatorChar) + File.separator;
-    String langSubdir = "lang" + File.separator + localeDirName + subPart;
+    // ADR-076: the rename map is a co-located dotfile sibling of the value file -
+    // `.<name>.lang.yml` beside `<name>.yml`, for EVERY locale. The value files are
+    // extracted flat into the data directory (configDir()) regardless of locale, so
+    // the map must sit right beside them - there is no per-locale `lang/<locale>/`
+    // mirror in the extracted data directory. The `lang/<locale>/` layout exists only
+    // for the bundled JAR resources (how translations are shipped and read below).
+    String dotMapName = "." + name.replace(".yml", ".lang.yml");
+    boolean autoResolved = false;
 
     if (langFile == null) {
-      File langDir = new File(pluginDirectory, langSubdir);
+      autoResolved = true;
+      // One-time cleanup: earlier builds mirrored a non-English locale's maps into
+      // plugins/RTP/lang/<locale>/... Remove that stray dotfile so it no longer
+      // confuses operators; the authoritative copy is the colocated sibling below.
+      purgeLegacyLocaleLangMirror();
+
+      File langDir = configDir();
       if (!langDir.exists()) {
         boolean mkdir = langDir.mkdirs();
         if (!mkdir) throw new IllegalStateException();
       }
-      langFile = new File(langDir, name.replace(".yml", ".lang.yml"));
+      langFile = new File(langDir, dotMapName);
     }
+
+    // Retain the resolved map so clone()/Factory reuse it rather than passing null (which would
+    // re-auto-resolve to a stray per-file map inside a MultiConfigParser folder).
+    this.langFile = langFile;
 
     RtpYamlConfig langYaml = new RtpYamlConfig(langFile.getPath());
     language_mapping.clear();
     reverse_language_mapping.clear();
-    if (!langFile.exists()) {
+
+    // Re-extract the active locale's map from the JAR. The colocated dotfile persists across
+    // locale switches (the English baseline copy is written on first install), so extracting only
+    // when absent would freeze the map at the first-installed locale. The map is read-only bundled
+    // metadata (operators do not rename config keys), so overwriting on load is safe and is what
+    // makes a language change take effect for the rename map too. This full re-extraction applies
+    // to a self-resolved (colocated) map; an externally supplied map (e.g. MultiConfigParser's
+    // shared definitions map) is only extracted when absent, preserving that path's original
+    // "extract defaults on first install" behavior.
+    boolean extracted = false;
+    if (autoResolved || !langFile.exists()) {
       // Try locale-specific JAR resource first, then English fallback. The
       // jarPrefix() carries any ADR-071 subdirectory (e.g. advanced/, messages/).
-      String jarPath =
-          "lang/" + localeDirName.replace(File.separatorChar, '/') + jarPrefix() + langFile.getName();
+      String localeJarPrefix = isEnglish() ? "" : ("lang/" + locale + "/");
+      String jarPath = localeJarPrefix + jarPrefix() + langFile.getName();
       try {
         java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream(jarPath);
         if (in == null && !isEnglish()) {
-          // Fallback: English baseline mapping.
-          in = RTP.class.getClassLoader().getResourceAsStream("lang/" + jarPrefix() + langFile.getName());
+          // Fallback: English baseline mapping (co-located sibling at JAR root/subDir).
+          in = RTP.class.getClassLoader().getResourceAsStream(jarPrefix() + langFile.getName());
         }
         if (in != null) {
           File parent = langFile.getParentFile();
           if (parent != null && !parent.exists()) parent.mkdirs();
-          java.io.FileOutputStream out = new java.io.FileOutputStream(langFile);
-          byte[] buf = new byte[1024];
-          int len;
-          while ((len = in.read(buf)) > 0) {
-            out.write(buf, 0, len);
+          try (java.io.InputStream src = in;
+              java.io.FileOutputStream out = new java.io.FileOutputStream(langFile)) {
+            byte[] buf = new byte[1024];
+            int len;
+            while ((len = src.read(buf)) > 0) {
+              out.write(buf, 0, len);
+            }
           }
-          out.close();
-          in.close();
+          extracted = true;
         }
       } catch (Exception ignored) {
       }
-      if (!langFile.exists()) {
-        for (String key : keys()) { // default data, to guard exceptions
-          langYaml.set(key, key);
-          language_mapping.put(key, key);
-          reverse_language_mapping.put(key, key);
-        }
-        langYaml.save();
+    }
+
+    if (!extracted && !langFile.exists()) {
+      for (String key : keys()) { // default data, to guard exceptions
+        langYaml.set(key, key);
+        language_mapping.put(key, key);
+        reverse_language_mapping.put(key, key);
       }
+      langYaml.save();
     }
 
     langYaml.loadWithComments();
     language_mapping = langYaml.getMapValues(true);
     language_mapping.forEach((s, o) -> reverse_language_mapping.put(o.toString(), s));
+  }
+
+  /**
+   * Remove the legacy {@code plugins/RTP/lang/<locale>/...} rename-map mirror that earlier builds
+   * extracted into the data directory. The active locale's map is now colocated beside its value
+   * file at {@link #configDir()}, so the entire data-directory {@code lang/} tree is stray - it
+   * only ever held these {@code .lang.yml} dotfiles and is never read anymore. Best-effort: any
+   * I/O failure is ignored, and empty ancestor directories are pruned so the {@code lang/} folder
+   * disappears once the last file is gone.
+   */
+  private void purgeLegacyLocaleLangMirror() {
+    File legacyRoot = new File(pluginDirectory, "lang");
+    if (!legacyRoot.isDirectory()) return;
+    try {
+      deleteRecursively(legacyRoot);
+    } catch (RuntimeException ignored) {
+      // best effort; a leftover folder is harmless, just cosmetic
+    }
+  }
+
+  private static void deleteRecursively(File f) {
+    if (f == null || !f.exists()) return;
+    if (f.isDirectory()) {
+      File[] children = f.listFiles();
+      if (children != null) {
+        for (File c : children) deleteRecursively(c);
+      }
+    }
+    try {
+      Files.deleteIfExists(f.toPath());
+    } catch (IOException ignored) {
+      // best effort
+    }
   }
 
   /**
@@ -427,12 +497,40 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    */
   private Map<E, Object> detectAndPreserveLocaleMismatch(File pluginDirectory) {
     Map<E, Object> preserved = new EnumMap<>(myClass);
-    // Only the non-default locales can have their JAR resource re-extracted by
-    // renameFiles() / saveResource(). The English baseline is the source of
-    // truth, so if locale=="en" there is nothing to migrate towards.
-    if (isEnglish()) return preserved;
     File f = new File(configDir(), this.name);
     if (!f.exists()) return preserved;
+
+    // Primary, format-agnostic gate: if the on-disk file is an unmodified pristine copy of a
+    // DIFFERENT bundled locale than the active one, back it up once and re-extract the active
+    // locale's resource. This covers key-renamed, value-translated, and comment-only-translated
+    // files (e.g. advanced/biomes.yml) uniformly, and both switch directions (English<->locale,
+    // including the fr->en return the value-based path below cannot see). It is idempotent - once
+    // the file equals the active locale resource it never fires again - so a repeated reload never
+    // accumulates redundant .old backups.
+    if (onDiskIsPristineForeignLocale(f)) {
+      RTP.log(
+          Level.INFO,
+          "[RTP] Locale switch detected for "
+              + this.name
+              + " (active locale: "
+              + locale
+              + "); backing up to "
+              + this.name
+              + ".old1 and extracting locale-specific defaults.");
+      migrateToActiveLocale();
+      return preserved;
+    }
+
+    // Already exactly in the active locale (a plain reload with no language change, or a second
+    // parser build within the same reload): do nothing. This is authoritative over the value/key
+    // heuristic below, which for some files (e.g. safety.yml) would otherwise re-decide "needs
+    // migration" and rotate a redundant backup on every reload - the double-.old regression.
+    if (onDiskMatchesActiveLocale(f)) return preserved;
+
+    // The value/key-preserving migration path below only applies to a non-default locale (the
+    // English baseline is the source of truth for value recovery). A pristine foreign file - in
+    // either direction - was already handled by the gate above.
+    if (isEnglish()) return preserved;
 
     // If the active locale's key mapping is entirely identity (every value
     // equals its key), the locale does not actually rename any keys for this
@@ -448,7 +546,19 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         break;
       }
     }
-    if (!anyRename) return preserved;
+    if (!anyRename) {
+      // No key renames for this locale. Two sub-cases:
+      //   (a) the file has no localized JAR resource at all (loadLangFile seeded an
+      //       identity map as a fallback, e.g. integrations.yml) - nothing to migrate,
+      //       and migrating would re-backup an unchanged file on every reload.
+      //   (b) the file's translation lives in its VALUES, not its keys (every message
+      //       file: the *.lang.yml map is identity, only the shipped text is localized).
+      //       These MUST still migrate on a locale switch, otherwise the on-disk file
+      //       keeps its English text forever. Guarded to only fire while the on-disk
+      //       file still carries the English baseline text, so an already-localized
+      //       file is not re-extracted and backed up on every reload.
+      if (!valueOnlyLocaleMigrationNeeded(f)) return preserved;
+    }
 
     RtpYamlConfig oldYaml = new RtpYamlConfig(f.getPath());
     try {
@@ -529,42 +639,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
             + preserved.size()
             + " customized value(s).");
 
-    // Back up and re-extract the locale-specific JAR resource.
-    renameFiles();
-
-    // Invalidate the file-database cache for this file. renameFiles() has just
-    // replaced the on-disk content with the locale-specific JAR resource, but
-    // the cache may still hold the previous (foreign-locale) RtpYamlConfig loaded
-    // at startup. Without eviction, the subsequent cachedLookup.containsKey
-    // check in check() short-circuits the reconnect, and value lookups via the
-    // active locale's key names all return null (the rtp info empty-line bug).
-    try {
-      Map<String, RtpYamlConfig> cache = fileDatabase.cachedLookup.get();
-      if (cache != null) cache.remove(this.name);
-      Map<String, Long> mtimes = fileDatabase.cachedLookupLastModified.get();
-      if (mtimes != null) mtimes.remove(this.name);
-    } catch (Exception ex) {
-      RTP.log(Level.WARNING, "[RTP] Failed to invalidate cache for " + this.name, ex);
-    }
-
-    // renameFiles() relies on a JAR-bundled localized resource. If it is
-    // missing (e.g. test fixtures, addons that ship without lang/<locale>/
-    // copies of every config), seed an empty file so the loader has something
-    // to populate; preserved values will be written via set() afterwards.
-    File seeded = new File(configDir(), this.name);
-    if (!seeded.exists()) {
-      try {
-        File parent = seeded.getParentFile();
-        if (parent != null && !parent.exists()) parent.mkdirs();
-        if (seeded.createNewFile()) {
-          try (FileOutputStream out = new FileOutputStream(seeded)) {
-            out.write(("version: " + version + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
-          }
-        }
-      } catch (IOException e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
-      }
-    }
+    // Back up and re-extract the locale-specific JAR resource, then re-apply preserved values.
+    migrateToActiveLocale();
     return preserved;
   }
 
@@ -612,6 +688,341 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       }
     }
     return defaults;
+  }
+
+  /**
+   * Text-based, format-agnostic locale-migration gate. Returns {@code true} when the on-disk
+   * file is an <em>unmodified</em> pristine copy of a <em>different</em> bundled locale than the
+   * active one (the English baseline or any {@code lang/<loc>/} member), in which case it should
+   * be backed up once and replaced with the active locale's resource. Covers key-renamed,
+   * value-translated, and comment-only-translated files (e.g. {@code advanced/biomes.yml})
+   * uniformly, and both switch directions (English &lt;-&gt; locale).
+   *
+   * <p>Reads bundled resources via the real classloader (not the overridable
+   * {@link #getResourceFromJar}), so it is inert under unit fixtures that stub that method with
+   * synthetic resources and only engages when the genuine {@code lang/} tree is on the classpath.
+   *
+   * <p>Idempotent: a file already equal to the active locale resource returns {@code false}, and
+   * an operator-customized file (matching no shipped locale verbatim) also returns {@code false}
+   * so it is left to the value-preserving migration path.
+   */
+  private boolean onDiskIsPristineForeignLocale(File f) {
+    String activeText = normalizeYamlText(readActiveLocaleResourceText());
+    if (activeText == null) return false;
+    String disk = normalizeYamlText(readFileTextQuietly(f));
+    if (disk == null || disk.isEmpty()) return false;
+    if (disk.equals(activeText)) return false; // already the active locale
+
+    String enText = normalizeYamlText(readClasspathText(jarPrefix() + this.name));
+    if (enText != null && !enText.equals(activeText) && disk.equals(enText)) return true;
+
+    for (String loc : bundledLocales()) {
+      if (loc.equalsIgnoreCase(locale)) continue;
+      String t = normalizeYamlText(readClasspathText("lang/" + loc + "/" + jarPrefix() + this.name));
+      if (t != null && !t.equals(activeText) && disk.equals(t)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * @return {@code true} when the on-disk file is (normalized) byte-identical to the active
+   *     locale's shipped resource - i.e. already fully localized, so no migration/backup is
+   *     warranted. Inert (returns {@code false}) when the active resource is not on the classpath.
+   */
+  private boolean onDiskMatchesActiveLocale(File f) {
+    String activeText = normalizeYamlText(readActiveLocaleResourceText());
+    if (activeText == null) return false;
+    String disk = normalizeYamlText(readFileTextQuietly(f));
+    return disk != null && disk.equals(activeText);
+  }
+
+  /** Full text of the active locale's shipped resource, English baseline when {@code isEnglish()}. */
+  private String readActiveLocaleResourceText() {
+    if (isEnglish()) return readClasspathText(jarPrefix() + this.name);
+    String t = readClasspathText("lang/" + locale + "/" + jarPrefix() + this.name);
+    return (t != null) ? t : readClasspathText(jarPrefix() + this.name);
+  }
+
+  private static String readClasspathText(String path) {
+    try (java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream(path)) {
+      if (in == null) return null;
+      return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      return null;
+    }
+  }
+
+  private static String readFileTextQuietly(File f) {
+    try {
+      return new String(Files.readAllBytes(f.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      return null;
+    }
+  }
+
+  /**
+   * Normalize a YAML document for locale-identity comparison: LF line endings, right-trimmed
+   * lines, dropped {@code version:} line (identical across locales, independently managed), and
+   * no leading/trailing blank lines.
+   */
+  private static String normalizeYamlText(String s) {
+    if (s == null) return null;
+    String[] lines = s.replace("\r\n", "\n").replace("\r", "\n").split("\n", -1);
+    StringBuilder sb = new StringBuilder();
+    for (String ln : lines) {
+      String t = ln.replaceAll("\\s+$", "");
+      if (t.matches("(?i)\\s*version\\s*:.*")) continue;
+      sb.append(t).append('\n');
+    }
+    return sb.toString().trim();
+  }
+
+  /**
+   * Enumerate locale directory names bundled under {@code lang/} on the classpath. Best-effort:
+   * returns an empty set when the layout cannot be walked (e.g. unit fixtures without a real
+   * {@code lang/} tree).
+   */
+  private Set<String> bundledLocales() {
+    Set<String> out = new LinkedHashSet<>();
+    try {
+      java.util.Enumeration<java.net.URL> urls = RTP.class.getClassLoader().getResources("lang");
+      while (urls.hasMoreElements()) {
+        java.net.URL url = urls.nextElement();
+        String protocol = url.getProtocol();
+        if ("jar".equals(protocol)) {
+          String path = url.getPath(); // file:/.../x.jar!/lang
+          int bang = path.indexOf('!');
+          if (bang < 0) continue;
+          String jarPath = path.substring("file:".length(), bang);
+          jarPath = java.net.URLDecoder.decode(jarPath, java.nio.charset.StandardCharsets.UTF_8);
+          try (java.util.jar.JarFile jar = new java.util.jar.JarFile(jarPath)) {
+            java.util.Enumeration<java.util.jar.JarEntry> entries = jar.entries();
+            while (entries.hasMoreElements()) {
+              String n = entries.nextElement().getName();
+              if (n.startsWith("lang/") && n.length() > 5) {
+                String rest = n.substring(5);
+                int slash = rest.indexOf('/');
+                if (slash > 0) out.add(rest.substring(0, slash));
+              }
+            }
+          }
+        } else if ("file".equals(protocol)) {
+          File dir = new File(url.toURI());
+          File[] subs = dir.listFiles(File::isDirectory);
+          if (subs != null) for (File d : subs) out.add(d.getName());
+        }
+      }
+    } catch (IOException | java.net.URISyntaxException | RuntimeException e) {
+      // best effort; caller degrades to English-baseline comparison only
+    }
+    return out;
+  }
+
+  /**
+   * Back up the current on-disk file (rotating to {@code <name>.old1}) and re-extract the active
+   * locale's shipped resource in its place, evicting the file-database cache entry so the next
+   * {@code connect()} re-reads the freshly extracted file. Seeds a minimal placeholder when no
+   * JAR resource exists (test fixtures / addons without a bundled copy).
+   */
+  private void migrateToActiveLocale() {
+    renameFiles();
+
+    // Invalidate the file-database cache for this file. renameFiles() has just
+    // replaced the on-disk content with the locale-specific JAR resource, but
+    // the cache may still hold the previous (foreign-locale) RtpYamlConfig loaded
+    // at startup. Without eviction, the subsequent cachedLookup.containsKey
+    // check in check() short-circuits the reconnect, and value lookups via the
+    // active locale's key names all return null (the rtp info empty-line bug).
+    try {
+      Map<String, RtpYamlConfig> cache = fileDatabase.cachedLookup.get();
+      if (cache != null) cache.remove(this.name);
+      Map<String, Long> mtimes = fileDatabase.cachedLookupLastModified.get();
+      if (mtimes != null) mtimes.remove(this.name);
+    } catch (Exception ex) {
+      RTP.log(Level.WARNING, "[RTP] Failed to invalidate cache for " + this.name, ex);
+    }
+
+    // renameFiles() relies on a JAR-bundled localized resource. If it is
+    // missing (e.g. test fixtures, addons that ship without lang/<locale>/
+    // copies of every config), seed an empty file so the loader has something
+    // to populate; preserved values will be written via set() afterwards.
+    File seeded = new File(configDir(), this.name);
+    if (!seeded.exists()) {
+      try {
+        File parent = seeded.getParentFile();
+        if (parent != null && !parent.exists()) parent.mkdirs();
+        if (seeded.createNewFile()) {
+          try (FileOutputStream out = new FileOutputStream(seeded)) {
+            out.write(("version: " + version + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+          }
+        }
+      } catch (IOException e) {
+        RTP.log(Level.WARNING, e.getMessage(), e);
+      }
+    }
+
+    // The bundled localized resource may carry a stale schema version (a locale value file can
+    // lag the English baseline's version bump - e.g. lang/<loc>/safety.yml at 1.0 while the
+    // baseline safety.yml is 1.1). If left unstamped, check() sees the mismatch, runs update(),
+    // and update() calls renameFiles() a SECOND time - rotating a redundant <name>.old2 on the
+    // very same reload (the double-.old regression). Stamp the freshly-extracted file with the
+    // required version so the version comparison matches and update() does not re-fire. Locale
+    // key-set parity is enforced separately (LocaleParityTest), so the only thing the skipped
+    // update() would have changed is this version stamp itself.
+    stampVersion(new File(configDir(), this.name), this.version);
+  }
+
+  /**
+   * Rewrite the top-level {@code version:} line of a just-extracted file to {@code ver} (appending
+   * one when absent), preserving all other bytes and the file's existing line endings. Used after
+   * a locale migration to prevent a stale-versioned locale resource from immediately re-triggering
+   * {@link #update()} (and its backup rotation). No-op on any I/O failure.
+   */
+  private void stampVersion(File f, String ver) {
+    if (f == null || !f.exists()) return;
+    try {
+      String text = new String(Files.readAllBytes(f.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+      String eol = text.contains("\r\n") ? "\r\n" : "\n";
+      String body = text.replace("\r\n", "\n").replace("\r", "\n");
+      String[] lines = body.split("\n", -1);
+      boolean replaced = false;
+      for (int i = 0; i < lines.length; i++) {
+        if (lines[i].matches("(?i)version\\s*:.*")) {
+          lines[i] = "version: " + ver;
+          replaced = true;
+          break;
+        }
+      }
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < lines.length; i++) {
+        sb.append(lines[i]);
+        if (i < lines.length - 1) sb.append(eol);
+      }
+      String out = sb.toString();
+      if (!replaced) {
+        if (!out.isEmpty() && !out.endsWith(eol)) out += eol;
+        out += "version: " + ver + eol;
+      }
+      Files.write(f.toPath(), out.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    } catch (IOException e) {
+      RTP.log(Level.WARNING, "[RTP] Failed to stamp version on " + this.name, e);
+    }
+  }
+
+  /**
+   * @return {@code true} when a locale-specific value resource for this file
+   *     ({@code lang/<locale>/<subDir>/<name>}) is bundled in the JAR. Always {@code false}
+   *     for the English baseline locale (which has no {@code lang/} prefix).
+   */
+  private boolean localizedResourceExists() {
+    if (isEnglish()) return false;
+    return RTP.class.getClassLoader().getResource("lang/" + locale + "/" + jarPrefix() + this.name)
+        != null;
+  }
+
+  /**
+   * Load the active locale's shipped default scalar values from the localized JAR resource
+   * ({@code lang/<locale>/<subDir>/<name>}), keyed by enum constant. Mirrors
+   * {@link #loadEnglishBaselineDefaults()} but reads the localized member. On-disk key names in
+   * the localized file use the active locale's key names, so they are mapped back to the
+   * canonical enum via {@link #reverse_language_mapping} first (identity for value-translated
+   * files), then via {@link #enumLookup}.
+   *
+   * <p>Used to distinguish an on-disk file that still carries the English baseline text (needs
+   * migration) from one already in the active locale (must not be re-extracted / re-backed-up).
+   */
+  private Map<E, Object> loadLocalizedDefaults() {
+    Map<E, Object> defaults = new EnumMap<>(myClass);
+    java.io.InputStream in = getDefaultsFromJar();
+    if (in == null) return defaults;
+    File tmp = null;
+    try {
+      tmp = File.createTempFile("rtp-localized-", "-" + this.name.replace('/', '_'));
+      try (java.io.FileOutputStream out = new java.io.FileOutputStream(tmp)) {
+        byte[] buf = new byte[1024];
+        int len;
+        while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
+      }
+      RtpYamlConfig localized = new RtpYamlConfig(tmp.getPath());
+      localized.loadWithComments();
+      for (String key : localized.getKeys(false)) {
+        String canonical = reverse_language_mapping.getOrDefault(key, key);
+        E enumKey = enumLookup.get(canonical.toLowerCase(Locale.ROOT));
+        if (enumKey == null) enumKey = enumLookup.get(key.toLowerCase(Locale.ROOT));
+        if (enumKey == null) continue;
+        Object value = localized.get(key);
+        if (value == null) continue;
+        if (value instanceof RtpYamlSection) continue;
+        defaults.put(enumKey, value);
+      }
+    } catch (IOException | RuntimeException ex) {
+      // Treat any failure as "no localized baseline known"; caller falls back to no migration.
+    } finally {
+      try { in.close(); } catch (IOException ignored) {}
+      if (tmp != null) {
+        try { java.nio.file.Files.deleteIfExists(tmp.toPath()); } catch (IOException ignored) {}
+      }
+    }
+    return defaults;
+  }
+
+  /**
+   * Decide whether a value-translated file (identity key map, so the {@code anyRename} test in
+   * {@link #detectAndPreserveLocaleMismatch} is false) still needs to be migrated to the active
+   * locale. This is the case when the file ships a localized JAR resource AND the on-disk file is
+   * not already in the active locale.
+   *
+   * <p>The decision is made against the <em>target locale</em>, not the current English baseline:
+   * over the keys the active locale actually translates ({@code English text != localized text}),
+   * count how many already hold the localized text on disk. If a majority already match the
+   * localized default, the file is treated as already in the active locale (no migration, so a
+   * few operator customizations never trigger a re-extract / re-backup loop). Otherwise the file
+   * still carries foreign text - English, an older build's English, or another locale - and is
+   * migrated. Anchoring on the target locale (rather than requiring an exact match to the
+   * <em>current</em> English baseline) is what lets a file extracted by an older build - whose
+   * English wording has since drifted - still switch on a locale change.
+   *
+   * <p>Returns {@code false} for files without any localized resource (e.g. {@code integrations.yml})
+   * and for files already in the active locale, so a locale switch never re-extracts and
+   * re-backs-up an already-localized file on every reload.
+   *
+   * @param f the on-disk value file for this parser
+   * @return {@code true} when the on-disk file should be migrated to the active locale
+   */
+  private boolean valueOnlyLocaleMigrationNeeded(File f) {
+    if (!localizedResourceExists()) return false;
+    Map<E, Object> englishDefaults = loadEnglishBaselineDefaults();
+    Map<E, Object> localizedDefaults = loadLocalizedDefaults();
+    if (englishDefaults.isEmpty() || localizedDefaults.isEmpty()) return false;
+
+    RtpYamlConfig probe = new RtpYamlConfig(f.getPath());
+    try {
+      probe.loadWithComments();
+    } catch (IOException | RuntimeException e) {
+      return false;
+    }
+
+    int translated = 0;
+    int alreadyLocalized = 0;
+    for (E key : myClass.getEnumConstants()) {
+      Object en = englishDefaults.get(key);
+      Object loc = localizedDefaults.get(key);
+      // Only keys the active locale actually translates carry a locale signal.
+      if (en == null || loc == null || valuesEqual(en, loc)) continue;
+      translated++;
+      Object onDiskName = language_mapping.getOrDefault(key.name(), key.name());
+      Object onDisk = probe.get(onDiskName.toString());
+      if (onDisk != null && valuesEqual(onDisk, loc)) {
+        alreadyLocalized++;
+      }
+    }
+    // No translatable signal at all -> nothing to decide on; leave the file untouched.
+    if (translated == 0) return false;
+    // Migrate unless a majority of translated keys already hold the localized text (i.e. the
+    // file is already in the active locale). Using a majority - rather than requiring every
+    // key to still be English - tolerates operator customizations and English wording drift
+    // between builds without re-backing-up an already-localized file on every reload.
+    return alreadyLocalized * 2 < translated;
   }
 
   /**
@@ -1071,7 +1482,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     clone.name = name;
     clone.version = version;
     clone.pluginDirectory = pluginDirectory;
-    clone.check(version, pluginDirectory, null);
+    clone.langFile = langFile;
+    clone.check(version, pluginDirectory, langFile);
     return clone;
   }
 
@@ -1079,7 +1491,13 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
     super.set(key, value);
 
+    // Mirror the lazy-load guard used by the constructor and update(): the YAML
+    // document may not have been cached yet (e.g. the first mutation happens
+    // before any read), in which case reconnect the file database rather than
+    // dereferencing a null document.
+    if (cachedLookup.get() == null || !cachedLookup.get().containsKey(name)) fileDatabase.connect();
     RtpYamlConfig RtpYamlConfig = cachedLookup.get().get(name);
+    if (RtpYamlConfig == null) return;
     Object yamlKey = language_mapping.get(key.name());
     if (yamlKey == null) yamlKey = key.name();
     String yamlKeyStr = yamlKey.toString();

@@ -1,0 +1,581 @@
+# Every meow, hiss, and purr the kitty wants the human staff to read.
+# Formatting:
+# - Bukkit legacy color codes (e.g. &a, &7, &c)
+# - Hex color codes (e.g. #2636ef)
+# - PlaceholderAPI placeholders (when PAPI is installed)
+# Placeholders:
+# - Shared "[Pn]" placeholders are defined in the `empty_bowls` list below.
+# [P0] is the RTP prefix by default.
+# - Per-message placeholders (e.g. [attempts], [world]) are documented inline
+# above each message that uses them.
+# Note: keys like `busy` and `invalidCommand` are not key-renamed in
+# messages.lang.yml, so they keep their English left-hand names below.
+# ###############################################################################
+# Section 0: Placeholders
+# ###############################################################################
+# list of additional placeholders
+# format: Pn - where n is the index in this list
+empty_bowls:
+  # P0
+  - "[RTP]"
+
+# ###############################################################################
+# Section 1: Pouncing
+# ###############################################################################
+# already mid-pounce
+already_pouncing: "&7[P0] ⚡ mrrp! you're already pouncing!"
+
+# plugin is grooming itself
+pounce_denied_grooming: "&7[P0] pounces are paused while the kitty grooms. try again after a few licks."
+hold_paw_message: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Pouncing in [delay]. Don't twitch your tail</gradient>"
+kibble_loading: "&7[P0] ⚙ Loading kibble! please wait..."
+pounce_message: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Pounced in [attempts] attempts, in [processingTime]</gradient>"
+
+# pounce cancelled
+pounce_cancelled: "&7[P0] ⚡ Pounce cancelled! mrow."
+
+# Sent when the optional PvP combat check refuses /rtp because the player is in combat
+pvpInCombat: "&c[P0] no pouncing away while you're scrapping, kitty."
+
+# no safe spots after max attempts
+# placeholder: [attempts] - the maximum number of attempts
+spooky: "&7[P0] ⌖ could not find a safe paw-spot within [attempts] attempts"
+
+# the kitty is on cooldown nap
+# placeholder: [remainingCooldown] - the remaining time
+nap_message: "&7[P0] ⚡ you can't pounce again for [remainingCooldown]. nap first."
+
+# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)
+lockedAfterUses: "&7[P0] ⌖ Out of zoomies! Nap [remainingLockTime] and pounce again."
+
+# no warm spots ready
+no_warm_spots_left: "#f5eb73[P0] ⌖ no warm spots ready at this time"
+
+# the line of waiting kitties shifted
+# placeholder: [spot] - the current position in line
+line_of_kitties_shuffled: "#2636ef[P0] your spot in the line of kitties: [spot]"
+
+# kitty does not have enough treats to pounce in this region
+# placeholder: [money] - how much money is required for the command
+not_enough_treats: "&7[P0] you need at least $[money] treats for that."
+
+# ###############################################################################
+# Section 2: Command Feedback
+# ###############################################################################
+# bukkit-box has no such world
+# placeholder: [world] - the world name
+not_a_real_box: "&7[P0] could not find box '[world]'"
+
+# tall-human asked for a trick the kitty does not know
+# placeholder: [arg] - the argument attempted
+silly_word: "&c[P0] silly word, kitty: [arg]"
+
+# unknown subcommand
+# placeholder: [arg] - the argument attempted
+silly_meow: "&c[P0] silly meow, kitty - [arg]"
+
+# no permission
+no_treats_for_you: "&7I'm sorry, but no treats for you. please ask the head kitty if you think this is wrong."
+
+# kitty is grooming and busy
+busy: "&c[P0] busy grooming"
+
+# the tall-human terminal is trying a kitty-only trick
+tall_human_forbidden: "&c[P0] only an in-game kitty can do that, tall human."
+
+# ###############################################################################
+# Section 3: Cross-Server Pouncing (Network Mode)
+# ###############################################################################
+# Sent only when `network.enabled: true` and the player's `/rtp` is routed
+# across the cross-server wait queue (see network.yml `routing.mode`).
+# All keys are optional from the player's perspective - the L2 baseline
+# `delayMessage` / `teleportMessage` cycle still drives the visible flow.
+# Sent when the request has been accepted into the cross-server wait queue
+# and is awaiting a backend claim. Placeholder: [position] - 0-indexed
+# position from `pollStatus`; may be empty if the transport returns no
+# position.
+lined_up_for_a_neighbour_box: "&7[P0] lined up for a warm spot in a neighbour box (position [position])..."
+# Sent when a player runs /rtp* while they already hold a non-terminal
+# cross-server enrolment (command-lock). Placeholder:
+# [position] - FIFO position when known; empty when the proxy has not yet
+# assigned one.
+already_in_neighbour_line: "&cyou're already sitting in the line for a neighbour box (position [position]). sit and wait, kitty."
+# Sent when a cross-server waitlist entry is reaped after exceeding its
+# configured TTL. No placeholders.
+neighbour_nap_too_long: "&c[P0] napped too long waiting for a neighbour box - the pounce timed out."
+# Sent when a cross-server waitlist enrolment is rejected because the shared
+# waitlist has reached its configured maximum size (REJECTED_FULL).
+# No placeholders.
+neighbour_line_too_crowded: "&c[P0] the neighbour-box line is packed with kitties; try again in a moment."
+# Sent when the queue has handed the request off to the proxy router and
+# a backend selection is in progress.
+sniffing_for_a_neighbour: "&7[P0] sniffing out a neighbour box..."
+# Sent when a backend has reserved a coordinate for this player and the
+# proxy is about to initiate the cross-server hop. Placeholder: [server]
+# - the destination backend's serverId.
+warm_spot_claimed_next_door: "&a[P0] warm spot claimed on [server]. leaping over the fence..."
+# Sent when the proxy is mid-hop. Placeholder: [server] - destination.
+leaping_to_neighbour: "&a[P0] leaping over to [server]..."
+# Sent when the cross-server path gave up and fell back to the local server.
+# Placeholder: [reason] - the reason for falling back.
+no_neighbour_pouncing_home: "&e[P0] no neighbour boxes available ([reason]); pouncing back to the home box."
+# Sent when the cross-server request failed and no fallback was possible.
+# Placeholder: [reason] - the failure reason.
+neighbour_pounce_flopped: "&c[P0] the neighbour-box pounce flopped: [reason]."
+# Sent when the player asked for a specific region (`/rtp <region>`) but
+# no backend in the network is currently serving it. Placeholder:
+# [region] - the requested region name.
+networkRegionUnavailable: "&c[P0] no neighbour box is currently serving territory '[region]'."
+# Sent when the requested region name resolves to two or more backends and
+# the operator-configured policy cannot pick one (only fires
+# under stronger policies than the default `warn`). Placeholder: [region].
+networkRegionAmbiguous: "&c[P0] territory '[region]' is ambiguous across neighbour boxes; please pin a box."
+# Section 4: Visuals
+# ###############################################################################
+# title settings
+# remove or set big_meow to " to disable
+# PlaceholderAPI is recommended for coordinates
+big_meow: "<rainbow>Teletransportat!</rainbow>"
+little_meow: "<gradient:#A78BFA:#E876A0>purr-fect fun!</gradient>"
+slow_blink_in: 20
+stay_visible: 20
+slow_blink_out: 20
+
+# tummy_strip (actionbar) setting
+tummy_strip: ""
+
+# ###############################################################################
+# Section 5: Time Formatting
+# ###############################################################################
+# for time placeholders: how a kitty counts time
+many_naps: "d"
+long_naps: "h"
+yawns: "m"
+tail_flicks: "s"
+whisker_twitches: "ms"
+
+# ###############################################################################
+# Section 6: Command Descriptions
+# ###############################################################################
+# shown in the help (ask-for-pets) command
+pounce: "&b/rtp - pounce to a random spot"
+pounce_description: "pounce to a random spot"
+ask_for_pets: "&b/rtp help - mrrp, see this list"
+ask_for_pets_description: "describe what each meow does"
+groom: "&b/rtp reload - re-lick config files"
+groom_description: "re-lick config files"
+sniff: "&b/rtp scan - try every territory placement to make pouncing faster"
+sniff_description: "forget stored data and try every territory placement"
+setup_description: "update config files at runtime"
+meow_info_description: "check the kitty's current state"
+practice_pounce_description: "practice-test RTP functions"
+
+# ###############################################################################
+# Section 7: Sniff (Scan) Command
+# ###############################################################################
+# sniff command status messages
+# placeholder: [scan_regions] - list of regions
+start_sniffing: "&a[P0] sniff started for territories: [scan_regions]"
+forget_the_smell: "&7[P0] sniff queue forgotten for territories: [scan_regions]"
+stop_sniffing: "&7[P0] sniff cancelled for territories: [scan_regions]"
+pause_sniffing: "#A020F0[P0] sniff paused for territories: [scan_regions]"
+resume_sniffing: "#10A5F5[P0] sniff resumed for territories: [scan_regions]"
+sniffing_now: "&c[P0] already sniffing territories: [scan_regions]"
+not_sniffing: "&c[P0] not sniffing territories: [scan_regions]"
+# placeholders: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+sniff_status: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 sniffs/s &8| #7E9CC8[scan_landPercentage]%&7 land smell &8| &7ETA #7E9CC8[scan_eta]"
+# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
+# Set to empty string to disable the boss-bar.
+# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+sniff_bar: "Sniffing [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% warm-spots) ETA [scan_eta]"
+
+# ###############################################################################
+# Section 8: Info (Meow) Command
+# ###############################################################################
+# info command output
+meow_title: "&2&l/rtp info"
+paw_tickets: "&7Global active kibble tickets: #7E9CC8[tickets]"
+pounces: "&7Active pounce state machines: #7E9CC8[teleports]"
+meows_per_tick: "&7Current plugin meows-per-tick: #7E9CC8[mspt]"
+total_naps_disturbed: "&7Lifetime kibble loaded: #7E9CC8[loads]"
+kibble_loads_by_origin: "&7Kibble loads by paw: #7E9CC8[loadsByOrigin]"
+drool_rate: "&7Current drool (chunk leak) rate: #7E9CC8[leakRate]"
+# --- Health metrics block ---
+kitties_in_territory_lines: "&7Kitties waiting in territory lines: #7E9CC8[queueDepth]"
+pending_pounces: "&7Pending pounce pipelines: #7E9CC8[pendingTeleports]"
+average_pounce_lag: "&7Average pounce lag: #7E9CC8[avgPipelineMs] ms"
+# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
+# [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
+infoPipelinePercentiles: "&7Pounce-pipe lag (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
+# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
+# [slowPipelineCount] [slowPipelineThresholdMs].
+infoSlowPipeline: "&7Slow pounces (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
+# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+infoQueueGrowth: "&7Line-growth hisses (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
+tall_human_brain_jar: "&7Tall-human brain-jar: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
+# Header line for the Health pipeline labelled block in /rtp info.
+pounce_pipeline_health_header: "&7--- Health: pounce pipeline ---"
+# TPS readout for the 1m / 5m / 15m windows. Placeholders: [tps1m] [tps5m] [tps15m].
+tail_flicks_per_sec: "&7Tail-flicks/sec (1m/5m/15m): #7E9CC8[tps1m] / [tps5m] / [tps15m]"
+# Live server MSPT and tick-budget purr-meter. Placeholders: [mspt] [tickBudgetUtilisation].
+box_purr_rate: "&7Box purr-rate (mspt): #7E9CC8[mspt] ms (&7whisker budget: #7E9CC8[tickBudgetUtilisation]&7)"
+# Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
+kitties_in_the_box: "&7Kitties: #7E9CC8[playerCount] / [softCap]"
+# Latest kibble-stash round-trip latency in ms. Placeholder: [databaseLatencyMs].
+scratching_post_lag: "&7Scratching-post lag: #7E9CC8[databaseLatencyMs] ms"
+# Generation outcome metrics.
+# Success/failure rate over all recorded generation attempts. Placeholders:
+# [genSuccessRate] [genFailureRate] [genOutcomeTotal].
+infoFailureRate: "&7Hunt success: #7E9CC8[genSuccessRate]&7 (flop #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
+# Single most common rejection cause and its share of all failures. Placeholders:
+# [genTopRejectionCause] [genTopRejectionShare].
+infoTopRejectionCause: "&7Top hiss reason: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
+# Per-cause rejection breakdown.
+# Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
+infoFailureBreakdown: "&7Hisses by reason: #7E9CC8[genFailureBreakdown]"
+# Health colour-band thresholds. Used to colour the coloured-variant
+# placeholders (e.g. [tps1mColoured]) green/yellow/red.
+infoThresholdTpsGreen: 19.5
+infoThresholdTpsYellow: 18.0
+infoThresholdMsptGreen: 30.0
+infoThresholdMsptYellow: 45.0
+infoThresholdCacheFillGreen: 0.5
+infoThresholdCacheFillYellow: 0.25
+infoThresholdNetworkAgeYellow: 5.0
+# Header line introducing the per-Folia-region table (Folia runtime only).
+folia_dens_header: "&7--- Folia dens ---"
+# Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
+# [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
+folia_den_row: "#7E9CC8[regionId]&7: flicks=#7E9CC8[tps1m]&7 purr=#7E9CC8[mspt]&7 kitties=#7E9CC8[playerCount]&7 line=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
+hairball_warning_header: "&7--- Hairball disclaimer ---"
+hairball_warning: "&7Hairball note: if the server's total orphaned-kibble count exceeds this kitty's lifetime loads ([loads]), this kitty is not the only droolster."
+box_header: "#008080Boxes:"
+tall_human_box_header: "&7--- Boxes ---"
+box_info_meow: "#21ADA8[world]"
+territory_header: "#63C5DATerritories:"
+tall_human_territory_header: "&7--- Territories ---"
+territory_meow: "#52B2BF[region]"
+# Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
+# players spend their time in, sampled over the server's uptime.
+# Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
+infoBiomeActivityHeader: "&8--- &3Flavour napping &8(&3[biomeTotalSamples]&8 sniffs, &3[biomeDistinctCount]&8 flavours) ---"
+# Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
+infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
+# Shown when no occupancy has been sampled yet.
+infoBiomeActivityEmpty: "&8--- &7no flavour naps sniffed yet &8---"
+
+# sub-info listings
+# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
+box_info:
+  - "#21ADA8[world]:"
+  - "#99EEBB  - territory: [region]"
+  - "#99EEBB  - requires_pets: [requirePermission]"
+  - "#99EEBB  - paw_over: [override]"
+
+territory_info:
+  - "#52B2BF[region]:"
+  - "#58CCED  - box: [world]"
+  - "#58CCED  - pounce_shape: [shape]"
+  - "#58CCED  - requires_pets: [requirePermission]"
+  - "#58CCED  - fence_override: [worldBorderOverride]"
+  - "#58CCED  - kibble_jar_lid: [cacheCap]"
+  - "#58CCED  - hot_pile (L1): [keptCache]"
+  - "#58CCED  - cold_pile (L2): [unkeptCache]"
+  - "#58CCED  - backlog_pile (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - warm_spots: [cached]"
+  - "#58CCED  - sniffed coverage: [memCoveragePct] (stinky: [memBadPct], [memBadCount] boxes)"
+  - "#58CCED  - top hiss reason: [memTopCause] ([memTopCausePct])"
+
+# ###############################################################################
+# Section 9: Generalized Menu Framework
+# ###############################################################################
+# Sent when a menu token is unknown, malformed, or belongs to another player.
+scratching_slip_silly: "&c[P0] that scratching slip is all chewed up."
+# Sent when a menu redeem cannot resolve the calling player UUID.
+scratching_slip_kitties_only: "&c[P0] scratching slips only work for kitties in the world, not tall humans at the console."
+# Hover-fallback template used by the menu reflector when no YAML block-comment
+# is available for a parameter. Placeholder: [type] - the declared parameter type.
+paw_hint_type: "paw-flavour: [type]"
+# Hover-fallback template used by the menu reflector when a parameter exposes a
+# small curated value set. Placeholder: [values] - comma-joined accepted values.
+menuHoverFallbackBounds: "accepted flavours: [values]"
+menuBack: "&7« scamper back"
+# runnable non-root menu page. Placeholder: [command] - the assembled /rtp... invocation.
+menuExecute: "&2▶ pounce [command]"
+# Header row at the top of a parameter-value picker sub-page.
+# Placeholders: [param] - parameter name; [command] - assembled /rtp... invocation.
+pick_a_flavour: "&7pick a flavour for [param] (will pounce: /rtp [command] [param]:<value>)"
+# Clicking it prefills chat with the assembled command up to '<param>:' so the player
+# can type any value, including ones not in the suggestion list.
+menuTypeValue: "&7✎ type a custom flavour..."
+# Non-clickable header row at the top of every non-root menu page.
+# Surfaces the currently-constructed /rtp invocation including any staged
+# parameter assignments (name:value). Placeholder: [command] - assembled args.
+kneading: "&7kneading: #7E9CC8/rtp [command]"
+# Non-clickable title row prepended to the root /rtp menu page.
+# Provides a welcoming header before the player descends into any subcommand.
+menuRootTitle: "#5FB3B3&l⚡ RTP meow menu"
+# Non-clickable subtitle/hint row prepended to the root /rtp menu page below
+# menuRootTitle. Short orientation text for first-time users.
+paw_an_option: "&7paw an option below to begin"
+# Navigation rows appended to paginated menu pages - clicking
+# them moves to the previous/next page of the same model. Placeholder:
+# [page] - the 1-based human-readable target page number.
+menuPagePrev: "&7« earlier page ([page])"
+menuPageNext: "&7onward page ([page]) »"
+# Section divider on the front page above teleport rows (player view).
+menuFrontPageSectionTeleport: "&8--- &7pounce &8---"
+# Front-page rows. No placeholders.
+menuFrontPageRowTeleport: "&2▶ /rtp &7- pounce to a random warm spot"
+menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- sniff a territory"
+menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- sniff a box"
+menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- sniff a flavour of land"
+menuFrontPageRowHelp: "#7A4FB8❓ list meows &7- /rtp help"
+# Front-page admin entry row: the only inline admin-visible row on the
+# front page; click descends into the admin panel. Hidden when the viewer
+# lacks rtp.menu.admin.
+menuFrontPageRowAdmin: "#9D7CD8▶ head-kitty panel &7- staff tools"
+# Hover text for the admin-panel entry row. No placeholders.
+menuFrontPageHoverAdmin: "&7staff tools: setup, sniffing, hairball checks, grooming"
+# --- Admin panel book page ---
+# Non-clickable title row at the top of the admin panel. No placeholders.
+menuAdminPanelTitle: "#5FB3B3&l⚙ human-staff panel"
+# Non-clickable hint row below menuAdminPanelTitle. No placeholders.
+menuAdminPanelHint: "&7paw an option; chompy actions show a warning hover"
+# Section dividers on the admin panel. No placeholders.
+menuAdminPanelSectionConfig: "&8--- &7purr-ferences &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7vet check &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7nine lives &8---"
+menuAdminPanelSectionBrowse: "&8--- &7sniff around &8---"
+# Admin-panel rows + hovers. No placeholders.
+menuAdminPanelRowConfig: "&b▶ setup editor"
+menuAdminPanelHoverConfig: "&7open the curated setup picker"
+menuAdminPanelRowRegions: "#5FB3B3▶ territories"
+menuAdminPanelHoverRegions: "&7add, remove, or groom per-territory setups"
+menuAdminPanelRowWorlds: "#5FB3B3▶ boxes"
+menuAdminPanelHoverWorlds: "&7add, remove, or groom per-box setups"
+menuAdminPanelRowEffects: "#5FB3B3▶ sparkles"
+menuAdminPanelHoverEffects: "&7add, remove, or groom per-group pounce effects"
+menuAdminPanelRowInfo: "&b▶ box info"
+menuAdminPanelHoverInfo: "&7show plugin version, territory counts, and line state"
+menuAdminPanelRowDiagnostics: "&c▶ full hairball checks"
+menuAdminPanelHoverDiagnostics: "&7runs every hairball check; may be expensive"
+menuAdminPanelRowMemory: "&b▶ snack inventory snapshot"
+menuAdminPanelHoverMemory: "&7dump active kibble-ticket and pounce-pipeline snacks"
+menuAdminPanelRowScan: "&b▶ sniff control"
+menuAdminPanelHoverScan: "&7open the sniff submenu (start / pause / cancel)"
+menuAdminPanelRowReload: "&c▶ groom (reload)"
+menuAdminPanelHoverReload: "&7grooms all setup files; mid-pounce kitties may be jostled"
+menuAdminPanelRowBrowse: "&b▶ browse all meows"
+menuAdminPanelHoverBrowse: "&7open the reflected /rtp meow tree"
+menuAdminPanelRowBack: "&7« scamper back"
+# --- Visualizations submenu (admin map of bad locations per region) ---
+# Admin-panel row: open the Visualizations submenu. No placeholders.
+menuAdminPanelRowVisualizations: "#5FB3B3▶ shiny pictures"
+# Hover text for the admin-panel Visualizations row. No placeholders.
+menuAdminPanelHoverVisualizations: "&7open maps and other head-kitty visualizations"
+# Section divider above the Visualizations block on the admin panel.
+menuAdminPanelSectionVisualizations: "&8» &7shiny pictures"
+# Non-clickable title row at the top of the Visualizations submenu.
+menuVisualizationsTitle: "#9D7CD8&l⌖ map sniffs"
+# Non-clickable hint row below the title.
+menuVisualizationsHint: "&7pick a territory to view its stinky-spots map"
+# Visualizations row template; [region] - region name.
+menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- territory shape map"
+# Hover text for a Visualizations region row; [region] - region name.
+menuVisualizationsHoverRegion: "&7open a map showing stinky spots in &b[region]"
+# Non-clickable hint row shown when no regions are configured.
+menuVisualizationsEmpty: "&7(no territories configured)"
+# Visualizations submenu back row (returns to the admin panel).
+menuVisualizationsRowBack: "&7« scurry back"
+# --- Admin panel Setup section: curated prefabs ---
+# Section divider above the Setup (quick start) block on the admin panel.
+menuAdminPanelSectionSetup: "&8» &7setup (quick paw start)"
+# Setup row + hover: survival-default identity overlay (reset to shipped defaults).
+menuPrefabSurvivalDefaultRow: "#5FB3B3▶ survival-default"
+menuPrefabSurvivalDefaultHover: "&7reset to the shipped defaults (plain-kibble overlay)"
+# Setup row + hover: low-performance (longer pulse, smaller caches, login cache off).
+menuPrefabLowPerformanceRow: "#5FB3B3▶ low-performance"
+menuPrefabLowPerformanceHover: "&7sleepy boxes / shared-CPU dens: longer pulse, smaller piles, login warm-spots off"
+# Setup row + hover: high-performance (short pulse, large caches, login cache on).
+menuPrefabHighPerformanceRow: "#5FB3B3▶ high-performance"
+menuPrefabHighPerformanceHover: "&7dedicated boxes / many kitties: short pulse, big piles, login warm-spots on"
+# Setup row + hover: folia-tuned (regional scheduler tuning).
+menuPrefabFoliaTunedRow: "#5FB3B3▶ folia-tuned"
+menuPrefabFoliaTunedHover: "&7folia regional scheduler: faster per-den pulses, fewer kibble tickets at once"
+# Setup row + hover: multi-world (one region per world from current default).
+menuPrefabMultiWorldRow: "#5FB3B3▶ multi-world"
+menuPrefabMultiWorldHover: "&7synthesise one territory per box from the current default"
+# Confirmation menu title. Placeholder: [prefab] - prefab id or display name.
+menuPrefabConfirmTitle: "#9D7CD8&l⚙ confirm flavour: #5FB3B3[prefab]"
+# Confirmation menu non-clickable hint row below the title. No placeholders.
+menuPrefabConfirmHint: "&7sniff the changes below, then paw confirm or cancel"
+# Confirmation menu footer row: confirm and write the prefab to disk.
+menuPrefabConfirmRow: "&2&l[paw to confirm]"
+# Confirmation menu footer row: cancel and return to the admin panel.
+menuPrefabCancelRow: "&c&l[paw to cancel]"
+# Clickable row label for the Refresh affordance at the bottom of the /rtp info
+# book. Re-renders the current scope against a fresh metrics snapshot.
+infoBookRefreshRow: "&2[Refresh]"
+# Hover text for the info-book refresh row.
+infoBookRefreshHover: "&7Re-sniff this page against a fresh hairball snapshot."
+# Clickable row label for the Switch-to-chat affordance at the bottom of the
+# /rtp info book. Re-runs the same scope through the legacy chat path.
+infoBookSwitchToTextRow: "&7[switch to meow chat]"
+# Hover text for the info-book switch-to-chat row.
+infoBookSwitchToTextHover: "&7Re-meow /rtp info in chat instead of the booklet."
+# Footer row rendered when the /rtp info book content exceeds the book page
+# cap. Clicking re-runs the same scope in chat mode so no data is lost.
+infoBookOverflowFooter: "&7(too many meows for one page - paw to see the rest in chat)"
+# Non-clickable note row indicating that periodic auto-refresh for the info
+# book is not currently supported on this build (deferred to a later
+# milestone). Users may click the Refresh row to refresh manually.
+infoBookAutoRefreshDeferredNote: "&8(auto-grooming not yet supported; paw re-sniff to update)"
+# Shown when an admin clicks "/rtp config" from the front page.
+configSelectorTitle: "#5FB3B3&l⚙ setup files"
+configSelectorBackRow: "&7« back to the meow menu"
+# Placeholder: [file] - the config file name (e.g. "performance", "safety").
+configFileTitle: "#5FB3B3&l⚙ purr-ferences: &7[file]"
+configFileBackRow: "&7« back to setup files"
+# Non-clickable hint row shown when a config file has no editable keys.
+configFileEmptyHint: "&7(no groomable keys in this file)"
+# Per-key row label on a config-file page. Placeholders:
+# [key] - the config key name; [value] - the currently-stored value.
+configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
+# Hover text for a per-key row on a config-file page. Placeholders:
+# [key], [value], [type] - the config key name, current value, and declared type.
+configKeyHoverFormat: "&7paw to groom &7[key] &7(flavour: [type])"
+# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
+configTypePickerTitle: "#5FB3B3&l⚙ pick [param] kind &7(current: &7[current]&7)"
+# Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7tiny tweaks"
+# Hint sent when the book view falls back to the legacy raw-YAML chat dump
+# (no book renderer available on this platform).
+configViewRawHint: "&7[P0] booklet view unavailable; falling back to raw dump."
+# Placeholder text rendered in place of a config value that has not been set.
+configValueUnsetPlaceholder: "&8(no scent)"
+# staging-cart list on a config-file page when the viewer has staged one or
+# more uncommitted edits. No placeholders.
+configPendingHeader: "&6&l-- pending changes --"
+# Per-row label for a staged (pending) key=value entry on a config-file page.
+# Clicking the row removes it from the cart. Placeholders: [key], [value].
+configPendingRowFormat: "&9[key]&8 = &0[value]"
+# Hover text shown when the viewer hovers a pending (staged) row on a
+# config-file page. No placeholders.
+configPendingRowHover: "paw to unstage"
+# Runs the assembled /rtp config <file> k1=v1... command and clears the cart.
+configApplyRow: "&2&l[apply]"
+# Clears the cart without applying.
+configDiscardRow: "&c&l[discard]"
+
+# --- Map / chart rendering ---
+# Sent when a map row is clicked but map rendering is not available on this
+# server (e.g. the Lite assembly, or no map provider installed).
+mapBindingMissing: "&c[P0] map rendering is not available on this box."
+# Sent when a chart is requested but no renderer is registered for that
+# chart type.
+mapResolverMissing: "&c[P0] no chart-sniffer registered for this request."
+# Sent when a resolver runs but the underlying data source is unavailable
+# for the requested target (unknown region, no data yet, world unloaded).
+# Placeholder: [region] - the requested region name (may be empty).
+mapUnavailable: "&e[P1] chart kibble is not available right now."
+# Sent when the map service cannot allocate a map right now (e.g. a
+# per-viewer cap has been reached).
+mapBusy: "&e[P1] the map-sniffer is busy; try again in a few licks."
+# Label for the clickable "/rtp info" menu row that renders a heatmap of
+# the current region's known bad locations. Hidden when map rendering is
+# not available on this server.
+menuInfoBadPointsLabel: "#9D7CD8&l# bad-spots map"
+
+# --- MultiConfig submenu ---
+# Header row fallback used when no per-kind header key is registered.
+# Placeholder: [parserKind] - the raw multi-config kind name.
+multiconfigHeaderDefault: "#5FB3B3&l[parserKind]"
+# Header row label for the regions multi-config selector page. No placeholders.
+multiconfigHeaderRegions: "#5FB3B3&l territories"
+# Header row label for the worlds multi-config selector page. No placeholders.
+multiconfigHeaderWorlds: "#5FB3B3&l boxes"
+# Toggle-row label when remove-mode is OFF. No placeholders.
+multiconfigToggleRemoveModeOff: "&8[ ] chompy mode"
+# Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
+multiconfigToggleRemoveModeOn: "&c[x] chompy mode (paw an entry to chomp it)"
+multiconfigRowAdd: "&2+ sniff out a new one..."
+# Hover text for the Add row. Placeholder: [name] - prefilled default name.
+multiconfigRowAddHover: "&7type a name in the scratching prompt; prefilled: &f[name]"
+# Hover text for an entry row in normal mode. Placeholder: [name].
+multiconfigRowEditHover: "&7groom &f[name]"
+# Hover text for an entry row in remove-mode. Placeholder: [name].
+multiconfigRowRemoveHover: "&cchomp &f[name]"
+# Confirm-delete page title row. Placeholder: [name].
+multiconfigConfirmTitle: "&c&lchomp [name]?"
+# Confirm-delete page Yes-row label. No placeholders.
+multiconfigConfirmYes: "&c&l[paw to chomp]"
+# Confirm-delete page Cancel-row label. No placeholders.
+multiconfigConfirmNo: "&2&l[scamper away]"
+# Hover text on a locked (grayed) default-region row. No placeholders.
+multiconfigLockRegionDefault: "&7the default territory cannot be chomped"
+# Hover text on a locked (grayed) world row. Placeholder: [name].
+multiconfigLockWorldLoaded: "&7box '[name]' is loaded on the server; unload it before chomping its setup"
+# Result message after a successful ADD. Placeholder: [name].
+multiconfigResultAdded: "&adragged in '[name]'."
+# Result message after a successful REMOVE. Placeholder: [name].
+multiconfigResultRemoved: "&achomped '[name]'."
+# Result message when ADD failed. Placeholders: [name], [reason].
+multiconfigResultAddFailed: "&ccouldn't drag in '[name]': [reason]"
+# Result message when REMOVE failed. Placeholders: [name], [reason].
+multiconfigResultRemoveFailed: "&ccould not chomp '[name]': [reason]"
+# Result message when the proposed entry name is rejected by the sanitiser.
+# Placeholder: [name].
+multiconfigResultNameInvalid: "&cname '[name]' is hiss-worthy; use letters, digits, '_', '-', '.'"
+# Result message when an ADD collides with an existing entry name.
+# Placeholder: [name].
+multiconfigResultNameTaken: "&can entry named '[name]' already lives here."
+
+# ###############################################################################
+# Section 10: System & Management
+# ###############################################################################
+# a config file 'version' is older than the latest
+# placeholder: [filename] - name of file, including file extension
+ancient_scroll: "&b[P0] dusty old [filename] sniffed out. grooming it fresh"
+
+# sniffed a new bukkit world not in the config file
+# placeholder: [world] - the world detected
+new_box: "&b[P0] sniffed a new box '[world]'"
+
+# tall-human reload / update text
+# placeholder: [filename] - name of file
+grooming: "&b[P0] grooming [filename]..."
+groomed_complete: "&b[P0] finished grooming [filename]."
+rearranging_whiskers: "&a[P0] rearranging [filename]..."
+groomed: "&a[P0] [filename] all tidy."
+
+# ###############################################################################
+# Section 11: Administrative Logs
+# ###############################################################################
+# logged when warm-spots are saved/loaded from the scratching post
+# placeholder: [amount] - number of locations
+# placeholder: [region] - name of region
+warm_spot_saved: "&7[P0] saved [amount] warm-spots for [region]"
+warm_spot_remembered: "&7[P0] remembered [amount] warm-spots for [region]"
+
+# ###############################################################################
+# Section 12: PlaceholderAPI Support
+# ###############################################################################
+# kitty status placeholders
+KITTY_READY: "&aREADY TO POUNCE"
+KITTY_NAP: "&7NAPPING"
+KITTY_PREP: "&bPICKING A WARM SPOT"
+KITTY_WAKING_UP: "&bLOADING KIBBLE"
+KITTY_POUNCING: "&bPOUNCING"
+
+# ###############################################################################
+# Section 13: Metadata
+# ###############################################################################
+# Do not bite the version number, sacred catnip
+meowsion: 1.0
+
+# ###############################################################################
+# Section 14: Developer Options
+# ###############################################################################
+# set to true to append a kitten tag (e.g. §8(RTP:ClassName)) to every message
+show_kitten_tag: false

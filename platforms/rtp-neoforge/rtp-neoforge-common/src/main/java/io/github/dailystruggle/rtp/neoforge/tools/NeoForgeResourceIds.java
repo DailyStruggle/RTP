@@ -39,12 +39,19 @@ public final class NeoForgeResourceIds {
     /**
      * Candidate no-arg accessor names for the identifier carried by a
      * {@code ResourceKey} / {@code TagKey}. The method was named
-     * {@code location()} through MC 1.21.8 and was renamed to {@code getValue()}
-     * in the MC 1.21.11 mappings (alongside the {@code ResourceLocation} ->
-     * {@code Identifier} type rename). Trying both lets the single 1.21.x carrier
-     * serve the whole line regardless of which name the runtime uses.
+     * {@code location()} through MC 1.21.8, renamed to {@code getValue()} in the
+     * MC 1.21.11 mappings (alongside the {@code ResourceLocation} ->
+     * {@code Identifier} type rename), and is named {@code identifier()} on the
+     * year-based MC 26.x mappings. Trying all three lets the single carrier serve
+     * the whole line regardless of which name the runtime uses.
+     *
+     * <p>Omitting {@code identifier()} previously made every dimension-id lookup
+     * on a 26.x runtime return {@code null}, which collapsed the region-file
+     * subpath resolution to the legacy overworld root and made already-generated
+     * chunks under the unified {@code dimensions/<ns>/<path>/region/} layout look
+     * ungenerated (prescan bailing to the full-load scan).</p>
      */
-    private static final String[] LOCATION_ACCESSORS = { "location", "getValue" };
+    private static final String[] LOCATION_ACCESSORS = { "location", "getValue", "identifier" };
 
     private static Method noArg(Class<?> owner, String name) {
         String key = owner.getName() + "#" + name;

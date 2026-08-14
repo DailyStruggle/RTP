@@ -123,9 +123,10 @@ public class LocaleUntranslatedTest {
             for (String category : categories) {
                 tests.add(DynamicTest.dynamicTest(localeName + " / " + category, () -> {
                     Path baselineValue = RESOURCES.resolve(category + ".yml");
-                    Path baselineLang = LANG_ROOT.resolve(category + ".lang.yml");
+                    // ADR-076: rename maps are co-located dotfile siblings.
+                    Path baselineLang = RESOURCES.resolve("." + category + ".lang.yml");
                     Path localeValue = localeDir.resolve(category + ".yml");
-                    Path localeLang = localeDir.resolve(category + ".lang.yml");
+                    Path localeLang = localeDir.resolve("." + category + ".lang.yml");
 
                     if (!Files.exists(localeValue)) return;
 
@@ -292,7 +293,8 @@ public class LocaleUntranslatedTest {
             for (Path yml : ymls) {
                 String name = yml.getFileName().toString();
                 String stem = name.substring(0, name.length() - ".yml".length());
-                Path langSibling = LANG_ROOT.resolve(stem + ".lang.yml");
+                // ADR-076: co-located dotfile map beside the baseline value file.
+                Path langSibling = RESOURCES.resolve("." + stem + ".lang.yml");
                 if (Files.exists(langSibling)) categories.add(stem);
             }
         }

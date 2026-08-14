@@ -1,0 +1,41 @@
+# --- RTP-Nachrichten (diese Sprache) ---
+# Nachrichtentexte fuer Spieler und Operatoren in dieser Sprache, nach Themen gruppiert.
+# Automatisch aus den englischen Nachrichten erzeugt; nicht von Hand bearbeiten (wird ueberschrieben).
+
+# ###############################################################################
+# Abschnitt 4: System & Verwaltung
+# ###############################################################################
+# die 'version' einer Konfigurationsdatei ist niedriger als die neueste
+# Platzhalter: [filename] - Dateiname einschließlich Dateiendung
+alteDatei: "&b[P0] alte [filename] erkannt. Aktualisiere"
+
+# eine Bukkit-Welt erkannt, die nicht in der Konfigurationsdatei steht
+# Platzhalter: [world] - die erkannte Welt
+neueWelt: "&b[P0] neue Welt '[world]' erkannt"
+
+# Text für Plugin-Reload/Update
+# Platzhalter: [filename] - Dateiname
+ladeNeu: "&b[P0] lade [filename]..."
+neuGeladen: "&b[P0] [filename] erfolgreich geladen."
+aktualisiere: "&a[P0] aktualisiere [filename]..."
+aktualisiert: "&a[P0] [filename] erfolgreich aktualisiert."
+
+# ###############################################################################
+# Abschnitt 5: Administrative Protokolle
+# ###############################################################################
+# protokolliert, wenn Orte in der Datenbank gespeichert/geladen werden
+# Platzhalter: [amount] - Anzahl der Orte
+# Platzhalter: [region] - Name der Region
+ortGespeichert: "&7[P0] [amount] Orte für [region] erfolgreich gespeichert"
+ortGeladen: "&7[P0] [amount] Orte für [region] erfolgreich geladen"
+
+# ###############################################################################
+# Abschnitt 11: Metadaten
+# ###############################################################################
+version: 1.0
+
+# ###############################################################################
+# Abschnitt 12: Entwickleroptionen
+# ###############################################################################
+# auf true setzen, um an jede Nachricht ein Entwickler-Tag anzuhängen (z. B. §8(RTP:ClassName))
+entwicklerTagAnzeigen: false

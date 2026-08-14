@@ -181,7 +181,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                     worldFolder = null;
                 }
                 if (worldFolder != null) {
-                    String dim = dimensionRegionSubpath(probeLevel);
+                    String dim = dimensionRegionSubpath(worldFolder, probeLevel);
                     java.util.Set<String> rawUnsafe = currentUnsafeBlocks();
                     return anvilProbeSupport
                             .probeAndPublish(worldFolder, dim, chunkX, chunkZ, key, rawUnsafe,
@@ -451,7 +451,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                     + name + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
             return CompletableFuture.completedFuture(null);
         }
-        final String dim = dimensionRegionSubpath(level);
+        final String dim = dimensionRegionSubpath(worldFolder, level);
         final int finalMinY = minY;
         final int finalMaxY = maxY;
 
@@ -493,7 +493,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         } catch (Throwable t) {
             return java.util.Collections.emptyMap();
         }
-        final String dim = dimensionRegionSubpath(level);
+        final String dim = dimensionRegionSubpath(worldFolder, level);
         try {
             java.nio.file.Path regionFile =
                 io.github.dailystruggle.rtp.anvil.AnvilPrefilter
@@ -561,23 +561,103 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         }
     }
 
-    private static String dimensionRegionSubpath(ServerLevel level) {
-        if (level == null) return "";
+    /**
+     * Candidate on-disk region subdirectories for {@code level}'s dimension, in
+     * priority order. Modern layouts unify every dimension under
+     * {@code <world>/dimensions/<ns>/<path>/region/}; legacy (and vanilla
+     * dedicated-server) layouts keep the classic roots ({@code ""} for the
+     * overworld, {@code "DIM-1"}/{@code "DIM1"} for the nether/end). Return both
+     * so {@link #dimensionRegionSubpath(java.nio.file.Path, ServerLevel)} can
+     * pick whichever actually exists on disk without knowing the engine layout
+     * a priori.
+     */
+    private static java.util.List<String> dimensionRegionSubpaths(ServerLevel level) {
+        if (level == null) return java.util.List.of("");
+        String ns = null;
+        String path = null;
         try {
+            Object dimKey = level.dimension();
             Object loc = io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds
-                    .location(level.dimension());
-            String ns = io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds.namespace(loc);
-            String path = io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds.path(loc);
-            if (ns == null || path == null) return "";
-            if ("minecraft".equals(ns)) {
-                if ("overworld".equals(path)) return "";
-                if ("the_nether".equals(path)) return "DIM-1";
-                if ("the_end".equals(path))    return "DIM1";
+                    .location(dimKey);
+            ns = io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds.namespace(loc);
+            path = io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds.path(loc);
+            if (ns == null || path == null) {
+                // Mapping-name-independent fallback. The reflective accessor path
+                // above depends on the runtime naming the id accessors
+                // location()/getValue()/identifier() and getNamespace()/getPath();
+                // those names drift across MC/NeoForge mapping generations and a
+                // single miss collapses the resolution to the legacy overworld
+                // root, making generated chunks under the unified
+                // dimensions/<ns>/<path>/region/ layout look ungenerated.
+                // ResourceKey.toString() is never remapped and renders as
+                // "ResourceKey[minecraft:dimension / minecraft:overworld]"; the
+                // dimension id is the token after the last '/'. Parse it directly.
+                String[] parsed = parseDimensionKeyToString(String.valueOf(dimKey));
+                if (parsed != null) {
+                    ns = parsed[0];
+                    path = parsed[1];
+                }
             }
-            return "dimensions/" + ns + "/" + path;
         } catch (Throwable ignored) {
-            return "";
+            // fall through to the "" default below
         }
+        if (ns == null || path == null) return java.util.List.of("");
+        String unified = "dimensions/" + ns + "/" + path;
+        if ("minecraft".equals(ns)) {
+            if ("overworld".equals(path))  return java.util.List.of(unified, "");
+            if ("the_nether".equals(path)) return java.util.List.of(unified, "DIM-1");
+            if ("the_end".equals(path))    return java.util.List.of(unified, "DIM1");
+        }
+        return java.util.List.of(unified);
+    }
+
+    /**
+     * Extract {@code [namespace, path]} from a {@code ResourceKey.toString()}
+     * rendering such as {@code "ResourceKey[minecraft:dimension / minecraft:overworld]"}.
+     * The dimension id is the token after the last {@code '/'} (or the whole
+     * bracketed body when there is no registry-key separator). Returns
+     * {@code null} when the string does not contain a {@code namespace:path}
+     * token. {@code toString()} is not affected by the obfuscation/mapping
+     * layer, so this is a stable fallback when the reflective id accessors miss.
+     */
+    private static String[] parseDimensionKeyToString(String s) {
+        if (s == null) return null;
+        int slash = s.lastIndexOf('/');
+        String tail = (slash >= 0) ? s.substring(slash + 1) : s;
+        tail = tail.replace("[", " ").replace("]", " ").trim();
+        // Keep only the last whitespace-delimited token (guards the no-slash case
+        // where the leading "ResourceKey" / registry id would otherwise remain).
+        int ws = tail.lastIndexOf(' ');
+        if (ws >= 0) tail = tail.substring(ws + 1);
+        int colon = tail.indexOf(':');
+        if (colon <= 0 || colon >= tail.length() - 1) return null;
+        String ns = tail.substring(0, colon);
+        String path = tail.substring(colon + 1);
+        if (ns.isEmpty() || path.isEmpty()) return null;
+        return new String[]{ ns, path };
+    }
+
+    /**
+     * Resolve the actual on-disk region subpath for {@code level}, preferring
+     * the first candidate from {@link #dimensionRegionSubpaths(ServerLevel)}
+     * whose {@code region/} directory exists. Falls back to the first candidate
+     * so callers always have a path to probe (probes naturally miss for
+     * ungenerated tiles). This disk-existence fallback prevents a wrong
+     * hardcoded layout from making generated chunks look ungenerated.
+     */
+    private static String dimensionRegionSubpath(java.nio.file.Path worldFolder, ServerLevel level) {
+        java.util.List<String> candidates = dimensionRegionSubpaths(level);
+        for (String c : candidates) {
+            java.nio.file.Path regionDir = c.isEmpty()
+                    ? worldFolder.resolve("region")
+                    : worldFolder.resolve(c).resolve("region");
+            try {
+                if (java.nio.file.Files.isDirectory(regionDir)) return c;
+            } catch (Throwable ignored) {
+                // try next candidate
+            }
+        }
+        return candidates.get(0);
     }
 
     @Override
@@ -600,11 +680,15 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
             return true;
         }
         try {
-            String dim = dimensionRegionSubpath(level);
+            String dim = dimensionRegionSubpath(worldFolder, level);
             java.nio.file.Path regionFile =
                 io.github.dailystruggle.rtp.anvil.AnvilPrefilter
                     .regionFileFor(worldFolder, dim, cx, cz);
             if (regionFile == null || !java.nio.file.Files.exists(regionFile)) {
+                RTP.log(java.util.logging.Level.FINE,
+                    "[RTP] NeoForgeRTPWorld.isChunkGenerated: no region file for world="
+                        + name + " dim=\"" + dim + "\" chunk=(" + cx + "," + cz
+                        + ") -> " + regionFile);
                 return false;
             }
             return io.github.dailystruggle.rtp.anvil.AnvilRegionOccupancyCache

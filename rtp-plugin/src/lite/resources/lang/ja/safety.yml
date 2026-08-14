@@ -1,0 +1,146 @@
+# --- RTP 安全設定 ---
+
+# プラグインがテレポート先を「安全」と判断する基準を設定します。
+# トークン構文:
+# MATERIAL -- 単純な素材、例: LAVA
+# MATERIAL[prop=val,prop2=val2] -- すべてのブロック状態プロパティが一致した場合のみ
+# #namespace:tag -- そのタグ配下のすべての素材に展開
+# #namespace:tag[prop=val] -- プロパティが一致した場合のみタグメンバーをカウント
+# *[prop=val] -- プロパティが一致したときに任意の素材にマッチ（ワイルドカード）
+# プロパティ値は Bukkit BlockData の文字列形式と大文字小文字を無視して比較されます。
+# 未知のタグは空集合に展開されます (no-op, fail-open)。形式不正のトークンはリロード時に
+# WARN レベルで一度だけログ出力されます 。リスト内の順序は重要ではありません。
+# 無敵時間（秒）
+# テレポート後にプレイヤーが無敵となる時間。到着直後に火・窒息・落下ダメージで死ぬのを防ぎます。
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 5
+無敵時間: 5
+
+# 安全チェック半径（ブロック）
+# ターゲットブロック周辺の危険チェック半径。
+# 大きいほど安全ですが、適切な着地点を見つけるのは難しくなります。
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 0
+安全半径: 0
+
+# 着地プラットフォーム
+# テレポート先に着地用プラットフォームを生成します。中心ブロックは目的地のブロック種類に応じて選択。
+# プラットフォームを無効にするには platformRadius を -1 に設定。
+# デフォルト: -1 (無効) — モダンな安全チェック (chunk.isSafe + 垂直調整) によって信頼できる
+# 着地点が安定して得られるため、この緊急用プラットフォーム (ガラスブロック) はデフォルトで無効です。
+# 旧式のフォールバックが必要なほど安全でない着地が出る場合のみ 0 以上に設定してください。
+# @type: integer
+# @range: [-1, null]
+# @unit: blocks
+# @default: -1
+プラットフォーム半径: -1
+
+# Depth (vertical thickness) of the emergency platform.
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
+プラットフォーム深さ: 1
+
+# プラットフォーム上に保証する空気の高さ。
+# 高すぎると光環境がおかしくなることがあります。
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+プラットフォーム空気高さ: 2
+
+# 目的地に固体ブロックがない場合にプラットフォームで使うデフォルト素材。
+# @type: material
+# @source: material
+# @default: GLASS
+プラットフォーム素材: "GLASS"
+
+# プラットフォームの跡地を元のブロックに戻すまでの秒数。-1=戻さない（恒久）、
+# 0=チャンクが再読み込みされ次第。カウントダウンはチャンクが読み込まれている間のみ
+# 進み、再起動後も維持されます。
+# @type: integer
+# @range: [-1, null]
+# @unit: seconds
+# @default: -1
+platformRestoreSeconds: -1
+
+# --- Optional PvP / combat-tag pre-flight gate ---
+# マスタースイッチ。true の場合、/rtp は戦闘状態を確認し、キュー登録前と
+# テレポート前に下記の pvpOnCombat を適用します。
+# @type: boolean
+# @default: false
+pvpCheckEnabled: false
+
+# PvP ダメージ後にプレイヤーが「戦闘中」とみなされる秒数（ネイティブトラッカー
+# のみ。外部の戦闘タグプラグインが連携している場合は無視されます）。
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 15"
+pvpCombatTagSeconds: 15
+
+# What to do when a combat-tagged player requests (or is mid-)/rtp.
+# ALLOW  - permit, but log an audit line
+# DENY   - refuse the command with the busy message
+# DELAY  - postpone until the combat tag expires, then proceed
+# CANCEL - abort an in-progress / queued teleport
+# Unknown values fail safe to DENY.
+# @type: enum
+# @options: [ALLOW, DENY, DELAY, CANCEL]
+# @default: DENY
+pvpOnCombat: "DENY"
+
+# Combat-state source preference.
+# AUTO     - external combat-tag plugin if one is bound, else native tracker
+# NATIVE   - always use RTP's native damage tracker
+# EXTERNAL - only a bound combat-tag plugin (no native fallback)
+# @type: enum
+# @options: [AUTO, NATIVE, EXTERNAL]
+# @default: AUTO
+pvpSource: "AUTO"
+
+# Native tracker: tag a player who TAKES PvP damage.
+# @type: boolean
+# @default: true
+pvpTagVictim: true
+
+# Native tracker: tag a player who DEALS PvP damage.
+# @type: boolean
+# @default: true
+pvpTagAggressor: true
+
+# 古いチャンクの再試行上限（回数）
+# における古いチャンクガードの有界リトライ予算。非同期チャンクロード
+# 完了後、後続のブロック評価タスクは Count-Bound のタスクパイプライン (Folia の Region Thread
+# スケジューラ) にキューイングされます。パイプラインが飽和している場合、ネイティブのチャンク GC
+# がそのタスクの実行前にチャンクをアンロードしてしまうことがあり、放置すると Region Thread での
+# 同期ロードが発生し Folia の Watchdog を起こします。ガードがこの競合を検知すると、最大この回数まで
+# 非同期ロードを再キューイングします。使い切ったらこの候補は通常の "unsafe" ルートで拒否されます
+# (WARN ログを出力。黙って捨てることはありません)。
+# デフォルト: 2。極めて積極的なチャンク GC を持つフォークでのみ増やしてください。
+# @type: integer
+# @range: [0, null]
+# @default: 2"
+staleChunkRetryLimit: 2
+
+# 読み取り専用 Anvil プリフィルタ（Vanilla Spigot のみ）
+# 永続化されたリージョンファイル `r.X.Z.mca` をスレッド外で解析する安全プローブで、
+# 明らかに安全でない候補（heightmap 表面が lava/magma/fire）について、ライブで権威ある
+# チャンクのロードを要求する前に拒否します。Vanilla Spigot ではライブチャンクロード API が
+# 真に非同期ではないため、tick スレッドの負荷を軽減します。Paper / Folia ではネイティブの
+# 非同期 API がチャンクロード経路を置き換えており、プリフィルタには到達しないため効果はありません。
+# ACCEPT 時は引き続き chunk.isSafe(...) のライブ再チェックが権威となります。REJECT のみが
+# ショートカットです。 を参照。
+# デフォルト: true。エキゾチックなリージョンフォーマットを使うフォークではプリフィルタを
+# 無効化するために false に設定してください。
+# @type: boolean
+# @default: true
+anvilPrefilterEnabled: true
+
+# バージョン番号は変更しないでください
+version: 1.0

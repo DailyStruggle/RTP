@@ -1,0 +1,15 @@
+# --- Language Mapping: network.yml ---
+# Maps internal baseline keys (left) to user-visible key names (right)
+# used in network.yml. Co-located dotfile sibling (ADR-076).
+networkQueued: "networkQueued"
+alreadyQueued: "alreadyQueued"
+networkTimedOut: "networkTimedOut"
+waitlistFull: "waitlistFull"
+networkRouting: "networkRouting"
+networkReserved: "networkReserved"
+networkTransferring: "networkTransferring"
+networkFallback: "networkFallback"
+networkFailed: "networkFailed"
+networkRegionUnavailable: "networkRegionUnavailable"
+networkRegionAmbiguous: "networkRegionAmbiguous"
+version: "version"

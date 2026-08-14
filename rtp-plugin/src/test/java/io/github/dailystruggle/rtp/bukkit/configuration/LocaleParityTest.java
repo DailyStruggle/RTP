@@ -62,13 +62,15 @@ public class LocaleParityTest {
     private static final Path LANG_ROOT = RESOURCES.resolve("lang");
     /**
      * The English baseline messages are split, per concern, across this
-     * directory (placeholders / player / network / commands / system) rather
-     * than a single top-level messages.yml. The locale trees still ship a
-     * single lang/&lt;locale&gt;/messages.yml, so "messages" is treated as a
-     * directory-backed baseline category whose key set is the union of these
-     * member files.
+     * directory (placeholders / player / network / commands / system). Each
+     * member file is its own category {@code advanced/messages/<file>} with a
+     * co-located dotfile rename map {@code .<file>.lang.yml} (ADR-076); the
+     * per-locale value + map trees mirror this under
+     * {@code lang/<locale>/advanced/messages/}. The flat per-locale
+     * {@code lang/<locale>/messages.yml} value file is retained as the union of
+     * these members and drives the placeholder / untranslated value scans.
      */
-    private static final Path MESSAGES_DIR = RESOURCES.resolve("messages");
+    private static final Path MESSAGES_DIR = RESOURCES.resolve("advanced").resolve("messages");
     private static final Pattern PLACEHOLDER = Pattern.compile("\\[[A-Za-z0-9_]+]");
 
     /** Subdirectories under {@code lang/} that are NOT locale folders. */
@@ -114,8 +116,15 @@ public class LocaleParityTest {
                                  Files.newDirectoryStream(localeDir, "*.lang.yml")) {
                         for (Path langMap : langMaps) {
                             String mapName = langMap.getFileName().toString();
-                            String valueName = mapName.substring(
-                                    0, mapName.length() - ".lang.yml".length()) + ".yml";
+                            // ADR-076: maps are co-located dotfile siblings
+                            // (`.config.lang.yml`); the backing value file drops
+                            // the leading dot (`config.yml`). The legacy monolithic
+                            // `messages.lang.yml` has no leading dot and is handled
+                            // by the same stripping (no-op).
+                            String stem = mapName.substring(
+                                    0, mapName.length() - ".lang.yml".length());
+                            if (stem.startsWith(".")) stem = stem.substring(1);
+                            String valueName = stem + ".yml";
                             Path valueFile = localeDir.resolve(valueName);
 
                             if (!Files.exists(valueFile)) {
@@ -215,7 +224,7 @@ public class LocaleParityTest {
             if (!Files.isDirectory(LANG_ROOT)) return;
             if (!Files.isDirectory(MESSAGES_DIR)) return;
 
-            Set<String> baselinePlaceholders = collectPlaceholders(loadBaselineValues("messages"));
+            Set<String> baselinePlaceholders = collectPlaceholders(mergedMessagesBaseline());
             List<String> failures = new ArrayList<>();
 
             try (DirectoryStream<Path> locales = Files.newDirectoryStream(LANG_ROOT, Files::isDirectory)) {
@@ -271,7 +280,7 @@ public class LocaleParityTest {
             if (!Files.isDirectory(LANG_ROOT)) return;
             if (!Files.isDirectory(MESSAGES_DIR)) return;
 
-            Map<String, Object> baseline = loadBaselineValues("messages");
+            Map<String, Object> baseline = mergedMessagesBaseline();
             Map<String, String> baselineNorm = new LinkedHashMap<>();
             for (Map.Entry<String, Object> e : baseline.entrySet()) {
                 if (e.getValue() instanceof String s) {
@@ -279,9 +288,9 @@ public class LocaleParityTest {
                 }
             }
 
-            Path baselineLang = LANG_ROOT.resolve("messages.lang.yml");
-            Map<String, String> baselineLangMap = Files.exists(baselineLang)
-                    ? loadLangMap(baselineLang) : Collections.emptyMap();
+            // ADR-076: baseline rename map is the union of the per-file
+            // co-located dotfile maps under advanced/messages/.
+            Map<String, String> baselineLangMap = mergedMessagesLangMap(MESSAGES_DIR);
 
             List<String> failures = new ArrayList<>();
             for (Path localeDir : discoverLocaleDirs()) {
@@ -296,9 +305,10 @@ public class LocaleParityTest {
                 Map<String, String> localeLangMap;
                 try {
                     localeValues = loadYaml(messages);
-                    Path localeLang = localeDir.resolve("messages.lang.yml");
-                    localeLangMap = Files.exists(localeLang)
-                            ? loadLangMap(localeLang) : Collections.emptyMap();
+                    // ADR-076: per-locale rename map is the union of the per-file
+                    // co-located dotfile maps under lang/<locale>/advanced/messages/.
+                    localeLangMap = mergedMessagesLangMap(
+                            localeDir.resolve("advanced").resolve("messages"));
                 } catch (RuntimeException | AssertionError parseFailure) {
                     continue;
                 }
@@ -389,7 +399,7 @@ public class LocaleParityTest {
             List<DynamicTest> tests = new ArrayList<>();
             for (String category : discoverBaselineCategories()) {
                 tests.add(DynamicTest.dynamicTest(category, () -> {
-                    Path langPath = LANG_ROOT.resolve(category + ".lang.yml");
+                    Path langPath = baselineLangPath(category);
                     Map<String, Object> values = loadBaselineValues(category);
                     Map<String, String> langMap = loadLangMap(langPath);
 
@@ -417,9 +427,9 @@ public class LocaleParityTest {
                 String localeName = localeDir.getFileName().toString();
                 for (String category : categories) {
                     tests.add(DynamicTest.dynamicTest(localeName + " / " + category, () -> {
-                        Path baselineLang = LANG_ROOT.resolve(category + ".lang.yml");
+                        Path baselineLang = baselineLangPath(category);
                         Path localeValue = localeDir.resolve(category + ".yml");
-                        Path localeLang = localeDir.resolve(category + ".lang.yml");
+                        Path localeLang = localeLangPath(localeDir, category);
 
                         Map<String, Object> baselineValues = loadBaselineValues(category);
                         Map<String, String> baselineLangMap = loadLangMap(baselineLang);
@@ -470,7 +480,7 @@ public class LocaleParityTest {
             for (Path localeDir : locales) {
                 String localeName = localeDir.getFileName().toString();
                 for (String category : categories) {
-                    Path localeLang = localeDir.resolve(category + ".lang.yml");
+                    Path localeLang = localeLangPath(localeDir, category);
                     if (!Files.exists(localeLang)) continue;
                     tests.add(DynamicTest.dynamicTest(localeName + " / " + category + ".lang.yml", () -> {
                         Set<String> baselineKeys = loadBaselineValues(category).keySet();
@@ -505,7 +515,34 @@ public class LocaleParityTest {
     // Shared discovery + YAML helpers
     // =========================================================================
 
-    /** Baseline categories: every {@code <file>.yml} with a sibling {@code lang/<file>.lang.yml}. */
+    /**
+     * ADR-076: the baseline rename map for a category is a co-located dotfile
+     * sibling of its value file - {@code .<stem>.lang.yml} beside {@code <stem>.yml}
+     * (root, {@code advanced/}, or {@code advanced/messages/}).
+     */
+    private static Path baselineLangPath(String category) {
+        int slash = category.lastIndexOf('/');
+        if (slash >= 0) {
+            return RESOURCES.resolve(category.substring(0, slash))
+                    .resolve("." + category.substring(slash + 1) + ".lang.yml");
+        }
+        return RESOURCES.resolve("." + category + ".lang.yml");
+    }
+
+    /**
+     * ADR-076: the per-locale rename map for a category, a co-located dotfile sibling
+     * of the per-locale value file under {@code lang/<locale>/}.
+     */
+    private static Path localeLangPath(Path localeDir, String category) {
+        int slash = category.lastIndexOf('/');
+        if (slash >= 0) {
+            return localeDir.resolve(category.substring(0, slash))
+                    .resolve("." + category.substring(slash + 1) + ".lang.yml");
+        }
+        return localeDir.resolve("." + category + ".lang.yml");
+    }
+
+    /** Baseline categories: every {@code <file>.yml} with a co-located {@code .<file>.lang.yml}. */
     private static List<String> discoverBaselineCategories() throws IOException {
         List<String> categories = new ArrayList<>();
         if (!Files.isDirectory(RESOURCES) || !Files.isDirectory(LANG_ROOT)) {
@@ -515,7 +552,8 @@ public class LocaleParityTest {
             for (Path yml : ymls) {
                 String name = yml.getFileName().toString();
                 String stem = name.substring(0, name.length() - ".yml".length());
-                Path langSibling = LANG_ROOT.resolve(stem + ".lang.yml");
+                // ADR-076: co-located dotfile map beside the baseline value file.
+                Path langSibling = RESOURCES.resolve("." + stem + ".lang.yml");
                 if (Files.exists(langSibling)) categories.add(stem);
             }
         }
@@ -528,38 +566,62 @@ public class LocaleParityTest {
                 for (Path yml : ymls) {
                     String name = yml.getFileName().toString();
                     String stem = name.substring(0, name.length() - ".yml".length());
-                    Path langSibling = LANG_ROOT.resolve("advanced").resolve(stem + ".lang.yml");
+                    // ADR-076: co-located dotfile map beside the advanced value file.
+                    Path langSibling = advancedDir.resolve("." + stem + ".lang.yml");
                     if (Files.exists(langSibling)) categories.add("advanced/" + stem);
                 }
             }
         }
-        // "messages" is directory-backed (messages/*.yml) with sibling
-        // lang/messages.lang.yml; it has no top-level messages.yml to discover.
-        if (Files.isDirectory(MESSAGES_DIR)
-                && Files.exists(LANG_ROOT.resolve("messages.lang.yml"))
-                && !categories.contains("messages")) {
-            categories.add("messages");
+        // ADR-076: the split messages tree lives under advanced/messages/ with
+        // per-file co-located dotfile maps (.<file>.lang.yml). Each member file
+        // is its own category "advanced/messages/<file>".
+        if (Files.isDirectory(MESSAGES_DIR)) {
+            try (DirectoryStream<Path> ymls = Files.newDirectoryStream(MESSAGES_DIR, "*.yml")) {
+                for (Path yml : ymls) {
+                    String name = yml.getFileName().toString();
+                    String stem = name.substring(0, name.length() - ".yml".length());
+                    Path langSibling = MESSAGES_DIR.resolve("." + stem + ".lang.yml");
+                    String cat = "advanced/messages/" + stem;
+                    if (Files.exists(langSibling) && !categories.contains(cat)) categories.add(cat);
+                }
+            }
         }
         Collections.sort(categories);
         return categories;
     }
 
-    /**
-     * Baseline value map for a category. For the directory-backed "messages"
-     * category this is the union of every {@code messages/*.yml} member file;
-     * for all others it is the single top-level {@code <category>.yml}.
-     */
+    /** Baseline value map for a category: the single {@code <category>.yml}. */
     private static Map<String, Object> loadBaselineValues(String category) throws IOException {
-        if ("messages".equals(category)) {
-            Map<String, Object> merged = new LinkedHashMap<>();
-            if (Files.isDirectory(MESSAGES_DIR)) {
-                try (DirectoryStream<Path> ymls = Files.newDirectoryStream(MESSAGES_DIR, "*.yml")) {
-                    for (Path p : ymls) merged.putAll(loadYaml(p));
-                }
-            }
-            return merged;
-        }
         return loadYaml(RESOURCES.resolve(category + ".yml"));
+    }
+
+    /**
+     * Union of every {@code advanced/messages/*.yml} member file - the effective
+     * baseline key set for the split messages tree, used by the placeholder /
+     * untranslated value scans that operate on the flat per-locale value file.
+     */
+    private static Map<String, Object> mergedMessagesBaseline() throws IOException {
+        Map<String, Object> merged = new LinkedHashMap<>();
+        if (Files.isDirectory(MESSAGES_DIR)) {
+            try (DirectoryStream<Path> ymls = Files.newDirectoryStream(MESSAGES_DIR, "*.yml")) {
+                for (Path p : ymls) merged.putAll(loadYaml(p));
+            }
+        }
+        return merged;
+    }
+
+    /**
+     * Union of every co-located dotfile rename map ({@code .<file>.lang.yml}) in
+     * a {@code advanced/messages} directory (baseline or a locale mirror).
+     */
+    private static Map<String, String> mergedMessagesLangMap(Path messagesDir) throws IOException {
+        Map<String, String> merged = new LinkedHashMap<>();
+        if (Files.isDirectory(messagesDir)) {
+            try (DirectoryStream<Path> maps = Files.newDirectoryStream(messagesDir, "*.lang.yml")) {
+                for (Path p : maps) merged.putAll(loadLangMap(p));
+            }
+        }
+        return merged;
     }
 
     /** Locale dirs: every directory under {@code lang/} not in {@link #NON_LOCALE_DIRS}. */

@@ -1,0 +1,28 @@
+# --- RTP mews (this kitty's tongue) ---
+# Player- and staff-facing mews for this language, grouped by what they're for.
+# Auto-copied from the baseline mews; do not paw-edit (it gets overwritten).
+
+# --- RTP User-Facing Messages (cat dialect) ---
+# Every meow, hiss, and purr the kitty wants the human staff to read.
+# Formatting:
+# - Bukkit legacy color codes (e.g. &a, &7, &c)
+# - Hex color codes (e.g. #2636ef)
+# - PlaceholderAPI placeholders (when PAPI is installed)
+# Placeholders:
+# - Shared "[Pn]" placeholders are defined in the `empty_bowls` list below.
+# [P0] is the RTP prefix by default.
+# - Per-message placeholders (e.g. [attempts], [world]) are documented inline
+# above each message that uses them.
+# Note: keys like `busy` and `invalidCommand` are not key-renamed in
+# messages.lang.yml, so they keep their English left-hand names below.
+# ###############################################################################
+# Section 1: General Configuration
+# ###############################################################################
+# list of additional placeholders
+# format: Pn - where n is the index in this list
+empty_bowls:
+  # P0
+  - "[RTP]"
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

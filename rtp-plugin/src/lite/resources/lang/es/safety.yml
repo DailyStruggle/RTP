@@ -1,0 +1,159 @@
+# --- Configuración de seguridad de RTP ---
+
+# Configura cómo el plugin determina si una ubicación de teletransporte es "segura".
+# Gramática de tokens:
+# MATERIAL -- material simple, p. ej. LAVA
+# MATERIAL[prop=val,prop2=val2] -- material sólo si TODAS las propiedades de
+# estado de bloque coinciden
+# #namespace:tag -- se expande a todos los materiales de esa etiqueta
+# #namespace:tag[prop=val] -- miembros de la etiqueta sólo si las propiedades coinciden
+# *[prop=val] -- CUALQUIER material cuando las propiedades coinciden (comodín)
+# Los valores de las propiedades se comparan sin distinguir mayúsculas/minúsculas
+# con la forma de cadena del BlockData de Bukkit. Las etiquetas desconocidas se
+# expanden al conjunto vacío (no-op, fail-open); los tokens malformados se
+# registran una vez en nivel WARN al recargar .
+# El orden dentro de una lista no importa.
+# Invulnerabilidad (segundos)
+# Duración de la invulnerabilidad concedida al jugador tras teletransportarse.
+# Evita daño por fuego, ahogamiento o caídas al llegar.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 5"
+tiempoInvulnerabilidad: 5
+
+# Radio de comprobación de seguridad (bloques)
+# Radio alrededor del bloque objetivo a comprobar en busca de condiciones peligrosas.
+# Valores mayores dan más seguridad pero dificultan encontrar un sitio.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 0
+radioSeguridad: 0
+
+# Plataformas de aterrizaje
+# Crea una plataforma de aterrizaje en el destino del teletransporte.
+# El bloque central se elige según el tipo de bloque en la ubicación.
+# Establece platformRadius en -1 para desactivar las plataformas.
+# Predeterminado: -1 (desactivado) — las comprobaciones modernas de seguridad
+# (chunk.isSafe + ajustador vertical) producen aterrizajes firmes de forma
+# fiable, por lo que la plataforma de emergencia (bloque de cristal) está
+# desactivada por defecto.
+# Auméntalo a 0 o más sólo si aún ves aterrizajes inseguros y deseas la opción
+# de respaldo antigua.
+# @type: integer
+# @range: [-1, null]
+# @unit: blocks
+# @default: -1
+radioPlataforma: -1
+
+# Depth (vertical thickness) of the emergency platform.
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
+profundidadPlataforma: 1
+
+# Altura de aire a asegurar sobre la plataforma.
+# Puede causar problemas de iluminación si es demasiado alta.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+alturaAirePlataforma: 2
+
+# Tipo de bloque predeterminado para la plataforma si no hay un bloque sólido.
+# @type: material
+# @source: material
+# @default: GLASS
+materialPlataforma: "GLASS"
+
+# Segundos tras los cuales la huella de la plataforma se restaura a sus bloques
+# originales. -1 = nunca (permanente), 0 = en cuanto el chunk se recargue. La
+# cuenta atrás solo avanza mientras el chunk está cargado; sobrevive a reinicios.
+# @type: integer
+# @range: [-1, null]
+# @unit: seconds
+# @default: -1
+platformRestoreSeconds: -1
+
+# --- Optional PvP / combat-tag pre-flight gate ---
+# Interruptor maestro. Si es true, /rtp comprueba el estado de combate y aplica
+# pvpOnCombat (abajo) antes de encolar y antes de teletransportar.
+# @type: boolean
+# @default: false
+pvpCheckEnabled: false
+
+# Segundos que un jugador permanece "en combate" tras recibir daño PvP (solo el
+# rastreador nativo; se ignora si hay un plugin de combat-tag externo).
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 15"
+pvpCombatTagSeconds: 15
+
+# What to do when a combat-tagged player requests (or is mid-)/rtp.
+# ALLOW  - permit, but log an audit line
+# DENY   - refuse the command with the busy message
+# DELAY  - postpone until the combat tag expires, then proceed
+# CANCEL - abort an in-progress / queued teleport
+# Unknown values fail safe to DENY.
+# @type: enum
+# @options: [ALLOW, DENY, DELAY, CANCEL]
+# @default: DENY
+pvpOnCombat: "DENY"
+
+# Combat-state source preference.
+# AUTO     - external combat-tag plugin if one is bound, else native tracker
+# NATIVE   - always use RTP's native damage tracker
+# EXTERNAL - only a bound combat-tag plugin (no native fallback)
+# @type: enum
+# @options: [AUTO, NATIVE, EXTERNAL]
+# @default: AUTO
+pvpSource: "AUTO"
+
+# Native tracker: tag a player who TAKES PvP damage.
+# @type: boolean
+# @default: true
+pvpTagVictim: true
+
+# Native tracker: tag a player who DEALS PvP damage.
+# @type: boolean
+# @default: true
+pvpTagAggressor: true
+
+# Límite de reintentos por chunk obsoleto (conteo)
+# Presupuesto acotado de reintentos para el guardián de chunks obsoletos
+# . Tras resolverse una carga asíncrona de chunk, la
+# tarea posterior de evaluación de bloque se encola en una tubería de tareas
+# Count-Bound (planificador de Region Thread de Folia). Si la tubería está
+# saturada, el GC nativo de chunks puede descargar el chunk antes de que la
+# tarea se ejecute, lo que de otro modo dispararía una carga síncrona en el
+# Region Thread y activaría el Watchdog de Folia. Cuando el guardián detecta
+# esta carrera, vuelve a encolar una carga asíncrona hasta este número de veces
+# por candidato. Al agotarse, el candidato se rechaza por la ruta "unsafe"
+# habitual (se registra un WARN; nada se descarta silenciosamente).
+# Predeterminado: 2. Súbelo sólo en forks con un GC de chunks muy agresivo.
+# @type: integer
+# @range: [0, null]
+# @default: 2"
+staleChunkRetryLimit: 2
+
+# Pre-filtro Anvil de sólo lectura (sólo Spigot vanilla)
+# Sonda de seguridad fuera de hilo que analiza el archivo de región persistido
+# `r.X.Z.mca` y rechaza candidatos claramente inseguros (lava/magma/fuego en la
+# superficie del heightmap) antes de solicitar la carga autoritativa del chunk
+# en vivo. Reduce la presión sobre el hilo de tick en Spigot vanilla, donde la
+# API de carga de chunks en vivo no es realmente asíncrona.
+# No tiene efecto en Paper ni en Folia (sustituyen la ruta de carga de chunks
+# por APIs asíncronas nativas y nunca entran al pre-filtro).
+# El re-chequeo en vivo chunk.isSafe(...) sigue siendo la fuente autoritativa
+# en caso de ACCEPT; REJECT es el único atajo. Véase
+# Predeterminado: true. Ponlo a false para desactivar la sonda (útil en forks
+# modificados con formatos de región exóticos).
+# @type: boolean
+# @default: true
+anvilPrefilterEnabled: true
+
+# NO MODIFIQUES EL NÚMERO DE VERSIÓN
+version: 1.0

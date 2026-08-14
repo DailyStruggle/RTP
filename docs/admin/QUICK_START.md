@@ -51,7 +51,7 @@ If you land somewhere random, the plugin is working. If you see a permission err
 RTP ships with one region called `default`, configured in:
 
 ```
-plugins/RTP/regions/default.yml
+plugins/RTP/definitions/regions/default.yml
 ```
 
 Out of the box it:
@@ -69,7 +69,7 @@ You can use this region as-is for most servers.
 
 ## Step 4 — Adjust the Teleport Area
 
-All shape settings live directly inside the region file. Open `plugins/RTP/regions/default.yml`
+All shape settings live directly inside the region file. Open `plugins/RTP/definitions/regions/default.yml`
 and look for the `shape:` block:
 
 ```yaml
@@ -92,9 +92,9 @@ Save the file and run `/rtp reload` to apply changes without restarting.
 
 ---
 
-## Step 5 — Configure Worlds (`plugins/RTP/worlds/<world>.yml`)
+## Step 5 — Configure Worlds (`plugins/RTP/definitions/worlds/<world>.yml`)
 
-Each world that should accept `/rtp` needs a file in `worlds/`. RTP creates one per loaded world on first run; review each:
+Each world that should accept `/rtp` needs a file in `definitions/worlds/`. RTP creates one per loaded world on first run; review each:
 
 ```yaml
 region: "default"            # which region this world's /rtp uses
@@ -160,7 +160,7 @@ Set `price: 0.0` to disable the cost entirely. Full options: [ECONOMY.md](config
 
 To create a second region (e.g., for a nether world):
 
-1. Copy `plugins/RTP/regions/default.yml` to `plugins/RTP/regions/nether.yml`.
+1. Copy `plugins/RTP/definitions/regions/default.yml` to `plugins/RTP/definitions/regions/nether.yml`.
 2. Edit `nether.yml` — at minimum change `world` and tune the shape:
    ```yaml
    world: "world_nether"

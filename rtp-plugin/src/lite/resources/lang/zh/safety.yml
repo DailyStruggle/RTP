@@ -1,0 +1,141 @@
+# --- RTP 安全配置 ---
+
+# 配置插件如何判断一个传送目标位置是否“安全”。
+# 令牌语法:
+# MATERIAL -- 简单材质，例如 LAVA
+# MATERIAL[prop=val,prop2=val2] -- 仅当所有方块状态属性匹配时才视为该材质
+# #namespace:tag -- 展开为该标签下的所有材质
+# #namespace:tag[prop=val] -- 仅当属性匹配时该标签的成员才计入
+# *[prop=val] -- 当属性匹配时匹配任意材质（通配符）
+# 属性值与 Bukkit BlockData 的字符串形式作不区分大小写的比较。未知标签将
+# 展开为空集（无操作，fail-open）；格式错误的令牌会在重载时以 WARN 级别
+# 记录一次（）。列表内的顺序无关紧要。
+# 无敌时间（秒）
+# 玩家传送后获得的无敌时长。可避免到达后被火焰、窒息或坠落造成伤害。
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 5
+无敌时间: 5
+
+# 安全检查半径（方块）
+# 在目标方块周围检查危险情况的半径。数值越大越安全，但可能更难找到落点。
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 0
+安全半径: 0
+
+# 落地平台
+# 在传送目标处建造落地平台。中心方块依目标处的方块类型选择。
+# 将 platformRadius 设为 -1 可禁用平台。
+# 默认值: -1（禁用）— 现代化的安全检查 (chunk.isSafe + 垂直调整) 已能可靠产出
+# 稳固落点，因此默认关闭这种应急平台（玻璃方块）。
+# 仅当仍出现不安全落点且需要旧版兜底方案时才将其调高到 0 或更大。
+# @type: integer
+# @range: [-1, null]
+# @unit: blocks
+# @default: -1
+平台半径: -1
+
+# 紧急平台的深度（垂直厚度）。
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
+平台深度: 1
+
+# 平台上方需要保证的空气高度。
+# 设得太高可能造成光照异常。
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+平台空气高度: 2
+
+# 当目标处没有实心方块时，平台默认使用的方块类型。
+# @type: material
+# @source: material
+# @default: GLASS
+平台材质: "GLASS"
+
+# 平台占地恢复为原始方块的秒数。-1 = 永不（永久），0 = 区块重新加载后立即恢复。
+# 倒计时仅在区块加载时推进；重启后仍保留。
+# @type: integer
+# @range: [-1, null]
+# @unit: seconds
+# @default: -1
+platformRestoreSeconds: -1
+
+# --- 可选 PvP / 战斗标记预检门 ---
+# 总开关。为 true 时，/rtp 在排队前和传送前检查战斗状态并应用下方的 pvpOnCombat。
+# @type: boolean
+# @default: false
+pvpCheckEnabled: false
+
+# 玩家受到 PvP 伤害后保持"战斗中"的秒数（仅原生跟踪器；若绑定了外部 combat-tag
+# 插件则忽略）。
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 15
+pvpCombatTagSeconds: 15
+
+# 当处于战斗标记的玩家请求（或正在进行）/rtp 时的处理方式。
+# ALLOW  - 允许，但记录审计日志
+# DENY   - 以繁忙消息拒绝命令
+# DELAY  - 推迟到战斗标记过期后再继续
+# CANCEL - 中止正在进行/排队的传送
+# 未知值安全回退到 DENY。
+# @type: enum
+# @options: [ALLOW, DENY, DELAY, CANCEL]
+# @default: DENY
+pvpOnCombat: "DENY"
+
+# 战斗状态来源偏好。
+# AUTO     - 如果绑定了外部战斗标记插件则使用，否则使用原生追踪器
+# NATIVE   - 始终使用 RTP 的原生伤害追踪器
+# EXTERNAL - 仅使用绑定的战斗标记插件（无原生回退）
+# @type: enum
+# @options: [AUTO, NATIVE, EXTERNAL]
+# @default: AUTO
+pvpSource: "AUTO"
+
+# 原生追踪器: 标记受到 PvP 伤害的玩家。
+# @type: boolean
+# @default: true
+pvpTagVictim: true
+
+# 原生追踪器: 标记造成 PvP 伤害的玩家。
+# @type: boolean
+# @default: true
+pvpTagAggressor: true
+
+# 陈旧区块重试上限（次数）
+# 中陈旧区块守护机制的有界重试预算。当一次异步
+# 区块加载完成后，后续的方块评估任务会被入队到一条 Count-Bound 的任务流水线
+# (Folia 的 Region Thread 调度器)。如果流水线饱和，原生的区块 GC 可能在该
+# 任务真正执行之前就把区块卸载，否则会触发 Region Thread 上的同步加载并
+# 唤醒 Folia 的 Watchdog。当守护机制检测到此竞争时，最多按本数值再次入队
+# 一个异步加载请求；用尽后该候选位置按常规“unsafe”路径拒绝（写入 WARN
+# 日志；不会静默丢弃）。
+# 默认值: 2。仅在区块 GC 极激进的分支上才需要调高。
+# @type: integer
+# @range: [0, null]
+# @default: 2
+staleChunkRetryLimit: 2
+
+# 只读 Anvil 预过滤器（仅原版 Spigot）
+# 一个线程外的安全探测器，分析持久化的区域文件 `r.X.Z.mca`，在请求加载实时
+# 权威区块之前直接拒绝明显不安全的候选（heightmap 表面为 lava/magma/fire）。
+# 减轻原版 Spigot 上 tick 线程的压力，因为其实时区块加载 API 并非真正异步。
+# 在 Paper 与 Folia 上无效（它们以原生异步 API 取代了区块加载路径，从不进入
+# 预过滤器）。chunk.isSafe(...) 的实时复检在 ACCEPT 时仍是权威依据；只有
+# REJECT 才是捷径。参见。
+# 默认值: true。设为 false 可关闭预过滤器（适用于使用奇异区域格式的修改版分支）。
+# @type: boolean
+# @default: true
+anvilPrefilterEnabled: true
+
+# 请勿修改版本号
+version: 1.0

@@ -86,13 +86,15 @@ public class Adr071SubpathConfigParserTest {
     }
 
     @Test
-    @DisplayName("the lang map mirror is created under lang/<subDir>/ for the English locale")
+    @DisplayName("the lang map is created as a co-located dotfile sibling for the English locale (ADR-076)")
     void langMirrorUnderSubDir() {
         subpathedParser();
+        // ADR-076: the English baseline rename map is a co-located dotfile sibling of
+        // the value file - advanced/.logging.lang.yml beside advanced/logging.yml.
         File langMirror = new File(tempDir.toFile(),
-                "lang" + File.separator + "advanced" + File.separator + "logging.lang.yml");
+                "advanced" + File.separator + ".logging.lang.yml");
         assertTrue(langMirror.exists(),
-                "lang mirror should be created at " + langMirror.getAbsolutePath());
+                "lang map should be created at " + langMirror.getAbsolutePath());
     }
 
     @Test
@@ -155,12 +157,13 @@ public class Adr071SubpathConfigParserTest {
     }
 
     @Test
-    @DisplayName("the lang map mirror is created under lang/messages/ for the English locale")
+    @DisplayName("the messages/ lang map is created as a co-located dotfile sibling for the English locale (ADR-076)")
     void messagesLangMirrorUnderSubDir() {
         messagesParser();
+        // ADR-076: co-located dotfile sibling - messages/.player.lang.yml beside messages/player.yml.
         File langMirror = new File(tempDir.toFile(),
-                "lang" + File.separator + "messages" + File.separator + "player.lang.yml");
+                "messages" + File.separator + ".player.lang.yml");
         assertTrue(langMirror.exists(),
-                "lang mirror should be created at " + langMirror.getAbsolutePath());
+                "lang map should be created at " + langMirror.getAbsolutePath());
     }
 }

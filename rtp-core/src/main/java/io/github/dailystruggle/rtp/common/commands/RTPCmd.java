@@ -751,77 +751,57 @@ public interface RTPCmd extends BaseRTPCmd {
         }
       }
 
+      // Sender charge. Routes through the single EconomyGate so the price math,
+      // balance-floor check and withdrawal live in one place (shared with the
+      // addon-facing RTPAPI.teleport path). The rtp.notme opt-out stays here as
+      // control flow; the charge is accumulated onto data.cost for the
+      // refund-on-failure path (RTPTeleportCancel).
       if (economy != null && !sender.hasPermission("rtp.free")) {
-        if (player.uuid().equals(senderId))
-          data.cost += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
-        else if (player.hasPermission("rtp.notme")) continue;
-        else data.cost += eco.getNumber(EconomyKeys.priceOther, 0.0).doubleValue();
-        if (shapeNames != null || vertNames != null || doWBO)
-          data.cost += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
-        if (biomeList != null)
-          data.cost += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
-
-        data.cost += region.getNumber(RegionKeys.price, 0.0d).doubleValue();
-
-        if (economy.bal(senderId) - data.cost < floor) {
+        io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey which;
+        if (player.uuid().equals(senderId)) {
+          which = io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.SELF;
+        } else if (player.hasPermission("rtp.notme")) {
+          continue;
+        } else {
+          which = io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.OTHER;
+        }
+        io.github.dailystruggle.rtp.common.economy.EconomyGate.Charge senderCharge =
+            io.github.dailystruggle.rtp.common.economy.EconomyGate.charge(
+                senderId, sender, region, which,
+                shapeNames != null || vertNames != null || doWBO, biomeList != null);
+        if (senderCharge.result()
+            == io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.INSUFFICIENT_FUNDS) {
           String s = RTP.configs.getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
           s = s.replace("[money]", String.valueOf(price));
           RTP.serverAccessor.sendMessage(senderId, s);
           RTP.getInstance().processingPlayers.remove(senderId);
           return true;
         }
-
-        final RTPEconomy economyRefSelf = economy;
-        final double takeCostSelf = data.cost;
-        final double priceSelfForMsg = price;
-        io.github.dailystruggle.rtp.common.economy.EconomyHop.run(
-            () -> {
-              if (!economyRefSelf.take(senderId, takeCostSelf)) {
-                RTP.log(java.util.logging.Level.WARNING,
-                    "[RTP] economy.take returned false for " + senderId
-                        + " cost=" + takeCostSelf + " (balance check passed earlier)");
-                String s = RTP.configs.getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
-                s = s.replace("[money]", String.valueOf(priceSelfForMsg));
-                RTP.serverAccessor.sendMessage(senderId, s);
-              }
-            });
+        data.cost += senderCharge.cost();
       }
 
+      // Target-pays charge (BetterRTP target-perms parity): when target perms
+      // are toggled and the target is not the sender, the target pays their own
+      // teleport price. Same single EconomyGate; the target's rtp.free exemption
+      // is applied inside the gate via the free-check subject.
       if (economy != null
           && toggleTargetPerms
           && !player.hasPermission("rtp.free")
           && !player.uuid().equals(senderId)) {
-        data.cost += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
-        if (shapeNames != null || vertNames != null || doWBO)
-          data.cost += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
-        if (biomeList != null)
-          data.cost += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
-
-        data.cost += region.getNumber(RegionKeys.price, 0.0d).doubleValue();
-
-        if (economy.bal(player.uuid()) - data.cost < floor) {
+        io.github.dailystruggle.rtp.common.economy.EconomyGate.Charge targetCharge =
+            io.github.dailystruggle.rtp.common.economy.EconomyGate.charge(
+                player.uuid(), player, region,
+                io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.SELF,
+                shapeNames != null || vertNames != null || doWBO, biomeList != null);
+        if (targetCharge.result()
+            == io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.INSUFFICIENT_FUNDS) {
           String s = RTP.configs.getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
           s = s.replace("[money]", String.valueOf(price));
           RTP.serverAccessor.sendMessage(senderId, player.uuid(), s);
           RTP.getInstance().processingPlayers.remove(senderId);
           return true;
         }
-
-        final RTPEconomy economyRefOther = economy;
-        final java.util.UUID otherId = player.uuid();
-        final double takeCostOther = data.cost;
-        final double priceOtherForMsg = price;
-        io.github.dailystruggle.rtp.common.economy.EconomyHop.run(
-            () -> {
-              if (!economyRefOther.take(otherId, takeCostOther)) {
-                RTP.log(java.util.logging.Level.WARNING,
-                    "[RTP] economy.take returned false for " + otherId
-                        + " cost=" + takeCostOther + " (balance check passed earlier)");
-                String s = RTP.configs.getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
-                s = s.replace("[money]", String.valueOf(priceOtherForMsg));
-                RTP.serverAccessor.sendMessage(senderId, otherId, s);
-              }
-            });
+        data.cost += targetCharge.cost();
       }
 
       Set<String> biomes = null;
