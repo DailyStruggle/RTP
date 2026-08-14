@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -135,7 +136,7 @@ public class ConfigsTest {
         configs.reloadConfigs();
 
         MultiConfigParser<WorldKeys> worldParser =
-                new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile());
+                new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile(), "definitions/worlds");
         configs.putParser(worldParser);
 
         FactoryValue<WorldKeys> retrieved = configs.getParser(WorldKeys.class);
@@ -154,7 +155,7 @@ public class ConfigsTest {
         configs.reloadConfigs();
 
         MultiConfigParser<WorldKeys> worldParser =
-                new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile());
+                new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile(), "definitions/worlds");
         configs.putParser(worldParser);
 
         ConfigParser<WorldKeys> worldCfg = configs.getWorldParser("world");
@@ -168,7 +169,7 @@ public class ConfigsTest {
         configs.reloadConfigs();
 
         MultiConfigParser<WorldKeys> worldParser =
-                new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile());
+                new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile(), "definitions/worlds");
         configs.putParser(worldParser);
 
         ConfigParser<WorldKeys> result = configs.getWorldParser("no_such_world");
@@ -207,7 +208,7 @@ public class ConfigsTest {
         configs.reloadConfigs();
 
         MultiConfigParser<WorldKeys> worldParser =
-                new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile());
+                new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile(), "definitions/worlds");
         configs.putParser(worldParser);
 
         Object result = configs.getWorldParserValue("no_such_world", WorldKeys.requirePermission);
@@ -223,7 +224,7 @@ public class ConfigsTest {
         configs.reloadConfigs();
 
         MultiConfigParser<WorldKeys> worldParser =
-                new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile());
+                new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile(), "definitions/worlds");
         configs.putParser(worldParser);
 
         // "world" is registered in MockRTPServerAccessor
@@ -244,5 +245,31 @@ public class ConfigsTest {
         assertNotNull(configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class));
         assertNotNull(configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class));
         assertNotNull(configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class));
+    }
+
+    // --- ADR-076 regression: MultiConfigParser children share the folder-similar rename map ---
+
+    @Test
+    void multiConfigWorldsReuseSharedLangMap_noStrayPerFileMapsInFolder() throws IOException {
+        Configs configs = new Configs(tempDir.toFile());
+        RTP.configs = configs;
+        // Registers the worlds MultiConfigParser and adds a per-world parser for the
+        // MockRTPServerAccessor-registered "world" via Factory.construct (the clone path).
+        configs.reloadConfigs();
+
+        File definitions = new File(tempDir.toFile(), "definitions");
+        File worldsDir = new File(definitions, "worlds");
+
+        // The shared, folder-similar rename map lives beside the folder, not inside it.
+        File shared = new File(definitions, ".worlds.lang.yml");
+        assertTrue(shared.isFile(),
+                "shared folder-similar rename map (definitions/.worlds.lang.yml) should exist beside the worlds folder");
+
+        // No stray per-file `.<name>.lang.yml` rename map should be written INSIDE the folder.
+        File[] strays = worldsDir.listFiles(
+                (d, n) -> n.startsWith(".") && n.endsWith(".lang.yml"));
+        assertTrue(strays == null || strays.length == 0,
+                "MultiConfigParser child parsers must reuse the shared map; found stray in-folder maps: "
+                        + java.util.Arrays.toString(strays));
     }
 }

@@ -234,6 +234,25 @@ public final class RTPNeoForgeMod {
       }
     }
 
+    // Seed <configDir>/rtp/docs/ from the bundled docs/ tree inside the running
+    // mod jar. Mirrors RTPBukkitPlugin's `JarUtils.extractDocs(...)` and
+    // RTPFabricMod's `FabricJarUtils.extractDocs(...)` so the admin-facing
+    // reference material (architecture diagrams, requirements, ADRs) ships
+    // alongside the config tree on NeoForge. Idempotent + fail-soft — see
+    // NeoForgeJarUtils Javadoc.
+    try {
+      String modVersion = net.neoforged.fml.ModList.get()
+          .getModContainerById(MOD_ID)
+          .map(c -> c.getModInfo().getVersion().toString())
+          .orElse("unknown");
+      io.github.dailystruggle.rtp.neoforge.utils.NeoForgeJarUtils
+          .extractDocs(acc.getPluginDirectory(), modVersion);
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP][NeoForge] NeoForgeJarUtils.extractDocs dispatch failed: "
+              + t.getClass().getSimpleName() + ": " + t.getMessage());
+    }
+
     // N2.3 — register the game-bus event bridge (player join/quit, world
     // load/unload). Created here (not in the constructor) because it needs the
     // accessor, which only exists once the server has started.

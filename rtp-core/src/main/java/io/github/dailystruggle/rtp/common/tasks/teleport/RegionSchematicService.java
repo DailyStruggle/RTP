@@ -11,8 +11,9 @@ import java.nio.file.Path;
  * Resolves the region-specific arrival schematic for a teleport (ADR-058, Amendment 1).
  *
  * <p>There is deliberately <em>no</em> per-region config knob: the presence of a file at
- * {@code <pluginDir>/schematics/<region>.schem} (or {@code .schematic}) is the entire knob.
- * Drop a file named after the region into the {@code schematics} directory and that region's
+ * {@code <pluginDir>/advanced/schematics/<region>.schem} (or {@code .schematic}) is the entire
+ * knob. Drop a file named after the region into the {@code advanced/schematics} directory and
+ * that region's
  * teleports paste it at the arrival location; remove the file and the behavior reverts to the
  * default emergency platform. Resolution lives in {@code rtp-core} so the path policy stays
  * platform-neutral; each platform's {@code SchematicPaster} only consumes the resolved
@@ -20,8 +21,11 @@ import java.nio.file.Path;
  */
 public final class RegionSchematicService {
 
-  /** Sub-directory of the plugin data folder holding region schematic files. */
-  public static final String SCHEMATICS_DIRNAME = "schematics";
+  /**
+   * Sub-directory of the plugin data folder holding region schematic files. ADR-076 relocates
+   * this under the {@code advanced/} door alongside the other rarely-hand-edited content.
+   */
+  public static final String SCHEMATICS_DIRNAME = "advanced/schematics";
 
   /** Recognised file extensions, in resolution-precedence order (Sponge {@code .schem} first). */
   private static final String[] EXTENSIONS = {"schem", "schematic"};

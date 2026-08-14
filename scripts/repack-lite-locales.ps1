@@ -17,9 +17,14 @@
 #   (top-level *.yml). Files Lite does not ship (e.g. economy.yml,
 #   integrations.yml, language.yml) are simply not emitted in the lite
 #   locale tree.
-# - messages.yml and lang/<loc>/messages.lang.yml are copied through
-#   unchanged: per ADR-024 (2026-05-11(b) amendment) lite ships the full
-#   messages.yml; unreachable keys are harmless.
+# - Every localized file EXCEPT the reduced root baselines is copied through
+#   unchanged: lite ships the full English tree for messages
+#   (advanced/messages/*), safety.yml, economy.yml, advanced/* and
+#   definitions/*, so its localized tree mirrors them in full. Only the files
+#   with a reduced lite English baseline (currently config.yml) are key-pruned.
+#   The old monolithic messages.yml no longer exists (ADR-071/076 split it into
+#   advanced/messages/<concern>.yml); the recursive mirror below captures the
+#   whole tree regardless of how deeply the value files are nested.
 # - The script preserves the lookup chain documented in .junie/AGENTS.md
 #   "Locale Parity Maintenance":
 #     localeLangMap.get(key) -> baselineLangMap.get(key) -> identity key
@@ -237,41 +242,48 @@ Write-Host "Repacking lite locale tree for $($locales.Count) locales: $($locales
 foreach ($loc in $locales) {
     $proLoc  = Join-Path $proLangDir $loc
     $liteLoc = Join-Path $liteLangOut $loc
-    [void](New-Item -ItemType Directory -Path $liteLoc -Force)
 
-    # Copy through the shape/ and vert/ subdirectories untouched. Their
-    # rename-map files (shape/<x>.lang.yml, vert/<x>.lang.yml) have no
-    # sibling value file and are not key-pruned.
-    foreach ($sub in @('shape','vert')) {
-        $srcSub = Join-Path $proLoc $sub
-        if (Test-Path $srcSub) {
-            $dstSub = Join-Path $liteLoc $sub
-            Copy-Item -Recurse -Force $srcSub $dstSub
-        }
-    }
+    # 1. Mirror the ENTIRE Pro locale subtree into the lite tree (copy-through).
+    #    Lite ships the full English tree for every localized file except the
+    #    reduced root baselines, so its localized tree must mirror that in full:
+    #    messages (advanced/messages/*), safety.yml, economy.yml, advanced/* and
+    #    definitions/* all ship whole. A recursive copy captures the tree no
+    #    matter how the value files are nested, so a future config-layout change
+    #    cannot silently drop a locale subtree the way the old per-file
+    #    enumeration did (it only knew about top-level *.yml + the now-defunct
+    #    monolithic messages.yml, which is why lite shipped only config.yml).
+    Copy-Item -Recurse -Force $proLoc $liteLoc
 
-    foreach ($rel in $liteTopLevel) {
-        # messages.yml + messages.lang.yml: copy through (lite ships full).
-        if ($rel -eq 'messages.yml') {
-            foreach ($name in @('messages.yml','messages.lang.yml')) {
-                $src = Join-Path $proLoc $name
-                if (Test-Path $src) { Copy-Item $src (Join-Path $liteLoc $name) -Force }
-            }
-            continue
-        }
+    # 2. Re-prune, in place, the localized value file (+ its co-located
+    #    .lang.yml sibling) for every file that has a *reduced* lite English
+    #    baseline. Discovered from src/lite/resources: top-level *.yml overlays
+    #    (config.yml) plus any regions/*.yml. All other files keep the full
+    #    copy-through content written in step 1.
+    $reduced = @()
+    $reduced += $liteTopLevel
+    $reduced += $liteRegions
 
-        $proValPath = Join-Path $proLoc $rel
+    foreach ($rel in $reduced) {
+        $relPath = $rel.Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+        $proValPath = Join-Path $proLoc $relPath
         if (-not (Test-Path $proValPath)) { continue }
 
-        $liteBaselinePath = Join-Path $liteMain $rel
+        $liteBaselinePath = Join-Path $liteMain $relPath
         $allowed = Get-TopLevelKeys $liteBaselinePath
         if ($allowed.Count -eq 0) { continue }
 
-        $dstValPath = Join-Path $liteLoc $rel
+        $dstValPath = Join-Path $liteLoc $relPath
+        [void](New-Item -ItemType Directory -Path (Split-Path -Parent $dstValPath) -Force)
 
-        $langSibling = $rel -replace '\.yml$', '.lang.yml'
-        $proLangPath = Join-Path $proLoc $langSibling
-        $dstLangPath = Join-Path $liteLoc $langSibling
+        # Co-located rename-map dotfile sibling (ADR-076): ".<leaf>.lang.yml"
+        # beside the value file (e.g. config.yml -> .config.lang.yml,
+        # regions/default.yml -> regions/.default.lang.yml).
+        $relDir  = Split-Path -Parent $relPath
+        $relLeaf = Split-Path -Leaf   $relPath
+        $langLeaf = '.' + ($relLeaf -replace '\.yml$', '.lang.yml')
+        $langRel  = if ([string]::IsNullOrEmpty($relDir)) { $langLeaf } else { Join-Path $relDir $langLeaf }
+        $proLangPath = Join-Path $proLoc $langRel
+        $dstLangPath = Join-Path $liteLoc $langRel
 
         if (Test-Path $proLangPath) {
             Repack-LangMap -SrcLangMap $proLangPath -DstLangMap $dstLangPath -AllowedBaseKeys $allowed
@@ -281,18 +293,6 @@ foreach ($loc in $locales) {
             # No rename map for this file: identity lookup only.
             Repack-LocaleValueFile -SrcYaml $proValPath -DstYaml $dstValPath -LocaleToBase @{} -AllowedBaseKeys $allowed
         }
-    }
-
-    # regions/<x>.yml: pure value files, no .lang.yml siblings; identity lookup.
-    foreach ($rel in $liteRegions) {
-        $proValPath = Join-Path $proLoc ($rel -replace '/', '\')
-        if (-not (Test-Path $proValPath)) { continue }
-        $liteBaselinePath = Join-Path $liteMain ($rel -replace '/', '\')
-        $allowed = Get-TopLevelKeys $liteBaselinePath
-        if ($allowed.Count -eq 0) { continue }
-        $dstValPath = Join-Path $liteLoc ($rel -replace '/', '\')
-        [void](New-Item -ItemType Directory -Path (Split-Path $dstValPath) -Force)
-        Repack-LocaleValueFile -SrcYaml $proValPath -DstYaml $dstValPath -LocaleToBase @{} -AllowedBaseKeys $allowed
     }
 }
 

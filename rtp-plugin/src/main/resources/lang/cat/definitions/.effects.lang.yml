@@ -1,0 +1,8 @@
+# --- Language Mapping: effects/*.yml (cat dialect) ---
+# Zoomies and sparkles! Edit only the right side, hooman.
+when: "when_the_zoomies_strike"
+permission: "allowed_to_purr"
+players: "kitties"
+inherit: "copy_from_elder_cat"
+effects: "sparkles"
+version: "meowsion"

@@ -1,0 +1,196 @@
+# 최소 TPS 요구치
+# 새 위치를 캐시에 추가하기 전에 필요한 최소 서버 TPS.
+# 범위: 0.0 - 20.0.
+# 영향: 낮음 — 서버가 이미 랙이 있을 때 플러그인이 부하를 가중시키는 것을 방지합니다.
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+최소TPS: 19.0
+
+# 백그라운드 캐시 채우기를 멈추는 JVM 힙 사용률 상한(최대의 %).
+# 이미 캐시된 위치는 계속 제공됩니다. 0 또는 100이면 비활성화.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeap백분율: 85.0
+
+# --- RTP 성능 설정 ---
+# 서버 성능에 맞춰 플러그인의 동작을 세밀하게 조정합니다.
+# 최대 검색 시도 횟수
+# 한 번의 요청에서 안전한 위치를 찾기 위한 최대 시도 횟수. 초과 시 포기합니다.
+# 영향: 높음 — 큰 값은 요청당 CPU 사용량을 크게 증가시킵니다.
+# @type: integer
+# @range: [1, null]
+# @default: 32
+최대시도횟수: 10
+
+# 선택 빈도(틱)
+# 각 리전의 위치 캐시를 백그라운드에서 보충하는 간격.
+# ( 20 틱 = 1 초 ).
+# 영향: 중간 — 값이 작을수록 보충은 빨라지지만 CPU 를 더 많이 사용합니다.
+# @type: integer
+# @range: [1, null]
+# @unit: ticks
+# @default: 20
+주기: 20
+
+# 작업당 할당 시간(밀리초)
+# 1 틱 내에서 RTP 작업에 사용하는 최대 시간(밀리초).
+# 범위: 0 - 50.
+# 영향: 중간 — 클수록 처리 속도가 빨라지지만 틱을 압박할 수 있습니다.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+할당시간_동기: 50
+
+# 틱당 비동기 작업에 사용하는 최대 밀리초.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+할당시간_비동기: 50
+
+# 목적지 사전 로드(청크)
+# 목적지 주변에서 미리 로드할 청크의 반경.
+# 로드되는 청크 수 = ( 1 + 2 * 반경 )^2.
+# 영향: 높음 — 너무 크면 텔레포트 시 TPS 저하를 일으킬 수 있습니다.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+시야거리_선택: 0
+
+# 텔레포트 직전에 최종 위치 주변에서 불러올 청크 반경.
+# 0 은 목적지 청크만 불러옵니다.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+시야거리_텔레포트: 0
+
+# 텔레포트한 플레이어의 시야 거리가 도착 후 정상으로 회복되는 틱 수. 청크 로드
+# 급증을 완화합니다. 0이면 클램프를 비활성화합니다.
+# 참고: 일시적으로 0으로 고정했습니다. 점진적 복원은 도착 시 클라이언트 측
+# 깜빡임 / 다시 렌더링을 유발합니다. 추후 공지가 있을 때까지 0으로 두세요.
+# @type: integer
+# @range: [0, null]
+# @unit: ticks
+# @default: 200
+시야거리_복원간격: 0
+
+# 텔레포트 후 큐잉
+# true 인 경우 RTP 직후에 플러그인이 위치 캐시 보충을 시도합니다.
+# 영향: 중간
+# @type: boolean
+# @default: false
+텔레포트후큐잉: false
+
+# 이미 로드된 청크의 바이옴을 공간 메모리에 등록하여 바이옴 재호출 / 가중치에
+# 반영합니다. 추가 청크 I/O는 없습니다.
+# @type: boolean
+# @default: true
+청크로드시검사: true
+
+# L3 백로그 용량 중 다시 채우기를 재개하는 비율(히스테리시스).
+# 0.5 = 50%까지 비운 뒤 채움; 1.0 = 계속 채움.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+백로그보충임계값: 0.5
+
+# 시도마다 미생성 청크를 거부할 확률.
+# 0.0 = 편향 없음, 1.0 = 미생성 지형 회피. 생성된 청크는 항상 통과합니다.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+사전생성선호도: 0.0
+
+# 접속 시 텔레포트를 위해 위치 캐시를 예약합니다
+# (rtp.onevent.firstjoin / rtp.onevent.join).
+# @type: boolean
+# @default: false
+로그인캐시활성화: false
+
+# 접속 캐시 상한. 0 = 자동 (시작 시 서버 max-players).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+로그인캐시상한: 0
+
+# 바이옴 선택 캐시
+# biomeRecall: 바이옴별로 과거에 찾은 위치를 재사용합니다.
+# biomeRecallForced: 캐시된 바이옴만 사용합니다.
+# 영향: 낮음~중간
+# @type: boolean
+# @default: true
+바이옴기억: true
+
+# 바이옴으로 필터된 요청을 캐시에서만 제공합니다(새 바이옴 검색은 생성하지
+# 않음). biomeRecall이 필요합니다.
+# @type: boolean
+# @default: false
+바이옴기억_강제: false
+
+# 즉시 제공된 텔레포트가 감사되는 지연 임계값(ms).
+# (WARN 기록, slowPipelineCount 증가). 0 이하이면 비활성화.
+# @type: integer
+# @range: [0, null]
+# @unit: ms
+# @default: 5000
+느린파이프라인임계값Ms: 5000
+
+# 백프레셔가 감사되는 대기열 깊이(대기 중인 플레이어 수).
+# (WARN 기록, queueGrowthWarnCount 증가). 0 이하이면 비활성화.
+# @type: integer
+# @range: [0, null]
+# @unit: players
+# @default: 0
+대기열증가경고임계값: 0
+
+# 동기 로딩
+# 위치 선택 시 동기 청크 로드를 사용합니다.
+# 영향: 높음 — 권장하지 않습니다! 심각한 서버 랙을 유발할 수 있습니다.
+# @type: boolean
+# @default: false
+동기로딩: false
+
+# 시작 시 권한 파싱
+# onEventParsing: 와일드카드 권한 *.* 와 호환되지 않습니다.
+# 영향: 중간 (onEvent) / 낮음 (effect)
+# @type: boolean
+# @default: false
+이벤트시파싱: false
+
+# 시작 시 효과 권한 노드를 구문 분석합니다.
+# @type: boolean
+# @default: true
+이펙트파싱: true
+
+# 관찰 모드 캐시 보충 (Region Data Visitor)
+# 사전 생성된 캐시가 가득 찬 경우, 동일한 `period` 주기로 각 리전에
+# 관찰 모드 작업을 스케줄링합니다.
+# 일반 캐시 보충과 동일한 파이프라인을 재사용하지만,
+# 안전 후보를 큐에 넣지 않고 폐기하므로 부수 효과(불량 위치 기록, 관찰된
+# 바이옴 수집 등)는 백그라운드에서 누적되지만 큐가 한계를 초과하지는
+# 않습니다.
+# 월드 생성을 결코 유발하지 않습니다: 디스크에 기록되지 않은 청크는
+# 의 Anvil 사전 필터에 의해 UNKNOWN 으로 건너뜁니다.
+# visitorEnabled: 메인 스위치 (true 로 관찰 모드 활성화).
+# 빈도는 위의 `period` 설정을 따릅니다. 전용 속도 매개변수는 없습니다.
+# 영향: 낮음 — 기존 `period` 에 의해 율속되며, 기본 보충 모드에서 캐시에
+# 여유가 있을 때만 추가 작업이 수행됩니다.
+# @type: boolean
+# @default: false
+방문자활성화: true
+
+# /rtp admin prefab 설정. apply -> confirm 흐름은 변경된 파일마다 백업을 작성합니다;
+# bakRetention은 보관 개수를 제한합니다(오래된 것부터 삭제).
+프리셋:
+  # Number of timestamped config backups kept per file before pruning.
+  # @type: integer
+  # @range: [1, null]
+  # @default: 3
+  bakRetention: 3
+# 버전 번호를 건드리지 마세요
+version: 1.0

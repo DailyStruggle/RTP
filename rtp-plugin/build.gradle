@@ -661,7 +661,23 @@ ext.mergeFabricUnobfBytecodeIntoJar = { File out, String editionLabel, File v26,
                 newEntry.time = e.time
                 zos.putNextEntry(newEntry)
                 if (!e.isDirectory()) {
-                    src.getInputStream(e).withCloseable { ins -> ins.transferTo(zos) }
+                    if (e.name == 'META-INF/MANIFEST.MF') {
+                        // Mark the jar as already living in the Mojang mapping
+                        // namespace so Paper's runtime plugin remapper skips it.
+                        // RTP's Bukkit-family code targets only the stable Bukkit
+                        // API (no NMS), so no Spigot->Mojang remap is needed. This
+                        // also avoids Paper's remapper reading the bundled Java-25
+                        // (class-file major 69) Fabric/unobf carrier classes with an
+                        // older ASM (9.7.1 on Paper 1.21.1), which otherwise fails
+                        // with "Unsupported class file major version 69" and aborts
+                        // plugin load. Newer Paper builds ship a newer ASM and
+                        // remap fine, but skipping the pass fixes both.
+                        def mf = src.getInputStream(e).withCloseable { ins -> new java.util.jar.Manifest(ins) }
+                        mf.mainAttributes.putValue('paperweight-mappings-namespace', 'mojang')
+                        mf.write(zos)
+                    } else {
+                        src.getInputStream(e).withCloseable { ins -> ins.transferTo(zos) }
+                    }
                 }
                 zos.closeEntry()
             }
@@ -955,6 +971,15 @@ remapJar {
     }
     def neoforgeCfg = neoforgeIncluded ? project.configurations.neoforgeBytecode : null
     def mergeNeoForgeFn = project.ext.mergeNeoForgeBytecodeIntoJar
+    // Same caching gotcha as the Fabric unobf carriers above: the NeoForge
+    // carrier bytecode is merged in doLast and is NOT part of remapJar's
+    // inputFile (shadowJar), so a NeoForge-only source change (e.g. a fix
+    // inside rtp-neoforge-common) would otherwise leave remapJar UP-TO-DATE
+    // and ship stale NeoForge bytecode. Declare the configuration as an input
+    // so any NeoForge change re-triggers the remap+merge.
+    if (neoforgeCfg != null) {
+        inputs.files(neoforgeCfg).withPropertyName('neoforgeCarrierBytecode')
+    }
     // Bundled GUI addon jar (resolved at config time; null when the addon is not
     // on the build graph). Appended whole AFTER the carrier merges.
     if (guiAddonShadowTask != null) dependsOn guiAddonShadowTask
@@ -1438,6 +1463,15 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     }
     def neoforgeCfg = neoforgeIncluded ? project.configurations.neoforgeBytecode : null
     def mergeNeoForgeFn = project.ext.mergeNeoForgeBytecodeIntoJar
+    // Same caching gotcha as the Fabric unobf carriers above (and parity with
+    // Pro's remapJar): the NeoForge carrier bytecode is merged in doLast and is
+    // NOT part of shadowLiteJar's output, so a NeoForge-only source change would
+    // otherwise leave remapLiteJar UP-TO-DATE and ship stale NeoForge bytecode.
+    // Declare the configuration as an input so any NeoForge change re-triggers
+    // the remap+merge.
+    if (neoforgeCfg != null) {
+        inputs.files(neoforgeCfg).withPropertyName('neoforgeCarrierBytecode')
+    }
     // Bundled GUI addon jar (resolved at config time; null when the addon is not on
     // the build graph). Appended whole AFTER the carrier merges - parity with Pro.
     if (guiAddonShadowTask != null) dependsOn guiAddonShadowTask
@@ -1571,6 +1605,18 @@ tasks.register('liteJarStructureCheck') {
             'io/github/dailystruggle/rtp/common/network/pluginmessage/PluginMessageNetworkBinding.class',
             'io/github/dailystruggle/rtp/common/network/pluginmessage/ProxyAutoDetector.class',
             'io/github/dailystruggle/rtp/common/network/pluginmessage/NetworkBridge.class',
+            // ADR-024 language-options amendment (2026-05-11): lite ships the full
+            // localized tree so a language switch actually re-localizes the config
+            // files. Assert a representative slice of the *split* message tree
+            // (ADR-071/076: advanced/messages/<concern>.yml) is present for a couple
+            // of locales. This is the regression guard for the packaging bug where
+            // the lite locale generator only emitted lang/<loc>/config.yml and every
+            // switch to a non-English locale left the message files in English.
+            'lang/fr/advanced/messages/player.yml',
+            'lang/fr/advanced/messages/.player.lang.yml',
+            'lang/fr/safety.yml',
+            'lang/zh/advanced/messages/player.yml',
+            'lang/es/advanced/messages/player.yml',
         ]
         def presentEntries = [] as Set
         new java.util.zip.ZipFile(jarFile).withCloseable { zip ->

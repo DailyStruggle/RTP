@@ -1,0 +1,34 @@
+# --- Настройки метрик RTP ---
+
+# Только настройки отчётности для метрик. Настройки
+# регулирования / тюнинга по-прежнему находятся в performance.yml.
+# Заполняет детализацией по регионам на Folia.
+# Не влияет на Paper / Bukkit / Fabric (рантаймы с одним регионом всегда
+# возвращают пустой список, что является корректным ответом).
+# @type: boolean
+# @default: true
+foliaIncludeRegions: true
+
+# Стратегия агрегации, объединяющая выборки по регионам в скалярные
+# поля tps{1,5,15}m на Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: mean
+foliaAggregationTps: "mean"
+
+# Стратегия агрегации, объединяющая выборки по регионам в скалярное
+# поле mspt на Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationMspt: "max"
+
+# Стратегия агрегации, объединяющая выборки по регионам в скалярное
+# поле tickBudgetUtilisation на Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationTickBudget: "max"
+
+# НЕ ТРОГАЙТЕ НОМЕР ВЕРСИИ
+version: 1.0

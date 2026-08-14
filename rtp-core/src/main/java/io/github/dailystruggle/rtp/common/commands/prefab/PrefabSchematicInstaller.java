@@ -38,8 +38,11 @@ public final class PrefabSchematicInstaller {
 
     /** Region-overlay key naming the schematic file (sans extension). */
     static final String SCHEMATIC_KEY = "schematic";
-    /** On-disk subdirectory (under the plugin directory) holding {@code .schem} files. */
-    static final String SCHEMATICS_SUBDIR = "schematics";
+    /**
+     * On-disk subdirectory (under the plugin directory) holding {@code .schem} files.
+     * ADR-076 relocates this under the {@code advanced/} door.
+     */
+    static final String SCHEMATICS_SUBDIR = "advanced/schematics";
     /** Bundled-resource subdirectory (classpath) holding {@code .schem} files. */
     static final String RESOURCE_DIR = "/schematics/";
     static final String SCHEM_EXT = ".schem";

@@ -254,6 +254,45 @@ public class Configs {
       java.util.concurrent.ConcurrentHashMap.newKeySet();
 
   /**
+   * ADR-071/ADR-076: reliably vacate a legacy config file or emptied directory from the
+   * plugin root by moving it to a {@code <name>.migrated} sibling (or, when that target is
+   * already taken from a prior migration, {@code <name>.migrated.<n>}), so the legacy path
+   * is always freed. Uses {@link java.nio.file.Files#move} rather than
+   * {@link File#renameTo}: {@code renameTo} silently fails when its target already exists
+   * (notably on Windows), which left the legacy file in place and caused it to be
+   * re-migrated - and its relocated copy re-backed-up - on every reboot, surfacing as a
+   * duplicated config file that reappeared after each restart. Best-effort: when even the
+   * move fails, the legacy path is deleted so it cannot re-trigger the migration.
+   *
+   * @param legacy the legacy file/directory to vacate
+   * @param legacyName the legacy path's base name (used to build the archive name)
+   * @return {@code true} when the legacy path no longer exists after the call
+   */
+  private boolean archiveLegacy(File legacy, String legacyName) {
+    File archived = new File(pluginDirectory, legacyName + ".migrated");
+    for (int i = 1; archived.exists() && i < 10000; i++) {
+      archived = new File(pluginDirectory, legacyName + ".migrated." + i);
+    }
+    try {
+      java.nio.file.Files.move(legacy.toPath(), archived.toPath());
+      return true;
+    } catch (Exception moveEx) {
+      RTP.log(Level.FINER,
+          "[RTP] archiveLegacy(" + legacyName + ") could not archive legacy path: "
+              + moveEx.getMessage());
+    }
+    // Last resort: remove the legacy path so it cannot be re-migrated on the next boot.
+    try {
+      java.nio.file.Files.deleteIfExists(legacy.toPath());
+    } catch (Exception delEx) {
+      RTP.log(Level.FINER,
+          "[RTP] archiveLegacy(" + legacyName + ") could not delete legacy path: "
+              + delEx.getMessage());
+    }
+    return !legacy.exists();
+  }
+
+  /**
    * ADR-071 rule 4: migrate a whole config file that has been relocated into a
    * subdirectory (e.g. {@code logging.yml} -> {@code advanced/logging.yml}). When a
    * legacy copy is still present at the plugin root, its operator-customized values
@@ -288,11 +327,7 @@ public class Configs {
               + ") save failed: " + saveEx.getMessage());
         }
       }
-      File archived = new File(pluginDirectory, legacyFileName + ".migrated");
-      if (!legacy.renameTo(archived)) {
-        RTP.log(Level.FINER,
-            "[RTP] migrateLegacyRootConfig(" + legacyFileName + ") could not archive legacy file");
-      }
+      archiveLegacy(legacy, legacyFileName);
       if (warnedLegacyRootFiles.add(legacyFileName)) {
         RTP.log(Level.WARNING, "[RTP] '" + legacyFileName + "' has moved to 'advanced/"
             + legacyFileName + "' (ADR-071). Your settings were migrated; the old file was "
@@ -407,10 +442,7 @@ public class Configs {
               + owner.getSimpleName() + ": " + saveEx.getMessage());
         }
       }
-      File archived = new File(pluginDirectory, "messages.yml.migrated");
-      if (!legacy.renameTo(archived)) {
-        RTP.log(Level.FINER, "[RTP] migrateLegacyFlatMessages() could not archive legacy file");
-      }
+      archiveLegacy(legacy, "messages.yml");
       if (!warnedLegacyFlatMessages) {
         warnedLegacyFlatMessages = true;
         RTP.log(Level.WARNING, "[RTP] the flat 'messages.yml' has been split into the 'messages/' "
@@ -419,6 +451,66 @@ public class Configs {
       }
     } catch (Exception ex) {
       RTP.log(Level.FINER, "[RTP] migrateLegacyFlatMessages() failed: " + ex.getMessage());
+    }
+  }
+
+  // ADR-076 rule 4: MultiConfigParser directory relocations into definitions/ that
+  // have already fired their one-time deprecation log, keyed by the legacy dir name.
+  private static final java.util.Set<String> warnedLegacyMultiDirs =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+  /**
+   * ADR-076 rule 4: relocate a legacy top-level {@code MultiConfigParser} folder
+   * (e.g. {@code regions/}) into its new home under {@code definitions/}
+   * (e.g. {@code definitions/regions/}). Every {@code .yml} definition the operator
+   * authored at the legacy location is moved into the new directory (files that already
+   * exist at the target are left untouched, so a re-run is idempotent and never clobbers
+   * a newer copy), the emptied legacy directory is archived (renamed, not deleted), and
+   * a one-time deprecation warning is logged. Runs before the parser is constructed so no
+   * operator-authored definition is stranded on upgrade.
+   *
+   * @param legacyDir the legacy top-level directory name (relative to the plugin dir)
+   * @param newDir the new directory path under {@code definitions/}
+   */
+  void migrateLegacyMultiDir(String legacyDir, String newDir) {
+    File legacy = new File(pluginDirectory, legacyDir);
+    if (!legacy.exists() || !legacy.isDirectory()) return;
+    File target = new File(pluginDirectory, newDir.replace('/', File.separatorChar));
+    try {
+      if (!target.exists() && !target.mkdirs()) {
+        RTP.log(Level.FINER,
+            "[RTP] migrateLegacyMultiDir(" + legacyDir + ") could not create '" + newDir + "'");
+        return;
+      }
+      File[] files = legacy.listFiles();
+      boolean movedAny = false;
+      if (files != null) {
+        for (File f : files) {
+          if (!f.isFile()) continue;
+          File dest = new File(target, f.getName());
+          if (dest.exists()) continue; // never clobber a newer copy at the target
+          try {
+            java.nio.file.Files.move(f.toPath(), dest.toPath());
+            movedAny = true;
+          } catch (Exception moveEx) {
+            RTP.log(Level.FINER, "[RTP] migrateLegacyMultiDir(" + legacyDir + ") move of '"
+                + f.getName() + "' failed: " + moveEx.getMessage());
+          }
+        }
+      }
+      // Archive the legacy directory so a second run does not re-trigger the migration.
+      File[] remaining = legacy.listFiles();
+      if (remaining == null || remaining.length == 0) {
+        archiveLegacy(legacy, legacyDir);
+      }
+      if (movedAny && warnedLegacyMultiDirs.add(legacyDir)) {
+        RTP.log(Level.WARNING, "[RTP] the '" + legacyDir + "/' folder has moved to '"
+            + newDir + "/' (ADR-076). Your files were migrated; the old folder was archived as '"
+            + legacyDir + ".migrated'.");
+      }
+    } catch (Exception ex) {
+      RTP.log(Level.FINER,
+          "[RTP] migrateLegacyMultiDir(" + legacyDir + ") failed: " + ex.getMessage());
     }
   }
 
@@ -612,21 +704,25 @@ public class Configs {
     // directory, and the former monolithic MessagesKeys enum into one small enum
     // per file. Each message file is an ordinary subpathed single-file parser
     // (one enum, one file, one parser) - no merge-loader.
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/placeholders.yml");
+    // ADR-076: that messages/ directory is relocated under the advanced/ door. A
+    // legacy root messages/ folder left by an older (ADR-071) install is relocated
+    // first so an operator's customized per-concern files are not stranded (rule 4).
+    migrateLegacyMultiDir("messages", "advanced/messages");
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/placeholders.yml");
     newConfigParserMap.put(PlaceholderMessages.class,
-            new ConfigParser<>(PlaceholderMessages.class, "messages/placeholders.yml", "1.0", pluginDirectory, fileDatabase, locale));
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/player.yml");
+            new ConfigParser<>(PlaceholderMessages.class, "advanced/messages/placeholders.yml", "1.0", pluginDirectory, fileDatabase, locale));
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/player.yml");
     newConfigParserMap.put(PlayerMessages.class,
-            new ConfigParser<>(PlayerMessages.class, "messages/player.yml", "1.0", pluginDirectory, fileDatabase, locale));
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/network.yml");
+            new ConfigParser<>(PlayerMessages.class, "advanced/messages/player.yml", "1.0", pluginDirectory, fileDatabase, locale));
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/network.yml");
     newConfigParserMap.put(NetworkMessages.class,
-            new ConfigParser<>(NetworkMessages.class, "messages/network.yml", "1.0", pluginDirectory, fileDatabase, locale));
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/commands.yml");
+            new ConfigParser<>(NetworkMessages.class, "advanced/messages/network.yml", "1.0", pluginDirectory, fileDatabase, locale));
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/commands.yml");
     newConfigParserMap.put(CommandMessages.class,
-            new ConfigParser<>(CommandMessages.class, "messages/commands.yml", "1.0", pluginDirectory, fileDatabase, locale));
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser messages/system.yml");
+            new ConfigParser<>(CommandMessages.class, "advanced/messages/commands.yml", "1.0", pluginDirectory, fileDatabase, locale));
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/system.yml");
     newConfigParserMap.put(SystemMessages.class,
-            new ConfigParser<>(SystemMessages.class, "messages/system.yml", "1.1", pluginDirectory, fileDatabase, locale));
+            new ConfigParser<>(SystemMessages.class, "advanced/messages/system.yml", "1.1", pluginDirectory, fileDatabase, locale));
     // ADR-071 rule 4: a legacy flat messages.yml left by an older install is read
     // once, its operator customizations folded into the matching per-concern
     // files, archived (renamed, not deleted), and logged.
@@ -687,14 +783,21 @@ public class Configs {
     // "placed on leaves / water" reports. See SafetyTokenExpander javadoc.
     SafetyTokenExpander.expandAndApply(blocks);
 
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser regions/*.yml");
+    // ADR-076: the region/world/effect definition folders are grouped under
+    // definitions/. The kind string stays "regions"/"worlds"/"effects" (so the menu,
+    // reload and removal-guards resolve unchanged); only the on-disk directory moves.
+    // A legacy root regions/ folder left by an older install is relocated first so an
+    // operator's authored region files are not stranded (rule 4).
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/regions/*.yml");
+    migrateLegacyMultiDir("regions", "definitions/regions");
     MultiConfigParser<RegionKeys> regions =
-            new MultiConfigParser<>(RegionKeys.class, "regions", "1.1", pluginDirectory);
+            new MultiConfigParser<>(RegionKeys.class, "regions", "1.1", pluginDirectory, "definitions/regions");
     newMultiConfigParserMap.put(RegionKeys.class, regions);
 
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser worlds/*.yml");
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/worlds/*.yml");
+    migrateLegacyMultiDir("worlds", "definitions/worlds");
     MultiConfigParser<WorldKeys> worlds =
-            new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory);
+            new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory, "definitions/worlds");
     newMultiConfigParserMap.put(WorldKeys.class, worlds);
 
     // effects-api-ADR-005: declarative effect groups under <pluginDir>/effects/<group>.yml.
@@ -702,10 +805,17 @@ public class Configs {
     // inherit / effects). Outer keys (group names) are admin-chosen, hence MultiConfigParser
     // (one ConfigParser per file). EffectsResolver in rtp-plugin reads this on every
     // teleport so /rtp reload is honored automatically by the parser-map atomic swap above.
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser effects/*.yml");
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/effects/*.yml");
+    migrateLegacyMultiDir("effects", "definitions/effects");
     MultiConfigParser<EffectsGroupKeys> effectsGroups =
-            new MultiConfigParser<>(EffectsGroupKeys.class, "effects", "1.0", pluginDirectory);
+            new MultiConfigParser<>(EffectsGroupKeys.class, "effects", "1.0", pluginDirectory, "definitions/effects");
     newMultiConfigParserMap.put(EffectsGroupKeys.class, effectsGroups);
+
+    // ADR-076: region arrival schematics (.schem files, resolved by file presence -
+    // see RegionSchematicService) live under advanced/schematics/. A legacy root
+    // schematics/ folder left by an older install is relocated (rule 4). There is no
+    // parser for schematics; this is a pure directory relocation.
+    migrateLegacyMultiDir("schematics", "advanced/schematics");
 
     int worldCount = 0;
     for (RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {

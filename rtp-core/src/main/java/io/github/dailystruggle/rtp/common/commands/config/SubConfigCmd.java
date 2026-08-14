@@ -467,6 +467,45 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
     }
   }
 
+  /**
+   * Register the dotted sub-knob leaves for a {@code shape} / {@code vert}
+   * key whose stored value is an inheritance-reference String (e.g.
+   * {@code @config}) rather than a resolved {@link FactoryValue} or a raw
+   * {@link RtpYamlSection}. Reuses each factory entry's own sub-parameter
+   * (so {@code shape.centerX} / {@code shape.centerZ} keep the
+   * {@code CoordinateParameter} type/filter, {@code shape.radius} keeps the
+   * {@code IntegerParameter} type, etc.) and registers the {@code name}
+   * discriminator leaf so the factory type can be switched from the flat
+   * view. The union across all registered factory entries is registered so
+   * every shape/vert variant's knobs resolve regardless of which concrete
+   * type the reference ultimately inherits.
+   */
+  private void addFactoryReferenceDottedParameters(String prefix, RTP.factoryNames factoryName) {
+    addParameter(
+        prefix + ".name",
+        new CommandParameter("rtp.update", "", (uuid, s1) -> true) {
+          @Override
+          public Set<String> values() {
+            return new HashSet<>();
+          }
+        });
+    Factory<?> factory = RTP.factoryMap.get(factoryName);
+    if (factory == null) return;
+    for (Object v : factory.map.values()) {
+      Map<String, CommandParameter> params = null;
+      if (v instanceof Shape) {
+        params = ((Shape<?>) v).getParameters();
+      } else if (v instanceof VerticalAdjustor) {
+        params = ((VerticalAdjustor<?>) v).getParameters();
+      }
+      if (params == null) continue;
+      for (Map.Entry<String, CommandParameter> pe : params.entrySet()) {
+        if (pe.getKey() == null || pe.getValue() == null) continue;
+        addParameter(prefix + "." + pe.getKey(), pe.getValue());
+      }
+    }
+  }
+
   private void addSectionParameters(String prefix, RtpYamlSection section) {
     for (String key : section.getKeys(false)) {
       String fullKey = prefix + "." + key;
@@ -527,6 +566,30 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
           addParameter(s, new WorldParameter("rtp.update", desc, (uuid, s1) -> true));
         } else if (name.contains("region")) {
           addParameter(s, new RegionParameter("rtp.update", desc, (uuid, s1) -> true));
+        } else if (o instanceof String && name.equalsIgnoreCase("shape")) {
+          // A region whose `shape` is stored as an inheritance-reference
+          // token (e.g. `@config`, or a bare shape name) resolves the value
+          // as a String rather than a `Shape` FactoryValue or a raw
+          // `RtpYamlSection`. Without special-casing it here the generic
+          // String branch below would register only a bare `shape`
+          // parameter with no sub-parameters and no dotted leaves, so both
+          // `shape=SQUARE <sub-knob>=...` (chaining) and
+          // `shape.centerX=...` / `shape.centerZ=...` (dotted) are rejected
+          // with "invalid command argument" and never tab-complete (the v2
+          // regression reported for referenced shapes). Register the proper
+          // ShapeParameter (restores chaining sub-knobs) plus the dotted
+          // sub-knob leaves drawn from the shape factory (restores the
+          // `shape.centerZ` grammar), reusing each shape's own sub-parameter
+          // so the type/validity filter matches (CoordinateParameter for
+          // centerX/centerZ, IntegerParameter for radius, ...).
+          addParameter(s, new ShapeParameter("rtp.update", desc, (uuid, s1) -> true));
+          addFactoryReferenceDottedParameters(s, RTP.factoryNames.shape);
+        } else if (o instanceof String && name.equalsIgnoreCase("vert")) {
+          // Symmetric to the referenced-`shape` case above: a `vert` stored
+          // as an inheritance-reference String must still expose its
+          // VerticalAdjustor sub-knobs and dotted leaves.
+          addParameter(s, new VertParameter("rtp.update", desc, (uuid, s1) -> true));
+          addFactoryReferenceDottedParameters(s, RTP.factoryNames.vert);
         } else if (o instanceof String) {
           final String desc_ = desc;
           addParameter(

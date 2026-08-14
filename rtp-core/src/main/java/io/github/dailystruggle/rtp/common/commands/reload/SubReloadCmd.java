@@ -110,7 +110,8 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
     serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
 
     MultiConfigParser<?> newParser =
-        new MultiConfigParser<>(parser.myClass, parser.name, "1.0", parser.pluginDirectory);
+        new MultiConfigParser<>(
+            parser.myClass, parser.name, "1.0", parser.pluginDirectory, parser.directory);
     if (parser.myClass.equals(RegionKeys.class)) {
       @SuppressWarnings("unchecked")
       MultiConfigParser<RegionKeys> regions = (MultiConfigParser<RegionKeys>) newParser;

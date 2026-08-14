@@ -1,0 +1,34 @@
+# --- RTP メトリクス設定 ---
+
+# メトリクスのレポート専用つまみ。スロットル / チューニング
+# つまみは引き続き performance.yml に置かれます。
+# Folia で にリージョン別詳細を格納します。
+# Paper / Bukkit / Fabric では効果なし (単一リージョン環境では常に空の
+# リストを返し、それがこれらのプラットフォームでは正しい挙動です)。
+# @type: boolean
+# @default: true
+foliaIncludeRegions: true
+
+# Folia 上で スカラー tps{1,5,15}m フィールドに
+# リージョン別サンプルを集約する方式。
+# @type: enum
+# @options: [mean, max]
+# @default: mean
+foliaAggregationTps: "mean"
+
+# Folia 上で スカラー mspt フィールドにリージョン別
+# サンプルを集約する方式。
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationMspt: "max"
+
+# Folia 上で スカラー tickBudgetUtilisation
+# フィールドにリージョン別サンプルを集約する方式。
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationTickBudget: "max"
+
+# バージョン番号は変更しないでください
+version: 1.0

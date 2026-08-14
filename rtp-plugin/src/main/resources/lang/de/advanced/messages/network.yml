@@ -1,0 +1,52 @@
+# --- RTP-Nachrichten (diese Sprache) ---
+# Nachrichtentexte fuer Spieler und Operatoren in dieser Sprache, nach Themen gruppiert.
+# Automatisch aus den englischen Nachrichten erzeugt; nicht von Hand bearbeiten (wird ueberschrieben).
+
+# --- Nachrichten für den serverübergreifenden Netzwerkmodus ---
+# Wird nur gesendet, wenn `network.enabled: true` ist und das `/rtp` des Spielers über
+# die serverübergreifende Warteschlange geleitet wird (siehe network.yml `routing.mode`).
+# Aus Sicht des Spielers sind alle Schlüssel optional - der L2-Basiszyklus aus
+# `delayMessage` / `teleportMessage` steuert weiterhin den sichtbaren Ablauf.
+# Wird gesendet, wenn die Anfrage in die serverübergreifende Warteschlange aufgenommen wurde
+# und auf eine Backend-Reservierung wartet. Platzhalter: [position] - 0-basierte
+# Position aus `pollStatus`; kann leer sein, wenn der Transport keine
+# Position zurückgibt.
+netzwerkInWarteschlange: "&7[P0] für ein serverübergreifendes Ziel eingereiht (Position [position])..."
+# Wird gesendet, wenn ein Spieler /rtp* ausführt, während er bereits eine nicht abgeschlossene
+# serverübergreifende Anmeldung hält. Platzhalter:
+# [position] - FIFO-Position, falls bekannt; leer, wenn der Proxy noch keine
+# zugewiesen hat.
+bereitsInWarteschlange: "&cDu wartest bereits in der serverübergreifenden Warteschlange (Position [position]). Bitte warte."
+# Wird gesendet, wenn ein serverübergreifender Warteschlangeneintrag nach Überschreiten seiner
+# konfigurierten TTL entfernt wird. Keine Platzhalter.
+netzwerkZeitueberschreitung: "&c[P0] serverübergreifender Teleport hat beim Warten auf ein Backend das Zeitlimit überschritten."
+# Wird gesendet, wenn eine serverübergreifende Warteschlangenanmeldung abgelehnt wird, weil die gemeinsame
+# Warteschlange ihre konfigurierte Maximalgröße erreicht hat ( REJECTED_FULL).
+# Keine Platzhalter.
+warteschlangeVoll: "&c[P0] serverübergreifende Warteschlange ist voll; bitte versuche es gleich erneut."
+# Wird gesendet, wenn die Warteschlange die Anfrage an den Proxy-Router übergeben hat und
+# eine Backend-Auswahl läuft.
+netzwerkWeiterleitung: "&7[P0] leite zu einem Backend weiter..."
+# Wird gesendet, wenn ein Backend eine Koordinate für diesen Spieler reserviert hat und der
+# Proxy im Begriff ist, den serverübergreifenden Sprung einzuleiten. Platzhalter: [server]
+# - die serverId des Ziel-Backends.
+netzwerkReserviert: "&a[P0] Koordinate auf [server] reserviert. Übertrage..."
+# Wird gesendet, während der Proxy den Sprung ausführt. Platzhalter: [server] - Ziel.
+netzwerkUebertragung: "&a[P0] übertrage zu [server]..."
+# Wird gesendet, wenn der serverübergreifende Pfad aufgegeben hat und die Anfrage
+# auf den lokalen Server zurückgefallen ist. Platzhalter: [reason] - der Grund für den Rückfall.
+netzwerkRueckfall: "&e[P0] serverübergreifend nicht verfügbar ([reason]); greife lokal zurück."
+# Wird gesendet, wenn die serverübergreifende Anfrage fehlgeschlagen ist und kein
+# Rückfall möglich war. Platzhalter: [reason] - der Fehlergrund.
+netzwerkFehlgeschlagen: "&c[P0] serverübergreifender Teleport fehlgeschlagen: [reason]."
+# Wird gesendet, wenn der Spieler eine bestimmte Region angefordert hat (`/rtp <region>`), aber
+# derzeit kein Backend im Netzwerk sie bedient. Platzhalter:
+# [region] - der angeforderte Regionsname.
+netzwerkRegionNichtVerfuegbar: "&c[P0] derzeit bedient kein Backend die Region '[region]'."
+# Wird gesendet, wenn der angeforderte Regionsname zu zwei oder mehr Backends aufgelöst wird und
+# die vom Operator konfigurierte Richtlinie keines auswählen kann (wird nur
+# unter strengeren Richtlinien als dem Standard `warn` ausgelöst). Platzhalter: [region].
+netzwerkRegionMehrdeutig: "&c[P0] Region '[region]' ist über mehrere Backends mehrdeutig; bitte einen Server festlegen."
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

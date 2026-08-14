@@ -123,6 +123,33 @@ public final class GradientExpander {
         || (code >= 'A' && code <= 'F');
   }
 
+  // True for a hex digit (0-9, a-f, A-F).
+  private static boolean isHexDigit(char c) {
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+  }
+
+  /**
+   * Detects the Bungee/Spigot legacy hex marker
+   * {@code \u00a7x\u00a7r\u00a7r\u00a7g\u00a7g\u00a7b\u00a7b} (a section sign, an
+   * {@code x}, then six {@code \u00a7}-prefixed hex digits) starting at index
+   * {@code i} in {@code chars}. Returns its full length (14) when present, or 0
+   * otherwise. Nested gradient/rainbow/transition tags emit this form via
+   * {@link #legacyHex}, so the per-character coloring loops must treat it as an
+   * already-colored run rather than as plain text - otherwise the outer tag
+   * injects its own color and leaks the marker's {@code x} as a literal glyph.
+   */
+  private static int hexMarkerLen(char[] chars, int i) {
+    if (i + 13 >= chars.length) return 0;
+    if (chars[i] != '\u00a7') return 0;
+    char x = chars[i + 1];
+    if (x != 'x' && x != 'X') return 0;
+    for (int k = 0; k < 6; k++) {
+      if (chars[i + 2 + k * 2] != '\u00a7') return 0;
+      if (!isHexDigit(chars[i + 3 + k * 2])) return 0;
+    }
+    return 14;
+  }
+
   // True for the legacy reset code, which clears any nested color.
   private static boolean isLegacyResetCode(char code) {
     return code == 'r' || code == 'R';
@@ -179,6 +206,16 @@ public final class GradientExpander {
     int i = 0;
     boolean nestedColored = false;
     while (i < chars.length) {
+      // Copy a nested legacy hex marker (\u00a7x\u00a7r\u00a7r...) verbatim so
+      // the outer tag does not inject color into the middle of it (which would
+      // leak the marker's 'x' as a literal glyph).
+      int hm = hexMarkerLen(chars, i);
+      if (hm > 0) {
+        sb.append(chars, i, hm);
+        nestedColored = true;
+        i += hm;
+        continue;
+      }
       // Skip existing legacy color/format codes (X) - copy them verbatim.
       if (chars[i] == '\u00a7' && i + 1 < chars.length) {
         char code = chars[i + 1];
@@ -195,9 +232,18 @@ public final class GradientExpander {
       if (!nestedColored) {
         float t = (visibleLen == 1) ? 0f
             : (float) visIdx / (visibleLen - 1);
-        // Apply phase: shift t by phase, wrapping in [0,1].
-        float shifted = (t + phase) % 1f;
-        if (shifted < 0) shifted += 1f;
+        // A plain gradient (phase == 0) is not cyclic: t runs the closed range
+        // [0,1] so the last visible character resolves to the end color. Only a
+        // non-zero phase shifts and wraps the gradient - taking the modulo
+        // unconditionally would map the endpoint (t == 1.0) back to 0.0 and
+        // render the final glyph in the start color.
+        float shifted;
+        if (phase == 0f) {
+          shifted = t;
+        } else {
+          shifted = (t + phase) % 1f;
+          if (shifted < 0) shifted += 1f;
+        }
         int[] color = interpolateStops(stops, shifted);
         sb.append(legacyHex(color[0], color[1], color[2]));
       }
@@ -245,6 +291,13 @@ public final class GradientExpander {
     int i = 0;
     boolean nestedColored = false;
     while (i < chars.length) {
+      int hm = hexMarkerLen(chars, i);
+      if (hm > 0) {
+        sb.append(chars, i, hm);
+        nestedColored = true;
+        i += hm;
+        continue;
+      }
       if (chars[i] == '\u00a7' && i + 1 < chars.length) {
         char code = chars[i + 1];
         if (isLegacyColorCode(code) || "klmnoKLMNO".indexOf(code) >= 0
@@ -292,6 +345,13 @@ public final class GradientExpander {
     int i = 0;
     boolean nestedColored = false;
     while (i < chars.length) {
+      int hm = hexMarkerLen(chars, i);
+      if (hm > 0) {
+        sb.append(chars, i, hm);
+        nestedColored = true;
+        i += hm;
+        continue;
+      }
       if (chars[i] == '\u00a7' && i + 1 < chars.length) {
         char code = chars[i + 1];
         if (isLegacyColorCode(code) || "klmnoKLMNO".indexOf(code) >= 0
@@ -402,6 +462,14 @@ public final class GradientExpander {
     int count = 0;
     int i = 0;
     while (i < chars.length) {
+      // A nested legacy hex marker (\u00a7x\u00a7r\u00a7r...) is a zero-width
+      // color run, not visible text - skip it whole so it doesn't inflate the
+      // visible-character count that drives per-character color distribution.
+      int hm = hexMarkerLen(chars, i);
+      if (hm > 0) {
+        i += hm;
+        continue;
+      }
       if (chars[i] == '\u00a7' && i + 1 < chars.length) {
         char code = chars[i + 1];
         if ((code >= '0' && code <= '9') || (code >= 'a' && code <= 'f')

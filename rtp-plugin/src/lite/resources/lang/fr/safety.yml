@@ -1,0 +1,111 @@
+# --- RTP Safety Configuration ---
+# Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
+
+# Seconds of invulnerability after teleport
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 5
+invulnerabilityTime: 5
+
+# Block radius around landing to check for hazards
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 0
+safetyRadius: 0
+
+# Radius of emergency platform (-1 to disable)
+# @type: integer
+# @range: [-1, null]
+# @unit: blocks
+# @default: -1
+platformRadius: -1
+
+# Depth of platform
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
+platformDepth: 1
+
+# Air space above platform
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+platformAirHeight: 2
+
+# Material for platform
+# @type: material
+# @source: material
+# @default: GLASS
+platformMaterial: "GLASS"
+
+# Secondes après lesquelles l'empreinte de la plateforme est restaurée à ses blocs
+# d'origine. -1 = jamais (permanent), 0 = dès que le chunk se recharge. Le compte
+# à rebours n'avance que si le chunk est chargé ; survit aux redémarrages.
+# @type: integer
+# @range: [-1, null]
+# @unit: seconds
+# @default: -1
+platformRestoreSeconds: -1
+
+# --- Optional PvP / combat-tag pre-flight gate ---
+# Interrupteur principal. Si true, /rtp vérifie l'état de combat et applique
+# pvpOnCombat (ci-dessous) avant la mise en file et avant la téléportation.
+# @type: boolean
+# @default: false
+pvpCheckEnabled: false
+
+# Secondes pendant lesquelles un joueur reste "en combat" après des dégâts PvP
+# (traqueur natif uniquement ; ignoré si un plugin de combat-tag externe est lié).
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 15"
+pvpCombatTagSeconds: 15
+
+# What to do when a combat-tagged player requests (or is mid-)/rtp.
+# ALLOW  - permit, but log an audit line
+# DENY   - refuse the command with the busy message
+# DELAY  - postpone until the combat tag expires, then proceed
+# CANCEL - abort an in-progress / queued teleport
+# Unknown values fail safe to DENY.
+# @type: enum
+# @options: [ALLOW, DENY, DELAY, CANCEL]
+# @default: DENY
+pvpOnCombat: "DENY"
+
+# Combat-state source preference.
+# AUTO     - external combat-tag plugin if one is bound, else native tracker
+# NATIVE   - always use RTP's native damage tracker
+# EXTERNAL - only a bound combat-tag plugin (no native fallback)
+# @type: enum
+# @options: [AUTO, NATIVE, EXTERNAL]
+# @default: AUTO
+pvpSource: "AUTO"
+
+# Native tracker: tag a player who TAKES PvP damage.
+# @type: boolean
+# @default: true
+pvpTagVictim: true
+
+# Native tracker: tag a player who DEALS PvP damage.
+# @type: boolean
+# @default: true
+pvpTagAggressor: true
+
+# Max retries for stale-chunk guard
+# @type: integer
+# @range: [0, null]
+# @default: 2
+staleChunkRetryLimit: 2
+
+# Off-thread anvil prefilter
+# @type: boolean
+# @default: true
+anvilPrefilterEnabled: true
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

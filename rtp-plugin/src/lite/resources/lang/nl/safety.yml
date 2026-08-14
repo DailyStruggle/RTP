@@ -1,0 +1,134 @@
+# --- Veiligheidsconfiguratie van RTP ---
+
+# Configureert hoe de plugin bepaalt of een teletransportlocatie "veilig" is.
+# Token-grammatica:
+# MATERIAAL -- enkel materiaal, bijv. LAVA
+# MATERIAAL[eigenschap=waarde] -- materiaal alleen als ALLE blokeigenschappen overeenkomen
+# #namespace:tag -- uitgebreid naar alle materialen van die tag
+# #namespace:tag[eigenschap=waarde] -- tagleden alleen als eigenschappen overeenkomen
+# *[eigenschap=waarde] -- ELK materiaal wanneer eigenschappen overeenkomen (wildcard)
+# Eigenschapswaarden worden hoofdletterongevoelig vergeleken met de
+# tekenreeksvorm van Bukkit BlockData. Onbekende tags worden uitgebreid
+# naar de lege verzameling (no-op, fail-open); misvormde tokens worden
+# eenmalig geregistreerd op WARN-niveau bij herladen .
+# De volgorde binnen een lijst maakt niet uit.
+# Onkwetsbaarheid (seconden)
+# Duur van de onkwetsbaarheid die aan de speler wordt verleend na teletransport.
+# Voorkomt schade door vuur, verdrinking of vallen bij aankomst.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 5"
+onkwetsbaarheidstijd: 5
+
+# Veiligheidscontrolestraal (blokken)
+# Straal rondom het doelblok om te controleren op gevaarlijke omstandigheden.
+# Hogere waarden geven meer veiligheid maar maken het moeilijker een plek te vinden.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 0
+veiligheidsStraal: 0
+
+# Landingsplatforms
+# Maakt een landingsplatform op de teletransportbestemming.
+# Stel platformStraal in op -1 om platforms uit te schakelen.
+# @type: integer
+# @range: [-1, null]
+# @unit: blocks
+# @default: -1
+platformStraal: -1
+
+# Depth (vertical thickness) of the emergency platform.
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
+platformDiepte: 1
+
+# Air-space height cleared above the emergency platform.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+platformLuchtHoogte: 2
+
+# Material used for the emergency landing platform.
+# @type: material
+# @source: material
+# @default: GLASS
+platformMateriaal: "GLASS"
+
+# Seconden waarna de voetafdruk van het platform wordt hersteld naar de originele
+# blokken. -1 = nooit (permanent), 0 = zodra de chunk herlaadt. De aftelling loopt
+# alleen terwijl de chunk geladen is; overleeft herstarts.
+# @type: integer
+# @range: [-1, null]
+# @unit: seconds
+# @default: -1
+platformRestoreSeconds: -1
+
+# --- Optional PvP / combat-tag pre-flight gate ---
+# Hoofdschakelaar. Indien true controleert /rtp de gevechtsstatus en past
+# pvpOnCombat (hieronder) toe vóór het inwachten en vóór het teleporteren.
+# @type: boolean
+# @default: false
+pvpCheckEnabled: false
+
+# Seconden dat een speler "in gevecht" blijft na PvP-schade (alleen de native
+# tracker; genegeerd wanneer een externe combat-tag-plugin is gekoppeld).
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 15"
+pvpCombatTagSeconds: 15
+
+# What to do when a combat-tagged player requests (or is mid-)/rtp.
+# ALLOW  - permit, but log an audit line
+# DENY   - refuse the command with the busy message
+# DELAY  - postpone until the combat tag expires, then proceed
+# CANCEL - abort an in-progress / queued teleport
+# Unknown values fail safe to DENY.
+# @type: enum
+# @options: [ALLOW, DENY, DELAY, CANCEL]
+# @default: DENY
+pvpOnCombat: "DENY"
+
+# Combat-state source preference.
+# AUTO     - external combat-tag plugin if one is bound, else native tracker
+# NATIVE   - always use RTP's native damage tracker
+# EXTERNAL - only a bound combat-tag plugin (no native fallback)
+# @type: enum
+# @options: [AUTO, NATIVE, EXTERNAL]
+# @default: AUTO
+pvpSource: "AUTO"
+
+# Native tracker: tag a player who TAKES PvP damage.
+# @type: boolean
+# @default: true
+pvpTagVictim: true
+
+# Native tracker: tag a player who DEALS PvP damage.
+# @type: boolean
+# @default: true
+pvpTagAggressor: true
+
+# Maximaal aantal pogingen voor verouderde chunk (telling)
+# Begrensd pogingsbudget voor de verouderde-chunk-bewaker
+# . Standaard: 2.
+# @type: integer
+# @range: [0, null]
+# @default: 2
+staleChunkRetryLimit: 2
+
+# Anvil-alleen-lezen-voorfilter (alleen Spigot vanilla)
+# Off-thread veiligheidssonde die het opgeslagen regiobestand analyseert
+# en duidelijk onveilige kandidaten afwijst vóór het opvragen van de
+# autoritatieve live-chunk. Zie
+# Standaard: true. Stel in op false om de sonde uit te schakelen.
+# @type: boolean
+# @default: true
+anvilPrefilterEnabled: true
+
+# WIJZIG HET VERSIENUMMER NIET
+version: 1.0

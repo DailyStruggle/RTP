@@ -1,0 +1,34 @@
+# --- Configurações de métricas do RTP ---
+
+# Botões somente de relatório de métricas. Botões de
+# limitação / ajuste fino continuam em performance.yml.
+# Preenche com detalhe por região no Folia.
+# Sem efeito em Paper / Bukkit / Fabric (runtimes de única região sempre
+# retornam lista vazia, que é a resposta correta para essas plataformas).
+# @type: boolean
+# @default: true
+foliaIncludeRegions: true
+
+# Estratégia de agregação usada para combinar amostras por região nos
+# campos escalares tps{1,5,15}m no Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: mean
+foliaAggregationTps: "mean"
+
+# Estratégia de agregação usada para combinar amostras por região no
+# campo escalar mspt no Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationMspt: "max"
+
+# Estratégia de agregação usada para combinar amostras por região no campo
+# escalar tickBudgetUtilisation no Folia.
+# @type: enum
+# @options: [mean, max]
+# @default: max
+foliaAggregationTickBudget: "max"
+
+# NÃO ALTERE O NÚMERO DA VERSÃO
+version: 1.0

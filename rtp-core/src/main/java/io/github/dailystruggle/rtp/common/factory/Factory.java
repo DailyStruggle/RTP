@@ -84,7 +84,10 @@ public class Factory<T extends FactoryValue<?>> {
 
         if (clone instanceof ConfigParser) {
           ConfigParser<?> configParser = (ConfigParser<?>) clone;
-          configParser.check(configParser.version, configParser.pluginDirectory, null);
+          // Reuse the template's rename map (e.g. a MultiConfigParser's shared
+          // folder-similar `.worlds.lang.yml`) rather than passing null, which
+          // would re-auto-resolve to a stray per-file map inside the folder.
+          configParser.check(configParser.version, configParser.pluginDirectory, configParser.langFile);
         }
         value = clone;
       } else return null;
@@ -123,7 +126,8 @@ public class Factory<T extends FactoryValue<?>> {
     clone.name = (name.endsWith(".yml")) ? name : name + ".yml";
     if (clone instanceof ConfigParser) {
       ConfigParser<?> configParser = (ConfigParser<?>) clone;
-      configParser.check(configParser.version, configParser.pluginDirectory, null);
+      // Reuse the template's rename map (see construct(String)) instead of null.
+      configParser.check(configParser.version, configParser.pluginDirectory, configParser.langFile);
     }
     return clone.clone();
   }

@@ -1,0 +1,13 @@
+# --- Language Mapping: system.yml ---
+# Maps internal baseline keys (left) to user-visible key names (right)
+# used in system.yml. Co-located dotfile sibling (ADR-076).
+oldFile: "oldFile"
+newWorld: "newWorld"
+reloading: "reloading"
+reloaded: "reloaded"
+updating: "updating"
+updated: "updated"
+locationSaved: "locationSaved"
+locationLoaded: "locationLoaded"
+version: "version"
+showDevTag: "showDevTag"

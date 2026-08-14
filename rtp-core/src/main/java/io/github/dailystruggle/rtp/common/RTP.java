@@ -413,9 +413,32 @@ public class RTP {
         }
 
         final Region targetRegion = region;
+
+        // Economy charge, mirroring the self-branch of RTPCmd.compute(): the
+        // addon-facing teleport (every GUI/menu addon drives it) must debit the
+        // configured teleport price + per-region price and refuse a player who
+        // cannot afford it, exactly as the /rtp command does. RtpTarget carries
+        // no shape/vert/biome parameters, so no params/biome surcharge applies.
+        // Skipped automatically when no economy is bound or the player has
+        // rtp.free (see EconomyGate).
+        io.github.dailystruggle.rtp.common.economy.EconomyGate.Charge apiCharge =
+            io.github.dailystruggle.rtp.common.economy.EconomyGate.charge(
+                uuid, player, targetRegion,
+                io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.SELF, false, false);
+        if (apiCharge.result()
+            == io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.INSUFFICIENT_FUNDS) {
+          getInstance().processingPlayers.remove(uuid);
+          future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+              io.github.dailystruggle.rtp.api.RTPResult.Reason.INSUFFICIENT_FUNDS,
+              "Player cannot afford the teleport cost"));
+          return future;
+        }
+
         TeleportData data = new TeleportData();
         io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(
             data, "TeleportData-" + uuid, 120000L);
+        // Record the charge so a failed teleport is refunded (RTPTeleportCancel).
+        data.cost = apiCharge.cost();
         data.sender = player;
         data.targetRegion = targetRegion;
         data.onComplete = td -> {
@@ -440,7 +463,19 @@ public class RTP {
         data.nextTask = task;
         getInstance().processingPlayers.add(uuid);
         targetRegion.inFlightCalculations.incrementAndGet();
-        scheduler.runTaskAsynchronously(task);
+        // Fast path, mirroring the sync branch of RTPCmd.compute(): when a
+        // pre-verified location is already cached for this player (its chunk is
+        // kept-loaded, so no synchronous chunk I/O happens - S-005 safe), run
+        // the pipeline inline instead of deferring to the next async scheduler
+        // pulse. This makes a menu/GUI click teleport as immediately as the
+        // /rtp command does. The addon-facing API applies no biome filter, so
+        // the only gate is a ready cached location; any other case (empty
+        // cache, biome-filtered - N/A here) still runs asynchronously.
+        if (targetRegion.hasLocation(uuid)) {
+          task.run();
+        } else {
+          scheduler.runTaskAsynchronously(task);
+        }
       } catch (Throwable t) {
         getInstance().processingPlayers.remove(uuid);
         future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
@@ -738,9 +773,27 @@ public class RTP {
       RTPPlayer player,
       Region targetRegion,
       java.util.concurrent.CompletableFuture<io.github.dailystruggle.rtp.api.RTPResult> future) {
+    // Economy charge parity with teleportDelegate: a network self-pin served
+    // locally still debits the teleport + region price and refuses a player who
+    // cannot afford it. Skipped when no economy is bound or the player is free.
+    io.github.dailystruggle.rtp.common.economy.EconomyGate.Charge charge =
+        io.github.dailystruggle.rtp.common.economy.EconomyGate.charge(
+            uuid, player, targetRegion,
+            io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.SELF, false, false);
+    if (charge.result()
+        == io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.INSUFFICIENT_FUNDS) {
+      getInstance().processingPlayers.remove(uuid);
+      future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+          io.github.dailystruggle.rtp.api.RTPResult.Reason.INSUFFICIENT_FUNDS,
+          "Player cannot afford the teleport cost"));
+      return;
+    }
+
     TeleportData data = new TeleportData();
     io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(
         data, "TeleportData-" + uuid, 120000L);
+    // Record the charge so a failed teleport is refunded (RTPTeleportCancel).
+    data.cost = charge.cost();
     data.sender = player;
     data.targetRegion = targetRegion;
     data.onComplete = td -> {

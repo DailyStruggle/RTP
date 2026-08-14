@@ -323,6 +323,115 @@ class RTPTest {
     }
 
     @Test
+    void economyGate_rejectsWhenPlayerCannotAffordPrice() {
+        // The shared charge gate (used by the addon-facing RTPAPI.teleport path,
+        // which every GUI/menu addon drives) must apply the same economy charge
+        // the /rtp command does: a player who cannot afford the configured price
+        // must be rejected with INSUFFICIENT_FUNDS rather than teleported free,
+        // and a player who can afford it (or has rtp.free) must be allowed.
+        var eco = (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
+                RTP.configs.getParser(
+                        io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.class);
+        java.util.EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys, Object> saved =
+                eco.getData();
+        io.github.dailystruggle.rtp.api.economy.RTPEconomy savedEconomy = RTP.economy;
+        try {
+            java.util.EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys, Object> mutated =
+                    new java.util.EnumMap<>(saved);
+            mutated.put(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.price, 100.0);
+            mutated.put(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.priceOther, 200.0);
+            mutated.put(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.balanceFloor, 0.0);
+            eco.setData(mutated);
+
+            final double[] balance = {0.0};
+            final java.util.concurrent.atomic.AtomicReference<Double> taken =
+                    new java.util.concurrent.atomic.AtomicReference<>(null);
+            RTP.economy = new io.github.dailystruggle.rtp.api.economy.RTPEconomy() {
+                @Override public void give(UUID playerId, double money) {}
+                @Override public boolean take(UUID playerId, double money) {
+                    taken.set(money);
+                    return true;
+                }
+                @Override public double bal(UUID playerId) { return balance[0]; }
+            };
+
+            UUID id = UUID.randomUUID();
+            MockRTPPlayer broke = new MockRTPPlayer(
+                    id, "Broke",
+                    new RTPLocation(new MockRTPWorld("default"), 0, 0, 0)) {
+                @Override
+                public boolean hasPermission(String permission) {
+                    return !"rtp.free".equals(permission);
+                }
+            };
+
+            // Broke: 0 - 100 < 0 (floor) -> reject, and no withdrawal attempted.
+            io.github.dailystruggle.rtp.common.economy.EconomyGate.Charge brokeCharge =
+                    io.github.dailystruggle.rtp.common.economy.EconomyGate.charge(
+                            id, broke, null,
+                            io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.SELF,
+                            false, false);
+            assertEquals(
+                    io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.INSUFFICIENT_FUNDS,
+                    brokeCharge.result());
+            assertEquals(100.0, brokeCharge.cost(), 1e-9, "computed cost is reported even on reject");
+            assertNull(taken.get(), "insufficient funds must not withdraw");
+
+            // Rich enough: 500 - 100 >= 0 -> allowed, and the price is withdrawn.
+            balance[0] = 500.0;
+            io.github.dailystruggle.rtp.common.economy.EconomyGate.Charge okCharge =
+                    io.github.dailystruggle.rtp.common.economy.EconomyGate.charge(
+                            id, broke, null,
+                            io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.SELF,
+                            false, false);
+            assertEquals(
+                    io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.ALLOWED,
+                    okCharge.result());
+            assertEquals(100.0, okCharge.cost(), 1e-9, "the returned cost must equal the price");
+            assertEquals(100.0, taken.get(), 1e-9, "the configured price must be withdrawn");
+
+            // PriceKey.OTHER selects priceOther (200) rather than price (100).
+            taken.set(null);
+            balance[0] = 500.0;
+            io.github.dailystruggle.rtp.common.economy.EconomyGate.Charge otherCharge =
+                    io.github.dailystruggle.rtp.common.economy.EconomyGate.charge(
+                            id, broke, null,
+                            io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.OTHER,
+                            false, false);
+            assertEquals(
+                    io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.ALLOWED,
+                    otherCharge.result());
+            assertEquals(200.0, taken.get(), 1e-9, "PriceKey.OTHER must use priceOther");
+
+            // rtp.free bypasses the charge entirely (returns ALLOWED, cost 0).
+            taken.set(null);
+            balance[0] = 0.0;
+            MockRTPPlayer freebie = new MockRTPPlayer(
+                    id, "Free",
+                    new RTPLocation(new MockRTPWorld("default"), 0, 0, 0)) {
+                @Override
+                public boolean hasPermission(String permission) {
+                    return "rtp.free".equals(permission);
+                }
+            };
+            io.github.dailystruggle.rtp.common.economy.EconomyGate.Charge freeCharge =
+                    io.github.dailystruggle.rtp.common.economy.EconomyGate.charge(
+                            id, freebie, null,
+                            io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.SELF,
+                            false, false);
+            assertEquals(
+                    io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.ALLOWED,
+                    freeCharge.result());
+            assertEquals(0.0, freeCharge.cost(), 1e-9, "rtp.free charge cost must be zero");
+            assertNull(taken.get(), "rtp.free must not be charged");
+        } finally {
+            eco.setData(saved);
+            RTP.economy = savedEconomy;
+        }
+    }
+
+    @Test
     void priorTeleportData_canStoreMultipleEntries() {
         for (int i = 0; i < 5; i++) {
             UUID id = UUID.randomUUID();

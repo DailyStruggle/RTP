@@ -47,7 +47,13 @@ class YamlFileDatabaseTest extends AbstractDatabaseAccessorTest {
 
     @Test
     void connect_emptyDirectory_returnsEmptyMap() {
-        Map<String, RtpYamlConfig> result = db.connect();
+        // RTPTestSetup.install() extracts the core config files into the shared
+        // plugin directory (tempDir), so point at a dedicated, genuinely-empty
+        // sub-directory to exercise the empty-directory contract.
+        File emptyDir = tempDir.resolve("empty").toFile();
+        assertTrue(emptyDir.mkdirs(), "test setup should create the empty directory");
+        YamlFileDatabase emptyDb = new YamlFileDatabase(emptyDir);
+        Map<String, RtpYamlConfig> result = emptyDb.connect();
         assertNotNull(result);
         assertTrue(result.isEmpty(), "connect on empty dir should return empty map");
     }

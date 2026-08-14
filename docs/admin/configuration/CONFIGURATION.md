@@ -2,6 +2,8 @@
 
 One jar covers every platform. Configuration is generated on first server start and lives under `plugins/RTP/` on the Bukkit family (Paper, Spigot, Folia and their forks, Arclight, Mohist) or under `config/rtp/` on Fabric / NeoForge. Edit the files directly and run `/rtp reload` to apply changes without a server restart, or change an individual key at runtime with `/rtp config <file> <key>=<value>` (atomic write + auto-reload).
 
+> **Folder layout (ADR-076):** the everyday files (`config.yml`, `economy.yml`, `language.yml`, `safety.yml`) sit at the top level. The named definitions you author (`regions/`, `worlds/`, `effects/`, plus the shared `shape/` and `vert/` catalogs) live under `definitions/`. The rarely-hand-edited tuning and text files (`performance.yml`, `logging.yml`, `metrics.yml`, `network.yml`, `database.yml`, `biomes.yml`, `blocks.yml`, the `messages/` tree, and the `schematics/` folder) live under `advanced/`. The per-locale translation mirror stays at `lang/`. Each rename map is a co-located hidden dotfile (`.<name>.lang.yml`) beside the file it describes. On upgrade from an older layout, RTP relocates your authored files automatically and archives the old folders as `<name>.migrated`.
+
 > **Inheritance:** to avoid repeating the same value across many region/world files, a region/world setting can inherit a global default with an `@<file>` token (e.g. `@config`, `@economy`). See [CORE_CONFIG.md → Defaults (inheritance)](CORE_CONFIG.md#defaults-inheritance).
 
 > 📎 **How RTP loads, reloads, and upgrades these files** (including what the `.old1`/`.old2` files are, and how your customizations are preserved across version bumps and locale switches): see [CONFIG_LIFECYCLE.md](CONFIG_LIFECYCLE.md).
@@ -12,25 +14,27 @@ One jar covers every platform. Configuration is generated on first server start 
 
 | File | Purpose | Detailed Reference |
 |---|---|---|
-| `config.yml` | Core plugin settings (language, delays, database) | [CORE_CONFIG.md](CORE_CONFIG.md) |
-| `regions/*.yml` | Per-region teleport area, shape, queue settings | [REGIONS.md](REGIONS.md) |
-| `worlds/*.yml` | Per-world default region and permission settings | [WORLDS.md](WORLDS.md) |
-| `performance.yml` | Background task timing, cache behaviour, TPS thresholds | [PERFORMANCE.md](PERFORMANCE.md) |
+| `config.yml` | Core plugin settings (delays, database) | [CORE_CONFIG.md](CORE_CONFIG.md) |
 | `economy.yml` | Teleport costs and refund policy (requires Vault) | [ECONOMY.md](ECONOMY.md) |
 | `safety.yml` | Landing safety checks, invulnerability, biome filters | [SAFETY.md](SAFETY.md) |
-| `messages.yml` | All player-facing message strings | [MESSAGES.md](MESSAGES.md) |
-| `logging.yml` | Console logging verbosity | [LOGGING.md](LOGGING.md) |
 | `language.yml` | Locale selection (loaded before all other files) | [LANGUAGE.md](LANGUAGE.md) |
-| `integrations.yml` | Claim/region protection plugin reroll toggles | [INTEGRATIONS.md](INTEGRATIONS.md) |
-| `metrics.yml` | Runtime-health metrics SPI reporting knobs | [METRICS.md](METRICS.md) |
-| `network.yml` | Multi-server / multi-proxy network mode | [proxies/CONFIGURATION.md](../proxies/CONFIGURATION.md) |
-| `effects/*.yml` | Per-event teleport effects (sounds, particles, potions) | [EVENTS_AND_EFFECTS.md](EVENTS_AND_EFFECTS.md) |
+| `definitions/regions/*.yml` | Per-region teleport area, shape, queue settings | [REGIONS.md](REGIONS.md) |
+| `definitions/worlds/*.yml` | Per-world default region and permission settings | [WORLDS.md](WORLDS.md) |
+| `definitions/effects/*.yml` | Per-event teleport effects (sounds, particles, potions) | [EVENTS_AND_EFFECTS.md](EVENTS_AND_EFFECTS.md) |
+| `advanced/performance.yml` | Background task timing, cache behaviour, TPS thresholds | [PERFORMANCE.md](PERFORMANCE.md) |
+| `advanced/messages/*.yml` | All player-facing message strings (split by concern) | [MESSAGES.md](MESSAGES.md) |
+| `advanced/logging.yml` | Console logging verbosity | [LOGGING.md](LOGGING.md) |
+| `advanced/metrics.yml` | Runtime-health metrics SPI reporting knobs | [METRICS.md](METRICS.md) |
+| `advanced/network.yml` | Multi-server / multi-proxy network mode | [proxies/CONFIGURATION.md](../proxies/CONFIGURATION.md) |
+| `advanced/database.yml` | Database backend and connection settings | [CORE_CONFIG.md](CORE_CONFIG.md) |
+| `advanced/biomes.yml`, `advanced/blocks.yml` | Biome / block tag catalogs used by safety filters | [SAFETY.md](SAFETY.md) |
+| `advanced/schematics/` | Prefab schematic files (`.schem`), created when a prefab is installed | [EVENTS_AND_EFFECTS.md](EVENTS_AND_EFFECTS.md) |
 
 ---
 
-## `regions/<name>.yml` — Region Configuration
+## `definitions/regions/<name>.yml` — Region Configuration
 
-Each file in the `regions/` folder defines one teleport region. The filename (without `.yml`) is the region's name.
+Each file in the `definitions/regions/` folder defines one teleport region. The filename (without `.yml`) is the region's name.
 
 > 📎 **Detailed Reference:** See [REGIONS.md](REGIONS.md) for a full breakdown of every key and engine parameter in the region configuration.
 
@@ -162,9 +166,9 @@ vert:
 
 ---
 
-## `worlds/<name>.yml` — World Configuration
+## `definitions/worlds/<name>.yml` — World Configuration
 
-Each file in the `worlds/` folder maps a world to its default region and permission settings.
+Each file in the `definitions/worlds/` folder maps a world to its default region and permission settings.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -175,7 +179,7 @@ Each file in the `worlds/` folder maps a world to its default region and permiss
 
 ---
 
-## `performance.yml` — Performance Settings
+## `advanced/performance.yml` — Performance Settings
 
 | Key | Type | Default | Description                                                                           |
 |---|---|---|---------------------------------------------------------------------------------------|
@@ -238,15 +242,15 @@ Custom shapes can be registered at runtime via `rtp-api`. See [`addons/`](../../
 
 ---
 
-## `logging.yml` — Console Logging Verbosity
+## `advanced/logging.yml` — Console Logging Verbosity
 
 Enables or disables individual console-log categories and sets the plugin's minimum log level. See [LOGGING.md](LOGGING.md) for the complete category list and the `min_level` filter.
 
 ---
 
-## `messages.yml` — Message Customisation
+## `advanced/messages/*.yml` — Message Customisation
 
-All player-facing strings are defined here. Supports `&` colour codes, hex codes, MiniMessage tags, and PlaceholderAPI placeholders. Edit any value to localise or rebrand messages. See [MESSAGES.md](MESSAGES.md) for the formatting rules, the `[Pn]` placeholder system, and the section-by-section layout.
+All player-facing strings are defined under `advanced/messages/`, split by concern into `commands.yml`, `player.yml`, `system.yml`, `network.yml`, and `placeholders.yml`. Supports `&` colour codes, hex codes, MiniMessage tags, and PlaceholderAPI placeholders. Edit any value to localise or rebrand messages. See [MESSAGES.md](MESSAGES.md) for the formatting rules, the `[Pn]` placeholder system, and the section-by-section layout.
 
 ---
 

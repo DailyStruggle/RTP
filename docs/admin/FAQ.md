@@ -128,7 +128,7 @@ This is the most common first-run confusion. RTP ships with a single region (`de
 
 Here's the full setup for a nether region:
 
-**Step 1 — Create the region file** `plugins/RTP/regions/nether.yml`:
+**Step 1 — Create the region file** `plugins/RTP/definitions/regions/nether.yml`:
 ```yaml
 world: "world_nether"
 cacheCap: 10
@@ -144,7 +144,7 @@ vert:
   requireSkyLight: false
 ```
 
-**Step 2 — Map the nether world to that region** in `plugins/RTP/worlds/world_nether.yml`:
+**Step 2 — Map the nether world to that region** in `plugins/RTP/definitions/worlds/world_nether.yml`:
 ```yaml
 region: "nether"
 ```
@@ -157,7 +157,7 @@ Now players who run `/rtp` while standing in the nether will land in the nether.
 
 ### Can I have different regions for different worlds?
 
-Yes. Create a file in `plugins/RTP/worlds/<worldName>.yml` and set:
+Yes. Create a file in `plugins/RTP/definitions/worlds/<worldName>.yml` and set:
 
 ```yaml
 region: "myRegionName"

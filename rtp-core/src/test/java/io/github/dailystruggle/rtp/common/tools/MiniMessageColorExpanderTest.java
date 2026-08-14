@@ -76,6 +76,53 @@ class MiniMessageColorExpanderTest {
   }
 
   @Test
+  void nestedRainbowHexMarkerNotLeakedByOuterGradient() {
+    // Regression (NeoForge/Fabric): the P0 prefix "<rainbow>[RTP]</rainbow>"
+    // wrapped in an outer <gradient> (messages.yml teleportMessage) must not
+    // leak the nested rainbow's legacy hex marker ("\u00a7x") as a literal 'x'
+    // glyph. Before the fix the outer gradient injected its own color into the
+    // middle of each nested "\u00a7x\u00a7r\u00a7r..." marker, so the client
+    // rendered a stray 'x' before "[RTP]".
+    String msg = "<gradient:#5FB3B3:#9D7CD8><rainbow>[RTP]</rainbow> Teleported</gradient>";
+    String out = MiniMessageColorExpander.expand(msg);
+
+    StringBuilder visible = new StringBuilder();
+    char[] chars = out.toCharArray();
+    int i = 0;
+    while (i < chars.length) {
+      if (chars[i] == '\u00a7' && i + 1 < chars.length) { i += 2; continue; }
+      visible.append(chars[i]);
+      i++;
+    }
+    assertEquals("[RTP] Teleported", visible.toString(),
+        "no stray glyphs should leak from the nested rainbow hex markers: " + out);
+  }
+
+  @Test
+  void gradientLastCharacterGetsEndColorNotStart() {
+    // Regression: a plain (phase-less) gradient must colour its LAST visible
+    // character with the END stop, not wrap it back to the START stop. The
+    // per-character position t reaches exactly 1.0 for the final glyph, and
+    // "t % 1f" used to map that endpoint back to 0.0, so e.g. the trailing
+    // "s" of "38ms" in the default teleportMessage rendered in the gradient's
+    // start colour instead of its end colour.
+    String out = MiniMessageColorExpander.expand("<gradient:#5fb3b3:#9d7cd8>abc</gradient>");
+    // The last coloured run must be the end stop 9d7cd8, never the start 5fb3b3.
+    int lastMarker = out.lastIndexOf("\u00a7x");
+    assertTrue(lastMarker >= 0, "expected a legacy hex marker: " + out);
+    String tail = out.substring(lastMarker);
+    // Reconstruct the 6 hex digits of the final marker.
+    StringBuilder hex = new StringBuilder();
+    for (int i = 0; i < tail.length() && hex.length() < 6; i++) {
+      char c = tail.charAt(i);
+      boolean isHex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+      if (isHex) hex.append(c);
+    }
+    assertEquals("9d7cd8", hex.toString(),
+        "final gradient glyph must use the end stop, not the start: " + out);
+  }
+
+  @Test
   void nullAndEmptyAreSafe() {
     assertEquals(null, MiniMessageColorExpander.expand(null));
     assertEquals("", MiniMessageColorExpander.expand(""));

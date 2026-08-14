@@ -57,7 +57,7 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
         throw new IllegalArgumentException("All values must be filled out on shape instantiation");
     }
     try {
-      loadLangFile("shape");
+      loadLangFile("definitions/shape");
     } catch (IOException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
     }

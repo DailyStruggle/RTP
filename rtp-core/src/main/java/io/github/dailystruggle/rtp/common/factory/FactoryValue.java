@@ -355,12 +355,14 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     if (!name.endsWith(".yml")) name = name + ".yml";
     File langFile;
     if (RTP.serverAccessor == null) return;
+    // ADR-076: the shared catalog rename map is a co-located dotfile sibling under the
+    // catalog directory itself (e.g. definitions/shape/.CIRCLE.lang.yml), not
+    // lang/<subDir>/<name>.lang.yml.
+    String subPart = subDir.replace('/', File.separatorChar);
     String langDirStr =
         RTP.serverAccessor.getPluginDirectory().getAbsolutePath()
             + File.separator
-            + "lang"
-            + File.separator
-            + subDir;
+            + subPart;
     File langDir = new File(langDirStr);
     if (!langDir.exists()) {
       boolean mkdir = langDir.mkdirs();
@@ -371,13 +373,13 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       }
     }
 
-    String mapFileName = langDir + File.separator + name.replace(".yml", ".lang.yml");
+    String mapFileName = langDir + File.separator + "." + name.replace(".yml", ".lang.yml");
     langFile = new File(mapFileName);
 
     RtpYamlConfig langYaml = new RtpYamlConfig(langFile);
     if (!langFile.exists()) {
       try {
-        java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream("lang/" + subDir + "/" + langFile.getName());
+        java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream(subDir + "/" + langFile.getName());
         if (in != null) {
           java.io.FileOutputStream out = new java.io.FileOutputStream(langFile);
           byte[] buf = new byte[1024];

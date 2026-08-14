@@ -1,0 +1,116 @@
+# --- Configurazione di sicurezza di RTP ---
+# Documentazione: plugins/RTP/docs/admin/configuration/SAFETY.md
+
+# Secondi di invulnerabilità concessi dopo il completamento di un teletrasporto.
+# 0 disattiva la finestra di invulnerabilità post-teletrasporto.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 5
+tempoInvulnerabilita: 5
+
+# Raggio in blocchi attorno al punto di atterraggio scansionato per pericoli.
+# 0 controlla solo il blocco di atterraggio + la verticale immediata.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 0
+raggioSicurezza: 0
+
+# Raggio della piattaforma di atterraggio di emergenza costruita alla destinazione.
+# -1 disattiva del tutto la piattaforma.
+# @type: integer
+# @range: [-1, null]
+# @unit: blocks
+# @default: -1
+raggioPiattaforma: -1
+
+# Profondità (spessore verticale) della piattaforma di emergenza.
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
+profonditaPiattaforma: 1
+
+# Altezza dello spazio d'aria liberato sopra la piattaforma di emergenza.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+altezzaAriaPiattaforma: 2
+
+# Materiale usato per la piattaforma di atterraggio di emergenza.
+# @type: material
+# @source: material
+# @default: GLASS
+materialePiattaforma: "GLASS"
+
+# Secondi dopo i quali l'impronta della piattaforma viene ripristinata ai blocchi
+# originali. -1 = mai (permanente), 0 = appena il chunk si ricarica. Il conto alla
+# rovescia avanza solo mentre il chunk è caricato; sopravvive ai riavvii.
+# @type: integer
+# @range: [-1, null]
+# @unit: seconds
+# @default: -1
+platformRestoreSeconds: -1
+
+# --- Optional PvP / combat-tag pre-flight gate ---
+# Interruttore principale. Se true, /rtp controlla lo stato di combattimento e
+# applica pvpOnCombat (sotto) prima di accodare e prima di teletrasportare.
+# @type: boolean
+# @default: false
+pvpCheckEnabled: false
+
+# Secondi in cui un giocatore resta "in combattimento" dopo danni PvP (solo il
+# tracker nativo; ignorato se è collegato un plugin di combat-tag esterno).
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 15"
+pvpCombatTagSeconds: 15
+
+# What to do when a combat-tagged player requests (or is mid-)/rtp.
+# ALLOW  - permit, but log an audit line
+# DENY   - refuse the command with the busy message
+# DELAY  - postpone until the combat tag expires, then proceed
+# CANCEL - abort an in-progress / queued teleport
+# Unknown values fail safe to DENY.
+# @type: enum
+# @options: [ALLOW, DENY, DELAY, CANCEL]
+# @default: DENY
+pvpOnCombat: "DENY"
+
+# Combat-state source preference.
+# AUTO     - external combat-tag plugin if one is bound, else native tracker
+# NATIVE   - always use RTP's native damage tracker
+# EXTERNAL - only a bound combat-tag plugin (no native fallback)
+# @type: enum
+# @options: [AUTO, NATIVE, EXTERNAL]
+# @default: AUTO
+pvpSource: "AUTO"
+
+# Native tracker: tag a player who TAKES PvP damage.
+# @type: boolean
+# @default: true
+pvpTagVictim: true
+
+# Native tracker: tag a player who DEALS PvP damage.
+# @type: boolean
+# @default: true
+pvpTagAggressor: true
+
+# Numero massimo di tentativi per la guardia dei chunk obsoleti prima di far fallire il tentativo.
+# Vedi
+# @type: integer
+# @range: [0, null]
+# @default: 2
+limiteRipetizioniChunkObsoleti: 2
+
+# Usa il prefiltro NBT anvil fuori dal thread per rifiutare i candidati senza
+# caricare i loro chunk. Vedi
+# @type: boolean
+# @default: true
+prefiltroAnvilAttivo: true
+
+# NON MODIFICARE IL NUMERO DI VERSIONE
+versione: 1.0

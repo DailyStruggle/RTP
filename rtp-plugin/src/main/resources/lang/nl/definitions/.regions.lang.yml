@@ -1,0 +1,16 @@
+# --- Taalkaart: regions/*.yml ---
+# Koppelt interne regiosleutels (links) aan de zichtbare namen in regions/-bestanden (rechts).
+# Wijzig alleen de rechterkant; de linkerkant is een codeconstante.
+# Als dit bestand ontbreekt, genereert de plugin het opnieuw met identieke paren.
+world: "wereld"
+worldBorderOverride: "wereldgrensOverschrijving"
+shape: "vorm"
+vert: "verticaal"
+requirePermission: "toestemmingVereist"
+cacheCap: "cacheLimiet"
+backlogCacheCap: "achterstandCacheLimiet"
+activeChunkCap: "actiefChunkLimiet"
+price: "prijs"
+spatialResolution: "ruimtelijkeResolutie"
+override: "overschrijven"
+version: "version"

@@ -1,0 +1,377 @@
+# --- RTP のメッセージ (この言語) ---
+# この言語でのプレイヤーおよび運営者向けメッセージ文。テーマごとに分類されています。
+# 英語版メッセージから自動生成された複製です。手動で編集しないでください (上書きされます)。
+
+# ###############################################################################
+# セクション 6: スキャンコマンド
+# ###############################################################################
+スキャン開始: "&a[P0] 以下のリージョンでスキャンタスクを開始しました: [scan_regions]"
+スキャンリセット: "&7[P0] 以下のリージョンのスキャンキューをリセットしました: [scan_regions]"
+スキャン取消: "&7[P0] 以下のリージョンのスキャンタスクを取り消しました: [scan_regions]"
+スキャン一時停止: "#A020F0[P0] 以下のリージョンのスキャンタスクを一時停止しました: [scan_regions]"
+スキャン再開: "#10A5F5[P0] 以下のリージョンのスキャンタスクを再開しました: [scan_regions]"
+スキャン実行中: "&c[P0] 以下のリージョンでは既にスキャンタスクが実行中です: [scan_regions]"
+スキャン未実行: "&c[P0] 以下のリージョンには現在スキャンタスクがありません: [scan_regions]"
+# placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+スキャン状況: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 陸地 &8| &7ETA #7E9CC8[scan_eta]"
+# Boss-bar title shown to players with rtp.scan permission while a world scan is running.
+# Set to empty string to disable the boss-bar.
+# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+scanBossBar: "Scanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
+
+# ###############################################################################
+# セクション 7: 情報コマンド
+# ###############################################################################
+情報タイトル: "&2&l/rtp info"
+情報_チケット: "&7グローバルアクティブチャンクチケット: #7E9CC8[tickets]"
+情報_テレポート: "&7アクティブテレポートステートマシン: #7E9CC8[teleports]"
+情報_MSPT: "&7プラグイン現在の MSPT: #7E9CC8[mspt]"
+情報_総ロード数: "&7累計ロードチャンク数: #7E9CC8[loads]"
+infoLoadsByOrigin: "&7発生源別の読み込み: #7E9CC8[loadsByOrigin]"
+情報_リーク率: "&7現在のチャンクリーク率: #7E9CC8[leakRate]"
+# --- Health metrics block ---
+infoQueueDepth: "&7リージョンキューで待機中のプレイヤー: #7E9CC8[queueDepth]"
+infoPendingTeleports: "&7保留中のテレポートパイプライン: #7E9CC8[pendingTeleports]"
+infoAvgPipelineMs: "&7パイプライン平均遅延: #7E9CC8[avgPipelineMs] ms"
+# Pipeline-latency percentiles. Placeholders: [pipelineMsP50] [pipelineMsP75]
+# [pipelineMsP90] [pipelineMsP95] [pipelineMsP99] [pipelineSampleCount].
+infoPipelinePercentiles: "&7パイプライン遅延 (ms) P50/P75/P90/P95/P99: #7E9CC8[pipelineMsP50] / [pipelineMsP75] / [pipelineMsP90] / [pipelineMsP95] / [pipelineMsP99]&7 (n=[pipelineSampleCount])"
+# Slow-teleport audit (immediate/unqueued teleports only). Placeholders:
+# [slowPipelineCount] [slowPipelineThresholdMs].
+infoSlowPipeline: "&7遅いテレポート (> #7E9CC8[slowPipelineThresholdMs]&7 ms): #7E9CC8[slowPipelineCount]"
+# Queue-growth audit. Placeholders: [queueGrowthWarnCount] [queueGrowthWarnThreshold].
+infoQueueGrowth: "&7キュー増加の警告 (>= #7E9CC8[queueGrowthWarnThreshold]&7): #7E9CC8[queueGrowthWarnCount]"
+infoHeap: "&7JVMヒープ: #7E9CC8[heapUsedMb] / [heapMaxMb] MiB"
+# /rtp info の Health pipeline ラベルブロックのヘッダー行。
+infoHealthPipelineHeader: "&7--- 状態: パイプライン ---"
+# 1m / 5m / 15m ウィンドウの TPS 表示。プレースホルダー: [tps1m] [tps5m] [tps15m]。
+infoTps: "&7TPS (1m/5m/15m): #7E9CC8[tps1m] / [tps5m] / [tps15m]"
+# サーバーのリアルタイム MSPT と tick バジェット使用率。プレースホルダー: [mspt] [tickBudgetUtilisation]。
+infoMSPTLive: "&7サーバーMSPT: #7E9CC8[mspt] ms (&7ティック予算: #7E9CC8[tickBudgetUtilisation]&7)"
+# Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
+infoSoftCap: "&7プレイヤー: #7E9CC8[playerCount] / [softCap]"
+# データベースの最新ラウンドトリップレイテンシ（ms）。プレースホルダー: [databaseLatencyMs]。
+infoDatabaseLatencyMs: "&7データベース遅延: #7E9CC8[databaseLatencyMs] ms"
+# Generation outcome metrics.
+# Success/failure rate over all recorded generation attempts. Placeholders:
+# [genSuccessRate] [genFailureRate] [genOutcomeTotal].
+infoFailureRate: "&7生成成功率: #7E9CC8[genSuccessRate]&7 (失敗 #7E9CC8[genFailureRate]&7, n=#7E9CC8[genOutcomeTotal]&7)"
+# Single most common rejection cause and its share of all failures. Placeholders:
+# [genTopRejectionCause] [genTopRejectionShare].
+infoTopRejectionCause: "&7主な拒否理由: #7E9CC8[genTopRejectionCause]&7 (#7E9CC8[genTopRejectionShare]&7)"
+# Per-cause rejection breakdown.
+# Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
+infoFailureBreakdown: "&7理由別の拒否: #7E9CC8[genFailureBreakdown]"
+# Health colour-band thresholds. Used to colour the coloured-variant
+# placeholders (e.g. [tps1mColoured]) green/yellow/red.
+infoThresholdTpsGreen: 19.5
+infoThresholdTpsYellow: 18.0
+infoThresholdMsptGreen: 30.0
+infoThresholdMsptYellow: 45.0
+infoThresholdCacheFillGreen: 0.5
+infoThresholdCacheFillYellow: 0.25
+infoThresholdNetworkAgeYellow: 5.0
+# Header line introducing the per-Folia-region table (Folia runtime only).
+infoFoliaRegionsHeader: "&7--- Foliaリージョン ---"
+# Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
+# [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
+infoFoliaRegion: "#7E9CC8[regionId]&7: tps=#7E9CC8[tps1m]&7 mspt=#7E9CC8[mspt]&7 players=#7E9CC8[playerCount]&7 queue=#7E9CC8[queueDepth]&7 budget=#7E9CC8[tickBudgetUtilisation]"
+情報_免責_ヘッダ: "&7--- 診断ノート ---"
+情報_免責: "&7診断ノート: サーバーの孤立チャンク総数が本プラグインの累計ロード数 ([loads]) を超える場合、本プラグインがメモリリークの唯一の原因ではありません。"
+情報_ワールドヘッダ: "#008080ワールド:"
+情報_コンソール_ワールドヘッダ: "&7--- ワールド ---"
+情報ワールド: "#21ADA8[world]"
+情報_リージョンヘッダ: "#63C5DAリージョン:"
+情報_コンソール_リージョンヘッダ: "&7--- リージョン ---"
+情報リージョン: "#52B2BF[region]"
+# Biome-occupancy leaderboard shown by /rtp info biomes - which biomes online
+# players spend their time in, sampled over the server's uptime.
+# Header placeholders: [biomeTotalSamples] [biomeDistinctCount].
+infoBiomeActivityHeader: "&8--- &3バイオーム占有 &8(&3[biomeTotalSamples]&8 サンプル, &3[biomeDistinctCount]&8 バイオーム) ---"
+# Per-biome row. Placeholders: [biomeRank] [biomeName] [biomeSamples] [biomePercent] [biomeBar].
+infoBiomeActivityRow: "&8 [biomeRank]. &3[biomeName] &8[biomeBar] &7[biomePercent]% &8([biomeSamples])"
+# Shown when no occupancy has been sampled yet.
+infoBiomeActivityEmpty: "&8--- &7まだバイオーム占有がサンプリングされていません &8---"
+
+# sub-info listings
+# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
+ワールド情報:
+  - "#21ADA8[world]:"
+  - "#99EEBB  - リージョン: [region]"
+  - "#99EEBB  - 必要な権限: [requirePermission]"
+  - "#99EEBB  - 上書き: [override]"
+
+リージョン情報:
+  - "#52B2BF[region]:"
+  - "#58CCED  - ワールド: [world]"
+  - "#58CCED  - 形状: [shape]"
+  - "#58CCED  - 必要な権限: [requirePermission]"
+  - "#58CCED  - ワールドボーダーの上書き: [worldBorderOverride]"
+  - "#58CCED  - キャッシュ上限: [cacheCap]"
+  - "#58CCED  - 保持キャッシュ (L1): [keptCache]"
+  - "#58CCED  - 解放キャッシュ (L2): [unkeptCache]"
+  - "#58CCED  - バックログキャッシュ (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - キャッシュ済み: [cached]"
+  - "#58CCED  - 学習済みカバレッジ: [memCoveragePct] (不良: [memBadPct], [memBadCount] セル)"
+  - "#58CCED  - 主な拒否理由: [memTopCause] ([memTopCausePct])"
+
+# ###############################################################################
+# Section 8b: Generalized Menu Framework
+# ###############################################################################
+# Sent when a menu token is unknown, malformed, or belongs to another player.
+menuInvalid: "&c[P0] that menu link is invalid."
+# メニューの引き換え時に呼び出し元プレイヤーの UUID を解決できなかった場合に送信されます。
+menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
+# Hover-fallback template used by the menu reflector when no YAML block-comment
+# is available for a parameter. Placeholder: [type] - the declared parameter type.
+menuHoverFallbackType: "種類: [type]"
+# Hover-fallback template used by the menu reflector when a parameter exposes a
+# small curated value set. Placeholder: [values] - comma-joined accepted values.
+menuHoverFallbackBounds: "受理: [values]"
+# Label for the "go back one level" navigation row prepended to every non-root menu page.
+menuBack: "&7« 戻る"
+# Label template for the "execute the assembled command" row prepended to every
+# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
+menuExecute: "&2▶ [command] を実行"
+# Header row at the top of a parameter-value picker sub-page.
+# Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
+menuPickValue: "&7[param] の値を選択 (実行: /rtp [command] [param]:<value>)"
+# Label for the "type a custom value" fallback row on a parameter-value picker page.
+# Clicking it prefills chat with the assembled command up to '<param>:' so the player
+# can type any value, including ones not in the suggestion list.
+menuTypeValue: "&7✎ カスタム値を入力..."
+# Non-clickable header row at the top of every non-root menu page.
+# Surfaces the currently-constructed /rtp invocation including any staged
+# parameter assignments (name:value). Placeholder: [command] - assembled args.
+menuConstructed: "&7作成中: #7E9CC8/rtp [command]"
+# Non-clickable title row prepended to the root /rtp menu page.
+# Provides a welcoming header before the player descends into any subcommand.
+menuRootTitle: "#5FB3B3&l⚡ RTPメニュー"
+# Non-clickable subtitle/hint row prepended to the root /rtp menu page below
+# menuRootTitle. Short orientation text for first-time users.
+menuRootHint: "&7下のオプションをクリックして開始"
+# Navigation rows appended to paginated menu pages — clicking
+# them moves to the previous/next page of the same model. Placeholder:
+# [page] - the 1-based human-readable target page number.
+menuPagePrev: "&7« 前のページ ([page])"
+menuPageNext: "&7次のページ ([page]) »"
+# Section divider on the front page above teleport rows (player view).
+menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
+# Front-page rows. No placeholders.
+menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
+menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- ワールドを選択"
+menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- バイオームを選択"
+menuFrontPageRowHelp: "#7A4FB8❓ コマンド一覧 &7- /rtp help"
+# Front-page admin entry row: the only inline admin-visible row on the
+# front page; click descends into the admin panel. Hidden when the viewer
+# lacks rtp.menu.admin.
+menuFrontPageRowAdmin: "#9D7CD8▶ 管理パネル &7- 運営者ツール"
+# Hover text for the admin-panel entry row. No placeholders.
+menuFrontPageHoverAdmin: "&7運営者ツール: 設定, スキャン, 診断, リロード"
+# --- Admin panel book page ---
+# Non-clickable title row at the top of the admin panel. No placeholders.
+menuAdminPanelTitle: "#5FB3B3&l⚙ admin panel"
+# Non-clickable hint row below menuAdminPanelTitle. No placeholders.
+menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
+# Section dividers on the admin panel. No placeholders.
+menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
+menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
+menuAdminPanelSectionLifecycle: "&8--- &7lifecycle &8---"
+menuAdminPanelSectionBrowse: "&8--- &7browse &8---"
+# Admin-panel rows + hovers. No placeholders.
+menuAdminPanelRowConfig: "&b▶ config editor"
+menuAdminPanelHoverConfig: "&7厳選された設定セレクターを開く"
+menuAdminPanelRowRegions: "#5FB3B3▶ リージョン"
+menuAdminPanelHoverRegions: "&7リージョンごとの設定を追加・削除・編集"
+menuAdminPanelRowWorlds: "#5FB3B3▶ ワールド"
+menuAdminPanelHoverWorlds: "&7ワールドごとの設定を追加・削除・編集"
+menuAdminPanelRowEffects: "#5FB3B3▶ エフェクト"
+menuAdminPanelHoverEffects: "&7グループごとのテレポートエフェクトを追加・削除・編集"
+menuAdminPanelRowInfo: "&b▶ server info"
+menuAdminPanelHoverInfo: "&7プラグインのバージョン, リージョン数, キュー状態を表示"
+menuAdminPanelRowDiagnostics: "&c▶ 完全診断"
+menuAdminPanelHoverDiagnostics: "&7完全な診断スイートを実行します。負荷が高い場合があります"
+menuAdminPanelRowMemory: "&b▶ memory tracker snapshot"
+menuAdminPanelHoverMemory: "&7アクティブなチャンクチケットとパイプラインの割り当てをダンプ"
+menuAdminPanelRowScan: "&b▶ scan control"
+menuAdminPanelHoverScan: "&7スキャンサブメニューを開く (開始 / 一時停止 / キャンセル)"
+menuAdminPanelRowReload: "&c▶ リロード"
+menuAdminPanelHoverReload: "&7すべての設定ファイルをリロードします。進行中のテレポートに影響する場合があります"
+menuAdminPanelRowBrowse: "&b▶ browse all commands"
+menuAdminPanelHoverBrowse: "&7反映された /rtp コマンドツリーを開く"
+menuAdminPanelRowBack: "&7« 戻る"
+# --- Visualizations submenu (admin map of bad locations per region) ---
+# Admin-panel row: open the Visualizations submenu. No placeholders.
+menuAdminPanelRowVisualizations: "#5FB3B3▶ 可視化"
+# Hover text for the admin-panel Visualizations row. No placeholders.
+menuAdminPanelHoverVisualizations: "&7マップやその他の運営者向け可視化を開く"
+# Section divider above the Visualizations block on the admin panel.
+menuAdminPanelSectionVisualizations: "&8» &7可視化"
+# Non-clickable title row at the top of the Visualizations submenu.
+menuVisualizationsTitle: "#9D7CD8&l⌖ 可視化"
+# Non-clickable hint row below the title.
+menuVisualizationsHint: "&7リージョンを選んで不適切な位置のマップを表示"
+# Visualizations row template; [region] - region name.
+menuVisualizationsRowRegion: "#5FB3B3▶ [region] &7- リージョン形状マップ"
+# Hover text for a Visualizations region row; [region] - region name.
+menuVisualizationsHoverRegion: "&7&b[region] 内の不適切な位置を示すマップを開く"
+# Non-clickable hint row shown when no regions are configured.
+menuVisualizationsEmpty: "&7(設定済みのリージョンがありません)"
+# Visualizations submenu back row (returns to the admin panel).
+menuVisualizationsRowBack: "&7« 戻る"
+# --- Admin panel Setup section: curated prefabs ---
+# Section divider above the Setup (quick start) block on the admin panel.
+menuAdminPanelSectionSetup: "&8» &7セットアップ (クイックスタート)"
+# Setup row + hover: survival-default identity overlay (reset to shipped defaults).
+menuPrefabSurvivalDefaultRow: "#5FB3B3▶ survival-default"
+menuPrefabSurvivalDefaultHover: "&7出荷時の既定値にリセット (恒等オーバーレイ)"
+# Setup row + hover: low-performance (longer pulse, smaller caches, login cache off).
+menuPrefabLowPerformanceRow: "#5FB3B3▶ low-performance"
+menuPrefabLowPerformanceHover: "&7低スペックホスト / 共有CPUのVPS: 長いパルス, 小さいキャッシュ, ログインキャッシュ無効"
+# Setup row + hover: high-performance (short pulse, large caches, login cache on).
+menuPrefabHighPerformanceRow: "#5FB3B3▶ high-performance"
+menuPrefabHighPerformanceHover: "&7専用ハードウェア / 大人数: 短いパルス, 大きいキャッシュ, ログインキャッシュ有効"
+# Setup row + hover: folia-tuned (regional scheduler tuning).
+menuPrefabFoliaTunedRow: "#5FB3B3▶ folia-tuned"
+menuPrefabFoliaTunedHover: "&7foliaリージョンスケジューラ: リージョンごとに高速なパルス, 同時チャンクチケットを削減"
+# Setup row + hover: multi-world (one region per world from current default).
+menuPrefabMultiWorldRow: "#5FB3B3▶ multi-world"
+menuPrefabMultiWorldHover: "&7現在の既定からワールドごとに1つのリージョンを合成"
+# Confirmation menu title. Placeholder: [prefab] - prefab id or display name.
+menuPrefabConfirmTitle: "#9D7CD8&l⚙ プリセットを確認: #5FB3B3[prefab]"
+# Confirmation menu non-clickable hint row below the title. No placeholders.
+menuPrefabConfirmHint: "&7下の変更を確認してから, 確認またはキャンセルをクリック"
+# Confirmation menu footer row: confirm and write the prefab to disk.
+menuPrefabConfirmRow: "&2&l[confirm]"
+# Confirmation menu footer row: cancel and return to the admin panel.
+menuPrefabCancelRow: "&c&l[cancel]"
+# Clickable row label for the Refresh affordance at the bottom of the /rtp info
+# book. Re-renders the current scope against a fresh metrics snapshot.
+infoBookRefreshRow: "&2[Refresh]"
+# Hover text for the info-book refresh row.
+infoBookRefreshHover: "&7このページを最新のメトリクススナップショットで再描画します。"
+# Clickable row label for the Switch-to-chat affordance at the bottom of the
+# /rtp info book. Re-runs the same scope through the legacy chat path.
+infoBookSwitchToTextRow: "&7[Switch to chat]"
+# Hover text for the info-book switch-to-chat row.
+infoBookSwitchToTextHover: "&7本の代わりにチャットで /rtp info を再実行します。"
+# Footer row rendered when the /rtp info book content exceeds the book page
+# cap. Clicking re-runs the same scope in chat mode so no data is lost.
+infoBookOverflowFooter: "&7(内容が切り詰められました - クリックで完全な出力をチャットに表示)"
+# Non-clickable note row indicating that periodic auto-refresh for the info
+# book is not currently supported on this build (deferred to a later
+# milestone). Users may click the Refresh row to refresh manually.
+infoBookAutoRefreshDeferredNote: "&8(自動更新は未対応です。更新をクリックしてください)"
+# Non-clickable title row at the top of the config-file selector page.
+# Shown when an admin clicks "/rtp config" from the front page.
+configSelectorTitle: "#5FB3B3&l⚙ 設定ファイル"
+# Label for the "back to /rtp menu root" navigation row on the config selector page.
+configSelectorBackRow: "&7« メニューに戻る"
+# Non-clickable title row at the top of a single config-file page.
+# Placeholder: [file] - the config file name (e.g. "performance", "safety").
+configFileTitle: "#5FB3B3&l⚙ config: &7[file]"
+# Label for the "back to config selector" navigation row on a single config-file page.
+configFileBackRow: "&7« 設定ファイルに戻る"
+# Non-clickable hint row shown when a config file has no editable keys.
+configFileEmptyHint: "&7(このファイルに編集可能なキーはありません)"
+# Per-key row label on a config-file page. Placeholders:
+#   [key]   - the config key name; [value] - the currently-stored value.
+configKeyRowFormat: "&7[key]&7: #7E9CC8[value]"
+# Hover text for a per-key row on a config-file page. Placeholders:
+#   [key], [value], [type] - the config key name, current value, and declared type.
+configKeyHoverFormat: "&7click to edit &7[key] &7(type: [type])"
+# Non-clickable title row at the top of a shape/vert type-picker page.
+# Placeholders: [param] - "shape" or "vert"; [current] - currently-active type name.
+configTypePickerTitle: "#5FB3B3&l⚙ pick [param] type &7(current: &7[current]&7)"
+# Non-clickable title row at the top of a shape/vert sub-parameter page.
+# Placeholders: [param] - "shape" or "vert"; [type] - the active type name.
+configSubParamPageTitle: "#5FB3B3&l⚙ [param] &7- &7[type] &7sub-parameters"
+# Hint sent when the book view falls back to the legacy raw-YAML chat dump
+# (no book renderer available on this platform).
+configViewRawHint: "&7[P0] 本表示は利用できません。生のダンプにフォールバックします。"
+# Placeholder text rendered in place of a config value that has not been set.
+configValueUnsetPlaceholder: "&8(未設定)"
+# Non-clickable header row separating the "Changeable" list from the "Pending"
+# staging-cart list on a config-file page when the viewer has staged one or
+# more uncommitted edits. No placeholders.
+configPendingHeader: "&6&l-- pending changes --"
+# Per-row label for a staged (pending) key=value entry on a config-file page.
+# Clicking the row removes it from the cart. Placeholders: [key], [value].
+configPendingRowFormat: "&9[key]&8 = &0[value]"
+# Hover text shown when the viewer hovers a pending (staged) row on a
+# config-file page. No placeholders.
+configPendingRowHover: "クリックで取り消し"
+# Clickable label for the "apply staged changes" row on a config-file page.
+# Runs the assembled /rtp config <file> k1=v1 ... command and clears the cart.
+configApplyRow: "&2&l[apply]"
+# Clickable label for the "discard staged changes" row on a config-file page.
+# Clears the cart without applying.
+configDiscardRow: "&c&l[discard]"
+
+# --- Map / chart rendering ---
+# Sent when a map row is clicked but map rendering is not available on this
+# server (e.g. the Lite assembly, or no map provider installed).
+mapBindingMissing: "&c[P0] このサーバーではマップ描画を利用できません。"
+# Sent when a chart is requested but no renderer is registered for that
+# chart type.
+mapResolverMissing: "&c[P0] この要求に登録されたチャートリゾルバがありません。"
+# Sent when a resolver runs but the underlying data source is unavailable
+# for the requested target (unknown region, no data yet, world unloaded).
+# Placeholder: [region] - the requested region name (may be empty).
+mapUnavailable: "&e[P1] 現在チャートデータを利用できません。"
+# Sent when the map service cannot allocate a map right now (e.g. a
+# per-viewer cap has been reached).
+mapBusy: "&e[P1] マップサービスがビジーです。しばらくしてからもう一度お試しください。"
+# Label for the clickable "/rtp info" menu row that renders a heatmap of
+# the current region's known bad locations. Hidden when map rendering is
+# not available on this server.
+menuInfoBadPointsLabel: "#9D7CD8&l# 不適切な位置のマップ"
+
+# --- MultiConfig submenu ---
+# Header row fallback used when no per-kind header key is registered.
+# Placeholder: [parserKind] - the raw multi-config kind name.
+multiconfigHeaderDefault: "#5FB3B3&l[parserKind]"
+# Header row label for the regions multi-config selector page. No placeholders.
+multiconfigHeaderRegions: "#5FB3B3&l リージョン"
+# Header row label for the worlds multi-config selector page. No placeholders.
+multiconfigHeaderWorlds: "#5FB3B3&l ワールド"
+# Toggle-row label when remove-mode is OFF. No placeholders.
+multiconfigToggleRemoveModeOff: "&8[ ] 削除モード"
+# Toggle-row label when remove-mode is ON. Clicks on entry rows delete.
+multiconfigToggleRemoveModeOn: "&c[x] 削除モード (項目をクリックで削除)"
+# Selector row label for the "+ Add new..." entry. No placeholders.
+multiconfigRowAdd: "&2+ 新規追加..."
+# Hover text for the Add row. Placeholder: [name] - prefilled default name.
+multiconfigRowAddHover: "&7金床のプロンプトに名前を入力。事前入力: &f[name]"
+# Hover text for an entry row in normal mode. Placeholder: [name].
+multiconfigRowEditHover: "&7&f[name] を編集"
+# Hover text for an entry row in remove-mode. Placeholder: [name].
+multiconfigRowRemoveHover: "&c&f[name] を削除"
+# Confirm-delete page title row. Placeholder: [name].
+multiconfigConfirmTitle: "&c&l[name] を削除しますか？"
+# Confirm-delete page Yes-row label. No placeholders.
+multiconfigConfirmYes: "&c&l[confirm delete]"
+# Confirm-delete page Cancel-row label. No placeholders.
+multiconfigConfirmNo: "&2&l[cancel]"
+# Hover text on a locked (grayed) default-region row. No placeholders.
+multiconfigLockRegionDefault: "&7既定のリージョンは削除できません"
+# Hover text on a locked (grayed) world row. Placeholder: [name].
+multiconfigLockWorldLoaded: "&7ワールド '[name]' はサーバーに読み込まれています。設定を削除する前にアンロードしてください"
+# Result message after a successful ADD. Placeholder: [name].
+multiconfigResultAdded: "&a'[name]' を追加しました。"
+# Result message after a successful REMOVE. Placeholder: [name].
+multiconfigResultRemoved: "&a'[name]' を削除しました。"
+# Result message when ADD failed. Placeholders: [name], [reason].
+multiconfigResultAddFailed: "&c'[name]' を追加できませんでした: [reason]"
+# Result message when REMOVE failed. Placeholders: [name], [reason].
+multiconfigResultRemoveFailed: "&c'[name]' を削除できませんでした: [reason]"
+# Result message when the proposed entry name is rejected by the sanitiser.
+# Placeholder: [name].
+multiconfigResultNameInvalid: "&c名前 '[name]' は使用できません。文字, 数字, '_', '-', '.' を使用してください"
+# Result message when an ADD collides with an existing entry name.
+# Placeholder: [name].
+multiconfigResultNameTaken: "&c'[name]' という名前の項目は既に存在します。"
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

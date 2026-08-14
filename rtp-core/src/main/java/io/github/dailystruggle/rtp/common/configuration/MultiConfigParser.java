@@ -17,6 +17,13 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
   public final File pluginDirectory;
   public final File myDirectory;
   public final String name;
+  /**
+   * ADR-076: the on-disk directory (relative to {@code pluginDirectory}) this parser
+   * reads/writes, e.g. {@code definitions/regions}. Decoupled from {@link #name} (the
+   * kind string, e.g. {@code regions}) so the menu / reload / removal-guards keep
+   * resolving parsers by kind while the folder lives under {@code definitions/}.
+   */
+  public final String directory;
   public final String version;
   public final YamlFileDatabase fileDatabase;
   protected final File langMap;
@@ -24,47 +31,62 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
   AtomicReference<Map<String, RtpYamlConfig>> cachedLookup;
   private ClassLoader classLoader = this.getClass().getClassLoader();
 
+  /**
+   * ADR-076: the shared rename map is a co-located dotfile sibling of the parser
+   * directory - {@code <parent>/.<leaf>.lang.yml} beside the {@code <parent>/<leaf>/}
+   * folder (e.g. {@code definitions/.regions.lang.yml}) - rather than
+   * {@code lang/<name>.lang.yml}.
+   */
+  private static File dotLangMap(File pluginDirectory, String directory) {
+    String dir = directory.replace('\\', '/');
+    int slash = dir.lastIndexOf('/');
+    String parent = slash >= 0 ? dir.substring(0, slash) : "";
+    String leaf = slash >= 0 ? dir.substring(slash + 1) : dir;
+    String rel =
+        (parent.isEmpty() ? "" : parent.replace('/', File.separatorChar) + File.separator)
+            + "."
+            + leaf
+            + ".lang.yml";
+    return new File(pluginDirectory, rel);
+  }
+
   public MultiConfigParser(
       Class<E> eClass, String name, String version, File pluginDirectory, ClassLoader classLoader) {
+    this(eClass, name, version, pluginDirectory, classLoader, name);
+  }
+
+  public MultiConfigParser(
+      Class<E> eClass,
+      String name,
+      String version,
+      File pluginDirectory,
+      ClassLoader classLoader,
+      String directory) {
     super(eClass, name);
     this.classLoader = classLoader;
     this.pluginDirectory = pluginDirectory;
     this.name = name;
     this.version = version;
-    this.myDirectory = new File(pluginDirectory.getAbsolutePath() + File.separator + name);
+    this.directory = (directory == null || directory.isEmpty()) ? name : directory;
+    this.myDirectory =
+        new File(pluginDirectory, this.directory.replace('/', File.separatorChar));
 
     this.fileDatabase = new YamlFileDatabase(this.myDirectory);
     cachedLookup = fileDatabase.cachedLookup;
     Map<String, RtpYamlConfig> connect = this.fileDatabase.connect();
     this.fileDatabase.disconnect(connect);
 
-    this.langMap =
-        new File(
-            pluginDirectory.getAbsolutePath()
-                + File.separator
-                + "lang"
-                + File.separator
-                + name
-                + ".lang.yml");
-    if (!this.myDirectory.exists() && !myDirectory.mkdir()) return;
+    this.langMap = dotLangMap(pluginDirectory, this.directory);
+    if (!this.myDirectory.exists() && !myDirectory.mkdirs()) return;
 
     File d = new File(myDirectory.getAbsolutePath() + File.separator + "default.yml");
     if (!d.exists()) {
       try {
-        saveResourceFromJar(name + File.separator + "default.yml", true);
+        saveResourceFromJar(this.directory + "/default.yml", true);
       } catch (IllegalArgumentException e) {
         RTP.log(Level.WARNING, e.getMessage(), e);
       }
     }
-
-    File langMap =
-        new File(
-            RTP.serverAccessor.getPluginDirectory()
-                + File.separator
-                + "lang"
-                + File.separator
-                + name
-                + ".lang.yml");
 
     File[] files = myDirectory.listFiles();
     if (files == null) return;
@@ -72,21 +94,34 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
       String fileName = file.getName();
       if (!fileName.endsWith(".yml")) continue;
       if (fileName.contains("old")) continue;
+      // ADR-076: a per-file clone (e.g. a per-world parser) writes its colocated rename map
+      // `.<name>.lang.yml` beside its value file - i.e. INSIDE this scanned directory. Those
+      // dotfiles end in `.yml`, so without this guard the scan would mistake them for value
+      // configs, build a parser named `.<name>.lang`, and re-rotate a `.<name>.lang.yml.old<N>`
+      // backup on every reload. Skip hidden dotfiles and any `.lang.yml` rename map.
+      if (fileName.startsWith(".") || fileName.endsWith(".lang.yml")) continue;
 
       fileName = fileName.replace(".yml", "");
 
       ConfigParser<E> parser =
-          new ConfigParser<>(eClass, fileName, version, myDirectory, langMap, fileDatabase);
+          new ConfigParser<>(eClass, fileName, version, myDirectory, this.langMap, fileDatabase);
       addParser(parser);
     }
   }
 
   public MultiConfigParser(Class<E> eClass, String name, String version, File pluginDirectory) {
+    this(eClass, name, version, pluginDirectory, (String) null);
+  }
+
+  public MultiConfigParser(
+      Class<E> eClass, String name, String version, File pluginDirectory, String directory) {
     super(eClass, name);
     this.pluginDirectory = pluginDirectory;
     this.name = name;
     this.version = version;
-    this.myDirectory = new File(pluginDirectory.getAbsolutePath() + File.separator + name);
+    this.directory = (directory == null || directory.isEmpty()) ? name : directory;
+    this.myDirectory =
+        new File(pluginDirectory, this.directory.replace('/', File.separatorChar));
 
     this.fileDatabase = new YamlFileDatabase(this.myDirectory);
     Map<String, RtpYamlConfig> connect = this.fileDatabase.connect();
@@ -104,33 +139,17 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
       T.printStackTrace();
     }
 
-    this.langMap =
-        new File(
-            pluginDirectory.getAbsolutePath()
-                + File.separator
-                + "lang"
-                + File.separator
-                + name
-                + ".lang.yml");
-    if (!this.myDirectory.exists() && !myDirectory.mkdir()) return;
+    this.langMap = dotLangMap(pluginDirectory, this.directory);
+    if (!this.myDirectory.exists() && !myDirectory.mkdirs()) return;
 
     File d = new File(myDirectory.getAbsolutePath() + File.separator + "default.yml");
     if (!d.exists()) {
       try {
-        saveResourceFromJar(name + File.separator + "default.yml", true);
+        saveResourceFromJar(this.directory + "/default.yml", true);
       } catch (IllegalArgumentException e) {
         RTP.log(Level.WARNING, e.getMessage(), e);
       }
     }
-
-    File langMap =
-        new File(
-            RTP.serverAccessor.getPluginDirectory()
-                + File.separator
-                + "lang"
-                + File.separator
-                + name
-                + ".lang.yml");
 
     File[] files = myDirectory.listFiles();
     if (files == null) return;
@@ -138,11 +157,17 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
       String fileName = file.getName();
       if (!fileName.endsWith(".yml")) continue;
       if (fileName.contains("old")) continue;
+      // ADR-076: a per-file clone (e.g. a per-world parser) writes its colocated rename map
+      // `.<name>.lang.yml` beside its value file - i.e. INSIDE this scanned directory. Those
+      // dotfiles end in `.yml`, so without this guard the scan would mistake them for value
+      // configs, build a parser named `.<name>.lang`, and re-rotate a `.<name>.lang.yml.old<N>`
+      // backup on every reload. Skip hidden dotfiles and any `.lang.yml` rename map.
+      if (fileName.startsWith(".") || fileName.endsWith(".lang.yml")) continue;
 
       fileName = fileName.replace(".yml", "");
 
       ConfigParser<E> parser =
-          new ConfigParser<>(eClass, fileName, version, myDirectory, langMap, fileDatabase);
+          new ConfigParser<>(eClass, fileName, version, myDirectory, this.langMap, fileDatabase);
       addParser(parser);
     }
   }
