@@ -191,7 +191,7 @@ Addons can arrive three ways - as a standalone plugin/mod, dropped into `plugins
 
 ### I want to add a custom claim plugin integration. Where do I start?
 
-RTP already bundles claim-plugin support for the common protection plugins (GriefPrevention, WorldGuard, Towny, etc.) directly in the plugin jar — there is no separate integration jar to install (see [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)). To add your *own* integration, look at the `addons/RTP_ExampleAddon/` directory for a working example: your addon compiles against `rtp-api` only, registers a safety verifier through `RTPAPI.hooks()` (the same seam the bundled claim checks use), and registers itself on plugin enable. See [the addon API contract](https://github.com/dailystruggle/RTP/blob/V3/addons/REQUIREMENTS.md) for details.
+RTP already bundles claim-plugin support for the common protection plugins (GriefPrevention, WorldGuard, Towny, etc.) directly in the plugin jar — there is no separate integration jar to install. To add your *own* integration, look at the `addons/RTP_ExampleAddon/` directory for a working example: your addon compiles against `rtp-api` only, registers a safety verifier through `RTPAPI.hooks()` (the same seam the bundled claim checks use), and registers itself on plugin enable. See [the addon API contract](https://github.com/dailystruggle/RTP/blob/V3/addons/REQUIREMENTS.md) for details.
 
 ### I added a requirement to a `REQUIREMENTS.md` file and CI is failing.
 

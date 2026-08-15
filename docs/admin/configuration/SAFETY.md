@@ -10,7 +10,7 @@ This document provides a detailed reference for all configuration options availa
 |---|---|---|---|
 | `invulnerabilityTime` | Integer | `5` | Seconds of invulnerability granted after teleporting. Prevents fall, fire, or drowning damage on arrival. |
 | `safetyRadius` | Integer | `0` | Block radius around the landing point to check for hazards. `0` = check only the landing block. |
-| `staleChunkRetryLimit` | Integer | `2` | Bounded retry budget for the stale-chunk guard (ADR-015). Prevents race conditions where a chunk unloads before evaluation. |
+| `staleChunkRetryLimit` | Integer | `2` | Bounded retry budget for the stale-chunk guard. Prevents race conditions where a chunk unloads before evaluation. |
 | `anvilPrefilterEnabled` | Boolean | `true` | Off-thread anvil prefilter: screens candidate destinations by reading region files (`.mca`) from disk, dropping known-unsafe ones before they cost a chunk load. A chunk it cannot read (e.g. not yet generated) is not rejected - it passes through to the normal live-load safety check. See [REGION_FILE_READING.md](../REGION_FILE_READING.md). |
 
 ## Landing Platforms
@@ -23,17 +23,17 @@ Used as a legacy fallback if no solid ground is found.
 | `platformDepth` | Integer | `1` | Depth (downward) of the platform. |
 | `platformAirHeight` | Integer | `2` | Height of air to ensure above the platform. |
 | `platformMaterial` | String | `GLASS` | Block type used if no solid block exists. |
-| `platformRestoreSeconds` | Integer | `-1` | Optional timeout after which a built platform's footprint is restored to its original blocks. `-1` disables restoration (permanent platform). `0` restores as soon as the footprint chunk is loaded again; a positive value restores after that many seconds. The countdown only advances while the footprint chunk is loaded (it pauses while the area is unloaded), and pending restores survive a server restart. See [ADR-060](../../adr/ADR-060-emergency-platform-block-restoration-timeout.md). |
+| `platformRestoreSeconds` | Integer | `-1` | Optional timeout after which a built platform's footprint is restored to its original blocks. `-1` disables restoration (permanent platform). `0` restores as soon as the footprint chunk is loaded again; a positive value restores after that many seconds. The countdown only advances while the footprint chunk is loaded (it pauses while the area is unloaded), and pending restores survive a server restart. |
 
-> **Note on `platformRestoreSeconds`.** Restoration writes the captured original blocks back; every restore (and any failure) is logged, never silently dropped. Available on the Bukkit/Spigot/Paper and Folia platforms; the Fabric platform does not build emergency platforms, so the timeout has no effect there. Because the platform is only ever built on land the safety pipeline already cleared of claims (S-003), the footprint starts in unclaimed terrain; if you expect players to build on top of the temporary platform before it expires, leave restoration disabled (`-1`).
+> **Note on `platformRestoreSeconds`.** Restoration writes the captured original blocks back; every restore (and any failure) is logged, never silently dropped. Available on the Bukkit/Spigot/Paper and Folia platforms; the Fabric platform does not build emergency platforms, so the timeout has no effect there. Because the platform is only ever built on land the safety pipeline already cleared of claims, the footprint starts in unclaimed terrain; if you expect players to build on top of the temporary platform before it expires, leave restoration disabled (`-1`).
 
 ---
 
 ## Block Filters & Token Grammar
 
-The `airBlocks` and `unsafeBlocks` lists use a specific grammar (ADR-017) to match blocks and properties.
+The `airBlocks` and `unsafeBlocks` lists use a specific grammar to match blocks and properties.
 
-> **Edition note (Pro only).** The plain-material rows below work in every edition, but the **block-tag and block-state-predicate grammar** (`#namespace:tag`, `MATERIAL[...]`, `*[...]`, including the numeric range predicates) ships only in the full (Pro) edition. The **rtp-lite** assembly variant ([ADR-024](../../adr/ADR-024-rtp-lite-assembly-variant.md)) parses `unsafeBlocks` / `airBlocks` as a **flat material allow/deny list** and does not honour any `#tag` token or `[...]` predicate. See the bundled lite docs (`SAFETY.md` inside the lite jar) for the lite-only surface.
+> **Edition note (Pro only).** The plain-material rows below work in every edition, but the **block-tag and block-state-predicate grammar** (`#namespace:tag`, `MATERIAL[...]`, `*[...]`, including the numeric range predicates) ships only in the full (Pro) edition. The **rtp-lite** build parses `unsafeBlocks` / `airBlocks` as a **flat material allow/deny list** and does not honour any `#tag` token or `[...]` predicate. See the bundled lite docs (`SAFETY.md` inside the lite jar) for the lite-only surface.
 
 ### Grammar (Token Syntax)
 - `MATERIAL` — Plain material (e.g., `LAVA`). *(All editions.)*
@@ -46,8 +46,8 @@ The `airBlocks` and `unsafeBlocks` lists use a specific grammar (ADR-017) to mat
 #### Predicate notes
 - Multiple predicates inside one `[ ... ]` combine with logical **AND** (e.g., `WATER[falling=true,level>=5]`).
 - Two range bounds on the same key form an interval, e.g., `LAVA[level>=2,level<=5]`.
-- Equality (`=`) compares values as case-insensitive strings; the range operators parse both sides as integers. A live block whose property is absent or non-numeric is treated as a **miss** (fail-open per ADR-017 §4) — it is never rejected by a predicate it cannot satisfy.
-- Malformed tokens (non-integer bound, empty value, duplicate `key`+operator, unbalanced brackets) are dropped at load with a single startup `WARNING` and never silently ignored (REQ-RTP-S-004).
+- Equality (`=`) compares values as case-insensitive strings; the range operators parse both sides as integers. A live block whose property is absent or non-numeric is treated as a **miss** (fail-open) - it is never rejected by a predicate it cannot satisfy.
+- Malformed tokens (non-integer bound, empty value, duplicate `key`+operator, unbalanced brackets) are dropped at load with a single startup `WARNING` and never silently ignored.
 
 ### `airBlocks`
 Materials treated as walkable / non-blocking space above the landing.

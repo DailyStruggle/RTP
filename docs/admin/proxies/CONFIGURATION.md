@@ -2,7 +2,7 @@
 
 `network.yml` configures **multi-server / multi-proxy network mode** (cross-server `/rtp`). It is **disabled by default**; flipping `network.enabled: true` opts a backend into the cross-server network.
 
-> When `enabled: false`, this file is read, validated, and otherwise ignored: no threads start, no database tables are created, no transport opens. The backend behaves byte-identically to a build without network mode (REQ-RTP-NET-002).
+> When `enabled: false`, this file is read, validated, and otherwise ignored: no threads start, no database tables are created, no transport opens. The backend behaves byte-identically to a build without network mode.
 
 For the conceptual model and verification walkthroughs see [`INDEX.md`](INDEX.md), [`SINGLE_BACKEND_VERIFICATION.md`](SINGLE_BACKEND_VERIFICATION.md), and [`CROSS_SERVER_VERIFICATION.md`](CROSS_SERVER_VERIFICATION.md).
 
@@ -127,4 +127,4 @@ Lower score wins. Each `terms` entry scores a backend by one metric through a cu
 
 ---
 
-> The `config.yml` `network.redis` block is a separate, simpler Redis-backed state binding for single-network cached-location sync; see [`../CORE_CONFIG.md`](../configuration/CORE_CONFIG.md#network-redis). Full design rationale lives in [`../../dev/MULTI_SERVER_PLAN.md`](../../dev/MULTI_SERVER_PLAN.md) and [ADR-036](../../adr/ADR-036-network-mode-multi-server-multi-proxy.md).
+> The `config.yml` `network.redis` block is a separate, simpler Redis-backed state binding for single-network cached-location sync; see [`CORE_CONFIG.md`](../configuration/CORE_CONFIG.md#network-redis).

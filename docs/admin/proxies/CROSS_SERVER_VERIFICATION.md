@@ -1,14 +1,11 @@
 # Cross-Server `/rtp` Verification
 
 Operator-facing manual verification of the cross-server `/rtp` round-trip on
-a multi-proxy, multi-backend network. The dev-facing automated fixture for
-the same scenarios lives at [`platforms/rtp-proxy/devstack/`](https://github.com/dailystruggle/RTP/tree/V3/platforms/rtp-proxy/devstack).
+a multi-proxy, multi-backend network.
 
-Single-backend / in-memory transport precursor:
-[`SINGLE_BACKEND_VERIFICATION.md`](SINGLE_BACKEND_VERIFICATION.md).
-
-Reference: [`MULTI_SERVER_PLAN.md`](../../dev/MULTI_SERVER_PLAN.md),
-[ADR-036](../../adr/ADR-036-network-mode-multi-server-multi-proxy.md).
+Start with the single-backend precursor first:
+[`SINGLE_BACKEND_VERIFICATION.md`](SINGLE_BACKEND_VERIFICATION.md), and see the
+[Proxy mode overview](INDEX.md) for what network mode is and what it needs.
 
 ## Prerequisites
 
@@ -98,7 +95,7 @@ The end-to-end happy path. Required: a live Minecraft 1.21.x client.
    so the immediately-following `/rtp` dispatch consumes that exact
    coord (no second pipeline run).
 
-L6 queue + reservation state transitions an operator can observe:
+Queue + reservation state transitions an operator can observe:
 
 - `rtp:net:wq:status:<pid>` HASH cycles through `PENDING -> ROUTING ->
   RESERVED -> COMPLETED` (or `FAILED/CANCELLED` on the failure paths);
@@ -173,7 +170,7 @@ canary for the Lua contract, not as authoritative acceptance evidence.
 ## Teardown
 
 - `network.enabled: false` on every participant restores byte-identical
-  pre-Phase-2 behavior (REQ-RTP-NET-002).
+  single-server behavior.
 - Reservation rows older than their TTL are reaped automatically. To
   flush manually: `redis-cli --scan --pattern 'rtp:net:*' | xargs redis-cli DEL`.
 

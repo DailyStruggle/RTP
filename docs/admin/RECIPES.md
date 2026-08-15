@@ -106,7 +106,7 @@ rerollGriefPrevention: true
 Supported plugins (full list on the [Integrations](configuration/INTEGRATIONS.md) page): SaberFactions, FactionsBridge, GriefDefender, GriefPrevention, Lands, RedProtect, Residence, CrashClaim, HuskClaims, KingdomsX, Towny Advanced, WorldGuard.
 
 !!! note "This is a safety guarantee, not just a convenience"
-    Re-rolling out of claims is enforced inside the teleport pipeline (prohibition S-003), so a destination cannot leak into protected land through the menu, the command, or the API. The reroll honours the bounded spiral selector and eventually exhausts attempts (`performance.yml` -> `maxAttempts`) rather than looping forever. See [Safety](configuration/SAFETY.md).
+    Re-rolling out of claims is enforced inside the teleport pipeline itself, so a destination cannot leak into protected land through the menu, the command, or the API. The reroll honours the bounded spiral selector and eventually exhausts attempts (`performance.yml` -> `maxAttempts`) rather than looping forever. See [Safety](configuration/SAFETY.md).
 
 ---
 
@@ -190,7 +190,7 @@ The recommended bring-up sequence for a new region is:
 | Scatter players on every login | Grant `rtp.onevent.join` |
 | Scatter players on death | Grant `rtp.onevent.respawn` |
 | Scatter players entering a world | Grant `rtp.onevent.changeworld` |
-| Avoid teleporting into claims | `integrations.yml` `reroll*` toggles (S-003) |
+| Avoid teleporting into claims | `integrations.yml` `reroll*` toggles |
 | Show cooldown / queue / region info | Native `%rtp_*%` PlaceholderAPI expansion |
 | Charge money per teleport | `economy.yml` (+ Vault) |
 | Always have a fast, safe landing spot | `/rtp scan start region=<name>` |

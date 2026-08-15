@@ -105,7 +105,7 @@ A quick decision tree:
 4. **Confirmation menu.** The merged result is diffed against the on-disk file; the diff is rendered as a per-file list of changed keys with old -> new values. You see this and pick `Confirm` or `Cancel`.
 5. **Bak + atomic write.** On `Confirm`, each touched file is copied to `<file>.yml.bak.<timestamp>`. The merged YAML is written to `<file>.yml.tmp`, fsync'd, then renamed over `<file>.yml`.
 6. **Reload.** RTP runs the equivalent of `/rtp reload` to pick up the new values.
-7. **Audit log.** Every confirmed apply and every rollback is logged via `RTP.log(Level.INFO, ...)` with the caller id, prefab name, list of touched files, and bak paths. No silent-discard paths (REQ-RTP-S-004).
+7. **Audit log.** Every confirmed apply and every rollback is logged with the caller id, prefab name, list of touched files, and bak paths. Nothing is silently discarded.
 
 If you have players mid-teleport when the confirm runs, their in-flight pipelines complete against the pre-apply settings; new `/rtp` calls see the new settings after the reload completes. This is the same staleness contract a hand-edit + `/rtp reload` has.
 
@@ -126,4 +126,4 @@ If you have players mid-teleport when the confirm runs, their in-flight pipeline
 - [PERFORMANCE.md](configuration/PERFORMANCE.md) - reference for every knob a prefab might set in `performance.yml`.
 - [REGIONS.md](configuration/REGIONS.md) - reference for every knob a prefab might set in `regions/<id>.yml`.
 - [RUNBOOK.md](RUNBOOK.md) - what to run when things go wrong after an apply (`/rtp info`, `/rtp test`, `/rtp scan reset`).
-- [`docs/adr/ADR-024-rtp-lite-assembly-variant.md`](../adr/ADR-024-rtp-lite-assembly-variant.md) - the `lightweight` prefab is the pro-portable subset of the lite assembly's `regions/default.yml`; as of 2026-06-18 lite inherits the full `regions/default.yml` (including `backlogCacheCap: 1000`).
+- The `lightweight` prefab is a trimmed subset of the shipped `regions/default.yml`; both the full and lite editions ship `backlogCacheCap: 1000` (enabled) by default.

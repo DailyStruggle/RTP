@@ -29,7 +29,7 @@ No configuration keys were renamed, removed, or restructured in 3.0.0-beta.1. Ex
 
 ### Database / Spatial Memory Cache
 
-The spatial memory format (`MemoryShape` bad-sector index ranges) is unchanged. Your existing cache will be read correctly after upgrade — no rebuild required.
+The spatial memory format (the bad-sector index ranges the plugin persists per region) is unchanged. Your existing cache will be read correctly after upgrade — no rebuild required.
 
 If you want a clean slate (e.g., after significantly changing a region's geometry), delete the relevant database entries or run:
 ```
