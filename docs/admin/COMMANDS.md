@@ -1,6 +1,6 @@
 # Command Reference
 
-**Applies to Plugin Version:** `@version@`
+**Current Plugin Version:** `@version@`
 
 All RTP commands are subcommands of `/rtp`. Parameters are passed in `key:value` format and can be combined freely unless noted otherwise. Tab-completion is available for all parameters and reflects live server state.
 

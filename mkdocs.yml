@@ -44,8 +44,15 @@ markdown_extensions:
   # Content tabs (=== "...") used in docs/site pages.
   - pymdownx.tabbed:
       alternate_style: true
-  # Fenced code, syntax highlighting, and nested blocks.
-  - pymdownx.superfences
+  # Fenced code, syntax highlighting, and nested blocks. The mermaid custom
+  # fence keeps ```mermaid blocks as <div class="mermaid"> instead of a plain
+  # code block, so Material's bundled Mermaid.js renders them client-side
+  # (works in Firefox; a bare fence without this leaves the diagram undrawn).
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight:
       use_pygments: true
       guess_lang: false
@@ -59,6 +66,12 @@ markdown_extensions:
 plugins:
   # Client-side search ships with Material; no extra dependency needed.
   - search
+
+# Build hooks. mkdocs_hooks.py expands the single-source `@version@` stamp (from
+# gradle.properties) into every page, mirroring the jar's copyDocs token
+# expansion so the website shows the real version instead of the literal token.
+hooks:
+  - mkdocs_hooks.py
 
 # Only narrative + operator-facing pages are published. Internal engineering
 # trees (dev/, adr/, architecture/) are intentionally left out of nav.
