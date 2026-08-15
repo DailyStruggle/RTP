@@ -1,9 +1,0 @@
-# --- Language Mapping: biomes.yml ---
-# Maps internal baseline keys (left) to user-visible key names used in
-# biomes.yml (right). Restored from the pre-split per-locale safety.lang.yml
-# so the translated key names survive the advanced/ relocation.
-biomeWhitelist: "바이옥화이트리스트"
-biomes: "바이옥"
-biomeWeighted: "바이옴가중치"
-biomeWeights: "바이옴가중치맵"
-version: "version"

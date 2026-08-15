@@ -57,6 +57,19 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   public String subDir = "";
 
   /**
+   * JAR-resource sub-directory override ('/'-normalized, no leading/trailing separator),
+   * decoupled from {@link #subDir}. A {@link MultiConfigParser} builds each per-file child
+   * with {@code pluginDirectory} pointing at the already-nested definitions folder and a bare
+   * leaf {@code name}, so the child's {@link #subDir} is empty and its on-disk paths are
+   * correct - but its bundled JAR resources still live under the definitions sub-directory
+   * (e.g. {@code definitions/regions/default.yml}, {@code lang/<locale>/definitions/regions/}).
+   * When non-empty this value supplies that JAR/{@code lang/} prefix via {@link #jarPrefix()}
+   * so locale detection, extraction, and migration read the right resource. Empty for a plain
+   * parser, where {@link #subDir} already drives both disk and JAR paths.
+   */
+  public String jarSubDir = "";
+
+  /**
    * Active locale for this parser (e.g. {@code "en"}, {@code "de"}). Drives the JAR resource
    * path used for first-extraction and the {@code .lang.yml} key-mapping path. See
    * {@link LanguageBootstrap}.
@@ -187,10 +200,36 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       File langFile,
       YamlFileDatabase fileDatabase,
       String locale) {
+    this(eClass, name, version, pluginDirectory, langFile, fileDatabase, locale, null);
+  }
+
+  /**
+   * Locale-aware constructor with an explicit JAR-resource sub-directory override.
+   *
+   * <p>Used by {@link MultiConfigParser} for its per-file children: the child's
+   * {@code pluginDirectory} already points at the nested definitions folder (so its
+   * {@link #subDir} is empty and disk paths are correct), while {@code jarSubDir} carries the
+   * definitions sub-directory the bundled JAR resources actually live under (e.g.
+   * {@code definitions/regions}). Without it a child's locale detection/extraction/migration
+   * would probe the JAR root instead of the definitions sub-directory and silently no-op on a
+   * language switch.
+   *
+   * @param jarSubDir the JAR/{@code lang/} resource sub-directory, or {@code null}/empty for none
+   */
+  public ConfigParser(
+      Class<E> eClass,
+      final String name,
+      final String version,
+      final File pluginDirectory,
+      File langFile,
+      YamlFileDatabase fileDatabase,
+      String locale,
+      String jarSubDir) {
     super(eClass, sanitizeName(leafName(name)));
     this.version = version;
     this.pluginDirectory = pluginDirectory;
     this.name = resolveName(name);
+    this.jarSubDir = normalizeJarSubDir(jarSubDir);
     this.fileDatabase = subDir.isEmpty() ? fileDatabase : new YamlFileDatabase(configDir());
     this.locale = LanguageBootstrap.sanitize(locale);
     check(version, pluginDirectory, langFile);
@@ -308,7 +347,24 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    * subpathed one.
    */
   private String jarPrefix() {
+    if (jarSubDir != null && !jarSubDir.isEmpty()) return jarSubDir + "/";
     return (subDir == null || subDir.isEmpty()) ? "" : subDir + "/";
+  }
+
+  /**
+   * Normalize a raw JAR sub-directory override: {@code '/'}-normalized, sanitized per segment,
+   * with no leading/trailing separator. Empty (never {@code null}) when absent.
+   */
+  private static String normalizeJarSubDir(String raw) {
+    if (raw == null) return "";
+    String norm = raw.replace('\\', '/');
+    StringBuilder sb = new StringBuilder();
+    for (String seg : norm.split("/")) {
+      if (seg.isEmpty()) continue;
+      if (sb.length() > 0) sb.append('/');
+      sb.append(sanitizeName(seg));
+    }
+    return sb.toString();
   }
 
   private static void setSection(RtpYamlSection section, Map<?, ?> map) {

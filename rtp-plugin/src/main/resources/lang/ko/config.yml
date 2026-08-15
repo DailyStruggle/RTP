@@ -88,6 +88,9 @@ menu:
 defaults:
   # 기본 영역의 모양과 크기. radius/centerRadius = 얼마나 멀리 착지하는지 (청크 단위).
   shape:
+    # Landing area shape algorithm.
+    # @type: enum
+    # @source: shape
     name: "CIRCLE"
     mode: "ACCUMULATE"
     radius: 256
@@ -100,6 +103,9 @@ defaults:
     expand: false
   # Default high/low landing window.
   vert:
+    # Vertical placement algorithm.
+    # @type: enum
+    # @source: vert
     name: "LINEAR"
     minY: 32
     maxY: 255

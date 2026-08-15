@@ -25,6 +25,14 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
    */
   public final String directory;
   public final String version;
+  /**
+   * ADR-020 / REQ-RTP-F-013: the active locale (e.g. {@code "en"}) threaded from
+   * {@code Configs.reloadConfigs()} into every per-file child {@link ConfigParser}
+   * this parser builds. Without it the children default to
+   * {@link LanguageBootstrap#DEFAULT_LOCALE} and never honor an in-game language
+   * switch, unlike the single-file parsers.
+   */
+  public final String locale;
   public final YamlFileDatabase fileDatabase;
   protected final File langMap;
   public Factory<ConfigParser<E>> configParserFactory = new Factory<>();
@@ -62,8 +70,21 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
       File pluginDirectory,
       ClassLoader classLoader,
       String directory) {
+    this(eClass, name, version, pluginDirectory, classLoader, directory,
+        LanguageBootstrap.DEFAULT_LOCALE);
+  }
+
+  public MultiConfigParser(
+      Class<E> eClass,
+      String name,
+      String version,
+      File pluginDirectory,
+      ClassLoader classLoader,
+      String directory,
+      String locale) {
     super(eClass, name);
     this.classLoader = classLoader;
+    this.locale = LanguageBootstrap.sanitize(locale);
     this.pluginDirectory = pluginDirectory;
     this.name = name;
     this.version = version;
@@ -104,7 +125,9 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
       fileName = fileName.replace(".yml", "");
 
       ConfigParser<E> parser =
-          new ConfigParser<>(eClass, fileName, version, myDirectory, this.langMap, fileDatabase);
+          new ConfigParser<>(
+              eClass, fileName, version, myDirectory, this.langMap, fileDatabase, this.locale,
+              this.directory);
       addParser(parser);
     }
   }
@@ -115,7 +138,18 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
 
   public MultiConfigParser(
       Class<E> eClass, String name, String version, File pluginDirectory, String directory) {
+    this(eClass, name, version, pluginDirectory, directory, LanguageBootstrap.DEFAULT_LOCALE);
+  }
+
+  public MultiConfigParser(
+      Class<E> eClass,
+      String name,
+      String version,
+      File pluginDirectory,
+      String directory,
+      String locale) {
     super(eClass, name);
+    this.locale = LanguageBootstrap.sanitize(locale);
     this.pluginDirectory = pluginDirectory;
     this.name = name;
     this.version = version;
@@ -167,7 +201,9 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
       fileName = fileName.replace(".yml", "");
 
       ConfigParser<E> parser =
-          new ConfigParser<>(eClass, fileName, version, myDirectory, this.langMap, fileDatabase);
+          new ConfigParser<>(
+              eClass, fileName, version, myDirectory, this.langMap, fileDatabase, this.locale,
+              this.directory);
       addParser(parser);
     }
   }
@@ -189,7 +225,8 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
       if (RTP.serverAccessor.getRTPWorld(worldName) == null) {
         ConfigParser<E> parser = (ConfigParser<E>) configParserFactory.getOrDefault("DEFAULT.YML");
         if (parser != null) return parser;
-        return new ConfigParser<>(myClass, name, version, myDirectory, langMap, fileDatabase);
+        return new ConfigParser<>(
+            myClass, name, version, myDirectory, langMap, fileDatabase, locale, this.directory);
       }
 
       ConfigParser<E> parser = (ConfigParser<E>) configParserFactory.getOrDefault(name);

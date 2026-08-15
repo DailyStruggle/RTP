@@ -3,6 +3,8 @@
 
 # Target world name (e.g. "world", "world_nether").
 # "[0]" = main world, "[1]" = 2nd loaded world, etc.
+# @type: enum
+# @source: world
 world: "[0]"
 # Use the world's /worldborder as the bound instead of the shape radius below.
 worldBorderOverride: false
@@ -42,6 +44,8 @@ vert: "@config"
 #   requirePermission: true
 requirePermission: "@config"
 # Region to redirect to if no permission
+# @type: enum
+# @source: region
 override: "default"
 # Economy cost override for this region (added on top of the economy.yml base price).
 # Use "@economy" to inherit the base price from economy.yml instead of a literal.

@@ -162,21 +162,26 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
           RTP.handleMigration(oldStr, newStr);
         }
 
-        // todo: shape and vert updates
-        if (key.equalsIgnoreCase("shape")) {
-          Factory<Shape<?>> factory =
-              (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
-          if (factory == null) continue;
-          Shape<?> shape = (Shape<?>) factory.get(value.toString());
-          if (shape == null) {
+        // A key that names one of the type-bearing factories we own
+        // (shape/vert today; any future FactoryValue-backed factory
+        // registered under RTP.factoryNames is picked up automatically) is
+        // not a plain scalar - it is a type discriminator (`name`) plus a
+        // block of sub-parameters. Expand the chosen type into its full
+        // materialized block so the write path stores a complete nested
+        // section rather than a bare scalar that would silently revert to
+        // the factory default on the next reload.
+        Factory<?> ownedFactory = ownedTypeFactoryForKey(key);
+        if (ownedFactory != null) {
+          FactoryValue<?> fv = ownedFactory.get(value.toString());
+          if (fv == null) {
             msgBadParameter(callerId, key, value.toString(), "CFG");
             continue;
           }
 
-          EnumMap<?, Object> data = shape.getData();
+          EnumMap<? extends Enum<?>, Object> data = fv.getData();
 
           Map<String, Object> subParams = new HashMap<>();
-          subParams.put("name", shape.name);
+          subParams.put("name", fv.name);
           for (Map.Entry<? extends Enum<?>, Object> entry : data.entrySet()) {
             subParams.put(entry.getKey().name(), entry.getValue());
           }
@@ -200,55 +205,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
             }
           }
 
-          subParams.put("name", shape.name);
+          subParams.put("name", fv.name);
           for (Map.Entry<? extends Enum<?>, Object> entry : data.entrySet()) {
-            String name = entry.getKey().name();
-            List<String> strings = parameterValues.get(name.toLowerCase());
-            if (strings != null && !strings.isEmpty()) {
-              subParams.put(name, strings.get(0));
-            }
-          }
-          value = subParams;
-        } else if (key.equalsIgnoreCase("vert")) {
-          Factory<VerticalAdjustor<?>> factory =
-              (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
-          if (factory == null) continue;
-          VerticalAdjustor<?> vert = (VerticalAdjustor<?>) factory.get(value.toString());
-          if (vert == null) {
-            msgBadParameter(callerId, key, value.toString(), "CFG");
-            continue;
-          }
-
-          EnumMap<? extends Enum<?>, Object> vertData = vert.getData();
-
-          Map<String, Object> subParams = new HashMap<>();
-
-          subParams.put("name", vert.name);
-          for (Map.Entry<? extends Enum<?>, Object> entry : vertData.entrySet()) {
-            subParams.put(entry.getKey().name(), entry.getValue());
-          }
-
-          RtpYamlConfig RtpYamlConfig = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
-          if (RtpYamlConfig != null) {
-            Object o = RtpYamlConfig.get(key);
-            if (o instanceof RtpYamlSection) {
-              RtpYamlSection section = (RtpYamlSection) o;
-              Map<String, Object> mapValues = section.getMapValues(false);
-              for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
-                if (subParams.containsKey(entry.getKey()))
-                  subParams.put(entry.getKey(), entry.getValue());
-              }
-            } else if (o instanceof Map) {
-              Map<String, Object> mapValues = (Map<String, Object>) o;
-              for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
-                if (subParams.containsKey(entry.getKey()))
-                  subParams.put(entry.getKey(), entry.getValue());
-              }
-            }
-          }
-
-          subParams.put("name", vert.name);
-          for (Map.Entry<? extends Enum<?>, Object> entry : vertData.entrySet()) {
             String name = entry.getKey().name();
             List<String> strings = parameterValues.get(name.toLowerCase());
             if (strings != null && !strings.isEmpty()) {
@@ -270,7 +228,35 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
             // parent block from the loaded FactoryValue first, then overlay the
             // edited leaf so the saved YAML stays a complete nested block.
             materializeSectionParentIfScalar(configParser, RtpYamlConfig, key);
+            // The commands-api parser lower-cases every parameter name
+            // (TreeCommand#onCommand, `argSplit[0].toLowerCase()`), so a menu
+            // edit of `shape.centerZ` arrives here as the dotted key
+            // `shape.centerz`. YAML mappings are case-sensitive, so a bare
+            // `set("shape.centerz", v)` would add a NEW orphan leaf alongside
+            // the real `centerZ` (which keeps its old value) instead of
+            // updating it - the edit appears to vanish on reload. Restore the
+            // canonical leaf case from the parent block's known keys before
+            // writing so the intended sub-parameter is actually overwritten.
+            String canonicalKey = canonicalizeDottedKey(configParser, RtpYamlConfig, key);
+            RtpYamlConfig.set(canonicalKey, value);
+          }
+        } else if (ownedTypeFactoryForKey(key) != null && value instanceof Map) {
+          // Explicit top-level type-bearing (shape/vert) override. When the on-disk slot is
+          // still the `"@config"` inheritance token (ADR-073), routing through
+          // ConfigParser.set would preserve that token verbatim and silently
+          // discard the operator's chosen type - so a user who selects SQUARE
+          // sees it revert to the global default (CIRCLE) on the next reload.
+          // The value here is already the fully materialized block (name plus
+          // every sub-parameter), so write it straight to the YAML document,
+          // materializing only this edited key while every untouched key keeps
+          // its `@config` token (materialize-only-changed-keys).
+          RtpYamlConfig RtpYamlConfig = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
+          if (RtpYamlConfig != null
+              && io.github.dailystruggle.rtp.common.configuration.ConfigDefaultResolver
+                  .isReference(RtpYamlConfig.get(key))) {
             RtpYamlConfig.set(key, value);
+          } else {
+            configParser.set(key, value);
           }
         } else {
           configParser.set(key, value);
@@ -353,6 +339,28 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
   }
 
   /**
+   * Return the type-bearing {@link Factory} we own whose {@link RTP.factoryNames}
+   * enum constant matches {@code key} (case-insensitively), or {@code null} when
+   * {@code key} is not one of our owned type factories. This generifies the
+   * former hard-coded {@code shape}/{@code vert} special-casing: any factory
+   * registered under {@link RTP.factoryNames} that holds {@link FactoryValue}
+   * type instances - i.e. every factory except the {@code singleConfig} /
+   * {@code multiConfig} config-parser factories, which are not type-bearing
+   * config keys - is treated as a type-bearing block key.
+   */
+  @Nullable
+  static Factory<?> ownedTypeFactoryForKey(String key) {
+    if (key == null) return null;
+    for (RTP.factoryNames fn : RTP.factoryNames.values()) {
+      if (fn == RTP.factoryNames.singleConfig || fn == RTP.factoryNames.multiConfig) continue;
+      if (!fn.name().equalsIgnoreCase(key)) continue;
+      Factory<?> factory = RTP.factoryMap.get(fn);
+      if (factory != null) return factory;
+    }
+    return null;
+  }
+
+  /**
    * Materialize the parent block of a dotted leaf key (e.g. the {@code shape}
    * block for {@code shape.radius}) when the on-disk parent is not already a
    * nested section. Region/world files ship inheritance tokens such as
@@ -392,6 +400,56 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       block.put(d.getKey().name(), d.getValue());
     }
     yaml.set(parentKey, block);
+  }
+
+  /**
+   * Restore the canonical case of a dotted leaf key before it is written to
+   * the (case-sensitive) YAML document. The commands-api parser lower-cases
+   * every parameter name, so a menu/CLI edit of {@code shape.centerZ} arrives
+   * as {@code shape.centerz}. Writing that verbatim would add a new orphan
+   * leaf ({@code centerz}) alongside the real key ({@code centerZ}) instead of
+   * overwriting it, so the edit silently vanishes on reload.
+   *
+   * <p>The canonical leaf name is resolved from the parent block's known keys:
+   * first the on-disk parent section (already materialized by
+   * {@link #materializeSectionParentIfScalar}), then the parser's loaded
+   * {@link FactoryValue} data (which carries the enum-cased sub-parameter
+   * names and the {@code name} discriminator). Falls back to the original key
+   * when no case-insensitive match is found (a genuinely new leaf).</p>
+   */
+  static String canonicalizeDottedKey(
+      ConfigParser<?> configParser, RtpYamlConfig yaml, String dottedKey) {
+    int dot = dottedKey.indexOf('.');
+    if (dot <= 0 || dot >= dottedKey.length() - 1) return dottedKey;
+    String parentKey = dottedKey.substring(0, dot);
+    String leaf = dottedKey.substring(dot + 1);
+
+    // Prefer the on-disk parent section's existing key casing.
+    Object parent = yaml.get(parentKey);
+    if (parent instanceof RtpYamlSection) {
+      for (String existing : ((RtpYamlSection) parent).getKeys(false)) {
+        if (existing != null && existing.equalsIgnoreCase(leaf)) {
+          return parentKey + "." + existing;
+        }
+      }
+    }
+
+    // Fall back to the loaded FactoryValue's data (enum-cased) key names.
+    Object resolved = null;
+    for (Map.Entry<? extends Enum<?>, Object> entry : configParser.getData().entrySet()) {
+      if (entry.getKey().name().equalsIgnoreCase(parentKey)) {
+        resolved = entry.getValue();
+        break;
+      }
+    }
+    if (resolved instanceof FactoryValue<?>) {
+      if ("name".equalsIgnoreCase(leaf)) return parentKey + ".name";
+      for (Map.Entry<? extends Enum<?>, Object> d : ((FactoryValue<?>) resolved).getData().entrySet()) {
+        String name = d.getKey().name();
+        if (name.equalsIgnoreCase(leaf)) return parentKey + "." + name;
+      }
+    }
+    return dottedKey;
   }
 
   /**

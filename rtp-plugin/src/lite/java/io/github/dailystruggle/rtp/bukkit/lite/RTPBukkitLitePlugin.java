@@ -337,70 +337,16 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     //
     // Each omission corresponds to a documented support-load source per ADR-024.
 
-    // Bundled stripped admin docs (ADR-024). The lite jar carries a small
-    // `lite-docs/` resource tree (intentionally not under `docs/` inside the
-    // jar, which the ADR-024 `liteJarStructureCheck` audit forbids in lite).
-    // The resources are extracted into the operator-facing `docs/` folder under
-    // the plugin data directory. Extract on every start so upgrades pick up
-    // updated bundled copies; existing files are overwritten, which is safe
-    // because the extracted docs are read-only reference material, not
-    // operator-edited config.
-    extractBundledLiteDocs();
+    // Bundled operator docs. Lite ships the same `docs/` tree as the Pro
+    // edition (config/docs parity) and extracts it through the shared
+    // JarUtils.extractDocs, identical to the Pro bootstrap. The docs are
+    // version-stamped and only overwritten on a version change, so
+    // operator-visible reference material stays in sync with the jar.
+    io.github.dailystruggle.rtp.bukkit.utils.JarUtils.extractDocs(
+        getDataFolder(), getDescription().getVersion());
     RTP.log(Level.INFO,
         "[RTP] Documentation extracted to "
             + new java.io.File(getDataFolder(), "docs").getAbsolutePath());
-  }
-
-  /**
-   * Copies every classpath resource under `lite-docs/` into
-   * `<plugin-data>/docs/`. The list of resources is hard-coded rather than
-   * scanned because Bukkit's classloader does not expose directory listings on
-   * shaded jars. The jar-internal resource tree stays under `lite-docs/`
-   * because the ADR-024 `liteJarStructureCheck` audit forbids a `docs/` entry
-   * in the lite jar; only the extracted, operator-facing destination is named
-   * `docs/`. Adding a new bundled doc requires updating both the resource file
-   * and the list below; the lite assembly's smoke test verifies that every
-   * entry resolves.
-   */
-  private void extractBundledLiteDocs() {
-    String[] resources = {
-        "lite-docs/INDEX.md",
-        "lite-docs/QUICK_START.md",
-        "lite-docs/COMMANDS.md",
-        "lite-docs/CONFIGURATION.md",
-        "lite-docs/SAFETY.md",
-        "lite-docs/FAQ.md",
-        "lite-docs/figures/region-shape.txt",
-        "lite-docs/figures/spiral-mapping.txt",
-    };
-    java.io.File dataFolder = getDataFolder();
-    //noinspection ResultOfMethodCallIgnored
-    new java.io.File(dataFolder, "docs/figures").mkdirs();
-    for (String resource : resources) {
-      // Map the jar-internal `lite-docs/` prefix to the operator-facing `docs/`
-      // destination folder.
-      String relativeTarget = resource.replaceFirst("^lite-docs/", "docs/");
-      java.io.File target = new java.io.File(dataFolder, relativeTarget);
-      //noinspection ResultOfMethodCallIgnored
-      target.getParentFile().mkdirs();
-      try (java.io.InputStream in = getResource(resource)) {
-        if (in == null) {
-          RTP.log(Level.WARNING,
-              "[RTP] Missing bundled doc resource: " + resource);
-          continue;
-        }
-        try (java.io.OutputStream out = new java.io.FileOutputStream(target)) {
-          byte[] buf = new byte[8192];
-          int n;
-          while ((n = in.read(buf)) != -1) {
-            out.write(buf, 0, n);
-          }
-        }
-      } catch (java.io.IOException e) {
-        RTP.log(Level.WARNING,
-            "[RTP] Failed to extract bundled doc " + resource, e);
-      }
-    }
   }
 
   @Override

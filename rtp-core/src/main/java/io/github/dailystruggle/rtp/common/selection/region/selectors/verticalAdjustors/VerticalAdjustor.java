@@ -44,7 +44,7 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
     this.name = name;
     if (!vertAdjustorFactory.contains(name)) vertAdjustorFactory.add(name, this);
     try {
-      loadLangFile("definitions/vert");
+      loadLangFile("definitions/regions/.vert");
     } catch (IOException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
     }

@@ -88,6 +88,9 @@ menu:
 defaults:
   # Форма и размер области по умолчанию. radius/centerRadius = как далеко вы приземляетесь, измеряется в чанках.
   shape:
+    # Landing area shape algorithm.
+    # @type: enum
+    # @source: shape
     name: "CIRCLE"
     mode: "ACCUMULATE"
     radius: 256
@@ -100,6 +103,9 @@ defaults:
     expand: false
   # Default high/low landing window.
   vert:
+    # Vertical placement algorithm.
+    # @type: enum
+    # @source: vert
     name: "LINEAR"
     minY: 32
     maxY: 255

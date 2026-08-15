@@ -232,6 +232,89 @@ public class RegionSubParameterUpdateTest {
         verify(regionConfig, never()).set(eq("shape"), any());
     }
 
+    @Test
+    void onCommand_shapeOverrideAtConfigScalar_materializesBlockInsteadOfPreservingToken()
+            throws InterruptedException {
+        // Region file ships `shape: "@config"` (ADR-073 inheritance token). The
+        // operator explicitly picks SQUARE. Before the fix, ConfigParser.set saw
+        // the on-disk `@config` token and preserved it verbatim, silently
+        // discarding SQUARE so the value reverted to the global default (CIRCLE)
+        // on the next reload. The explicit override must instead materialize the
+        // chosen block onto disk (materialize-only-changed-keys).
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig yaml =
+                io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig.parse(
+                        "shape: \"@config\"\n");
+        mockDb.cachedLookup.get().put("default.yml", yaml);
+
+        SubConfigCmd cmd = new SubConfigCmd(null, "default.yml", regionConfig);
+
+        Map<String, List<String>> params = new HashMap<>();
+        params.put("shape", Collections.singletonList("SQUARE"));
+
+        cmd.onCommand(UUID.randomUUID(), params, null);
+
+        // Poll for the async write to land on the YAML document.
+        long deadline = System.currentTimeMillis() + 2_000;
+        Object parent = null;
+        while (System.currentTimeMillis() < deadline) {
+            parent = yaml.get("shape");
+            if (parent instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) {
+                break;
+            }
+            Thread.sleep(25);
+        }
+
+        assertTrue(parent instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection,
+                "explicit shape override must materialize a nested section, not preserve the @config token");
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection section =
+                (io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) parent;
+        assertEquals("SQUARE", String.valueOf(section.get("name")).toUpperCase(),
+                "the operator's chosen shape type must be saved, not reverted to the default");
+    }
+
+    @Test
+    void onCommand_dottedLeafLowercasedByParser_updatesCanonicalKeyNotOrphan()
+            throws InterruptedException {
+        // The commands-api parser lower-cases every parameter name, so a menu
+        // edit of `shape.centerZ` arrives as the dotted key `shape.centerz`.
+        // YAML mappings are case-sensitive, so writing that verbatim would add
+        // a NEW orphan leaf `centerz` alongside the real `centerZ` (which keeps
+        // its old value), and the edit would appear to vanish on reload. The
+        // write must instead restore the canonical leaf case and overwrite the
+        // real `centerZ`.
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig yaml =
+                io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig.parse(
+                        "shape: \"@config\"\n");
+        mockDb.cachedLookup.get().put("default.yml", yaml);
+
+        SubConfigCmd cmd = new SubConfigCmd(null, "default.yml", regionConfig);
+
+        Map<String, List<String>> params = new HashMap<>();
+        params.put("shape.centerz", Collections.singletonList("512"));
+
+        cmd.onCommand(UUID.randomUUID(), params, null);
+
+        long deadline = System.currentTimeMillis() + 2_000;
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection section = null;
+        while (System.currentTimeMillis() < deadline) {
+            Object parent = yaml.get("shape");
+            if (parent instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) {
+                section = (io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection) parent;
+                if (section.getKeys(false).contains("centerZ")
+                        && "512".equals(String.valueOf(section.get("centerZ")))) {
+                    break;
+                }
+            }
+            Thread.sleep(25);
+        }
+
+        assertNotNull(section, "shape block must be materialized as a nested section");
+        assertEquals("512", String.valueOf(section.get("centerZ")),
+                "the canonical centerZ leaf must carry the edited value");
+        assertFalse(section.getKeys(false).contains("centerz"),
+                "no lowercase orphan leaf may be created alongside the canonical centerZ");
+    }
+
     // ── vert sub-parameter tests ────────────────────────────────────────────
 
     @Test

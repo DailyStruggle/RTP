@@ -982,6 +982,21 @@ public final class CommandTreeMenuBuilder {
                     parser.getYamlRoot();
             for (E key : visibleKeys) {
                 Object current = loaded.get(key);
+                // ADR-073: a key may hold an @<file> inheritance token (e.g.
+                // shape/vert ship `@config` in region/world files). The raw
+                // token is meaningful only on disk; surfacing it in the menu
+                // is confusing and, for the type-bearing shape/vert blocks,
+                // hides the editable name/sub-parameter rows. Resolve the
+                // token to its effective value for display only (the on-disk
+                // token is preserved until the operator actually edits the
+                // key), so a shape/vert block flattens into shape.name /
+                // shape.radius rows just like any other nested section.
+                boolean inheritedRef = io.github.dailystruggle.rtp.common.configuration
+                        .ConfigDefaultResolver.isReference(current);
+                if (inheritedRef) {
+                    current = io.github.dailystruggle.rtp.common.configuration
+                            .ConfigDefaultResolver.resolve(current, key.name(), current);
+                }
                 // Nested config values (e.g. database/network/menu under
                 // config.yml whose stored value is an RtpYamlSection or
                 // Map; or `shape`/`vert` on a freshly added multi-config
@@ -1020,6 +1035,10 @@ public final class CommandTreeMenuBuilder {
                 String currentStr = current == null
                         ? "&8(unset)"
                         : String.valueOf(current);
+                // Mark a still-inherited scalar so the operator understands
+                // the shown value comes from the global default rather than
+                // being written literally in this file.
+                if (inheritedRef && current != null) currentStr = currentStr + " &8(inherited)";
                 String label = "&2" + key.name() + "&7: &0" + currentStr;
                 String hover = resolveConfigHover(yamlRoot, key.name());
                 lines.add(MenuLine.of(new MenuFragment(label, hover,
@@ -1043,6 +1062,85 @@ public final class CommandTreeMenuBuilder {
         // ADR-050 Stage 3β.D.2b (2026-05-24): per-fragment mint loop collapsed.
 
         return new MenuModel("config:" + fileName, pages);
+    }
+
+    /**
+     * Build a generic finite-value picker page for a config key whose valid
+     * values are a predetermined set (declared via the key's {@code @options}
+     * or {@code @source} directive; see {@link
+     * io.github.dailystruggle.rtp.common.configuration.ConfigDirectives} and
+     * ADR-064). Each option row stages {@code paramName = value} into the
+     * viewer's per-file cart via {@link MenuAction.StageConfigValue} (the same
+     * write path a free-text anvil confirm uses), then the stage dispatch
+     * re-renders the file page with the choice surfaced under "Pending".
+     *
+     * <p>Layout mirrors {@link #buildShapeVertTypePicker}: a Back row (to the
+     * per-file config page via {@link MenuAction.OpenConfigFile}), a
+     * non-clickable header row showing the current value, and one row per
+     * option with the current value starred. Rows use parchment-safe colors
+     * (no {@code &e}/{@code &6}/{@code &f}) per the Book Menu Color Contrast
+     * rule.
+     *
+     * @param callerId     UUID of the viewing player
+     * @param fileName     config file name (Back target; also the stage scope)
+     * @param paramName    the (possibly dotted) config key being edited
+     * @param currentValue the current value string, or {@code null} if unset
+     * @param options      ordered list of valid values (must be non-empty)
+     * @return the assembled {@link MenuModel}
+     */
+    public MenuModel buildOptionsPicker(UUID callerId,
+                                        String fileName,
+                                        String paramName,
+                                        String currentValue,
+                                        List<String> options) {
+        Objects.requireNonNull(callerId, "callerId");
+        Objects.requireNonNull(fileName, "fileName");
+        Objects.requireNonNull(paramName, "paramName");
+        Objects.requireNonNull(options, "options");
+        if (fileName.isEmpty()) {
+            throw new IllegalArgumentException("fileName must not be empty");
+        }
+        if (paramName.isEmpty()) {
+            throw new IllegalArgumentException("paramName must not be empty");
+        }
+        if (options.isEmpty()) {
+            throw new IllegalArgumentException("options must not be empty");
+        }
+
+        final int visualLinesPerPage = 14;
+        String backLabel = lookupMsg(CommandMessages.menuBack, "« back");
+        MenuLine backRow = MenuLine.of(new MenuFragment(backLabel, null,
+                new MenuAction.OpenConfigFile(fileName)));
+        String currentLabel = (currentValue == null || currentValue.isEmpty())
+                ? "&8(unset)" : "&0" + currentValue;
+        MenuLine headerRow = MenuLine.of(new MenuFragment(
+                "&1&l" + paramName + " &7(current: " + currentLabel + "&7)", null, null));
+
+        List<MenuPage> pages = new ArrayList<>();
+        List<MenuLine> lines = new ArrayList<>();
+        lines.add(backRow);
+        lines.add(headerRow);
+        int visualLinesUsed = predictVisualLines(backLabel) + predictVisualLines(paramName);
+        for (String option : options) {
+            if (option == null || option.isEmpty()) continue;
+            boolean isCurrent = currentValue != null && option.equalsIgnoreCase(currentValue);
+            String marker = isCurrent ? "&2&l* " : "&2";
+            String label = marker + option;
+            lines.add(MenuLine.of(new MenuFragment(label, null,
+                    new MenuAction.StageConfigValue(fileName, paramName, option))));
+            visualLinesUsed += predictVisualLines(label);
+            if (visualLinesUsed >= visualLinesPerPage) {
+                pages.add(new MenuPage(lines));
+                lines = new ArrayList<>();
+                lines.add(backRow);
+                lines.add(headerRow);
+                visualLinesUsed = predictVisualLines(backLabel) + predictVisualLines(paramName);
+            }
+        }
+        if (lines.size() > 2 || pages.isEmpty()) {
+            pages.add(new MenuPage(lines));
+        }
+        return new MenuModel("config:" + fileName + ":" + paramName + ":options", pages);
     }
 
     /**
