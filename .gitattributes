@@ -1,0 +1,35 @@
+# Normalize line endings across platforms.
+# Default: let Git decide text vs binary, and check out LF in the working tree.
+* text=auto eol=lf
+
+# Scripts that must be LF for POSIX shells and the Gradle wrapper.
+*.sh    text eol=lf
+gradlew text eol=lf
+
+# Windows-only launchers must stay CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Common source/config kept as LF text.
+*.java   text eol=lf
+*.gradle text eol=lf
+*.py     text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.json   text eol=lf
+*.md     text eol=lf
+*.xml    text eol=lf
+*.toml   text eol=lf
+*.properties text eol=lf
+
+# Binary assets: never touch line endings.
+*.jar    binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.zip    binary
+*.mca    binary
+*.dat    binary
