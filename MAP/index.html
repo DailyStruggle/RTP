@@ -1677,27 +1677,81 @@
 </ul>
 <h2 id="decisions-adr">Decisions (<code>adr/</code>)<a class="headerlink" href="#decisions-adr" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../adr/"><code>adr/README.md</code></a> — ADR index.</li>
+<li><a href="../adr/"><code>adr/README.md</code></a> — ADR index (authoritative, with statuses and subproject ADRs).</li>
 <li><a href="../adr/ADR-TEMPLATE/"><code>adr/ADR-TEMPLATE.md</code></a> — template.</li>
+<li><code>ADR-000</code> Development workflow (meta).</li>
 <li><code>ADR-001</code> Archimedean spiral 1D mapping.</li>
 <li><code>ADR-002</code> H2/SQLite over flat-file cache.</li>
 <li><code>ADR-003</code> <code>rtp-plugin</code> bridge module.</li>
 <li><code>ADR-004</code> Count-Bound TaskPipe on Folia.</li>
 <li><code>ADR-005</code> PaperLib removal.</li>
 <li><code>ADR-006</code> Async queue pre-generation.</li>
-<li><code>ADR-007</code> Per-user isolated queues.</li>
+<li><code>ADR-007</code> Per-user isolated queues (operational details superseded by ADR-043).</li>
 <li><code>ADR-008</code> Memory tracker / active GC.</li>
 <li><code>ADR-009</code> Configurable spatial distributions.</li>
 <li><code>ADR-010</code> Versioned platform adapter submodules.</li>
 <li><code>ADR-011</code> <code>rtp-api</code> separate module.</li>
 <li><code>ADR-012</code> Chunk reservation abstraction.</li>
-<li><code>ADR-013</code> Addons as external Gradle projects.</li>
-<li><code>commands-api-ADR-001</code> Brigadier bridge via <code>commands-api</code>.</li>
+<li><code>ADR-013</code> Addons as external Gradle projects (partially superseded by ADR-019).</li>
 <li><code>ADR-015</code> Stale-chunk guard / Count-Bound pipes.</li>
 <li><code>ADR-016</code> Anvil subsystem.</li>
 <li><code>ADR-017</code> Block tags and state predicates in safety lists.</li>
 <li><code>ADR-018</code> <code>AGENTS.md</code> public-release structure.</li>
 <li><code>ADR-019</code> Claim plugin integrations folded into plugin.</li>
+<li><code>ADR-020</code> Language bootstrap and locale-aware ConfigParser.</li>
+<li><code>ADR-021</code> Legacy MC and Java support out of scope.</li>
+<li><code>ADR-022</code> Shape cache key: seed + config hash.</li>
+<li><code>ADR-023</code> Login reserve cache for join-time RTP.</li>
+<li><code>ADR-024</code> RTP lite assembly variant.</li>
+<li><code>ADR-025</code> Replace SimpleYaml with internal SnakeYAML wrapper (proposed).</li>
+<li><code>ADR-026</code> External hook API surface.</li>
+<li><code>ADR-028</code> L3 backlog cache (<code>backlogLocations</code>).</li>
+<li><code>ADR-032</code> Teleport pipeline latency histogram (proposed).</li>
+<li><code>ADR-033</code> NeoForge platform in scope.</li>
+<li><code>ADR-034</code> Memory shape catalog and polygon shape.</li>
+<li><code>ADR-035</code> Interactive menus via written book (proposed).</li>
+<li><code>ADR-036</code> Network mode: multi-server, multi-proxy RTP.</li>
+<li><code>ADR-037</code> Harden RTP config commands.</li>
+<li><code>ADR-038</code> <code>/rtpadmin</code> setup wizards (proposed).</li>
+<li><code>ADR-039</code> <code>/rtpadmin</code> diagnostic surfaces (proposed).</li>
+<li><code>ADR-040</code> Cross-backend metric time-series publication (proposed).</li>
+<li><code>ADR-041</code> <code>/rtp config</code> command and save implementation (proposed).</li>
+<li><code>ADR-042</code> YAML comment preservation (block-only).</li>
+<li><code>ADR-043</code> <code>rtp.personalqueue</code> permission semantics (supersedes ADR-007 operational details).</li>
+<li><code>ADR-044</code> Command-tree menu reflector.</li>
+<li><code>ADR-045</code> RTP docs menu consumer.</li>
+<li><code>ADR-046</code> <code>maps-api</code> module for runtime cartography.</li>
+<li><code>ADR-047</code> Declarative chart composition bridge.</li>
+<li><code>ADR-048</code> Menu page builders behind <code>RTPServerAccessor</code> (proposed).</li>
+<li><code>ADR-049</code> Network-mode platform-neutral lift; <code>PlayerLifecycleHook</code> SPI.</li>
+<li><code>ADR-050</code> Concrete menu commands supersede tokens.</li>
+<li><code>ADR-051</code> Two-tier API extension model.</li>
+<li><code>ADR-052</code> Outcome metrics and cause-tagged bad locations.</li>
+<li><code>ADR-053</code> Pipeline latency percentiles and slow-teleport audit.</li>
+<li><code>ADR-054</code> RTPRunnable self-scheduling thread routing.</li>
+<li><code>ADR-055</code> PvP combat gate.</li>
+<li><code>ADR-056</code> Bare <code>/rtp</code> root action.</li>
+<li><code>ADR-057</code> Platform-agnostic addon SPI (<code>RTPAddon</code> + <code>AddonRegistry</code>).</li>
+<li><code>ADR-058</code> Region-specific schematic paste.</li>
+<li><code>ADR-059</code> Relative ground-distance safety predicate (proposed).</li>
+<li><code>ADR-060</code> Emergency-platform block-restoration timeout.</li>
+<li><code>ADR-061</code> Open-core dual licensing.</li>
+<li><code>ADR-062</code> Biome-probability weighting for location selection.</li>
+<li><code>ADR-063</code> Biome-first menu and auto-region by biome.</li>
+<li><code>ADR-064</code> Config-comment format: summary line as menu hover.</li>
+<li><code>ADR-065</code> World-override regions and the <code>/rtp</code> world menu.</li>
+<li><code>ADR-066</code> Foreign config importer.</li>
+<li><code>ADR-067</code> Adaptive scan rate and <code>.mca</code>-header generation check (proposed).</li>
+<li><code>ADR-068</code> Cross-server persisted teleport limits.</li>
+<li><code>ADR-069</code> Claim integrations extracted to bundled addon.</li>
+<li><code>ADR-070</code> Platform-neutral <code>/rtp</code> command root (<code>CoreRtpRoot</code>).</li>
+<li><code>ADR-071</code> Config organization and discoverability (proposed).</li>
+<li><code>ADR-072</code> Teleport view-distance clamp and steady restore.</li>
+<li><code>ADR-073</code> Config default inheritance via <code>@&lt;file&gt;</code> references (proposed).</li>
+<li><code>ADR-074</code> Operator-facing throughput and cost metrics (proposed).</li>
+<li><code>ADR-075</code> Platform-neutral player-move event SPI.</li>
+<li><code>ADR-076</code> Config folder consolidation.</li>
+<li>Subproject ADRs (<code>commands-api</code>, <code>effects-api</code>, <code>maps-api</code>, <code>metrics-api</code>, <code>rtp-fabric</code>, <code>rtp-neoforge</code>, <code>rtp-proxy</code>, addons) — see the <em>Subproject ADRs</em> table in <a href="../adr/"><code>adr/README.md</code></a>.</li>
 </ul>
 <h2 id="architecture-slices-architecture">Architecture slices (<code>architecture/</code>)<a class="headerlink" href="#architecture-slices-architecture" title="Permanent link">&para;</a></h2>
 <ul>

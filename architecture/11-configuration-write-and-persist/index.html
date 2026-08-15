@@ -1524,7 +1524,7 @@
 <blockquote>
 <p>Companion documents: target-state spec <a href="../../dev/CONFIG_COMMAND_SPEC/"><code>docs/dev/CONFIG_COMMAND_SPEC.md</code></a>, decision <a href="../../adr/ADR-037-harden-rtp-config-commands/">ADR-037</a>, implementation strategy <a href="../../adr/ADR-041-config-command-and-save-implementation/">ADR-041</a>.</p>
 </blockquote>
-<div class="highlight"><pre><span></span><code>flowchart TD
+<pre class="mermaid"><code>flowchart TD
     %% Color legend: green = durable success state (audit record emitted, on-disk YAML matches in-memory), red = failure / rollback (audit record emitted, no on-disk change), blue = in-memory or disk I/O work, yellow = data / decision point
 
     Trigger{{/rtp config write&lt;br/&gt;or LanguageCmd&lt;br/&gt;or wizard-driven mutation}}:::data
@@ -1584,8 +1584,7 @@
     classDef success fill:#b7e4b7,stroke:#1f6b1f,stroke-width:2px,color:#0b2a0b;
     classDef fail    fill:#f4b7b7,stroke:#8a1f1f,color:#3a0b0b;
     classDef async   fill:#cfe2ff,stroke:#1f4e8a,color:#0b1f3a;
-    classDef data    fill:#fff2b3,stroke:#8a6d1f,color:#3a2f0b;
-</code></pre></div>
+    classDef data    fill:#fff2b3,stroke:#8a6d1f,color:#3a2f0b;</code></pre>
 <h2 id="how-to-read-this-chart">How to read this chart<a class="headerlink" href="#how-to-read-this-chart" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Three accepting states:</strong> <code>Done</code> (live commit succeeded), <code>DoneDry</code> (dry-run preview succeeded), <code>DoneFail</code> (any failure). Every invocation ends in exactly one of them, and every accepting state has emitted exactly one audit record. This is the spec §6 / S-004 guarantee made visible.</li>

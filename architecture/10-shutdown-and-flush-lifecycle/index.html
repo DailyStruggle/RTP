@@ -1542,7 +1542,7 @@
 <li>Yellow = durable-state bookkeeping (DB queues, chunk-ticket map, region maps).</li>
 <li>The <strong>order of the blue/yellow nodes is load-bearing.</strong> The two most common bugs — "cached locations vanished after restart" and "leaked force-loaded chunks after /reload" — are both ordering regressions (see repair lenses 3 and 9).</li>
 </ul>
-<div class="highlight"><pre><span></span><code>flowchart TD
+<pre class="mermaid"><code>flowchart TD
     %% Color legend: green=terminal-ok, red=kill/cancel, blue=async-drain, yellow=durable-state
     classDef success fill:#c8f0c8,stroke:#225522,color:#111
     classDef fail fill:#f0c8c8,stroke:#882222,color:#111
@@ -1590,8 +1590,7 @@
     DbFlush1 --&gt; Rebuild --&gt; FlushDirty --&gt; Drain --&gt; OrderGuard --&gt; StopPipes
     StopPipes --&gt; CancelTracked --&gt; PermRegions --&gt; TempRegions --&gt; StopFlag
     StopFlag --&gt; CancelAgain --&gt; ClearProc --&gt; ScanKill --&gt; Redis --&gt; AccStop
-    AccStop --&gt; PendingBukkit --&gt; RefData --&gt; ReleaseTickets ==&gt; Super
-</code></pre></div>
+    AccStop --&gt; PendingBukkit --&gt; RefData --&gt; ReleaseTickets ==&gt; Super</code></pre>
 <h2 id="repair-lenses">Repair lenses<a class="headerlink" href="#repair-lenses" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>"Server hang on stop"</strong> → a blue node is waiting on a future that will never complete. Check <code>CompleteFutures</code> and the <code>processQueries(Long.MAX_VALUE)</code> drain — if the DB thread already exited, <code>processQueries</code> returns fast; if it's mid-batch and another thread set <code>stop.set(true)</code> early, the drain dead-ends. The ordering guard between <code>Drain</code> and <code>StopFlag</code> exists for exactly this reason.</li>

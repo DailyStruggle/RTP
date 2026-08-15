@@ -1666,7 +1666,7 @@
 <p>This record is a meta document: how a developer ought to work in this repository (assuming a working style similar to the maintainer's), and why. It describes the entire lifecycle at rationale level; the operational rules stay in their canonical homes per D-003.</p>
 <h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
 <p>Record the development workflow as actually practiced, end to end - the stages below are this repository's software development lifecycle (SDLC), descriptive of a common non-corporate development cycle (no agile "points", no performance tracking, no artificial task division). The chart identifies the lifecycle; the stage walk after it names the artifacts each stage produces and the reason the stage exists.</p>
-<div class="highlight"><pre><span></span><code>flowchart TD
+<pre class="mermaid"><code>flowchart TD
     A[1. Intake] --&gt; B[2. Planning tier - mutable]
     B --&gt; C[3. Read, document, modify]
     C --&gt; D[4. Design records - ADRs]
@@ -1676,8 +1676,7 @@
     F --&gt;|supersede / amend| D
     F --&gt;|refine| A
     E --&gt; G[7. Communication surfaces]
-    H[8. Self-maintenance] -.-&gt; B &amp; D &amp; E
-</code></pre></div>
+    H[8. Self-maintenance] -.-&gt; B &amp; D &amp; E</code></pre>
 <p>The chart is illustrative; the stage prose below is authoritative.</p>
 <h3 id="1-intake">1. Intake<a class="headerlink" href="#1-intake" title="Permanent link">&para;</a></h3>
 <p>Change begins as user feedback, developer intent, or a bug report. Feedback is collected, abstracted, and only then specified. Occasionally that specification crystallizes into a <strong>requirement</strong> - and requirements record only the absolutes: core invariants and needs (regional threading on Folia, "<code>/rtp</code> shall teleport the caller"), stated in <code>shall</code> terms, implementation-free, identified as <code>REQ-&lt;module&gt;-&lt;family&gt;-NNN</code>. A whole plugin evolves from a handful of core requirements; they are not per-change forcing functions, and most changes never touch them.</p>

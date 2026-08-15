@@ -1487,7 +1487,7 @@
 <li><strong>Pipeline stages after <code>Start LOAD</code></strong> — see diagram 01.</li>
 <li><strong>Cache replenishment</strong> driving the "Cache has verified location?" decision — see diagram 02.</li>
 </ul>
-<div class="highlight"><pre><span></span><code>flowchart TD
+<pre class="mermaid"><code>flowchart TD
     Start([Player runs /rtp&lt;br/&gt;or /wild]) --&gt; CmdParse
 
 %% 1. Command layer decision
@@ -1540,8 +1540,7 @@
     classDef fail    fill:#f4b7b7,stroke:#8a1f1f,color:#3a0b0b;
     classDef async   fill:#cfe2ff,stroke:#1f4e8a,color:#0b1f3a;
     classDef data    fill:#fff2b3,stroke:#8a6d1f,color:#3a2f0b;
-    class MsgBad,MsgBusy,ThrowW,ThrowR fail
-</code></pre></div>
+    class MsgBad,MsgBusy,ThrowW,ThrowR fail</code></pre>
 <p>How to read this chart:</p>
 <ul>
 <li><strong>The decision tree is almost entirely data-driven.</strong> Nothing in <code>rtp-core</code> hardcodes "if world == X, use shape Y". Behavior is the product of <code>world.yml</code>, <code>region.yml</code>, <code>messages.yml</code>, plus per-player permission nodes.</li>

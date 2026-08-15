@@ -1487,7 +1487,7 @@
 <li><strong>Stale-chunk guard</strong> on live-backed chunks — see <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a>.</li>
 <li><strong>Anvil probe ordering</strong> — see <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a> §11 and §13.1.</li>
 </ul>
-<div class="highlight"><pre><span></span><code>%% Color legend: green=accepting success; red=hard terminal / fail-fast sink; blue=async or thread-hop work; yellow=config / bookkeeping / data-driven choice.
+<pre class="mermaid"><code>%% Color legend: green=accepting success; red=hard terminal / fail-fast sink; blue=async or thread-hop work; yellow=config / bookkeeping / data-driven choice.
 flowchart TD
     Start([PregenTask.runAttempt&lt;br/&gt;attempt i / maxAttempts]):::async --&gt; CapCheck{i &amp;gt; maxAttempts&lt;br/&gt;or biomeChecks &amp;gt;= maxBiomeChecks?}
     CapCheck -- Yes --&gt; Exhausted[completeExhausted&lt;br/&gt;result = GenerationResult null, i, null]:::fail
@@ -1568,8 +1568,7 @@ flowchart TD
     classDef success fill:#b7e4b7,stroke:#1f6b1f,stroke-width:2px,color:#0b2a0b;
     classDef fail    fill:#f2b8b8,stroke:#8a1f1f,stroke-width:1px,color:#2a0b0b;
     classDef async   fill:#c9dcf5,stroke:#28518a,stroke-width:1px,color:#0b1f3a;
-    classDef data    fill:#f2e6a8,stroke:#8a6b1f,stroke-width:1px,color:#2a220b;
-</code></pre></div>
+    classDef data    fill:#f2e6a8,stroke:#8a6b1f,stroke-width:1px,color:#2a220b;</code></pre>
 <p>How to read this chart:</p>
 <ul>
 <li>

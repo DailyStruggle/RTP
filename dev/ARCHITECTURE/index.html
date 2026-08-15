@@ -1556,7 +1556,7 @@
 
 
 <h1 id="project-architecture">Project Architecture<a class="headerlink" href="#project-architecture" title="Permanent link">&para;</a></h1>
-<p><strong>Current Plugin Version:</strong> <code>@version@</code></p>
+<p><strong>Current Plugin Version:</strong> <code>3.2.1</code></p>
 <p>For a high-level overview of the plugin's reliability guarantees and bounded execution architecture, see <a href="../DESIGN/">System Architecture and High-Reliability Design</a>.
 For the full requirements-to-code traceability matrix (Req ID → design decision → implementing class → test), see <a href="../TRACEABILITY/">TRACEABILITY.md</a>.
 For actor definitions and stakeholder goals, see <a href="../STAKEHOLDERS/">STAKEHOLDERS.md</a>.
@@ -1587,7 +1587,7 @@ For the rationale behind key architectural decisions (why, not just what), see <
 <li><strong>addons</strong>: A directory containing subprojects that integrate RTP with external plugins. The canonical template is <code>LeafRTPCountdownAddon</code>, which demonstrates how to utilize <code>rtp-api</code> to extend the plugin's capabilities. Note: Several common integrations (such as claim plugins) are now folded directly into the core plugin (ADR-019); the standalone <code>RTP_Glide</code> addon was folded into <code>effects-api</code> as the <code>GLIDE</code> effect (effects-api-ADR-001); the experimental <code>RTP_Iris_integration</code> addon has been removed (no dedicated integration is required to teleport into Iris-generated worlds).</li>
 </ul>
 <h2 id="module-dependency-graph">Module Dependency Graph<a class="headerlink" href="#module-dependency-graph" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>graph TD
+<pre class="mermaid"><code>graph TD
     rtp-api --&gt; rtp-core
     commands-api --&gt; rtp-core
     effects-api --&gt; rtp-core
@@ -1596,8 +1596,7 @@ For the rationale behind key architectural decisions (why, not just what), see <
     rtp-paper --&gt; rtp-plugin
     rtp-folia --&gt; rtp-plugin
     rtp-core -.-&gt; rtp-fabric
-    rtp-api --&gt; addons
-</code></pre></div>
+    rtp-api --&gt; addons</code></pre>
 <blockquote>
 <p><strong>Dependency rule:</strong> <code>rtp-core</code> and <code>rtp-api</code> must never import platform-specific classes (Bukkit, Spigot, Paper, Folia, Fabric). This is enforced by ArchUnit tests.</p>
 </blockquote>

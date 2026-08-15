@@ -1487,7 +1487,7 @@
 <blockquote>
 <p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> §10 — Plugin setup lifecycle</a>.</p>
 </blockquote>
-<div class="highlight"><pre><span></span><code>stateDiagram-v2
+<pre class="mermaid"><code>stateDiagram-v2
     BukkitLoad : Server classloads plugin JAR
     [*] --&gt; BukkitLoad
 
@@ -1562,8 +1562,7 @@
     class ExtractDocs success
     class FailFast,OnDisable fail
     class DrainStartup,Integrations,EffectsHook,ChunkUnloader,DBLoop async
-    class SetupDB,ChunkyProbe,BindCmds,RegEvents,RebindWorlds,PAPI data
-</code></pre></div>
+    class SetupDB,ChunkyProbe,BindCmds,RegEvents,RebindWorlds,PAPI data</code></pre>
 <p>Notes on ordering (do not reorder without reading):</p>
 <ul>
 <li><strong><code>setupBukkitEvents</code> runs synchronously</strong> inside <code>onEnable</code>, not via <code>runTaskLater</code>. A previous bug (see <code>OnWorldLoadUnload</code> Javadoc) missed <code>WorldLoadEvent</code>s fired on tick 1 by generators like Multiverse when the listener registration was deferred.</li>

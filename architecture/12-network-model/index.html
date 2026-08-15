@@ -1553,24 +1553,24 @@
 <hr />
 <h2 id="1-topology">1. Topology<a class="headerlink" href="#1-topology" title="Permanent link">&para;</a></h2>
 <p>Hub-and-spokes star around a single shared store. Proxies never call each other; backends never call each other. All cross-host coordination flows through the transport. The store has three interchangeable backings selected by <code>transport.type</code>: a durable external <code>redis</code> server, a durable <code>sql</code> database, or <code>proxy-direct</code> (the proxy's own in-memory maps, reached over a TCP socket). The diagram below shows the durable case; for the DB-free <code>proxy-direct</code> case the <code>Shared store</code> box collapses into the proxy process itself (see Section 5).</p>
-<div class="highlight"><pre><span></span><code>flowchart LR
+<pre class="mermaid"><code>flowchart LR
     subgraph Clients
         P1[Player on Proxy A]
         P2[Player on Proxy B]
     end
 
-    subgraph Proxies[&quot;Proxy fleet (any N, identical network.yml + per-host proxyId)&quot;]
-        PX1[&quot;Proxy A&lt;br/&gt;(Velocity / Bungee)&lt;br/&gt;DefaultRtpDispatcher&lt;br/&gt;TransportRequestTriggerSource&lt;br/&gt;ReservationTokenReaper&quot;]
-        PX2[&quot;Proxy B&lt;br/&gt;(Velocity / Bungee)&quot;]
+    subgraph Proxies["Proxy fleet (any N, identical network.yml + per-host proxyId)"]
+        PX1["Proxy A&lt;br/&gt;(Velocity / Bungee)&lt;br/&gt;DefaultRtpDispatcher&lt;br/&gt;TransportRequestTriggerSource&lt;br/&gt;ReservationTokenReaper"]
+        PX2["Proxy B&lt;br/&gt;(Velocity / Bungee)"]
     end
 
-    subgraph Transport[&quot;Shared store (D3)&quot;]
-        T[&quot;NetworkTransport&lt;br/&gt;NetworkRequestQueue&lt;br/&gt;NetworkStateBinding&lt;br/&gt;backend_state / proxy_state / reservations&quot;]
+    subgraph Transport["Shared store (D3)"]
+        T["NetworkTransport&lt;br/&gt;NetworkRequestQueue&lt;br/&gt;NetworkStateBinding&lt;br/&gt;backend_state / proxy_state / reservations"]
     end
 
-    subgraph Backends[&quot;Backend fleet (Spigot / Paper / Folia / Fabric)&quot;]
-        B1[&quot;Backend A&lt;br/&gt;RegionQueueManager&lt;br/&gt;NetworkRouter&lt;br/&gt;NetworkEnrolmentBuffer&lt;br/&gt;networkKeptLocations&lt;br/&gt;networkReservedLocations&lt;br/&gt;JoinTriggerSource&quot;]
-        B2[&quot;Backend B&lt;br/&gt;(same shape)&quot;]
+    subgraph Backends["Backend fleet (Spigot / Paper / Folia / Fabric)"]
+        B1["Backend A&lt;br/&gt;RegionQueueManager&lt;br/&gt;NetworkRouter&lt;br/&gt;NetworkEnrolmentBuffer&lt;br/&gt;networkKeptLocations&lt;br/&gt;networkReservedLocations&lt;br/&gt;JoinTriggerSource"]
+        B2["Backend B&lt;br/&gt;(same shape)"]
     end
 
     P1 --&gt;|connects| PX1
@@ -1583,8 +1583,7 @@
     B2 &lt;--&gt;|heartbeat / enrol / status| T
 
     PX1 -.-&gt;|transferPlayer&lt;br/&gt;ServerPreConnectEvent| B2
-    PX2 -.-&gt;|transferPlayer| B1
-</code></pre></div>
+    PX2 -.-&gt;|transferPlayer| B1</code></pre>
 <p>Key invariants (see <em>Multi-Proxy Deployment</em> in <code>MULTI_SERVER_PLAN.md</code>):</p>
 <ul>
 <li>No proxy-to-proxy chatter. Hub-and-spokes only.</li>
@@ -1594,7 +1593,7 @@
 <hr />
 <h2 id="2-cross-server-rtp-request-lifecycle-l6">2. Cross-Server <code>/rtp</code> Request Lifecycle (L6)<a class="headerlink" href="#2-cross-server-rtp-request-lifecycle-l6" title="Permanent link">&para;</a></h2>
 <p>The backend owns <code>/rtp</code>. The proxy is a dispatch + reservation broker. Walks through the happy path of a player on backend A running <code>/rtp</code> and landing on backend B.</p>
-<div class="highlight"><pre><span></span><code>sequenceDiagram
+<pre class="mermaid"><code>sequenceDiagram
     autonumber
     actor Player
     participant BA as Backend A&lt;br/&gt;(origin)
@@ -1633,8 +1632,7 @@
 
     opt token expires before redeem
         PX-&gt;&gt;TS: ReservationTokenReaper sweeps&lt;br/&gt;ReleaseSink fires per token
-    end
-</code></pre></div>
+    end</code></pre>
 <p>Notes:</p>
 <ul>
 <li>Coordinates are resolved on backend B <strong>before</strong> the player transfers (<code>MULTI_SERVER_PLAN.md</code> <em>Coordinate Resolution Timing</em>). The proxy carries <code>worldKey + x/y/z/yaw/pitch</code> in the token; the destination's join handler <em>consumes</em>, it does not re-run the pipeline.</li>
@@ -1644,9 +1642,9 @@
 <hr />
 <h2 id="3-reservation-token-state-machine">3. Reservation Token State Machine<a class="headerlink" href="#3-reservation-token-state-machine" title="Permanent link">&para;</a></h2>
 <p>A single coordinate's life from "earmarked on backend B" to "consumed by the player" or "reclaimed by the reaper". Multi-proxy races are resolved by the <code>WHERE state='PENDING'</code> row-count guard on the <code>PENDING</code> to <code>CLAIMED</code> transition.</p>
-<div class="highlight"><pre><span></span><code>stateDiagram-v2
+<pre class="mermaid"><code>stateDiagram-v2
     [*] --&gt; PENDING : reserveFromNetworkKept(tokenId)&lt;br/&gt;(backend B carves from networkKeptLocations)
-    PENDING --&gt; CLAIMED : UPDATE ... WHERE state=&#39;PENDING&#39;&lt;br/&gt;(row-count = 1, winning proxy)
+    PENDING --&gt; CLAIMED : UPDATE ... WHERE state='PENDING'&lt;br/&gt;(row-count = 1, winning proxy)
     PENDING --&gt; CLAIMED_LOSS : row-count = 0&lt;br/&gt;(racing proxy loses)
     CLAIMED_LOSS --&gt; [*] : surface messages.yml failure,&lt;br/&gt;capped-retry chain picks next candidate
 
@@ -1660,14 +1658,13 @@
     CLAIMED --&gt; EXPIRED : TTL elapses without redeem&lt;br/&gt;ReservationTokenReaper sweep
     ROUTING --&gt; EXPIRED : same
     EXPIRED --&gt; PENDING : claimReanimateMs window&lt;br/&gt;(proxy died, surviving proxy re-opens)
-    EXPIRED --&gt; [*] : beyond reanimation (coord falls back to unkeptLocations)
-</code></pre></div>
+    EXPIRED --&gt; [*] : beyond reanimation (coord falls back to unkeptLocations)</code></pre>
 <p>The <code>EXPIRED</code> to <code>PENDING</code> reanimation edge is what makes multi-proxy failover work: a token claimed by a dead proxy returns to the pool after <code>claimReanimateMs</code>, and any surviving proxy can pick it up without operator intervention. The same primitive covers proxy restart and proxy death (<code>MULTI_SERVER_PLAN.md</code> <em>Reservation tokens under multiple proxies</em>).</p>
 <hr />
 <h2 id="4-data-plane-summary">4. Data Plane Summary<a class="headerlink" href="#4-data-plane-summary" title="Permanent link">&para;</a></h2>
 <p>What lives where, at a glance.</p>
-<div class="highlight"><pre><span></span><code>flowchart TB
-    subgraph Backend[&quot;Backend (rtp-core)&quot;]
+<pre class="mermaid"><code>flowchart TB
+    subgraph Backend["Backend (rtp-core)"]
         direction TB
         RQM[RegionQueueManager]
         KL[keptLocations&lt;br/&gt;L1 / hot]
@@ -1685,7 +1682,7 @@
         RQM --- NRL
     end
 
-    subgraph Proxy[&quot;Proxy (rtp-proxy-common + adapter)&quot;]
+    subgraph Proxy["Proxy (rtp-proxy-common + adapter)"]
         direction TB
         DRD[DefaultRtpDispatcher]
         TRT[TransportRequestTriggerSource]
@@ -1694,7 +1691,7 @@
         SS[StatusSink / ReleaseSink]
     end
 
-    subgraph Store[&quot;Transport (Redis / SQL)&quot;]
+    subgraph Store["Transport (Redis / SQL)"]
         direction TB
         NRQ[NetworkRequestQueue&lt;br/&gt;FIFO + envelopes]
         NSB[NetworkStateBinding&lt;br/&gt;backend_state / proxy_state / reservations]
@@ -1708,30 +1705,28 @@
     RTR --&gt; NSB
     DRD --&gt; SS --&gt; NRQ
     Backend -- heartbeat --&gt; NSB
-    Proxy -- heartbeat --&gt; NSB
-</code></pre></div>
+    Proxy -- heartbeat --&gt; NSB</code></pre>
 <p>The <code>cacheCap</code> budget on each region is the upper bound for <code>keptLocations + networkKeptLocations</code>; <code>networkReserveSize</code> (per-region, default <code>0</code>) carves a slice for cross-server use without changing the existing single-server behaviour when set to <code>0</code>.</p>
 <hr />
 <h2 id="5-the-proxy-direct-transport-server-as-database-db-free">5. The <code>proxy-direct</code> Transport (server-as-database, DB-free)<a class="headerlink" href="#5-the-proxy-direct-transport-server-as-database-db-free" title="Permanent link">&para;</a></h2>
 <p><code>proxy-direct</code> is the third value of <code>transport.type</code>, alongside <code>redis</code> and <code>sql</code>. It exists so a small network (typically an rtp-lite deployment, ADR-024) can run cross-server <code>/rtp</code> <strong>without standing up a Redis server or a shared SQL database</strong>. The proxy process itself plays the role the Redis server plays: it owns the shared store, and backends are stateless RPC clients that read and write it over the player-independent TCP socket from <a href="../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-017-proxy-direct-transport.md">rtp-proxy-ADR-017</a>.</p>
 <p>The key invariant (<a href="../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-019-proxy-direct-as-remote-store.md">rtp-proxy-ADR-019</a>) is that <code>proxy-direct</code> is <strong>just another data-management transport</strong>: every cross-server behaviour (region discovery, enrolment, dispatch, reservation, arrival redeem) runs through the same <code>NetworkTransport</code> + <code>NetworkRequestQueue</code> SPI and the same proxy-side code (<code>DefaultRtpDispatcher</code>, <code>TransportRequestTriggerSource</code>, <code>ReservationTokenReaper</code>, the pre-connect redeem) that the Redis/SQL tiers use. The only thing that changes between <code>redis</code> and <code>proxy-direct</code> is <em>where the bytes land</em>. So the lifecycle (Section 2) and the reservation-token state machine (Section 3) apply unchanged; the <code>proxy-direct</code> mode only relocates the store.</p>
-<div class="highlight"><pre><span></span><code>flowchart LR
-    subgraph Backends[&quot;Backend fleet (stateless RPC clients)&quot;]
-        B1[&quot;Backend A&lt;br/&gt;ProxyDirectNetworkBinding&lt;br/&gt;ProxyDirectNetworkRequestQueue&lt;br/&gt;(standard JoinTriggerSource)&quot;]
-        B2[&quot;Backend B&lt;br/&gt;(same shape)&quot;]
+<pre class="mermaid"><code>flowchart LR
+    subgraph Backends["Backend fleet (stateless RPC clients)"]
+        B1["Backend A&lt;br/&gt;ProxyDirectNetworkBinding&lt;br/&gt;ProxyDirectNetworkRequestQueue&lt;br/&gt;(standard JoinTriggerSource)"]
+        B2["Backend B&lt;br/&gt;(same shape)"]
     end
 
-    subgraph Proxy[&quot;Proxy process = the shared store&quot;]
-        L[&quot;ProxyDirectListener&lt;br/&gt;(TCP socket, HMAC-signed)&quot;]
-        IM[&quot;InMemoryNetworkStateBinding&lt;br/&gt;+ in-memory NetworkRequestQueue&lt;br/&gt;(heartbeats / enrolments / reservations)&quot;]
-        DRD[&quot;DefaultRtpDispatcher&lt;br/&gt;TransportRequestTriggerSource&lt;br/&gt;ReservationTokenReaper&quot;]
+    subgraph Proxy["Proxy process = the shared store"]
+        L["ProxyDirectListener&lt;br/&gt;(TCP socket, HMAC-signed)"]
+        IM["InMemoryNetworkStateBinding&lt;br/&gt;+ in-memory NetworkRequestQueue&lt;br/&gt;(heartbeats / enrolments / reservations)"]
+        DRD["DefaultRtpDispatcher&lt;br/&gt;TransportRequestTriggerSource&lt;br/&gt;ReservationTokenReaper"]
         L --- IM
         IM --- DRD
     end
 
-    B1 &lt;--&gt;|&quot;RPC: heartbeat+snapshot, flushPending,&lt;br/&gt;pollStatus, cancel, findReservation,&lt;br/&gt;redeem, listActiveForServer&quot;| L
-    B2 &lt;--&gt;|same RPC verbs| L
-</code></pre></div>
+    B1 &lt;--&gt;|"RPC: heartbeat+snapshot, flushPending,&lt;br/&gt;pollStatus, cancel, findReservation,&lt;br/&gt;redeem, listActiveForServer"| L
+    B2 &lt;--&gt;|same RPC verbs| L</code></pre>
 <p>Notes:</p>
 <ul>
 <li>The RPC direction is <strong>backend -&gt; proxy only</strong>; the proxy never dials a backend. Proxy-local SPI methods (<code>claim</code>, <code>dequeueReady</code>, <code>transition</code>, <code>release</code>, <code>reapExpired</code>) run against the proxy's own store and are never sent over the wire.</li>

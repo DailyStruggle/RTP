@@ -1777,18 +1777,17 @@
 <p>You may delete <code>.oldN</code> files manually once you are satisfied the upgrade is clean. RTP never reads them at runtime.</p>
 <hr />
 <h2 id="lifecycle-1-first-startup-no-on-disk-file-yet">Lifecycle 1: First startup (no on-disk file yet)<a class="headerlink" href="#lifecycle-1-first-startup-no-on-disk-file-yet" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>flowchart TD
+<pre class="mermaid"><code>flowchart TD
     A[Plugin enables] --&gt; B{File exists on disk?}
     B -- No --&gt; C[Extract default file from jar]
     C --&gt; D[Parse with RtpYamlConfig]
     D --&gt; E[Populate in-memory parser data]
     B -- Yes --&gt; D
-    E --&gt; F[Plugin ready]
-</code></pre></div>
+    E --&gt; F[Plugin ready]</code></pre>
 <p>On first startup, every managed file is extracted verbatim from the jar (the active locale's variant if applicable), parsed, and held in memory. No upgrade logic runs because there is nothing on disk yet.</p>
 <hr />
 <h2 id="lifecycle-2-normal-startup-or-rtp-reload-versions-match">Lifecycle 2: Normal startup or <code>/rtp reload</code> (versions match)<a class="headerlink" href="#lifecycle-2-normal-startup-or-rtp-reload-versions-match" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>flowchart TD
+<pre class="mermaid"><code>flowchart TD
     A[Startup or /rtp reload] --&gt; B[Load locale rename map&lt;br/&gt;lang/file.lang.yml]
     B --&gt; C{Locale matches&lt;br/&gt;active locale?}
     C -- No --&gt; L1[See Lifecycle 4:&lt;br/&gt;Locale switch]
@@ -1800,14 +1799,13 @@
     F --&gt; G{Matches required&lt;br/&gt;version?}
     G -- Yes --&gt; H[Populate in-memory data&lt;br/&gt;from enum keys]
     G -- No --&gt; U1[See Lifecycle 3:&lt;br/&gt;Version upgrade]
-    H --&gt; I[Plugin ready / reload complete]
-</code></pre></div>
+    H --&gt; I[Plugin ready / reload complete]</code></pre>
 <p>The happy path: parse, check version, copy enum-keyed values into memory. No file rewrite happens. Comments you added to the YAML are preserved on disk because the file is never rewritten.</p>
 <p>If the file is corrupt (malformed YAML), RTP quarantines it (renames it to <code>&lt;file&gt;.yml.corrupt-&lt;timestamp&gt;</code>) and re-extracts jar defaults so the plugin self-heals on the next load rather than silently running with empty data. The quarantined file is left alone so you can recover edits from it.</p>
 <hr />
 <h2 id="lifecycle-3-version-upgrade-on-disk-version-required-version">Lifecycle 3: Version upgrade (on-disk version != required version)<a class="headerlink" href="#lifecycle-3-version-upgrade-on-disk-version-required-version" title="Permanent link">&para;</a></h2>
 <p>This is the case the issue's question targets: <strong>what happens when the plugin bumps a file's required version and you have customizations in the old file?</strong></p>
-<div class="highlight"><pre><span></span><code>flowchart TD
+<pre class="mermaid"><code>flowchart TD
     A[Version mismatch detected] --&gt; B[Snapshot current on-disk file&lt;br/&gt;into oldYaml&lt;br/&gt;via loadWithComments]
     B --&gt; C[Rotate files:&lt;br/&gt;file.old&lt;sub&gt;N&lt;/sub&gt; -&gt; file.old&lt;sub&gt;N+1&lt;/sub&gt;&lt;br/&gt;...&lt;br/&gt;file -&gt; file.old1]
     C --&gt; D[Extract fresh defaults from jar&lt;br/&gt;into the original path]
@@ -1824,8 +1822,7 @@
     J2 --&gt; M
     L --&gt; M[Continue overlay loop]
     M --&gt; N[Save merged file via RtpYamlConfig.save]
-    N --&gt; O[Populate in-memory data&lt;br/&gt;from enum keys]
-</code></pre></div>
+    N --&gt; O[Populate in-memory data&lt;br/&gt;from enum keys]</code></pre>
 <p><strong>Key guarantee:</strong> the snapshot in step B happens <strong>before</strong> any file is rotated or overwritten. The old values live entirely in memory while the new defaults are being written, then they are overlaid back on top. The on-disk <code>.old1</code> is also kept as a manual fallback.</p>
 <p><strong>What gets preserved automatically:</strong></p>
 <ul>
@@ -1843,20 +1840,19 @@
 <hr />
 <h2 id="lifecycle-4-locale-switch-you-changed-language-in-configyml">Lifecycle 4: Locale switch (you changed <code>language:</code> in <code>config.yml</code>)<a class="headerlink" href="#lifecycle-4-locale-switch-you-changed-language-in-configyml" title="Permanent link">&para;</a></h2>
 <p>YAML keys themselves may be translated for non-English locales (e.g. <code>teleportDelay</code> -&gt; <code>verzogerung_teleport</code> in a hypothetical German locale). Switching locales is therefore not just a translation of <em>values</em> — it is a rename of <em>keys</em>. RTP handles this without you having to hand-edit each file.</p>
-<div class="highlight"><pre><span></span><code>flowchart TD
-    A[/rtp reload after&lt;br/&gt;language: en -&gt; de/] --&gt; B[Load new locale&#39;s&lt;br/&gt;rename map&lt;br/&gt;lang/file.lang.yml]
+<pre class="mermaid"><code>flowchart TD
+    A[/rtp reload after&lt;br/&gt;language: en -&gt; de/] --&gt; B[Load new locale's&lt;br/&gt;rename map&lt;br/&gt;lang/file.lang.yml]
     B --&gt; C[Read on-disk file]
     C --&gt; D{Keys match&lt;br/&gt;new locale?}
     D -- Yes --&gt; Z[No migration needed&lt;br/&gt;see Lifecycle 2]
     D -- No --&gt; E[Detect: file is in a&lt;br/&gt;different locale]
-    E --&gt; F[For each on-disk key:&lt;br/&gt;look up the enum constant&lt;br/&gt;via the OLD locale&#39;s rename map]
+    E --&gt; F[For each on-disk key:&lt;br/&gt;look up the enum constant&lt;br/&gt;via the OLD locale's rename map]
     F --&gt; G[Build preservedValues:&lt;br/&gt;Map of enum -&gt; value]
     G --&gt; H[Run normal version-check&lt;br/&gt;and upgrade Lifecycle 3]
-    H --&gt; I[After file is rewritten&lt;br/&gt;under NEW locale&#39;s key names]
+    H --&gt; I[After file is rewritten&lt;br/&gt;under NEW locale's key names]
     I --&gt; J[Re-apply preservedValues&lt;br/&gt;via set enum, value]
-    J --&gt; K[set translates back to the&lt;br/&gt;new locale&#39;s key name and&lt;br/&gt;writes the customization]
-    K --&gt; L[Save and finish reload]
-</code></pre></div>
+    J --&gt; K[set translates back to the&lt;br/&gt;new locale's key name and&lt;br/&gt;writes the customization]
+    K --&gt; L[Save and finish reload]</code></pre>
 <p>This is governed by <a href="../../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/">ADR-020</a>. The in-memory representation is always enum-keyed (locale-independent); locale only affects what the YAML key looks like on disk. Switching locale rewrites the file under new key names but your numeric/string/boolean values come along for the ride.</p>
 <p>If you customized a value under the old locale's key name, after <code>/rtp reload</code> with a new <code>language:</code> you will find your customization under the new locale's key name in the same file. Nothing is lost.</p>
 <hr />
@@ -1870,7 +1866,7 @@
 </ol>
 <hr />
 <h2 id="disaster-recovery-restoring-a-customization-that-went-missing">Disaster recovery: restoring a customization that went missing<a class="headerlink" href="#disaster-recovery-restoring-a-customization-that-went-missing" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>flowchart TD
+<pre class="mermaid"><code>flowchart TD
     A[I think I lost a setting&lt;br/&gt;after /rtp reload] --&gt; B[Stop the server]
     B --&gt; C[Open plugins/RTP/file.yml.old1]
     C --&gt; D{Setting present&lt;br/&gt;with your value?}
@@ -1878,8 +1874,7 @@
     D -- Yes --&gt; F[Copy the line into the&lt;br/&gt;live file under the&lt;br/&gt;current key name]
     E --&gt; F
     F --&gt; G[Start server]
-    G --&gt; H[Verify with /rtp viewconfig]
-</code></pre></div>
+    G --&gt; H[Verify with /rtp viewconfig]</code></pre>
 <p><code>.oldN</code> files are plain YAML. You can read them with any editor. The newest snapshot is always <code>.old1</code>.</p>
 <p>If a key was renamed across versions, the safest reference is the <strong>new</strong> file's defaults plus the value you find in <code>.oldN</code>. The plugin's <a href="../../../CHANGELOG.md">CHANGELOG.md</a> lists any key renames per release.</p>
 <hr />

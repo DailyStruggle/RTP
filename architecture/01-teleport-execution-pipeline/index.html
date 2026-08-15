@@ -1488,7 +1488,7 @@
 <blockquote>
 <p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> §2 — Teleport pipeline (end-to-end)</a>.</p>
 </blockquote>
-<div class="highlight"><pre><span></span><code>stateDiagram-v2
+<pre class="mermaid"><code>stateDiagram-v2
     CmdTrigger : Player executes /rtp
     [*] --&gt; CmdTrigger
 
@@ -1532,12 +1532,12 @@
     cache_check --&gt; perm_check : Cache Empty
 
 %% Public Queue Loop
-    perm_check --&gt; QueueWait : Lacks &#39;unqueued&#39; perm
+    perm_check --&gt; QueueWait : Lacks 'unqueued' perm
     QueueWait --&gt; QueueWait : Loop while Cache Empty
     QueueWait --&gt; ReqTicket : Location Prepared (Spawn Async Worker)
 
 %% Unqueued Path
-    perm_check --&gt; GenRandom : Has &#39;unqueued&#39; perm (Start SETUP)
+    perm_check --&gt; GenRandom : Has 'unqueued' perm (Start SETUP)
 
 %% Generation &amp; Ticket Pipeline
     GenRandom --&gt; ReqTicket : Coords Generated
@@ -1560,8 +1560,7 @@
     class MovePlayer success
     class GenRandom,ReqTicket,EvalBlocks async
     class QueryCache,QueueWait data
-    class Teardown cleanup
-</code></pre></div>
+    class Teardown cleanup</code></pre>
 
 
 

@@ -1486,7 +1486,7 @@
 <blockquote>
 <p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> §4 — Chunk ticket lifecycle</a>.</p>
 </blockquote>
-<div class="highlight"><pre><span></span><code>stateDiagram-v2
+<pre class="mermaid"><code>stateDiagram-v2
     [*] --&gt; ReqTicket : Task Needs Chunk
 
     %% 1. Chunk Loading Context
@@ -1544,8 +1544,7 @@
     class UntrackRes success
     class ForceClose fail
     class ReqTicket,EvalBlocks,SweepTask async
-    class TrackRes,CheckStale,CloseRes,DropTicket data
-</code></pre></div>
+    class TrackRes,CheckStale,CloseRes,DropTicket data</code></pre>
 
 
 

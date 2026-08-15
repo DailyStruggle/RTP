@@ -1874,51 +1874,50 @@
 </ul>
 <h2 id="8-mermaid-chart">8. Mermaid chart<a class="headerlink" href="#8-mermaid-chart" title="Permanent link">&para;</a></h2>
 <p>Visual model of the new dispatch surface, including how it composes with the already-shipped config-view book menu and the anvil-input prompt.</p>
-<div class="highlight"><pre><span></span><code>flowchart TD
+<pre class="mermaid"><code>flowchart TD
     %% Existing surface (shaded by convention)
-    Front[&quot;/rtp menu (front page)&quot;]
-    Admin[&quot;Admin panel (AdminPanelBuilder)&quot;]
-    Selector[&quot;OpenConfigSelector&lt;br/&gt;(global files: config.yml, safety.yml, ...)&quot;]
-    File[&quot;OpenConfigFile&lt;br/&gt;(staging cart)&quot;]
+    Front["/rtp menu (front page)"]
+    Admin["Admin panel (AdminPanelBuilder)"]
+    Selector["OpenConfigSelector&lt;br/&gt;(global files: config.yml, safety.yml, ...)"]
+    File["OpenConfigFile&lt;br/&gt;(staging cart)"]
 
     Front --&gt; Admin
     Admin --&gt; Selector
     Selector --&gt; File
-    File --&gt;|Apply| ConfigApply[&quot;MenuRedeemSubcommand&lt;br/&gt;cart apply&quot;]
+    File --&gt;|Apply| ConfigApply["MenuRedeemSubcommand&lt;br/&gt;cart apply"]
 
     %% New surface
-    Admin -- &quot;rtp.config.view&quot; --&gt; MCSel
-    MCSel[&quot;OpenMultiConfigSelector(parserKind)&lt;br/&gt;regions / worlds / future&quot;]
+    Admin -- "rtp.config.view" --&gt; MCSel
+    MCSel["OpenMultiConfigSelector(parserKind)&lt;br/&gt;regions / worlds / future"]
 
     MCSel --&gt;|toggle row click| MCSel
-    MCSel --&gt;|+ Add new...| AnvilPrompt[&quot;PromptAnvilInput&lt;br/&gt;prefill = default&amp;lt;N&amp;gt;&quot;]
-    MCSel --&gt;|entry row click&lt;br/&gt;(normal mode)| MCEntry[&quot;OpenMultiConfigEntry&lt;br/&gt;(parserKind, entryName)&quot;]
-    MCSel --&gt;|entry row click&lt;br/&gt;(remove mode, non-locked)| ConfirmRem[&quot;buildConfirmRemove&quot;]
-    MCSel -.-&gt;|locked row&lt;br/&gt;(gray, non-clickable)| LockHover[&quot;hover: messages.multiconfig.lock.*&quot;]
+    MCSel --&gt;|+ Add new...| AnvilPrompt["PromptAnvilInput&lt;br/&gt;prefill = default&amp;lt;N&amp;gt;"]
+    MCSel --&gt;|entry row click&lt;br/&gt;(normal mode)| MCEntry["OpenMultiConfigEntry&lt;br/&gt;(parserKind, entryName)"]
+    MCSel --&gt;|entry row click&lt;br/&gt;(remove mode, non-locked)| ConfirmRem["buildConfirmRemove"]
+    MCSel -.-&gt;|locked row&lt;br/&gt;(gray, non-clickable)| LockHover["hover: messages.multiconfig.lock.*"]
 
-    AnvilPrompt --&gt;|confirm| MutateAdd[&quot;MultiConfigMutate(parserKind, name, ADD)&quot;]
-    ConfirmRem --&gt;|confirm| MutateRem[&quot;MultiConfigMutate(parserKind, name, REMOVE)&quot;]
+    AnvilPrompt --&gt;|confirm| MutateAdd["MultiConfigMutate(parserKind, name, ADD)"]
+    ConfirmRem --&gt;|confirm| MutateRem["MultiConfigMutate(parserKind, name, REMOVE)"]
     ConfirmRem --&gt;|cancel| MCSel
 
-    MutateAdd --&gt;|&quot;rtp.config.edit + name valid&quot;| AddDispatch[&quot;MenuRedeemSubcommand&lt;br/&gt;dispatchMultiConfigMutate ADD&lt;br/&gt;parser.addParser(name)&lt;br/&gt;NetherEndConfigAmender.amend(...)&quot;]
+    MutateAdd --&gt;|"rtp.config.edit + name valid"| AddDispatch["MenuRedeemSubcommand&lt;br/&gt;dispatchMultiConfigMutate ADD&lt;br/&gt;parser.addParser(name)&lt;br/&gt;NetherEndConfigAmender.amend(...)"]
     AddDispatch --&gt; MCSel
 
-    MutateRem --&gt;|&quot;rtp.config.edit + guard.isLocked(name)==false&quot;| RemDispatch[&quot;MenuRedeemSubcommand&lt;br/&gt;dispatchMultiConfigMutate REMOVE&lt;br/&gt;configParserFactory.remove + file.deleteOnExit&quot;]
+    MutateRem --&gt;|"rtp.config.edit + guard.isLocked(name)==false"| RemDispatch["MenuRedeemSubcommand&lt;br/&gt;dispatchMultiConfigMutate REMOVE&lt;br/&gt;configParserFactory.remove + file.deleteOnExit"]
     RemDispatch --&gt; MCSel
 
     MCEntry --&gt;|Apply| ConfigApply
 
     %% Guards
-    Guards[&quot;MultiConfigRemovalGuards&lt;br/&gt;(registry)&quot;]
-    Guards -.-&gt;|regions: lock &#39;default&#39;| MCSel
+    Guards["MultiConfigRemovalGuards&lt;br/&gt;(registry)"]
+    Guards -.-&gt;|regions: lock 'default'| MCSel
     Guards -.-&gt;|worlds: lock if server has world| MCSel
     Guards -.-&gt;|server-side re-check| RemDispatch
 
     %% Reject paths
-    Reject[&quot;reject(menuInvalid)&lt;br/&gt;S-004 log WARN&quot;]
+    Reject["reject(menuInvalid)&lt;br/&gt;S-004 log WARN"]
     MutateAdd -.-&gt;|invalid name / taken / no perm| Reject
-    MutateRem -.-&gt;|locked / no perm / unknown kind| Reject
-</code></pre></div>
+    MutateRem -.-&gt;|locked / no perm / unknown kind| Reject</code></pre>
 <hr />
 <p>End of proposal. The next session should open <code>CHECKLIST-multiconfig-menu.md</code>, re-verify the latest checked box if any, then continue from the first unchecked step.</p>
 

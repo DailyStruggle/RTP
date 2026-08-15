@@ -1524,7 +1524,7 @@
 <blockquote>
 <p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> §13 — Configuration load and reload</a>.</p>
 </blockquote>
-<div class="highlight"><pre><span></span><code>flowchart TD
+<pre class="mermaid"><code>flowchart TD
     %% Color legend: green = live-parser swap (new readers see new values), red = in-flight cancel / region shutdown, blue = disk I/O + async shape selection, yellow = config data / snapshot
 
     Trigger{{First enable&lt;br/&gt;or /rtp reload}}:::data
@@ -1551,7 +1551,7 @@
     BuildRegions[For each regions/*.yml:&lt;br/&gt;RegionConfigLoader.load -&gt; RegionSettings]:::async
     Dormant{World loaded?}:::data
     LiveRegion[new Region world bound&lt;br/&gt;log success]:::success
-    DormantRegion[new Region world=null&lt;br/&gt;log &#39;dormant&#39;&lt;br/&gt;OnWorldLoadUnload will rebind]:::data
+    DormantRegion[new Region world=null&lt;br/&gt;log 'dormant'&lt;br/&gt;OnWorldLoadUnload will rebind]:::data
     ShapePick[miscAsyncTasks: region.getShape.select&lt;br/&gt;skipped if dormant or null shape]:::async
 
     OnReload[onReload callbacks&lt;br/&gt;e.g. integrations reattach]:::success
@@ -1576,8 +1576,7 @@
     classDef success fill:#b7e4b7,stroke:#1f6b1f,stroke-width:2px,color:#0b2a0b;
     classDef fail    fill:#f4b7b7,stroke:#8a1f1f,color:#3a0b0b;
     classDef async   fill:#cfe2ff,stroke:#1f4e8a,color:#0b1f3a;
-    classDef data    fill:#fff2b3,stroke:#8a6d1f,color:#3a2f0b;
-</code></pre></div>
+    classDef data    fill:#fff2b3,stroke:#8a6d1f,color:#3a2f0b;</code></pre>
 <h2 id="how-to-read-this-chart">How to read this chart<a class="headerlink" href="#how-to-read-this-chart" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Single accepting state:</strong> <code>Done</code>. Every other node is either preparatory I/O (blue), destructive bookkeeping (red), a data/decision point (yellow), or the atomic swap (green).</li>

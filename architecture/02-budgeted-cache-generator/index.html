@@ -1487,7 +1487,7 @@
 <blockquote>
 <p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> §3 — Budgeted cache generator</a>.</p>
 </blockquote>
-<div class="highlight"><pre><span></span><code>stateDiagram-v2
+<pre class="mermaid"><code>stateDiagram-v2
     PulseTrigger : selectionAPI.compute() [Async]
     [*] --&gt; PulseTrigger
 
@@ -1495,7 +1495,7 @@
     state Budgeted_Task_Pipeline {
         InitBudget : Initialize Execution Budget
         CheckBudget : Budget Remaining? (Time or Count)
-        CheckPeriod : Is Region Due? (Based on &#39;period&#39;)
+        CheckPeriod : Is Region Due? (Based on 'period')
         ExecuteRegion : region.execute() [Platform Scheduler]
         YieldTask : Yield to next tick/pulse
     }
@@ -1537,8 +1537,7 @@
     class PushQueue,WakePlayer success
     class PulseTrigger,SpawnWorker,ExecuteRegion async
     class InitBudget,CheckBudget,CheckPeriod data
-    class YieldTask cleanup
-</code></pre></div>
+    class YieldTask cleanup</code></pre>
 
 
 

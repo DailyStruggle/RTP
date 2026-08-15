@@ -1486,7 +1486,7 @@
 <blockquote>
 <p>Companion walkthrough: <a href="../../dev/CODE_TOUR/"><code>CODE_TOUR.md</code> §5 — Active GC sweep</a>.</p>
 </blockquote>
-<div class="highlight"><pre><span></span><code>stateDiagram-v2
+<pre class="mermaid"><code>stateDiagram-v2
     TimerTrigger : Async GC Timer Pulse
     [*] --&gt; TimerTrigger
 
@@ -1538,8 +1538,7 @@
     classDef data  fill:#fff2b3,stroke:#8a6d1f,color:#3a2f0b;
     class ForceClose,DropOrphan fail
     class TimerTrigger,FetchMap,FetchServer async
-    class CheckTimeout,CheckTracked,DecCounter,Untrack data
-</code></pre></div>
+    class CheckTimeout,CheckTracked,DecCounter,Untrack data</code></pre>
 
 
 

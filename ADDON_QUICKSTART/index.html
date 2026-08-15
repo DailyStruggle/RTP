@@ -1646,7 +1646,7 @@
 
 
 <h1 id="addon-quickstart-register-a-custom-shape">Addon Quickstart - Register a Custom Shape<a class="headerlink" href="#addon-quickstart-register-a-custom-shape" title="Permanent link">&para;</a></h1>
-<p><strong>Current Plugin Version:</strong> <code>@version@</code></p>
+<p><strong>Current Plugin Version:</strong> <code>3.2.1</code></p>
 <p>This is the shortest path from nothing to a working RTP addon that registers a custom
 region shape. It is the "hello world" companion to the router in
 <a href="../FOR_ADDON_DEVELOPERS/"><code>FOR_ADDON_DEVELOPERS.md</code></a> and the fuller walkthrough in
@@ -1691,38 +1691,59 @@ dependencies {
 <hr />
 <h2 id="3-register-a-custom-shape-in-20-lines">3. Register a custom shape in ~20 lines<a class="headerlink" href="#3-register-a-custom-shape-in-20-lines" title="Permanent link">&para;</a></h2>
 <p><code>onLoad()</code> runs once, after <code>rtp-core</code> has finished initialising, on an RTP task thread.
-That is the moment to register your shape. The simplest custom shape is a re-configured
-clone of a built-in one, registered under a new name so operators can select it as a region
-shape named <code>BIGSQUARE</code> exactly like any built-in shape:</p>
+That is the moment to register your shape. A genuine custom shape is a subclass that changes
+the geometry <em>in code</em>, not just a re-configured clone of a built-in one. The example below
+subclasses the built-in <code>Square</code> and overrides <code>select()</code> to rotate every chosen point 45
+degrees about the region centre, turning the axis-aligned square ring into a diamond-oriented
+one. It is a pure coordinate transform: still bounded, no reroll loop (see
+<a href="../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>).</p>
 <div class="highlight"><pre><span></span><code><span class="kn">package</span><span class="w"> </span><span class="nn">com.example.myrtpaddon</span><span class="p">;</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.api.addon.RTPAddon</span><span class="p">;</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.RTP</span><span class="p">;</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square</span><span class="p">;</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams</span><span class="p">;</span>
 
-<span class="kd">public</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kd">class</span> <span class="nc">MyRtpAddon</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">RTPAddon</span><span class="w"> </span><span class="p">{</span>
+<span class="cm">/** A square spawn ring rotated 45 degrees into a diamond, computed programmatically. */</span>
+<span class="kd">public</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kd">class</span> <span class="nc">DiamondShape</span><span class="w"> </span><span class="kd">extends</span><span class="w"> </span><span class="n">Square</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="nf">DiamondShape</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">super</span><span class="p">(</span><span class="s">&quot;DIAMOND&quot;</span><span class="p">);</span><span class="w"> </span><span class="c1">// operators select it as shape=DIAMOND, like any built-in</span>
+<span class="w">  </span><span class="p">}</span>
 
 <span class="w">  </span><span class="nd">@Override</span>
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="kt">int</span><span class="o">[]</span><span class="w"> </span><span class="nf">select</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Start from the built-in square distribution, then rotate the picked</span>
+<span class="w">    </span><span class="c1">// (x, z) by 45 degrees. Rotation preserves magnitude, so the result stays</span>
+<span class="w">    </span><span class="c1">// inside the same bounded range - no unbounded reroll.</span>
+<span class="w">    </span><span class="kt">int</span><span class="o">[]</span><span class="w"> </span><span class="n">xz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kd">super</span><span class="p">.</span><span class="na">select</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">double</span><span class="w"> </span><span class="n">inv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">Math</span><span class="p">.</span><span class="na">sqrt</span><span class="p">(</span><span class="mf">2.0</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">rx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="n">Math</span><span class="p">.</span><span class="na">round</span><span class="p">((</span><span class="n">xz</span><span class="o">[</span><span class="mi">0</span><span class="o">]</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">xz</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">inv</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">rz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="n">Math</span><span class="p">.</span><span class="na">round</span><span class="p">((</span><span class="n">xz</span><span class="o">[</span><span class="mi">0</span><span class="o">]</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">xz</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">inv</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="kt">int</span><span class="o">[]</span><span class="w"> </span><span class="p">{</span><span class="n">rx</span><span class="p">,</span><span class="w"> </span><span class="n">rz</span><span class="p">};</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Register the instance from your <code>RTPAddon.onLoad()</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">public</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kd">class</span> <span class="nc">MyRtpAddon</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">RTPAddon</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nd">@Override</span>
 <span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">onLoad</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="c1">// A 4096-radius square spawn ring, registered under a new name.</span>
-<span class="w">    </span><span class="n">Square</span><span class="w"> </span><span class="n">bigSquare</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">Square</span><span class="p">(</span><span class="s">&quot;BIGSQUARE&quot;</span><span class="p">);</span>
-<span class="w">    </span><span class="n">bigSquare</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="n">GenericMemoryShapeParams</span><span class="p">.</span><span class="na">radius</span><span class="p">,</span><span class="w"> </span><span class="mi">4096</span><span class="p">);</span>
-<span class="w">    </span><span class="n">bigSquare</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="n">GenericMemoryShapeParams</span><span class="p">.</span><span class="na">centerRadius</span><span class="p">,</span><span class="w"> </span><span class="mi">512</span><span class="p">);</span>
-<span class="w">    </span><span class="n">RTP</span><span class="p">.</span><span class="na">addShape</span><span class="p">(</span><span class="n">bigSquare</span><span class="p">);</span>
-<span class="w">    </span><span class="n">RTP</span><span class="p">.</span><span class="na">log</span><span class="p">(</span><span class="n">java</span><span class="p">.</span><span class="na">util</span><span class="p">.</span><span class="na">logging</span><span class="p">.</span><span class="na">Level</span><span class="p">.</span><span class="na">INFO</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;[MyRtpAddon] registered shape BIGSQUARE&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">RTP</span><span class="p">.</span><span class="na">addShape</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">DiamondShape</span><span class="p">());</span>
+<span class="w">    </span><span class="n">RTP</span><span class="p">.</span><span class="na">log</span><span class="p">(</span><span class="n">java</span><span class="p">.</span><span class="na">util</span><span class="p">.</span><span class="na">logging</span><span class="p">.</span><span class="na">Level</span><span class="p">.</span><span class="na">INFO</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;[MyRtpAddon] registered shape DIAMOND&quot;</span><span class="p">);</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
 </code></pre></div>
 <p>That is the whole addon. Build it, drop the jar on RTP's classpath (see
-<a href="../dev/ADDON_LOADING/"><code>dev/ADDON_LOADING.md</code></a>), and <code>BIGSQUARE</code> is available everywhere a
-built-in shape is.</p>
+<a href="../dev/ADDON_LOADING/"><code>dev/ADDON_LOADING.md</code></a>), and <code>DIAMOND</code> is available everywhere a
+built-in shape is. Because <code>select()</code> is overridden the new geometry comes entirely from your
+code; the inherited <code>radius</code> / <code>centerRadius</code> knobs still tune the size of the ring you rotate.</p>
 <hr />
 <h2 id="4-fully-custom-geometry-when-a-re-config-is-not-enough">4. Fully custom geometry (when a re-config is not enough)<a class="headerlink" href="#4-fully-custom-geometry-when-a-re-config-is-not-enough" title="Permanent link">&para;</a></h2>
-<p>To define brand-new geometry rather than re-configuring an existing shape, extend
-<code>MemoryShape&lt;E extends Enum&lt;E&gt;&gt;</code> (the base for all spiral-mapped shapes) and implement its
-<code>xzToLocation</code> / <code>locationToXZ</code> / <code>getRange</code> / <code>rand</code> contract, then register the instance
-with the same <code>RTP.addShape(...)</code> call. Read
+<p>The <code>select()</code> override above reuses the parent square's spiral mapping. To define brand-new
+geometry from scratch - so that the bad-location cache, <code>uniqueplacements</code>, and the scan
+bitmap all stay consistent with your shape - extend <code>MemoryShape&lt;E extends Enum&lt;E&gt;&gt;</code> (the base
+for all spiral-mapped shapes) and implement its <code>xzToLocation</code> / <code>locationToXZ</code> / <code>getRange</code> /
+<code>rand</code> contract as a matched pair, then register the instance with the same <code>RTP.addShape(...)</code>
+call. Read
 <a href="../dev/CONCEPTS/"><code>dev/CONCEPTS.md</code></a> (the spiral 1D mapping) and
 <a href="../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a> first - the bounded-distribution
 contract is mandatory, and unbounded reroll loops are prohibited.</p>
