@@ -3,7 +3,7 @@ site_description: Fast, safe, bounded random teleportation for Bukkit, Paper, Fo
 site_author: DailyStruggle
 repo_name: DailyStruggle/RTP
 repo_url: https://github.com/DailyStruggle/RTP
-edit_uri: edit/main/docs/
+edit_uri: edit/V3/docs/
 
 # Serve the tracked Markdown under docs/ directly; no separate content copy.
 docs_dir: docs
@@ -130,7 +130,6 @@ exclude_docs: |
 # not warn about them being absent from nav.
 not_in_nav: |
   /dev/
-  /adr/
   /architecture/
   /assets/
   /site/README.md
