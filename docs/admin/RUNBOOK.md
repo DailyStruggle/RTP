@@ -1,6 +1,6 @@
 # Operator Runbook
 
-**Applies to Plugin Version:** `@version@`
+**Current Plugin Version:** `@version@`
 
 This document provides step-by-step diagnosis and resolution procedures for common operational
 problems. Each section follows the pattern: **Symptom → Diagnosis → Resolution**.

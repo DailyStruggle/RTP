@@ -1,6 +1,6 @@
 # Frequently Asked Questions
 
-**Applies to Plugin Version:** `@version@`
+**Current Plugin Version:** `@version@`
 
 Answers to the most common questions from server administrators and contributors.
 

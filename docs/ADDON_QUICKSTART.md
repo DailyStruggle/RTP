@@ -68,9 +68,12 @@ com.example.myrtpaddon.MyRtpAddon
 ## 3. Register a custom shape in ~20 lines
 
 `onLoad()` runs once, after `rtp-core` has finished initialising, on an RTP task thread.
-That is the moment to register your shape. The simplest custom shape is a re-configured
-clone of a built-in one, registered under a new name so operators can select it as a region
-shape named `BIGSQUARE` exactly like any built-in shape:
+That is the moment to register your shape. A genuine custom shape is a subclass that changes
+the geometry *in code*, not just a re-configured clone of a built-in one. The example below
+subclasses the built-in `Square` and overrides `select()` to rotate every chosen point 45
+degrees about the region centre, turning the axis-aligned square ring into a diamond-oriented
+one. It is a pure coordinate transform: still bounded, no reroll loop (see
+[ADR-001](adr/ADR-001-archimedean-spiral-1d-mapping.md)).
 
 ```java
 package com.example.myrtpaddon;
@@ -78,34 +81,55 @@ package com.example.myrtpaddon;
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 
-public final class MyRtpAddon implements RTPAddon {
+/** A square spawn ring rotated 45 degrees into a diamond, computed programmatically. */
+public final class DiamondShape extends Square {
+
+  public DiamondShape() {
+    super("DIAMOND"); // operators select it as shape=DIAMOND, like any built-in
+  }
 
   @Override
+  public int[] select() {
+    // Start from the built-in square distribution, then rotate the picked
+    // (x, z) by 45 degrees. Rotation preserves magnitude, so the result stays
+    // inside the same bounded range - no unbounded reroll.
+    int[] xz = super.select();
+    double inv = 1.0 / Math.sqrt(2.0);
+    int rx = (int) Math.round((xz[0] - xz[1]) * inv);
+    int rz = (int) Math.round((xz[0] + xz[1]) * inv);
+    return new int[] {rx, rz};
+  }
+}
+```
+
+Register the instance from your `RTPAddon.onLoad()`:
+
+```java
+public final class MyRtpAddon implements RTPAddon {
+  @Override
   public void onLoad() {
-    // A 4096-radius square spawn ring, registered under a new name.
-    Square bigSquare = new Square("BIGSQUARE");
-    bigSquare.set(GenericMemoryShapeParams.radius, 4096);
-    bigSquare.set(GenericMemoryShapeParams.centerRadius, 512);
-    RTP.addShape(bigSquare);
-    RTP.log(java.util.logging.Level.INFO, "[MyRtpAddon] registered shape BIGSQUARE");
+    RTP.addShape(new DiamondShape());
+    RTP.log(java.util.logging.Level.INFO, "[MyRtpAddon] registered shape DIAMOND");
   }
 }
 ```
 
 That is the whole addon. Build it, drop the jar on RTP's classpath (see
-[`dev/ADDON_LOADING.md`](dev/ADDON_LOADING.md)), and `BIGSQUARE` is available everywhere a
-built-in shape is.
+[`dev/ADDON_LOADING.md`](dev/ADDON_LOADING.md)), and `DIAMOND` is available everywhere a
+built-in shape is. Because `select()` is overridden the new geometry comes entirely from your
+code; the inherited `radius` / `centerRadius` knobs still tune the size of the ring you rotate.
 
 ---
 
 ## 4. Fully custom geometry (when a re-config is not enough)
 
-To define brand-new geometry rather than re-configuring an existing shape, extend
-`MemoryShape<E extends Enum<E>>` (the base for all spiral-mapped shapes) and implement its
-`xzToLocation` / `locationToXZ` / `getRange` / `rand` contract, then register the instance
-with the same `RTP.addShape(...)` call. Read
+The `select()` override above reuses the parent square's spiral mapping. To define brand-new
+geometry from scratch - so that the bad-location cache, `uniqueplacements`, and the scan
+bitmap all stay consistent with your shape - extend `MemoryShape<E extends Enum<E>>` (the base
+for all spiral-mapped shapes) and implement its `xzToLocation` / `locationToXZ` / `getRange` /
+`rand` contract as a matched pair, then register the instance with the same `RTP.addShape(...)`
+call. Read
 [`dev/CONCEPTS.md`](dev/CONCEPTS.md) (the spiral 1D mapping) and
 [ADR-001](adr/ADR-001-archimedean-spiral-1d-mapping.md) first - the bounded-distribution
 contract is mandatory, and unbounded reroll loops are prohibited.

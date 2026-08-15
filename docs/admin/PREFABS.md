@@ -1,6 +1,8 @@
 # Prefabs - one-click admin setups
 
-**Applies to plugin version:** `3.0.0-beta.3+` (post-prefab landing). If your jar predates the `Setup (quick start)` section in `/rtp admin`, prefabs are not available; the rest of [QUICK_START.md](QUICK_START.md) still applies.
+**Current Plugin Version:** `@version@`
+
+> **Availability:** Prefabs landed in `3.0.0-beta.3` (the `Setup (quick start)` section in `/rtp admin`). If your jar predates that, prefabs are not available; the rest of [QUICK_START.md](QUICK_START.md) still applies.
 
 > **TL;DR:** A prefab is a curated overlay on `performance.yml` and `regions/default.yml` (and, for `multi-world`, synthesised per-world region files) you can apply in one click from the admin panel. Apply opens a confirmation menu that shows the exact diff; confirming writes `.bak.<timestamp>` siblings of every touched file before replacing them. Rollback restores the most recent bak.
 

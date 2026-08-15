@@ -29,27 +29,81 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`dev/STAKEHOLDERS.md`](dev/STAKEHOLDERS.md) — roles.
 
 ## Decisions (`adr/`)
-- [`adr/README.md`](adr/README.md) — ADR index.
+- [`adr/README.md`](adr/README.md) — ADR index (authoritative, with statuses and subproject ADRs).
 - [`adr/ADR-TEMPLATE.md`](adr/ADR-TEMPLATE.md) — template.
+- `ADR-000` Development workflow (meta).
 - `ADR-001` Archimedean spiral 1D mapping.
 - `ADR-002` H2/SQLite over flat-file cache.
 - `ADR-003` `rtp-plugin` bridge module.
 - `ADR-004` Count-Bound TaskPipe on Folia.
 - `ADR-005` PaperLib removal.
 - `ADR-006` Async queue pre-generation.
-- `ADR-007` Per-user isolated queues.
+- `ADR-007` Per-user isolated queues (operational details superseded by ADR-043).
 - `ADR-008` Memory tracker / active GC.
 - `ADR-009` Configurable spatial distributions.
 - `ADR-010` Versioned platform adapter submodules.
 - `ADR-011` `rtp-api` separate module.
 - `ADR-012` Chunk reservation abstraction.
-- `ADR-013` Addons as external Gradle projects.
-- `commands-api-ADR-001` Brigadier bridge via `commands-api`.
+- `ADR-013` Addons as external Gradle projects (partially superseded by ADR-019).
 - `ADR-015` Stale-chunk guard / Count-Bound pipes.
 - `ADR-016` Anvil subsystem.
 - `ADR-017` Block tags and state predicates in safety lists.
 - `ADR-018` `AGENTS.md` public-release structure.
 - `ADR-019` Claim plugin integrations folded into plugin.
+- `ADR-020` Language bootstrap and locale-aware ConfigParser.
+- `ADR-021` Legacy MC and Java support out of scope.
+- `ADR-022` Shape cache key: seed + config hash.
+- `ADR-023` Login reserve cache for join-time RTP.
+- `ADR-024` RTP lite assembly variant.
+- `ADR-025` Replace SimpleYaml with internal SnakeYAML wrapper (proposed).
+- `ADR-026` External hook API surface.
+- `ADR-028` L3 backlog cache (`backlogLocations`).
+- `ADR-032` Teleport pipeline latency histogram (proposed).
+- `ADR-033` NeoForge platform in scope.
+- `ADR-034` Memory shape catalog and polygon shape.
+- `ADR-035` Interactive menus via written book (proposed).
+- `ADR-036` Network mode: multi-server, multi-proxy RTP.
+- `ADR-037` Harden RTP config commands.
+- `ADR-038` `/rtpadmin` setup wizards (proposed).
+- `ADR-039` `/rtpadmin` diagnostic surfaces (proposed).
+- `ADR-040` Cross-backend metric time-series publication (proposed).
+- `ADR-041` `/rtp config` command and save implementation (proposed).
+- `ADR-042` YAML comment preservation (block-only).
+- `ADR-043` `rtp.personalqueue` permission semantics (supersedes ADR-007 operational details).
+- `ADR-044` Command-tree menu reflector.
+- `ADR-045` RTP docs menu consumer.
+- `ADR-046` `maps-api` module for runtime cartography.
+- `ADR-047` Declarative chart composition bridge.
+- `ADR-048` Menu page builders behind `RTPServerAccessor` (proposed).
+- `ADR-049` Network-mode platform-neutral lift; `PlayerLifecycleHook` SPI.
+- `ADR-050` Concrete menu commands supersede tokens.
+- `ADR-051` Two-tier API extension model.
+- `ADR-052` Outcome metrics and cause-tagged bad locations.
+- `ADR-053` Pipeline latency percentiles and slow-teleport audit.
+- `ADR-054` RTPRunnable self-scheduling thread routing.
+- `ADR-055` PvP combat gate.
+- `ADR-056` Bare `/rtp` root action.
+- `ADR-057` Platform-agnostic addon SPI (`RTPAddon` + `AddonRegistry`).
+- `ADR-058` Region-specific schematic paste.
+- `ADR-059` Relative ground-distance safety predicate (proposed).
+- `ADR-060` Emergency-platform block-restoration timeout.
+- `ADR-061` Open-core dual licensing.
+- `ADR-062` Biome-probability weighting for location selection.
+- `ADR-063` Biome-first menu and auto-region by biome.
+- `ADR-064` Config-comment format: summary line as menu hover.
+- `ADR-065` World-override regions and the `/rtp` world menu.
+- `ADR-066` Foreign config importer.
+- `ADR-067` Adaptive scan rate and `.mca`-header generation check (proposed).
+- `ADR-068` Cross-server persisted teleport limits.
+- `ADR-069` Claim integrations extracted to bundled addon.
+- `ADR-070` Platform-neutral `/rtp` command root (`CoreRtpRoot`).
+- `ADR-071` Config organization and discoverability (proposed).
+- `ADR-072` Teleport view-distance clamp and steady restore.
+- `ADR-073` Config default inheritance via `@<file>` references (proposed).
+- `ADR-074` Operator-facing throughput and cost metrics (proposed).
+- `ADR-075` Platform-neutral player-move event SPI.
+- `ADR-076` Config folder consolidation.
+- Subproject ADRs (`commands-api`, `effects-api`, `maps-api`, `metrics-api`, `rtp-fabric`, `rtp-neoforge`, `rtp-proxy`, addons) — see the *Subproject ADRs* table in [`adr/README.md`](adr/README.md).
 
 ## Architecture slices (`architecture/`)
 - [`architecture/01-teleport-execution-pipeline.md`](architecture/01-teleport-execution-pipeline.md)
