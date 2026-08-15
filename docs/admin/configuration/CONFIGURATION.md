@@ -28,7 +28,6 @@ One jar covers every platform. Configuration is generated on first server start 
 | `advanced/network.yml` | Multi-server / multi-proxy network mode | [proxies/CONFIGURATION.md](../proxies/CONFIGURATION.md) |
 | `advanced/database.yml` | Database backend and connection settings | [CORE_CONFIG.md](CORE_CONFIG.md) |
 | `advanced/biomes.yml`, `advanced/blocks.yml` | Biome / block tag catalogs used by safety filters | [SAFETY.md](SAFETY.md) |
-| (no file - runtime behaviour) | How RTP reads region files (`.mca`) to find safe spots, and its fallback for formats it cannot read | [REGION_FILE_READING.md](../REGION_FILE_READING.md) |
 | `advanced/schematics/` | Per-region arrival structures (`.schem`) pasted on landing; also where prefabs drop their bundled schematic | [SCHEMATICS.md](SCHEMATICS.md) |
 
 ---
@@ -104,8 +103,8 @@ Normal-distribution variants replace `weight` with explicit statistical paramete
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `width` | Integer | — | Half-width of the rectangle in **chunks** (X-axis extent from centre). |
-| `height` | Integer | — | Half-height of the rectangle in **chunks** (Z-axis extent from centre). |
+| `width` | Integer | — | Full width of the rectangle (total X-axis extent, centred on the region). |
+| `height` | Integer | — | Full height of the rectangle (total Z-axis extent, centred on the region). |
 | `rotation` | Double | `0.0` | Rotation of the rectangle in degrees around the centre. |
 
 ---
