@@ -1,6 +1,6 @@
 # Command Reference
 
-**Applies to Plugin Version:** `3.0.0-beta.1`
+**Applies to Plugin Version:** `@version@`
 
 All RTP commands are subcommands of `/rtp`. Parameters are passed in `key:value` format and can be combined freely unless noted otherwise. Tab-completion is available for all parameters and reflects live server state.
 
@@ -325,7 +325,7 @@ Each displayed line is a clickable chat message; clicking it runs `/rtp <subcomm
 
 ## PlaceholderAPI Placeholders
 
-When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are available. All placeholders resolve against the requesting player's UUID at call time.
+When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are available. All placeholders resolve against the requesting player's UUID at call time, reflecting the player's current/last region context. The **same keys** also resolve inside `messages.yml` as `[key]` (square brackets) without PlaceholderAPI installed. A key with no value resolves to an empty string.
 
 | Placeholder | Description |
 |---|---|
@@ -344,12 +344,36 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 | `%rtp_world%` | Player's current world |
 | `%rtp_name%` | Player name |
 | `%rtp_region%` | Player's current region name |
+| `%rtp_displayName%` | Region's cosmetic display name (falls back to the region name) |
 | `%rtp_shape%` | Region shape type |
+| `%rtp_requirePermission%` | Whether the region requires `rtp.regions.<name>` |
+| `%rtp_override%` | The region's no-permission redirect target |
+| `%rtp_worldBorderOverride%` | Whether the region honors the vanilla world border |
+| `%rtp_pluginForced%` | Whether a plugin forced the region |
+| `%rtp_serverForced%` | Whether the server forced the region |
 | `%rtp_cacheCap%` | Region cache capacity |
 | `%rtp_backlogCacheCap%` | L3 backlog cache capacity (ADR-028); 0 disables L3 |
-| `%rtp_cached%` | Number of currently cached locations |
-| `%rtp_locationQueue%` | Location queue depth |
+| `%rtp_cached%` | Total currently cached locations |
+| `%rtp_keptCache%` | Locations whose chunks are kept loaded (hot/ready-to-serve) |
+| `%rtp_unkeptCache%` | Verified locations whose chunks were released (warm) |
+| `%rtp_backlogCache%` | Unverified backlog buffer depth |
+| `%rtp_locationQueue%` | Number of players waiting on a coordinate |
 | `%rtp_inFlightCalculations%` | In-flight async calculations |
+| `%rtp_pipelineMsP50%` | Teleport-pipeline latency, 50th percentile (ms) |
+| `%rtp_pipelineMsP75%` | Pipeline latency, 75th percentile (ms) |
+| `%rtp_pipelineMsP90%` | Pipeline latency, 90th percentile (ms) |
+| `%rtp_pipelineMsP95%` | Pipeline latency, 95th percentile (ms) |
+| `%rtp_pipelineMsP99%` | Pipeline latency, 99th percentile (ms) |
+| `%rtp_pipelineSampleCount%` | Number of latency samples in the current window |
+| `%rtp_slowPipelineCount%` | Count of pipeline runs over the slow threshold |
+| `%rtp_slowPipelineThresholdMs%` | The slow-pipeline threshold (ms) |
+| `%rtp_queueGrowthWarnCount%` | How many times queue growth tripped the warning |
+| `%rtp_queueGrowthWarnThreshold%` | The queue-growth warning threshold |
+| `%rtp_memCoveragePct%` | Percentage of the region mapped by spatial memory |
+| `%rtp_memBadPct%` | Percentage of mapped area marked unsafe |
+| `%rtp_memBadCount%` | Count of known-bad cells |
+| `%rtp_memTopCause%` | Most common rejection cause (biome, unsafe block, claim, ...) |
+| `%rtp_memTopCausePct%` | Share of rejections attributable to `memTopCause` |
 | `%rtp_scan_chunks%` | Chunks processed across all active scans |
 | `%rtp_scan_totalChunks%` | Total chunks to process across all active scans |
 | `%rtp_scan_cps%` | Chunks processed per second (all active scans) |

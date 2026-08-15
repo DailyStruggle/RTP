@@ -1348,6 +1348,25 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                                   java.util.function.Function<String, String> colorSupplier,
                                   boolean executeOnClick,
                                   @Nullable Consumer<String> messageMethod) {
+        return dispatchSelectionMenu(senderId, parentPath, paramName, displayName,
+                colorSupplier, executeOnClick, null, messageMethod);
+    }
+
+    /**
+     * Variant of {@link #dispatchSelectionMenu(UUID, String[], String, String,
+     * java.util.function.Function, boolean, Consumer)} that lets the caller
+     * override the Back-row destination. Used by the prefab picker, whose
+     * value-staging {@code parentPath} ({@code admin prefab apply}) is not a
+     * navigable page: its Back row must return to the admin panel.
+     */
+    boolean dispatchSelectionMenu(UUID senderId,
+                                  String[] parentPath,
+                                  String paramName,
+                                  String displayName,
+                                  java.util.function.Function<String, String> colorSupplier,
+                                  boolean executeOnClick,
+                                  @Nullable MenuAction backAction,
+                                  @Nullable Consumer<String> messageMethod) {
         if (renderer == null) {
             RTP.log(Level.WARNING,
                     "menu selection received with menu disabled for " + senderId);
@@ -1409,7 +1428,7 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         try {
             model = new SelectionMenuBuilder().build(
                     java.util.List.of(parentPath), paramName, displayName, entries,
-                    colorSupplier, executeOnClick);
+                    colorSupplier, executeOnClick, backAction);
         } catch (RuntimeException e) {
             RTP.log(Level.WARNING,
                     "menu selection failed for " + senderId
@@ -1651,6 +1670,19 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             return false;
         }
         String fileName = open.fileName();
+        // Slash-aware routing (ADR-050): a "<kind>/<entryName>" synthetic name
+        // addresses a multiconfig entry page, not a flat config file. The
+        // flat-config buildFile below cannot resolve a slash-bearing name and
+        // would reject it as "unknown file", which breaks the Back row of the
+        // finite-value picker opened for a multiconfig entry key (e.g. the
+        // shape/vert type picker on regions/<entry>). Route those to the
+        // multiconfig entry re-open so Back returns to the correct page.
+        if (fileName != null) {
+            int fileSlash = fileName.indexOf('/');
+            if (fileSlash > 0 && fileSlash < fileName.length() - 1) {
+                return reopenAfterCartOp(senderId, fileName, messageMethod);
+            }
+        }
         MenuModel model;
         try {
             // Item 6 of the staging-cart redesign: pass the viewer's current
@@ -1774,6 +1806,17 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                 if (rest == null) {
                     return v == null ? "" : String.valueOf(v);
                 }
+                // ADR-073 inheritance: a block value may be an @<file> reference
+                // token (e.g. region/world files store `shape: "@config"`) rather
+                // than a nested section. Descending into the raw token yields
+                // nothing, which surfaced as a spurious "(unset)" current value in
+                // the finite-value picker. Resolve the reference to its owning
+                // block first so the stored sub-key (e.g. shape.name) is found.
+                if (io.github.dailystruggle.rtp.common.configuration
+                        .ConfigDefaultResolver.isReference(v)) {
+                    v = io.github.dailystruggle.rtp.common.configuration
+                            .ConfigDefaultResolver.resolve(v, head, v);
+                }
                 Object nested = descendDotted(v, rest);
                 return nested == null ? "" : String.valueOf(nested);
             }
@@ -1789,6 +1832,26 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      */
     private static Object descendDotted(Object value, String dottedPath) {
         if (value == null || dottedPath == null || dottedPath.isEmpty()) return null;
+        // A materialized shape/vert block is stored in a region/world config
+        // parser not as a nested section but as a FactoryValue (e.g. a Shape
+        // object) whose sub-keys live in its own enum-keyed getData() map.
+        // Descending into it as if it were a section returned nothing, which
+        // surfaced as a spurious "(unset)" current value in the finite-value
+        // picker even after the operator picked a type. Descend via the
+        // enum-keyed data map instead.
+        if (value instanceof io.github.dailystruggle.rtp.common.factory.FactoryValue<?> fv) {
+            int dot = dottedPath.indexOf('.');
+            String head = dot < 0 ? dottedPath : dottedPath.substring(0, dot);
+            String rest = dot < 0 ? null : dottedPath.substring(dot + 1);
+            for (java.util.Map.Entry<? extends Enum<?>, Object> e : fv.getData().entrySet()) {
+                Enum<?> k = e.getKey();
+                if (k != null && k.name().equalsIgnoreCase(head)) {
+                    Object child = e.getValue();
+                    return rest == null ? child : descendDotted(child, rest);
+                }
+            }
+            return null;
+        }
         if (value instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection section) {
             try {
                 return section.get(dottedPath);
@@ -1988,15 +2051,31 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         if (paramName == null || paramName.isEmpty()) return java.util.List.of();
         io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection yamlRoot =
                 resolveYamlRootForFile(fileName);
-        if (yamlRoot == null) return java.util.List.of();
-        String comment;
-        try {
-            comment = yamlRoot.getComment(paramName);
-        } catch (RuntimeException ignored) {
-            return java.util.List.of();
+        String comment = null;
+        if (yamlRoot != null) {
+            try {
+                comment = yamlRoot.getComment(paramName);
+            } catch (RuntimeException ignored) {
+                comment = null;
+            }
         }
         io.github.dailystruggle.rtp.common.configuration.ConfigDirectives directives =
                 io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(comment);
+        // ADR-073 inheritance fallback: a dotted key like "shape.name" carries
+        // no local comment when its parent block ships an @<file> inheritance
+        // token (e.g. region/world files store `shape: "@config"`). The menu
+        // resolves that token for display; do the same for directive lookup so
+        // the finite-value picker still fires. Resolve the parent's reference
+        // to the owning default file and read the sub-key's comment there.
+        if (directives.options().isEmpty()
+                && (directives.source() == null || directives.source().isEmpty())) {
+            io.github.dailystruggle.rtp.common.configuration.ConfigDirectives inherited =
+                    resolveInheritedDirectives(fileName, paramName);
+            if (!inherited.options().isEmpty()
+                    || (inherited.source() != null && !inherited.source().isEmpty())) {
+                directives = inherited;
+            }
+        }
         if (!directives.options().isEmpty()) {
             return directives.options();
         }
@@ -2007,9 +2086,11 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             String s = source.toLowerCase(java.util.Locale.ROOT);
             switch (s) {
                 case "shape" ->
-                        keys = RTP.factoryMap.get(RTP.factoryNames.shape).map.keySet();
+                        keys = stripYmlSuffix(
+                                RTP.factoryMap.get(RTP.factoryNames.shape).map.keySet());
                 case "vert" ->
-                        keys = RTP.factoryMap.get(RTP.factoryNames.vert).map.keySet();
+                        keys = stripYmlSuffix(
+                                RTP.factoryMap.get(RTP.factoryNames.vert).map.keySet());
                 case "world" -> keys = RTP.serverAccessor.getRTPWorlds().stream()
                         .map(io.github.dailystruggle.rtp.api.world.RTPWorld::name)
                         .collect(java.util.stream.Collectors.toList());
@@ -2023,6 +2104,156 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         java.util.List<String> out = new java.util.ArrayList<>(keys);
         java.util.Collections.sort(out);
         return out;
+    }
+
+    /**
+     * Strip the internal {@code .yml}/{@code .YML} suffix that the
+     * {@link io.github.dailystruggle.rtp.common.factory.Factory} keyset carries
+     * (factory keys are stored upper-cased and {@code .YML}-suffixed, e.g.
+     * {@code SQUARE.YML}). Shape/vert type names are discriminators, not files,
+     * so the finite-value picker must present the bare type name
+     * ({@code SQUARE}) rather than a spurious {@code SQUARE.yml}. Empty results
+     * are skipped; casing is otherwise preserved.
+     */
+    private static java.util.List<String> stripYmlSuffix(
+            java.util.Collection<String> names) {
+        java.util.List<String> out = new java.util.ArrayList<>(names.size());
+        for (String name : names) {
+            if (name == null) continue;
+            String stripped = name;
+            if (stripped.length() >= 4
+                    && stripped.regionMatches(true, stripped.length() - 4, ".yml", 0, 4)) {
+                stripped = stripped.substring(0, stripped.length() - 4);
+            }
+            if (!stripped.isEmpty()) out.add(stripped);
+        }
+        return out;
+    }
+
+    /**
+     * Resolve directives for a {@code paramName} whose owning block comment does
+     * not live on the addressed file itself. This covers two related cases that
+     * both arise for runtime-created / inherited multiconfig entries (e.g.
+     * {@code regions/asdf}):
+     *
+     * <ul>
+     *   <li><b>Materialized entries.</b> A multiconfig entry's schema is defined
+     *       by the kind's {@code default} template. A runtime-created entry
+     *       often carries no block comments of its own, so the same key's
+     *       comment is read from {@code <kind>/default} (candidate A). This
+     *       recovers the {@code @source: world}/{@code @source: region}
+     *       discriminators on top-level keys.</li>
+     *   <li><b>ADR-073 inheritance.</b> A block inherited via an {@code @<file>}
+     *       reference token (e.g. a region file that ships {@code shape: "@config"})
+     *       carries no sub-key comment in either the entry or the template, so
+     *       the reference is followed to the owning file (candidate B), and -
+     *       whether or not the block is a live reference token or has been
+     *       materialized - the region/world schemas mirror
+     *       {@code config.yml#defaults.<paramName>}, which is consulted as a
+     *       final fallback (candidate C). This recovers the
+     *       {@code @source: shape}/{@code @source: vert} discriminators on
+     *       {@code shape.name} / {@code vert.name}.</li>
+     * </ul>
+     *
+     * <p>Returns an empty
+     * {@link io.github.dailystruggle.rtp.common.configuration.ConfigDirectives}
+     * when no candidate declares a finite domain. No file I/O - all comments are
+     * served from the in-memory cached YAML roots.
+     */
+    private static io.github.dailystruggle.rtp.common.configuration.ConfigDirectives
+            resolveInheritedDirectives(String fileName, String paramName) {
+        io.github.dailystruggle.rtp.common.configuration.ConfigDirectives empty =
+                io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(null);
+        if (paramName == null || paramName.isEmpty()) return empty;
+
+        int slash = fileName == null ? -1 : fileName.indexOf('/');
+        boolean multi = slash > 0 && slash < fileName.length() - 1;
+
+        // Candidate A: multiconfig entry schemas are defined by the kind's
+        // "default" template; a runtime-created entry often carries no block
+        // comments of its own, so read the same key's comment from
+        // "<kind>/default".
+        if (multi) {
+            String kind = fileName.substring(0, slash);
+            String entry = fileName.substring(slash + 1);
+            if (!stripYmlLower(entry).equals("default")) {
+                io.github.dailystruggle.rtp.common.configuration.ConfigDirectives d =
+                        directivesFor(kind + "/default", paramName);
+                if (hasFiniteDomain(d)) return d;
+            }
+        }
+
+        int dot = paramName.indexOf('.');
+        if (dot <= 0) return empty;
+        String parent = paramName.substring(0, dot);
+
+        // Candidate B: follow an explicit @<file> reference on the parent block.
+        try {
+            String rawParent;
+            if (multi) {
+                rawParent = resolveCurrentMultiConfigValueAsString(
+                        fileName.substring(0, slash), fileName.substring(slash + 1), parent);
+            } else {
+                rawParent = resolveCurrentConfigValueAsString(fileName, parent);
+            }
+            if (io.github.dailystruggle.rtp.common.configuration
+                    .ConfigDefaultResolver.isReference(rawParent)) {
+                String refFile = io.github.dailystruggle.rtp.common.configuration
+                        .ConfigDefaultResolver.referencedFile(rawParent);
+                if (refFile != null && !refFile.isEmpty()) {
+                    String lookupKey = refFile.equals("config")
+                            ? "defaults." + paramName
+                            : paramName;
+                    io.github.dailystruggle.rtp.common.configuration.ConfigDirectives d =
+                            directivesFor(refFile, lookupKey);
+                    if (hasFiniteDomain(d)) return d;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // fall through to candidate C
+        }
+
+        // Candidate C: region/world block schemas mirror config.yml#defaults, so
+        // a materialized (non-reference) inherited block still finds its
+        // directive under config.yml#defaults.<paramName>.
+        io.github.dailystruggle.rtp.common.configuration.ConfigDirectives fromConfig =
+                directivesFor("config", "defaults." + paramName);
+        if (hasFiniteDomain(fromConfig)) return fromConfig;
+
+        return empty;
+    }
+
+    /**
+     * Read the in-memory block comment for {@code key} in {@code fileName} and
+     * parse it into {@link io.github.dailystruggle.rtp.common.configuration.ConfigDirectives}.
+     * Returns empty directives when the file's YAML root is unavailable or the
+     * comment lookup fails. No file I/O.
+     */
+    private static io.github.dailystruggle.rtp.common.configuration.ConfigDirectives
+            directivesFor(String fileName, String key) {
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection root =
+                resolveYamlRootForFile(fileName);
+        if (root == null) {
+            return io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(null);
+        }
+        String comment;
+        try {
+            comment = root.getComment(key);
+        } catch (RuntimeException ignored) {
+            return io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(null);
+        }
+        return io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(comment);
+    }
+
+    /**
+     * @return {@code true} when {@code directives} declares a finite domain
+     *     (a non-empty {@code @options} list or a non-empty {@code @source}).
+     */
+    private static boolean hasFiniteDomain(
+            io.github.dailystruggle.rtp.common.configuration.ConfigDirectives directives) {
+        return directives != null
+                && (!directives.options().isEmpty()
+                    || (directives.source() != null && !directives.source().isEmpty()));
     }
 
     /**

@@ -101,6 +101,29 @@ class SelectionMenuBuilderTest {
     }
 
     @Test
+    void backRow_usesExplicitBackActionWhenSupplied() {
+        // The prefab picker stages onto the (non-navigable) `admin prefab apply`
+        // path, so it supplies an explicit Back destination (the admin panel).
+        MenuModel model = new SelectionMenuBuilder().build(
+                List.of("admin", "prefab", "apply"), "id", "prefab",
+                List.of("survival-default"), value -> "&2", false,
+                new MenuAction.OpenAdminPanel());
+        MenuFragment back = model.pages().get(0).lines().get(0).fragments().get(0);
+        assertTrue(back.action() instanceof MenuAction.OpenAdminPanel,
+                "explicit back action must be used for the Back row: " + back.action());
+    }
+
+    @Test
+    void backRow_defaultsToParentPathWhenNoBackActionSupplied() {
+        MenuModel model = new SelectionMenuBuilder().build(
+                List.of("admin", "prefab", "apply"), "id", "prefab",
+                List.of("survival-default"), value -> "&2", false);
+        MenuFragment back = model.pages().get(0).lines().get(0).fragments().get(0);
+        assertTrue(back.action() instanceof MenuAction.OpenMenu,
+                "default back action must re-open the parent path: " + back.action());
+    }
+
+    @Test
     void nullColorSupplier_defaultsToDarkGreen() {
         MenuModel model = new SelectionMenuBuilder().build(
                 List.of(), "region", "region", List.of("alpha"), null, true);

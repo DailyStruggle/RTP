@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-**Applies to Plugin Version:** `3.0.0-beta.1`
+**Applies to Plugin Version:** `@version@`
 
 Get RTP running on your server in under 5 minutes, then follow the rest of the sequence to take it to production. The numbered steps below are the **recommended end-to-end setup sequence**: prerequisites → install → worlds → regions → permissions → economy → scan → verify. Each step summarises what to do and links to the canonical doc for full detail.
 

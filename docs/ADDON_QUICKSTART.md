@@ -1,6 +1,6 @@
 # Addon Quickstart - Register a Custom Shape
 
-**Current Plugin Version:** `3.0.0-beta.1`
+**Current Plugin Version:** `@version@`
 
 This is the shortest path from nothing to a working RTP addon that registers a custom
 region shape. It is the "hello world" companion to the router in
