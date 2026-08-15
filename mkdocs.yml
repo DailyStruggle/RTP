@@ -63,7 +63,7 @@ plugins:
 # Only narrative + operator-facing pages are published. Internal engineering
 # trees (dev/, adr/, architecture/) are intentionally left out of nav.
 nav:
-  - Home: site/index.md
+  - Home: index.md
   - Why: site/why.md
   - Intended usage: site/intended-usage.md
   - What NOT to do: site/what-not-to-do.md
@@ -115,6 +115,7 @@ not_in_nav: |
   /architecture/
   /assets/
   /site/README.md
+  /site/index.md
   /FRONT_PAGE*.md
   /FRONT_PAGE*.bbcode
   /FRONT_PAGE_LITE_MODRINTH.md
