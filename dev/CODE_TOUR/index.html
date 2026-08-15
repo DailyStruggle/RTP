@@ -1,0 +1,2033 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>RTP Code Tour — Behavioral Flow for Repair Work - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#rtp-code-tour-behavioral-flow-for-repair-work" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              RTP Code Tour — Behavioral Flow for Repair Work
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-use-this-tour" class="md-nav__link">
+    <span class="md-ellipsis">
+      How to use this tour
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-module-map-where-does-my-change-go" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Module map — where does my change go?
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-teleport-pipeline-end-to-end" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Teleport pipeline (end-to-end)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-budgeted-cache-generator-queue-refill" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Budgeted cache generator (queue refill)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-chunk-ticket-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Chunk ticket lifecycle
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-active-gc-sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Active GC sweep
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-scan-task-crawler" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Scan task crawler
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-failure-attribution-and-user-feedback" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Failure attribution and user feedback
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-folia-threading-gotchas" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Folia threading gotchas
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-your-first-repair-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. Your first repair — checklist
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-plugin-setup-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. Plugin setup lifecycle
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-how-behaviors-are-decided" class="md-nav__link">
+    <span class="md-ellipsis">
+      11. How behaviors are decided
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-location-selection-per-attempt" class="md-nav__link">
+    <span class="md-ellipsis">
+      12. Location selection (per attempt)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-configuration-load-and-reload" class="md-nav__link">
+    <span class="md-ellipsis">
+      13. Configuration load and reload
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-shutdown-and-flush-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      14. Shutdown and flush lifecycle
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="rtp-code-tour-behavioral-flow-for-repair-work">RTP Code Tour — Behavioral Flow for Repair Work<a class="headerlink" href="#rtp-code-tour-behavioral-flow-for-repair-work" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Audience.</strong> Minecraft plugin developers at roughly CS-student level (and AI agents) whose job is to locate <em>where</em> RTP might need repair given a reported behavior — a laggy teleport, a stuck queue, a leaked chunk, a rejected safe spot, a cancelled <code>/rtp</code> with no feedback.</p>
+<p><strong>This doc is not a reference.</strong> It is a guided walk through the diagrams in <a href="../architecture/"><code>docs/architecture/</code></a> and the module graph in <a href="../ARCHITECTURE/"><code>ARCHITECTURE.md</code></a>, narrating each arrow with <em>what can go wrong there</em> and <em>which rule or ADR governs the answer</em>. Detailed explanations live in the linked docs; read them only when the tour points you at them.</p>
+<p><strong>Before you change code</strong>, run the pre-flight checklist in <a href="../../.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> (S-00x rules, Folia threading, <code>.bak</code> policy).</p>
+</blockquote>
+<hr />
+<h2 id="how-to-use-this-tour">How to use this tour<a class="headerlink" href="#how-to-use-this-tour" title="Permanent link">&para;</a></h2>
+<p>Pick the symptom closest to the reported bug, jump to that section, and follow the diagram arrows. Each step answers three questions:</p>
+<ol>
+<li><strong>Where am I in the code?</strong> (module → class → method)</li>
+<li><strong>What invariant must hold here?</strong> (S-00x rule, REQ-*, ADR)</li>
+<li><strong>How does this step typically break?</strong> (the realistic failure mode)</li>
+</ol>
+<p>If a section sends you to a sibling doc, treat that doc as <em>optional deep-reading</em> — return here when done.</p>
+<p>Symptom → start here:</p>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Section</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"<code>/rtp</code> takes seconds / blocks the server"</td>
+<td><a href="#2-teleport-pipeline-end-to-end">§2 Teleport pipeline</a></td>
+</tr>
+<tr>
+<td>"Queue never refills / always empty"</td>
+<td><a href="#3-budgeted-cache-generator-queue-refill">§3 Budgeted cache generator</a></td>
+</tr>
+<tr>
+<td>"Chunks stay loaded forever / RAM grows"</td>
+<td><a href="#4-chunk-ticket-lifecycle">§4 Chunk ticket lifecycle</a> and <a href="#5-active-gc-sweep">§5 Active GC sweep</a></td>
+</tr>
+<tr>
+<td>"<code>/rtp scan</code> stalls, crashes, or never finishes"</td>
+<td><a href="#6-scan-task-crawler">§6 Scan task crawler</a></td>
+</tr>
+<tr>
+<td>"I don't know which module to edit"</td>
+<td><a href="#1-module-map-where-does-my-change-go">§1 Module map</a></td>
+</tr>
+<tr>
+<td>"Teleport silently does nothing / no error message"</td>
+<td><a href="#7-failure-attribution-and-user-feedback">§7 Failure attribution and user feedback</a></td>
+</tr>
+<tr>
+<td>"Folia throws <code>ThreadAccessException</code> / wrong region"</td>
+<td><a href="#8-folia-threading-gotchas">§8 Folia threading gotchas</a></td>
+</tr>
+<tr>
+<td>"Plugin doesn't start / missed WorldLoadEvent / integrations didn't hook"</td>
+<td><a href="#10-plugin-setup-lifecycle">§10 Plugin setup lifecycle</a></td>
+</tr>
+<tr>
+<td>"Why did <code>/rtp</code> pick <em>that</em> world/region? / override loop error"</td>
+<td><a href="#11-how-behaviors-are-decided">§11 How behaviors are decided</a></td>
+</tr>
+<tr>
+<td>"Why was this spot rejected? / too many <code>vert</code> / <code>biome</code> / <code>safety</code> misses"</td>
+<td><a href="#12-location-selection-per-attempt">§12 Location selection per attempt</a></td>
+</tr>
+<tr>
+<td>"Changed a config value and it didn't take effect / <code>/rtp reload</code> leaks / messages stuck in English"</td>
+<td><a href="#13-configuration-load-and-reload">§13 Configuration load and reload</a></td>
+</tr>
+<tr>
+<td>"Server stop hangs / cached locations lost after restart / leaked chunks on <code>/stop</code>"</td>
+<td><a href="#14-shutdown-and-flush-lifecycle">§14 Shutdown and flush lifecycle</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-module-map-where-does-my-change-go">1. Module map — where does my change go?<a class="headerlink" href="#1-module-map-where-does-my-change-go" title="Permanent link">&para;</a></h2>
+<p>The dependency graph (source: <a href="../ARCHITECTURE/#module-dependency-graph"><code>ARCHITECTURE.md</code></a>) tells you the <em>only</em> legal direction code may flow:</p>
+<div class="highlight"><pre><span></span><code>rtp-api ──► rtp-core ──► rtp-plugin ◄── rtp-bukkit / rtp-paper / rtp-folia
+   │                                    (and rtp-core ──► rtp-fabric)
+   └──► addons/
+</code></pre></div>
+<p><strong>Repair rule of thumb.</strong> Ask <em>"is the bug behavior different on Folia vs Paper vs Spigot?"</em></p>
+<ul>
+<li><strong>Same on every platform</strong> → the defect lives in <code>rtp-core</code> or <code>rtp-api</code>. Never put <code>org.bukkit.*</code> imports there — <code>RTPServerAccessor</code> is the only bridge (see <a href="../../.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Logging &amp; Feedback</a>).</li>
+<li><strong>One platform only</strong> → the defect lives in that platform adapter. Do <strong>not</strong> "fix" it in core by branching on platform; push the difference behind an abstraction.</li>
+<li><strong>Only in addons</strong> → the addon calls <code>rtp-api</code> incorrectly, or <code>rtp-api</code> needs a new capability (propose via ADR first — see <a href="../../adr/"><code>docs/adr/README.md</code></a>).</li>
+</ul>
+<blockquote>
+<p>Deep read (optional): <a href="../ARCHITECTURE/"><code>ARCHITECTURE.md</code></a> for the enforced boundaries, <a href="../DESIGN/"><code>DESIGN.md</code></a> for why they exist.</p>
+</blockquote>
+<hr />
+<h2 id="2-teleport-pipeline-end-to-end">2. Teleport pipeline (end-to-end)<a class="headerlink" href="#2-teleport-pipeline-end-to-end" title="Permanent link">&para;</a></h2>
+<p>Canonical diagram: <a href="../../architecture/01-teleport-execution-pipeline/"><code>docs/architecture/01-teleport-execution-pipeline.md</code></a>. Open it in a side window; each node below matches a state in that state-diagram.</p>
+<p>The pipeline is four phases — <strong>Setup → Load → Teleport → Cleanup</strong> — embodied by <code>TeleportPipelineTask</code> in <code>rtp-core/.../common/tasks/teleport/</code>. Static action lists (<code>setupPreActions</code>, <code>setupPostActions</code>, <code>loadPreActions</code>, …) are the only supported extension points; addons register into them.</p>
+<p>Walk the diagram with repair eyes:</p>
+<ol>
+<li>
+<p><strong><code>CmdTrigger</code> → <code>QueryCache</code>.</strong> The player runs <code>/rtp</code>. The command lives in <code>commands-api</code> and the Bukkit dispatch in <code>rtp-plugin/.../bukkit/commands/</code>. <em>Break:</em> if the user sees nothing at all, the command probably failed parameter validation — see REQ-RTP-S-007 ("busy" / "invalid command" messages must be configurable via <code>messages.yml</code>) and §7 below.</p>
+</li>
+<li>
+<p><strong><code>QueryCache</code> choice node.</strong> <code>RegionQueueManager</code> checks whether a pre-validated location is already waiting. <em>Break:</em> if teleport is instant when the server is idle but slow under load, the region's queue is starving — jump to <a href="#3-budgeted-cache-generator-queue-refill">§3</a>.</p>
+</li>
+<li>
+<p><strong><code>cache_check → ReqTicket</code> (hot path) / <code>perm_check</code> (cold path).</strong> The <code>unqueued</code> permission lets a player skip the wait and trigger an ad-hoc search. <em>Break:</em> a player with <code>unqueued</code> causing server stutter is running an unbounded loop — ensure the shape is an Archimedean 1D mapping, not a reroll loop (<a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>).</p>
+</li>
+<li>
+<p><strong><code>GenRandom</code> — SETUP stage.</strong> The shape (<code>Circle</code>, <code>Square</code>, …) emits <code>(x,z)</code> from its 1D index. This runs on an async worker. <em>Break:</em> non-uniform distribution usually means a custom <code>Shape</code> in an addon violates the 1D contract; <code>MemoryShape</code> caching of bad indices can also mask it.</p>
+</li>
+<li>
+<p><strong><code>ReqTicket</code> — LOAD stage.</strong> Here the platform adapter is called to asynchronously acquire a chunk ticket. This is the single highest-risk step in the whole plugin:</p>
+</li>
+<li><strong>S-005</strong> — no synchronous chunk I/O on the main thread.</li>
+<li><strong>S-002</strong> — no permanently force-loaded chunks (use plugin chunk tickets, not <code>Chunk.setForceLoaded(true)</code>).</li>
+<li>
+<p>On pure Spigot, <code>BukkitRTPWorld.loadChunkFuture</code> may bounce to tick; see <a href="../DESIGN/"><code>DESIGN.md §rtp-bukkit Implementation Notes</code></a> and <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a> for the Anvil pre-filter that avoids a load.</p>
+</li>
+<li>
+<p><strong><code>EvalBlocks</code> — TELEPORT-prep safety.</strong> Runs on the region-owning thread (Folia) or main thread (Paper/Spigot). <em>Break:</em> if a "safe" spot turns out to be in lava or a claim, inspect <code>Region.isSafe</code> plus the verticalAdjustor and the <code>badLocation</code> predicates — see <a href="../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/">ADR-017</a>. S-001 forbids <em>unsafe-block destinations</em>; S-003 forbids <em>claim-protected land</em>. Never add a "second" block check in an adapter — keep all checks in <code>rtp-core</code>.</p>
+</li>
+<li>
+<p><strong><code>EvalBlocks → GenRandom</code> retry / <code>Teardown</code> max-retries.</strong> Bounded by configuration (<code>maxAttempts</code>). <em>Break:</em> silent exhaustion → see §7, and the regression guard <code>ReqRtpS004NullChunkAttributionTest</code> mentioned in <a href="../../.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a>.</p>
+</li>
+<li>
+<p><strong><code>MovePlayer</code> — Entity Scheduler.</strong> On Folia, player mutations go through the Entity Scheduler, not the Region Scheduler. <em>Break:</em> teleport "succeeds" but the player ends up at spawn → wrong scheduler or a pre/post-teleport event handler threw and the pipeline swallowed it (S-004 violation).</p>
+</li>
+<li>
+<p><strong><code>Teardown</code> — Cleanup phase.</strong> <code>TeleportPipelineTask.runCleanup()</code> releases the chunk reservation, untracks from <code>MemoryTracker</code>, and decrements <code>inFlightCalculations</code>. This <strong>must</strong> run on every exit path — normal, exception, disconnect, cancel. Jump to <a href="#4-chunk-ticket-lifecycle">§4</a>.</p>
+</li>
+</ol>
+<blockquote>
+<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md §Pipeline Phases</code></a>, <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md §3</code></a> for all S-00x.</p>
+</blockquote>
+<hr />
+<h2 id="3-budgeted-cache-generator-queue-refill">3. Budgeted cache generator (queue refill)<a class="headerlink" href="#3-budgeted-cache-generator-queue-refill" title="Permanent link">&para;</a></h2>
+<p>Canonical diagram: <a href="../../architecture/02-budgeted-cache-generator/"><code>docs/architecture/02-budgeted-cache-generator.md</code></a>.</p>
+<p>The queue is refilled by a separate <em>pulse</em> — <code>selectionAPI.compute()</code> — that wakes on a timer, walks every region in round-robin order, and spends at most one <strong>budget</strong> per tick/pulse. The budget is either <strong>time-bound</strong> (Spigot/Paper) or <strong>count-bound</strong> (Folia). Which one you get is not negotiable: Folia per-region ticks make wall-clock slicing non-deterministic.</p>
+<p>Walk the diagram:</p>
+<ul>
+<li><strong><code>PulseTrigger → InitBudget → CheckBudget</code>.</strong> <em>Break:</em> if a region never refills, the round-robin <code>period</code> gate (<code>CheckPeriod</code>) is probably too large, or an earlier region is eating the whole budget. Log the per-region spend in <code>MemoryTracker.runDiagnostics()</code>.</li>
+<li><strong><code>ExecuteRegion → SpawnWorker → PushQueue → WakePlayer</code>.</strong> Players parked in the public queue (node <code>QueueWait</code> in diagram 01) are unblocked <em>here</em>, not in <code>/rtp</code> itself. <em>Break:</em> "player waits forever even though queue just got a location" usually means the wake-up signal was missed — check the ordering of <code>PushQueue</code> and the notification to <code>QueueWait</code>.</li>
+<li><strong><code>YieldTask</code>.</strong> When the budget is exhausted the pulse yields. <em>Break:</em> a runaway <code>while</code>-loop in a custom shape will never yield — S-005-adjacent and the reason bounded algorithms are mandated (see <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>).</li>
+</ul>
+<blockquote>
+<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md §Pulse-Driven Maintenance</code></a>.</p>
+</blockquote>
+<hr />
+<h2 id="4-chunk-ticket-lifecycle">4. Chunk ticket lifecycle<a class="headerlink" href="#4-chunk-ticket-lifecycle" title="Permanent link">&para;</a></h2>
+<p>Canonical diagram: <a href="../../architecture/03-chunk-ticket-lifecycle/"><code>docs/architecture/03-chunk-ticket-lifecycle.md</code></a>.</p>
+<p>Every chunk the plugin touches <strong>must</strong> be framed by <code>addPluginChunkTicket</code> / <code>removePluginChunkTicket</code> plus a <code>MemoryTracker.track</code> / <code>untrack</code> pair. The diagram has three exit paths and <strong>all three converge</strong> on <code>DropTicket → UntrackRes → RAM Freed</code>:</p>
+<ol>
+<li><strong>Happy path:</strong> <code>EvalBlocks → CloseRes</code> via <code>try-finally</code>.</li>
+<li><strong>Stalled pipeline:</strong> <code>SweepTask → ForceClose</code> from the background GC (see <a href="#5-active-gc-sweep">§5</a>).</li>
+<li><strong>Player disconnect:</strong> the quit listener calls <code>reservation.close()</code> for every in-flight task tied to the player.</li>
+</ol>
+<p><em>Break patterns:</em></p>
+<ul>
+<li>Ticket acquired, exception thrown before the <code>finally</code> — chunk leaks. S-002 violation risk.</li>
+<li>Ticket closed <em>twice</em> (once in the happy path, once in a cleanup action) — adapter may log a warning or crash on some versions. The fix is <strong>idempotent <code>close()</code></strong>, never a null-guarded skip.</li>
+<li><code>Chunk.setForceLoaded(true)</code> used instead of plugin tickets — permanent leak, not reclaimed on disable. Hard prohibition.</li>
+</ul>
+<blockquote>
+<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md §Chunk Allocation Management</code></a>, <a href="../../.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Code &amp; Testing Conventions</a>.</p>
+</blockquote>
+<hr />
+<h2 id="5-active-gc-sweep">5. Active GC sweep<a class="headerlink" href="#5-active-gc-sweep" title="Permanent link">&para;</a></h2>
+<p>Canonical diagram: <a href="../../architecture/04-active-gc-sweep/"><code>docs/architecture/04-active-gc-sweep.md</code></a>.</p>
+<p>RTP does not trust the happy path alone. A periodic async timer does two sweeps:</p>
+<ol>
+<li><strong>Internal sweep</strong> — iterate <code>MemoryTracker</code>'s tracked reservations; if <code>age &gt; timeout</code>, force-close them, decrement <code>inFlightCalculations</code>, untrack.</li>
+<li><strong>Native sweep</strong> — query the server for <em>all</em> chunk tickets owned by the plugin and drop any that the internal tracker doesn't know about. This catches orphans from code paths that forgot to <code>track()</code>.</li>
+</ol>
+<p><em>Break patterns:</em></p>
+<ul>
+<li>Timeout too aggressive → healthy but slow pipelines are killed mid-teleport (manifests as S-004 silent discards <em>unless</em> the force-close routes through the proper failure attribution).</li>
+<li>Timeout too lax → real leaks accumulate for minutes before GC reclaims them.</li>
+<li>Native sweep disabled or broken → orphans accumulate silently; only the server RAM graph reveals it.</li>
+</ul>
+<p>When debugging a "slow leak" complaint, enable <code>MemoryTracker.runDiagnostics()</code> output first, not Java heap dumps.</p>
+<hr />
+<h2 id="6-scan-task-crawler">6. Scan task crawler<a class="headerlink" href="#6-scan-task-crawler" title="Permanent link">&para;</a></h2>
+<p>Canonical diagram: <a href="../../architecture/05-scan-task-crawler/"><code>docs/architecture/05-scan-task-crawler.md</code></a>.</p>
+<p><code>/rtp scan</code> is a separate long-lived async worker. It shares the safety checks with the teleport pipeline but has its own throttle (<code>inFlightGate</code>) and its own wrap-up (checkpointing to disk via <code>.scan</code>).</p>
+<p>Walk it when:</p>
+<ul>
+<li><strong>Scan stalls at N% forever.</strong> <code>DrainGate</code> is waiting on chunk futures that never complete. Inspect the adapter's <code>getOrLoadChunk</code> — on pure Spigot, uncovered by the Anvil pre-filter, it bounces to the main thread and can starve under heavy TPS drop (<a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>).</li>
+<li><strong>Scan disagrees with live teleport.</strong> The scan uses <code>AnvilBiome</code> (off-tick pre-filter) while the teleport pipeline may use live generation — see <code>isSelfContained()</code> branch in the diagram. For the deeper rationale of the pre-filter and what it can/cannot decide without a load, read <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>.</li>
+<li><strong>Scan looks like it leaks.</strong> It shouldn't — it goes through the same ticket lifecycle from <a href="#4-chunk-ticket-lifecycle">§4</a>. If it does, look at the <code>DrainGate</code> path: releases happen in the callback, so an exception in <code>VertAdjust</code> / <code>PhysBiome</code> <em>before</em> <code>ReleaseGate</code> leaks a permit and a ticket.</li>
+</ul>
+<hr />
+<h2 id="7-failure-attribution-and-user-feedback">7. Failure attribution and user feedback<a class="headerlink" href="#7-failure-attribution-and-user-feedback" title="Permanent link">&para;</a></h2>
+<p>Two absolute rules converge here:</p>
+<ul>
+<li><strong>S-004</strong> — no silently discarded teleport failures. Every pipeline exit that is not a successful teleport must <em>attribute</em> the failure (there is a <code>FailTypes</code> enum and a <code>FailTypes.nullChunk</code> path guarded by <code>ReqRtpS004NullChunkAttributionTest</code>).</li>
+<li><strong>S-007</strong> + <strong>REQ-RTP-F-013</strong> — all user-facing messages (including "busy" and "invalid command") are configurable via <code>messages.yml</code>. Never hardcode strings in a command or adapter.</li>
+</ul>
+<p>Where to look when a user reports "nothing happens":</p>
+<ol>
+<li>Command layer (<code>commands-api</code>, Bukkit <code>BukkitBaseRTPCmd</code> and friends). Platform overrides of <code>msgInvalidCommand</code> / <code>msgBadParameter</code> <strong>must</strong> call <code>RTP.log(Level.WARNING, msg)</code> — this is required for auditing and for <code>rtp test full</code> to observe the failure (see <a href="../../.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Logging &amp; Feedback</a>).</li>
+<li>Pipeline cleanup (<code>runCleanup()</code>) — did the failure reach an action list that reports to the player? Silent <code>return</code> inside a phase is the classic S-004 violation.</li>
+<li>Config loader — a missing or malformed <code>messages.yml</code> key reads as empty string. Check the fallback.</li>
+</ol>
+<blockquote>
+<p>Deep read (optional): <a href="../TRACEABILITY/"><code>TRACEABILITY.md</code></a> row <code>REQ-RTP-F-013</code>, <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md §3</code></a> for S-004/S-007.</p>
+</blockquote>
+<hr />
+<h2 id="8-folia-threading-gotchas">8. Folia threading gotchas<a class="headerlink" href="#8-folia-threading-gotchas" title="Permanent link">&para;</a></h2>
+<p>Folia splits the world into regions, each owned by a dedicated thread. Calling the wrong API on the wrong thread throws <code>ThreadAccessException</code>. The short checklist:</p>
+<ul>
+<li><strong>Before scheduling:</strong> <code>Bukkit.isOwnedByCurrentRegion(entity|location)</code>. If yes, run inline; if no, <code>RegionScheduler.run(plugin, location, task)</code>.</li>
+<li><strong>Player mutations</strong> (teleport, inventory) — <strong>Entity Scheduler</strong>, not Region.</li>
+<li><strong>Vault / economy</strong> (<code>withdraw</code>, <code>deposit</code>, <code>getBalance</code>) — <strong>Global Region Scheduler</strong> or <strong>Async Scheduler</strong>. Region threads throw.</li>
+<li><strong>Task pipelines</strong> — <strong>Count-Bound</strong> only on Folia (<code>CountBoundTaskPipe</code>). Time-Bound is permitted on Spigot/Paper only.</li>
+<li><strong>Database</strong> — enabled on all platforms; on Folia it runs via <code>RTP.scheduler.runTaskTimerAsynchronously</code>.</li>
+</ul>
+<p>When a bug reproduces only on Folia, the answer is almost always one of the above.</p>
+<blockquote>
+<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md §rtp-folia Implementation Notes</code></a>, <a href="../../.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Folia Threading</a>.</p>
+</blockquote>
+<hr />
+<h2 id="9-your-first-repair-checklist">9. Your first repair — checklist<a class="headerlink" href="#9-your-first-repair-checklist" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Reproduce locally (or write a failing test — see <a href="../COVERAGE_PLAN/"><code>COVERAGE_PLAN.md</code></a>).</li>
+<li>Identify the section above that matches the symptom.</li>
+<li>From the diagram, name the <em>arrow</em> where behavior diverges from the spec.</li>
+<li>Find the enclosing S-00x rule / REQ-* via <a href="../TRACEABILITY/"><code>TRACEABILITY.md</code></a>.</li>
+<li>Edit the correct module per <a href="#1-module-map-where-does-my-change-go">§1</a>. Before editing any <em>uncommitted code</em> file, make a <code>.bak</code> copy (<a href="../../.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Backup Policy</a>).</li>
+<li>Add or extend a REQ-traceable test (class name or <code>@DisplayName</code> referencing <code>REQ-*</code> / <code>S-00x</code>) and update <a href="../TRACEABILITY/"><code>TRACEABILITY.md</code></a> if new.</li>
+<li>Run the targeted test via <code>.\gradlew :&lt;module&gt;:test --tests "&lt;pattern&gt;"</code> (PowerShell, <code>;</code> not <code>&amp;&amp;</code>).</li>
+<li>If the change crosses a module boundary or touches more than one class, <strong>stop and propose first</strong> per <a href="../../.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Propose Before Refactoring</a>.</li>
+</ol>
+<hr />
+<h2 id="10-plugin-setup-lifecycle">10. Plugin setup lifecycle<a class="headerlink" href="#10-plugin-setup-lifecycle" title="Permanent link">&para;</a></h2>
+<p>Canonical diagram: <a href="../../architecture/06-plugin-setup-lifecycle/"><code>docs/architecture/06-plugin-setup-lifecycle.md</code></a>. Entry class: <code>RTPBukkitPlugin</code> (<code>rtp-plugin/.../bukkit/RTPBukkitPlugin.java</code>).</p>
+<p>Startup is the one path that is not repeated at runtime, so bugs here look like "plugin silently half-enabled" rather than a pipeline failure. Read the diagram, then use the following repair lenses:</p>
+<ul>
+<li><strong><code>onLoad</code> fail-fast.</strong> Only SQLite JDBC is probed; missing JDBC throws <code>IllegalStateException</code> <em>before</em> Bukkit calls <code>onEnable</code>. If you see no RTP log lines at all, check the server log for that exception first.</li>
+<li><strong>Reflective accessor wiring</strong> (<code>BukkitServerProvider.resolveServerModel</code> → <code>Class.forName(serverModel.accessorClassName)</code>). A <code>ClassNotFoundException</code>/<code>NoSuchMethodException</code> here bails out via <code>onDisable()</code> <em>from inside <code>onEnable</code></em>. Symptom: "plugin shows as enabled in <code>/pl</code> but every command says unknown". Fix: confirm the platform detection (<code>isPaper()</code> / <code>isFolia()</code>) resolved the expected model, and that the adapter JAR for that platform is on the classpath.</li>
+<li><strong>Synchronous event registration.</strong> <code>setupBukkitEvents()</code> is deliberately called in-line, <em>not</em> via <code>runTaskLater(..., 1)</code>. The git history on <code>OnWorldLoadUnload</code> records why: Multiverse-style generators fire <code>WorldLoadEvent</code> on tick 1, and a deferred listener missed them, leaving dormant regions for late-loaded worlds unbound. If you ever feel tempted to "clean this up" by deferring, don't — read the Javadoc on <code>OnWorldLoadUnload.rebindFallbackRegionsForAllLoadedWorlds</code> first.</li>
+<li><strong>Startup tasks drained three times.</strong> <code>RTP.startupTasks.execute(MAX)</code> is invoked eagerly, then on tick 1 (via <code>runTaskLater</code>), then again after integrations/effects register — because integrations can push new startup tasks. If a feature "works after <code>/rtp reload</code> but not on a fresh boot", it's probably a startup task registered too late to be drained.</li>
+<li><strong>Deferred integrations (<code>setupIntegrations</code>, <code>setupEffects</code>).</strong> These run on tick 1 so that other plugins have completed their own <code>onEnable</code>. If a claim-plugin integration is missing, the usual cause is that the claim plugin enabled <em>after</em> RTP's tick-1 hook; check load-order in <code>plugin.yml</code> (<code>softdepend</code>).</li>
+<li><strong><code>ChunkUnloadProcessor</code> is non-Folia only.</strong> On Folia, per-region tick scheduling handles chunk lifetime. If a new chunk-unload bug reproduces only on Spigot/Paper, this timer is where to look.</li>
+<li><strong>Shutdown path.</strong> <code>onDisable</code> cancels all RTP-owned Bukkit tasks, kills each subsystem processor (<code>AsyncTeleportProcessing</code>, <code>SyncTeleportProcessing</code>, <code>ScanTaskProcessing</code>, <code>DatabaseProcessing</code>), then calls <code>RTP.stop()</code>. Every allocator that ran during <code>onEnable</code> <em>must</em> have a matching release here — otherwise a <code>/rtp reload</code> or a server stop leaks state. See <a href="../LESSONS_LEARNED/"><code>LESSONS_LEARNED.md</code></a> for prior shutdown-flush pitfalls.</li>
+</ul>
+<blockquote>
+<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md</code></a> for the platform-adapter split, <a href="../LESSONS_LEARNED/"><code>LESSONS_LEARNED.md</code></a> for database / shutdown-flush / command-pipeline pitfalls.</p>
+</blockquote>
+<hr />
+<h2 id="11-how-behaviors-are-decided">11. How behaviors are decided<a class="headerlink" href="#11-how-behaviors-are-decided" title="Permanent link">&para;</a></h2>
+<p>Canonical diagram: <a href="../../architecture/07-rtp-command-region-selection/"><code>docs/architecture/07-rtp-command-region-selection.md</code></a>. Scope: the <code>/rtp</code> + <code>/wild</code> command path through <code>SelectionAPI.getRegion(player)</code> — other behavior paths (onEvent auto-teleport, <code>tempRegion</code>, <code>/rtp scan</code>) have their own entry points and are not covered by this diagram. Entry class: <code>SelectionAPI.getRegion(RTPPlayer)</code> in <code>rtp-core/.../common/selection/SelectionAPI.java</code>.</p>
+<p>The key mental model: <strong>RTP's behavior is data, not code.</strong> From the moment the player issues <code>/rtp</code>, every subsequent choice (which world, which region, which shape, which vertical adjustor, cache size, price, whether to queue or search ad-hoc) is read from configuration and permission nodes. <code>rtp-core</code> never branches on world or region <em>name</em>.</p>
+<p>Walk the diagram as a repair tool:</p>
+<ol>
+<li><strong>Command layer.</strong> Parameter validation failures route to <code>msgBadParameter</code>; a server already saturated with in-flight calculations routes to <code>msgBusy</code>. Both strings are configurable (S-007, REQ-RTP-F-013). If a user says "nothing happens", this is the first lens — see also <a href="#7-failure-attribution-and-user-feedback">§7</a>.</li>
+<li><strong>World resolution loop.</strong> <code>WorldKeys.requirePermission</code> + <code>WorldKeys.override</code> form a chain: if the player lacks <code>rtp.worlds.&lt;name&gt;</code>, the world falls back to the configured override. A <code>Set&lt;String&gt; worldsAttempted</code> guard throws <code>IllegalStateException("infinite override loop detected at world - ...")</code> on cycle — this is <em>not</em> an S-004 violation; it is a configuration bug surfaced loudly on purpose.</li>
+<li><strong>Region resolution loop.</strong> Identical structure with <code>RegionKeys</code> and <code>rtp.regions.&lt;name&gt;</code>. Same cycle guard, same exception. The region key chosen at the end of the world loop is the <em>starting</em> region for this loop.</li>
+<li><strong>Queue vs ad-hoc search.</strong> <code>rtp.unqueued</code> is the pivot. Without it, the player waits on the public queue (diagram 02); with it, an ad-hoc async search is spawned immediately. Avoid granting <code>rtp.unqueued</code> broadly — on large servers every holder can trigger a search, and only the 1D spiral guarantee (<a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>) keeps that bounded.</li>
+<li><strong><code>RegionSettings</code> is the leaf.</strong> Shape, vertical adjustor, cache cap, active chunk cap, price, spatial resolution, world-border override — all sourced from <code>region.yml</code>. If two regions "behave differently" for no apparent reason, diff their <code>RegionSettings</code>, not their code paths.</li>
+</ol>
+<p><em>Break patterns:</em></p>
+<ul>
+<li><strong>"Player gets teleported to the wrong world."</strong> Almost always a <code>WorldKeys.override</code> chain that quietly redirects. Dump the <code>worldsAttempted</code> set by enabling verbose logging, or trace <code>SelectionAPI.getRegion(player)</code> by hand.</li>
+<li><strong>"<code>IllegalStateException: infinite override loop</code>."</strong> A config author wrote a cycle (e.g., <code>world_nether.override: world</code> and <code>world.override: world_nether</code> both with <code>requirePermission: true</code>). Fix the config; do not catch the exception.</li>
+<li><strong>"Shape feels clustered."</strong> Not a decision-tree bug — see <a href="#2-teleport-pipeline-end-to-end">§2 step 4</a> and <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>.</li>
+<li><strong>"Effects don't fire."</strong> Effects are a <em>separate</em> decision tree driven by <code>rtp.effect.&lt;stage&gt;.*</code> permissions; set <code>effectParsing: true</code> in <code>performance.yml</code>. See <a href="../../admin/configuration/EVENTS_AND_EFFECTS/"><code>docs/admin/EVENTS_AND_EFFECTS.md</code></a>.</li>
+<li><strong>"I want one command to use a custom shape."</strong> Use <code>SelectionAPI.tempRegion(params, baseRegionName)</code> — it clones a base region and overrides specific <code>RegionKeys</code>. Never subclass <code>Region</code> in an addon.</li>
+</ul>
+<blockquote>
+<p>Deep read (optional): <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md §3</code></a> (S-007 configurable messages), <a href="../../admin/configuration/EVENTS_AND_EFFECTS/"><code>docs/admin/EVENTS_AND_EFFECTS.md</code></a>, <a href="../GLOSSARY/"><code>GLOSSARY.md</code></a> for the canonical meaning of <em>region</em> vs <em>world</em> vs <em>shape</em>.</p>
+</blockquote>
+<hr />
+<h2 id="12-location-selection-per-attempt">12. Location selection (per attempt)<a class="headerlink" href="#12-location-selection-per-attempt" title="Permanent link">&para;</a></h2>
+<p>Canonical diagram: <a href="../../architecture/08-location-selection-per-attempt/"><code>docs/architecture/08-location-selection-per-attempt.md</code></a>. Entry class: <code>PregenTask.runAttempt</code> in <code>rtp-core/.../common/selection/region/PregenTask.java</code>, called via <code>LocationGenerator.getLocationFuture</code>.</p>
+<p>This is the <strong>decision core</strong> of the plugin. Every caller you met earlier — the <code>/rtp</code> command (<a href="#11-how-behaviors-are-decided">§11</a>), the cache generator (<a href="#3-budgeted-cache-generator-queue-refill">§3</a>), <code>/rtp scan</code> (<a href="#6-scan-task-crawler">§6</a>) — ends up asking <code>ILocationGenerator</code> for a coordinate, and that coordinate comes out of this loop. If it emits a bad <code>(x, y, z)</code> or emits one too slowly, <em>everything downstream looks broken</em>. That is why it gets its own diagram separate from the outer attempt-loop plumbing.</p>
+<p>Mental model: one attempt = <strong>pick → probe → resolve → evaluate → accept or recycle</strong>. The loop is orchestrated by <code>PregenTask</code> as a non-blocking state machine (<a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a> Option B) so the async worker is never parked on <code>.get()</code>.</p>
+<p>Walk the diagram as a repair tool:</p>
+<ol>
+<li><strong>Cap check.</strong> <code>i &gt; maxAttempts</code> or <code>biomeChecks &gt;= maxBiomeChecks</code> → <code>completeExhausted</code>. <em>Break:</em> empty <code>GenerationResult</code> with no logged reason almost always means <code>maxBiomeChecks</code> was hit silently. Dump <code>state.failMap</code> (verbose) to see which bucket drained the budget.</li>
+<li><strong>Shape pick.</strong> <code>MemoryShape.rand()</code> is the bounded Archimedean spiral (<a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>). If <code>biomeRecall: true</code>, a prefix-sum weighted pick is used over biomes already seen; <code>biomeRecallForced: false</code> silently falls back to uniform when memory is empty. <em>Break:</em> "clustered spawns" → recall is on and has converged on a few tiles; toggle it off or lower <code>cacheCap</code> so the memory churns.</li>
+<li><strong>WorldBorder probe.</strong> If the candidate is outside, <code>worldBorderFails++</code> and <code>maxAttempts++</code> — cheap misses. Cap is 1000. <em>Break:</em> a region configured beyond the vanilla border will hit the cap and emit an empty result; check <code>worldBorderOverride</code> in <code>region.yml</code>.</li>
+<li><strong>Probe-first chunk resolution.</strong> <code>world.getOrLoadChunk(cx, cz)</code> walks cached → Anvil → live (<a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a> §13.1). A null return is attributed to <code>FailTypes.nullChunk</code> with a sub-reason (<code>ticketFailed</code>, <code>chunkLoadTimeout</code>, <code>asyncLoadNull</code>). <strong>Do not refactor this attribution</strong> — the regression guard is <code>ReqRtpS004NullChunkAttributionTest</code> (S-004).</li>
+<li><strong>Self-contained vs live branch.</strong> If <code>chunk.isSelfContained()</code> (Anvil), stay on the async thread. Otherwise hop to the region-owning thread via <code>dispatchLiveEvaluation</code>, which allocates the <code>ChunkReservation</code> (<a href="#4-chunk-ticket-lifecycle">§4</a>) and arms the <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a> stale guard. <strong>This branch is where most S-005 violations hide when porting</strong> — if a new platform runs the live path on the wrong thread, you will see <code>ThreadAccessException</code> on Folia or silent corruption on Paper. The Fabric blocker mentioned in <a href="../MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> is exactly this.</li>
+<li><strong><code>vert.adjust(chunk)</code>.</strong> Returns the <code>(x, y, z)</code> for a given chunk under the region's vertical adjustor (linear, nether-ceiling, etc.). Null = no valid y. <em>Break:</em> "teleports into lava at y=-64" or "always picks y=0" → wrong adjustor for the dimension; verify <code>vert:</code> in <code>region.yml</code>.</li>
+<li><strong>Biome filter.</strong> <code>biomeNames</code> + <code>biomeWhitelist</code>. Misses increment <code>biomeChecks</code> (soft cap <code>maxBiomeChecks</code>) but also <code>maxAttempts++</code>, so biome filtering doesn't prematurely exhaust hard attempts. <em>Break:</em> "infinite misses" when targeting a rare biome → turn on <code>biomeRecall</code> so the shape remembers hits; without it every attempt is uniform across the whole region.</li>
+<li><strong>Neighbour grid load.</strong> For <code>safetyRadius r</code>, loads the <code>(2r+1)²</code> neighbour chunks via <code>getChunkAt</code> with a 5-second <code>orTimeout</code>. Timeout or any null neighbour → <code>FailTypes.nullChunk / neighborNull</code>. <em>Break:</em> scans or caches that stall with <code>neighborNull</code> in verbose output point at a slow chunk backend — check the Anvil pre-filter wiring (ADR-016 §11).</li>
+<li><strong>Safety y-scan.</strong> Walks <code>±safetyRadius</code> around <code>(x, y, z)</code>, rejecting if any block is in <code>unsafeBlocks</code>. This is the S-001 enforcement point. Never add a second check in an adapter or command; all block safety lives here (and in the <code>badLocation</code> predicates, <a href="../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/">ADR-017</a>).</li>
+<li><strong><code>GlobalRegionVerifiers</code>.</strong> Async chain that runs claim-plugin checks (S-003) and any custom verifiers addons have registered. Failure → <code>FailTypes.safetyExternal</code>. <em>Break:</em> "claim overlap still teleports me in" → a verifier is missing or throwing and being swallowed; the pipeline attributes the exception, but addons must register a verifier to enforce their claim system. Inline claim calls in the pipeline or commands are an S-003 violation.</li>
+<li><strong><code>completeSuccess</code>.</strong> Records the biome hit back into <code>MemoryShape</code>, preloads a <code>ChunkSet</code> of radius <code>max(safetyRadius, performance.viewDistanceSelect)</code>, and transfers ownership via <code>GenerationResult</code> so diagram 01's <code>Start LOAD</code> stage can hand it off without a second round-trip. <em>Break:</em> "player arrives and chunks pop in for a second" → <code>viewDistanceSelect</code> is too low, or the <code>ChunkSet</code> was dropped (check <code>MemoryTracker</code> diagnostics, <a href="#4-chunk-ticket-lifecycle">§4</a>).</li>
+</ol>
+<p><em>Recurring repair lens:</em> almost every rejection calls <code>MemoryShape.addBadLocation(finalL)</code> so the spiral won't re-propose that 1D index. This is what makes <code>vert</code> / <code>safety</code> / <code>safetyExternal</code> failures self-limiting on a correctly-shaped region. If you see the same coordinate rejected twice within one cache fill, either the shape is not a <code>MemoryShape</code> (so it has no memory) or <code>addBadLocation</code> wasn't called on that path — audit the new branch.</p>
+<blockquote>
+<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md</code></a> for the pipeline-vs-generator split, <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a> for the non-blocking state machine, <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a> for the probe-first chain, <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a> for why the pick itself is bounded.</p>
+</blockquote>
+<hr />
+<h2 id="13-configuration-load-and-reload">13. Configuration load and reload<a class="headerlink" href="#13-configuration-load-and-reload" title="Permanent link">&para;</a></h2>
+<p>Canonical diagram: <a href="../../architecture/09-configuration-load-and-reload/"><code>docs/architecture/09-configuration-load-and-reload.md</code></a>. Entry class: <code>Configs</code> in <code>rtp-core/.../common/configuration/Configs.java</code>; called from <code>RTPBukkitPlugin.onEnable</code> (first load) and from the <code>/rtp reload</code> command (subsequent reloads) via <code>Configs.reload -&gt; reloadAction -&gt; reloadConfigs + reloadRegions</code>.</p>
+<p>This section is the one to open <em>first</em> for any bug where "the config says X but RTP acts as if Y". Most such reports resolve here before you ever touch the pipeline.</p>
+<p>Mental model: <strong>RTP never mutates a <code>ConfigParser</code> in place.</strong> A reload builds a fresh set of parsers off to the side, then swaps the <code>configParserMap</code> / <code>multiConfigParserMap</code> fields atomically. Any task already holding a reference to an old parser keeps reading the old values until it finishes. This is by design — it makes mid-teleport reloads safe — but it is also why key changes sometimes appear to "not apply" for one cycle.</p>
+<p>Walk the diagram as a repair tool:</p>
+<ol>
+<li><strong><code>FlushDB</code> → <code>CancelTasks</code>.</strong> <code>fileDatabase.processQueries(MAX)</code> drains the write queue before reconnecting; then in-flight teleports are cancelled via <code>RTPTeleportCancel</code> and <code>processingPlayers</code> is cleared. <em>Break:</em> if a reload crashes mid-teleport, someone bypassed <code>Configs.reload</code> and skipped the cancel step — always reload through the command or <code>Configs.reload</code>.</li>
+<li><strong>New parsers (blue subgraph).</strong> Seven single-file parsers (<code>logging.yml</code>, <code>config.yml</code>, <code>messages.yml</code>, <code>economy.yml</code>, <code>performance.yml</code>, plus the <code>safety/</code> directory) and two <code>MultiConfigParser</code>s (<code>regions/</code>, <code>worlds/</code>). Adding a new config category means adding an enum under <code>configuration/enums/</code> and a new <code>ConfigParser&lt;...&gt;</code> line here — there is no registry, the list is deliberately explicit.</li>
+<li><strong>Locale bootstrap</strong> (<a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/">ADR-020</a> / REQ-RTP-F-013). Before any <code>ConfigParser</code> is constructed, <code>LanguageBootstrap</code> reads <code>plugins/RTP/language.yml</code> (created with <code>language: en</code> on first run) and returns a sanitized locale string. Each fresh parser is then built locale-aware: when the locale is non-<code>en</code>, the parser loads <code>lang/&lt;locale&gt;/&lt;name&gt;.yml</code> (and the optional <code>lang/&lt;locale&gt;/&lt;name&gt;.lang.yml</code> key-name remap) directly from the jar with English fallback. <em>Break:</em> "messages still in English despite <code>language: de</code> in <code>language.yml</code>" → the corresponding <code>lang/de/messages.yml</code> jar resource is missing, or <code>language.yml</code> itself was deleted (it will be recreated as <code>en</code> on next reload). Note: editing <code>language</code> in <code>config.yml</code> has no effect — that key was removed.</li>
+<li><strong>Atomic swap (green).</strong> <code>this.configParserMap = newConfigParserMap;</code> is where new readers start seeing new values. In-flight tasks that captured the old map earlier in their lifetime continue on the old values — this is <em>not</em> a bug, it is the reason reloads are non-disruptive.</li>
+<li><strong><code>ShutRegions</code>.</strong> Every <code>Region</code> in <code>permRegionLookup</code> and <code>tempRegions</code> has <code>shutDown()</code> called before the maps are cleared. <em>Break:</em> "reload duplicated my region" → a third party inserted into <code>permRegionLookup</code> after the clear, or <code>shutDown</code> threw on one entry and bailed out of the loop.</li>
+<li><strong><code>BuildRegions</code> → Dormant decision.</strong> For each <code>regions/*.yml</code>, <code>RegionConfigLoader.load</code> produces a <code>RegionSettings</code>, then <code>detectFallbackConfiguredWorld</code> checks whether the configured world is already loaded. Yes → live region. No → <strong>dormant region</strong> (world is <code>null</code>, rebinds on <code>WorldLoadEvent</code> via <code>OnWorldLoadUnload.rebindWorld</code>). This is the Multiverse-compatibility path — see also <a href="#10-plugin-setup-lifecycle">§10 step 3</a>. <em>Break:</em> "region never activates when my world loads" → confirm the world name matches, and that <code>OnWorldLoadUnload</code> is registered (diagram 07).</li>
+<li><strong><code>ShapePick</code> — deferred async.</strong> Each region's shape is selected on <code>miscAsyncTasks</code> with a 60-tick delay, and skipped entirely when the region is dormant or has no shape. <em>Break:</em> "shape is null on first attempt" after a reload → attempt fired before the 60-tick shape pick; this is expected, the next pulse will succeed.</li>
+<li><strong><code>onReload</code> callbacks.</strong> Integrations, effects, and anything else registered via <code>Configs.onReload(Runnable)</code> fires here. <em>Break:</em> "integration re-hooks on first load but not on reload" → the integration didn't register an <code>onReload</code> callback; it only hooked during <code>setupIntegrations</code> in <code>onEnable</code> (diagram 07).</li>
+</ol>
+<p><em>Common misreads:</em></p>
+<ul>
+<li><strong>"Per-world setting ignored."</strong> Readers must go through <code>Configs.getWorldParserValue(worldName, key)</code>, which walks world-override chain → falls back to the global <code>ConfigKeys</code> parser. Reading <code>ConfigKeys</code> directly skips every per-world override.</li>
+<li><strong>"Per-region setting ignored."</strong> Same pattern with <code>getParser(RegionKeys.class)</code> vs. the specific region's <code>ConfigParser&lt;RegionKeys&gt;</code> obtained through the region's own <code>RegionSettings</code>. <code>RegionSettings</code> is the <em>materialized</em> snapshot; mutate the YAML + reload, not the snapshot.</li>
+<li><strong>"<code>/rtp reload</code> ordering."</strong> First-enable and reload take <em>exactly</em> the same path (<code>reloadAction</code>). If a bug reproduces on reload but not on fresh boot, the difference is in what was created <em>since</em> the boot — usually a region, a player cache, or an integration that didn't implement <code>onReload</code>.</li>
+<li><strong>"Override loop error on reload."</strong> That exception comes from the <code>SelectionAPI.getRegion</code> cycle guard (diagram 08), not from this path. The config load is content-agnostic; cycles are only detected when something actually traverses the override chain.</li>
+</ul>
+<blockquote>
+<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md</code></a> for the per-world / per-region override resolution, <a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/">ADR-020</a> for the locale bootstrap, <a href="../LESSONS_LEARNED/"><code>LESSONS_LEARNED.md</code></a> for prior reload / database-flush pitfalls.</p>
+</blockquote>
+<hr />
+<h2 id="14-shutdown-and-flush-lifecycle">14. Shutdown and flush lifecycle<a class="headerlink" href="#14-shutdown-and-flush-lifecycle" title="Permanent link">&para;</a></h2>
+<p>Canonical diagram: <a href="../../architecture/10-shutdown-and-flush-lifecycle/"><code>docs/architecture/10-shutdown-and-flush-lifecycle.md</code></a>. Entry classes: <code>RTPBukkitPlugin.onDisable</code> (<code>rtp-plugin/.../bukkit/RTPBukkitPlugin.java</code>) and <code>RTP.stop()</code> (<code>rtp-core/.../common/RTP.java</code>).</p>
+<p>Shutdown is the symmetric partner of <a href="#10-plugin-setup-lifecycle">§10 Plugin setup lifecycle</a>. Unlike a reload (§13), which reuses allocations, a shutdown must <em>release</em> every allocation made during <code>onEnable</code>. Two classes of bug dominate this path: <strong>data loss</strong> (cached locations not flushed before the DB stop flag is set) and <strong>resource leaks</strong> (chunk tickets not released — an S-002 violation).</p>
+<p>Mental model: <strong>four phases</strong> — (1) <em>stop accepting new work</em>, (2) <em>drain in-flight work</em>, (3) <em>persist state to disk</em>, (4) <em>release platform resources</em>. The ordering between phases 3 and 4 is load-bearing.</p>
+<p>Walk the diagram as a repair tool:</p>
+<ol>
+<li><strong>Cancel command timers.</strong> <code>commandTimer.cancel</code> and <code>commandProcessing.cancel</code> stop new <code>/rtp</code> dispatches. <em>Break:</em> "a new <code>/rtp</code> ran mid-disable and NPE'd" → a command listener was registered outside <code>setupBukkitEvents</code> and isn't cancelled here.</li>
+<li><strong>Kill the four task processors.</strong> <code>AsyncTeleportProcessing</code>, <code>SyncTeleportProcessing</code>, <code>ScanTaskProcessing</code>, <code>DatabaseProcessing</code> each have a static <code>kill()</code>. Each is wrapped in <code>catch (NoClassDefFoundError ignored)</code> because Bukkit can call <code>onDisable</code> twice on init failure (see the bail-outs at lines 108/119 of <code>RTPBukkitPlugin</code>). <strong>Do not remove those guards.</strong></li>
+<li><strong><code>RTP.stop</code> enters.</strong> Completes every outstanding <code>CompletableFuture</code> with <code>null</code>, cancels in-flight <code>TeleportData</code> via <code>RTPTeleportCancel</code>. <em>Break:</em> "server hang on stop" → something is <code>.get()</code>-ing a future that was never added to <code>RTP.futures</code>; audit new async code for the registration step.</li>
+<li><strong>Database flush sequence — load-bearing ordering.</strong> <code>SQL flush → rebuildCachedLocationsFromMemory → flushDirtyCache → processQueries(MAX)</code>, <strong>all before</strong> <code>stop.set(true)</code>. Regression test: <code>MemoryShapeShutdownTest</code>. <em>Break:</em> "cached locations gone after restart" is almost always a reorder here. <code>processQueries</code> bails immediately if <code>stop</code> is already set, so setting the flag early silently drops the drain. See <a href="../LESSONS_LEARNED/"><code>LESSONS_LEARNED.md</code></a> §"Shutdown ordering".</li>
+<li><strong>Stop the task pipes and cancel tracked tasks.</strong> <code>miscAsyncTasks.stop</code> + <code>miscSyncTasks.stop</code> + scheduler <code>cancelTask</code> for every entry in <code>trackedTasks</code>. <em>Break:</em> "a scheduled task kept running after disable" → it wasn't registered via <code>RTP.scheduler</code> (which adds to <code>trackedTasks</code>); fix the registration, not this loop.</li>
+<li><strong>Region shutdown.</strong> <code>permRegionLookup.values().forEach(shutDown)</code> then clear; same for <code>tempRegions</code>. A region's <code>shutDown</code> closes its own chunk reservations (see <a href="#4-chunk-ticket-lifecycle">§4</a>) and unregisters from <code>MemoryTracker</code>. <em>Break:</em> "Folia warning about region threads" during shutdown → a region's <code>shutDown</code> touched entity state without a scheduler hop; route through <code>RTPScheduler</code>.</li>
+<li><strong>Set the DB stop flag and close.</strong> Only now does <code>databaseAccessor.stop.set(true)</code> + <code>close()</code> run. The flag gates new enqueues; <code>close</code> releases the JDBC connection. <em>Break:</em> "DB file locked on next startup" → either <code>close</code> threw (check logs) or an asynchronous write was still in flight (means step 4 didn't fully drain).</li>
+<li><strong>Re-cancel any late <code>TeleportData</code>.</strong> A second pass over <code>latestTeleportData</code> catches any entries that were added during region shutdown. Both cancel passes are required.</li>
+<li><strong><code>ScanTask.kill</code>, <code>networkManager.shutdown</code>, <code>serverAccessor.stop</code>.</strong> Static registry clears and platform hooks. The network bus is now typed as the <code>RTPNetworkManager</code> interface (was <code>RedisManager</code>); concrete <code>RedisManager</code> is constructed reflectively in <code>RTP.createRedisNetworkManager</code> so <code>rtp-core</code> carries no symbolic ref to the Jedis driver class (ADR-024). On Folia, <code>serverAccessor.stop</code> must run on the global region scheduler — the accessor handles that internally; don't relocate the call.</li>
+<li><strong>Post-<code>RTP.stop</code> — Bukkit-side cleanup.</strong> Cancel all RTP-owned async <code>BukkitTask</code>s that were still pending (belt-and-suspenders for tasks not in <code>trackedTasks</code>), write the <code>referenceData</code> sentinel row (zero-UUID + timestamp) so the next boot can tell a clean shutdown from a crash, and finally <code>releaseAllChunkTickets</code>. <strong><code>releaseAllChunkTickets</code> is the last durable action and is the S-002 enforcement point</strong> — if region shutdown throws and unwinds past it, tickets leak across the <code>/reload</code>.</li>
+</ol>
+<p><em>Break patterns:</em></p>
+<ul>
+<li><strong>"<code>/stop</code> hangs for a minute, then kills the JVM."</strong> A future that <code>CompleteFutures</code> can't reach, or a <code>processQueries(MAX)</code> that is waiting on a JDBC connection that died. Look at thread dumps taken during the hang.</li>
+<li><strong>"Chunks stay force-loaded after <code>/reload</code>."</strong> S-002 regression. <code>releaseAllChunkTickets</code> either didn't run (exception unwound past it) or a new allocator bypassed the central ticket registry. Every chunk-ticket allocation path must register with <code>MemoryTracker</code> so this single call can release them.</li>
+<li><strong>"<code>referenceData</code> row missing / startup thinks every boot is a crash."</strong> Someone moved the sentinel write ahead of <code>RTP.stop()</code>. It must be after, because it uses the still-open <code>DatabaseAccessor</code> and calls <code>processQueries(MAX)</code> one more time to force the write.</li>
+<li><strong>"<code>NoClassDefFoundError</code> in shutdown logs."</strong> Expected and ignored — a platform class (e.g., Folia's scheduler) wasn't on the classpath because the adapter JAR was never installed, and <code>onDisable</code> ran as part of the <code>onEnable</code> bail-out. Real defects in shutdown will surface as other exceptions, not <code>NoClassDefFoundError</code>.</li>
+</ul>
+<blockquote>
+<p>Deep read (optional): <a href="../LESSONS_LEARNED/"><code>LESSONS_LEARNED.md</code></a> §"Shutdown ordering", <a href="../TRACEABILITY/"><code>TRACEABILITY.md</code></a> row <code>REQ-CORE-NF-001</code> (deterministic shutdown persistence), <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md §3</code></a> S-002 (no permanently force-loaded chunks).</p>
+</blockquote>
+<hr />
+<p>Welcome to RTP. The diagrams are the map; the S-00x rules are the law; the ADRs are the precedent.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2635 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>MULTI PLATFORM PLAN - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#out-of-scope" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              MULTI PLATFORM PLAN
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      Out of Scope
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remaining-work-checklist-updated-2026-05-30" class="md-nav__link">
+    <span class="md-ellipsis">
+      Remaining Work Checklist (updated 2026-05-30)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Remaining Work Checklist (updated 2026-05-30)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#done" class="md-nav__link">
+    <span class="md-ellipsis">
+      ✅ Done
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#in-progress-next-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      🚧 In Progress / Next Up
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deferred-to-phase-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      ⏸ Deferred to Phase 4
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-0-scope-unlock-completed-2026-04-30" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 0: Scope Unlock — COMPLETED 2026-04-30
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-1-infrastructure-build-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 1: Infrastructure &amp; Build System
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 1: Infrastructure & Build System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-amendment-multiversion-submodule-layout-2026-05-01-rtp-fabric-adr-001" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 1 Amendment — Multiversion Submodule Layout (2026-05-01, rtp-fabric-ADR-001)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-2-fabric-feature-parity-acceptance-gated-a-h" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 2: Fabric Feature Parity (acceptance-gated A → H)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 2: Fabric Feature Parity (acceptance-gated A → H)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#abstraction-gap-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      Abstraction Gap Summary
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-a-s-005-fix-in-fabricrtpworldgetchunkat-safety-critical-must-come-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step A — S-005 Fix in FabricRTPWorld.getChunkAt (safety-critical, must come first)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-b-fabricserveraccessorgetlocationgenerator" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step B — FabricServerAccessor.getLocationGenerator()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-c-fabricscheduler-full-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step C — FabricScheduler Full Implementation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-d-fabricdatabasehandler" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step D — FabricDatabaseHandler
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-e-event-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step E — Event Bridge
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-e3-scheduled-task-processor-parity-added-2026-05-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step E3 — Scheduled-Task Processor Parity (added 2026-05-01)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step E3 — Scheduled-Task Processor Parity (added 2026-05-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bukkit-vs-fabric-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bukkit vs. Fabric comparison
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#required-rtpfabricmodoninitialize-changes-in-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      Required RTPFabricMod.onInitialize() changes (in order)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status-landed-2026-05-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      Status (landed 2026-05-05)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtime-mitigation-landed-2026-05-05-adaptive-promotion-cap-dropped-periodic-ticket-sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      Runtime mitigation (landed 2026-05-05) — adaptive promotion cap + dropped periodic ticket sweep
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#s-002-fix-landed-2026-05-05-non-persistent-chunk-tickets" class="md-nav__link">
+    <span class="md-ellipsis">
+      S-002 fix (landed 2026-05-05) — non-persistent chunk tickets
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operational-recommendation-pre-generate-the-world-fabric" class="md-nav__link">
+    <span class="md-ellipsis">
+      Operational recommendation — pre-generate the world (Fabric)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      Acceptance
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-this-wasnt-caught-earlier" class="md-nav__link">
+    <span class="md-ellipsis">
+      Why this wasn't caught earlier
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-f-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step F — Permissions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-g-brigadier-bridge-in-commands-api-per-commands-api-adr-001" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step G — Brigadier Bridge in commands-api (per commands-api-ADR-001)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-h-stabilization-dual-runtime-smoke-test-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step H — Stabilization, Dual-Runtime Smoke Test &amp; Testing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-3-documentation-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 3: Documentation &amp; Release
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-4-neoforge-adapter-rtp-neoforge" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 4: NeoForge Adapter (rtp-neoforge)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 4: NeoForge Adapter (rtp-neoforge)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-n0-scope-unlock-bring-up-prerequisites-adr-033-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase N0 — Scope unlock &amp; bring-up prerequisites (ADR-033 §3)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-n1-module-skeleton-mod-bootstrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase N1 — Module skeleton &amp; mod bootstrap
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-n2-platform-adapter-steps-mirror-fabric-steps-a-k" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase N2 — Platform adapter steps (mirror Fabric Steps A-K)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-n3-documentation-traceability-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase N3 — Documentation, traceability &amp; release
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mod-side-claim-integrations-out-of-scope-reminders" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mod-side claim integrations &amp; out-of-scope reminders
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-does-not-need-to-change-in-rtp-api-or-rtp-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      What Does NOT Need to Change in rtp-api or rtp-core
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Risks &amp; Mitigations
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ownership
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+  <h1>MULTI PLATFORM PLAN</h1>
+
+<p>out b# Multi-Platform Support Roadmap</p>
+<p>This document outlines the plan for RTP's multi-platform expansion. Fabric is <strong>in scope</strong> as of 2026-04-30 (see <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a>). NeoForge is <strong>in scope but gated</strong> on Fabric stabilization (see <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> and Phase 4 below); legacy Forge and other mod loaders remain out of scope.</p>
+<p>For the supersession history: legacy Minecraft and Java versions are out of scope per <a href="../../adr/ADR-021-legacy-mc-and-java-support-scope/">ADR-021</a>. Do not backport Fabric-stage work to legacy servers without first superseding ADR-021.</p>
+<h2 id="out-of-scope">Out of Scope<a class="headerlink" href="#out-of-scope" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Legacy Minecraft versions (older than the shipped <code>v*_R*</code> adapter submodules) and legacy Java runtimes (older than Java 21). See <a href="../../adr/ADR-021-legacy-mc-and-java-support-scope/">ADR-021</a>.</li>
+<li>Legacy Forge (&lt;=1.20.1), Sponge, hybrid servers (Mohist / Magma / Arclight), and other non-Fabric / non-NeoForge mod loaders. (NeoForge itself is in scope but gated - see <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> and Phase 4 below.)</li>
+<li>Networked Fabric setups (Velocity / BungeeCord in front of a Fabric backend) as a prioritized feature. Decision recorded 2026-05-24: the <code>rtp-proxy-common</code> dispatcher is platform-agnostic and the devstack's <code>backend-c</code> Fabric instance exercises the SPI, so a Fabric backend in a proxied fleet is not actively broken, but no Fabric-specific proxy work is on the roadmap and no operator-facing forwarding-mode recipe ships until a modpack operator files a concrete request. Vanilla Minecraft does not implement Velocity modern forwarding; today's only path is Velocity legacy forwarding + the third-party FabricProxy-Lite mod, at operator risk. See also the matching non-goal in <code>MULTI_SERVER_PLAN.md</code>.</li>
+</ul>
+<h2 id="remaining-work-checklist-updated-2026-05-30">Remaining Work Checklist <em>(updated 2026-05-30)</em><a class="headerlink" href="#remaining-work-checklist-updated-2026-05-30" title="Permanent link">&para;</a></h2>
+<p>Quick scan of what's done and what's left across Phases 0–3. Each Phase 2 step links to its detailed status block below. Tick boxes are authoritative — sub-bullets are scope reminders.</p>
+<p><strong>Status (2026-05-30):</strong> the bulk of Fabric parity is done and verified running end-to-end on each supported runtime (<code>v1_20_R1</code>, <code>v1_21_R1</code>, <code>v1_21_R5</code>, <code>v1_21_R11</code>, <code>v26_1_R1</code>) — core teleport pipeline, scheduler, database, event bridge, anvil pre-filter, login reserve cache, permissions, the full Brigadier command tree, and the chat-based menu renderer all ship. Three areas remain open: <strong>metrics</strong> (cross-platform consolidation follow-up C6 below; the <code>FabricMetricsBinding</code> itself already landed), <strong>networking</strong> (Step J — network-mode backend parity so a proxied player arriving on a Fabric backend can redeem a reservation token), and <strong>book menus</strong> (Step I Session 3 — the 1.21+ <code>FabricBookMenuRenderer</code> un-defer; 1.20.x stays on the chat renderer).</p>
+<h3 id="done">✅ Done<a class="headerlink" href="#done" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] <strong>Phase 0</strong> — scope unlock (ADR-022, REQUIREMENTS.md §0, AGENTS.md, INDEX.md).</li>
+<li>[x] <strong>Phase 1</strong> — module skeleton, single-JAR multi-loader bootstrap, Loom 1.11-SNAPSHOT integration, shadowJar bloat fix (102 MB → 3.87 MB).</li>
+<li>[x] <strong>Step A</strong> — <code>FabricRTPWorld.getChunkAt</code> async via <code>MinecraftServer#submit</code> (S-005).</li>
+<li>[x] <strong>Step B</strong> — <code>FabricServerAccessor.getLocationGenerator()</code> real (S-006 fail-loud).</li>
+<li>[x] <strong>Step C</strong> — <code>FabricScheduler</code> full 12-method impl (async/sync/tick-driven cancellation).</li>
+<li>[x] <strong>Step D</strong> — <code>FabricDatabaseHandler.setupDatabase(rtp)</code> mirrors <code>BukkitDatabaseHandler</code>.</li>
+<li>[x] <strong>Step E2</strong> — <code>FabricEventBridge</code> + <code>FabricRTPPlayer</code> + real <code>RTPFabricMod.onInitialize()</code> body + accessor map population.</li>
+<li>[x] <strong>Step G (structural)</strong> — <code>BrigadierCommandAdapter</code> + <code>BrigadierBridgeContext</code> in <code>commands-api</code>; <code>RTPCmdFabric</code> shim landed.</li>
+<li>[x] <strong>Step G G1 (wiring)</strong> — <code>RTPCmdFabricRoot</code> (bare <code>/rtp</code>, no params/subcommands), <code>FabricServerAccessor.getSender</code>/<code>sendMessage</code> minimal, <code>FabricConsoleSender</code> inner sender, <code>RTPFabricMod.onInitialize()</code> registers via <code>CommandRegistrationCallback.EVENT</code> with permissive predicate (Step F deferred).</li>
+<li>[x] <code>platforms/rtp-fabric/REQUIREMENTS.md</code> authored.</li>
+<li>[x] <strong>Metrics axis — Fabric parity complete</strong> <em>(2026-05-17, <code>CHECKLIST-metrics-and-multiserver.md</code> C2)</em> — <code>FabricMetricsBinding</code> (<code>rtp-fabric-common/.../fabric/metrics/</code>) implements <code>MetricsBinding</code>, installed by <code>RTPFabricMod</code> via <code>CoreMetrics.setBinding(...)</code>, sampler driven by <code>FabricEventBridge</code> server-tick callback. Covered by <code>FabricMetricsBindingTest</code> and enumerated in <code>MetricsConsolidationArchTest</code> as a recognized binding-boundary entry point. Open follow-up <code>C6</code> (cross-platform metrics consolidation) is not Fabric-specific.</li>
+</ul>
+<h3 id="in-progress-next-up">🚧 In Progress / Next Up<a class="headerlink" href="#in-progress-next-up" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] <strong>Step E3 — Scheduled-task processor parity <em>(complete 2026-05-23)</em></strong> — <code>/rtp</code> is functional end-to-end on Fabric at beta.2-level content parity, and the SQL-transport cross-process write path is now pumped on Fabric (<code>FabricDatabaseProcessing.start()</code> wired in SERVER_STARTED 2026-05-23). Bukkit <code>onEnable</code> recurring-task wiring fully ported to <code>RTPFabricMod.onInitialize()</code> across E3-1…E3-6 + <code>DatabaseProcessing</code> parity. Sub-items:<ul>
+<li>[x] <strong><code>RTP.scheduler = accessor.getScheduler()</code> in <code>RTPFabricMod.onInitialize()</code> BEFORE <code>RTP.getInstance()</code></strong> <em>(landed 2026-05-01)</em> — <code>FabricScheduler.scheduleTimer</code> queues into a tick-drained map and is safe to call before SERVER_STARTED binds the <code>MinecraftServer</code>; the <code>RTP()</code> constructor's <code>runTaskTimer*</code> calls now succeed. Build green (<code>:rtp-fabric:rtp-fabric-common:compileJava :rtp-plugin:compileJava</code>).</li>
+<li>[x] <strong>Configuration &amp; Database setup wired</strong> <em>(landed 2026-05-01)</em> — <code>FabricDatabaseHandler.setupDatabase(rtp)</code> invoked from <code>RTPFabricMod.onInitialize()</code> immediately after <code>RTP.getInstance()</code>, mirroring <code>RTPBukkitPlugin.onEnable</code> ordering. <code>FabricServerAccessor.getPluginDirectory()</code> mkdirs <code>&lt;fabric-config&gt;/rtp/</code> so both <code>Configs</code> ctor and <code>setupDatabase</code> find it on first run. <code>FileSystemException</code> is caught + logged at SEVERE so a DB failure doesn't abort mod init (RTP runs without persistence rather than failing to load). Build green.</li>
+<li>[x] <code>DatabaseProcessing.start(...)</code> Fabric equivalent <em>(landed 2026-05-23; consolidated into <code>rtp-core</code> same day)</em> — initial port (<code>FabricDatabaseProcessing</code>) was a one-to-one mirror of the Bukkit class; on review the logic had zero platform-specific surface (every dependency is an <code>rtp-core</code> API: <code>RTP.scheduler</code>, <code>RTP.getInstance().databaseAccessor</code>, and the Bukkit <code>JavaPlugin</code> parameter was already unused). The canonical implementation now lives at <code>io.github.dailystruggle.rtp.common.server.DatabaseProcessing</code> in <code>rtp-core</code>; the original <code>bukkitplatform.server.DatabaseProcessing</code> and <code>fabric.server.FabricDatabaseProcessing</code> classes were deleted and all call sites (<code>RTPBukkitPlugin</code>, <code>RTPBukkitLitePlugin</code>, <code>RTPFabricMod</code>) re-pointed at the core class with the no-arg <code>start()</code> signature. Semantics unchanged: 100-tick async drain of <code>databaseAccessor.processQueries</code>, atomic <code>getAndSet</code> cancel, re-entrant <code>processing</code> guard, permanent <code>kill()</code> flag. On Fabric this is wired in <code>RTPFabricMod</code>'s <code>SERVER_STARTED</code> handler immediately after <code>FabricDatabaseHandler.setupDatabase</code>; <code>kill()</code> registered on <code>ServerLifecycleEvents.SERVER_STOPPING</code> so the timer is cancelled while the scheduler is still alive (final mutation drain remains the responsibility of <code>rtp-core</code>'s <code>RTPRunnable</code> shutdown path). Rationale for promoting this from the original "rtp-core constructor's flush timers cover the workload" assumption: the constructor's 60-tick <code>flush</code> pass covers prepared-statement flushing only — it does <strong>not</strong> drain the queued mutation queue serviced by <code>processQueries</code>, which is the cross-process write path needed for SQL-transport network mode (cooldown rows, reservation tokens, player-state rows).</li>
+<li>[x] <code>ChunkUnloadProcessor</code> timer <em>(landed 2026-05-05, see Status block below)</em> — <code>RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1)</code> scheduled in <code>RTPFabricMod.onInitialize()</code> after Brigadier registration. Fabric has no Folia-style region threading so the non-Folia branch always applies.</li>
+<li>[x] <code>JarUtils.extractDocs(...)</code> Fabric equivalent <em>(landed 2026-05-23)</em> — <code>FabricJarUtils.extractDocs(File, String)</code> in <code>rtp-plugin/.../fabric/utils/</code> mirrors the Bukkit utility (no <code>JavaPlugin</code> dep; routes diagnostics through <code>RTP.log</code> since <code>SendMessage</code> is in <code>rtp-bukkit-common</code>'s <code>bukkitplatform</code> package and unreachable from the Fabric entrypoint per rtp-fabric-ADR-002 §4). Wired in <code>RTPFabricMod.onInitialize()</code> after the <code>startupTasks</code> drain block; mod version resolved via <code>FabricLoader.getInstance().getModContainer("rtp").getMetadata().getVersion().getFriendlyString()</code>. Fail-soft (logged at <code>WARNING</code>) and idempotent (re-extracts only when <code>&lt;configDir&gt;/rtp/docs/.version</code> disagrees with the running mod version).</li>
+<li>[x] <strong>Login Reserve Cache (ADR-023)</strong> <em>(landed 2026-05-11)</em> — <code>FabricEventBridge.initLoginReserveCache(server)</code> runs at SERVER_STARTED; <code>refillLoginReserveOnQuit()</code> on the Disconnect proxy; <code>FabricOnEventTeleports.onJoin</code> covers the join path. Uses <code>MinecraftServer#getMaxPlayers()</code> + <code>MinecraftServer#getPlayerList().getPlayerCount()</code>; default-world resolved via <code>MinecraftServer#overworld()</code>. Covered by <code>ReqFabricAdr023HasPlayedBeforeTest</code>. See ADR-023 <em>Fabric port</em>.</li>
+<li>[x] <strong><code>startupTasks</code> drain</strong> <em>(landed 2026-05-05)</em> — three drains added in <code>RTPFabricMod.onInitialize()</code> mirroring <code>RTPBukkitPlugin.onEnable</code> / <code>BootstrapSupport.drainStartupTasks</code>: synchronous, then <code>RTP.scheduler.runTaskLater(..., 1)</code>, then synchronous again. Without this the region prefill never started and <code>/rtp</code> could not produce a destination.</li>
+<li>[x] <strong>Acceptance:</strong> <code>/rtp</code> actually teleports a player on Fabric <em>(verified 2026-05-23 by maintainer; beta.2-level content parity confirmed working end-to-end on Fabric. Networking and menus remain out of scope here — tracked under Step I and Step J respectively.)</em></li>
+</ul>
+</li>
+<li>[x] <strong>Step E-tail</strong> — defer-able items from E2 <em>(complete 2026-05-24; all bullets either landed earlier under E2/E-perf or formally dropped — verified by point-in-code audit)</em>:<ul>
+<li>[x] ~~Teleport-cancel callback (requires Mixin against <code>Entity#teleportTo</code>).~~ <strong>Not needed</strong> <em>(decided 2026-05-24)</em> - the Bukkit equivalent (<code>OnPlayerTeleport</code>) guarded the race window between <code>RTPTeleportCancel</code>-able state and the actual <code>teleport</code> call inside the RTP runnable, but that window is too narrow in practice for an external teleport to land in, and the RTP pipeline already pre-checks <code>TeleportData</code> before dispatching. <code>OnPlayerTeleport</code> is now <code>@Deprecated</code> on Bukkit (kept wired for one release cycle, slated for removal); no Fabric port (no Mixin, no <code>ServerEntityWorldChangeEvents</code> hook) is required for parity.</li>
+<li>[x] ~~Biome / material listing on <code>FabricServerAccessor</code> (<code>setBiomeGetter</code>, <code>getMaterials</code>, etc.).~~ <strong>Already done</strong> <em>(verified 2026-05-24; landed earlier under Step E2/E-perf)</em> — biome side: <code>FabricServerAccessor.setBiomeGetter</code> / <code>setBiomesGetter</code> real (L1761-1771), backed by <code>defaultBiomeAt</code> (dynamic biome registry lookup via <code>ServerLevel#getBiome</code> + <code>PaletteIdentifierNormalizer.normalize</code> for Spigot-form parity) and <code>defaultBiomesFor</code> (reflective <code>registryAccess</code>/<code>reloadableRegistries</code> to bridge MC 1.21.1 vs. 26.x mapping drift). Material side: <code>FabricRTPChunk</code> exposes <code>materialNameAt</code>, <code>isAir</code>, <code>isSafe(Set&lt;String&gt;)</code>, <code>isSafe(CompiledUnsafeSet)</code>, <code>getSurfaceHeight</code>, <code>getSkyLight</code>, <code>getBiome</code>, <code>reconciledAirBlocks</code> (dual-mode live/anvil per <code>rtp-fabric-ADR-005</code>). The original <code>getMaterials</code> plan-doc bullet was an outdated name — no such API exists in <code>rtp-api</code> (<code>RTPServerAccessor</code> has no <code>getMaterials</code>); per-chunk material resolution is the actual contract and it is implemented. Confirmed in practice by maintainer's beta.2-level <code>/rtp</code> smoke (safety stage cannot pass without working material lookups).</li>
+<li>[x] ~~World-border + shape function plumbing on <code>FabricServerAccessor</code>.~~ <strong>Already done</strong> <em>(verified 2026-05-24; landed earlier under Step E2)</em> — <code>FabricServerAccessor</code> (<code>platforms/rtp-fabric/rtp-fabric-common/.../server/FabricServerAccessor.java</code>): <code>setWorldBorderFunction</code> (L1635-1638) and <code>setShapeFunction</code> (L1641-1644) are real, returning <code>true</code>; getters <code>getWorldBorder(String)</code> (L1600-1604, falls through to native default if the override returns <code>null</code>) and <code>getShape(String)</code> (L1630-1632) apply the registered function. Native defaults <code>createNativeWorldBorder(String)</code> (~L1565-1597) and <code>createNativeShape(String)</code> (L1615-1627) read <code>ServerLevel#getWorldBorder()</code> and build a <code>SQUARE</code> <code>Shape</code> with radius <code>border.getSize()/32.0</code> (diameter -&gt; per-side radius in chunks) and centre <code>border.getCenter{X,Z}()/16.0</code> (blocks -&gt; chunks), mirroring <code>AbstractServerAccessor</code> (Bukkit). The <code>worldBorderFunction</code> field is initialised at L79 to <code>this::createNativeWorldBorder</code>. Addon override path (e.g. <code>ChunkyBorderChecker:48</code> calling <code>RTP.serverAccessor.setWorldBorderFunction(...)</code>) is therefore unblocked on Fabric.</li>
+<li>[x] ~~<code>getConsolePlayer()</code> real implementation (currently stub-throws).~~ <strong>Already done — bullet was inaccurate</strong> <em>(verified 2026-05-24)</em> — <code>FabricServerAccessor.getConsolePlayer()</code> at L572-578 does <strong>not</strong> stub-throw; it returns <code>null</code> by design, matching the <code>@Nullable</code> contract on Bukkit's <code>AbstractServerAccessor.getConsolePlayer()</code> (<code>rtp-bukkit-common/.../AbstractServerAccessor.java:242</code>). Fabric has no "console as player" concept, so callers that need a console sink go through <code>getSender(RTPAPI.serverId)</code> (L581-596) which returns a real <code>FabricConsoleSender(server)</code>. The Javadoc at L573-576 explicitly documents this routing. No behavioural gap.</li>
+<li>[x] ~~Message routing helpers (<code>announce</code>, formatted <code>log</code>) wired to Fabric console + player chat.~~ <strong>Already done</strong> <em>(verified 2026-05-24)</em> — <code>FabricServerAccessor.announce(String, String, String)</code> at L919-940 iterates <code>playersById</code>, permission-gates each recipient (reusing <code>FabricRTPPlayer.hasPermission</code>'s op-level fallback / <code>fabric-permissions-api</code> per Step F), runs the <code>messages.yml</code> placeholder pipeline via <code>format(...)</code>, then routes a console copy through Log4j2's <code>RTP</code> logger with section-code -&gt; ANSI conversion (<code>FabricAnsiText.toAnsiString</code>). <code>log(Level, String)</code> at L784-806 and <code>log(Level, String, Throwable)</code> at L809-815 honor <code>logging.yml#min_level</code> (cached at L834-835, resolved at L850-876), run the same placeholder pipeline (<code>formatForLog</code>, L822-828, fail-soft), apply a level-coloured prefix (<code>prefixForLevel</code>, L907-916: SEVERE -&gt; <code>&amp;c</code>, WARNING -&gt; <code>&amp;e</code>, CONFIG -&gt; <code>&amp;a</code>, FINE -&gt; <code>&amp;b</code>), and dispatch via <code>LogManager.getLogger("RTP").log(toLog4jLevel(level), ansi[, throwable])</code> so the dedicated server's <code>TerminalConsoleAppender</code> renders colour on console. Mirrors <code>rtp-spigot</code> <code>SendMessage.log</code> / <code>SendMessage.sendMessage</code> semantics.</li>
+</ul>
+</li>
+<li>[x] <strong>Step E-perf — Anvil pre-filter parity (ADR-016)</strong> <em>(landed 2026-05-06, <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md">rtp-fabric-ADR-005</a>)</em> — without this override every <code>ScanTask</code> refill candidate fell through <code>RTPWorld#probeChunkColumn</code>'s default <code>null</code> (UNKNOWN) into <code>runFullLoadPath</code> → <code>FabricRTPWorld.getChunkAt</code> → synchronous <code>cache.getChunk(..., FULL, /*load=*/true)</code> on the server tick. Operators reported <code>/rtp</code> cost rising from ~1 ms (Bukkit baseline) to ~14 ms on Fabric under steady-state queue refill — exactly that tick-thread chunk-generation cost surfacing as command latency. Resolution:<ul>
+<li>[x] <code>api project(':rtp-anvil')</code> added to <code>:rtp-fabric:rtp-fabric-common</code>.</li>
+<li>[x] <code>FabricRTPWorld#probeChunkColumn</code> overrides the default — gates on <code>SafetyKeys.anvilPrefilterEnabled</code> + <code>isChunkLoaded</code>, resolves world folder via <code>MinecraftServer#getWorldPath(LevelResource.ROOT)</code> and dimension subpath via <code>ServerLevel#dimension().location()</code> (<code>overworld → ""</code>, <code>the_nether → "DIM-1"</code>, <code>the_end → "DIM1"</code>, custom → <code>"dimensions/&lt;ns&gt;/&lt;path&gt;"</code>). Dispatches onto <code>AnvilIoPool.get()</code>; all failures resolve to UNKNOWN so the live-path fallback remains authoritative (ADR-016).</li>
+<li>[x] <code>FabricAnvilColumnProbeAdapter</code> added (mirrors <code>rtp-bukkit-common</code>'s <code>AnvilColumnProbeAdapter</code>; uses platform-neutral <code>PaletteIdentifierNormalizer</code> instead of Spigot's <code>Material</code>-aware <code>PaletteNormalizer</code>).</li>
+<li>[x] <strong>Follow-up:</strong> anvil-backed <code>FabricRTPChunk</code> for the safety stage (parity with <code>BukkitRTPChunk</code>'s anvil mode). <em>(landed 2026-05-06, <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md#addendum-2026-05-06--full-anvil-backed-fabricrtpchunk-deferral-lifted">rtp-fabric-ADR-005 Addendum 2026-05-06</a>)</em> — <code>FabricRTPChunk</code> is now dual-mode (live <code>ChunkAccess</code> or anvil <code>AnvilChunkView</code>); <code>FabricRTPWorld.getChunkAt</code> wires <code>AnvilProbeSupport.probeAndPublish</code> so accepted prefilter candidates evaluate entirely off-tick against the decoded view, with <code>getCachedChunk</code> falling through to a fresh anvil-backed <code>FabricRTPChunk</code> when the live caches miss. New <code>FabricPaletteNormalizer</code> + <code>ReqRtpS005FabricAnvilChunkTest</code> + <code>FabricPaletteNormalizerTest</code> cover the regression.</li>
+<li>[ ] <strong>Follow-up:</strong> hoist <code>*AnvilColumnProbeAdapter</code> into <code>rtp-anvil</code> (requires moving <code>PaletteNormalizer</code>'s Material coupling out first).</li>
+</ul>
+</li>
+<li>[ ] <strong>Step F - Permissions</strong> <em>(5/5 sub-items landed 2026-05-22. <code>getEffectivePermissions()</code> landed via ADR-011. <code>/rtp</code> is gated on real perms via the perms-api fallback chain and the Brigadier bridge predicate.)</em>:<ul>
+<li>[x] Add <code>me.lucko:fabric-permissions-api</code> as <code>modCompileOnly</code> <em>(landed pre-2026-05-22)</em> - wired in all six fabric Gradle modules: <code>rtp-fabric-common/build.gradle:52</code>, <code>rtp-fabric-common-unobf/build.gradle:46</code> (<code>compileOnly</code>), <code>rtp-fabric-v1_20_R1/build.gradle:34</code>, <code>rtp-fabric-v1_21_R1/build.gradle:35</code>, <code>rtp-fabric-v1_21_R5/build.gradle:32</code>, <code>rtp-fabric-v1_21_R11/build.gradle:45</code>, <code>rtp-fabric-v26_1_R1/build.gradle:50</code> (<code>compileOnly</code>).</li>
+<li>[x] <code>FabricRTPPlayer.hasPermission(node)</code> via perms-api <em>(landed pre-2026-05-22)</em> - all three platform variants (<code>FabricRTPPlayer.java:93-216</code>, <code>FabricRTPPlayerUnobf.java:99-233</code>, <code>V26_1_R1FabricRTPPlayer.java:82-137</code>) implement a three-tier fallback chain: (1) <code>Permissions.getPermissionValue(uuid, node).getNow(TriState.DEFAULT)</code> (LuckPerms-Fabric / Cyan / Ledger), (2) <code>FabricDefaultPermissions.resolve(node)</code> mirroring <code>plugin.yml</code>'s default table (<code>rtp.see=true</code>, <code>rtp.use=true</code>, <code>rtp.onevent.*=false</code>, ...), (3) on-disk <code>ops.json</code> UUID scan via <code>PlayerList.getOps().getFile()</code>. Direct <code>ServerPlayer#hasPermissions(int)</code> and <code>PlayerList#isOp(GameProfile)</code> are deliberately avoided because their intermediary mappings (<code>method_5687</code>, <code>method_14569</code>) drifted on MC 1.21.11 and trigger <code>NoSuchMethodError</code> / <code>ClassCastException</code> under Loom remapping.</li>
+<li>[x] <code>getEffectivePermissions()</code> real impl <em>(landed 2026-05-22 via <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md">rtp-fabric-ADR-011</a> Accepted)</em> - was <code>Collections.emptySet()</code> in all three variants - <code>FabricRTPPlayer.java:218</code>, <code>FabricRTPPlayerUnobf.java:235</code>, <code>V26_1_R1FabricRTPPlayer.java:139</code>, and the console sender at <code>FabricServerAccessor.java:1968</code>). <strong>Blocker:</strong> <code>fabric-permissions-api</code> is a check-only interface; it exposes no enumeration analogous to Bukkit's <code>Player#getEffectivePermissions()</code>. Impact: <code>EffectFactory.buildEffects(prefix, player.getEffectivePermissions())</code> consumes this set, so the empty stub means <strong>zero effects fire on Fabric</strong> (documented in <code>FabricEffectsHandlerUnobf.java:43</code>, <a href="../../effects-api/docs/adr/effects-api-ADR-005-effects-yml-config-and-translations.md">effects-api-ADR-005</a> §"empty getEffectivePermissions()", <code>FabricEffectsHandler.java:45</code>). <code>ParsePermissions.java:53/88</code> also consumes it for permission-tree resolution. A subproject ADR (candidate paths: enumerate from the <code>FabricDefaultPermissions</code> known-node table unioned with op-implies-all; or have <code>FabricEffectsHandler</code> probe each registered effect node via repeated <code>hasPermission</code> calls; or defer until LuckPerms-Fabric exposes an enumeration surface) - <strong>resolved and implemented 2026-05-22</strong> in <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md">rtp-fabric-ADR-011</a> (Accepted; revised same day after consumer audit widened scope to <code>rtp.onevent.*</code> and numeric tails <code>rtp.delay.&lt;n&gt;</code> / <code>rtp.cooldown.&lt;n&gt;</code>). Adopts Option E: LuckPerms-Fabric primary path (the only enumerable Fabric perms foundation) with closed-namespace registry probe (<code>EffectFactory.registeredNames()</code> + 6-event <code>rtp.onevent.*</code> list) as fallback. Implementation landed 2026-05-22: new <code>FabricEffectivePermissionsResolver</code> + <code>LuckPermsFabricEnumerator</code> + <code>FabricOnEventPermissions</code> in <code>rtp-fabric-common</code>; wired in all three player variants and the console sender; covered by <code>FabricEffectivePermissionsTest</code> (22 tests).</li>
+<li>[x] Replace <code>BrigadierBridgeContext</code> permissive predicate (always-true) with real perms-api lookup <em>(landed pre-2026-05-22)</em> - <code>FabricBrigadierSourceBridge.checkPermission</code> (<code>rtp-fabric-common/.../tools/FabricBrigadierSourceBridge.java:159-174</code>) resolves the source UUID, treats the <code>RTPAPI.serverId</code> sentinel and console as fully privileged (matching Bukkit <code>ConsoleCommandSender.hasPermission()</code>), and otherwise routes through <code>RTP.serverAccessor.getSender(uuid).hasPermission(permission)</code> - which on Fabric dispatches into <code>FabricRTPPlayer.hasPermission</code>'s three-tier perms-api / <code>FabricDefaultPermissions</code> / <code>ops.json</code> chain. <code>RTPFabricMod.onInitialize()</code> (L495) wires this as the <code>BrigadierBridgeContext</code> permission predicate (commented <code>// Permission gating: defer to RTP.serverAccessor.getSender(uuid).hasPermission(perm)</code> at L482-494). The "always-true" placeholder noted in the <code>RTPCmdFabricRoot</code> Javadoc and at <code>RTPFabricMod.java:454</code> referred to the early G1 wiring and is stale.</li>
+<li>[x] Permission node parity test vs. Bukkit adapter <em>(2026-05-22)</em> - <code>FabricDefaultPermissionsParityTest</code> (<code>rtp-fabric-common/src/test/.../player/</code>) pins <code>FabricDefaultPermissions.resolve()</code> against the <code>plugin.yml</code> declared defaults for the full canonical node set (~26 nodes covering <code>rtp.see</code>/<code>rtp.use</code> default-true, the <code>rtp.onevent.*</code> default-false family, and the default-op majority). Scoped to the middle tier of the three-tier chain because that is where regression risk concentrates - perms-api and <code>ops.json</code> are stable surfaces and would require a live <code>MinecraftServer</code> to exercise (out of scope for a unit test). Additionally pins Fabric-side tightenings of <code>rtp.delay</code> / <code>rtp.cooldown</code> (placeholder base-keys, denied so numeric-suffix overrides drive value) and <code>rtp.personalqueue</code> (ADR-043 opt-in, denied so op does not implicitly carry the bucket lifecycle). Traces candidate <code>REQ-RTP-F-???</code> (permission semantics; row to be added under <code>REQUIREMENTS.md §F</code>).</li>
+</ul>
+</li>
+<li>[ ] <strong>Step G2 — Brigadier wiring (full Bukkit parity)</strong> <em>(G1 minimal landed 2026-05-01; parameter + subcommand parity landed 2026-05-06)</em>:<ul>
+<li>[x] Port <code>RTPCmdBukkit</code>'s 5 parameters (<code>region</code>/<code>biome</code>/<code>player</code>/<code>world</code>/<code>toggletargetperms</code>) to Fabric, routing world/player lookups via <code>RTP.serverAccessor.*</code> (no <code>Bukkit.*</code>). <em>(landed 2026-05-06 — <code>RTPCmdFabricRoot</code> ctor; <code>Locale.ROOT</code> biome casing and <code>rtp.notme</code> opt-out preserved; <code>player</code> parameter uses an inline <code>CommandParameter</code> subclass with empty <code>values()</code> until an online-player listing helper is added to <code>FabricServerAccessor</code> under Step E-tail.)</em></li>
+<li>[x] Port 5 of 6 subcommands (<code>reload</code>/<code>help</code>/<code>config</code>/<code>scan</code>/<code>info</code>). <em>(landed 2026-05-06.)</em> <code>test</code> deferred — <code>TestCmd</code> lives in <code>rtp-plugin/.../bukkit/commands/test/</code> and is Bukkit-only; a platform-neutral lift is a separate Step G2 follow-up.</li>
+<li>[~] <code>TestCmd</code> — port or lift to platform-neutral. <strong>Deferred 2026-05-24</strong> — <code>TestCmd</code> is already class-load-safe on Fabric (constructor at <code>rtp-plugin/.../bukkit/commands/test/TestCmd.java:146</code> takes a nullable parent and registers only platform-neutral children; Bukkit-only children quarantined in <code>BukkitTestCmd</code> via <code>registerPlatformSpecificChildren()</code>), and <code>TestCmdPlatformSplitTest</code> enforces the split. The remaining gap is purely a missing <code>addSubCommand(new TestCmd(this))</code> callsite in <code>RTPCmdFabricRoot</code>. Deferred at maintainer direction along with the <code>commands-live</code> smoke below; revisit when the Fabric devstack <code>commands-live</code> invocation is actually exercised.</li>
+<li>[x] ~~<code>successEvent</code>/<code>failEvent</code> hooks on <code>RTPCmdFabricRoot</code> (currently no-op — Bukkit fires <code>TeleportCommandSuccessEvent</code>).~~ <strong>Resolved as intentional no-op on Fabric</strong> <em>(decided 2026-05-24)</em> — the Bukkit overrides fire <code>TeleportCommandSuccessEvent</code> / <code>TeleportCommandFailEvent</code> on the Bukkit plugin event bus (<code>org.bukkit.event.Event</code> subclasses) for third-party plugin observability; those types cannot be reused on Fabric and Fabric has no equivalent plugin-event-bus consumer surface in scope. RTP's in-house runnable-collection hooks (<code>RTPRunnable</code> / <code>TeleportData</code>) already cover internal observability, so firing nothing on Fabric is the correct behaviour. <code>RTPCmdFabricRoot.successEvent</code>/<code>failEvent</code> Javadoc updated to mark these as by-design no-ops (not deferred). No new SPI required; revisit only if a Fabric-side observability consumer materialises.</li>
+<li>[~] End-to-end <code>commands-live</code> smoke under <code>rtp test full</code> on Fabric. <strong>Deferred 2026-05-24</strong> — the rest of Step H's runtime smoke (Paper + Fabric single-JAR load, <code>/rtp</code> end-to-end on both, no S-005 main-thread chunk I/O, no S-004 unattributed warnings) has been exercised live by the maintainer; only the <code>commands-live</code> portion remains, and it is gated on the missing <code>addSubCommand(new TestCmd(this))</code> registration above. Re-open together with the <code>TestCmd</code> bullet when a Fabric <code>rtp test full</code> invocation is needed.</li>
+<li>[x] Tab-completion smoke test. <em>(2026-05-06: Brigadier-tree audit
+  landed — <code>BrigadierCommandAdapter.attachChildren</code> now recurses through
+  <code>CommandParameter.subParams</code> and chains sibling parameters with a
+  cycle guard; <code>CommandParameter.isSuggestionRelevant</code> decoupled from
+  <code>isRelevant</code> so non-op Fabric players get a populated suggestion
+  list pre-<code>fabric-permissions-api</code>; <code>FabricServerAccessor.getOnlinePlayerNames</code>
+  backs the <code>player</code> parameter's <code>values()</code>. See
+  <a href="../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md#addendum--2026-05-06-recursion-contract-sibling-chaining-and-suggestion-relevance-split">commands-api-ADR-001 §Addendum 2026-05-06</a>
+  and <code>BrigadierTreeShapeTest</code>. End-to-end live tab-completion in a
+  running Fabric server is still gated on a fresh build of
+  <code>rtp-fabric-common</code> + the platform's <code>commands-api</code> jar.)</em></li>
+</ul>
+</li>
+<li>[x] <strong>Step H — Stabilization &amp; Dual-Runtime Smoke Test</strong> <em>(complete 2026-05-24 except for the <code>commands-live</code> portion of Step G2, which is deferred — see above. Phase 2 runtime acceptance gate met by maintainer's live smoke.)</em>:<ul>
+<li>[x] Memory-leak audit — chunk tickets + <code>MemoryTracker</code> register/release on all Fabric exit paths. <em>(verified during runtime smoke 2026-05-24.)</em></li>
+<li>[x] Concurrency review — no Folia-isms in Fabric code paths. <em>(verified during runtime smoke 2026-05-24.)</em></li>
+<li>[x] <strong>Dual-runtime smoke test</strong> — one JAR loads on Paper <em>and</em> Fabric, <code>/rtp</code> works end-to-end on both. <em>(verified during runtime smoke 2026-05-24; Phase 2 acceptance gate met.)</em></li>
+<li>[x] ArchUnit guard for disjoint <code>bukkit/</code> + <code>fabric/</code> packages in <code>rtp-plugin</code> <em>(2026-05-22)</em> — <code>PluginPlatformPackageBoundaryArchTest</code> (4 rules: bukkit↛fabric, fabric↛bukkit, bukkit↛<code>net.minecraft</code>, fabric↛<code>org.bukkit</code>). Scoped to <code>rtp-plugin/build/classes</code> so cross-module Fabric types under <code>rtp-fabric-common</code>'s <code>io.github.dailystruggle.rtp.fabric.*</code> are out of scope. Narrow FQN-keyed exception for the legacy platform-neutral <code>bukkit.commands.test.TestCmd</code> that <code>RTPFabricMod</code> constructs (documented in-file ~L460-469); relocation tracked as Step G2 follow-up.</li>
+<li>[ ] <code>TRACEABILITY.md</code> rows for <code>REQ-RTP-S-005</code> (Fabric), <code>REQ-RTP-S-006</code> (Fabric), Step F perm test, Step G <code>commands-live</code>.</li>
+</ul>
+</li>
+<li>[ ] <strong>Step I — Menu Framework Parity <em>(NEW, 2026-05-22)</em></strong> — the menu rollout under <a href="../../adr/ADR-035-interactive-menus-book-first/">ADR-035</a> and <a href="../../adr/ADR-044-command-tree-menu-reflector/">ADR-044</a> shipped its <code>rtp-api</code> model and <code>rtp-core</code> reflectors as platform-agnostic; the renderer layer was Paper-only. Multi-session rollout (Path B per maintainer 2026-05-24: extract the platform-neutral wiring before duplicating onto Fabric, so both platforms benefit). Sub-items:<ul>
+<li>[x] <strong>Renderer decision ADR</strong> <em>(drafted 2026-05-22 as <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md">rtp-fabric-ADR-012</a> Proposed; chose chat-first first, book renderer follow-up for 1.21+ carriers per 2026-05-24 maintainer decision to un-defer the book renderer).</em></li>
+<li>[x] <strong>Session 1 — <code>MenuWiringSupport</code> lift</strong> <em>(landed 2026-05-24)</em> — the previously-inline ~520-line menu wiring block at <code>RTPCmdBukkit:210-731</code> (LocalMenuTokenRegistry, all 11 <code>MenuRedeemSubcommand</code> builders, <code>/rtp admin</code> opener, deferred <code>/rtp config search</code> handler, <code>MultiConfigMenuBuilder</code>, staging-cart sink) is extracted to platform-neutral <code>rtp-core/.../common/commands/menu/MenuWiringSupport</code> + <code>MenuWiringSupportInstaller</code> + <code>MenuPlatformBindings</code> (record carrying the caller-owned <code>MenuTokenRegistry</code>, <code>permissionProbe</code>, <code>MenuRenderer</code>, <code>AnvilInputOpener</code>). <code>RTPCmdBukkit</code> constructor shrinks from 1032 → 509 lines and now calls <code>MenuWiringSupport.attachTo(this, new MenuPlatformBindings(...))</code> after constructing the three platform-specific hooks (probe + reflective renderer + reflective anvil opener). Behaviour is byte-identical on Bukkit/Paper/Folia (lifted verbatim; <code>LocaleParityTest</code> + every menu test green; full multi-module <code>.\gradlew build</code> SUCCESSFUL). Fabric reuses the same <code>MenuWiringSupport.attachTo</code> in a future session with a Fabric-flavoured bindings record.</li>
+<li>[x] <strong>Session 2</strong> <em>(landed 2026-05-24)</em> — <code>sendMessageWithRunCommand</code> SPI extension on <code>RTPServerAccessor</code> shipped on Bukkit (<code>AbstractServerAccessor</code>), Folia (<code>AbstractFoliaServerAccessor</code>), and Fabric (<code>FabricServerAccessor</code> via the new <code>FabricLegacyText.ClickKind</code> enum threaded through <code>parseInteractive</code>, with <code>CLICK_CTOR_RUN</code> probed alongside <code>CLICK_CTOR_SUGGEST</code> for the 1.21.5+ record-shaped <code>ClickEvent$RunCommand</code>). Platform-neutral <code>ChatMenuRenderer</code> landed in <code>rtp-core</code> and shares its <code>MenuAction -&gt; /rtp menu ...</code> translation table with <code>BookMenuRenderer</code> via the new <code>MenuActionToCommand</code> helper (single source of truth; <code>BookMenuRendererTest</code> 33/33 green confirms no regression). <code>RTPCmdFabricRoot:218-249</code> mirrors <code>RTPCmdBukkit:215-230</code> and wires <code>ChatMenuRenderer</code> + a <code>FabricChatPromptCallback</code> (TTL-bounded chat-prompt substitute for <code>PromptAnvilInput</code> per ADR-012 §3, drained via <code>ServerMessageEvents.ALLOW_CHAT_MESSAGE</code> and the <code>RTP.scheduler.runTaskTimerAsynchronously</code> reaper) through <code>MenuWiringSupport.attachTo</code>; the permission probe routes through ADR-048 Phase B's <code>RTPServerAccessor.menuPermissionProbe(uuid)</code> (Fabric override delegates to <code>FabricEffectivePermissionsResolver</code> per <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md">rtp-fabric-ADR-011</a>). No <code>MenuRendererRegistry</code> was introduced — ADR-050's token deletion made the renderer a single class with a direct constructor injection, matching the Paper path. New test: <code>ChatMenuRendererTest</code> 12/12 green. <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md"><code>rtp-fabric-ADR-012</code></a> flipped Proposed → Accepted with an amendment block recording the three editorial deltas (no carrier split for the chat renderer, <code>menuPermissionProbe</code> supplied by <code>RTPServerAccessor</code>, no <code>LocalMenuTokenRegistry</code> construction).</li>
+<li>[x] <strong>Session 3</strong> <em>(landed 2026-05-31)</em> — book renderer un-defer (per maintainer 2026-05-24, in lieu of ADR-012 §4's deferral). 1.21+ obf carriers (<code>v1_21_R1</code>, <code>v1_21_R5</code>, <code>v1_21_R11</code>); 1.20.x and the deobf <code>v26_1_R1</code> carrier fall back to the chat renderer (their <code>FabricVersionAdapter.openBookMenu</code> keeps the SPI default <code>false</code>). New platform-neutral <code>FabricBookMenuRenderer</code> (<code>rtp-fabric-common</code>, no <code>net.minecraft.*</code> binding) translates the <code>MenuModel</code> to a fully-formatted <code>FabricBookSpec</code> (placeholders + colour codes resolved via <code>RTPServerAccessor.format</code>; click commands via the shared <code>MenuActionToCommand</code>), then hands it to the new <code>FabricVersionAdapter.openBookMenu(Object, FabricBookSpec)</code> SPI. The per-carrier override builds a <code>WRITTEN_BOOK</code> <code>ItemStack</code> carrying a <code>WrittenBookContent</code> data component (one <code>Component</code> per page, fragments built by <code>FabricLegacyText.parseInteractive(..., ClickKind.RUN)</code>), sends a transient <code>ClientboundContainerSetSlotPacket</code> for the held hotbar slot, sends <code>ClientboundOpenBookPacket(MAIN_HAND)</code>, then reverts the slot — the server-side inventory is never mutated. The renderer falls back to the injected <code>ChatMenuRenderer</code> whenever the carrier returns <code>false</code> (1.20.x / 1.26.x), the viewer is offline, or the book dispatch throws. Wired in <code>RTPCmdFabricRoot</code> in place of the bare <code>ChatMenuRenderer</code>. <code>v26_1_R1</code> book support remains a follow-up (deobf carrier; <code>getSelectedSlot()</code>/<code>WrittenBookContent</code> need verification against the live mapping).</li>
+<li>[ ] Renderer integration tests — <code>MenuStageTwoTest</code>, <code>MenuNavigationStageATest</code>, etc. already cover the platform-agnostic side; add Fabric renderer integration test analogous to <code>BookMenuRendererTest</code>.</li>
+</ul>
+</li>
+<li>[ ] <strong>Step J — Network Mode Backend Parity <em>(NEW, 2026-05-22; lift-to-core path adopted 2026-05-23)</em></strong> — <code>MULTI_SERVER_PLAN.md</code> Phase 1 SPI lives in <code>rtp-proxy-common</code> (platform-agnostic, reachable from Fabric), but the Phase 2 backend integration currently lives under <code>rtp-plugin/.../bukkit/network/</code> (<code>NetworkModeBootstrap</code> + 12 helpers). A Velocity-routed player arriving on a Fabric backend with a reservation token has no listener to redeem it. Re-audit of the platform-coupling surface on 2026-05-23 showed nine of the thirteen classes have zero <code>org.bukkit.*</code> imports and the four that do touch the Bukkit API touch it only for player join/quit subscription + <code>Bukkit.getPlayer(uuid)</code> lookup. <a href="../../adr/ADR-049-network-mode-platform-neutral-lift/">ADR-049</a> (Proposed 2026-05-23) adopts a lift-to-<code>rtp-core</code> path that adds a single new SPI primitive (<code>PlayerLifecycleHook</code>) on <code>RTPServerAccessor</code> and supersedes the parallel-reimplementation path proposed in rtp-fabric-ADR-013. Gated on Step E3 (must teleport locally first) and Step F (reservation-token authorization leans on <code>hasPermission</code>). Sub-items:<ul>
+<li>[x] <a href="../../adr/ADR-049-network-mode-platform-neutral-lift/">ADR-049</a> <em>(Proposed 2026-05-23, lift-to-core path with <code>PlayerLifecycleHook</code> SPI; supersedes <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md">rtp-fabric-ADR-013</a>. Implementation pending ADR acceptance.)</em></li>
+<li>[ ] <code>PlayerLifecycleHook</code> SPI in <code>rtp-api</code>; <code>getPlayerLifecycleHook()</code> default on <code>RTPServerAccessor</code> returning a no-op.</li>
+<li>[ ] <code>BukkitPlayerLifecycleHook</code> in <code>rtp-bukkit-common</code> (registers a <code>Listener</code> for <code>PlayerJoinEvent</code>/<code>PlayerQuitEvent</code>, routes via UUID handlers); <code>AbstractServerAccessor.getPlayerLifecycleHook()</code> override.</li>
+<li>[ ] Lift the nine zero-Bukkit-import classes (<code>NetworkModeBootstrap</code>, <code>NetworkRouter</code>, <code>NetworkStatusCache</code>, <code>NetworkEnrolmentBuffer</code>, <code>PeerRegionRegistry</code>, <code>LobbyDispatchRetryQueue</code>, <code>NetworkRegionCollisionWarner</code>, <code>RoutingDecision</code>) from <code>rtp-plugin/.../bukkit/network/</code> to <code>rtp-core/.../common/network/</code>; update import sites.</li>
+<li>[ ] Rewrite + lift <code>JoinTriggerSource</code>, <code>NetworkWaitlistQuitListener</code>, <code>NetworkWaitlistNotifier</code>, <code>NetworkWaitlistGuard</code> to use <code>PlayerLifecycleHook</code> + <code>RTP.serverAccessor.getPlayer</code>/<code>RTPCommandSender</code> instead of Bukkit event/listener types; adjust <code>RTPCmdBukkit</code> waitlist-guard call site.</li>
+<li>[ ] Move tests (<code>LobbyModeEarlyReadTest</code>, <code>ReqRtpNet015NetworkWaitlistTest</code>, <code>NetworkRouterTest</code>, <code>NetworkStatusCacheTest</code>) to <code>rtp-core/src/test/...</code>; adapt to <code>MockRTPServerAccessor</code> + synthetic <code>PlayerLifecycleHook</code> fixture.</li>
+<li>[ ] <code>FabricPlayerLifecycleHook</code> in <code>rtp-fabric-common</code> hooking <code>ServerPlayConnectionEvents.JOIN</code>/<code>DISCONNECT</code>; <code>FabricServerAccessor.getPlayerLifecycleHook()</code> override.</li>
+<li>[ ] Wire <code>NetworkModeBootstrap.boot(networkYml)</code> from <code>RTPFabricMod.onInitialize()</code> after version-adapter install, before command tree wires; shutdown drain on <code>ServerLifecycleEvents.SERVER_STOPPING</code>.</li>
+<li>[ ] <code>RtpTriggerSource</code> install on Fabric — registered through the lifted <code>NetworkModeBootstrap</code> once the Fabric entrypoint calls <code>boot()</code>.</li>
+<li>[ ] <code>network.yml</code> extraction on Fabric — depends on <code>FabricJarUtils.extractDocs</code> from Step E3; without it the operator never gets a seed config.</li>
+<li>[ ] Fabric backend lane in <code>platforms/rtp-proxy/devstack/</code> already exists (<code>backend-c</code>); add an acceptance round-trip in the 2-proxy + 2-backend smoke matrix once the lift lands.</li>
+</ul>
+</li>
+<li>[ ] <strong>Step K — Maps API Parity (beta.5 gate) <em>(NEW, 2026-05-22)</em></strong> — <code>maps-api</code> (<code>MapBinding</code>, <code>MapBindingLifecycle</code>, <code>MapHandle</code>, <code>MapCanvas</code>, <code>MapAllocationRequest</code>, models <code>Heatmap2D</code> / <code>ChartModel</code> / <code>MermaidChart</code> / <code>RegionCoverage</code> / <code>TimeSeries</code> / <code>CategoryDistribution</code>, renderers <code>HeatmapRenderer</code> / <code>ChartRenderer</code>) is platform-neutral and has <code>BukkitMapBinding</code> + <code>FoliaMapBinding</code> + <code>NoopMapBinding</code> impls; there is no <code>FabricMapBinding</code> and no <code>MapDispatch.setMapBinding(...)</code> call in <code>RTPFabricMod</code>. The consumer surface is unused until beta.5 — this is scheduled work, <strong>not currently blocking</strong> the Phase 2 acceptance gate or the first public Fabric beta release. Required to ship beta.5 with feature parity vs. Bukkit. Sub-items:<ul>
+<li>[x] <code>rtp-fabric-ADR-015-maps-binding-parity.md</code> (subproject ADR, Accepted 2026-05-31) — chose the <strong>vanilla filled-map item path</strong> (<code>MapItemSavedData</code> / <code>MapId</code> + nearest-<code>MapColor</code> palette match + full-canvas <code>MapPatch</code> packet). Chat-ASCII fallback rejected by maintainer (too low fidelity for heatmap / region-shape). Work split across the rtp-fabric-ADR-007 NM-free seam.</li>
+<li>[x] <code>FabricMapBinding</code> (+ <code>FabricMapCanvas</code>) impl in <code>rtp-fabric-common</code> against the <code>MapBinding</code> SPI. NM-free: buffers an ARGB 128×128 canvas and delegates all <code>net.minecraft.*</code> work to three new NM-free <code>FabricVersionAdapter</code> seams (<code>renderMapChart</code> / <code>releaseMapChart</code> / <code>supportsMapCharts</code>). Implemented in the <strong>26.2_R1 carrier</strong> (the user's runtime); other carriers default to unsupported. Live-refresh loop via <code>RTP.scheduler.runTaskTimerAsynchronously</code> (~1 Hz).</li>
+<li>[x] <code>MapBindingLifecycle</code> viewer-release hook wired in <code>RTPFabricMod</code> via <code>FabricPlayerLifecycleHook.onPlayerQuit(uuid -&gt; MapDispatch.firePlayerQuit(uuid))</code> (parallel to <code>rtp-plugin/.../bukkit/bukkitListeners/OnPlayerQuit.java</code> release path).</li>
+<li>[x] Install in <code>RTPFabricMod</code> mirroring <code>RTPBukkitPlugin</code> (install <code>FabricMapBinding</code> only when the active adapter <code>supportsMapCharts()</code>; otherwise leave <code>NoopMapBinding</code> so the localized <code>mapBindingMissing</code> message surfaces on un-ported lines). Follow-up: port the three seam methods to the 1.20.x / 1.21.x / 26.1_R1 carriers.</li>
+<li>[ ] S-005 re-verification: extend <code>ReqRtpMap001RequireByContractTest</code> + <code>ReqRtpMap002NoChunkIoTest</code> (or add Fabric-flavored siblings) to exercise the Fabric binding once it lands.</li>
+<li>[ ] Audit <code>MapDispatch</code> (<code>rtp-core/.../commands/maps/</code>) for any Bukkit-only branch before beta.5 — the SPI itself is clean and the only call site today is Bukkit, so the dispatcher's internal selector is dormant but unaudited for Fabric.</li>
+<li>[ ] If the beta.5 consumer surface is invoked from menu rows (admin-panel heatmap viewer etc.) rather than <code>/rtp info</code> only, Step K becomes co-gated with Step I.</li>
+</ul>
+</li>
+<li>[ ] <strong>Phase 3 — Documentation &amp; Release</strong>:<ul>
+<li>[ ] <code>docs/admin/</code> Fabric install/config notes.</li>
+<li>[ ] <code>docs/dev/</code> multi-platform architecture + Fabric contribution guide.</li>
+<li>[ ] <code>CHANGELOG.md</code> — one entry per phase under <em>Unreleased</em>.</li>
+<li>[ ] <code>COVERAGE_PLAN.md</code> — add Fabric column.</li>
+<li>[ ] <code>LESSONS_LEARNED.md</code> — Loom 1.11 + JDK 21 daemon requirement; Loom-vs-Shadow bloat fix.</li>
+<li>[ ] First public Fabric beta release (gated on Step H green).</li>
+</ul>
+</li>
+</ul>
+<h3 id="deferred-to-phase-4">⏸ Deferred to Phase 4<a class="headerlink" href="#deferred-to-phase-4" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] NeoForge adapter (<code>rtp-neoforge</code>) — in scope but gated on Fabric stabilization (<a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a>); full work breakdown in Phase 4 below (Phases N0-N3, Steps NA-NK).</li>
+<li>[ ] Legacy Forge evaluation — out of scope (sunsetting; address via a NeoForge backport if ever needed).</li>
+<li>[ ] Architectury re-evaluation for multi-loader maintenance (Phase 4).</li>
+</ul>
+<hr />
+<h2 id="phase-0-scope-unlock-completed-2026-04-30">Phase 0: Scope Unlock — COMPLETED 2026-04-30<a class="headerlink" href="#phase-0-scope-unlock-completed-2026-04-30" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] <strong>ADR-022 accepted</strong> — Fabric promoted from "experimental frontier" to a first-class supported platform.</li>
+<li>[x] <strong><code>REQUIREMENTS.md §0</code></strong> updated to add Fabric to <em>In Scope</em> and remove it from the <em>Non-Bukkit platforms</em> exclusion.</li>
+<li>[x] <strong><code>REQ-RTP-SYS-002</code></strong> updated to include Fabric.</li>
+<li>[x] <strong><code>AGENTS.md</code> <em>Current Development Focus</em></strong> — promoted from "out of scope per §0" wording to first-class platform; ADR-022 linked; <code>rtp-fabric</code> added to safe-to-modify modules; "do not backport" guardrail preserved.</li>
+<li>[x] <strong><code>docs/dev/INDEX.md</code></strong> — added ADR-022 ("Why Fabric is in scope") and ADR-021 ("Why legacy MC / Java are out of scope") rows to the task router.</li>
+</ul>
+<h2 id="phase-1-infrastructure-build-system">Phase 1: Infrastructure &amp; Build System<a class="headerlink" href="#phase-1-infrastructure-build-system" title="Permanent link">&para;</a></h2>
+<p>The foundation for the <code>rtp-fabric</code> module.</p>
+<ul>
+<li>[x] <strong>Consolidate APIs</strong>: <code>CommandsAPI</code> and <code>EffectsAPI</code> pulled in as sub-modules.</li>
+<li>[x] <strong>Refactor Dependencies</strong>: <code>rtp-core</code> and <code>rtp-plugin</code> use local project dependencies for APIs.</li>
+<li>[x] <strong>April 2026 gap analysis</strong>: confirmed <code>rtp-api</code> and <code>rtp-core</code> abstractions are sufficient for Fabric — no new interfaces needed (see <em>What Does NOT Need to Change</em> below).</li>
+<li>
+<p>[x] <strong>Bootstrap <code>platforms/rtp-fabric/</code> module tree</strong> <em>(skeleton landed 2026-04-30; plain <code>java-library</code>, no Loom yet)</em> — layout (Fabric-platform glue lives here; the entry-point class lives in <code>rtp-plugin</code>, see <em>Single-JAR Multi-Loader Bootstrap</em> below):</p>
+<p>platforms/rtp-fabric/
+  └── rtp-fabric-common/                 # version-agnostic Fabric adapter (library, not entry point)
+      └── src/main/java/io/github/dailystruggle/rtp/fabric/
+          ├── server/FabricServerAccessor.java        # extends AbstractServerAccessor
+          ├── world/FabricRTPWorld.java
+          ├── world/FabricRTPChunk.java
+          ├── player/FabricRTPPlayer.java
+          ├── scheduler/FabricScheduler.java
+          ├── database/FabricDatabaseHandler.java     # delegates to rtp-core
+          ├── permissions/FabricPermissionResolver.java
+          ├── events/FabricEventBridge.java
+          └── commands/RTPCmdFabric.java              # registers commands-api Brigadier adapter</p>
+</li>
+</ul>
+<p>Decisions: one common module first; defer <code>rtp-fabric-v&lt;MC&gt;/</code> shim until a real version-specific need appears (Yarn-mapped Fabric rarely needs NMS-style version splits). No Bukkit imports under <code>platforms/rtp-fabric/**</code>. The <code>ModInitializer</code> entry point (<code>RTPFabricMod</code>) lives in <code>rtp-plugin</code> per ADR-022's single-JAR multi-loader packaging — not in <code>rtp-fabric-common</code> — so both <code>plugin.yml</code> and <code>fabric.mod.json</code> ship from one bootstrap module.</p>
+<ul>
+<li>
+<p>[x] <strong>Single-JAR Multi-Loader Bootstrap in <code>rtp-plugin</code></strong> <em>(landed 2026-04-30; <code>RTPFabricMod implements ModInitializer</code>, <code>fabric.mod.json</code> declares the entrypoint, Loom 1.11-SNAPSHOT applied to <code>:rtp-fabric:rtp-fabric-common</code> and <code>:rtp-plugin</code>; <code>:rtp-plugin:shadowJar</code> green. Dual-runtime smoke test on a Paper + Fabric dev server is the next debug-phase task — runtime verification is intentionally separated from structural landing per the user's "structure first, debug after" directive)</em> (per <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a>):</p>
+<p>rtp-plugin/
+  └── src/main/
+      ├── java/io/github/dailystruggle/rtp/
+      │   ├── bukkit/RTPBukkitPlugin.java     # extends JavaPlugin (existing entry, renamed)
+      │   └── fabric/RTPFabricMod.java        # implements ModInitializer (new)
+      └── resources/
+          ├── plugin.yml                       # main: ...rtp.bukkit.RTPBukkitPlugin
+          └── fabric.mod.json                  # entrypoints.main: [...rtp.fabric.RTPFabricMod]</p>
+</li>
+</ul>
+<p>Both entry-point classes shall remain disjoint: neither imports the other, neither transitively reaches the other platform's classes. Shared code lives only in <code>rtp-core</code> / <code>rtp-api</code> / <code>commands-api</code> / <code>effects-api</code>. An ArchUnit rule shall enforce the disjoint-package invariant. <code>RTPFabricMod</code> consumes <code>:rtp-fabric:rtp-fabric-common</code> as a project dependency and contains no business logic — it dispatches to the Fabric adapter the same way <code>RTPBukkitPlugin</code> dispatches to <code>rtp-bukkit</code> / <code>rtp-paper</code> / <code>rtp-folia</code>.</p>
+<ul>
+<li>[x] <strong>Loom integration</strong> <em>(landed 2026-04-30 with <code>fabric-loom 1.11-SNAPSHOT</code> — <code>1.7</code> rejected by Gradle 9.4 with <code>NoSuchMethodError</code> on the Problems API; <code>1.11</code> is the current stable line that supports Gradle 9. Pin documented in <code>:rtp-fabric:rtp-fabric-common/build.gradle</code> and <code>:rtp-plugin/build.gradle</code>. <code>pluginManagement</code> block in <code>settings.gradle</code> registers FabricMC's Maven so the plugin resolves)</em>:</li>
+<li>Pin <code>fabric-loom 1.11-SNAPSHOT</code> (Java 21 + Gradle 9.4 compatible).</li>
+<li><strong>Apply Loom in <code>platforms/rtp-fabric/**/build.gradle</code> AND in <code>rtp-plugin/build.gradle</code></strong> — never at the root, never in <code>rtp-core</code>, <code>rtp-api</code>, <code>commands-api</code>, <code>effects-api</code>, or any Bukkit-family adapter (<code>rtp-bukkit</code>, <code>rtp-paper</code>, <code>rtp-folia</code>). Applying Loom outside this set is the most likely cause of the historical "unresolved Loom dependency" symptom because it leaks remap caches and Maven repos into Bukkit-family modules.</li>
+<li><strong>Remap scoping</strong> — Loom's <code>remapJar</code> task in <code>rtp-plugin</code> shall include only <code>io/github/dailystruggle/rtp/fabric/**</code> and the <code>platforms/rtp-fabric/rtp-fabric-common</code> classpath contribution. Bukkit-family classes shall be excluded so they retain Spigot/Paper-mapped bytecode in the final shaded JAR.</li>
+<li>Add Fabric Maven repos in a <code>subprojects</code> block guarded by <code>if (project.path.startsWith(':rtp-fabric') || project.path == ':rtp-plugin')</code>.</li>
+<li><code>settings.gradle</code> includes <code>:rtp-fabric:rtp-fabric-common</code>. Do not include version submodules until they exist.</li>
+<li>Mappings: <code>loom.officialMojangMappings()</code> (revisit if community prefers Yarn).</li>
+<li>Dependencies: <code>fabric-loader</code>, <code>fabric-api</code>, <code>fabric-permissions-api</code> (<code>modCompileOnly</code>), and project deps <code>:rtp-core</code>, <code>:rtp-api</code>, <code>:commands-api</code>, <code>:effects-api</code>. <code>rtp-plugin</code> additionally depends on <code>:rtp-fabric:rtp-fabric-common</code>.</li>
+<li>
+<p>Jenkinsfile: add <code>:rtp-fabric:rtp-fabric-common:build</code> and <code>:rtp-plugin:remapJar</code> as non-blocking stages initially; promote to blocking once Phase 2 gates are green.</p>
+</li>
+<li>
+<p><strong>Phase 1 acceptance gates (structural only):</strong></p>
+</li>
+<li><code>.\gradlew :rtp-fabric:rtp-fabric-common:assemble</code> green on a clean clone with no daemon-context surprises and no impact on Bukkit-family module builds.</li>
+<li><code>.\gradlew :rtp-plugin:shadowJar</code> (or the equivalent Loom-aware single-JAR task) produces <strong>one JAR</strong> containing both <code>plugin.yml</code> and <code>fabric.mod.json</code>, with Bukkit classes left un-remapped and Fabric classes remapped to intermediary mappings.</li>
+<li><code>fabric.mod.json</code> parses against Fabric Loader's schema (offline lint sufficient at this stage).</li>
+</ul>
+<p><strong>Note — runtime / dual-loader end-to-end smoke testing is intentionally NOT a Phase 1 gate.</strong> Until Phase 2 Steps A–G land, <code>RTPFabricMod.onInitialize()</code> is a placeholder and there is no Fabric functionality to validate end-to-end. "Loads on Fabric" would be trivially true (and trivially uninformative) at this stage. The dual-runtime end-to-end smoke test has been moved to <strong>Phase 2 Step H</strong> where the featureset is sufficient to make it meaningful. Bukkit-side regression risk from Loom is covered by the existing Bukkit-family test suites (<code>:rtp-plugin:test</code>, etc.) — these must remain green at all phases.</p>
+<h3 id="phase-1-amendment-multiversion-submodule-layout-2026-05-01-rtp-fabric-adr-001">Phase 1 Amendment — Multiversion Submodule Layout <em>(2026-05-01, <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md">rtp-fabric-ADR-001</a>)</em><a class="headerlink" href="#phase-1-amendment-multiversion-submodule-layout-2026-05-01-rtp-fabric-adr-001" title="Permanent link">&para;</a></h3>
+<p>The original Phase 1 deferred <code>rtp-fabric-v&lt;MC&gt;/</code> shims until a real version-specific need appeared (line 109 above). That need has now arrived ahead of any single trigger: cross-version mojmap drift between 1.20.x and 1.21.x (e.g. <code>ChunkStatus</code> package move at 1.21.3), and — more decisively — MC 26.1's deobfuscation, which mandates Loom 1.15+, Java 25, Gradle 9.4+, and a different build-script shape (no <code>mappings</code> line, plain <code>implementation</code>/<code>compileOnly</code> instead of <code>modImplementation</code>/<code>modCompileOnly</code>, plugin id <code>net.fabricmc.fabric-loom</code>). None of those can coexist with the 1.20/1.21 build script in a single common module.</p>
+<p>rtp-fabric-ADR-001 supersedes lines 109 ("defer <code>rtp-fabric-v&lt;MC&gt;/</code> shim") and 129 ("Do not include version submodules until they exist") with the following layout:</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>MC</th>
+<th>Mappings</th>
+<th>Loom</th>
+<th>Java</th>
+<th>Fabric API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>:rtp-fabric:rtp-fabric-common</code></td>
+<td>(compileOnly) 1.21.1 mojmap</td>
+<td>mojmap</td>
+<td>1.11+</td>
+<td>21</td>
+<td>(compileOnly) 0.115.0+1.21.1</td>
+</tr>
+<tr>
+<td><code>:rtp-fabric:rtp-fabric-v1_20_R1</code></td>
+<td>1.20.1</td>
+<td>mojmap</td>
+<td>1.11+</td>
+<td>21</td>
+<td>0.92.x+1.20.1</td>
+</tr>
+<tr>
+<td><code>:rtp-fabric:rtp-fabric-v1_21_R1</code></td>
+<td>1.21.1</td>
+<td>mojmap</td>
+<td>1.11+</td>
+<td>21</td>
+<td>0.115.0+1.21.1</td>
+</tr>
+<tr>
+<td><code>:rtp-fabric:rtp-fabric-v26_1_R1</code></td>
+<td>26.1.2</td>
+<td>(deobfuscated)</td>
+<td>1.15+</td>
+<td>25</td>
+<td>0.143.5+26.1</td>
+</tr>
+</tbody>
+</table>
+<p><code>rtp-fabric-common</code> switches MC + fabric-api to <code>compileOnly</code> / <code>modCompileOnly</code> so it ships no MC classes; v-submodules each supply their own runtime jar. Common defines a small <code>FabricVersionAdapter</code> SPI carrying only the version-volatile call sites (registry access, <code>ChunkStatus</code> location, chunk-loading entrypoint normalisation, biome key lookup at <code>BlockPos</code>, permissions API surface). <code>RTPFabricMod</code> (<code>rtp-plugin</code>) reads <code>SharedConstants.getCurrentVersion().getName()</code> at server-start and reflectively instantiates the matching v-submodule's adapter — direct symbol reference is forbidden so a Java 21 server never resolves v26_1_R1 (Java 25) bytecode.</p>
+<p><strong>Initial deliverable:</strong> v1_21_R1 ships with the full adapter implementation (relocated from common); v1_20_R1 and v26_1_R1 ship with build-correct stubs throwing <code>UnsupportedOperationException</code> carrying the <code>// TODO(rtp-fabric-ADR-001)</code> marker. Real porting bodies for the latter two land as follow-up Phase 2.5 tasks driven by the smoke gates per MC line.</p>
+<h2 id="phase-2-fabric-feature-parity-acceptance-gated-a-h">Phase 2: Fabric Feature Parity (acceptance-gated A → H)<a class="headerlink" href="#phase-2-fabric-feature-parity-acceptance-gated-a-h" title="Permanent link">&para;</a></h2>
+<p>The goal of this phase is feature parity with the Bukkit/Paper/Folia adapters. Each step's acceptance gate must be green before the next step begins.</p>
+<h3 id="abstraction-gap-summary">Abstraction Gap Summary<a class="headerlink" href="#abstraction-gap-summary" title="Permanent link">&para;</a></h3>
+<p>The table tracks the current implementation status of each cross-platform abstraction. "Critical" gaps block the teleport pipeline from functioning at all; "High" gaps cause data loss or incorrect behaviour at runtime.</p>
+<table>
+<thead>
+<tr>
+<th>Abstraction</th>
+<th>Bukkit Status</th>
+<th>Fabric Status</th>
+<th>Gap Severity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RTPServerAccessor</code></td>
+<td>Full (<code>AbstractServerAccessor</code>)</td>
+<td><code>FabricServerAccessor</code> now backed by <code>ConcurrentHashMap</code>s populated by <code>FabricEventBridge</code>: <code>getRTPWorld(name/id)</code>, <code>getRTPWorlds()</code>, <code>getPlayer(uuid/name)</code>, <code>getPluginDirectory</code>, <code>getServerVersion</code>, <code>getPluginVersion</code>, <code>getServerIntVersion</code>, <code>isPrimaryThread</code>, <code>getScheduler</code>, <code>getPlugin</code> all real (Step E2 landed 2026-05-01). <code>getConsolePlayer</code>, biome/material, world-border/shape, message routing still stub-throw pending Steps E-tail/F</td>
+<td>Resolved (S-006 + lifecycle); message + perms routing pending</td>
+</tr>
+<tr>
+<td><code>RTPWorld</code> (async chunk load)</td>
+<td>Full (<code>BukkitRTPWorld</code> / Paper override)</td>
+<td><code>FabricRTPWorld.getChunkAt</code> async via <code>MinecraftServer#submit</code> (Step A landed 2026-05-01); other <code>RTPWorld</code> methods stubbed pending Steps C/E</td>
+<td>Resolved (S-005); other coverage pending</td>
+</tr>
+<tr>
+<td><code>RTPPlayer</code></td>
+<td>Full (<code>BukkitRTPPlayer</code>)</td>
+<td><code>FabricRTPPlayer</code> landed (Step E2): real <code>uuid</code>/<code>name</code>/<code>isOnline</code>/<code>getLocation</code>/<code>setLocation</code> (async via <code>server.submit</code>)/<code>sendMessage</code>/<code>performCommand</code>; <code>hasPermission</code> op-level fallback; <code>getEffectivePermissions()</code> empty pending Step F</td>
+<td>High (perms only)</td>
+</tr>
+<tr>
+<td><code>RTPScheduler</code></td>
+<td>Full (<code>BukkitSchedulerImpl</code>)</td>
+<td><code>FabricScheduler</code> landed (Step C, 2026-05-01): async via <code>Util.backgroundExecutor()</code>, sync via <code>MinecraftServer#execute</code>, tick-driven <code>runTaskLater</code>/<code>runTaskTimer</code> with <code>ConcurrentHashMap</code> cancellation; region-aware overloads delegate (no Folia-style regions on Fabric)</td>
+<td>Resolved (S-005 sync/async dispatch); lifecycle wiring pending Step E</td>
+</tr>
+<tr>
+<td>Database / Persistence</td>
+<td>Full (<code>DatabaseProcessing</code>)</td>
+<td><code>FabricDatabaseHandler.setupDatabase(rtp)</code> mirrors <code>BukkitDatabaseHandler</code> (Step D landed 2026-05-01); accessor selection delegates to <code>rtp-core</code> options (<code>SQLite</code>/<code>H2</code>/<code>MySQL</code>/<code>PostgreSQL</code>/<code>Yaml</code>); config dir via <code>FabricLoader.getInstance().getConfigDir().resolve("rtp")</code></td>
+<td>Resolved (handler factory); lifecycle wiring pending Step E</td>
+</tr>
+<tr>
+<td>Event mapping</td>
+<td>Full (Bukkit listeners)</td>
+<td><code>FabricEventBridge</code> registers SERVER_STARTED/STOPPING, END_SERVER_TICK, ServerWorldEvents.LOAD/UNLOAD, ServerPlayConnectionEvents.JOIN/DISCONNECT (Step E2 landed 2026-05-01); world-border events deferred (teleport-cancel callback <strong>dropped 2026-05-24</strong> — see Step E-tail)</td>
+<td>Resolved (lifecycle + session)</td>
+</tr>
+<tr>
+<td>Command system</td>
+<td>Full Bukkit tree</td>
+<td>Brigadier adapter landed; not yet wired to <code>CommandRegistrationCallback</code></td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Permissions</td>
+<td>Bukkit permissions API</td>
+<td>Hardcoded op-check</td>
+<td>Medium</td>
+</tr>
+</tbody>
+</table>
+<h3 id="step-a-s-005-fix-in-fabricrtpworldgetchunkat-safety-critical-must-come-first">Step A — S-005 Fix in <code>FabricRTPWorld.getChunkAt</code> <em>(safety-critical, must come first)</em><a class="headerlink" href="#step-a-s-005-fix-in-fabricrtpworldgetchunkat-safety-critical-must-come-first" title="Permanent link">&para;</a></h3>
+<p>Replace <code>getChunkFutureSyncOnMainThread</code> with a truly async dispatch. Mirror <code>rtp-paper-common</code>'s <code>getChunkAtAsync</code> override, using the server tick thread (<code>MinecraftServer#submit</code>) to safely touch <code>ServerChunkCache</code>, which is single-threaded on Fabric.</p>
+<ul>
+<li><strong>Status (landed 2026-05-01 — minimal slice, A1 scope):</strong><ul>
+<li>[x] <code>FabricRTPWorld extends RTPWorld&lt;ServerLevel&gt;</code> in <code>platforms/rtp-fabric/rtp-fabric-common/.../world/FabricRTPWorld.java</code>. <code>getChunkAt(int,int)</code> dispatches via <code>world.getServer().submit(() -&gt; chunkSource.getChunk(cx, cz, ChunkStatus.FULL, true))</code>, returning a <code>CompletableFuture&lt;Long&gt;</code> that resolves on the server tick thread with the canonical packed chunk key. Null-server defensive path completes exceptionally (REQ-RTP-S-004 attribution).</li>
+<li>[x] <code>name()</code> returns the dimension <code>ResourceLocation</code> string; <code>id()</code> is a deterministic UUID derived from the dimension id (Fabric has no per-world UUID). All other abstract <code>RTPWorld</code> methods (<code>getChunkAtAsync</code>, <code>setForceLoadedImpl</code>, <code>getServerForceLoadedCount</code>, <code>getCachedChunk</code>, <code>keepChunkAt</code>/<code>forgetChunkAt</code>/<code>forgetChunks</code>, <code>getBiome</code>, <code>platform</code>, <code>isInactive</code>, <code>save</code>, <code>getMaxHeight</code>, <code>getMinHeight</code>, <code>getCacheSize</code>, <code>getSeed</code>) throw <code>UnsupportedOperationException</code> with per-step routing notes — fail-loud per REQ-RTP-S-006.</li>
+<li>[x] <code>:rtp-fabric:rtp-fabric-common:compileJava</code> BUILD SUCCESSFUL.</li>
+<li>[x] <strong>Test complete</strong> <em>(2026-05-31)</em> — the S-005 path was exercised end-to-end by the <strong>Step H dual-runtime smoke test</strong> booting a Fabric server (option c); <code>/rtp</code> teleports with no main-thread <code>ServerLevel#getChunk</code>. <code>TRACEABILITY.md</code> row for REQ-RTP-S-005 (Fabric) added.</li>
+</ul>
+</li>
+<li><strong>Acceptance gate:</strong> Step H dual-runtime smoke test exercises the S-005 path end-to-end on a Fabric dev server; no <code>ServerLevel#getChunk</code> on any caller-side main-thread path (the implementation hops onto the tick thread internally via <code>server.submit</code>, which is the documented thread-safe entry).</li>
+</ul>
+<h3 id="step-b-fabricserveraccessorgetlocationgenerator">Step B — <code>FabricServerAccessor.getLocationGenerator()</code><a class="headerlink" href="#step-b-fabricserveraccessorgetlocationgenerator" title="Permanent link">&para;</a></h3>
+<p>Return a fresh <code>LocationGenerator</code> (matching <code>AbstractServerAccessor</code>'s pattern — Bukkit constructs per-call, not via a singleton field). Throw <code>IllegalStateException</code> if called before <code>rtp-core</code> is loaded (REQ-RTP-S-006). Unblocks the teleport pipeline end-to-end.</p>
+<ul>
+<li><strong>Status (landed 2026-05-01 — minimal slice):</strong><ul>
+<li>[x] <code>FabricServerAccessor implements RTPServerAccessor</code> in <code>platforms/rtp-fabric/rtp-fabric-common/.../server/FabricServerAccessor.java</code>. <code>getLocationGenerator()</code> returns <code>new LocationGenerator()</code> after a <code>RTP.getInstance() != null</code> gate that throws <code>IllegalStateException</code> (REQ-RTP-S-006).</li>
+<li>[x] <code>getPlatform()</code> returns <code>"fabric"</code>. <code>getTPS(int)</code> returns the nominal <code>20.0</code> until Step C wires real measurement (callers gating on TPS won't block the pipeline before Step C). <code>format</code>/<code>formatNoColor</code> pass-through; <code>log(...)</code> falls back to JUL until Step E. <code>stop()</code> is a documented no-op.</li>
+<li>[x] All other ~45 abstract methods throw <code>UnsupportedOperationException</code> carrying the owning step letter (C/D/E/F) — fail-loud per REQ-RTP-S-006, mirrors the Step A approach in <code>FabricRTPWorld</code>.</li>
+<li>[x] <code>:rtp-fabric:rtp-fabric-common:compileJava</code> BUILD SUCCESSFUL.</li>
+<li>[x] <strong>Test complete</strong> <em>(2026-05-31)</em> — the early-API fail-loud contract was exercised by the wired <code>RTPFabricMod.onInitialize()</code> (Step E) under the Step H dual-runtime smoke test. <code>TRACEABILITY.md</code> row for REQ-RTP-S-006 (Fabric) added.</li>
+</ul>
+</li>
+<li><strong>Acceptance gate:</strong> Step H dual-runtime smoke test exercises the early-API contract on a Fabric dev server; Bukkit-family build remains green throughout.</li>
+</ul>
+<h3 id="step-c-fabricscheduler-full-implementation">Step C — <code>FabricScheduler</code> Full Implementation<a class="headerlink" href="#step-c-fabricscheduler-full-implementation" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>scheduleAsync</code> → <code>Util.backgroundExecutor()</code> (canonical mojmap accessor on MC 1.21.1; <code>getMainWorkerExecutor</code> was the pre-1.21 name).</li>
+<li><code>scheduleSync</code> → <code>MinecraftServer#execute(Runnable)</code> for one-shot main-thread dispatches; <code>ServerTickEvents.END_SERVER_TICK</code> callback drains the delayed/repeating queue.</li>
+<li>
+<p><code>cancelTask</code> → backed by <code>ConcurrentHashMap&lt;Integer, ScheduledEntry&gt;</code>; cancellation flips a <code>volatile boolean</code> checked at next tick drain.</p>
+</li>
+<li>
+<p><strong>Status (landed 2026-05-01 — minimal slice):</strong></p>
+<ul>
+<li>[x] <code>FabricScheduler implements RTPScheduler</code> in <code>platforms/rtp-fabric/rtp-fabric-common/.../scheduling/FabricScheduler.java</code>. Full implementation of all 12 contract methods.</li>
+<li>[x] Async path: <code>runTaskAsynchronously</code> and <code>runTaskTimerAsynchronously</code> dispatch via <code>Util.backgroundExecutor()</code>. Async repeating timers schedule on the tick queue and dispatch each fire to the worker pool.</li>
+<li>[x] Sync path: <code>runTask</code> runs inline if already on the server thread (<code>Thread.currentThread() == server.getRunningThread()</code>), else <code>server.execute(task)</code>. Pre-server-start calls throw <code>IllegalStateException</code> (REQ-RTP-S-006 fail-loud).</li>
+<li>[x] Delayed/repeating: tick-counted <code>ScheduledEntry</code> map drained by <code>tick(MinecraftServer)</code>; one-shot entries removed after fire, periodic entries reset to <code>periodTicks</code>. Throwables caught and logged via <code>RTP.log</code>.</li>
+<li>[x] Region-aware overloads (<code>runTask(RTPLocation,...)</code>, <code>runTask(RTPWorld,cx,cz,...)</code>, etc.) delegate to non-region equivalents — Fabric has no Folia-style region threading; matches <code>BukkitSchedulerImpl</code>'s convention on Spigot/Paper.</li>
+<li>[x] <code>setServer(MinecraftServer)</code> / <code>clearServer()</code> lifecycle hooks; <code>tick(MinecraftServer)</code> callback hook — to be wired from <code>ServerLifecycleEvents.SERVER_STARTED</code> / <code>SERVER_STOPPING</code> / <code>ServerTickEvents.END_SERVER_TICK</code> in Step E (<code>RTPFabricMod.onInitialize()</code>).</li>
+<li>[x] <code>:rtp-fabric:rtp-fabric-common:compileJava</code> BUILD SUCCESSFUL.</li>
+<li>[x] <strong>Test complete</strong> <em>(2026-05-31)</em> — lifecycle/tick callbacks were registered by the wired <code>RTPFabricMod.onInitialize()</code> (Step E) and the scheduler contract was exercised end-to-end under the Step H dual-runtime smoke test (lifecycle hooks fire once each, tick callback drains the queue, <code>cancelTask</code> prevents subsequent fires). Cross-platform contract additionally covered by <code>MockRTPScheduler</code> and the Bukkit/Folia scheduler contract tests.</li>
+</ul>
+</li>
+<li><strong>Acceptance gate:</strong> existing scheduler contract behaviour holds on Fabric — verified end-to-end via the Step H dual-runtime smoke test (lifecycle hooks called once each, tick callback drains the queue, <code>cancelTask</code> prevents subsequent fires).</li>
+</ul>
+<h3 id="step-d-fabricdatabasehandler">Step D — <code>FabricDatabaseHandler</code><a class="headerlink" href="#step-d-fabricdatabasehandler" title="Permanent link">&para;</a></h3>
+<p>Locate the config dir via <code>FabricLoader.getInstance().getConfigDir().resolve("rtp")</code>, then delegate to <code>rtp-core</code>'s platform-agnostic <code>DatabaseHandler</code>. <strong>No new <code>rtp-api</code> abstraction.</strong></p>
+<ul>
+<li><strong>Status (landed 2026-05-01 — minimal slice, D2 scope):</strong><ul>
+<li>[x] <code>FabricDatabaseHandler</code> in <code>platforms/rtp-fabric/rtp-fabric-common/.../database/FabricDatabaseHandler.java</code>. Static <code>setupDatabase(RTP)</code> mirrors <code>BukkitDatabaseHandler</code> semantics: reads <code>database</code> config map, picks accessor (<code>yaml</code>/<code>h2</code>/<code>mysql</code>/<code>postgresql</code>/<code>sqlite</code> default), writes <code>.db_state</code>, calls <code>RTP.handleMigration</code>, schedules <code>databaseAccessor.startup()</code> one tick later.</li>
+<li>[x] Config dir resolution via <code>resolveConfigDirectory()</code> → <code>FabricLoader.getInstance().getConfigDir().resolve("rtp")</code>; creates the directory if absent. No <code>org.bukkit.*</code> imports (ADR-022 §4 invariant).</li>
+<li>[x] REQ-RTP-S-006 fail-loud: throws <code>IllegalStateException</code> if invoked with a <code>null</code> <code>RTP</code> instance. <code>printStackTrace</code> replaced with <code>RTP.log(Level.WARNING, ..., e)</code> per AGENTS.md <em>Logging &amp; Feedback</em>.</li>
+<li>[x] <code>:rtp-fabric:rtp-fabric-common:compileJava</code> BUILD SUCCESSFUL.</li>
+<li>[x] <strong>Test complete</strong> <em>(2026-05-31)</em> — <code>setupDatabase</code> was invoked at the correct lifecycle point by the wired <code>RTPFabricMod.onInitialize()</code> (Step E) and exercised under the Step H dual-runtime smoke test (DB flush observed on shutdown). Underlying accessor contract additionally covered by <code>CachedLocationRoundTripTest</code>.</li>
+</ul>
+</li>
+<li><strong>Acceptance gate:</strong> existing <code>CachedLocationRoundTripTest</code> reused against the Fabric handler. Shutdown-flush rule from <code>LESSONS_LEARNED.md</code> (2026-04-18) honoured: <code>databaseAccessor.processQueries(Long.MAX_VALUE)</code> runs <strong>after</strong> <code>flushDirtyCache()</code> and <strong>before</strong> <code>stop.set(true)</code> on <code>ServerLifecycleEvents.SERVER_STOPPING</code> (wired in Step E).</li>
+</ul>
+<h3 id="step-e-event-bridge">Step E — Event Bridge<a class="headerlink" href="#step-e-event-bridge" title="Permanent link">&para;</a></h3>
+<p>Map all critical Bukkit events to Fabric's hooks in <code>FabricEventBridge</code>, registered from <code>RTPFabricMod.onInitialize()</code>:</p>
+<ul>
+<li><code>PlayerQuitEvent</code> → <code>ServerPlayConnectionEvents.DISCONNECT</code> (queue cleanup; release any <code>MemoryTracker</code>-tracked tickets owned by the player).</li>
+<li><code>WorldLoadEvent</code> → <code>ServerWorldEvents.LOAD</code>.</li>
+<li><code>WorldUnloadEvent</code> → <code>ServerWorldEvents.UNLOAD</code>.</li>
+<li>Server lifecycle → <code>ServerLifecycleEvents.SERVER_STOPPING</code> drives <code>RTP.stop()</code> shutdown-flush.</li>
+<li>
+<p>~~Cancelable <code>PlayerTeleportEvent</code> → <code>EntityTeleportCallback</code> or a mixin to allow RTP to intercept teleports when necessary.~~ <strong>Dropped 2026-05-24</strong> — see Step E-tail; the Bukkit equivalent (<code>OnPlayerTeleport</code>) is now <code>@Deprecated</code> because the race window it guards is too narrow in practice for an external teleport to land in mid-RTP.</p>
+</li>
+<li>
+<p><strong>Status (landed 2026-05-01 — E2 scope: lifecycle + tick + world + player session):</strong></p>
+<ul>
+<li>[x] <code>FabricEventBridge</code> in <code>platforms/rtp-fabric/rtp-fabric-common/.../events/FabricEventBridge.java</code> registers <code>ServerLifecycleEvents.SERVER_STARTED</code> (binds <code>MinecraftServer</code> into <code>FabricServerAccessor</code> + <code>FabricScheduler</code>, registers all already-loaded <code>ServerLevel</code>s, kicks <code>FabricDatabaseHandler.setupDatabase</code>), <code>SERVER_STOPPING</code> (calls <code>RTP.stop()</code> for shutdown flush, then <code>accessor.unbindServer()</code>), <code>END_SERVER_TICK</code> (drives <code>FabricScheduler.tick</code>), <code>ServerWorldEvents.LOAD/UNLOAD</code> (world cache maintenance), <code>ServerPlayConnectionEvents.JOIN/DISCONNECT</code> (<code>FabricRTPPlayer</code> lifecycle).</li>
+<li>[x] <code>FabricRTPPlayer</code> in <code>platforms/rtp-fabric/rtp-fabric-common/.../player/FabricRTPPlayer.java</code>. Real <code>uuid()</code>, <code>name()</code>, <code>isOnline()</code>, <code>getLocation()</code> (resolves world via <code>RTP.serverAccessor.getRTPWorld(dimension)</code>), <code>setLocation()</code> (hops to server thread via <code>server.submit</code>, calls <code>ServerPlayer#teleportTo</code>), <code>sendMessage()</code> via <code>Component.literal</code>, <code>performCommand()</code> via <code>MinecraftServer.getCommands().performPrefixedCommand</code>. <code>hasPermission()</code> falls back to op-level (<code>hasPermissions(2)</code>) pending Step F. <code>unbind()</code> called by the bridge on disconnect to drop the native handle (REQ-RTP-S-004 / REQ-FABRIC-ARCH-006 memory hygiene).</li>
+<li>[x] <code>RTPFabricMod.onInitialize()</code> body now real: instantiates <code>FabricServerAccessor</code>, sets <code>RTP.serverAccessor</code>, triggers <code>RTP.getInstance()</code>, registers <code>FabricEventBridge</code>. Failures throw out of <code>onInitialize</code> (REQ-RTP-S-004 — no silent mod-load).</li>
+<li>[x] <code>FabricServerAccessor</code> <code>getRTPWorld</code>/<code>getPlayer</code>/<code>getRTPWorlds</code>/<code>getPluginDirectory</code>/<code>getServerVersion</code>/<code>getPluginVersion</code>/<code>getServerIntVersion</code>/<code>isPrimaryThread</code>/<code>getScheduler</code>/<code>getPlugin</code>/<code>stop</code>/<code>start</code> all real; backed by the bridge-populated maps.</li>
+<li>[x] <code>platforms/rtp-fabric/REQUIREMENTS.md</code> authored (REQ-FABRIC-F-001…010 + REQ-FABRIC-ARCH-001…010); resolves the previously-404 link from top-level <code>REQUIREMENTS.md</code>.</li>
+<li>[x] <code>:rtp-fabric:rtp-fabric-common:compileJava :rtp-plugin:compileJava</code> BUILD SUCCESSFUL.</li>
+<li>[ ] <strong>Deferred to E-tail / E3 / Step F / Step H:</strong> ~~teleport-cancel callback (would need a Mixin against <code>Entity#teleportTo</code>)~~ <em>(dropped 2026-05-24 — see Step E-tail)</em>; biome/material listings; world-border + shape function plumbing; full perms via <code>fabric-permissions-api</code> (Step F); end-to-end runtime exercise (Step H smoke gate); <strong>scheduled-task processor parity (Step E3 — see below)</strong>.</li>
+</ul>
+</li>
+<li><strong>Acceptance gate:</strong> Step H dual-runtime smoke test — server boots, <code>FabricEventBridge</code> callbacks fire in order, players join/leave cleanly, DB flushes on shutdown.</li>
+</ul>
+<h3 id="step-e3-scheduled-task-processor-parity-added-2026-05-01">Step E3 — Scheduled-Task Processor Parity <em>(added 2026-05-01)</em><a class="headerlink" href="#step-e3-scheduled-task-processor-parity-added-2026-05-01" title="Permanent link">&para;</a></h3>
+<p><strong>Discovered during Step G G1 review.</strong> A direct comparison of <code>RTPBukkitPlugin.onEnable</code> against <code>RTPFabricMod.onInitialize</code> shows Fabric is missing the recurring-task wiring that makes <code>/rtp</code> actually function. The teleport pipeline (<code>AsyncTaskProcessing</code> / <code>SyncTaskProcessing</code>) is what turns queued teleport requests into real teleports — without something pumping it, <code>/rtp</code> queues work that nothing executes.</p>
+<p><strong>The good news:</strong> <code>rtp-core</code>'s <code>RTP</code> constructor (<code>rtp-core/.../common/RTP.java</code> ~line 193–220) <strong>already schedules</strong> the core pipeline timers itself:</p>
+<ul>
+<li><code>SyncTaskProcessing</code> via <code>RTP.scheduler.runTaskTimer(...)</code> every tick.</li>
+<li><code>AsyncTaskProcessing</code> via <code>RTP.scheduler.runTaskTimerAsynchronously(...)</code> every tick.</li>
+<li><code>databaseAccessor.rebuildCachedLocationsFromMemory()</code> + <code>flushDirtyCache()</code> every 6000 ticks.</li>
+<li><code>databaseAccessor.flush()</code> (SQL) every 60 ticks.</li>
+<li><code>PerformanceTracker.start(scheduler)</code> heartbeat.</li>
+</ul>
+<p>This means <strong>most of the parity gap closes for free</strong> as soon as <code>RTP.scheduler</code> is set before <code>new RTP()</code> runs. The remaining gap is the platform-specific wiring that lives in the Bukkit plugin's <code>onEnable</code> body.</p>
+<h4 id="bukkit-vs-fabric-comparison">Bukkit vs. Fabric comparison<a class="headerlink" href="#bukkit-vs-fabric-comparison" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>What Bukkit <code>onEnable</code> does</th>
+<th>Fabric <code>onInitialize</code> status</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RTP.serverAccessor = new BukkitServerAccessor()</code></td>
+<td>✅ done (Step E2)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong><code>RTP.scheduler = new BukkitSchedulerImpl(this)</code></strong> <em>(reflective)</em></td>
+<td>❌ <strong>missing — silently NPEs in <code>RTP</code> ctor</strong></td>
+<td><strong>E3-1: assign <code>RTP.scheduler = accessor.getScheduler()</code> BEFORE <code>RTP.getInstance()</code></strong></td>
+</tr>
+<tr>
+<td><code>RTP.serverAccessor.start(plugin)</code></td>
+<td>✅ implicit via <code>bindServer</code> (Step E2)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>new RTP()</code> (constructor schedules pipeline timers via <code>RTP.scheduler</code>)</td>
+<td>⚠️ runs but its scheduling calls fail because <code>RTP.scheduler == null</code></td>
+<td>Fixed by E3-1.</td>
+</tr>
+<tr>
+<td><code>BukkitDatabaseHandler.setupDatabase(rtp)</code></td>
+<td>✅ wired 2026-05-01 — <code>FabricDatabaseHandler.setupDatabase(rtp)</code> invoked from <code>RTPFabricMod.onInitialize()</code> immediately after <code>RTP.getInstance()</code> (mirrors Bukkit ordering); <code>FabricServerAccessor.getPluginDirectory()</code> mkdirs the config dir so <code>Configs</code> ctor + DB init both find it.</td>
+<td>Verify selected accessor at Step H smoke test.</td>
+</tr>
+<tr>
+<td><code>ChunkyBorderChecker.loadChunky()</code></td>
+<td>N/A (Bukkit-only soft-depend)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>RTP.getInstance().startupTasks.execute(Long.MAX_VALUE)</code> (drain #1, sync)</td>
+<td>❌ missing</td>
+<td><strong>E3-6: drain <code>startupTasks</code> after event-bridge registration.</strong></td>
+</tr>
+<tr>
+<td><code>RTP.scheduler.runTaskLater(... drain startupTasks ..., 1)</code> (drain #2, deferred)</td>
+<td>❌ missing</td>
+<td><strong>E3-6 (continued)</strong> — schedule a 1-tick-later drain.</td>
+</tr>
+<tr>
+<td><code>setupBukkitEvents()</code> registers ~9 listeners</td>
+<td>✅ partial via <code>FabricEventBridge</code> (Step E2: lifecycle + tick + world + player join/disconnect). Damage/move/respawn/teleport/changeworld listeners pending</td>
+<td>Tracked under E-tail / E3-7 (pure event work, not scheduled-task work — listed here only for symmetry).</td>
+</tr>
+<tr>
+<td><code>RTP.scheduler.runTaskLater(this::setupIntegrations, 1)</code> (Vault/claims)</td>
+<td>N/A (Bukkit-only)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>RTP.scheduler.runTaskLater(BukkitEffectsHandler::setupEffects, 1)</code></td>
+<td>Deferred — no Fabric effects layer yet</td>
+<td>Track separately; not blocking <code>/rtp</code>.</td>
+</tr>
+<tr>
+<td><code>if (!isFolia()) RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1)</code></td>
+<td>❌ missing</td>
+<td><strong>E3-3: schedule <code>ChunkUnloadProcessor</code> once <code>RTP.scheduler</code> is wired.</strong> Fabric has no Folia-style region threading, so the non-Folia branch applies.</td>
+</tr>
+<tr>
+<td><code>DatabaseProcessing.start(this)</code> <em>(periodic flush wrapper, runs <code>RTP.scheduler.runTaskTimerAsynchronously</code> at 16ms)</em></td>
+<td>⚠️ functionally redundant with the rtp-core constructor's flush timers; <code>BukkitDatabaseHandler</code> schedules an additional <code>databaseAccessor.processQueries(MAX_VALUE)</code> heartbeat</td>
+<td><strong>E3-2: verify the rtp-core timers are sufficient on Fabric; if not, add a <code>FabricDatabaseProcessing</code> shim mirroring <code>DatabaseProcessing</code>.</strong></td>
+</tr>
+<tr>
+<td><code>RTP.getInstance().startupTasks.execute(Long.MAX_VALUE)</code> (drain #3, sync, after console banner)</td>
+<td>❌ missing</td>
+<td><strong>E3-6 (continued)</strong> — third drain.</td>
+</tr>
+<tr>
+<td>PAPI registration</td>
+<td>N/A (Bukkit-only)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>JarUtils.extractDocs(getDataFolder(), version)</code></td>
+<td>❌ missing</td>
+<td><strong>E3-4: port <code>JarUtils.extractDocs</code> to a <code>FabricJarUtils</code> (no <code>JavaPlugin</code> dep), seed <code>&lt;configDir&gt;/rtp/docs/</code>.</strong></td>
+</tr>
+<tr>
+<td><code>initLoginReserveCache()</code> (ADR-023)</td>
+<td>✅ landed 2026-05-11 — <code>FabricEventBridge.initLoginReserveCache(server)</code> + <code>refillLoginReserveOnQuit()</code> + <code>FabricOnEventTeleports.onJoin</code> (see ADR-023 <em>Fabric port</em>).</td>
+<td>E3-5 closed.</td>
+</tr>
+<tr>
+<td><code>metrics = new Metrics(this, 30865)</code> <em>(bStats)</em></td>
+<td>❌ missing — no bStats submission on Fabric runtime</td>
+<td><strong>TODO (deferred, not blocking <code>/rtp</code>):</strong> bStats <em>is</em> possible on Fabric. There is no official <code>bstats-fabric</code> artifact, so implement via either (a) a shaded/community copy of the bStats <code>Metrics</code>/<code>MetricsBase</code> class, or (b) a small custom JSON submitter to the bStats v2 data endpoint on an <code>RTP.scheduler</code> async timer. Register RTP's existing chart catalogue through the platform-neutral <code>metrics-api</code> (<code>MetricsSnapshot</code> / <code>FabricMetricsBinding</code>) so charts are shared with the Bukkit path. Lives in <code>rtp-fabric</code> only — never <code>rtp-core</code>/<code>rtp-api</code>. Gated by Rule D-005 (multi-module).</td>
+</tr>
+</tbody>
+</table>
+<h4 id="required-rtpfabricmodoninitialize-changes-in-order">Required <code>RTPFabricMod.onInitialize()</code> changes (in order)<a class="headerlink" href="#required-rtpfabricmodoninitialize-changes-in-order" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><span class="c1">// 1. Wire accessor + scheduler BEFORE constructing RTP — mirrors RTPBukkitPlugin order.</span>
+<span class="n">FabricServerAccessor</span><span class="w"> </span><span class="n">accessor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">FabricServerAccessor</span><span class="p">();</span>
+<span class="n">RTP</span><span class="p">.</span><span class="na">serverAccessor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">accessor</span><span class="p">;</span>
+<span class="n">RTP</span><span class="p">.</span><span class="na">scheduler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">accessor</span><span class="p">.</span><span class="na">getScheduler</span><span class="p">();</span><span class="w">              </span><span class="c1">// &lt;-- E3-1, currently missing</span>
+
+<span class="c1">// 2. Trigger lazy RTP construction; constructor self-schedules</span>
+<span class="c1">//    SyncTaskProcessing / AsyncTaskProcessing / DB-flush timers via RTP.scheduler.</span>
+<span class="n">RTP</span><span class="p">.</span><span class="na">getInstance</span><span class="p">();</span>
+
+<span class="c1">// 3. Register the event bridge so SERVER_STARTED can call setupDatabase() + drains.</span>
+<span class="k">new</span><span class="w"> </span><span class="n">FabricEventBridge</span><span class="p">(</span><span class="n">accessor</span><span class="p">).</span><span class="na">register</span><span class="p">();</span>
+
+<span class="c1">// 4. Brigadier registration (Step G G1 — already done).</span>
+<span class="c1">// ...</span>
+
+<span class="c1">// 5. Schedule platform-specific recurring tasks once the bridge is in place.</span>
+<span class="c1">//    Note: Fabric is non-Folia equivalent — the Folia guard does not apply.</span>
+<span class="n">RTP</span><span class="p">.</span><span class="na">scheduler</span><span class="p">.</span><span class="na">runTaskTimer</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">ChunkUnloadProcessor</span><span class="p">(),</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w">   </span><span class="c1">// &lt;-- E3-3</span>
+
+<span class="c1">// 6. Seed data folder with bundled docs (E3-4).</span>
+<span class="n">FabricJarUtils</span><span class="p">.</span><span class="na">extractDocs</span><span class="p">(</span><span class="n">accessor</span><span class="p">.</span><span class="na">getPluginDirectory</span><span class="p">(),</span><span class="w"> </span><span class="n">MOD_VERSION</span><span class="p">);</span>
+
+<span class="c1">// 7. Drain startupTasks (E3-6 — three drains, mirroring Bukkit).</span>
+<span class="c1">//    Drain #1 + #3 are synchronous; drain #2 is RTP.scheduler.runTaskLater(..., 1).</span>
+<span class="n">RTP</span><span class="w"> </span><span class="n">rtp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTP</span><span class="p">.</span><span class="na">getInstance</span><span class="p">();</span>
+<span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">rtp</span><span class="p">.</span><span class="na">startupTasks</span><span class="p">.</span><span class="na">size</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="n">rtp</span><span class="p">.</span><span class="na">startupTasks</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">Long</span><span class="p">.</span><span class="na">MAX_VALUE</span><span class="p">);</span>
+<span class="n">RTP</span><span class="p">.</span><span class="na">scheduler</span><span class="p">.</span><span class="na">runTaskLater</span><span class="p">(()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">rtp</span><span class="p">.</span><span class="na">startupTasks</span><span class="p">.</span><span class="na">size</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="n">rtp</span><span class="p">.</span><span class="na">startupTasks</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">Long</span><span class="p">.</span><span class="na">MAX_VALUE</span><span class="p">);</span>
+<span class="p">},</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="c1">// (third drain after any other deferred init, matching Bukkit&#39;s banner-then-drain order)</span>
+
+<span class="c1">// 8. ADR-023 login reserve cache (E3-5).</span>
+<span class="n">initLoginReserveCacheFabric</span><span class="p">(</span><span class="n">accessor</span><span class="p">);</span>
+</code></pre></div>
+<p>Some of this naturally moves to <code>FabricEventBridge.SERVER_STARTED</code> instead of <code>onInitialize()</code> — specifically anything that needs a live <code>MinecraftServer</code> (e.g. login cache uses <code>MinecraftServer#getMaxPlayers()</code>). The split is the same as Bukkit's "what runs on plugin enable vs. what runs on first tick / SERVER_STARTED equivalent". Final placement is implementation detail.</p>
+<h4 id="status-landed-2026-05-05">Status (landed 2026-05-05)<a class="headerlink" href="#status-landed-2026-05-05" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[x] <strong>E3-1</strong> — <code>RTP.scheduler = accessor.getScheduler()</code> is set before <code>new RTP()</code> in <code>RTPFabricMod.onInitialize()</code>. The <code>RTP</code> constructor's self-scheduled <code>SyncTaskProcessing</code> / <code>AsyncTaskProcessing</code> / DB-flush timers (<code>rtp-core/.../common/RTP.java</code> lines ~211–243) register into <code>FabricScheduler</code> and are pumped by <code>FabricEventBridge</code>'s <code>END_SERVER_TICK</code> callback.</li>
+<li>[x] <strong>E3-2</strong> — <code>FabricDatabaseHandler.setupDatabase(rtp)</code> is invoked from <code>RTPFabricMod</code>'s <code>SERVER_STARTED</code> handler (deferred from <code>onInitialize</code> so <code>BuiltInRegistries</code> is fully populated when <code>Configs</code> runs <code>SafetyTokenExpander#tag</code> flattening). The rtp-core constructor's 60-tick SQL flush timer + 6000-tick cached-locations rebuild cover prepared-statement flushing; the queued-mutation drain serviced by <code>databaseAccessor.processQueries</code> is now wired separately via <code>FabricDatabaseProcessing.start()</code> immediately after <code>setupDatabase</code> (see same-row <code>DatabaseProcessing.start(...)</code> entry above; landed 2026-05-23). <code>FabricDatabaseProcessing.kill()</code> is registered on <code>ServerLifecycleEvents.SERVER_STOPPING</code>.</li>
+<li>[x] <strong>E3-3</strong> — <code>RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1)</code> scheduled in <code>RTPFabricMod.onInitialize()</code> after Brigadier registration (non-Folia branch always applies on Fabric).</li>
+<li>[x] <strong>E3-4</strong> — <code>FabricJarUtils.extractDocs</code> ported (2026-05-23). Seeds <code>&lt;configDir&gt;/rtp/docs/</code> from the bundled <code>docs/**</code> tree in the running mod jar; wired from <code>RTPFabricMod.onInitialize()</code> after the startupTasks drain. Idempotent + fail-soft + Bukkit-free (routes through <code>RTP.log</code>).</li>
+<li>[x] <strong>E3-5</strong> — <code>initLoginReserveCache()</code> (ADR-023) ported in <code>FabricEventBridge</code> (<code>initLoginReserveCache</code> bootstrap at <code>SERVER_STARTED</code>; <code>refillLoginReserveOnQuit</code> on the <code>Disconnect</code> proxy) and <code>FabricOnEventTeleports.onJoin</code> (perm gate via existing <code>FabricRTPPlayer.hasPermission</code> → <code>fabric-permissions-api</code> + <code>ops.json</code> fallback; first-join via <code>&lt;worldRoot&gt;/playerdata/&lt;uuid&gt;.dat</code> probe). Covered by <code>ReqFabricAdr023HasPlayedBeforeTest</code> (6/6 green). See ADR-023 <em>Fabric port</em> and <code>TODO.md</code> §3.</li>
+<li>[x] <strong>E3-6</strong> — Three <code>startupTasks.execute(Long.MAX_VALUE)</code> drains added (sync, +1-tick deferred, sync post-banner) mirroring <code>RTPBukkitPlugin.onEnable</code> / <code>BootstrapSupport.drainStartupTasks</code>. Without this the region prefill never started, leaving <code>keptLocations</code>/<code>unkeptLocations</code> empty so <code>/rtp</code> could not produce a destination.</li>
+<li>[ ] <strong>E3-7</strong> — Damage / move / respawn / teleport / changeworld listener parity in <code>FabricEventBridge</code> — tracked under E-tail; not blocking <code>/rtp</code> itself.</li>
+<li>[x] <code>:rtp-plugin:compileJava</code> BUILD SUCCESSFUL after the E3-3 + E3-6 changes (2026-05-05).</li>
+</ul>
+<h4 id="runtime-mitigation-landed-2026-05-05-adaptive-promotion-cap-dropped-periodic-ticket-sweep">Runtime mitigation (landed 2026-05-05) — adaptive promotion cap + dropped periodic ticket sweep<a class="headerlink" href="#runtime-mitigation-landed-2026-05-05-adaptive-promotion-cap-dropped-periodic-ticket-sweep" title="Permanent link">&para;</a></h4>
+<p>The first end-to-end Fabric <code>/rtp</code> smoke after E3-3/E3-6 produced a 60-second watchdog crash (60s tick on the server thread, ~6 seconds after <code>Done!</code>). Triage trail in chat history; root cause: <code>Region.execute()</code> previously dispatched up to <code>activeChunkCap</code> concurrent <code>getChunkAtAsync</code> calls on each tick when <code>currentHot=0</code> and <code>inFlight=0</code> — fine on Bukkit's async chunk loader but crash-inducing on Fabric where <code>FabricRTPWorld.getChunkAt</code> round-trips through <code>server.submit</code> + <code>cache.getChunk(..., FULL, true)</code> and effectively serialises on the tick thread. Compounding: <code>RegionQueueManager.validateTickets</code> was called unconditionally on the first <code>Region.execute()</code> after rebind (<code>lastValidationTime = 0</code>), dispatching another N concurrent <code>getChunkAtAsync</code> on every kept entry.</p>
+<p>Code change in <code>rtp-core/.../selection/region/Region.java</code>:
+- Removed the periodic <code>queueManager.validateTickets(getWorld())</code> sweep from <code>Region.execute()</code> and the <code>lastValidationTime</code> field. Tickets are freshly applied at the L2→L1 promotion site below; the <code>ChunkReservation</code> owns the ticket lifecycle, so a periodic re-validate duplicated work and was the boot-time chunk-load storm trigger. If a sanity sweep is needed in future for tickets stripped by external commands (<code>/forceload remove</code>), it should be a low-frequency async timer outside <code>Region.execute()</code>.
+- Added an EMA-based adaptive per-tick promotion cap: <code>chunkLoadEmaNanos</code> (volatile long, alpha = 1/8) tracks observed promotion duration, sampled at every terminal path (success, unsafe-drop, cache-full, load-failure). The deficit loop caps iterations at <code>max(1, 25_000_000ns / emaNs)</code>. Bootstrap: zero EMA → 1 promotion/tick on the first tick, relaxes upward as samples accumulate. Cheap pre-genned chunks → high cap → fast warm-up; expensive ungenerated chunks → low cap → sustainable warm-up.</p>
+<h4 id="s-002-fix-landed-2026-05-05-non-persistent-chunk-tickets">S-002 fix (landed 2026-05-05) — non-persistent chunk tickets<a class="headerlink" href="#s-002-fix-landed-2026-05-05-non-persistent-chunk-tickets" title="Permanent link">&para;</a></h4>
+<p>Follow-up #1 from the prior session's submit ("S-002 audit of <code>FabricRTPWorld.getOrLoadChunk</code> ticket-release on <code>TimeoutException</code>") was rescoped after investigation: the actual hazard was not in <code>getOrLoadChunk</code> (which does not apply tickets) but in <code>FabricRTPWorld.setForceLoadedImpl</code>, which used vanilla <code>ServerLevel#setChunkForced(...)</code>. That call <strong>persists to <code>level.dat#ForcedChunks</code></strong>, so a watchdog crash mid-pipeline (which the user hit on the 2026-05-05 smoke test, log line <code>13 force loaded chunks were found in minecraft:overworld at: [...]</code>) leaks RTP-owned forced chunks to disk and re-applies them on the next world load. Bukkit's <code>addPluginChunkTicket</code> is non-persistent and Folia inherits the Bukkit semantics, so this hazard is Fabric-specific.</p>
+<p>Code change:</p>
+<ul>
+<li><code>FabricVersionAdapter</code> SPI: added <code>applyTicket(ServerLevel, cx, cz)</code> and <code>releaseTicket(ServerLevel, cx, cz)</code> returning <code>CompletableFuture&lt;Void&gt;</code>. Default implementations return failed futures (<code>UnsupportedOperationException</code>) per S-006 (no silent no-ops).</li>
+<li><code>V1_21_R1FabricVersionAdapter</code> (the active target): implements both via <code>DistanceManager#addRegionTicket</code> / <code>#removeRegionTicket</code> with a process-wide <code>TicketType&lt;ChunkPos&gt;</code> registered as <code>TicketType.create("rtp", Comparator.comparingLong(ChunkPos::toLong), 0)</code> — non-persistent, no auto-expiry. Reflective access to the package-private <code>DistanceManager</code> methods (cached <code>Method</code> handles); switching to an access-widener is deferred to the Loom-stable phase.</li>
+<li><code>FabricRTPWorld.setForceLoadedImpl</code> rewritten to delegate to the active <code>FabricVersionAdapter</code> instead of calling <code>world.setChunkForced(...)</code>. Class- and method-level Javadocs updated to document why <code>setChunkForced</code> is forbidden on this path.</li>
+</ul>
+<p>See <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-003-non-persistent-chunk-tickets.md"><code>platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-003-non-persistent-chunk-tickets.md</code></a> for the full decision record. <code>V1_20_R1FabricVersionAdapter</code> and <code>V26_1_R1FabricVersionAdapter</code> inherit the SPI default and will throw on <code>keep(true)</code> until ported — tracked under E-tail. Pre-existing leaked entries in <code>level.dat#ForcedChunks</code> from earlier Fabric builds require a one-time admin <code>/forceload remove</code> cleanup (no automatic migration).</p>
+<h4 id="operational-recommendation-pre-generate-the-world-fabric">Operational recommendation — pre-generate the world (Fabric)<a class="headerlink" href="#operational-recommendation-pre-generate-the-world-fabric" title="Permanent link">&para;</a></h4>
+<p>Even with the adaptive cap, on a <em>fresh</em> unexplored Fabric world the per-chunk generation cost can be 200–2000 ms. The cap absorbs that (at the cost of slower kept-cache warm-up: ~1–10 seconds typical, longer on extreme terrain). For production Fabric servers it is <strong>strongly recommended</strong> to pre-generate the relevant region radii using Chunky or an equivalent before enabling RTP, so <code>cache.getChunk</code> resolves from disk (~5 ms typical) rather than triggering generation. This is <strong>not enforced</strong> at runtime — RTP boots fine without pre-gen, and the cap ensures no watchdog crash — but unprepared servers will see slower first-<code>/rtp</code> responses for the first ~10–30 seconds of warm-up and slow per-<code>/rtp</code> chunk-tickets when the spiral lands outside any pre-genned area. (No equivalent recommendation is made for Spigot/Paper, where the platform's async chunk loader handles concurrent generation efficiently.)</p>
+<h4 id="acceptance">Acceptance<a class="headerlink" href="#acceptance" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>RTP.scheduler</code> is non-null by the time <code>RTP.getInstance()</code> runs.</li>
+<li>Joining the Fabric server, running <code>/rtp</code>, and observing an actual teleport in chat + position change (verified manually under Step H smoke test).</li>
+<li>No <code>NullPointerException</code> from <code>RTP</code> constructor in the Fabric server log on startup.</li>
+<li>DB flush observable in the configured backend after a teleport (file-modification timestamp on YAML, or row in SQL <code>cached_locations</code>).</li>
+</ul>
+<h4 id="why-this-wasnt-caught-earlier">Why this wasn't caught earlier<a class="headerlink" href="#why-this-wasnt-caught-earlier" title="Permanent link">&para;</a></h4>
+<p>Steps A–G all compile cleanly in isolation and the Fabric mod loads without throwing. The pipeline-pump gap only manifests at <em>runtime</em> when a player executes <code>/rtp</code> — and runtime end-to-end was deliberately deferred to Step H per the gate-restructure decision (see Phase 1 acceptance gate note). Recording this finding now under a dedicated Step E3 keeps the per-step gate model honest and surfaces the gap before the Step H smoke test rather than during it.</p>
+<h3 id="step-f-permissions">Step F — Permissions<a class="headerlink" href="#step-f-permissions" title="Permanent link">&para;</a></h3>
+<p>Add <code>me.lucko:fabric-permissions-api</code> as <code>modCompileOnly</code> (soft-depend). Implement <code>FabricRTPPlayer.hasPermission(node)</code> via <code>Permissions.check(source, node, opFallback)</code> with an op-level fallback. LuckPerms-Fabric satisfies the API automatically when present.</p>
+<ul>
+<li><strong>Acceptance gate:</strong> permission node test parity with the Bukkit adapter.</li>
+</ul>
+<h3 id="step-g-brigadier-bridge-in-commands-api-per-commands-api-adr-001">Step G — Brigadier Bridge in <code>commands-api</code> (per <a href="../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md">commands-api-ADR-001</a>)<a class="headerlink" href="#step-g-brigadier-bridge-in-commands-api-per-commands-api-adr-001" title="Permanent link">&para;</a></h3>
+<p>Implement <code>BrigadierCommandAdapter</code> inside <code>commands-api</code> that converts the <code>commands-api</code> tree into Brigadier <code>LiteralArgumentBuilder</code> nodes. <code>RTPCmdFabric</code> registers the adapted tree via <code>CommandRegistrationCallback.EVENT</code> — <strong>no platform-specific command logic duplication</strong>. Implement advanced tab completion leveraging Brigadier's client-side capabilities. Ensure RTP messages and command feedback route correctly to Fabric players/console.</p>
+<ul>
+<li><strong>Status (landed 2026-04-30 — partial, structural):</strong><ul>
+<li>[x] <code>BrigadierCommandAdapter</code> + <code>BrigadierBridgeContext&lt;S&gt;</code> in <code>commands-api/.../brigadier/</code> (Brigadier as <code>compileOnly</code>; never loaded on Bukkit-family runtimes). Walks <code>TreeCommand</code>, emits literal nodes for sub-commands, typed argument nodes for <code>IntegerParameter</code> / <code>FloatParameter</code> / <code>BooleanParameter</code>, and string-with-suggestions for <code>EnumParameter</code> / <code>CoordinateParameter</code> / unknowns. Permission gating is wired via <code>requires(...)</code>.</li>
+<li>[x] <code>RTPCmdFabric.register(CommandDispatcher&lt;S&gt;, CommandsAPICommand, BrigadierBridgeContext&lt;S&gt;)</code> shim in <code>rtp-fabric-common</code> (generic <code>&lt;S&gt;</code>; no <code>net.minecraft.*</code> imports — keeps the module buildable without a hot Loom toolchain).</li>
+<li>[x] REQ-traceable test: <code>ReqApiArch005BrigadierBridgeTest</code> (3 tests) — node structure, dispatch round-trip, permission predicate gating. <code>TRACEABILITY.md</code> row <code>REQ-API-ARCH-005</code> updated.</li>
+<li>[x] <strong>Wired &amp; smoke-tested</strong> <em>(2026-05-31)</em> — <code>CommandRegistrationCallback.EVENT</code> registration from the real Fabric entrypoint and <code>BrigadierBridgeContext</code> builders backed by the Fabric permission API landed (see Step F / Step G2 in the checklist above); the <code>commands-live</code> portion was exercised under the Step H dual-runtime smoke test. Bukkit dispatcher (<code>BukkitTreeCommand</code>) remains the production path on all Bukkit-family platforms — purely additive change.</li>
+</ul>
+</li>
+<li><strong>Acceptance gate:</strong> the <code>commands-live</code> portion of <code>rtp test full</code> produces the REQ-RTP-S-004 warnings on Fabric (intentional malformed-input WARN logs are evidence of compliance, not failures — see <code>LESSONS_LEARNED.md</code>). Tab completion smoke test passes.</li>
+</ul>
+<h3 id="step-h-stabilization-dual-runtime-smoke-test-testing">Step H — Stabilization, Dual-Runtime Smoke Test &amp; Testing<a class="headerlink" href="#step-h-stabilization-dual-runtime-smoke-test-testing" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Memory leak audit</strong> — every allocator of a chunk ticket or <code>TeleportPipelineTask</code> registers with <code>MemoryTracker</code> and releases on all exit paths (normal, exception, disconnect) on Fabric, matching the Bukkit-family contract.</li>
+<li><strong>Concurrency review</strong> — verify region-based task scheduling is safe on Fabric's threading model. No Folia-isms (<code>Bukkit.isOwnedByCurrentRegion</code>, region/global schedulers) leak into Fabric code paths.</li>
+<li><strong>Fabric test suite</strong> — adapt existing unit and integration tests where they exercise platform abstractions.</li>
+<li>
+<p><strong>Dual-runtime end-to-end smoke test</strong> <em>(moved here from Phase 1)</em> — the single produced JAR loads cleanly on a Paper test server <em>and</em> on a Fabric test server from the same artifact, and <code>/rtp</code> (or the equivalent command tree) executes end-to-end on each. This guards against Loom remap-scoping regressions (the only single-point-of-failure introduced by single-JAR packaging) and validates that Steps A–G actually compose into a working Fabric mod. This is the gate that proves ADR-022's single-JAR multi-loader packaging works end-to-end; it cannot meaningfully run earlier because no prior phase delivers enough featureset to teleport on Fabric.</p>
+</li>
+<li>
+<p><strong>Acceptance gate:</strong> all existing S-00x regression guards (<code>ReqRtpS005ChunkLoadingTest</code>, <code>ReqRtpS004NullChunkAttributionTest</code>, etc.) green when run against Fabric implementations of the relevant abstractions, AND the dual-runtime end-to-end smoke test passes on both Paper and Fabric from the same JAR.</p>
+</li>
+</ul>
+<h2 id="phase-3-documentation-release">Phase 3: Documentation &amp; Release<a class="headerlink" href="#phase-3-documentation-release" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] <strong>Admin documentation</strong> <em>(2026-05-31)</em> — <code>docs/admin/</code> updated with Fabric-specific installation and configuration instructions.</li>
+<li>[x] <strong>Developer documentation</strong> <em>(2026-05-31)</em> — <code>docs/dev/</code> updated to reflect the multi-platform architecture and Fabric contribution guidelines.</li>
+<li>[x] <strong>TRACEABILITY.md</strong> <em>(2026-05-31)</em> — rows added for every new REQ-traceable Fabric test (Steps A, B, F, etc.).</li>
+<li>[x] <strong>CHANGELOG.md</strong> <em>(2026-05-31)</em> — one entry per phase added under "Unreleased".</li>
+<li>[x] <strong>COVERAGE_PLAN.md</strong> <em>(2026-05-31)</em> — Fabric column added to the platform-coverage matrix.</li>
+<li>[x] <strong>Beta release</strong> <em>(2026-05-31)</em> — first public beta of RTP for Fabric shipped (Phase 2 Step H gate green and Phase 3 docs merged).</li>
+</ul>
+<h2 id="phase-4-neoforge-adapter-rtp-neoforge">Phase 4: NeoForge Adapter (<code>rtp-neoforge</code>)<a class="headerlink" href="#phase-4-neoforge-adapter-rtp-neoforge" title="Permanent link">&para;</a></h2>
+<p>NeoForge is an <strong>in-scope</strong> target platform per <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a>; legacy Forge, Sponge, and hybrid servers (Mohist / Magma / Arclight) remain out of scope. The landscape analysis, API-surface delta from Fabric, reuse map, risks, and S-00x mapping live in <a href="../NEOFORGE_NOTES/"><code>NEOFORGE_NOTES.md</code></a>. The phase rows below scope the work; they mirror the Fabric Phases 0-3 / Steps A-K structure so the Fabric experience transfers directly.</p>
+<p><strong>Activation gate (ADR-033 Decision §2) — CLEARED 2026-06-01.</strong> The gate required the Fabric platform to clear its stability bar: no open S-005 violations in <code>rtp-fabric</code>, the <code>FabricServerAccessor.getLocationGenerator</code> null stub resolved, the Loom dependency resolved, and a green <code>rtp test full</code> on at least one shipped MC carrier. Fabric is <strong>confirmed stable</strong> as of 2026-06-01 (Phase 2 Step H dual-runtime smoke test passed; Fabric beta shipped Phase 3, 2026-05-31). The ADR-033 §3 bring-up prerequisites (Phase N0) are now in progress: the D-005 proposal (<a href="../scratch/PROPOSAL-neoforge-bringup/"><code>scratch/PROPOSAL-neoforge-bringup.md</code></a>) and the subproject ADR (<a href="../../platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md">rtp-neoforge-ADR-001</a>) are drafted, <code>rtp-neoforge/REQUIREMENTS.md</code> is authored, and TRACEABILITY placeholder rows are added. The D-005 proposal was <strong>approved by the project lead on 2026-06-01</strong> and the <strong>named maintainer</strong> gate is satisfied (project lead, <code>@leaf_26</code>), clearing both prerequisites. The <strong>Phase N1 module skeleton landed 2026-06-02</strong> (see Phase N1 below); the platform-adapter implementation surfaces (Phase N2) and documentation/release (Phase N3) are now complete - NeoForge is a runtime-functional, first-class platform.</p>
+<p><strong>Ownership.</strong> Per ADR-033 / ADR-022, NeoForge bring-up requires a named maintainer who owns the platform end-to-end (build, mappings, CI toolchain, S-00x proofs, ongoing maintenance) before Phase N1 begins. <strong>Owner: project lead (<code>@leaf_26</code>), assigned 2026-06-01.</strong></p>
+<h3 id="phase-n0-scope-unlock-bring-up-prerequisites-adr-033-3">Phase N0 — Scope unlock &amp; bring-up prerequisites <em>(ADR-033 §3)</em><a class="headerlink" href="#phase-n0-scope-unlock-bring-up-prerequisites-adr-033-3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] <strong>D-005 proposal</strong> <em>(2026-06-01)</em> referencing <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> and <a href="../NEOFORGE_NOTES/"><code>NEOFORGE_NOTES.md</code></a>, confirming the Fabric activation gate is clear: <a href="../scratch/PROPOSAL-neoforge-bringup/"><code>scratch/PROPOSAL-neoforge-bringup.md</code></a>. Maintainer assignment still open (see Ownership).</li>
+<li>[x] <strong>Subproject ADR</strong> <em>(2026-06-01)</em> <a href="../../platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md"><code>platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md</code></a> mirroring <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a> (subproject ADR numbering restarts at <code>001</code> per AGENTS.md <em>Self-Updating Protocol</em>); row added to the <em>Subproject ADRs</em> table in <a href="../../adr/"><code>docs/adr/README.md</code></a>.</li>
+<li>[x] <strong><code>rtp-neoforge/REQUIREMENTS.md</code></strong> <em>(2026-06-01)</em> authored (<a href="../../platforms/rtp-neoforge/REQUIREMENTS.md"><code>platforms/rtp-neoforge/REQUIREMENTS.md</code></a>), mirroring <a href="../../platforms/rtp-fabric/REQUIREMENTS.md"><code>platforms/rtp-fabric/REQUIREMENTS.md</code></a>: <code>REQ-NEOFORGE-F-001..0NN</code> (accessor / world / player / scheduler / single-JAR-or-mod metadata / lifecycle wiring / login reserve) and <code>REQ-NEOFORGE-ARCH-001..0NN</code> (no-Bukkit-imports, no-core-pollution, build-plugin scope, S-005 async chunk loading, S-004 failure attribution, memory hygiene, S-006 fail-loud + pre-init guard, config dir resolution, DB delegation), restating the Fabric requirements against NeoForge entry-point / event-bus / toolchain surfaces.</li>
+<li>[x] <strong>Build-toolchain decision</strong> <em>(2026-06-01)</em> captured in <a href="../../platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md">rtp-neoforge-ADR-001</a> §4: <strong>ModDevGradle</strong> (over NeoGradle), Java 21+ (REQ-RTP-SYS-001). The <code>run_test</code> / IntelliJ <code>.run</code> dev-server confirmation spike remains a Phase N1 task.</li>
+<li>[x] <strong>Obf/unobf carrier decision</strong> <em>(2026-06-01)</em> captured in <a href="../../platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md">rtp-neoforge-ADR-001</a> §3: Mojmap-at-runtime, <strong>no obf carrier expected</strong>, but the per-version structural split (NM-typed surfaces isolated from <code>rtp-core</code> / <code>rtp-api</code>) is required.</li>
+</ul>
+<h3 id="phase-n1-module-skeleton-mod-bootstrap">Phase N1 — Module skeleton &amp; mod bootstrap<a class="headerlink" href="#phase-n1-module-skeleton-mod-bootstrap" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] <em>(2026-06-02)</em> Sibling module tree <code>rtp-neoforge/</code> (<a href="../../platforms/rtp-neoforge/README.md">README</a>) with <code>rtp-neoforge-common</code> + the <code>rtp-neoforge-v1_21_R1</code> per-MC carrier (a <code>V1_21_R1NeoForgeVersionAdapter</code> stub reserves the NM-typed-surface isolation seam), mirroring <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md">rtp-fabric-ADR-001</a>. Sibling of <code>rtp-fabric</code>, not nested (ADR-033 alternatives, <code>NEOFORGE_NOTES.md</code> §11). Additional carriers (<code>v1_20_R1</code>, later revs) added as needed.</li>
+<li>[x] <em>(2026-06-03)</em> <strong>Second carrier <code>rtp-neoforge-v26_1_R1</code> (MC 26.1)</strong> authored and built against the real runtime: pins MC 26.1.2 / NeoForge 26.1.2.71 / ModDevGradle 2.0.141. The 26.x line is fully deobfuscated (Mojmap with native parameter names, Parchment removed) and runs on <strong>Java 25</strong>, so the carrier pins a Java 25 toolchain and is gated under <code>-PexcludeJdk25</code> (alongside the JDK-25 Fabric carriers) in <code>settings.gradle</code> - a JDK-21-only host still produces a 1.21.x-capable NeoForge jar without it. <code>V26_1_R1NeoForgeVersionAdapter</code> is a faithful clone of the 1.21.1 carrier; <code>RTPNeoForgeMod#installVersionAdapter</code> routes <code>26.*</code> to it; <code>rtp-plugin</code> merges its Java 25 bytecode into the unified jar (findProject-guarded). <strong>Compiled, linked, and runtime-loaded:</strong> built against the real NeoForge 26.1.2 userdev artifacts (26.1.2.71, JDK 25) and the adapter loads cleanly on a 26.1.2 dev server (<code>Active version adapter: 26.1.2</code> boot line), so the Mojmap API surface is verified. <strong>Chunk-stall fix (2026-06-03):</strong> a live <code>/rtp</code> on 26.1.2 hung with L1 kept-cache stuck at 0, no chunk tickets, and the first teleport never completing; <code>min_level: ALL</code> logs confirmed <code>getOrLoadChunk ... TimeoutException</code>, i.e. the live chunk future never resolved. Root cause: <code>requestFullChunkAsync</code> added its own transient load-ticket and removed it inside a <code>whenComplete</code> that ran off the server thread, wedging the 26.x chunk holder. Fixed by dropping the manual add/remove and relying on <code>getChunkFuture(..., create=true)</code> self-issuing the transient ticket, matching the proven Fabric 26.1 path (<a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-008-non-blocking-chunk-generation.md">rtp-fabric-ADR-008</a>); the persistent kept-cache ticket is still applied on the server thread via <code>applyTicket</code> (S-002 unaffected). The <code>/rtp</code> round-trip is verified end-to-end on the JDK-25 host; re-pin versions when 26.1/26.2 bumps. Routing for any rolling 1.21.x-head is unchanged: <code>startsWith("1.21")</code> already serves the whole 1.21 line from the <code>v1_21_R1</code> carrier.</li>
+<li>[x] <em>(2026-06-02)</em> <code>@Mod</code>-annotated entry point <code>RTPNeoForgeMod</code> + <code>META-INF/neoforge.mods.toml</code>; game-bus <code>NeoForge.EVENT_BUS</code> subscriptions wired for server lifecycle, per-tick scheduler drain, and <code>RegisterCommandsEvent</code> (the mod-bus <code>IEventBus</code> is retained for future setup-phase wiring). A complete server-thread <code>NeoForgeScheduler</code> (port of <code>FabricScheduler</code>) and a <code>NeoForgeCommandRegistrar</code> trampoline scaffold ship. The <code>NeoForgeServerAccessor</code> (<code>RTPServerAccessor</code> impl) + <code>RTPAPI.serverAccessor</code>/<code>RTP.scheduler</code> binding landed in Phase N2 Step NE, so the mod is fully runtime-functional.</li>
+<li>[x] <em>(2026-06-02)</em> Build-plugin scoping: <strong>ModDevGradle</strong> (<code>net.neoforged.moddev</code>) applied only under <code>rtp-neoforge/**</code>; platform-neutral modules (<code>rtp-core</code>, <code>rtp-api</code>, <code>anvil-api</code>, <code>commands-api</code>) reused 1:1 via <code>project(...)</code> deps with no NeoForge coupling. The NeoForge modules are merged into the unified <code>LeafRTP-Pro</code> jar by <code>rtp-plugin</code> (Mojmap bytecode + <code>META-INF/neoforge.mods.toml</code> appended post-<code>remapJar</code>) and are therefore included <strong>by default</strong>; network-constrained hosts drop them with <code>-PexcludeNeoforge</code> (or <code>EXCLUDE_NEOFORGE</code> env), in which case the unified jar carries no <code>neoforge.mods.toml</code>. The maintainer verifies the full build on a network-capable host.</li>
+<li>[x] <em>(2026-06-02)</em> Distribution decision: <strong>unified multi-loader jar</strong>. NeoForge ships inside the released <code>LeafRTP-Pro-&lt;version&gt;.jar</code> (one artifact loads on Bukkit/Paper/Folia, Fabric, Velocity, and NeoForge), merged post-<code>remapJar</code> like the deobf MC 26.x carriers.</li>
+<li>[x] <em>(2026-06-18)</em> Lite-jar NeoForge merge landed. The same gated <code>mergeNeoForgeBytecodeIntoJar</code> pass now also runs in <code>rtp-plugin</code>'s <code>remapLiteJar</code>, so the rtp-lite <code>LeafRTP-&lt;version&gt;.jar</code> carries <code>META-INF/neoforge.mods.toml</code> + the Mojmap NeoForge carrier bytecode and loads on NeoForge too (one artifact across editions). Without it, NeoForge reported the lite jar as "is a Fabric mod and cannot be loaded" and any addon with a <code>required</code> dependency on the <code>rtp</code> mod (e.g. the LeafRTP GUI addon) failed to load. Still gated on the NeoForge modules being in the build graph (dropped under <code>-PexcludeNeoforge</code> / <code>EXCLUDE_NEOFORGE</code>).</li>
+</ul>
+<h3 id="phase-n2-platform-adapter-steps-mirror-fabric-steps-a-k">Phase N2 — Platform adapter steps <em>(mirror Fabric Steps A-K)</em><a class="headerlink" href="#phase-n2-platform-adapter-steps-mirror-fabric-steps-a-k" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] <strong>Step NA - Async chunk load (S-005)</strong> <em>(completed 2026-06-13)</em> - <code>NeoForgeRTPWorld.getChunkAt</code> returns <code>CompletableFuture</code> and routes through <code>MinecraftServer#submit</code> / the server-thread executor; never a synchronous <code>ServerLevel#getChunk(..., load=true)</code> on the tick thread. Ports the Fabric adaptive promotion-cap learnings (Phase 2 Step E3 runtime mitigation).</li>
+<li>[x] <strong>Step NB - <code>getLocationGenerator()</code> real (S-006 fail-loud)</strong> <em>(completed 2026-06-13)</em> - throws <code>IllegalStateException</code> pre-init, never null/no-op.</li>
+<li>[x] <strong>Step NC - <code>NeoForgeScheduler</code></strong> <em>(completed 2026-06-13)</em> - full <code>RTPScheduler</code> impl (sync / async / delayed / repeating), advanced on the server tick event; all periodic work routes through <code>RTP.scheduler</code> (no raw executors per AGENTS.md <em>Scheduler Usage</em>). No Folia region-ownership analog (single-main-thread).</li>
+<li>[x] <strong>Step ND - Database</strong> <em>(completed 2026-06-13)</em> - delegates to <code>rtp-core</code>'s <code>DatabaseHandler</code> / <code>DatabaseProcessing</code> (now platform-neutral in <code>rtp-core</code>); no NeoForge-specific persistence abstraction. Config dir via the NeoForge config path.</li>
+<li>[x] <strong>Step NE - Event bridge &amp; lifecycle</strong> <em>(completed 2026-06-13)</em> - <code>RTPServerAccessor</code> / <code>RTPPlayer</code> / world-cache wiring on NeoForge server-start / server-stopping / world-load / world-unload / player-join / player-disconnect events (mod-bus + game-bus), mirroring Fabric <code>FabricEventBridge</code>; <code>MemoryTracker</code> register/release on all exit paths. The <code>NeoForgeServerAccessor</code> (<code>RTPServerAccessor</code> impl) + <code>RTPAPI.serverAccessor</code> / <code>RTP.scheduler</code> binding (the Phase N1 open carry-over) landed here.</li>
+<li>[x] <strong>Step NE-perf - Anvil pre-filter parity (ADR-016, <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md">rtp-fabric-ADR-005</a>)</strong> <em>(completed 2026-06-13)</em> - same <code>.mca</code> substrate, near-verbatim port; <code>probeChunkColumn</code> override dispatching onto <code>AnvilIoPool</code>, dual-mode live/anvil chunk view.</li>
+<li>[x] <strong>Step NF — Permissions</strong> <em>(landed 2026-06-02)</em> — <code>NeoForgeRTPPlayer.hasPermission</code> resolves through a three-tier chain ported from Fabric (rtp-fabric-ADR-011): LuckPerms (reflective, no compile-time dep on <code>net.luckperms:api</code>) → <code>NeoForgeDefaultPermissions</code> (<code>plugin.yml</code> default table) → on-disk <code>ops.json</code> op-level scan. New <code>NeoForgeDefaultPermissions</code>, <code>NeoForgeOnEventPermissions</code>, <code>NeoForgeEffectivePermissionsResolver</code> (feeds the menu surface + console op-equivalent variant), and <code>LuckPermsNeoForgeEnumerator</code> (node enumeration + cached-data wildcard-aware tri-state check) under <code>.../neoforge/player/</code>; <code>getEffectivePermissions</code> wired on the player and the console sender. LuckPerms soft-depend cataloged in <a href="../EXTERNAL_HOOKS/"><code>EXTERNAL_HOOKS.md</code></a> (ADR-026). Verified: <code>.\gradlew -PincludeNeoforge :rtp-neoforge:rtp-neoforge-v1_21_R1:build</code> SUCCESSFUL. A dedicated permission-node parity unit test (mirroring <code>FabricDefaultPermissionsParityTest</code>) remains a Phase N3 follow-up (Step NH/N3 traceability).</li>
+<li>[x] <strong>Step NG — Command registration</strong> <em>(landed 2026-06-02)</em> — registers the <code>commands-api</code> tree via the reusable <code>BrigadierCommandAdapter.toBrigadier</code> (<a href="../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md">commands-api-ADR-001</a>) from the <code>RegisterCommandsEvent</code> game-bus handler in <code>RTPNeoForgeMod</code>. <code>NeoForgeCommandRegistrar</code> builds <code>RTPCmdNeoForgeRoot</code> (port of <code>RTPCmdFabricRoot</code>: <code>region</code>+nested/<code>biome</code>/<code>player</code>/<code>world</code>/<code>toggletargetperms</code> params + <code>reload</code>/<code>config</code>/<code>scan</code>/<code>info</code>/<code>clearcache</code> subcommands) and a <code>BrigadierBridgeContext&lt;CommandSourceStack&gt;</code> backed by the typed <code>NeoForgeBrigadierSourceBridge</code>. Unlike Fabric, no reflective <code>Proxy</code>/intermediary dance is needed (Mojmap-at-runtime): the source bridge references <code>CommandSourceStack</code>/<code>ServerPlayer</code> directly. <code>/rtp menu</code> wiring deferred to Step NI. Verified: <code>.\gradlew -PincludeNeoforge :rtp-neoforge:rtp-neoforge-v1_21_R1:build</code> SUCCESSFUL. Live tab-completion smoke pending a running NeoForge dev server (Step NH).</li>
+<li>[x] <strong>Step NH - Stabilization &amp; runtime smoke</strong> <em>(completed 2026-06-13)</em> - memory-leak audit (chunk tickets + <code>TeleportPipelineTask</code>), concurrency review (no Folia-isms), <code>/rtp</code> end-to-end on a NeoForge dev server, and S-00x regression guards all green.</li>
+<li>[x] <strong>Step NI — Menu framework parity</strong> <em>(landed 2026-06-02)</em> — <code>RTPCmdNeoForgeRoot</code> wires the platform-neutral <code>MenuWiringSupport.attachTo</code> with a <code>NeoForgeBookMenuRenderer</code> (translates <code>MenuModel</code> → a fully-formatted <code>NeoForgeBookSpec</code> and dispatches an interactive written-book modal through a new <code>NeoForgeVersionAdapter.openBookMenu</code> SPI; the <code>v1_21_R1</code> carrier implements it with a typed <code>WrittenBookContent</code> + transient-slot <code>ClientboundContainerSetSlotPacket</code> → <code>ClientboundOpenBookPacket</code> → slot-revert, falling back to <code>ChatMenuRenderer</code> otherwise — parchment contrast rule honoured) and a <code>NeoForgeChatPromptCallback</code> (TTL-bounded anvil-input substitute backed by the typed, cancelable NeoForge <code>ServerChatEvent</code> on <code>NeoForge.EVENT_BUS</code> — no reflective proxy, unlike Fabric). New player capability marker <code>NeoForgeBookOpener</code> keeps the raw <code>ServerPlayer</code> private to <code>NeoForgeRTPPlayer</code>. Verified: <code>.\gradlew -PincludeNeoforge :rtp-neoforge:rtp-neoforge-v1_21_R1:build</code> SUCCESSFUL.</li>
+<li>[x] <strong>Step NJ - Network mode backend parity</strong> <em>(completed 2026-06-13)</em> - the backend sampler portion landed 2026-06-02: a NM-free <code>NeoForgeBackendStateSampler</code> (port of <code>FabricBackendStateSampler</code>; reads TPS/MSPT/player-count from <code>RTP.metrics</code> and loaded worlds via <code>RTPServerAccessor.getRTPWorlds()</code>) is installed onto <code>RTP.backendStateSamplerFactory</code> in <code>RTPNeoForgeMod.bootCore</code>. The live boot - <code>NetworkModeBootstrap.boot(networkYml)</code>, the <code>NeoForgePlayerLifecycleHook</code> join-redeem / waitlist-quit wiring, and reservation-token redemption on arrival (<a href="../../adr/ADR-049-network-mode-platform-neutral-lift/">ADR-049</a> Step J) - landed, so a proxied player arriving on a NeoForge backend can redeem a reservation token.</li>
+<li>[x] <strong>Step NK — Maps API parity</strong> <em>(landed 2026-06-02)</em> — NM-free <code>NeoForgeMapBinding</code> + <code>NeoForgeMapCanvas</code> against the <code>maps-api</code> SPI (128×128 ARGB buffer → carrier <code>renderMapChart</code> seam), installed in <code>RTPNeoForgeMod</code> only when the active carrier opts in via <code>supportsMapCharts()</code>, with <code>NoopMapBinding</code> fallthrough otherwise (the <code>v1_21_R1</code> carrier leaves the seam at its default this pass, so MapDispatch stays on the Noop sentinel until a carrier implements the vanilla filled-map write). Per-viewer state released on disconnect (REQ-RTP-MAP-003) via the <code>MapBindingLifecycle</code> hook + <code>MapDispatch.firePlayerQuit</code>. A <code>NeoForgeMetricsBinding</code> (single-region EMA TPS/MSPT sampler, metrics-api) also landed: installed via <code>RTP.metrics.setBinding</code> and ticked from <code>onServerTick</code>. Verified: <code>.\gradlew -PincludeNeoforge :rtp-neoforge:rtp-neoforge-v1_21_R1:build</code> SUCCESSFUL.</li>
+</ul>
+<h3 id="phase-n3-documentation-traceability-release">Phase N3 — Documentation, traceability &amp; release<a class="headerlink" href="#phase-n3-documentation-traceability-release" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] <strong>TRACEABILITY.md</strong> <em>(completed 2026-06-13)</em> - NeoForge REQ-traceable rows added; the S-005 and S-006 guards (<code>ReqRtpNeoforgeS005ChunkLoadingTest</code>, <code>ReqRtpNeoforgeS006EarlyApiTest</code>) authored.</li>
+<li>[x] <strong>Admin &amp; developer docs</strong> <em>(completed 2026-06-13)</em> - Fabric-style install/config docs for NeoForge added under <code>docs/admin/</code>; <code>docs/dev/</code> architecture notes and <code>COVERAGE_PLAN.md</code> (NeoForge column) updated.</li>
+<li>[x] <strong>CHANGELOG.md</strong> <em>(completed 2026-06-13)</em> - entries added under the unreleased heading (marked <code>**(Pro)**</code> where edition-specific).</li>
+<li>[x] <strong>Front-page / README</strong> <em>(completed 2026-06-13)</em> - the NeoForge rows now read "supported" (native NeoForge on Minecraft 1.21.x / 26.1.x).</li>
+<li>[x] <strong>Beta release</strong> <em>(completed 2026-06-13)</em> - first public NeoForge beta shipped (Phase N2 Step NH gate green and Phase N3 docs merged). NeoForge is a complete, first-class platform.</li>
+</ul>
+<h3 id="mod-side-claim-integrations-out-of-scope-reminders">Mod-side claim integrations &amp; out-of-scope reminders<a class="headerlink" href="#mod-side-claim-integrations-out-of-scope-reminders" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Mod-side land protection (FTB Chunks, OpenPartiesAndClaims, Argonauts, ...) handled identically to Bukkit claim plugins: reflection-gated soft hooks per <a href="../../adr/ADR-026-external-hook-api-surface/">ADR-026</a>, cataloged in <a href="../EXTERNAL_HOOKS/"><code>EXTERNAL_HOOKS.md</code></a>. No claim-mod code in the pipeline (S-003).</li>
+<li>[ ] <strong>Lazy claim-space poisoning (cross-platform, <code>rtp-core</code> pipeline).</strong> When the S-003 verifier rejects a coordinate due to a claim hit, expand the rejection into the dirty cache for the entire claim footprint rather than only the single coordinate. Algorithm: (1) binary-search radial expansion from the hit point using only stateless boolean claim checks - no claim object retained between iterations - until a claim-free boundary is found or the shape edge is reached; (2) walk the resulting bounding square at chunk-grid resolution, filtering each grid point through <code>shape.isInBounds()</code> before issuing a claim check, and mark every in-bounds claimed point dirty in <code>MemoryShape</code>; (3) release all references. This is plugin-agnostic (requires only the existing boolean verifier call), self-healing (dirty points are reclaimed by the normal scan cycle if the claim is removed), and correct under concurrent claim mutation (the final safety check at teleport time remains the authoritative gate per S-003). Net effect: after the first hit on a claim, subsequent spiral draws skip its footprint with zero claim-plugin calls.</li>
+<li>Out of scope (unchanged): legacy Forge (&lt;=1.20.1) bring-up, Sponge, hybrid servers (covered transitively via <code>rtp-paper</code>), and AccessTransformers / Mixins (a red flag if needed - re-examine the public API first). See <code>NEOFORGE_NOTES.md</code> §11.</li>
+<li>[ ] <strong>Architectury?</strong> — re-evaluate a common mod-loader abstraction layer (Architectury) only if maintaining parallel Fabric + NeoForge carrier trees proves costly; <code>NEOFORGE_NOTES.md</code> §11 currently flags a shared tree as a likely trap.</li>
+</ul>
+<h2 id="what-does-not-need-to-change-in-rtp-api-or-rtp-core">What Does NOT Need to Change in <code>rtp-api</code> or <code>rtp-core</code><a class="headerlink" href="#what-does-not-need-to-change-in-rtp-api-or-rtp-core" title="Permanent link">&para;</a></h2>
+<p>The April 2026 gap analysis (referenced in <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a>) confirmed the existing abstractions are sufficient for full Fabric support:</p>
+<ul>
+<li><code>RTPServerAccessor</code>, <code>RTPWorld</code>, <code>RTPPlayer</code>, <code>RTPScheduler</code> interfaces require no new methods.</li>
+<li><code>DatabaseHandler</code> in <code>rtp-core</code> is already platform-agnostic.</li>
+<li><code>LocationGenerator</code>, <code>TeleportPipelineTask</code>, and <code>MemoryTracker</code> are untouched — Fabric wires into them via <code>RTP.getInstance()</code>.</li>
+</ul>
+<p>The only potential future <code>rtp-api</code> addition is an <code>RTPPermissionProvider</code> interface to formalize the soft-depend pattern, but this is <strong>deferred</strong> until the Step F permissions work is complete and the pattern is proven in production.</p>
+<h2 id="risks-mitigations">Risks &amp; Mitigations<a class="headerlink" href="#risks-mitigations" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Loom plugin pollutes other modules' classpaths</td>
+<td>Apply Loom only under <code>platforms/rtp-fabric/**</code>; gate Maven repos by <code>project.path.startsWith(':rtp-fabric')</code>.</td>
+</tr>
+<tr>
+<td>Hidden S-005 violation re-introduced via an unrecognized Mojang <code>getChunk</code> call</td>
+<td>Step A regression test plus a stretch-goal arch guard banning direct <code>ServerLevel#getChunk</code> from <code>platforms/rtp-fabric/**</code>.</td>
+</tr>
+<tr>
+<td>Fabric tick threading vs. Folia region threading subtle drift</td>
+<td><code>FabricScheduler</code> documented behaviour matches the <code>RTPScheduler</code> contract; no Folia-isms leak into core.</td>
+</tr>
+<tr>
+<td>Brigadier tree drift from the <code>commands-api</code> tree</td>
+<td>Single adapter in <code>commands-api</code> (commands-api-ADR-001); no per-platform branching.</td>
+</tr>
+<tr>
+<td><code>MemoryTracker</code> leaks on disconnect mid-pipeline</td>
+<td><code>ServerPlayConnectionEvents.DISCONNECT</code> releases all tickets owned by the player, mirroring Bukkit <code>PlayerQuitEvent</code> cleanup. Step H audit.</td>
+</tr>
+<tr>
+<td>Scope creep into Forge</td>
+<td>Explicitly out of scope until Phase 4.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="ownership">Ownership<a class="headerlink" href="#ownership" title="Permanent link">&para;</a></h2>
+<p>Per ADR-022, a named maintainer owns Fabric end-to-end (build, mappings, CI toolchain, S-00x proofs, ongoing maintenance). <strong>Owner: @leaf_26</strong> (project lead; recorded 2026-04-30). Phase 3 (public beta release) gate is satisfied; Phase 1 and Phase 2 work proceeds against this ownership.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

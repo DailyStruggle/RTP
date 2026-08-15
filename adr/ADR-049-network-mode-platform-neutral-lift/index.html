@@ -1,0 +1,1964 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-049 - Network-mode plumbing in rtp-core, platform-specific via PlayerLifecycleHook SPI - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-049-network-mode-plumbing-in-rtp-core-platform-specific-via-playerlifecyclehook-spi" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-049 - Network-mode plumbing in rtp-core, platform-specific via PlayerLifecycleHook SPI
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-new-spi-playerlifecyclehook" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. New SPI: PlayerLifecycleHook
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-lifted-classes-in-rtp-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Lifted classes in rtp-core
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-lifted-listener-classes-signature-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Lifted listener classes (signature change)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-bukkitnetworkcommandhook-and-bukkitbackendstatesampler" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. BukkitNetworkCommandHook and BukkitBackendStateSampler
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-platform-shims" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Platform shims
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-wiring" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Wiring
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-live-singleton" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. LIVE singleton
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-test-moves" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Test moves
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Consequences">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      Positive
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#negative-trade-offs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Negative / Trade-offs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Limitations
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-plan-post-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      Implementation plan (post-acceptance)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-049-network-mode-plumbing-in-rtp-core-platform-specific-via-playerlifecyclehook-spi">ADR-049 - Network-mode plumbing in <code>rtp-core</code>, platform-specific via <code>PlayerLifecycleHook</code> SPI<a class="headerlink" href="#adr-049-network-mode-plumbing-in-rtp-core-platform-specific-via-playerlifecyclehook-spi" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted
+<strong>Date:</strong> 2026-05-23
+<strong>Supersedes:</strong> <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md">rtp-fabric-ADR-013</a> (was Proposed 2026-05-22; the rejected-alternatives analysis in that ADR is based on an incorrect coupling estimate, see Context below)
+<strong>Related:</strong> <a href="../ADR-036-network-mode-multi-server-multi-proxy/">ADR-036</a> (umbrella network-mode ADR), <a href="../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md">rtp-proxy-ADR-014</a>, <a href="../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md">rtp-proxy-ADR-015</a>, <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a> (Fabric in scope), <a href="../../dev/MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a>, <a href="../../dev/MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> Step J.</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>Network-mode multi-server support landed end-to-end on Paper in this cycle (user-confirmed working 2026-05-22). The Phase 1 SPI in <code>rtp-proxy-common</code> is platform-agnostic and already reachable from any backend JVM, but the Phase 2 backend integration currently lives under <code>rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/network/</code> (<code>NetworkModeBootstrap</code> and twelve neighbouring classes). A Velocity-routed player arriving on a Fabric backend with a reservation token has no listener to redeem it: the lookup happens but the redeem-side handler is Bukkit-only. The cross-server flow therefore silently degrades on Fabric, violating the Phase 2 acceptance criterion in <code>MULTI_SERVER_PLAN.md</code> that says "a backend that advertises <code>RtpTriggerSource</code> MUST redeem reservation tokens on join".</p>
+<p><a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md">rtp-fabric-ADR-013</a> proposed solving this by reimplementing <code>NetworkModeBootstrap</code> as a parallel <code>FabricNetworkModeBootstrap</code>. Its central rejection of the refactor path leaned on the claim that the Bukkit class has "eight independent coupling points to <code>org.bukkit.*</code> (<code>Plugin</code>, <code>BukkitScheduler</code>, <code>PluginManager</code>, <code>Listener</code>, <code>PlayerJoinEvent</code>, <code>EventHandler</code>, <code>EventPriority</code>, <code>Bukkit.getOnlinePlayers()</code>)" and that a base-class refactor would produce "a near-equal amount of Fabric-side code anyway".</p>
+<p>This claim was re-audited on 2026-05-23 and is incorrect. A precise count of <code>org.bukkit.*</code> imports in every file under <code>rtp-plugin/.../bukkit/network/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th><code>org.bukkit.*</code> imports</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NetworkModeBootstrap</code> (1108 lines)</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>NetworkRouter</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>NetworkStatusCache</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>NetworkEnrolmentBuffer</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>PeerRegionRegistry</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>LobbyDispatchRetryQueue</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>NetworkRegionCollisionWarner</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>RoutingDecision</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>BukkitNetworkCommandHook</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>JoinTriggerSource</code></td>
+<td>7 (<code>Bukkit</code>, <code>Player</code>, <code>EventHandler</code>, <code>EventPriority</code>, <code>Listener</code>, <code>PlayerJoinEvent</code>, <code>PlayerQuitEvent</code>)</td>
+</tr>
+<tr>
+<td><code>NetworkWaitlistQuitListener</code></td>
+<td>4 (<code>EventHandler</code>, <code>EventPriority</code>, <code>Listener</code>, <code>PlayerQuitEvent</code>)</td>
+</tr>
+<tr>
+<td><code>NetworkWaitlistNotifier</code></td>
+<td>2 (<code>Bukkit</code>, <code>Player</code>)</td>
+</tr>
+<tr>
+<td><code>NetworkWaitlistGuard</code></td>
+<td>2 (<code>CommandSender</code>, <code>Player</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Of thirteen classes, nine have zero Bukkit imports. The four that do touch the Bukkit API touch it for one of two reasons:</p>
+<ol>
+<li>Subscribing to player join / quit events (<code>Listener</code>, <code>@EventHandler</code>, <code>PlayerJoinEvent</code>, <code>PlayerQuitEvent</code>).</li>
+<li>Looking up a player or sender by UUID (<code>Bukkit.getPlayer(uuid)</code>, <code>org.bukkit.entity.Player</code>, <code>org.bukkit.command.CommandSender</code>).</li>
+</ol>
+<p><code>RTPServerAccessor</code> already covers (2) end-to-end: <code>getPlayer(UUID)</code>, <code>getSender(UUID)</code>, <code>sendMessage</code>, <code>getScheduler</code>. The only primitive missing from the SPI is a player-join / player-quit lifecycle hook for (1).</p>
+<p>The Bukkit class's "platform coupling surface" is therefore one missing SPI method, not eight, and the surface is shared with every other backend platform that already routes player operations through <code>RTPServerAccessor</code>. The cost calculus that drove ADR-013 toward reimplementation no longer holds.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Lift the network-mode plumbing into <code>rtp-core</code> and add a single new platform SPI primitive (<code>PlayerLifecycleHook</code>) accessed via <code>RTPServerAccessor</code>. Each backend platform supplies a shim that registers a join/quit subscription and routes the resulting UUIDs to the platform-neutral handler. There is no second backend bootstrap class.</p>
+<h3 id="1-new-spi-playerlifecyclehook">1. New SPI: <code>PlayerLifecycleHook</code><a class="headerlink" href="#1-new-spi-playerlifecyclehook" title="Permanent link">&para;</a></h3>
+<p>A new interface in <code>rtp-api</code>:</p>
+<div class="highlight"><pre><span></span><code>package io.github.dailystruggle.rtp.api.server;
+
+public interface PlayerLifecycleHook {
+    AutoCloseable onPlayerJoin(java.util.function.Consumer&lt;java.util.UUID&gt; handler);
+    AutoCloseable onPlayerQuit(java.util.function.Consumer&lt;java.util.UUID&gt; handler);
+}
+</code></pre></div>
+<p><code>RTPServerAccessor</code> gains:</p>
+<div class="highlight"><pre><span></span><code>default PlayerLifecycleHook getPlayerLifecycleHook() {
+    return NoopPlayerLifecycleHook.INSTANCE;
+}
+</code></pre></div>
+<p>The default returns a no-op that ignores subscriptions. Existing <code>RTPServerAccessor</code> implementations (<code>AbstractServerAccessor</code> for Bukkit/Paper/Folia, <code>FabricServerAccessor</code>, <code>MockRTPServerAccessor</code>) do not need to be touched to compile; each backend platform overrides only when it wants real lifecycle hooks (Bukkit and Fabric will; the mock does not).</p>
+<h3 id="2-lifted-classes-in-rtp-core">2. Lifted classes in <code>rtp-core</code><a class="headerlink" href="#2-lifted-classes-in-rtp-core" title="Permanent link">&para;</a></h3>
+<p>Moved verbatim (zero behavioural change) from <code>rtp-plugin/.../bukkit/network/</code> to <code>rtp-core/.../common/network/</code>:</p>
+<ul>
+<li><code>NetworkModeBootstrap</code></li>
+<li><code>NetworkRouter</code></li>
+<li><code>NetworkStatusCache</code></li>
+<li><code>NetworkEnrolmentBuffer</code></li>
+<li><code>PeerRegionRegistry</code></li>
+<li><code>LobbyDispatchRetryQueue</code></li>
+<li><code>NetworkRegionCollisionWarner</code></li>
+<li><code>RoutingDecision</code></li>
+</ul>
+<p>These nine classes (counting <code>NetworkModeBootstrap</code>) have no Bukkit imports today and require only a package rename plus updates to their import sites elsewhere in the codebase.</p>
+<h3 id="3-lifted-listener-classes-signature-change">3. Lifted listener classes (signature change)<a class="headerlink" href="#3-lifted-listener-classes-signature-change" title="Permanent link">&para;</a></h3>
+<p>Moved to <code>rtp-core/.../common/network/</code> with their event-registration surface replaced by <code>PlayerLifecycleHook</code> calls:</p>
+<ul>
+<li><code>JoinTriggerSource</code>. Removes <code>implements Listener</code> and the two <code>@EventHandler</code> methods. Gains <code>register(PlayerLifecycleHook hook)</code> that calls <code>hook.onPlayerJoin(uuid -&gt; handleJoin(uuid))</code> and <code>hook.onPlayerQuit(uuid -&gt; handleQuit(uuid))</code>. The body of <code>handleJoin</code> / <code>handleQuit</code> is the existing event-handler body with <code>event.getPlayer().getUniqueId()</code> replaced by the inbound <code>uuid</code> and <code>Bukkit.getPlayer(uuid)</code> replaced by <code>RTP.serverAccessor.getPlayer(uuid)</code>.</li>
+<li><code>NetworkWaitlistQuitListener</code>. Same treatment: lose <code>Listener</code> + <code>@EventHandler</code>, gain a <code>register(PlayerLifecycleHook)</code> that subscribes to <code>onPlayerQuit</code>.</li>
+<li><code>NetworkWaitlistNotifier</code>. Replace <code>Bukkit.getPlayer(uuid)</code> with <code>RTP.serverAccessor.getPlayer(uuid)</code>; replace <code>Player.isOnline()</code> with a <code>null</code>-or-<code>isOnline</code> check via <code>RTPPlayer</code>.</li>
+<li><code>NetworkWaitlistGuard</code>. Change <code>Predicate&lt;CommandSender&gt;</code> to <code>Predicate&lt;RTPCommandSender&gt;</code>. The single caller is <code>RTPCmdBukkit</code>; that caller wraps its incoming <code>CommandSender</code> with the existing <code>RTPCommandSender</code> adapter before invoking the predicate.</li>
+</ul>
+<h3 id="4-bukkitnetworkcommandhook-and-bukkitbackendstatesampler">4. <code>BukkitNetworkCommandHook</code> and <code>BukkitBackendStateSampler</code><a class="headerlink" href="#4-bukkitnetworkcommandhook-and-bukkitbackendstatesampler" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p><strong>Addendum (2026-05-23, post-acceptance audit):</strong> the original Decision text under-counted the platform coupling at this step. While neither class imports <code>org.bukkit.*</code>, both are <strong>directly instantiated by name</strong> inside <code>NetworkModeBootstrap</code> (<code>new BukkitBackendStateSampler(lobbyMode)</code> at line ~234; <code>new BukkitNetworkCommandHook(...)</code> at line ~551, exposed via <code>commandHook()</code>). A literal lift to <code>rtp-core</code> is therefore impossible without further SPI extraction. This addendum supersedes the original step 4 as the authoritative guidance.</p>
+<p><strong>Resolution.</strong> Introduce two additional platform-injected types so the bootstrap depends only on <code>rtp-core</code> interfaces:</p>
+<ul>
+<li><code>BackendStateSampler</code> interface in <code>rtp-core</code> (or <code>rtp-api</code>). Methods cover the small surface today's <code>BukkitBackendStateSampler</code> exposes (current player count, TPS, MSPT sample, world list, lobby-mode flag). Concrete implementations: <code>BukkitBackendStateSampler</code> (existing, moves only if its package changes) and a new <code>FabricBackendStateSampler</code> that pulls equivalent metrics via <code>RTPServerAccessor</code> / <code>FabricVersionAdapter</code>.</li>
+<li><code>NetworkCommandHook</code> interface in <code>rtp-core</code>. Existing <code>BukkitNetworkCommandHook</code> becomes one implementation; new <code>FabricNetworkCommandHook</code> mounts the network sub-commands into the Fabric Brigadier tree (via the existing <code>BrigadierCommandAdapter</code> per <a href="../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md">commands-api-ADR-001</a>).</li>
+</ul>
+<p>Accessed through new <code>RTPServerAccessor</code> factory / getter methods:</p>
+<div class="highlight"><pre><span></span><code><span class="k">default</span><span class="w"> </span><span class="n">BackendStateSampler</span><span class="w"> </span><span class="nf">createBackendStateSampler</span><span class="p">(</span><span class="kt">boolean</span><span class="w"> </span><span class="n">lobbyMode</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">throw</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">IllegalStateException</span><span class="p">(</span>
+<span class="w">        </span><span class="s">&quot;Platform does not provide a BackendStateSampler; network mode requires one.&quot;</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">default</span><span class="w"> </span><span class="n">NetworkCommandHook</span><span class="w"> </span><span class="nf">getNetworkCommandHook</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">NoopNetworkCommandHook</span><span class="p">.</span><span class="na">INSTANCE</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>NetworkModeBootstrap</code> replaces its two direct <code>new</code> calls with <code>RTP.serverAccessor.createBackendStateSampler(lobbyMode)</code> and <code>RTP.serverAccessor.getNetworkCommandHook()</code>. The <code>commandHook()</code> getter on the bootstrap stays but now returns the SPI type.</p>
+<p><strong>Scope impact.</strong> This raises the lift estimate from "mechanical move + 1 new SPI" to "mechanical move + 3 new SPIs + 1 new Fabric metric sampler + 1 new Fabric command hook". The Fabric command hook in particular is non-trivial work that may overlap with other Fabric command-tree gaps; estimate it separately before scheduling. The session that authored this addendum did not start the lift — see <em>Implementation plan</em> below for the updated checklist.</p>
+</blockquote>
+<h3 id="5-platform-shims">5. Platform shims<a class="headerlink" href="#5-platform-shims" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>BukkitPlayerLifecycleHook</code> in <code>rtp-bukkit-common</code>. Implements <code>PlayerLifecycleHook</code>. Constructs a <code>Listener</code> with <code>@EventHandler</code> methods on <code>PlayerJoinEvent</code> and <code>PlayerQuitEvent</code>, registers it via <code>Bukkit.getPluginManager().registerEvents(...)</code> on first subscription, and routes events to the registered <code>Consumer&lt;UUID&gt;</code> handlers. Each <code>AutoCloseable</code> returned unsubscribes the handler; closing the last handler unregisters the listener. <code>AbstractServerAccessor.getPlayerLifecycleHook()</code> returns a lazily-created singleton.</li>
+<li><code>FabricPlayerLifecycleHook</code> in <code>rtp-fabric-common</code>. Implements <code>PlayerLifecycleHook</code> by hooking <code>ServerPlayConnectionEvents.JOIN</code> and <code>ServerPlayConnectionEvents.DISCONNECT</code>. On the obf carrier the same events are reached through the intermediary surface per <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md">rtp-fabric-ADR-009</a>; on the unobf carrier through the deobf API directly. The dispatch can go through <code>FabricVersionAdapter</code> so the shim class itself does not need an obf / unobf split. <code>FabricServerAccessor.getPlayerLifecycleHook()</code> returns the singleton.</li>
+</ul>
+<h3 id="6-wiring">6. Wiring<a class="headerlink" href="#6-wiring" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>RTPBukkitPlugin.onEnable</code>: import <code>NetworkModeBootstrap</code> from its new package and call <code>boot(networkYml)</code>. The bootstrap pulls its lifecycle hook from <code>RTP.serverAccessor.getPlayerLifecycleHook()</code> internally. No <code>Plugin</code> reference passes through the bootstrap entry point.</li>
+<li><code>RTPCmdBukkit</code>: update the waitlist guard call site to wrap <code>CommandSender</code> in <code>RTPCommandSender</code> once at the predicate boundary.</li>
+<li>Fabric mod entrypoint (<code>RTPFabricMod.onInitialize</code> or equivalent): construct <code>NetworkModeBootstrap</code>, call <code>boot(networkYml)</code> after the version adapter installs and before the command tree wires. <code>ServerLifecycleEvents.SERVER_STOPPING</code> calls <code>bootstrap.shutdown()</code>. The path mirrors the Bukkit entrypoint line-for-line.</li>
+</ul>
+<h3 id="7-live-singleton">7. <code>LIVE</code> singleton<a class="headerlink" href="#7-live-singleton" title="Permanent link">&para;</a></h3>
+<p>The <code>LIVE</code> static on <code>NetworkModeBootstrap</code> stays exactly as it is. It is a per-process singleton today; lifted to <code>rtp-core</code> it remains a per-process singleton, and works the same on either platform. Command-side code (<code>RTPCmdBukkit</code>, future <code>RTPCmdFabricRoot</code>) reads <code>NetworkModeBootstrap.LIVE</code> identically.</p>
+<h3 id="8-test-moves">8. Test moves<a class="headerlink" href="#8-test-moves" title="Permanent link">&para;</a></h3>
+<p>These tests move with the code:</p>
+<ul>
+<li><code>LobbyModeEarlyReadTest</code></li>
+<li><code>ReqRtpNet015NetworkWaitlistTest</code></li>
+<li><code>NetworkRouterTest</code></li>
+<li><code>NetworkStatusCacheTest</code></li>
+</ul>
+<p>They lose their Bukkit imports (where any exist) and exercise the lifted classes against <code>MockRTPServerAccessor</code> plus a synthetic <code>PlayerLifecycleHook</code> test fixture. All existing assertions remain.</p>
+<h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why Rejected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reimplement <code>NetworkModeBootstrap</code> as a parallel <code>FabricNetworkModeBootstrap</code> (rtp-fabric-ADR-013)</td>
+<td>Predicated on an "8 Bukkit coupling points in the bootstrap" estimate that does not hold: the bootstrap has zero Bukkit imports, and the actual surface is one missing SPI primitive (player join / quit). The reimplement path would duplicate ~1108 lines of platform-neutral bootstrap plus ~300 lines of helpers, on a code path that will keep evolving through <code>MULTI_SERVER_PLAN.md</code> Phase 3 (Postgres <code>LISTEN/NOTIFY</code>, BungeeCord transport, multi-transport composition). Each future phase would land twice.</td>
+</tr>
+<tr>
+<td>Refactor <code>NetworkModeBootstrap</code> into a platform-neutral abstract base class with a Bukkit subclass and a Fabric subclass</td>
+<td>Abstract-base inheritance is heavier than this case warrants. The only platform-varying primitive is "subscribe to player join / quit"; a one-method interface plus composition is simpler than an abstract base with subclass-only overrides, and lets <code>MockRTPServerAccessor</code> plug a synthetic hook in for tests without subclassing.</td>
+</tr>
+<tr>
+<td>Defer Fabric network mode until Phase 3</td>
+<td>Step J of <code>MULTI_PLATFORM_PLAN.md</code> is the missing acceptance criterion that downgrades Fabric from "first-class platform" to "single-server only" backend. Deferring violates <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a>.</td>
+</tr>
+<tr>
+<td>Share <code>JoinTriggerSource</code> between platforms via a <code>Listener</code> shim on Fabric</td>
+<td>Forces a non-trivial event-system shim on Fabric (Fabric has no <code>Listener</code> concept). The <code>PlayerLifecycleHook</code> SPI is the cleaner inversion: platform owns event wiring, core owns the handler body.</td>
+</tr>
+<tr>
+<td>Place the lifted classes in <code>rtp-network-common</code> (new module)</td>
+<td>A new Gradle module costs setup overhead and adds a build edge for no benefit; <code>rtp-core</code> already depends on <code>rtp-proxy-common</code> (this is established by the existing Bukkit class's imports from <code>io.github.dailystruggle.rtp.proxy.common.*</code>). The classes belong in <code>rtp-core/.../common/network/</code> next to the existing <code>network/</code> subpackage.</td>
+</tr>
+<tr>
+<td>Defer the <code>NetworkWaitlistGuard</code> signature change</td>
+<td><code>Predicate&lt;CommandSender&gt;</code> is unsafe to keep once the class is in <code>rtp-core</code> (which forbids <code>org.bukkit.*</code> imports). The single caller in <code>RTPCmdBukkit</code> is a 1-line adapter wrap.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<h3 id="positive">Positive<a class="headerlink" href="#positive" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Closes Step J in <code>MULTI_PLATFORM_PLAN.md</code>. Cross-server RTP arrival on a Fabric backend redeems reservation tokens, matching the documented Phase 2 contract, with zero duplicate code.</li>
+<li>Future <code>MULTI_SERVER_PLAN.md</code> phases (BungeeCord adapter, Postgres <code>LISTEN/NOTIFY</code>, multi-transport composition) land once in <code>rtp-core</code> and ship on every platform simultaneously.</li>
+<li><code>PlayerLifecycleHook</code> is reusable for any future cross-cutting concern that needs "do X when a player joins / leaves" without leaking platform-specific event types into core (e.g. <code>MULTI_SERVER_PLAN.md</code> lobby-side UX work, <code>metrics-api</code> per-player heartbeats).</li>
+<li>The Bukkit class moves verbatim apart from one line (<code>registerEvents</code> to <code>lifecycleHook.onPlayerJoin</code>), preserving the user-confirmed-working Paper code path. All existing Paper / Folia tests move with the code and stay green.</li>
+<li><code>MockRTPServerAccessor</code> can supply a synthetic <code>PlayerLifecycleHook</code> that drives test-controlled join / quit events, replacing the per-platform listener test harnesses that exist today.</li>
+</ul>
+<h3 id="negative-trade-offs">Negative / Trade-offs<a class="headerlink" href="#negative-trade-offs" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>NetworkWaitlistGuard</code>'s public predicate signature changes from <code>Predicate&lt;CommandSender&gt;</code> to <code>Predicate&lt;RTPCommandSender&gt;</code>. Internal-only API, one caller (<code>RTPCmdBukkit</code>), one-line wrap adapter at the call site. Acceptable.</li>
+<li><code>RTPServerAccessor</code> gains a new default method. Existing implementations compile without changes; platforms that want real lifecycle hooks override (Bukkit, Fabric). Mock / Folia / tests inherit the no-op.</li>
+<li><code>LIVE</code> singleton is now reachable from a wider set of call sites (any backend platform's command tree). This is intentional but means the existing volatile-publish contract is the only memory-visibility guarantee for cross-thread reads; no change from today's Bukkit behaviour.</li>
+<li>Test fixtures that previously plugged into a Bukkit <code>Listener</code> registry now plug into <code>PlayerLifecycleHook</code>. New tests are needed for the platform shims (<code>BukkitPlayerLifecycleHookTest</code>, <code>FabricPlayerLifecycleHookTest</code>); these are straightforward harnesses and small.</li>
+</ul>
+<h3 id="limitations">Limitations<a class="headerlink" href="#limitations" title="Permanent link">&para;</a></h3>
+<ol>
+<li>No proxy adapter for Fabric. This ADR concerns the backend side only. Proxies remain Velocity (working) and BungeeCord (Phase 3). A Fabric process can be a backend; it cannot be a proxy.</li>
+<li>No Phase 3 hooks. Postgres <code>LISTEN/NOTIFY</code>, BungeeCord transport, and the <code>JoinTriggerSource</code> rework are explicitly out of scope. The lifted code implements Phase 2 only.</li>
+<li>Single transport per process. Same constraint as today's Bukkit class. Multi-transport composition (<code>network.yml::transport.type</code> listed as a sequence) is a <code>MULTI_SERVER_PLAN.md</code> Phase 3 follow-up.</li>
+<li>No live <code>rtp test full</code> for the network suite on Fabric in this ADR. A Fabric equivalent harness is a follow-up; the lift unblocks it but does not deliver it.</li>
+</ol>
+<h2 id="implementation-plan-post-acceptance">Implementation plan (post-acceptance)<a class="headerlink" href="#implementation-plan-post-acceptance" title="Permanent link">&para;</a></h2>
+<p>The implementation is a separate change after this ADR is accepted. Updated 2026-05-23 after the step-4 addendum widened the SPI surface. Live progress tracking lives in <a href="../../dev/scratch/CHECKLIST-adr049-network-mode-lift/"><code>docs/dev/scratch/CHECKLIST-adr049-network-mode-lift.md</code></a>.</p>
+<p><strong>Done (prior sessions):</strong></p>
+<ol>
+<li>✅ <code>PlayerLifecycleHook</code> interface in <code>rtp-api</code>; <code>NoopPlayerLifecycleHook</code>; <code>DispatchingPlayerLifecycleHook</code> skeleton; <code>RTPServerAccessor.getPlayerLifecycleHook()</code> default.</li>
+<li>✅ <code>BukkitPlayerLifecycleHook</code> in <code>rtp-bukkit-common</code>; <code>AbstractServerAccessor</code> owns and registers the singleton.</li>
+<li>✅ <code>FabricPlayerLifecycleHook</code> in <code>rtp-fabric-common</code>; <code>FabricServerAccessor.getPlayerLifecycleHook()</code> override; <code>FabricEventBridge</code> fans JOIN / DISCONNECT into the hook.</li>
+</ol>
+<p><strong>Open (in order):</strong></p>
+<ol>
+<li><strong>New SPI: <code>BackendStateSampler</code>.</strong> Interface in <code>rtp-core</code> (or <code>rtp-api</code>) covering player count, TPS, MSPT, world list, lobby-mode flag. <code>RTPServerAccessor.createBackendStateSampler(boolean lobbyMode)</code> factory method (no default — throw <code>IllegalStateException</code> until a platform provides one, per S-006). <code>BukkitBackendStateSampler</code> becomes an implementation; new <code>FabricBackendStateSampler</code> reads from <code>MinecraftServer</code> via <code>FabricVersionAdapter</code> (TPS/MSPT may need a Fabric-side sampler that does not exist yet — scope this before estimating).</li>
+<li><strong>New SPI: <code>NetworkCommandHook</code>.</strong> Interface in <code>rtp-core</code> covering the surface today's <code>BukkitNetworkCommandHook</code> exposes (mount <code>/rtp server:&lt;x&gt;</code> and network sub-verbs, expose <code>commandHook()</code> getter on the bootstrap). <code>RTPServerAccessor.getNetworkCommandHook()</code> default returns a no-op. <code>BukkitNetworkCommandHook</code> becomes an implementation. New <code>FabricNetworkCommandHook</code> mounts into the Fabric Brigadier tree via <code>BrigadierCommandAdapter</code> (commands-api-ADR-001). <strong>Estimate separately</strong> — this is the heaviest unknown in the lift.</li>
+<li><strong>Lift the nine zero-Bukkit-import classes</strong> (<code>NetworkModeBootstrap</code>, <code>NetworkRouter</code>, <code>NetworkStatusCache</code>, <code>NetworkEnrolmentBuffer</code>, <code>PeerRegionRegistry</code>, <code>LobbyDispatchRetryQueue</code>, <code>NetworkRegionCollisionWarner</code>, <code>RoutingDecision</code>) from <code>rtp-plugin/.../bukkit/network/</code> to <code>rtp-core/.../common/network/</code>. Replace the two <code>new BukkitBackendStateSampler(...)</code> / <code>new BukkitNetworkCommandHook(...)</code> call sites with <code>RTP.serverAccessor.createBackendStateSampler(...)</code> / <code>getNetworkCommandHook()</code>. Update import sites across the codebase.</li>
+<li><strong>Move and rewrite the 4 listener classes</strong> (<code>JoinTriggerSource</code>, <code>NetworkWaitlistQuitListener</code>, <code>NetworkWaitlistNotifier</code>, <code>NetworkWaitlistGuard</code>) per Decision §3. Update <code>RTPCmdBukkit</code> waitlist-guard call site (<code>Predicate&lt;CommandSender&gt;</code> -&gt; <code>Predicate&lt;RTPCommandSender&gt;</code>).</li>
+<li><strong>Move the 4 tests</strong> (<code>LobbyModeEarlyReadTest</code>, <code>ReqRtpNet015NetworkWaitlistTest</code>, <code>NetworkRouterTest</code>, <code>NetworkStatusCacheTest</code>) and adjust to <code>MockRTPServerAccessor</code> + synthetic <code>PlayerLifecycleHook</code> fixture.</li>
+<li><strong>Wire Fabric mod entrypoint</strong> (<code>RTPFabricMod.onInitialize</code> or equivalent) to construct <code>NetworkModeBootstrap</code>, call <code>boot(networkYml)</code> after version-adapter install and before command-tree wiring, and call <code>shutdown()</code> on <code>ServerLifecycleEvents.SERVER_STOPPING</code>.</li>
+<li><strong>New tests</strong>: <code>BukkitPlayerLifecycleHookTest</code>, <code>FabricPlayerLifecycleHookTest</code>, Fabric bootstrap smoke test.</li>
+<li><strong>CHANGELOG</strong> entry under the current Unreleased cycle.</li>
+<li><strong>Devstack acceptance</strong> (user-driven per session direction): cross-server round-trip with Fabric backend, reservation-token redeem, Fabric-lobby dispatch.</li>
+<li><strong>Full <code>.\gradlew build</code></strong>.</li>
+</ol>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../ADR-036-network-mode-multi-server-multi-proxy/">ADR-036 - Network mode (multi-server, multi-proxy)</a></li>
+<li><a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md">rtp-fabric-ADR-013 - Network-mode backend parity on Fabric (superseded by this ADR)</a></li>
+<li><a href="../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md">rtp-proxy-ADR-014 - Backend-owned RTP with network queue</a></li>
+<li><a href="../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md">rtp-proxy-ADR-015 - Shared network waitlist and dynamic batched dispatch</a></li>
+<li><a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002 - Platform in scope</a></li>
+<li><a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md">rtp-fabric-ADR-009 - Obf / unobf common split</a></li>
+<li><a href="../../dev/MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a></li>
+<li><a href="../../dev/MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> Step J</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2577 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+        <link rel="prev" href="../ECONOMY/">
+      
+      
+        <link rel="next" href="../INTEGRATIONS/">
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>Events & effects - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#events-effects" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Events & effects
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#part-1-effect-listeners-for-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      Part 1 — Effect listeners (for operators)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part 1 — Effect listeners (for operators)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enable-disable-globally" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enable / disable globally
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-stage-permission-prefix" class="md-nav__link">
+    <span class="md-ellipsis">
+      Pipeline stage → permission prefix
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#permission-node-grammar" class="md-nav__link">
+    <span class="md-ellipsis">
+      Permission node grammar
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#built-in-effect-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      Built-in effect types
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Built-in effect types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positional-arguments-per-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      Positional arguments per type
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-to-find-valid-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      Where to find valid values
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tab-completion-via-your-permissions-plugin" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tab completion via your permissions plugin
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#worked-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Worked examples
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operator-verification-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      Operator verification commands
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-2-event-listeners-for-developers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Part 2 — Event listeners (for developers)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part 2 — Event listeners (for developers)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reference-addon-addonsleafrtpcountdownaddon" class="md-nav__link">
+    <span class="md-ellipsis">
+      Reference addon — addons/LeafRTPCountdownAddon
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reference addon — addons/LeafRTPCountdownAddon">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#listener-shape-exampleteleportlistener" class="md-nav__link">
+    <span class="md-ellipsis">
+      Listener shape (ExampleTeleportListener)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-event-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      Public event catalog
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#developer-do-dont" class="md-nav__link">
+    <span class="md-ellipsis">
+      Developer do / don't
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cross-references
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#part-1-effect-listeners-for-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      Part 1 — Effect listeners (for operators)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part 1 — Effect listeners (for operators)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enable-disable-globally" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enable / disable globally
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-stage-permission-prefix" class="md-nav__link">
+    <span class="md-ellipsis">
+      Pipeline stage → permission prefix
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#permission-node-grammar" class="md-nav__link">
+    <span class="md-ellipsis">
+      Permission node grammar
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#built-in-effect-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      Built-in effect types
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Built-in effect types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positional-arguments-per-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      Positional arguments per type
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-to-find-valid-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      Where to find valid values
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tab-completion-via-your-permissions-plugin" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tab completion via your permissions plugin
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#worked-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Worked examples
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operator-verification-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      Operator verification commands
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-2-event-listeners-for-developers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Part 2 — Event listeners (for developers)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part 2 — Event listeners (for developers)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reference-addon-addonsleafrtpcountdownaddon" class="md-nav__link">
+    <span class="md-ellipsis">
+      Reference addon — addons/LeafRTPCountdownAddon
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reference addon — addons/LeafRTPCountdownAddon">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#listener-shape-exampleteleportlistener" class="md-nav__link">
+    <span class="md-ellipsis">
+      Listener shape (ExampleTeleportListener)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-event-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      Public event catalog
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#developer-do-dont" class="md-nav__link">
+    <span class="md-ellipsis">
+      Developer do / don't
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cross-references
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="events-effects">Events &amp; Effects<a class="headerlink" href="#events-effects" title="Permanent link">&para;</a></h1>
+<p>Two related but distinct extension points in RTP:</p>
+<ul>
+<li><strong>Part 1 — Effect listeners</strong> are for <strong>server operators</strong> who want visual / audio feedback (sounds, particles, fireworks, potions, notes) when players move through the teleport pipeline — configured entirely through permissions, no code.</li>
+<li><strong>Part 2 — Event listeners</strong> are for <strong>plugin developers</strong> writing an addon that wants to react to RTP's teleport lifecycle (logging, analytics, economy hooks, custom safety checks, etc.).</li>
+</ul>
+<blockquote>
+<p>Supported server versions: <strong>Minecraft 1.20.1 and above</strong>. Anything in this document assumes that baseline — legacy-version caveats have been omitted.</p>
+<p>See also: <a href="../../COMMANDS/"><code>COMMANDS.md</code></a> for permission reference, <a href="../CONFIGURATION/"><code>CONFIGURATION.md</code></a> for <code>performance.yml</code> toggles.</p>
+</blockquote>
+<hr />
+<h2 id="part-1-effect-listeners-for-operators">Part 1 — Effect listeners (for operators)<a class="headerlink" href="#part-1-effect-listeners-for-operators" title="Permanent link">&para;</a></h2>
+<p>RTP bundles the <code>effects-api</code> module (shaded as <code>io.github.dailystruggle.rtp.effectsapi</code>). <code>BukkitEffectsHandler.setupEffects(...)</code> hooks each teleport pipeline stage and — when enabled — dispatches effects driven entirely by <strong>permission nodes</strong> granted to the player (directly, via group, or via a permissions plugin).</p>
+<p>Operators write <strong>no code</strong>. Just:</p>
+<ol>
+<li>Enable effect parsing.</li>
+<li>Grant <code>rtp.effect.&lt;stage&gt;.&lt;TYPE&gt;[.&lt;arg&gt;...]</code> nodes to the players / groups who should see them.</li>
+</ol>
+<h3 id="enable-disable-globally">Enable / disable globally<a class="headerlink" href="#enable-disable-globally" title="Permanent link">&para;</a></h3>
+<p>In <code>performance.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Scan player permissions for rtp.effect.* on every teleport pipeline stage.</span>
+<span class="c1"># MEDIUM impact. Leave false unless you actually use rtp.effect.* nodes.</span>
+<span class="nt">effectParsing</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<p>Set to <code>true</code> to activate effect dispatch. A <code>/rtp reload</code> picks the change up without a restart.</p>
+<blockquote>
+<p>Unrelated but sometimes confused: <code>onEventParsing</code> gates the <strong>auto-teleport on lifecycle events</strong> listener (<code>rtp.onevent.join</code>, <code>rtp.onevent.respawn</code>, etc.). That is not an effect.</p>
+</blockquote>
+<h3 id="pipeline-stage-permission-prefix">Pipeline stage → permission prefix<a class="headerlink" href="#pipeline-stage-permission-prefix" title="Permanent link">&para;</a></h3>
+<p>Each stage scans a specific permission prefix (source of truth: <code>rtp-plugin/.../bukkit/effects/BukkitEffectsHandler.java</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Pipeline stage</th>
+<th>Permission prefix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pre-setup (pipeline start)</td>
+<td><code>rtp.effect.presetup.*</code></td>
+</tr>
+<tr>
+<td>Post-setup</td>
+<td><code>rtp.effect.postsetup.*</code></td>
+</tr>
+<tr>
+<td>Pre-load (before async chunk load)</td>
+<td><code>rtp.effect.presetup.*</code> <em>(shared with pre-setup — see note)</em></td>
+</tr>
+<tr>
+<td>Post-load (chunks ready)</td>
+<td><code>rtp.effect.postload.*</code></td>
+</tr>
+<tr>
+<td>Pre-teleport</td>
+<td><code>rtp.effect.preteleport.*</code></td>
+</tr>
+<tr>
+<td>Post-teleport</td>
+<td><code>rtp.effect.postteleport.*</code></td>
+</tr>
+<tr>
+<td>Teleport cancelled</td>
+<td><code>rtp.effect.cancel.*</code></td>
+</tr>
+<tr>
+<td>Queue push (player enters region queue)</td>
+<td><code>rtp.effect.queuepush.*</code></td>
+</tr>
+<tr>
+<td>Queue pop (player leaves region queue)</td>
+<td><code>rtp.effect.queuepop.*</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Note — pre-load reuse.</strong> The <code>PreLoadChunksEvent</code> stage currently calls <code>buildEffects("rtp.effect.presetup", ...)</code> rather than a dedicated <code>preload</code> prefix. This means effects granted at <code>rtp.effect.presetup.*</code> will fire twice (once at pipeline start, once before chunk load). If operators need a separate pre-load trigger, open an issue.</p>
+</blockquote>
+<h3 id="permission-node-grammar">Permission node grammar<a class="headerlink" href="#permission-node-grammar" title="Permanent link">&para;</a></h3>
+<p>Each <code>.</code>-separated permission granted under a stage prefix is parsed as:</p>
+<div class="highlight"><pre><span></span><code>rtp.effect.&lt;stage&gt;.&lt;TYPE&gt;[.&lt;arg1&gt;[.&lt;arg2&gt;[...]]]
+</code></pre></div>
+<ul>
+<li><code>&lt;TYPE&gt;</code> is one of the registered effect tokens (see table below).</li>
+<li><code>&lt;arg1&gt;</code>, <code>&lt;arg2&gt;</code>, … are <strong>positional</strong> values, filled into the effect's parameter enum <strong>in declaration order</strong>. Missing arguments fall back to the effect's defaults.</li>
+</ul>
+<h3 id="built-in-effect-types">Built-in effect types<a class="headerlink" href="#built-in-effect-types" title="Permanent link">&para;</a></h3>
+<p>Registered in <code>effects-api/.../EffectFactory.java</code>. All five are available on every supported server version (MC ≥ 1.20.1):</p>
+<table>
+<thead>
+<tr>
+<th><code>&lt;TYPE&gt;</code></th>
+<th>Class</th>
+<th>Safety / extras</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FIREWORK</code></td>
+<td><code>FireworkEffect</code></td>
+<td><code>FireworkSafetyListener</code> auto-suppresses damage from effect-spawned fireworks.</td>
+</tr>
+<tr>
+<td><code>NOTE</code></td>
+<td><code>NoteEffect</code></td>
+<td>Plays a note block sound at the player.</td>
+</tr>
+<tr>
+<td><code>PARTICLE</code></td>
+<td><code>ParticleEffect</code></td>
+<td>Spawns particles at the player.</td>
+</tr>
+<tr>
+<td><code>POTION</code></td>
+<td><code>PotionEffect</code></td>
+<td>Applied to the teleporting player.</td>
+</tr>
+<tr>
+<td><code>SOUND</code></td>
+<td><code>SoundEffect</code></td>
+<td>Played at the player's location.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="positional-arguments-per-type">Positional arguments per type<a class="headerlink" href="#positional-arguments-per-type" title="Permanent link">&para;</a></h4>
+<p>Order and names come directly from the matching <code>*TypeNames</code> enum in <code>effects-api/.../LocalEffects/enums/</code>.</p>
+<p><strong><code>FIREWORK</code></strong> — <code>FireworkTypeNames</code></p>
+<p>Canonical positional order matches <code>FireworkEffect.KEY_ORDER</code> in <code>effects-api</code>. Since effects-api-ADR-002 (3.0.0-beta.2), <code>Effect.setData(String...)</code> walks <code>KEY_ORDER</code> with a non-rewinding cursor and assigns each token to the <em>first remaining key whose default type accepts it</em> — so trailing booleans land on <code>FLICKER</code> / <code>TRAIL</code> / <code>SAFE</code> even when given before the offsets. For predictability, supply tokens in the order below.</p>
+<table>
+<thead>
+<tr>
+<th>Pos</th>
+<th>Variable</th>
+<th>Typical values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>TYPE</code></td>
+<td><code>BALL</code>, <code>BALL_LARGE</code>, <code>BURST</code>, <code>CREEPER</code>, <code>STAR</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>NUMBER</code></td>
+<td>integer, fireworks to spawn</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>POWER</code></td>
+<td>0–3 (flight duration)</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>COLOR</code></td>
+<td>Bukkit <code>Color</code> name or <code>#RRGGBB</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>FADE</code></td>
+<td>fade-out <code>Color</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>FLICKER</code></td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>TRAIL</code></td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>SAFE</code></td>
+<td><code>true</code> disables damage (recommended)</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>DX</code></td>
+<td>x-offset from player</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>DY</code></td>
+<td>y-offset</td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>DZ</code></td>
+<td>z-offset</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>NOTE</code></strong> — <code>NoteTypeNames</code></p>
+<table>
+<thead>
+<tr>
+<th>Pos</th>
+<th>Variable</th>
+<th>Typical values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>TYPE</code></td>
+<td>instrument name (<code>PIANO</code>, <code>BASS_DRUM</code>, <code>SNARE_DRUM</code>, <code>STICKS</code>, <code>BASS_GUITAR</code>, …)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>TONE</code></td>
+<td>integer <code>0</code>–<code>24</code> (Bukkit <code>Note</code> two-octave id, <strong>not</strong> a letter). Common references: <code>0</code> = F♯ low, <code>6</code> = C, <code>8</code> = D, <code>12</code> = F♯ middle, <code>18</code> = C high, <code>24</code> = F♯ high.</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>PARTICLE</code></strong> — <code>ParticleTypeNames</code></p>
+<table>
+<thead>
+<tr>
+<th>Pos</th>
+<th>Variable</th>
+<th>Typical values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>TYPE</code></td>
+<td>any <code>org.bukkit.Particle</code> constant (<code>PORTAL</code>, <code>FLAME</code>, <code>END_ROD</code>, …)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>NUMBER</code></td>
+<td>count (int)</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>POTION</code></strong> — <code>PotionTypeNames</code></p>
+<table>
+<thead>
+<tr>
+<th>Pos</th>
+<th>Variable</th>
+<th>Typical values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>TYPE</code></td>
+<td><code>PotionEffectType</code> name (<code>BLINDNESS</code>, <code>SPEED</code>, <code>NIGHT_VISION</code>, …)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>DURATION</code></td>
+<td>ticks (20 = 1 s)</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>AMPLIFIER</code></td>
+<td>0 = level I</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>AMBIENT</code></td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>PARTICLES</code></td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>ICON</code></td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>SOUND</code></strong> — <code>SoundTypeNames</code></p>
+<table>
+<thead>
+<tr>
+<th>Pos</th>
+<th>Variable</th>
+<th>Typical values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>TYPE</code></td>
+<td>any <code>org.bukkit.Sound</code> constant (<code>ENTITY_ENDERMAN_TELEPORT</code>, <code>BLOCK_ANVIL_LAND</code>, …)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>VOLUME</code></td>
+<td>integer, <strong>scaled by / 100</strong> (so <code>100</code> = volume 1.0)</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>PITCH</code></td>
+<td>integer, <strong>scaled by / 100</strong> (so <code>100</code> = pitch 1.0)</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>DX</code></td>
+<td>x-offset from player</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>DY</code></td>
+<td>y-offset</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>DZ</code></td>
+<td>z-offset</td>
+</tr>
+</tbody>
+</table>
+<p>Missing trailing arguments keep the effect's built-in defaults (see each <code>*Effect</code> class constructor).</p>
+<h3 id="where-to-find-valid-values">Where to find valid values<a class="headerlink" href="#where-to-find-valid-values" title="Permanent link">&para;</a></h3>
+<p>The positional tables above tell you which <em>kind</em> of token each slot accepts (<code>Particle</code> constant, <code>Sound</code> constant, <code>PotionEffectType</code> name, ...). The exhaustive list of constants is <strong>server-version-specific</strong> and lives in the platform's own reference, not here. Use these as your catalogue:</p>
+<p><strong>Bukkit / Paper / Spigot / Folia backends</strong> (the <code>rtp.effect.*</code> permission grammar resolves directly against these enums):</p>
+<table>
+<thead>
+<tr>
+<th>Token type</th>
+<th>1.21 (LTS line)</th>
+<th>26.1 (current)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Particle</code> (PARTICLE.TYPE)</td>
+<td><a href="https://jd.papermc.io/paper/1.21.4/org/bukkit/Particle.html"><code>org.bukkit.Particle</code> - 1.21</a></td>
+<td><a href="https://jd.papermc.io/paper/26.1.2/org/bukkit/Particle.html"><code>org.bukkit.Particle</code> - 26.1</a></td>
+</tr>
+<tr>
+<td><code>Sound</code> (SOUND.TYPE)</td>
+<td><a href="https://jd.papermc.io/paper/1.21.4/org/bukkit/Sound.html"><code>org.bukkit.Sound</code> - 1.21</a></td>
+<td><a href="https://jd.papermc.io/paper/26.1.2/org/bukkit/Sound.html"><code>org.bukkit.Sound</code> - 26.1</a></td>
+</tr>
+<tr>
+<td><code>PotionEffectType</code> (POTION.TYPE)</td>
+<td><a href="https://jd.papermc.io/paper/1.21.4/org/bukkit/potion/PotionEffectType.html"><code>PotionEffectType</code> - 1.21</a></td>
+<td><a href="https://jd.papermc.io/paper/26.1.2/org/bukkit/potion/PotionEffectType.html"><code>PotionEffectType</code> - 26.1</a></td>
+</tr>
+<tr>
+<td><code>FireworkEffect.Type</code> (FIREWORK.TYPE)</td>
+<td><a href="https://jd.papermc.io/paper/1.21.4/org/bukkit/FireworkEffect.Type.html"><code>FireworkEffect.Type</code> - 1.21</a></td>
+<td><a href="https://jd.papermc.io/paper/26.1.2/org/bukkit/FireworkEffect.Type.html"><code>FireworkEffect.Type</code> - 26.1</a></td>
+</tr>
+<tr>
+<td><code>Color</code> (FIREWORK.COLOR / FADE)</td>
+<td><a href="https://jd.papermc.io/paper/1.21.4/org/bukkit/Color.html"><code>org.bukkit.Color</code> - 1.21</a></td>
+<td><a href="https://jd.papermc.io/paper/26.1.2/org/bukkit/Color.html"><code>org.bukkit.Color</code> - 26.1</a></td>
+</tr>
+<tr>
+<td><code>Note.Tone</code> reference (NOTE.TONE)</td>
+<td><a href="https://jd.papermc.io/paper/1.21.4/org/bukkit/Note.html"><code>org.bukkit.Note</code> - 1.21</a></td>
+<td><a href="https://jd.papermc.io/paper/26.1.2/org/bukkit/Note.html"><code>org.bukkit.Note</code> - 26.1</a></td>
+</tr>
+</tbody>
+</table>
+<p>Use the <strong>enum constant name</strong> verbatim in the permission node (e.g. <code>FLAME</code>, <code>ENTITY_ENDERMAN_TELEPORT</code>, <code>NIGHT_VISION</code>, <code>BALL</code>, <code>BLUE</code>). Names are case-sensitive in the underlying <code>valueOf</code> call, but the parser uppercases the token before lookup so casing in the permission node is forgiving.</p>
+<p><strong>Fabric / plain Minecraft backends</strong> (and any time you want the version-agnostic, vanilla-side catalogue):</p>
+<table>
+<thead>
+<tr>
+<th>Token type</th>
+<th>Reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Particles</td>
+<td><a href="https://minecraft.wiki/w/Java_Edition_protocol/Particles">Minecraft Wiki - Java Edition particle list</a></td>
+</tr>
+<tr>
+<td>Sounds (sound event IDs)</td>
+<td><a href="https://minecraft.wiki/w/Sounds.json">Minecraft Wiki - Sounds.json / sound events</a></td>
+</tr>
+<tr>
+<td>Status effects (potion types)</td>
+<td><a href="https://minecraft.wiki/w/Effect">Minecraft Wiki - Effect</a></td>
+</tr>
+<tr>
+<td>Firework shapes / colors</td>
+<td><a href="https://minecraft.wiki/w/Firework_Star">Minecraft Wiki - Firework Star</a></td>
+</tr>
+</tbody>
+</table>
+<p>The wiki tables use lowercase namespaced IDs (e.g. <code>minecraft:flame</code>, <code>minecraft:entity.enderman.teleport</code>). Strip the <code>minecraft:</code> prefix and translate to the Bukkit enum form by uppercasing and replacing <code>.</code> with <code>_</code> (<code>entity.enderman.teleport</code> -&gt; <code>ENTITY_ENDERMAN_TELEPORT</code>). For Fabric, the same vanilla IDs are what the underlying <code>ParticleType</code> / <code>SoundEvent</code> registries use.</p>
+<blockquote>
+<p><strong>Version drift is real.</strong> <code>Particle</code> and <code>Sound</code> constants are renamed, added, or removed between Minecraft versions (notable churn between 1.20.x and 1.21.x, and again into the 26.x line). If a permission node stops working after a server update, check the Javadoc for your running version before assuming a bug. The <code>/particle</code> and <code>/playsound</code> vanilla commands have tab completion against the running registry and are the fastest sanity check.</p>
+</blockquote>
+<h3 id="tab-completion-via-your-permissions-plugin">Tab completion via your permissions plugin<a class="headerlink" href="#tab-completion-via-your-permissions-plugin" title="Permanent link">&para;</a></h3>
+<p><code>EffectFactory.addPermissions(prefix)</code> (called by <code>rtp-plugin</code> when <code>effectParsing</code> is enabled) auto-registers a Bukkit <code>Permission</code> node for <strong>every</strong> <code>TYPE</code> enum constant of every built-in effect, under each pipeline-stage prefix. If your permissions plugin (LuckPerms, PEX, GroupManager, ...) reads from the server's <code>PluginManager</code> permission registry, those nodes show up in tab completion:</p>
+<div class="highlight"><pre><span></span><code>/lp user &lt;name&gt; permission set rtp.effect.postteleport.PARTICLE.&lt;TAB&gt;
+   -&gt; FLAME, PORTAL, END_ROD, HEART, ... (every Particle constant on this server)
+</code></pre></div>
+<p>This is the <strong>fastest way to discover valid type names without leaving the game</strong>: turn on <code>effectParsing</code>, reload, and tab-complete from your perms plugin. Positional args after the TYPE (NUMBER, DURATION, color, offsets, etc.) are not auto-registered as nodes - those still come from the Javadoc / wiki tables above.</p>
+<h3 id="worked-examples">Worked examples<a class="headerlink" href="#worked-examples" title="Permanent link">&para;</a></h3>
+<p>Each node is one complete effect. Grant multiple to stack them on the same stage.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># plugin.yml / permissions.yml / LuckPerms / PEX — same grammar everywhere</span>
+<span class="nt">permissions</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># Classic &quot;teleport whoosh&quot; on arrival</span>
+<span class="w">  </span><span class="nt">rtp.effect.postteleport.SOUND.ENTITY_ENDERMAN_TELEPORT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="w">  </span><span class="c1"># Portal particles when the player is about to be moved</span>
+<span class="w">  </span><span class="nt">rtp.effect.preteleport.PARTICLE.PORTAL.50</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="w">  </span><span class="c1"># Brief blindness while chunks load (immersion for async delay)</span>
+<span class="w">  </span><span class="nt">rtp.effect.postsetup.POTION.BLINDNESS.40.0</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="w">  </span><span class="c1"># Celebratory firework at the destination (safe = no damage)</span>
+<span class="w">  </span><span class="c1"># Token order: TYPE.NUMBER.POWER.COLOR.FADE.FLICKER.TRAIL.SAFE.DX.DY.DZ</span>
+<span class="w">  </span><span class="nt">rtp.effect.postteleport.FIREWORK.BALL.1.1.BLUE.WHITE.true.true.true.0.0.0</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="w">  </span><span class="c1"># Note blip when player enters a queue (TONE is 0-24, see NoteTypeNames table above)</span>
+<span class="w">  </span><span class="nt">rtp.effect.queuepush.NOTE.PIANO.12</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="w">  </span><span class="c1"># Audible cue when a teleport is cancelled</span>
+<span class="w">  </span><span class="nt">rtp.effect.cancel.SOUND.BLOCK_ANVIL_LAND.80.100</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<h3 id="operator-verification-commands">Operator verification commands<a class="headerlink" href="#operator-verification-commands" title="Permanent link">&para;</a></h3>
+<p><code>effects-api</code> registers standalone test commands so operators can preview an effect <strong>without</strong> triggering a teleport:</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/effectsapi</code></td>
+<td>Base command (help / listing).</td>
+</tr>
+<tr>
+<td><code>/firework</code>, <code>/note</code>, <code>/particle</code>, <code>/potion</code>, <code>/sound</code></td>
+<td>Trigger one instance of that effect on yourself with the given args.</td>
+</tr>
+<tr>
+<td><code>/effectsapi test</code> (<code>TestCommand</code>)</td>
+<td>Generic parameterised test.</td>
+</tr>
+</tbody>
+</table>
+<p>Use these to validate an enum name and argument order before baking it into a permission node.</p>
+<h3 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Likely cause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Nothing happens, no errors</td>
+<td><code>performance.yml → effectParsing: false</code>.</td>
+</tr>
+<tr>
+<td>Only some players see effects</td>
+<td>Permission is on a group they're not in, or a <code>*</code> wildcard is over-matching and resolving to <code>false</code>.</td>
+</tr>
+<tr>
+<td>Effect fires at the wrong stage</td>
+<td>Stage prefixes are literal — <code>postsetup</code> ≠ <code>postteleport</code>. Check the table above.</td>
+</tr>
+<tr>
+<td>Unknown enum name in a node</td>
+<td>Bukkit <code>Sound</code> / <code>Particle</code> / <code>PotionEffectType</code> constants vary slightly between 1.20.1, 1.21.x, and newer versions. Verify with <code>/sound</code>, <code>/particle</code>, <code>/potion</code> on your actual server.</td>
+</tr>
+<tr>
+<td><code>rtp.effect.presetup.*</code> seems to fire twice</td>
+<td>Pre-load stage currently reuses the pre-setup prefix (see note above).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="part-2-event-listeners-for-developers">Part 2 — Event listeners (for developers)<a class="headerlink" href="#part-2-event-listeners-for-developers" title="Permanent link">&para;</a></h2>
+<p>RTP publishes Bukkit-style events under <code>io.github.dailystruggle.rtp.bukkit.events</code> (module <code>rtp-plugin</code>). An addon consumes them the same way as any other Bukkit event: implement <code>Listener</code>, annotate with <code>@EventHandler</code>, register with the plugin manager.</p>
+<h3 id="reference-addon-addonsleafrtpcountdownaddon">Reference addon — <code>addons/LeafRTPCountdownAddon</code><a class="headerlink" href="#reference-addon-addonsleafrtpcountdownaddon" title="Permanent link">&para;</a></h3>
+<p>A complete, compilable template ships in the repository. It demonstrates the four API touch-points every addon typically needs:</p>
+<ol>
+<li><strong>Config registration</strong> — <code>ConfigParser&lt;CountdownKeys&gt;</code> participates in <code>/rtp reload</code>.</li>
+<li><strong>Safety contribution</strong> — <code>GlobalRegionVerifiers.addGlobalRegionVerifier(...)</code> predicate, invoked asynchronously by the teleport pipeline (S-003 / S-005 compliant).</li>
+<li><strong>Event handling</strong> — a Bukkit <code>Listener</code> for one of RTP's lifecycle events.</li>
+<li><strong>Reload hook</strong> — <code>Configs.onReload(Runnable)</code> so operator <code>/rtp reload</code> picks up addon changes without a restart.</li>
+</ol>
+<p>Relevant files:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>addons/LeafRTPCountdownAddon/src/main/java/io/github/dailystruggle/rtp/countdownaddon/RTPCountdownAddon.java</code></td>
+<td>Plugin main class, wires all four touch-points.</td>
+</tr>
+<tr>
+<td><code>.../ExampleTeleportListener.java</code></td>
+<td>Minimal <code>PostTeleportEvent</code> listener.</td>
+</tr>
+<tr>
+<td><code>.../CountdownKeys.java</code></td>
+<td>Enum backing <code>countdown.yml</code>.</td>
+</tr>
+<tr>
+<td><code>addons/LeafRTPCountdownAddon/README.md</code></td>
+<td>Step-by-step walkthrough.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="listener-shape-exampleteleportlistener">Listener shape (<code>ExampleTeleportListener</code>)<a class="headerlink" href="#listener-shape-exampleteleportlistener" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><span class="kd">public</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kd">class</span> <span class="nc">ExampleTeleportListener</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">Listener</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nd">@EventHandler</span>
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">onPostTeleport</span><span class="p">(</span><span class="n">PostTeleportEvent</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">ConfigParser</span><span class="o">&lt;</span><span class="n">CountdownKeys</span><span class="o">&gt;</span><span class="w"> </span><span class="n">parser</span><span class="w"> </span><span class="o">=</span>
+<span class="w">        </span><span class="p">(</span><span class="n">ConfigParser</span><span class="o">&lt;</span><span class="n">CountdownKeys</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="n">RTP</span><span class="p">.</span><span class="na">configs</span><span class="p">.</span><span class="na">getParser</span><span class="p">(</span><span class="n">CountdownKeys</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">parser</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">Object</span><span class="w"> </span><span class="n">flag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">parser</span><span class="p">.</span><span class="na">getConfigValue</span><span class="p">(</span><span class="n">CountdownKeys</span><span class="p">.</span><span class="na">announceTeleport</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">boolean</span><span class="w"> </span><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">flag</span><span class="w"> </span><span class="k">instanceof</span><span class="w"> </span><span class="n">Boolean</span><span class="p">)</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="p">(</span><span class="n">Boolean</span><span class="p">)</span><span class="w"> </span><span class="n">flag</span>
+<span class="w">                                                 </span><span class="p">:</span><span class="w"> </span><span class="n">Boolean</span><span class="p">.</span><span class="na">parseBoolean</span><span class="p">(</span><span class="n">String</span><span class="p">.</span><span class="na">valueOf</span><span class="p">(</span><span class="n">flag</span><span class="p">));</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">enabled</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">RTP</span><span class="p">.</span><span class="na">log</span><span class="p">(</span><span class="n">Level</span><span class="p">.</span><span class="na">INFO</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;[LeafRTPCountdownAddon] PostTeleportEvent observed: &quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">event</span><span class="p">.</span><span class="na">getDoTeleport</span><span class="p">());</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Registration (from <code>RTPExampleAddon.onEnable</code>):</p>
+<div class="highlight"><pre><span></span><code><span class="n">Bukkit</span><span class="p">.</span><span class="na">getPluginManager</span><span class="p">().</span><span class="na">registerEvents</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">ExampleTeleportListener</span><span class="p">(),</span><span class="w"> </span><span class="k">this</span><span class="p">);</span>
+</code></pre></div>
+<h3 id="public-event-catalog">Public event catalog<a class="headerlink" href="#public-event-catalog" title="Permanent link">&para;</a></h3>
+<p>All events live in <code>rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/events/</code>. Pipeline-stage events are fired from <code>BukkitEffectsHandler.setupEffects(...)</code>; queue events are fired from <code>Region.onPlayerQueuePush</code> / <code>onPlayerQueuePop</code>; command events are fired from the <code>/rtp</code> command pipeline.</p>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>When it fires</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PreSetupTeleportEvent</code></td>
+<td>Before <code>TeleportPipelineTask</code> setup stage. <strong>Cancellable</strong> — setting cancelled aborts the teleport.</td>
+</tr>
+<tr>
+<td><code>PostSetupTeleportEvent</code></td>
+<td>Setup stage completed successfully.</td>
+</tr>
+<tr>
+<td><code>PreLoadChunksEvent</code></td>
+<td>Before async chunk load of the destination.</td>
+</tr>
+<tr>
+<td><code>PostLoadChunksEvent</code></td>
+<td>Destination chunks are loaded (still async-safe — S-005).</td>
+</tr>
+<tr>
+<td><code>PreTeleportEvent</code></td>
+<td>Immediately before the entity teleport call.</td>
+</tr>
+<tr>
+<td><code>PostTeleportEvent</code></td>
+<td>Immediately after a successful teleport.</td>
+</tr>
+<tr>
+<td><code>TeleportCancelEvent</code></td>
+<td>Player/pipeline cancelled a scheduled teleport (<code>RTPTeleportCancel</code>).</td>
+</tr>
+<tr>
+<td><code>TeleportCommandSuccessEvent</code></td>
+<td><code>/rtp</code> command accepted, pipeline started.</td>
+</tr>
+<tr>
+<td><code>TeleportCommandFailEvent</code></td>
+<td><code>/rtp</code> command rejected (cooldown, parse error, etc.).</td>
+</tr>
+<tr>
+<td><code>PlayerQueuePushEvent</code></td>
+<td>Player added to a region's waiting queue.</td>
+</tr>
+<tr>
+<td><code>PlayerQueuePopEvent</code></td>
+<td>Player popped off a region's waiting queue.</td>
+</tr>
+<tr>
+<td><code>RandomSelectQueueEvent</code></td>
+<td>A queued candidate location was selected from the buffer.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="developer-do-dont">Developer do / don't<a class="headerlink" href="#developer-do-dont" title="Permanent link">&para;</a></h3>
+<p>Pulled from <a href="../../../dev/REQUIREMENTS/"><code>REQUIREMENTS.md §3</code></a> (S-00x rules):</p>
+<ul>
+<li><strong>Do</strong> put chunk / claim / biome checks inside a <code>GlobalRegionVerifiers</code> lambda — it runs asynchronously and is S-005 safe.</li>
+<li><strong>Do</strong> log via <code>RTP.log(Level, msg[, throwable])</code>. Never <code>Bukkit.getLogger()</code>, never <code>printStackTrace()</code>.</li>
+<li><strong>Don't</strong> perform synchronous <code>world.getChunkAt(...)</code> inside an event handler (S-005).</li>
+<li><strong>Don't</strong> silently <code>return</code> on a teleport failure (S-004) — surface via the event or log.</li>
+<li><strong>Don't</strong> import <code>org.bukkit.*</code> from <code>rtp-core</code> or <code>rtp-api</code>; keep platform code in the adapter module or in the addon.</li>
+</ul>
+<hr />
+<h2 id="cross-references">Cross-references<a class="headerlink" href="#cross-references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Source of truth, effect dispatch: <code>rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/effects/BukkitEffectsHandler.java</code></li>
+<li>Source of truth, effect registry: <code>effects-api/src/main/java/io/github/dailystruggle/effectsapi/EffectFactory.java</code></li>
+<li>Parameter enums: <code>effects-api/src/main/java/io/github/dailystruggle/effectsapi/LocalEffects/enums/</code></li>
+<li>Developer walkthrough: <code>addons/LeafRTPCountdownAddon/README.md</code></li>
+<li>Safety rules every listener must follow: <a href="../../../dev/REQUIREMENTS/"><code>../dev/REQUIREMENTS.md §3</code></a></li>
+<li>Auto-teleport (<code>rtp.onevent.*</code>) permissions: <a href="../../COMMANDS/"><code>COMMANDS.md</code></a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

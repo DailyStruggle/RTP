@@ -1,0 +1,2149 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-025-replace-simpleyaml-with-an-internal-comment-preserving-yaml-library" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scope-which-yaml-features-the-in-house-library-supports" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scope: which YAML features the in-house library supports
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pluginyml-carve-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      plugin.yml carve-out
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#comment-preservation-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Comment preservation strategy
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-abstraction-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      New abstraction package
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-and-build-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Migration and build changes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-platform-applicability" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cross-platform applicability
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decision-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision History
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-025-replace-simpleyaml-with-an-internal-comment-preserving-yaml-library">ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library<a class="headerlink" href="#adr-025-replace-simpleyaml-with-an-internal-comment-preserving-yaml-library" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Proposed
+<strong>Date:</strong> 2026-05-01 (initial) / 2026-05-15 (decision reversed: in-house parser
+chosen over a SnakeYAML-backed wrapper; see <em>Decision History</em> below)</p>
+<blockquote>
+<p><strong>File name note.</strong> This ADR's filename
+(<code>ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper.md</code>) reflects the
+original 2026-05-01 direction. The decision was reversed on 2026-05-15 in
+response to two new constraints that the original ADR had not weighed:
+(1) SnakeYAML's <code>processComments</code> does not actually preserve comments through
+a <code>set + save</code> round-trip in the way <code>/rtp config</code> requires (the comment-
+attachment is node-keyed and heuristic, not lexical-position-stable); and
+(2) SnakeYAML cannot be assumed present on the proxy classpath (Velocity does
+not export it; BungeeCord's version is unpinned and unstable for plugin use),
+so any SnakeYAML-based plan would require shading into every assembly variant
+including the proxy modules planned in MULTI_SERVER_PLAN.md. The filename is
+kept for traceability; the canonical title is the H1 above. A rename is
+deferred to avoid breaking inbound links from CHANGELOG / TRACEABILITY / spec
+Appendix A12 until after acceptance.</p>
+</blockquote>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p><code>rtp-core</code> depends on <code>me.carleslc.Simple-YAML:Simple-Yaml:1.8.4</code> (and its
+transitive <code>Simple-Configuration:1.8.4</code>) for all YAML configuration I/O.
+SimpleYaml is shaded into both shadowJar variants of <code>rtp-plugin</code> via:</p>
+<ul>
+<li><code>rtp-core/build.gradle</code> line 14 — <code>api('me.carleslc.Simple-YAML:Simple-Yaml:1.8.4')</code></li>
+<li><code>rtp-plugin/build.gradle</code> lines 186 and 387 — <code>relocate 'me.carleslc.Simple-YAML', 'io.github.dailystruggle.rtp.Simple-Yaml'</code></li>
+</ul>
+<p>This adds roughly 250 KB of third-party bytecode (Simple-Yaml ~120 KB +
+Simple-Configuration ~130 KB) to every produced jar, plus a relocate rule
+whose target package name (<code>...Simple-Yaml</code>) is itself unconventional
+because of the hyphen in the upstream coordinate.</p>
+<p>The actual surface of SimpleYaml that the project consumes is small —
+verified by an exhaustive search of <code>org.simpleyaml.*</code> imports in
+<code>rtp-core</code> (1 May 2026):</p>
+<ul>
+<li><strong>Production code (13 files):</strong> <code>RTP.java</code>, <code>ConfigParser.java</code>,
+  <code>MultiConfigParser.java</code>, <code>LanguageBootstrap.java</code>, <code>FactoryValue.java</code>,
+  <code>YamlFileDatabase.java</code>, <code>RegionConfigLoader.java</code>, <code>SubConfigCmd.java</code>,
+  <code>LanguageCmd.java</code>, <code>ListCmd.java</code>, <code>ListAddParameter.java</code>,
+  <code>ListRemoveParameter.java</code> (+ duplicate test path).</li>
+<li><strong>Test code (6 files):</strong> <code>ConfigParserUpdateTest</code>, two
+  <code>YamlFileDatabaseTest</code> files, <code>SubConfigCmdTest</code>, <code>LanguageCmdTest</code>,
+  <code>ListParameterTest</code>.</li>
+</ul>
+<p>The methods actually invoked are:</p>
+<ul>
+<li><code>YamlFile</code>: <code>new YamlFile(File)</code>, <code>load()</code> / <code>loadWithComments()</code>,
+  <code>save()</code>, <code>get(key)</code> / <code>get(key, default)</code>, <code>set(key, value)</code>,
+  <code>getKeys(deep)</code>, <code>getConfigurationSection(key)</code>,
+  <code>options().copyDefaults(true)</code>, <code>setComment(key, comment)</code>.</li>
+<li><code>ConfigurationSection</code> / <code>MemorySection</code>: <code>getKeys(false)</code>, <code>get(key)</code>,
+  <code>getConfigurationSection(key)</code>, <code>set(key, value)</code>.</li>
+</ul>
+<p>Nothing else from SimpleYaml is used. SnakeYAML (<code>org.yaml:snakeyaml:2.3</code>)
+is already on every classpath: provided at runtime by Spigot/Paper/Folia
+and declared <code>compileOnly</code> in <code>rtp-core/build.gradle</code> line 12 (with
+<code>testRuntimeOnly</code> on line 13).</p>
+<p>The only feature SnakeYAML does not offer through a key-addressed API is
+<strong>comment preservation</strong>, which <code>ConfigParser.update()</code> (lines 857, 871,
+879) and <code>LanguageBootstrap</code> (line 106) rely on via
+<code>YamlFile.setComment(key, comment)</code>. SnakeYAML 2.x does, however, parse
+and emit comments at the node level (<code>LoaderOptions.processComments</code> and
+<code>DumperOptions.processComments</code>, plus <code>CommentLine</code> on <code>Node</code>).</p>
+<p>The shadowJar build (<code>rtp-plugin/build.gradle</code> lines 185 and 386) already
+declares <code>relocate 'org.yaml.snakeyaml', 'io.github.dailystruggle.rtp.snakeyaml'</code>
+in both pro and lite variants, anticipating the case where SnakeYAML must
+be shaded.</p>
+<blockquote>
+<p><strong>Context update (2026-05-15).</strong> The paragraphs above describe the
+shape of the problem as understood on 2026-05-01. Two facts surfaced
+since then have made the original "wrap SnakeYAML" framing the wrong
+one (preserved here so the reader can follow the reasoning; the
+<em>Decision</em> section that follows acts on the updated understanding):</p>
+<ol>
+<li>SnakeYAML's <code>processComments</code> API exposes comments on the AST but
+   its emitter does <strong>not</strong> preserve their lexical position across a
+   <code>set + save</code> cycle — the comment-attachment is node-keyed and
+   heuristic. A comment-preserving save for the
+   <code>CONFIG_COMMAND_SPEC.md</code> Appendix A12 contract therefore cannot be
+   delegated to SnakeYAML; the surgical line-edit save layer has to
+   be written in-house regardless of substrate.</li>
+<li>The proxy modules planned in
+   <a href="../../dev/MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a> (Phase 1+,
+   Velocity and BungeeCord) cannot rely on a runtime-provided
+   SnakeYAML: Velocity does not export <code>org.yaml.snakeyaml</code> to
+   plugins, and BungeeCord's bundled version is unpinned. Any
+   SnakeYAML-based plan therefore needs to shade SnakeYAML into every
+   proxy assembly variant, which contradicts the lite-variant
+   footprint promise of ADR-024 by extension.</li>
+</ol>
+<p>Combined with the 2026-05-15 YAML feature audit (see
+<a href="../dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md"><code>docs/dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md</code></a>),
+which bounds the YAML subset RTP actually uses to a tractable
+hand-rollable grammar, the conclusion is to replace simpleyaml with
+an in-house parser rather than a SnakeYAML wrapper.</p>
+</blockquote>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Remove the <code>me.carleslc.Simple-YAML</code> dependency entirely and replace it
+with a small, <strong>in-house</strong> YAML parser/serializer in <code>rtp-core</code>,
+scoped to the subset of YAML the project actually uses. <strong>No
+third-party YAML library is shaded into any assembly variant; no
+runtime-provided YAML library is consumed either.</strong> The substrate
+becomes 100% RTP-owned code.</p>
+<p>This replaces the 2026-05-01 plan to wrap SnakeYAML. Rationale for the
+reversal is preserved under <em>Decision History</em>.</p>
+<h3 id="scope-which-yaml-features-the-in-house-library-supports">Scope: which YAML features the in-house library supports<a class="headerlink" href="#scope-which-yaml-features-the-in-house-library-supports" title="Permanent link">&para;</a></h3>
+<p>Bounded by the 2026-05-15 <em>YAML Feature Audit</em> over 187 shipped <code>.yml</code>
+files (see <code>docs/dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md</code>, to be
+folded into this ADR on acceptance).</p>
+<p><strong>Supported (reader and writer):</strong></p>
+<ul>
+<li>Block-style mappings (nested, arbitrary depth).</li>
+<li>Block-style sequences of scalars (<code>- item</code>).</li>
+<li>Scalar types: integer, double, boolean, <code>null</code>/empty.</li>
+<li>Bare (unquoted) string scalars.</li>
+<li>Double-quoted string scalars with standard escape sequences
+  (<code>\"</code>, <code>\\</code>, <code>\n</code>, <code>\t</code>, <code>\uXXXX</code>). Audited usage: 822 occurrences.</li>
+<li>Single-quoted string scalars with YAML's doubled-quote escape (<code>''</code>).
+  Audited usage: 7 occurrences.</li>
+<li>Above-line (block) comments at arbitrary indentation, preserved
+  across a load/mutate/save round-trip with surgical line-level edits
+  (see <em>Comment preservation strategy</em> below).</li>
+</ul>
+<p><strong>Tolerated on input, not preserved across write-back:</strong></p>
+<ul>
+<li>Inline (same-line, trailing) <code># …</code> comments. The parser must not
+  fail on these — admins who hand-edit may write them — but a
+  subsequent <code>/rtp config set</code> that rewrites the line is permitted to
+  drop the trailing comment. This matches the 2026-05-14 A12 scope
+  decision (block-only comment preservation) and the user's
+  2026-05-15 preference for the above-line idiom.</li>
+</ul>
+<p><strong>Explicitly rejected on input (parser fails fast with a configurable
+<code>UNSUPPORTED_YAML_FEATURE</code> reason code, per REQ-RTP-F-013 /
+REQ-RTP-S-007):</strong></p>
+<ul>
+<li>Anchors <code>&amp;name</code> and aliases <code>*name</code> (0 audited real occurrences;
+  the 64 raw hits were all Bukkit color codes <code>&amp;a</code>/<code>&amp;c</code> inside quoted
+  strings, which are <em>not</em> anchors — they're string content).</li>
+<li>Merge keys <code>&lt;&lt;:</code> (0 audited occurrences).</li>
+<li>Flow-style mappings <code>{…}</code> or sequences <code>[…]</code> at value position
+  (0 audited real occurrences; the 234 raw hits were <code>[placeholder]</code>
+  substrings inside quoted strings or comments).</li>
+<li>Explicit tags <code>!Tag</code> / <code>!!type</code> (0 audited occurrences).</li>
+<li>Multi-document separators <code>---</code> / <code>...</code> (0 audited occurrences).</li>
+<li>Block-scalar indicators <code>|</code> and <code>&gt;</code> (4 audited occurrences, all
+  <code>usage: |</code> in <code>plugin.yml</code>, see <em>plugin.yml carve-out</em> below).</li>
+</ul>
+<p>The fail-fast error reports the offending line and column and the
+specific unsupported feature, in a <code>messages.yml</code>-resolved key
+(REQ-RTP-F-013).</p>
+<h3 id="pluginyml-carve-out"><code>plugin.yml</code> carve-out<a class="headerlink" href="#pluginyml-carve-out" title="Permanent link">&para;</a></h3>
+<p><code>plugin.yml</code> is loaded by the Bukkit platform's plugin loader, not by
+RTP's configuration layer. It is never read or written by <code>rtp-core</code>,
+never mutated by <code>/rtp config</code>, and never round-tripped through the
+in-house parser. Its <code>usage: |</code> block-scalar fields therefore do not
+need to be supported by the in-house parser. The audit results
+documented this as the only place block scalars appear in the
+shipped tree.</p>
+<h3 id="comment-preservation-strategy">Comment preservation strategy<a class="headerlink" href="#comment-preservation-strategy" title="Permanent link">&para;</a></h3>
+<p>The reader produces a comment-aware AST: each <code>Node</code> carries its
+source line/column and the list of <code>^# …</code> comment lines immediately
+preceding it at the same or lesser indentation. The writer is <strong>not
+an emitter</strong> in the YAML-library sense; it performs <strong>surgical
+line-range edits on the on-disk text</strong>:</p>
+<ul>
+<li><code>set(key, value)</code> locates the key's value-line range in the source
+  text (cached from the parse) and rewrites only the value portion of
+  that line, leaving every other byte of the file untouched —
+  including all above-line comment blocks and any inline trailing
+  comment that happens to remain.</li>
+<li>New keys appended to a mapping go after the last existing key of
+  that mapping, with one blank line of separation; no existing
+  content is reflowed.</li>
+<li>Removed keys delete only the key's own line range and its directly
+  attached above-line comment block (the block-comment "ownership"
+  rule from the A12 scope decision).</li>
+<li>Lists are rewritten item-by-item with a stable diff; comment-only
+  lines between items are preserved.</li>
+</ul>
+<p>This is the approach the comparison scratch note
+(<code>docs/dev/scratch/CONFIG_COMMENT_PRESERVATION_COMPARISON.md</code>)
+identified as the only robust path for A12 — and it is the same work
+required regardless of which parser produces the AST. Owning the
+parser too just removes the shaded dependency.</p>
+<h3 id="new-abstraction-package">New abstraction package<a class="headerlink" href="#new-abstraction-package" title="Permanent link">&para;</a></h3>
+<p><code>io.github.dailystruggle.rtp.common.configuration.yaml</code>:</p>
+<ul>
+<li><code>RtpYamlConfig</code> — interface exposing the surface enumerated in
+  <em>Context</em> (load, save, get, set, getKeys(deep), getSection, options
+  with <code>copyDefaults</code>, <code>setComment</code>).</li>
+<li><code>RtpYamlSection</code> — interface exposing only <code>getKeys(boolean)</code>,
+  <code>get</code>, <code>getSection</code>, <code>set</code>. Bukkit's <code>ConfigurationSection</code> shape
+  is <strong>not</strong> mirrored.</li>
+<li><code>RtpYamlReader</code> / <code>RtpYamlWriter</code> — internal classes implementing
+  the lexer + recursive-descent parser and the surgical line-edit
+  writer. Estimated size: ~300–500 LoC reader, ~300–500 LoC writer +
+  comment-bind walker, plus a focused test suite.</li>
+<li><code>RtpYamlNode</code> family — comment-aware AST nodes carrying
+  line/column source positions and attached above-line comment
+  blocks.</li>
+</ul>
+<h3 id="migration-and-build-changes">Migration and build changes<a class="headerlink" href="#migration-and-build-changes" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Migration of 13 production files and 6 test files</strong> by mechanical
+   import substitution and type rename
+   (<code>org.simpleyaml.configuration.file.YamlFile</code> →
+   <code>RtpYamlConfig</code>, etc.).</li>
+<li><strong>Build changes:</strong><ul>
+<li>Remove <code>api('me.carleslc.Simple-YAML:Simple-Yaml:1.8.4')</code> from
+  <code>rtp-core/build.gradle</code>.</li>
+<li>Leave <code>compileOnly 'org.yaml:snakeyaml:2.3'</code> and
+  <code>testRuntimeOnly</code> declarations untouched. SnakeYAML is <em>not</em>
+  promoted to <code>implementation</code> and <em>not</em> shaded.</li>
+<li>Remove both <code>relocate 'me.carleslc.Simple-YAML', ...</code> lines
+  from <code>rtp-plugin/build.gradle</code>.</li>
+<li>Remove the now-unused <code>relocate 'org.yaml.snakeyaml', ...</code>
+  lines from <code>rtp-plugin/build.gradle</code> (pro and lite). They were
+  added in anticipation of shading SnakeYAML; under this revised
+  decision they relocate nothing in <code>rtp-plugin</code> and would become
+  a maintenance trap.</li>
+<li><strong>Lite, pro, Fabric, and (future) proxy assembly variants all
+  benefit equally</strong> — no shaded YAML in any of them.</li>
+</ul>
+</li>
+<li><strong>Shipped-defaults rewrite (one-time, mechanical):</strong> the 228
+   inline trailing comments in shipped <code>.yml</code> defaults are converted
+   to above-line block comments before the in-house parser ships.
+   This aligns shipped defaults with the A12 block-only scope, with
+   the user's 2026-05-15 preference for the above-line idiom, and
+   gives <code>view</code> hover-text full comment coverage for every default
+   parameter without depending on inline-comment recovery.</li>
+<li><strong>Comment-preservation regression test</strong> added before any
+   production migration: <code>RtpYamlBlockCommentRoundTripTest</code> covering
+   pre-key block comments at arbitrary nesting, comments surviving a
+   <code>set()</code> rewrite of a <em>different</em> key in the same mapping, and
+   golden-file byte-for-byte idempotence over every shipped <code>.yml</code>
+   in <code>rtp-plugin/src/main/resources/</code>.</li>
+<li><strong>Subset-rejection tests</strong> <code>RtpYamlUnsupportedFeatureTest</code>: one
+   case per rejected feature (anchor, alias, merge key, flow map,
+   flow sequence, tag, doc separator, block scalar), each asserting
+   a precise line/column error and a configurable <code>messages.yml</code> key.</li>
+<li><strong>Deep-keys parity test</strong> <code>RtpYamlDeepKeysParityTest</code> locks in
+   dotted-path semantics of <code>getKeys(true)</code> matching SimpleYaml's
+   prior output.</li>
+</ol>
+<h3 id="cross-platform-applicability">Cross-platform applicability<a class="headerlink" href="#cross-platform-applicability" title="Permanent link">&para;</a></h3>
+<p>Because the parser is JDK-only, <strong>all</strong> assembly variants get the
+same substrate at zero shaded cost:</p>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>YAML substrate before</th>
+<th>YAML substrate after</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pro <code>rtp-plugin</code> shadowJar</td>
+<td>simpleyaml shaded (~250 KB)</td>
+<td>in-house, 0 KB third-party</td>
+</tr>
+<tr>
+<td>Lite <code>rtp-plugin</code> shadowJar</td>
+<td>platform SnakeYAML (deferred)</td>
+<td>in-house, 0 KB third-party</td>
+</tr>
+<tr>
+<td>Fabric (<code>rtp-fabric</code>)</td>
+<td>undecided per ADR-022</td>
+<td>in-house, 0 KB third-party — decision closed</td>
+</tr>
+<tr>
+<td>Proxy Velocity (planned, MULTI_SERVER_PLAN Phase 1+)</td>
+<td>n/a; SnakeYAML not exported by Velocity</td>
+<td>in-house, 0 KB third-party — proxy YAML question closed</td>
+</tr>
+<tr>
+<td>Proxy BungeeCord (planned)</td>
+<td>n/a; SnakeYAML version unpinned</td>
+<td>in-house, 0 KB third-party</td>
+</tr>
+</tbody>
+</table>
+<p>The Fabric "out of scope" carve-out from the 2026-05-01 version of
+this ADR is <strong>no longer needed</strong> under the revised decision; the
+Fabric mod jar gets the same in-house parser as every other variant.</p>
+<h3 id="decision-history">Decision History<a class="headerlink" href="#decision-history" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>2026-05-01 (original Proposed):</strong> Replace simpleyaml with a thin
+  wrapper around <code>org.yaml:snakeyaml:2.3</code>. Hand-rolled YAML was
+  considered and rejected with: <em>"Out of the question for any
+  non-trivial config; subtle YAML edge cases (anchors, multi-line,
+  quoting) are not worth re-implementing."</em></li>
+<li><strong>2026-05-15 (this revision):</strong> Decision reversed in favor of an
+  in-house parser. Two new constraints surfaced after the original
+  ADR:</li>
+<li><strong>The library doesn't deliver the feature we need.</strong> Neither
+     simpleyaml's <code>loadWithComments</code> nor SnakeYAML's
+     <code>processComments</code> survives a <code>set + save</code> round-trip in the way
+     <code>/rtp config</code> and Appendix A12 require. The comment-attachment
+     is node-keyed and heuristic; inline comments on rewritten
+     scalars are dropped, list-interior comments are reordered, and
+     <code>setSection</code> wholesale replacement drops interior comments
+     entirely (see
+     <code>docs/dev/scratch/CONFIG_COMMENT_PRESERVATION_COMPARISON.md</code>).
+     The comment-preserving save layer has to be written in-house
+     against the AST regardless of which parser produces the AST.
+     Once that fact is accepted, the off-the-shelf parser is buying
+     a lexer only — not a feature.</li>
+<li><strong>SnakeYAML is not classpath-stable across our planned assembly
+     surface.</strong> MULTI_SERVER_PLAN.md Phase 1+ adds Velocity and
+     BungeeCord proxy modules. Velocity does not export SnakeYAML
+     to plugins; BungeeCord bundles an unpinned version. The
+     original 2026-05-01 plan — "Spigot/Paper/Folia ship SnakeYAML
+     at runtime, so the lite jar shades nothing" — does not
+     generalize to the proxy axis. Either we shade SnakeYAML into
+     every variant (rejecting the lite-variant footprint promise of
+     ADR-024 by extension), or we stop depending on it.</li>
+<li><strong>YAML feature audit (2026-05-15)</strong> confirmed that the subset of
+  YAML the project actually uses is small enough that the
+  original rejection's premise — <em>"subtle YAML edge cases"</em> — does
+  not apply. Anchors, merge keys, flow style, tags, and multi-doc
+  separators have <strong>zero occurrences</strong> in 187 shipped <code>.yml</code> files;
+  block scalars exist only in <code>plugin.yml</code>, which is not parsed by
+  RTP at all.</li>
+</ul>
+<h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why Rejected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stay on SimpleYaml</td>
+<td>Issue explicitly asks to remove the dependency; ~250 KB of shaded third-party code we do not control; does not actually solve the A12 comment-preservation problem (see comparison scratch note for the v2/v3 failure modes).</td>
+</tr>
+<tr>
+<td>Internal wrapper around <code>org.yaml:snakeyaml:2.3</code> (original 2026-05-01 plan)</td>
+<td>Reversed 2026-05-15. (1) SnakeYAML's <code>processComments</code> is node-keyed and heuristic — it does not survive a <code>set + save</code> round-trip for the comment-preservation contract A12 needs, so we'd have to write a surgical-edit save layer in-house <em>anyway</em>. (2) SnakeYAML is not available on the Velocity classloader and is unpinned on BungeeCord, so the proxy modules planned in MULTI_SERVER_PLAN would force shading into every assembly variant — including the lite variant, breaking ADR-024's footprint promise. (3) The YAML feature audit (2026-05-15) showed the subset we actually use is small enough that owning the parser too removes a third-party dependency at low marginal cost.</td>
+</tr>
+<tr>
+<td>BoostedYAML (<code>dev.dejvokep:boosted-yaml</code>)</td>
+<td>Solves comment preservation cleanly but adds a new ~250 KB shaded dependency. The user requirement is "reduce footprint to just RTP code" — adding a different third-party library defeats that goal. Same proxy-classpath problem as SnakeYAML.</td>
+</tr>
+<tr>
+<td>Sponge Configurate</td>
+<td>Larger conceptual shift (<code>CommentedConfigurationNode</code> idiom), heavier shaded footprint, and changes idioms across many files. Cost outweighs benefit for the small surface we use.</td>
+</tr>
+<tr>
+<td>SnakeYAML Engine (YAML 1.2)</td>
+<td>Equivalent footprint to SnakeYAML 1.x, same comment-preservation gap, same proxy-classpath problem.</td>
+</tr>
+<tr>
+<td>Module split (separate <code>rtp-core-yaml</code> module that ships SnakeYAML in only some shadowJars)</td>
+<td>A defensible compromise if we still wanted a vendored parser. Rejected for the same reason as the SnakeYAML wrapper: the work we'd save (the lexer/parser) is small once the comment-preserving save layer is in-house anyway, and the module-split approach still leaves the proxy variants paying ~330 KB of shaded SnakeYAML each.</td>
+</tr>
+<tr>
+<td>Hand-rolled YAML parser <strong>(this ADR's chosen direction as of 2026-05-15)</strong></td>
+<td>Chosen. The 2026-05-01 rejection (<em>"subtle YAML edge cases — anchors, multi-line, quoting — are not worth re-implementing"</em>) was reasoning about <em>full-YAML</em> compliance; the audit shows zero usage of the genuinely complex features and bounds the subset to block mappings + block sequences + scalars + above-line comments.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Positive:</strong><ul>
+<li>Removes ~250 KB of shaded simpleyaml + Simple-Configuration from
+  every produced jar, with <strong>no replacement third-party YAML
+  library shaded</strong>. Net change against today is approximately
+  <strong>−250 KB</strong> in every shadowJar variant.</li>
+<li>YAML substrate is 100% RTP-owned (interface + single
+  implementation), trivially mockable in tests, free of upstream
+  release cadence risk, and free of CVE responsibility for a
+  third-party YAML library we'd otherwise have to track.</li>
+<li>License surface in shaded code drops from three Apache-2.0
+  artifacts to <strong>zero</strong> for YAML.</li>
+<li>The proxy axis (MULTI_SERVER_PLAN Phase 1+) gets a clean,
+  already-decided substrate — no follow-up ADR is needed to pick
+  between "shade SnakeYAML into every proxy jar" and
+  "use a different parser on the proxy."</li>
+<li>The Fabric out-of-scope carve-out from the 2026-05-01 version
+  of this ADR is closed; the same substrate ships on Fabric.</li>
+<li>The lite variant (ADR-024) gets <em>more</em> footprint headroom, not
+  less — its previous platform-deferral was a coincidence of
+  Spigot/Paper/Folia bundling SnakeYAML, not a guarantee.</li>
+<li>Comment preservation for the A12 contract is structurally
+  possible (text-surgery on the on-disk file) where it was
+  structurally impossible against a library emitter.</li>
+<li><code>view</code> hover-text gets reliable above-line-comment recovery
+  for every default parameter once the shipped-defaults rewrite
+  converts the 228 inline trailing comments to above-line form.</li>
+</ul>
+</li>
+<li><strong>Negative / Trade-offs:</strong><ul>
+<li>We own the parser (~300–500 LoC reader, ~300–500 LoC
+  surgical-edit writer, plus a comment-binding walker). Larger
+  LoC count than the SnakeYAML-wrapper plan would have produced.
+  Mitigated by: (a) the audit-bounded subset, (b) golden-file
+  idempotence tests against every shipped <code>.yml</code>, and (c) the
+  fact that we were already committing to write the surgical-
+  edit save layer in either plan.</li>
+<li>One-time shipped-defaults rewrite: 228 inline trailing
+  comments become above-line block comments. Mechanical edit,
+  no behavior change, but adds ~30 minutes of manual review per
+  file family to confirm the comment-key attachment is
+  preserved by the parser. Mitigated by golden-file tests.</li>
+<li>Locale defaults under <code>lang/&lt;locale&gt;/</code> (110+ files) inherit
+  the same rewrite. We commit to keeping translations in the
+  above-line idiom going forward; the translation guidelines
+  in <code>messages.yml</code> admin docs need a short note.</li>
+<li>Slim <code>RtpYamlSection</code> API means future code that wants
+  additional Bukkit-<code>ConfigurationSection</code>-style methods (e.g.,
+  <code>getStringList</code>, <code>getInt(default)</code>) must explicitly extend
+  the interface. Intentional and aligned with the
+  user directive ("slimmer is better").</li>
+<li>Tests that today instantiate <code>YamlFile</code> directly to seed YAML
+  fixtures must migrate. Most can write a <code>String</code> to disk and
+  read it back through the new abstraction; no test logic
+  changes.</li>
+<li>Addons (<code>RTP_ExampleAddon</code>, <code>RTP_Glide</code>) consume <code>rtp-api</code>
+  only, and <code>rtp-api</code> does not import <code>org.simpleyaml.*</code>
+  (verified). They are unaffected.</li>
+<li>Admins who hand-edit their config with unsupported YAML
+  features (anchors, merge keys, flow style, tags) get a
+  fail-fast parse error on next load instead of the previous
+  silent simpleyaml behavior. This is intended (REQ-RTP-F-013
+  configurable message), but it is a user-visible behavior
+  change; the implementation PR's release notes must call it
+  out.</li>
+</ul>
+</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Issue: <em>"scope the refactor required to remove our dependency on
+  simpleyaml"</em> — May 2026. Follow-up issue updates (2026-05-14 /
+  2026-05-15) narrowed the comment-preservation scope to above-line
+  block comments and reversed the substrate decision from a SnakeYAML
+  wrapper to an in-house parser.</li>
+<li><code>rtp-core/build.gradle</code> line 14 (simpleyaml dependency declaration —
+  to be removed by this ADR's implementation PR).</li>
+<li><code>rtp-plugin/build.gradle</code> lines 185–186 (pro shadowJar simpleyaml
+  relocation) and 386–387 (lite shadowJar simpleyaml relocation) — all
+  four lines removed; the anticipatory <code>org.yaml.snakeyaml</code> relocations
+  are also removed since SnakeYAML is no longer shaded.</li>
+<li><code>rtp-core/.../configuration/ConfigParser.java</code> lines 857, 871, 879
+  (<code>setComment</code> call sites).</li>
+<li><code>rtp-core/.../configuration/LanguageBootstrap.java</code> line 106
+  (<code>setComment</code> call site).</li>
+<li>ADR-020 — Language Bootstrap and Locale-Aware ConfigParser (the
+  comment-preservation requirement originated here).</li>
+<li>ADR-024 — RTP-lite Assembly Variant. Under this revised decision the
+  lite variant <em>also</em> drops simpleyaml; the previous platform-deferral
+  of SnakeYAML becomes irrelevant (no SnakeYAML dependency anywhere).
+  The lite footprint promise is <strong>strengthened</strong>, not relaxed.</li>
+<li><a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a>
+  — Fabric Platform In Scope (renumbered from project-wide ADR-022 on
+  2026-05-05). The "Fabric YAML packaging is deferred to a follow-up
+  ADR" carve-out is <strong>closed</strong> by this revision: the in-house parser
+  ships on Fabric like every other variant.</li>
+<li><a href="../../dev/CONFIG_COMMAND_SPEC/"><code>CONFIG_COMMAND_SPEC.md</code></a> §2.4 +
+  Appendix A row A12 — the comment-preservation contract this ADR
+  enables. Block-only scope per 2026-05-14; inline comments tolerated
+  on input but not preserved across write-back.</li>
+<li><a href="../../dev/MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a> — proxy-axis
+  constraint that drove (alongside the A12 feature gap) the reversal
+  from a SnakeYAML wrapper to an in-house parser.</li>
+<li><a href="../../dev/scratch/CONFIG_COMMENT_PRESERVATION_COMPARISON/"><code>docs/dev/scratch/CONFIG_COMMENT_PRESERVATION_COMPARISON.md</code></a>
+  — v1/v2/v3 failure-mode analysis that motivated the surgical
+  line-edit save strategy.</li>
+<li><a href="../dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md"><code>docs/dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md</code></a>
+  — 2026-05-15 audit over 187 shipped <code>.yml</code> files; bounds the parser
+  subset.</li>
+<li>SnakeYAML 2.x comment APIs (<code>LoaderOptions#setProcessComments</code>,
+  <code>DumperOptions#setProcessComments</code>, <code>CommentLine</code>, <code>MappingNode</code>) —
+  retained for reference because the <em>failure modes</em> of those APIs
+  (node-keyed, heuristic comment placement; emitter does not preserve
+  lexical position) are the technical motivation for not adopting
+  them.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

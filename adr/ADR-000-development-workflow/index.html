@@ -1,0 +1,1842 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-000 - Development Workflow - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-000-development-workflow" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-000 - Development Workflow
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-intake" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Intake
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-planning-tier" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Planning tier
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-default-change-loop-read-document-modify" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Default change loop: read, document, modify
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-design-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Design records
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-implementation-and-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Implementation and verification
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-divergence-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Divergence handling
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-communication-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Communication surfaces
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-self-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Self-maintenance
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constraints-applied-to-the-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      Constraints applied to the workflow
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-ai-tooling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Optional AI tooling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="References">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prior-art" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prior art
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-000-development-workflow">ADR-000 - Development Workflow<a class="headerlink" href="#adr-000-development-workflow" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted
+<strong>Date:</strong> 2026-07-19</p>
+<blockquote>
+<p>Numbering note: this record was authored after ADR-073 but is numbered <code>000</code> because it is foundational - it documents the workflow under which every other record in this repository is produced. It changes no prior decision.</p>
+</blockquote>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>RTP is a long-lived, multi-platform codebase (Bukkit family, Folia, Fabric, NeoForge, proxy JVMs) maintained by a single developer, with AI tooling used as an executor. Two recurring failure modes motivated a disciplined documentation workflow:</p>
+<ul>
+<li><strong>Architecture drift</strong>: code changes that silently invalidate the documented design, so the docs describe a system that no longer exists.</li>
+<li><strong>Doc rot / retconning</strong>: design documents edited in place until nobody can reconstruct why a decision was made or what it replaced.</li>
+</ul>
+<p>The workflow that prevents these already operates in practice, but it is <em>implied</em> by scattered artifacts rather than <em>decided</em> anywhere:</p>
+<ul>
+<li><a href="../../dev/RULES/"><code>docs/dev/RULES.md</code></a> - the D-family documentation rules (D-001 traceability, D-002 unambiguity, D-003 single source of truth, D-004 audience, D-005 propose-before-implementation) and the Document Type Catalog.</li>
+<li><a href="../"><code>docs/adr/README.md</code></a> and <a href="../ADR-TEMPLATE/"><code>ADR-TEMPLATE.md</code></a> - what an ADR is, sequential numbering, subproject ADR directories, and the never-delete/supersede convention.</li>
+<li><a href="../../dev/REQUIREMENTS/"><code>docs/dev/REQUIREMENTS.md</code></a> and the requirement-authoring style rules - <code>shall</code>/<code>shall not</code> phrasing, absolute state, what-not-how.</li>
+<li><a href="../../dev/TRACEABILITY/"><code>docs/dev/TRACEABILITY.md</code></a> - the REQ-* to class to test binding that closes the loop.</li>
+<li><a href="../../.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> <em>Self-Updating Protocol</em> - the discovery-to-destination table that keeps the doc system itself current.</li>
+</ul>
+<p>None of those answers "why is the workflow shaped this way, and what were the alternatives?" - which is exactly an ADR's job. <a href="../ADR-018-agents-md-public-release-structure/">ADR-018</a> established precedent for meta-level ADRs.</p>
+<p>This record is a meta document: how a developer ought to work in this repository (assuming a working style similar to the maintainer's), and why. It describes the entire lifecycle at rationale level; the operational rules stay in their canonical homes per D-003.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Record the development workflow as actually practiced, end to end - the stages below are this repository's software development lifecycle (SDLC), descriptive of a common non-corporate development cycle (no agile "points", no performance tracking, no artificial task division). The chart identifies the lifecycle; the stage walk after it names the artifacts each stage produces and the reason the stage exists.</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[1. Intake] --&gt; B[2. Planning tier - mutable]
+    B --&gt; C[3. Read, document, modify]
+    C --&gt; D[4. Design records - ADRs]
+    C --&gt; E[5. Implementation + verification]
+    D &lt;--&gt; E
+    E --&gt; F[6. Divergence handling]
+    F --&gt;|supersede / amend| D
+    F --&gt;|refine| A
+    E --&gt; G[7. Communication surfaces]
+    H[8. Self-maintenance] -.-&gt; B &amp; D &amp; E
+</code></pre></div>
+<p>The chart is illustrative; the stage prose below is authoritative.</p>
+<h3 id="1-intake">1. Intake<a class="headerlink" href="#1-intake" title="Permanent link">&para;</a></h3>
+<p>Change begins as user feedback, developer intent, or a bug report. Feedback is collected, abstracted, and only then specified. Occasionally that specification crystallizes into a <strong>requirement</strong> - and requirements record only the absolutes: core invariants and needs (regional threading on Folia, "<code>/rtp</code> shall teleport the caller"), stated in <code>shall</code> terms, implementation-free, identified as <code>REQ-&lt;module&gt;-&lt;family&gt;-NNN</code>. A whole plugin evolves from a handful of core requirements; they are not per-change forcing functions, and most changes never touch them.</p>
+<h3 id="2-planning-tier">2. Planning tier<a class="headerlink" href="#2-planning-tier" title="Permanent link">&para;</a></h3>
+<p>Between intake and design sits a deliberately <em>mutable</em> staging layer: plan docs (<code>MULTI_PLATFORM_PLAN.md</code>, <code>MULTI_SERVER_PLAN.md</code>, <code>METRICS_PLAN.md</code>, <code>ROADMAP.md</code>) and scratch/proposal notes (<code>docs/dev/scratch/</code>, PROPOSAL drafts). These are living documents, edited in place, because the ideas in them are not yet decisions. When a plan ships or is superseded, the plan is removed and the ADR becomes the durable record - the mutability is the point of the tier, not a defect of it.</p>
+<h3 id="3-default-change-loop-read-document-modify">3. Default change loop: read, document, modify<a class="headerlink" href="#3-default-change-loop-read-document-modify" title="Permanent link">&para;</a></h3>
+<p>The default loop for any change is: read the relevant code and records, document intent at a weight proportional to the change (nothing beyond a changelog entry for a small fix, a scratch note or proposal for medium work, an ADR for architectural work), then modify. Most third-party contributions - a bugfix - require neither a requirement nor an ADR. Rule D-005 is a guard rail on the large end of that spectrum, aimed primarily at low-skill contributors and AI agents whose compulsions or tooling can cause major breakage; it is not a universal forward gate - it binds only changes that reach its multi-class / cross-module trigger, where it is mandatory for every contributor.</p>
+<h3 id="4-design-records">4. Design records<a class="headerlink" href="#4-design-records" title="Permanent link">&para;</a></h3>
+<p>For larger changes, the architecture and thought process are a layer above the coding (and often emerge <em>during</em> coding); that layer is what gets recorded. <strong>ADRs co-exist with code and document the work itself</strong>, so that anyone - including the author years later - asking "why doesn't this work like X model?" has an answer. Answerability is the point: its absence causes quality drift and gives "slop" PRs a foothold. ADRs are also provenance - every architectural decision has an explicit human owner, whether or not execution was AI-assisted. Records are superseded or amended, never retconned. Supporting design surfaces: <code>DESIGN.md</code> for the <em>how</em> of cross-cutting mechanisms, <code>GLOSSARY.md</code> for term definitions, subproject ADR sequences for decisions confined to one module.</p>
+<h3 id="5-implementation-and-verification">5. Implementation and verification<a class="headerlink" href="#5-implementation-and-verification" title="Permanent link">&para;</a></h3>
+<p><strong>Code is the functional component and has priority.</strong> A bugfix may or may not warrant documentation, depending on the scale of its impact - though most bugfixes still warrant a <code>CHANGELOG.md</code> entry; the changelog is the exception to weight-proportional documentation. Implementation is bound back to the record layer through REQ-traceable tests and <code>TRACEABILITY.md</code> rows, and guarded mechanically by ArchUnit boundary tests and <code>check_traceability.sh</code>. Runtime-testable work ends with a full build; integration behavior is exercised against the devstack where the change warrants it.</p>
+<h3 id="6-divergence-handling">6. Divergence handling<a class="headerlink" href="#6-divergence-handling" title="Permanent link">&para;</a></h3>
+<p>When code and an ADR are found to disagree, priority is chosen case by case: the divergence reveals information about both, and examining it may show the code needs updated architecture rather than the ADR being right by default. That in-the-moment decision process has produced more value than predetermined architecture. Findings worth keeping flow to a superseding/amending ADR, a requirement refinement, or a dated <code>LESSONS_LEARNED.md</code> entry, at the maintainer's judgment. Incidental discoveries made mid-change are recorded rather than chased (<code>POTENTIAL_BUGS.md</code>), keeping each change traceable to a single driving need. Drift is also caught mechanically: <code>TRACEABILITY.md</code> updates on symbol renames and the automated backstops above.</p>
+<h3 id="7-communication-surfaces">7. Communication surfaces<a class="headerlink" href="#7-communication-surfaces" title="Permanent link">&para;</a></h3>
+<p>Completed work is reflected outward at registers appropriate to each audience (Rule D-004): <code>CHANGELOG.md</code> (net delta against the last released tag, Pro-only entries tagged), wiki and <code>docs/admin/</code> operator docs, locale parity for every user-facing string (the English baseline mirrored into every shipped locale in the same change), and maintainer-voice prose for listings and front pages. These surfaces are downstream of the record layer - they describe what shipped, they do not decide anything.</p>
+<h3 id="8-self-maintenance">8. Self-maintenance<a class="headerlink" href="#8-self-maintenance" title="Permanent link">&para;</a></h3>
+<p>The doc system maintains itself through the Self-Updating Protocol in <a href="../../.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a>: every durable discovery has a designated destination (environment fixes, engineering pitfalls, glossary terms, aliases, plan-status updates, traceability rows, new ADRs), so knowledge lands where the next reader will look for it instead of decaying in chat history or memory.</p>
+<h3 id="constraints-applied-to-the-workflow">Constraints applied to the workflow<a class="headerlink" href="#constraints-applied-to-the-workflow" title="Permanent link">&para;</a></h3>
+<p>The lifecycle operates under the following constraints (canonical definitions live in <a href="../../dev/RULES/"><code>RULES.md</code></a>; summarized here because they shape the workflow itself):</p>
+<ul>
+<li><strong>Rule D-005 - Propose Architecture Before Implementation.</strong> For any change that touches more than one class, crosses a module boundary, or introduces a new command architecture, a written proposal (affected modules, before/after structure, relevant REQ-<em>/ADRs, risks and trade-offs) shall be presented and explicitly approved </em>before* any code is written. D-005 is the guard rail on the large end of the documentation-weight spectrum: it forces big design onto paper, where a bad idea is cheap, and constrains contributors (human or agent) whose tooling or habits could otherwise cause major breakage. A change that contradicts an existing ADR shall say so and propose a superseding ADR.</li>
+<li><strong>Rule D-001 - Traceability.</strong> Every requirement, decision, and rule links to a source; code changes trace back to a requirement or decision.</li>
+<li><strong>Rule D-002 - Unambiguity.</strong> Requirements use <code>shall</code>/<code>shall not</code>; new or overloaded terms are defined in <code>GLOSSARY.md</code>.</li>
+<li><strong>Rule D-003 - Single Source of Truth.</strong> Each piece of information has exactly one authoritative home; other documents reference it rather than duplicating it. This ADR obeys D-003 by recording rationale and lifecycle topology only - the operational rules remain in <code>RULES.md</code> and <code>.junie/AGENTS.md</code>.</li>
+<li><strong>Rule D-004 - Audience separation.</strong> User docs, developer docs, and agent-operational docs are distinct surfaces.</li>
+<li><strong>S-00x prohibitions.</strong> The safety prohibitions in <code>REQUIREMENTS.md</code> section 3 are absolute at every stage of the lifecycle; no proposal, ADR, or implementation may relax them without a superseding requirement change.</li>
+<li><strong>Requirement-authoring style.</strong> Requirements state <em>what</em>, not <em>how</em>; no class names, no temporal framing, legal phrasing (<code>shall</code>). Implementation detail belongs in <code>DESIGN.md</code> or an ADR.</li>
+</ul>
+<p>Constraints that apply only to AI agents (pre-flight checklist, stay-on-task/record-don't-chase, git safety, checklist-based state tracking, encoding hygiene) are operational rules on the tool, not on the workflow; they live in <a href="../../.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> and are covered under <em>Optional AI tooling</em> below.</p>
+<h3 id="optional-ai-tooling">Optional AI tooling<a class="headerlink" href="#optional-ai-tooling" title="Permanent link">&para;</a></h3>
+<p>AI tooling (agentic LLM assistants) is an <em>optional</em> executor of human-directed work, never a design participant. Its use is bounded:</p>
+<ul>
+<li><strong>The workflow regulates the tool, not the other way around.</strong> The requirement/ADR discipline predates AI use and originates from human-safety-systems practice. Its shape - explicit what, explicit why, explicit trade-offs, numbered records that cannot be quietly retconned - is what makes LLM output auditable. An AI-produced change enters the codebase through the same D-005 gate, ADR record, and traceability row as any other; the human owns the design and approves the result. That gate is what establishes quality and human provenance.</li>
+<li><strong>Where AI is used</strong>: mechanical instances of human-designed patterns (the Nth <code>Shape</code>, platform adapter wrappers), locally-specified unit tests, filling narrow API-knowledge gaps, and formatting human-directed prose into the document templates.</li>
+<li><strong>Where AI is not used</strong>: system design, code review, automated git operations, and independently-authored requirements or ADRs. Design happens in human brainstorming; AI formats the result. An AI-written ADR or requirement whose substance was not human-directed is a defect.</li>
+<li><strong>Operational rules for agents</strong> live in <a href="../../.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> (pre-flight checklist, checklist-based state tracking, git safety, encoding hygiene). The full rationale, boundaries, and honest failure modes of AI use are documented in <a href="../../dev/AI_USAGE/"><code>docs/dev/AI_USAGE.md</code></a>, which is the canonical source for this topic per D-003.</li>
+</ul>
+<h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why Rejected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Keep the workflow implicit in <code>RULES.md</code> + <code>AGENTS.md</code></td>
+<td>No rationale record; each new contributor or agent re-derives (or violates) the lifecycle; the workflow itself can drift with no supersession trail</td>
+</tr>
+<tr>
+<td>A <code>WORKFLOW.md</code> living doc in <code>docs/dev/</code></td>
+<td>Living docs get edited in place; the <em>decision</em> to use this workflow deserves immutability plus supersession semantics, i.e. an ADR</td>
+</tr>
+<tr>
+<td>Document only the requirements/ADR/code triangle</td>
+<td>Undersells the practice: planning, verification, communication, and self-maintenance stages are equally load-bearing, and omitting them invites the same folklore problem at those stages</td>
+</tr>
+<tr>
+<td>Waterfall (requirements frozen before design, design frozen before code)</td>
+<td>Contradicts observed reality: architecture and thought process often emerge during coding and are recorded then (the Fabric obf/unobf carrier split, ADR-043 superseding ADR-007's operational details)</td>
+</tr>
+<tr>
+<td>Code-first with no documentation</td>
+<td>Undocumented code-first is what produces quality drift and unanswerable "why doesn't it work like X" questions; documented-during-coding is in fact the practice - the rejection is the <em>undocumented</em> variant</td>
+</tr>
+<tr>
+<td>Mandating (or banning) AI tooling as part of the workflow</td>
+<td>Tooling availability and trust vary by contributor and by task; the workflow is tool-neutral by design, with AI-produced output bounded by the same gates as any change</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Positive:</strong> one citable anchor for "how should I work here, and why"; new ADRs and proposals can reference ADR-000 instead of re-explaining process; the read-document-modify default, the mutable planning tier, and case-by-case divergence handling become explicit rather than folklore; the AI-tooling boundary is recorded as a decision rather than a habit.</li>
+<li><strong>Negative / Trade-offs:</strong> risk of overlap with <code>RULES.md</code> and <code>AGENTS.md</code> - this record deliberately confines itself to rationale and lifecycle topology and references the operational homes per D-003; keeping the summaries here consistent with those sources is a (small) ongoing maintenance cost. The out-of-sequence number <code>000</code> is a permanent mild oddity, accepted for its foundational readability.</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../dev/RULES/"><code>docs/dev/RULES.md</code></a> - D-001..D-005 definitions and the Document Type Catalog.</li>
+<li><a href="../../dev/REQUIREMENTS/"><code>docs/dev/REQUIREMENTS.md</code></a> - requirement families and S-00x prohibitions.</li>
+<li><a href="../../dev/TRACEABILITY/"><code>docs/dev/TRACEABILITY.md</code></a> - REQ-* to class to test matrix.</li>
+<li><a href="../../dev/LESSONS_LEARNED/"><code>docs/dev/LESSONS_LEARNED.md</code></a> - dated engineering findings.</li>
+<li><a href="../../dev/AI_USAGE/"><code>docs/dev/AI_USAGE.md</code></a> - canonical AI-tooling rationale and boundaries.</li>
+<li><a href="../../.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> - agent-operational guide (Self-Updating Protocol, D-005 gate restatement).</li>
+<li><a href="../ADR-018-agents-md-public-release-structure/">ADR-018</a> - precedent for meta-level ADRs.</li>
+<li><a href="../ADR-TEMPLATE/">ADR-TEMPLATE.md</a> - the record format this workflow produces.</li>
+</ul>
+<h3 id="prior-art">Prior art<a class="headerlink" href="#prior-art" title="Permanent link">&para;</a></h3>
+<p>Where a stage or constraint has a named preexisting practice, credit belongs to its first origin; none of these were invented here:</p>
+<ul>
+<li><strong>Architecture Decision Records</strong> - Michael Nygard, "Documenting Architecture Decisions" (blog post, 2011), which also established the lightweight context/decision/consequences format this repository's template descends from.</li>
+<li><strong>Never-delete / supersede-instead records</strong> - the IETF RFC series (Steve Crocker, RFC 1, 1969): published RFCs are never edited, only obsoleted by successors.</li>
+<li><strong><code>shall</code> / <code>shall not</code> requirement language</strong> - long-standing systems-engineering specification practice, standardized in US defense specifications (MIL-STD-490, 1968) and carried into IEEE 830 / ISO-IEC-IEEE 29148 requirement-writing standards.</li>
+<li><strong>Requirements traceability matrices</strong> - aerospace / safety-critical certification practice, notably RTCA DO-178 (1982) and its successors, which require every requirement to trace to design, code, and test.</li>
+<li><strong>Single source of truth</strong> - the DRY principle, Andy Hunt and Dave Thomas, <em>The Pragmatic Programmer</em> (1999), generalized from code to knowledge.</li>
+<li><strong>Documentation weight proportional to the change</strong> - Alistair Cockburn's methodology-weight principle (Crystal family, <em>Agile Software Development</em>, 2001): ceremony scales with criticality and size, not uniformly.</li>
+<li><strong>Capture existing behavior before modifying</strong> - closest named prior art is characterization testing, Michael Feathers, <em>Working Effectively with Legacy Code</em> (2004); the same capture-first idea applied here at the documentation layer.</li>
+<li><strong>Record incidental findings instead of chasing them</strong> - a scope-discipline commonplace with no single origin; the fence-before-removal rationale traces to G. K. Chesterton, <em>The Thing</em> (1929, "The Drift from Domesticity").</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

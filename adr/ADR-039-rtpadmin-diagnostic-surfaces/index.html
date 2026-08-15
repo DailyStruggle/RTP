@@ -1,0 +1,2093 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-039 — /rtpadmin Diagnostic Surfaces (Biome Map, Bad-Selection Heatmap, Metrics Readouts) - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-039-rtpadmin-diagnostic-surfaces-biome-map-bad-selection-heatmap-metrics-readouts" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-039 — /rtpadmin Diagnostic Surfaces (Biome Map, Bad-Selection Heatmap, Metrics Readouts)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-four-surfaces-beta4" class="md-nav__link">
+    <span class="md-ellipsis">
+      The four surfaces (beta.4)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-backend-aggregation-network-mode-enabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cross-backend aggregation (network mode enabled)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-ties-them-together" class="md-nav__link">
+    <span class="md-ellipsis">
+      What ties them together
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-placement-architecture-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module placement (Architecture Boundaries)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-six-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      The six contracts
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-this-adr-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      What this ADR is not
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#initial-surface-catalog-beta4" class="md-nav__link">
+    <span class="md-ellipsis">
+      Initial surface catalog (beta.4)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtpadmin-diag-command-grammar" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtpadmin diag command grammar
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Permissions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concrete-affected-classes-informational-final-shape-decided-during-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Concrete affected classes (informational; final shape decided during implementation)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migration-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      Migration / Rollout
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-references-to-existing-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cross-references to existing rules
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-039-rtpadmin-diagnostic-surfaces-biome-map-bad-selection-heatmap-metrics-readouts">ADR-039 — <code>/rtpadmin</code> Diagnostic Surfaces (Biome Map, Bad-Selection Heatmap, Metrics Readouts)<a class="headerlink" href="#adr-039-rtpadmin-diagnostic-surfaces-biome-map-bad-selection-heatmap-metrics-readouts" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Proposed
+<strong>Date:</strong> 2026-05-13
+<strong>Target release:</strong> <code>3.0.0-beta.4</code> (read-only surfaces only, including cross-backend aggregation via ADR-036's shared store and in-memory time-series charts sampled by a repurposed <code>MemoryTracker</code>; deeper visualizations may slip to beta.5)
+<strong>Supersedes:</strong> —
+<strong>Superseded by:</strong> —
+<strong>Related:</strong> ADR-035 (Interactive Menus via Written Book), ADR-036 (Network Mode: Multi-Server, Multi-Proxy RTP), ADR-037 (Harden RTP Config Commands), ADR-038 (<code>/rtpadmin</code> Setup Wizards), ADR-016 (Anvil Subsystem), ADR-028 (L3 Backlog Cache), <a href="../../dev/METRICS_PLAN/"><code>docs/dev/METRICS_PLAN.md</code></a></p>
+<hr />
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>ADR-038 gives admins <strong>wizards that change configuration</strong>. It does not give them surfaces that <strong>answer questions</strong> — "why is this region rerolling so often?", "what biome distribution will players actually see inside this shape?", "which areas of the bounded region are failing safety the most?", "is the pipeline starved or is the L1/L2/L3 cache the bottleneck?".</p>
+<p>Today, the only way to answer those questions is:</p>
+<ul>
+<li><code>/rtp info</code> — short text dump, no spatial information.</li>
+<li><code>/rtp test full</code> — synthetic sample, not a real distribution.</li>
+<li>Tail the server log and read <code>MemoryTracker</code> / scan-task lines.</li>
+<li>Read the YAML and reason about it.</li>
+</ul>
+<p>That is fine for the author of the plugin. It is not acceptable as the only diagnostic surface for the admins ADR-038 is supposed to empower. Without a diagnostic layer, the wizards in ADR-038 become "guess, commit, test, repeat" — the very workflow ADR-037's preview/dry-run was designed to avoid.</p>
+<p>This ADR introduces <strong>diagnostic surfaces</strong>: read-only views, opened from the same book-menu primitive ADR-035 defines, that present spatial and metric information to admins. It does <strong>not</strong> add any new configurable knob, and it does <strong>not</strong> open a write path. Diagnostic surfaces are a sibling of wizards, not a replacement.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Adopt a <strong>read-only diagnostic surface layer</strong>, mounted under <code>/rtpadmin diag &lt;surface&gt;</code>, rendered through the ADR-035 <code>MenuRenderer</code> (book first, chat fallback), and sourced exclusively from data the codebase already produces or can produce without new I/O on the main thread.</p>
+<p>Four surfaces ship in <code>3.0.0-beta.4</code> (three spatial/tabular plus one time-series chart surface backed by a repurposed <code>MemoryTracker</code> sampler). Additional surfaces are explicitly deferred (see <em>What this ADR is not</em>).</p>
+<h3 id="the-four-surfaces-beta4">The four surfaces (beta.4)<a class="headerlink" href="#the-four-surfaces-beta4" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Biome map</strong> — <code>/rtpadmin diag biomes &lt;region&gt;</code>
+   For the named region's shape, render biome distribution <strong>from region data the running pipeline already retains</strong> — the verified entries in <code>keptLocations</code>/<code>unkeptLocations</code>/<code>backlogLocations</code> for that region (their stored biome attribution). <strong>No</strong> anvil sweep, <strong>no</strong> chunk loads, <strong>no</strong> TTL-driven re-scan. Render as:</li>
+<li>A pageable table: biome → observed share of retained cells → permitted/blocked under current <code>biomes</code>/<code>badBiomes</code> config.</li>
+<li>An optional <strong>ASCII map page</strong> (book-friendly, ~14×19 grid): one glyph per retained cell bucketed onto the shape's bounding box, colored by biome family (warm/cold/wet/dry/nether-ish/end-ish). Empty buckets render as <code>·</code>; resolution is whatever the bounding box downsamples to under the page budget.</li>
+<li>One annotation row per page: retained cells counted, cells excluded by current bad-biome list, cells excluded by water/lava prefilter (all read off the existing region entries, not re-computed).</li>
+<li><strong>Bad-selection heatmap</strong> — <code>/rtpadmin diag heatmap &lt;region&gt; [window]</code>
+   For the same shape, render the <strong>per-cell failure rate</strong> observed by the live pipeline over the last <code>window</code> (default: 1 hour, max: 24 h on Folia/Paper, capped by the sampler's ring buffer). Same ~14×19 grid; glyph intensity (<code>·</code> → <code>▒</code> → <code>█</code>) encodes fail-rate. A second page legends the <strong>dominant failure mode per quadrant</strong> (<code>badBiome</code>, <code>nullChunk</code>, <code>unsafeBlock</code>, <code>claimBlocked</code>, <code>vertNoLand</code>). Source: <code>MemoryTracker</code> + <code>FailTypes</code> counters, sampled by a new lock-free ring per region, <strong>not</strong> persisted across restarts in beta.4.</li>
+<li><strong>Metrics readouts</strong> — <code>/rtpadmin diag metrics [section]</code>
+   A guided view of the live values defined in <code>METRICS_PLAN.md</code>. Sections:</li>
+<li><code>tps</code> — TPS / MSPT (per-region on Folia), with the <code>tickCpuBudget</code> analytical bound.</li>
+<li><code>cache</code> — L1/L2/L3 fill, hit %, refill rate, stalls.</li>
+<li><code>pipeline</code> — active <code>TeleportPipelineTask</code> count, chunk-ticket count, queue depth, fairness FIFO depth.</li>
+<li><code>network</code> — only when ADR-036 network mode is enabled: snapshot age, peer count, reservation token in-flight, per-backend L1/L2/L3 fill and pipeline depth read from the shared network snapshot.
+   Each section is one book page. Numbers refresh by <strong>re-opening</strong> the surface (ADR-035's no-live-update constraint); a <code>[refresh]</code> click runs <code>/rtpadmin diag metrics &lt;section&gt;</code> again with a fresh token.</li>
+<li><strong>Metric chart (time-series)</strong> — <code>/rtpadmin diag chart &lt;metric&gt; [window]</code>
+   Renders a <strong>per-metric time-series chart vs time</strong> for any key the live metrics subsystem currently exposes (enumerated dynamically per contract 6). The chart is sourced from an <strong>in-memory ring</strong> that <code>MemoryTracker</code> — repurposed as a periodic sampler/condenser — fills on its existing scheduler tick: each tick, every live sampler key is read once and appended to its per-metric ring; older samples are <strong>condensed</strong> in place (downsampled to coarser buckets at fixed boundaries — e.g. raw 1 s for the last 5 min, 10 s for the last 1 h, 1 min for the last 24 h) so total per-metric memory stays bounded regardless of window. No new scheduler is introduced; <code>MemoryTracker</code>'s existing periodic pass gains one cheap read-and-append per registered key, with sampling already off the main/region thread (S-005). Render as a single book page: an ASCII sparkline grid (~14×19) sized to the chosen window, with y-axis auto-scaled to the observed range, a min/avg/max annotation row, and a legend naming the metric, its unit (from the metrics subsystem), and the active condensation tier. Windows are bounded enums (<code>5m|1h|6h|24h</code>) sized to the ring tiers; values beyond the ring's retention render as <code>— (outside retention)</code>. Like the heatmap, the time-series ring is <strong>in-memory only</strong> in beta.4 — no new DB writes, no new schema, no new heartbeat.</li>
+</ol>
+<h3 id="cross-backend-aggregation-network-mode-enabled">Cross-backend aggregation (network mode enabled)<a class="headerlink" href="#cross-backend-aggregation-network-mode-enabled" title="Permanent link">&para;</a></h3>
+<p>When ADR-036 network mode is enabled, the <code>metrics</code>, <code>chart</code>, and <code>network</code> surfaces gain an optional <code>--backend &lt;id|all&gt;</code> selector and <strong>read</strong> from the <strong>same shared store</strong> ADR-036's network snapshot and the metrics subsystem (<code>METRICS_PLAN.md</code>) already write (Postgres / MySQL / Redis, dispatched via <code>AbstractSQLDatabaseAccessor</code> or the Redis driver). Diagnostic surfaces are a <strong>strict consumer</strong> of that store; they do not write, do not introduce a publisher, do not introduce a new transport, schema, table, or dependency.</p>
+<ul>
+<li><strong>Source rows.</strong> Cross-backend reads consume only rows that the <strong>metrics subsystem</strong> and <strong>ADR-036 network snapshot</strong> already publish on their own cadence (the <code>network_snapshot</code> / <code>serverIds</code> heartbeat row described in <code>METRICS_PLAN.md</code> and ADR-036). If a metric isn't currently written to the shared store, the cross-backend page renders that field as <code>—</code>; this ADR adds no new column, no new key, and no new write.</li>
+<li><strong>Consumption.</strong> <code>/rtpadmin diag metrics --backend &lt;id&gt;</code> reads that backend's existing network-snapshot row directly. <code>--backend all</code> reads every non-expired peer row and renders one page per backend plus an aggregate page (sum for counts, weighted mean for rates, max-age for staleness). The <code>chart</code> surface is <strong>origin-only by default</strong>; <code>--backend &lt;id&gt;</code> plots <strong>only</strong> if the chosen peer's metric key is present in its already-published network-snapshot row (the per-metric time-series ring is local to each backend and is <strong>not</strong> transmitted), and renders <code>— (cross-backend chart unavailable)</code> otherwise. <code>--backend all</code> on <code>chart</code> overlays the latest per-backend value the network snapshot does carry, not the time-series. Origin-only behavior (no selector) is preserved as the default.</li>
+<li><strong>Surfaces that do not aggregate.</strong> The <code>biomes</code> and <code>heatmap</code> surfaces are <strong>origin-only</strong>, with or without network mode: neither retained-region-entry biome tallies nor the in-memory fail-rate ring are written to the shared store by any subsystem, and this ADR does not propose to start writing them. <code>--backend</code> on those surfaces is rejected with <code>menu.surface.network.unsupported</code> (REQ-RTP-F-013). The <code>chart</code> surface's <strong>time-series</strong> is likewise origin-only (the per-metric ring is in-memory and not published); cross-backend <code>chart</code> invocations fall back to the per-tick value already in the network snapshot per the bullet above.</li>
+<li><strong>Staleness.</strong> Each row's <code>generation</code> / <code>last_seen_epoch</code> (as already published by ADR-036) is rendered verbatim so admins can see when a backend last reported. Stale rows past the existing network-snapshot TTL render as <code>— (stale)</code> with the age; missing backends render as <code>— (no report)</code>. No surface ever blocks on a peer.</li>
+<li><strong>Store-down behavior.</strong> If the shared store is unreachable, cross-backend pages collapse to origin-only with a one-line <code>menu.surface.network.unavailable</code> notice (REQ-RTP-F-013). The origin surface keeps working.</li>
+<li><strong>Write boundary.</strong> Surfaces write <strong>nothing</strong> to the shared store — not on click, not on a heartbeat, not at all. The only persistent side effect of a surface invocation is the structured audit line on the local node (ADR-037 audit stream). All cross-backend data shown was put there by the metrics subsystem or ADR-036, not by this feature.</li>
+</ul>
+<h3 id="what-ties-them-together">What ties them together<a class="headerlink" href="#what-ties-them-together" title="Permanent link">&para;</a></h3>
+<p>All four surfaces share:</p>
+<ul>
+<li><strong>Source-of-truth contract.</strong> A surface may only read data the codebase already exposes through <code>MemoryTracker</code>, <code>FailTypes</code>, the region/queue accessors, the metrics samplers, or — when ADR-036 network mode is enabled — the peer rows that the <strong>metrics subsystem and ADR-036 already write</strong> to the shared store on their existing cadence. <strong>No</strong> surface may trigger chunk loads, anvil reads, new DB writes, or <em>new</em> DB queries beyond reading rows other subsystems already maintain; the shared-store read piggybacks on ADR-036's existing accessor and adds no new transport, schema, or write path. If a number isn't already being computed or already being written, the surface reports <code>—</code> and names the metrics-plan phase that would unlock it.</li>
+<li><strong>Threading.</strong> Surface rendering runs off the main/region thread. On Folia the snapshot is taken via <code>Bukkit.getGlobalRegionScheduler()</code> for cross-region aggregates; per-region values are read from the owning region scheduler. S-005 applies in full.</li>
+<li><strong>Token model.</strong> Surfaces reuse ADR-035's UUID-bound, single-use, TTL'd token registry. A <code>[refresh]</code> button mints a new token; a stale token returns a configurable <code>menu.surface.expired</code> message (REQ-RTP-F-013).</li>
+<li><strong>Audit.</strong> Every surface invocation logs one structured <code>RTP.log(INFO, …)</code> line with <code>(actor, surface, region?, window?)</code>, reusing ADR-037's audit stream (no new sink).</li>
+<li><strong>Permissions.</strong> <code>rtp.admin.diag.&lt;surface&gt;</code> per surface, plus the umbrella <code>rtp.admin.diag</code> matching ADR-038's <code>rtp.admin.wizard.*</code> shape.</li>
+<li><strong>No writes.</strong> Diagnostic surfaces have <strong>no</strong> <code>[apply]</code> button. A surface that wants to drive a change ends with a <code>[open wizard …]</code> click that hands off to ADR-038. The handoff is the only coupling.</li>
+</ul>
+<h2 id="module-placement-architecture-boundaries">Module placement (Architecture Boundaries)<a class="headerlink" href="#module-placement-architecture-boundaries" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Module</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DiagnosticSurface</code> interface, <code>SurfaceModel</code> (POJO snapshot), <code>BiomeSampleSnapshot</code>, <code>FailHeatSnapshot</code>, <code>MetricsSnapshot</code></td>
+<td><code>rtp-api</code></td>
+<td>No platform imports. Stable for addons to read; deliberately not for them to register their own surfaces in beta.4.</td>
+</tr>
+<tr>
+<td>Per-region fail-rate ring buffer, snapshot assembly, biome tally over existing region entries</td>
+<td><code>rtp-core</code></td>
+<td>New <code>diagnostics/</code> subpackage. Reads <code>MemoryTracker</code> / <code>FailTypes</code> / <code>keptLocations</code> / <code>unkeptLocations</code> / <code>backlogLocations</code>; <strong>no new I/O paths</strong>.</td>
+</tr>
+<tr>
+<td><code>/rtpadmin diag</code> subcommand, surface → <code>MenuModel</code> rendering</td>
+<td><code>rtp-plugin</code></td>
+<td>Composes <code>commands-api</code>, ADR-035 renderer, and the snapshots from <code>rtp-core</code>.</td>
+</tr>
+<tr>
+<td>Adapter-specific concerns (e.g., Folia per-region TPS)</td>
+<td>platform adapters</td>
+<td>Same pattern as existing <code>rtp-folia</code> aggregation in <code>METRICS_PLAN.md §Folia Aggregation</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>No change to <code>rtp-api</code>'s wizard interfaces from ADR-038. Surfaces are a sibling, not a subclass.</p>
+<h2 id="the-six-contracts">The six contracts<a class="headerlink" href="#the-six-contracts" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Read-only.</strong> A surface shall not mutate config, queues, caches, or any persistent state. Audit log writes and the menu token registry are the only side effects permitted.</li>
+<li><strong>No new I/O hotpaths.</strong> A surface shall not introduce chunk loads, anvil-file reads, or new transports. Local data must already be in memory because the running pipeline (region entries, <code>MemoryTracker</code>, <code>FailTypes</code>, metrics samplers) put it there. Cross-backend data is read from the <strong>same</strong> shared-store accessor ADR-036 already uses for network snapshots; surfaces add no new connection pool, scheduler, or schema beyond ADR-036's published row shape. Sampling is piggyback-only.</li>
+<li><strong>Snapshot, not stream.</strong> A surface renders one immutable snapshot per token. Live-update is out of scope (consistent with ADR-035's no-live-update note). Refresh is explicit.</li>
+<li><strong>Bounded memory.</strong> Per-region fail-rate rings are fixed-size (configurable, default 4096 samples ≈ 1–24 h depending on traffic). The biome surface allocates only a transient snapshot view; it caches nothing and adds no new per-region state.</li>
+<li><strong>Graceful degradation.</strong> When a data source isn't available (e.g., metrics phase not shipped, anvil disabled for the world, network mode off), the surface renders the row as <code>—</code> with a one-line reason and a doc link, never an error.</li>
+<li><strong>Dynamic enumeration (no hardcoded catalogs).</strong> A surface shall not bake in static lists of metric keys, command/parameter names, region names, biome families, fail-mode labels, or backend ids. Every enumeration is resolved at render time from the live source already used elsewhere in the codebase:</li>
+<li><strong>Metric rows</strong> — enumerated from whatever the metrics subsystem currently exposes (live sampler keys for the origin surface; the column/key set actually present on the shared-store rows for cross-backend pages). New metrics added by <code>METRICS_PLAN.md</code> phases appear in <code>/rtpadmin diag metrics</code> without an ADR-039 code change.</li>
+<li><strong>Subcommands, parameters, and value enums</strong> — sourced from the same tab-complete supplier <code>/rtpadmin</code> and <code>/rtp</code> config commands already use (ADR-037's shared parse/tab-complete grammar). Adding a config knob in ADR-037 makes it visible to relevant surface pickers automatically; surfaces never maintain a parallel list.</li>
+<li><strong>Region names</strong> — read from the live in-memory region registry, the same source <code>/rtp info</code> consults. Newly created regions (including those created mid-session by an ADR-038 wizard) are pickable on next surface open without a reload or hardcoded refresh.</li>
+<li><strong>Fail-mode labels</strong> — enumerated from the <code>FailTypes</code> enum / registry actually populating the ring; new fail modes appear in legends without renderer edits.</li>
+<li><strong>Backend ids</strong> — enumerated from the peer rows present in ADR-036's network snapshot at read time; no static <code>serverIds</code> list in the surface code.
+   A surface that needs a list shall obtain it through one of the above providers or render <code>—</code> with the configurable <code>menu.surface.source.unavailable</code> reason (REQ-RTP-F-013). Hardcoded catalogs are a contract violation.</li>
+</ol>
+<h2 id="what-this-adr-is-not">What this ADR is <strong>not</strong><a class="headerlink" href="#what-this-adr-is-not" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Not</strong> a metrics-plan rewrite. It consumes <code>METRICS_PLAN.md</code>; it does not redefine any metric, bound, or sampler. Metrics phases that haven't shipped render as <code>—</code>.</li>
+<li><strong>Not</strong> a live dashboard. No websocket, no HTTP endpoint, no auto-refresh, no Prometheus exporter. Those are explicitly out of scope and tracked in <code>METRICS_PLAN.md §Phased Roadmap</code> / a future ADR.</li>
+<li><strong>Not</strong> a write path. No <code>[apply]</code> from a diagnostic page. Surfaces hand off to ADR-038 wizards or to ADR-037 config commands; they never bypass either.</li>
+<li><strong>Not</strong> the place for the heatmap to gain persistence. The fail-rate ring is in-memory only in beta.4. Persisting samples across restarts (and the schema work that implies) is deferred.</li>
+<li><strong>Not</strong> an addon extension point in beta.4. The interface is sealed against third-party surfaces until the API has soaked one release cycle.</li>
+<li><strong>Not</strong> restricted to origin-only for surfaces whose data is already written cross-backend. When ADR-036 network mode is enabled, the <code>metrics</code> and <code>network</code> surfaces read peer rows the <strong>metrics subsystem and ADR-036 already publish</strong> (no new writer) and render per-backend and aggregate pages. The <code>biomes</code> and <code>heatmap</code> surfaces remain origin-only because their data is not written to the shared store by any subsystem and this ADR adds none. When network mode is disabled, origin-only is the only possible behavior and is the default.</li>
+<li><strong>Not</strong> a database writer. This ADR introduces zero new persisted state: no new table, no new column, no new Redis key, no new publisher, no new heartbeat. All cross-backend reads consume rows other subsystems already maintain.</li>
+</ul>
+<h2 id="initial-surface-catalog-beta4">Initial surface catalog (beta.4)<a class="headerlink" href="#initial-surface-catalog-beta4" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Command</th>
+<th>Source</th>
+<th>Refresh cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>biomes</code></td>
+<td><code>/rtpadmin diag biomes &lt;region&gt;</code></td>
+<td>Existing region entries (<code>keptLocations</code> / <code>unkeptLocations</code> / <code>backlogLocations</code>)</td>
+<td>O(retained cell count) snapshot copy</td>
+</tr>
+<tr>
+<td><code>heatmap</code></td>
+<td><code>/rtpadmin diag heatmap &lt;region&gt; [window]</code></td>
+<td>In-memory fail-rate ring (<code>MemoryTracker</code> + <code>FailTypes</code>)</td>
+<td>O(ring size) snapshot copy</td>
+</tr>
+<tr>
+<td><code>metrics</code></td>
+<td><code>/rtpadmin diag metrics [section]</code></td>
+<td>Live metrics samplers</td>
+<td>O(section size) read</td>
+</tr>
+<tr>
+<td><code>chart</code></td>
+<td><code>/rtpadmin diag chart &lt;metric&gt; [window]</code></td>
+<td>In-memory per-metric time-series ring (<code>MemoryTracker</code> periodic sampler/condenser)</td>
+<td>O(window bucket count) snapshot copy</td>
+</tr>
+<tr>
+<td><code>network</code></td>
+<td><code>/rtpadmin diag network [--backend &lt;id\|all&gt;]</code></td>
+<td>Existing ADR-036 network-snapshot rows (read-only)</td>
+<td>O(peer count) row reads</td>
+</tr>
+</tbody>
+</table>
+<p><code>--backend &lt;id|all&gt;</code> is accepted on <code>metrics</code>, <code>chart</code>, and <code>network</code> when ADR-036 network mode is enabled (defaulting to the origin backend); <code>biomes</code> and <code>heatmap</code> are origin-only and reject the selector with a configurable message. On <code>chart</code>, <code>--backend</code> plots only the per-tick value the network snapshot already carries; the time-series itself is origin-only because the per-metric ring is not published cross-backend.</p>
+<p>Deferred surfaces (named here so they don't get re-proposed informally): <code>claims</code> (overlay of claim-plugin-blocked cells; gated on EXTERNAL_HOOKS/ADR-026 surface), <code>pipeline-trace</code> (per-attempt timeline; needs persistent sample store), <code>players</code> (per-player teleport history; privacy review required).</p>
+<h2 id="rtpadmin-diag-command-grammar"><code>/rtpadmin diag</code> command grammar<a class="headerlink" href="#rtpadmin-diag-command-grammar" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>/rtpadmin diag biomes  &lt;region&gt;
+/rtpadmin diag heatmap &lt;region&gt; [window=1h|6h|24h]
+/rtpadmin diag metrics [tps|cache|pipeline|network] [--backend &lt;id|all&gt;]
+/rtpadmin diag chart   &lt;metric&gt;             [window=5m|1h|6h|24h] [--backend &lt;id|all&gt;]
+/rtpadmin diag network [--backend &lt;id|all&gt;]
+</code></pre></div>
+<p><code>--backend</code> is rejected with a configurable <code>menu.surface.network.disabled</code> message when network mode is off, and with <code>menu.surface.network.unsupported</code> when used on the <code>biomes</code> / <code>heatmap</code> surfaces (S-007).</p>
+<p>Tab completion uses ADR-037's shared parse/tab-complete grammar end-to-end — <code>&lt;region&gt;</code> completes against the <strong>live in-memory region registry</strong> (same source <code>/rtp info</code> reads), <code>&lt;window&gt;</code> against the bounded enum, sections against the <strong>metric keys actually present in the live samplers / shared-store rows</strong>, and <code>--backend</code> against the <strong>peer ids present in ADR-036's current network snapshot</strong>. None of these lists are hardcoded in the surface layer (contract 6).</p>
+<h2 id="permissions">Permissions<a class="headerlink" href="#permissions" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Node</th>
+<th>Default</th>
+<th>Grants</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rtp.admin.diag</code></td>
+<td>op</td>
+<td>Umbrella; required by every surface</td>
+</tr>
+<tr>
+<td><code>rtp.admin.diag.biomes</code></td>
+<td>op</td>
+<td>Biome map surface</td>
+</tr>
+<tr>
+<td><code>rtp.admin.diag.heatmap</code></td>
+<td>op</td>
+<td>Bad-selection heatmap</td>
+</tr>
+<tr>
+<td><code>rtp.admin.diag.metrics</code></td>
+<td>op</td>
+<td>Metrics readouts</td>
+</tr>
+<tr>
+<td><code>rtp.admin.diag.chart</code></td>
+<td>op</td>
+<td>Per-metric time-series chart surface</td>
+</tr>
+<tr>
+<td><code>rtp.admin.diag.network</code></td>
+<td>op</td>
+<td>Cross-backend <code>network</code> surface and <code>--backend</code> selector on other surfaces</td>
+</tr>
+</tbody>
+</table>
+<p>Permission denials emit the configurable <code>menu.surface.denied</code> message (REQ-RTP-F-013); they are not silent (S-007).</p>
+<h2 id="concrete-affected-classes-informational-final-shape-decided-during-implementation">Concrete affected classes (informational; final shape decided during implementation)<a class="headerlink" href="#concrete-affected-classes-informational-final-shape-decided-during-implementation" title="Permanent link">&para;</a></h2>
+<ul>
+<li>New: <code>rtp-api/.../diagnostics/DiagnosticSurface.java</code>, <code>SurfaceModel.java</code>, <code>BiomeSampleSnapshot.java</code>, <code>FailHeatSnapshot.java</code>, <code>MetricsSnapshot.java</code>.</li>
+<li>New: <code>rtp-core/.../diagnostics/FailRateRing.java</code> (per-region lock-free ring; bounded; piggybacks on <code>FailTypes</code> increments).</li>
+<li>New: <code>rtp-core/.../diagnostics/BiomeSnapshotAssembler.java</code> (iterates existing region entries — <code>keptLocations</code> / <code>unkeptLocations</code> / <code>backlogLocations</code> — and tallies their already-attributed biomes; no anvil read, no chunk load, no cache).</li>
+<li>New: <code>rtp-core/.../diagnostics/MetricsSnapshotAssembler.java</code> (assembles the per-section snapshot from existing samplers; <strong>enumerates</strong> the metric keys actually present rather than reading a static list).</li>
+<li>New: <code>rtp-core/.../diagnostics/MetricTimeSeriesRing.java</code> (per-metric multi-tier in-memory ring: e.g. tier-0 = raw last 5 min, tier-1 = 10 s last 1 h, tier-2 = 1 min last 24 h; condensation pushes oldest tier-0 buckets into tier-1 averages, oldest tier-1 buckets into tier-2 averages; fixed-size, lock-free append, bounded heap regardless of window).</li>
+<li>New: <code>rtp-core/.../diagnostics/ChartSnapshotAssembler.java</code> (snapshots a single metric's ring into a <code>MetricChartSnapshot</code> POJO for the renderer; no I/O).</li>
+<li>New: <code>rtp-api/.../diagnostics/MetricChartSnapshot.java</code> (POJO: metric key, unit, tier label, bucket timestamps, bucket values, min/avg/max).</li>
+<li>Reused (no new class): the live region registry (same accessor <code>/rtp info</code> uses) for region-name enumeration, ADR-037's shared parse/tab-complete supplier for subcommand/parameter/value enumeration, the <code>FailTypes</code> registry for fail-mode labels, and ADR-036's network-snapshot row reader for backend-id enumeration. Surfaces obtain these by reference; they do not maintain parallel catalogs.</li>
+<li>New: <code>rtp-core/.../diagnostics/NetworkSnapshotReader.java</code> (reads peer rows the metrics subsystem and ADR-036 already write, via the existing <code>AbstractSQLDatabaseAccessor</code> or Redis driver; no new connection pool, no writer counterpart).</li>
+<li>New: <code>rtp-plugin/.../commands/diag/DiagCmd.java</code> (parses <code>/rtpadmin diag …</code>), <code>DiagBiomesCmd</code>, <code>DiagHeatmapCmd</code>, <code>DiagMetricsCmd</code>, <code>DiagChartCmd</code>.</li>
+<li>New: <code>rtp-plugin/.../menu/surfaces/{BiomeMapRenderer,HeatmapRenderer,MetricsRenderer,MetricChartRenderer}.java</code> (translate snapshots to ADR-035 <code>MenuModel</code>; the chart renderer turns a <code>MetricChartSnapshot</code> into a book-page ASCII sparkline).</li>
+<li>Touched: <code>MemoryTracker</code> — repurposed as the <strong>diagnostic periodic sampler/condenser</strong>. Two cheap additions: (a) the existing notification hook for the per-region fail-rate ring (heatmap surface), and (b) a new per-tick pass over the dynamically enumerated metrics keys that appends one sample per key to its <code>MetricTimeSeriesRing</code> and runs the tier-condensation step in place. No new scheduler, no new thread, no new allocation on the teleport hot path; the pass runs on <code>MemoryTracker</code>'s existing periodic cadence and reads samplers that already exist.</li>
+<li>No touch: <code>rtp-core</code> selection/pipeline core logic, ADR-037 config command surface, ADR-038 wizards. Cross-coupling is one-way (surface → wizard handoff only).</li>
+</ul>
+<h2 id="alternatives-considered">Alternatives considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why rejected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Web dashboard / HTTP endpoint</td>
+<td>New attack surface, new dependency, multi-platform burden, conflicts with ADR-035's "menus reuse the command pipeline" stance.</td>
+</tr>
+<tr>
+<td>Prometheus / OpenTelemetry exporter</td>
+<td>Valuable but a different audience (ops, not in-game admins). Tracked in <code>METRICS_PLAN.md</code>; not blocking beta.4.</td>
+</tr>
+<tr>
+<td>Render inside <code>/rtp info verbose</code> only</td>
+<td>Text-only, no spatial view; admins already have this and it doesn't answer the biome/heatmap questions.</td>
+</tr>
+<tr>
+<td>Inventory map item / filled map</td>
+<td>Reintroduces exactly the inventory-desync class ADR-035 was created to avoid.</td>
+</tr>
+<tr>
+<td>Persist fail-rate samples to DB</td>
+<td>New schema, new migration, new shutdown-flush hazard. Deferred; in-memory ring is sufficient for "is this region misconfigured right now?".</td>
+</tr>
+<tr>
+<td>Persist the per-metric time-series ring to DB</td>
+<td>Same hazards as persisting heatmap samples (schema, migration, shutdown-flush); the in-memory multi-tier ring already gives 24 h of bounded retention with no I/O. Deferred to phase 2.</td>
+</tr>
+<tr>
+<td>Add a dedicated scheduler/thread for time-series sampling</td>
+<td><code>MemoryTracker</code> already runs a periodic pass; adding a second scheduler duplicates that surface and complicates Folia region-scheduler ownership. Rejected — repurpose the existing pass.</td>
+</tr>
+<tr>
+<td>Sample every metric every tick at raw resolution for 24 h</td>
+<td>Unbounded heap (<code>O(metrics × tickrate × 24h)</code>). Multi-tier in-place condensation keeps heap bounded by tier sizes, not by window length.</td>
+</tr>
+<tr>
+<td>Render charts as a Bukkit map item or external image</td>
+<td>Reintroduces the inventory-surface / external-dependency classes ADR-035 already rejected. Book-page ASCII sparklines are sufficient for triage and stay inside the menu primitive.</td>
+</tr>
+<tr>
+<td>Live websocket-pushed surface</td>
+<td>No live updates per ADR-035 §no-live-update; would also require an out-of-game client.</td>
+</tr>
+<tr>
+<td>Sample biomes via real chunk loads</td>
+<td>S-005 violation; defeats the point of the prefilter.</td>
+</tr>
+<tr>
+<td>Trigger a fresh anvil sweep on first open per TTL window</td>
+<td>New I/O hotpath; violates contract 2 and duplicates work the prefilter already did when the region's entries were generated. The retained region entries are the authoritative cache.</td>
+</tr>
+<tr>
+<td>Make surfaces an addon extension point in beta.4</td>
+<td>Premature; the snapshot POJOs need one release cycle to stabilize before third parties depend on them.</td>
+</tr>
+<tr>
+<td>Combine diagnostic + write in one page</td>
+<td>Violates contract 1 (read-only); muddles the audit story; re-opens the "guess and apply" workflow ADR-037/038 closed.</td>
+</tr>
+<tr>
+<td>Hardcode the metric / region / subcommand / backend / fail-mode catalogs in each surface</td>
+<td>Violates contract 6 (dynamic enumeration); every <code>METRICS_PLAN.md</code> phase, ADR-037 grammar change, ADR-038 region creation, new <code>FailTypes</code> entry, and new ADR-036 backend would require a parallel edit in <code>rtp-plugin/.../menu/surfaces/</code>. Surfaces consume the same providers <code>/rtp info</code> and the tab-complete supplier already use.</td>
+</tr>
+<tr>
+<td>New transport (gRPC / plugin-messaging channel) for diag aggregation</td>
+<td>Duplicates ADR-036's shared-store accessor; adds a second consistency model; rejected.</td>
+</tr>
+<tr>
+<td>Push-based live diag stream across backends</td>
+<td>Conflicts with ADR-035's no-live-update constraint and would require an out-of-game subscriber.</td>
+</tr>
+<tr>
+<td>Per-backend file dump scraped centrally</td>
+<td>Reintroduces filesystem-as-transport with no atomicity; rejected.</td>
+</tr>
+<tr>
+<td>Have ADR-039 publish its own <code>DiagSnapshot</code> rows to the shared store</td>
+<td>Duplicates data the metrics subsystem and ADR-036 already write; introduces a new schema, a new heartbeat, and a new shutdown-flush hazard for no new information. Rejected — this ADR is strictly a reader.</td>
+</tr>
+<tr>
+<td>Persist biome tally / heatmap ring cross-backend so they aggregate too</td>
+<td>Requires a new writer and new schema purely for diagnostics; out of scope for a read-only surface ADR. Revisit after <code>METRICS_PLAN.md</code> covers them natively.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<p><strong>Positive</strong></p>
+<ul>
+<li>Admins gain spatial answers (biome distribution, failure hotspots) without leaving the game, with <strong>zero</strong> new I/O hot paths.</li>
+<li>Wizards (ADR-038) become "look, decide, apply" instead of "apply, log-dive, repeat". The diagnostic surfaces close the perceive→act loop.</li>
+<li>The fail-rate ring is reusable: future ADRs (persistence, network aggregation, alerting) can read the same snapshot contract without re-instrumenting the pipeline.</li>
+<li>Read-only contract keeps the change blast radius small; the regression surface is rendering correctness, not state mutation.</li>
+</ul>
+<p><strong>Negative / accepted trade-offs</strong></p>
+<ul>
+<li>Per-region fail-rate ring adds bounded heap (default ~4096 × 16 B per region ≈ 64 KB/region; configurable). Acceptable; tracked under <code>MemoryTracker</code>.</li>
+<li>Heatmap data is lost on restart. Acceptable for beta.4; persistence deferred.</li>
+<li>Book pages are a coarse rendering medium; ~14×19 glyphs cap heatmap resolution. Acceptable — the surface is for triage, not cartography.</li>
+<li>Surfaces that depend on unshipped <code>METRICS_PLAN.md</code> phases render <code>—</code>; a few rows will look empty until those phases land.</li>
+</ul>
+<h2 id="migration-rollout">Migration / Rollout<a class="headerlink" href="#migration-rollout" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Phase 1 (beta.4):</strong> Ship <code>biomes</code>, <code>heatmap</code>, <code>metrics</code>, <code>chart</code>, and <code>network</code> surfaces. Add <code>rtp.admin.diag.*</code> permissions including <code>rtp.admin.diag.chart</code> and <code>rtp.admin.diag.network</code>. Add <code>messages.yml → menu.surface.*</code> (REQ-RTP-F-013) including <code>menu.surface.network.{disabled,unsupported,unavailable,stale,no-report}</code> and <code>menu.surface.chart.{outside-retention,unknown-metric}</code>. New config keys: <code>metrics.failRateRing.{size,windowCap}</code> and <code>metrics.timeSeriesRing.tiers</code> (the multi-tier bucket spec for the per-metric chart ring, defaulting to <code>5m@1s,1h@10s,24h@1m</code>). No <code>diagnostics.network.publish</code> key — this ADR introduces no writer. Staleness is judged against the existing ADR-036 network-snapshot TTL; no new TTL knob is added. The biome surface introduces no new config keys.</li>
+<li><strong>Phase 2 (post-beta.4):</strong> Persist fail-rate samples at raw resolution (schema TBD), add deferred surfaces (<code>claims</code>, <code>pipeline-trace</code>, <code>players</code>), open the surface interface to addons. Cross-backend per-metric time-series (history for <code>chart --backend &lt;id|all&gt;</code>) is owned by a separate writer ADR — see ADR-040; ADR-039 stays strictly the reader.</li>
+<li><strong>Phase 3 (post-network-mode-GA):</strong> Live cross-backend deltas (push, not pull), gated on ADR-036 phase 2+.</li>
+</ul>
+<p>Traceability rows to add when implementation lands (not in this ADR per CHANGELOG/TRACEABILITY hygiene):</p>
+<ul>
+<li><code>REQ-RTP-DIAG-001</code> Read-only contract → <code>DiagnosticSurfaceReadOnlyTest</code>.</li>
+<li><code>REQ-RTP-DIAG-002</code> No new I/O on diag invocation → <code>DiagInvocationNoChunkLoadTest</code> (S-005 regression).</li>
+<li><code>REQ-RTP-DIAG-003</code> Token reuse + permission denial → <code>DiagTokenAndPermissionTest</code>.</li>
+<li><code>REQ-RTP-DIAG-004</code> Fail-rate ring bounded + thread-safe → <code>FailRateRingBoundedConcurrentTest</code>.</li>
+<li><code>REQ-RTP-DIAG-005</code> Graceful <code>—</code> rendering when metric phase absent → <code>DiagGracefulDegradationTest</code>.</li>
+<li><code>REQ-RTP-DIAG-006</code> Cross-backend aggregation reads only via ADR-036 shared store; no new transport → <code>DiagCrossBackendSharedStoreTest</code>.</li>
+<li><code>REQ-RTP-DIAG-007</code> Store-down collapse to origin-only with configurable notice → <code>DiagStoreDownDegradationTest</code>.</li>
+<li><code>REQ-RTP-DIAG-008</code> Diagnostic surfaces perform zero writes to the shared store under any invocation → <code>DiagNoSharedStoreWriteTest</code>.</li>
+<li><code>REQ-RTP-DIAG-009</code> Surface enumerations (metrics, regions, subcommands/parameters, fail modes, backend ids) are resolved at render time from the live source; no static catalogs → <code>DiagDynamicEnumerationTest</code>.</li>
+<li><code>REQ-RTP-DIAG-010</code> Per-metric time-series ring is bounded across all windows via multi-tier in-place condensation; sampling is piggybacked on <code>MemoryTracker</code>'s existing periodic pass with no new scheduler → <code>MetricTimeSeriesRingBoundedCondensationTest</code>.</li>
+<li><code>REQ-RTP-DIAG-011</code> Chart surface renders only metric keys currently exposed by the live samplers (contract 6) and reports <code>— (outside retention)</code> / <code>— (unknown metric)</code> with configurable messages otherwise → <code>DiagChartDynamicMetricTest</code>.</li>
+</ul>
+<h2 id="cross-references-to-existing-rules">Cross-references to existing rules<a class="headerlink" href="#cross-references-to-existing-rules" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>S-004</strong> Diag invocations emit one structured audit line; no silent paths.</li>
+<li><strong>S-005</strong> Surfaces shall not trigger main-thread chunk I/O. The biome surface reads only data already attached to retained region entries; the heatmap reads in-memory counters; the metrics surface reads existing samplers.</li>
+<li><strong>S-006</strong> <code>/rtpadmin diag</code> before core load throws <code>IllegalStateException</code> via existing API entry guard.</li>
+<li><strong>S-007</strong> All surface-side error messages (<code>expired</code>, <code>denied</code>, <code>unavailable</code>, <code>bad parameter</code>) are configurable.</li>
+<li><strong>D-005</strong> This ADR is the proposal; implementation follows acceptance.</li>
+<li><strong>REQ-RTP-F-013</strong> All surface strings live in <code>messages.yml</code>.</li>
+<li><strong>ADR-035</strong> Surfaces are renderers over <code>MenuModel</code>; reuse the same token registry.</li>
+<li><strong>ADR-036</strong> Cross-backend surfaces <strong>read only</strong> the peer rows ADR-036 (and the metrics subsystem per <code>METRICS_PLAN.md</code>) already write to the shared store; this ADR adds no writer, no new row shape, no new transport, and no new connection pool.</li>
+<li><strong>ADR-037</strong> Audit stream and parse/tab-complete grammar are reused as-is.</li>
+<li><strong>ADR-038</strong> One-way handoff: surface <code>[open wizard …]</code> button invokes a wizard; wizards never invoke surfaces.</li>
+<li><strong><code>METRICS_PLAN.md</code></strong> Single source of truth for the <code>metrics</code> surface's contents and phase status.</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>ADR-035 — Interactive Menus via Written Book (Book-First, Chat Fallback)</li>
+<li>ADR-036 — Network Mode: Multi-Server, Multi-Proxy RTP</li>
+<li>ADR-037 — Harden RTP Config Commands</li>
+<li>ADR-038 — <code>/rtpadmin</code> Setup Wizards</li>
+<li>ADR-016 — Anvil Subsystem</li>
+<li>ADR-028 — L3 Backlog Cache</li>
+<li><a href="../../dev/METRICS_PLAN/"><code>docs/dev/METRICS_PLAN.md</code></a></li>
+<li><a href="../../dev/REQUIREMENTS/"><code>docs/dev/REQUIREMENTS.md §3</code></a> (S-00x prohibitions)</li>
+<li>commands-api-ADR-001 — Brigadier Bridge</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

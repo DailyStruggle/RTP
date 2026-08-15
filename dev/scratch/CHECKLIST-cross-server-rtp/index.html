@@ -1,0 +1,1711 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>CHECKLIST: Cross-server RTP (first end-to-end hop) - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#checklist-cross-server-rtp-first-end-to-end-hop" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              CHECKLIST: Cross-server RTP (first end-to-end hop)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#l1-velocity-dispatcher-sender-wiring-05d" class="md-nav__link">
+    <span class="md-ellipsis">
+      L1. Velocity dispatcher + sender wiring (~0.5d)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#l2-backend-jointriggersource-redeem-path-1d" class="md-nav__link">
+    <span class="md-ellipsis">
+      L2. Backend JoinTriggerSource + redeem path (~1d)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#l3-devstack-acceptance-harness-05d" class="md-nav__link">
+    <span class="md-ellipsis">
+      L3. Devstack + acceptance harness (~0.5d)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#l4-rtp-test-network-crossserver-probe-025d-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      L4. /rtp test network crossserver probe (~0.25d, optional)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#l5-adr-docs-cleanup-1h-ride-along-any-of-l1-l4" class="md-nav__link">
+    <span class="md-ellipsis">
+      L5. ADR / docs cleanup (~1h, ride along any of L1-L4)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#out-of-scope-defer" class="md-nav__link">
+    <span class="md-ellipsis">
+      Out of scope (defer)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#estimate" class="md-nav__link">
+    <span class="md-ellipsis">
+      Estimate
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#delete-on-submit" class="md-nav__link">
+    <span class="md-ellipsis">
+      Delete-on-submit
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="checklist-cross-server-rtp-first-end-to-end-hop">CHECKLIST: Cross-server RTP (first end-to-end hop)<a class="headerlink" href="#checklist-cross-server-rtp-first-end-to-end-hop" title="Permanent link">&para;</a></h1>
+<p><strong>Effective Issue</strong>: enable a player on backend A to run <code>/rtp</code> (or be routed by a proxy command) and end up on backend B, with reservation token redeemed atomically on arrival.</p>
+<p><strong>Mode</strong>: <code>[CODE]</code> (multi-slice, will need D-005 proposals per slice).</p>
+<p><strong>Anchors</strong>: <code>MULTI_SERVER_PLAN.md</code> Phase 2 (proxy work) + <code>MULTI_SERVER_PLAN.md §Failure-Mode Policy (network-mode bootstrap)</code>; Phase 3 (<code>JoinTriggerSource</code>); ADR-005, ADR-006, ADR-010. (Prior anchor <code>PROPOSAL-velocity-redis-startup.md</code> deleted 2026-05-20 per its own §11 lifecycle clause once §6 failure-mode table was migrated and all OQs were resolved.)</p>
+<p><strong>Reconciled-in from <code>CHECKLIST-metrics-and-multiserver.md</code> (2026-05-20)</strong>: F4 (Velocity <code>ServerPreConnect</code> hook) folded into L1+L3; F5 (<code>CommandTriggerSource</code> -&gt; dispatcher) folded into L1; F7 (<code>InfoCmd</code> <em>Health - network</em> block) folded into L5; F9 (2x2 devstack acceptance) is L3; G2 (backend-side <code>JoinTriggerSource</code>) is L2. This checklist is the canonical worklist for the cross-server frontier; the metrics+multiserver file remains the release-gate audit doc.</p>
+<p><strong>Reconciled-in from <code>PROPOSAL-velocity-redis-startup.md</code> (2026-05-20, file since deleted)</strong>: §1 steps 11-18 (dispatcher + sender + publisher + listener + triggers + Brigadier) folded into L1; §5 shutdown sequence folded into L1 (rows 7b-7f); §6 failure-mode policy table migrated to <code>MULTI_SERVER_PLAN.md §Failure-Mode Policy (network-mode bootstrap)</code> (row 42 ticked); §8 OQ2 (<code>proxyId</code> empty-string <code>fail-fast</code>) folded into L1 (row 5b); §8 OQ6 already in L5 row 35; OQ1/OQ3/OQ5 resolved by shipped A3 + Lua SHA pinning + Velocity-side role probe. PROPOSAL file deleted (row 43 ticked).</p>
+<p><strong>Prerequisites already shipped</strong> (do not redo):
+- [x] 0a. Transport (Redis + SQL) HMAC-signed end-to-end - A3 complete 2026-05-20.
+- [x] 0b. <code>HmacVerifier</code> + <code>secretEnv</code> fail-fast loader.
+- [x] 0c. <code>BackendSelector</code> + <code>WeightedAverageBackendSelector</code> SPI present.
+- [x] 0d. <code>RtpDispatcher</code> SPI present in <code>rtp-proxy-common</code>.
+- [x] 0e. Single-backend <code>/rtp test network all</code> green against real Redis.
+- [x] 0f. Reservation token TTL reaper running.</p>
+<h2 id="l1-velocity-dispatcher-sender-wiring-05d">L1. Velocity dispatcher + sender wiring (~0.5d)<a class="headerlink" href="#l1-velocity-dispatcher-sender-wiring-05d" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] 1. D-005 proposal for L1 - <code>PROPOSAL-cross-server-rtp-L1.md</code> drafted 2026-05-20, approved by user 2026-05-20.</li>
+<li>[x] 2. New <code>VelocityProxySender implements ProxySender</code> - <code>rtp-proxy-velocity/.../VelocityProxySender.java</code>; single chokepoint for <code>sendTo</code> (Velocity <code>createConnectionRequest</code>) + <code>sendMessage</code> (baseline-fallback <code>MessageKey</code> resolver with log-once-per-missing-key dedup).</li>
+<li>[x] 3. <code>RtpVelocityPlugin.onProxyInitialize</code> constructs <code>DefaultRtpDispatcher(selector, transport, sender, scheduler)</code> - stored as plugin field; new <code>dispatcher</code>/<code>sender</code> fields added.</li>
+<li>[x] 4. <code>/rtp</code> Brigadier handler routed through <code>dispatcher.dispatch(RtpRequest)</code>; inline <code>Component.text("RTP: ...")</code> literals removed from <code>onCommandTrigger</code> (thinned from ~70 LOC to ~25 LOC).</li>
+<li>[x] 5. Failure path - <code>DispatchOutcome.Failed</code> carries configurable <code>MessageKey</code>; dispatcher emits <code>MSG_NO_BACKEND</code>/<code>MSG_CLAIM_FAILED</code>/<code>MSG_TRANSFER_FAILED</code>/<code>MSG_INTERNAL</code>/<code>MSG_PLAYER_GONE</code> via <code>sender.sendMessage</code> on every failure (REQ-RTP-S-004).</li>
+<li>[x] 5b. <strong>(PROPOSAL §8 OQ2)</strong> <code>proxyId</code> empty-string fail-fast - shipped at <code>NetworkConfig.java:160-166</code>; covered by <code>NetworkConfigTest.emptyProxyIdFailsFastWhenResolvedToProxy</code> + <code>missingProxyIdFailsFastWhenResolvedToProxy</code>.</li>
+<li>[x] 6. Unit test <code>DefaultRtpDispatcherTest</code> - 6 cases (routed, no-backend, claim-race, player-gone, transfer-failure with release, transport-exception); all green.</li>
+<li>[x] 7. <code>:rtp-proxy:rtp-proxy-velocity:test</code> green + <code>.\gradlew build</code> green (2026-05-20).</li>
+<li>[x] 7b. <strong>(PROPOSAL §5 shutdown sequence)</strong> <code>onProxyShutdown</code> now delegates to <code>shutdown()</code>: stepwise teardown (unregister <code>/rtp</code>, stop trigger source, close reaper, stop publisher, drain scheduler, close transport). <code>ServerPreConnectEvent</code> listener stays registered (per-instance event subscription removed implicitly when plugin reference is dropped by Velocity).</li>
+<li>[x] 7c. <strong>(PROPOSAL §5)</strong> <code>NetworkTransport.close()</code> bounded by 2000ms via worker-thread <code>join</code>; on timeout log WARNING + banner reports timed-out step (<code>RtpVelocityPlugin.closeTransportBounded</code>).</li>
+<li>[x] 7d. <strong>(PROPOSAL §5 step 7)</strong> <code>HmacVerifier</code> now <code>implements AutoCloseable</code>; <code>close()</code> calls <code>Arrays.fill(secret, (byte) 0)</code>. Transitive zeroize: transport owns the verifier today, so <code>transport.close()</code> drives it.</li>
+<li>[x] 7e. <strong>(PROPOSAL §5 step 8)</strong> Banner log line distinguishes clean (<code>"RTP network mode disabled (shutdown clean)."</code>) vs timed-out (<code>"RTP network mode disabled (shutdown timed out at step N)."</code>).</li>
+<li>[x] 7f. Unit test <code>RtpVelocityPluginShutdownIdempotenceTest</code> - disabled-config + enabled-config two-shutdown cases both pass; <code>shutdownStarted</code> flag short-circuits the second call.</li>
+<li>[x] 8. Gate: dispatcher is wired; no second-JVM behavior change yet (cross-server hop redemption is L2).</li>
+</ul>
+<h2 id="l2-backend-jointriggersource-redeem-path-1d">L2. Backend <code>JoinTriggerSource</code> + redeem path (~1d)<a class="headerlink" href="#l2-backend-jointriggersource-redeem-path-1d" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] 9. D-005 proposal for L2 - <code>PROPOSAL-cross-server-rtp-L2.md</code> drafted 2026-05-20, approved by user 2026-05-20. Deleted on submit per §9 lifecycle clause.</li>
+<li>[x] 10. Redeem semantics decided: new <code>redeem.lua</code> + <code>redeem.lua.sha1</code> sidecar (LF-normalized SHA1 <code>d4ce4939abe5494ea6ea3d81b69056693923b558</code>). Lua returns one of <code>REDEEMED</code>/<code>NOT_FOUND</code>/<code>WRONG_SERVER</code>/<code>ALREADY_CONSUMED</code>/<code>EXPIRED</code>/<code>BAD_STATE</code>; binding maps to <code>RedeemOutcome</code> enum. New SPI method <code>NetworkTransport.redeem(tokenId, playerId, expectedServerId)</code> returns <code>CompletableFuture&lt;RedeemOutcome&gt;</code> (default impl degrades to release+CONSUMED for back-compat).</li>
+<li>[x] 11. SQL redeem: <code>SqlNetworkStateBinding.redeemSync</code> runs <code>SELECT</code> to classify outcome then <code>UPDATE rtp_network_tokens SET state='CONSUMED', released_at_ms=? WHERE token_id=? AND server_id=? AND player_id=? AND released_at_ms IS NULL AND state IN ('CLAIMED','PENDING')</code> - row-count atomic (affected=1 -&gt; REDEEMED; affected=0 -&gt; ALREADY_CONSUMED). Portable ANSI SQL (H2/Postgres/MySQL/SQLite).</li>
+<li>[x] 12. HMAC verification reuses <code>findReservationSync</code> (which already calls <code>verifier.verify</code> on the row before returning the token to <code>JoinTriggerSource</code>). Redeem itself does not re-verify because the lookup that found the token id already gated on a valid envelope; an attacker that forges a token id without the envelope cannot make <code>findReservation</code> surface it.</li>
+<li>[x] 13. New <code>JoinTriggerSource implements Listener</code> at <code>rtp-plugin/.../bukkit/network/JoinTriggerSource.java</code>; subscribes <code>PlayerJoinEvent</code> at <code>MONITOR</code> priority. Folia-aware: the redeem chain runs on the transport's async pool, and the <code>/rtp</code> dispatch hops via <code>RTP.scheduler.runTaskLater(.., 1L)</code>.</li>
+<li>[x] 14. On join: <code>transport.findReservation(uuid)</code> -&gt; if present and <code>serverId</code> matches this backend, <code>transport.redeem(...)</code>. On <code>REDEEMED</code> the trigger dispatches <code>Bukkit.dispatchCommand(player, "rtp")</code> (first-cut design - reuses the local pipeline including cooldown / economy / claim / safety; admin-controlled bypass deferred to L5 follow-up per L2 proposal §8 OQ2).</li>
+<li>[x] 15. Failure paths in <code>JoinTriggerSource.handleRedeem</code>: <code>ALREADY_CONSUMED</code>/<code>WRONG_SERVER</code> -&gt; silent; <code>NOT_FOUND</code>/<code>EXPIRED</code> -&gt; WARNING (player still joins normally, just without bonus teleport); <code>BAD_STATE</code>/<code>HMAC_INVALID</code>/<code>TRANSPORT_ERROR</code> -&gt; WARNING per REQ-RTP-S-004. Configurable <code>MessageKey</code> for cross-server-only player feedback deferred to L5 row 41 per L2 proposal §8 OQ1.</li>
+<li>[x] 16. <code>NetworkModeBootstrap.boot()</code> instantiates <code>JoinTriggerSource</code> only after a transport opens successfully (i.e. only when <code>network.enabled:true</code> AND a non-empty <code>serverId</code> AND the transport actually opens). <code>RTPBukkitPlugin.setupBukkitEvents</code> calls <code>networkBootstrap.registerJoinTriggerSource(this)</code>; with <code>network.enabled:false</code> the field stays null and the call is a no-op.</li>
+<li>[x] 17. New <code>InMemoryNetworkStateBindingRedeemTest</code> (7 cases): happy path, NOT_FOUND, WRONG_SERVER on serverId mismatch, WRONG_SERVER on playerId mismatch, ALREADY_CONSUMED-via-release, EXPIRED via injected clock, and 16-way concurrent redeem yielding exactly one <code>REDEEMED</code>. All green.</li>
+<li>[x] 18. <code>:rtp-proxy:rtp-proxy-common:test</code> green + <code>.\gradlew build</code> green (2026-05-20, 1m 57s).</li>
+<li>[x] 19. Gate: cross-server redeem path is shipped. Token creation already wired in L1 (<code>DefaultRtpDispatcher</code> calls <code>transport.claim</code> from the proxy <code>/rtp</code> handler), so first real cross-server hop is technically possible. Runtime verification of the round-trip is L3 (devstack).</li>
+</ul>
+<h2 id="l3-devstack-acceptance-harness-05d">L3. Devstack + acceptance harness (~0.5d)<a class="headerlink" href="#l3-devstack-acceptance-harness-05d" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] 20. D-005 proposal for L3 - <code>PROPOSAL-cross-server-rtp-L3.md</code> drafted 2026-05-20, approved by user 2026-05-20. Deleted on submit per its lifecycle clause.</li>
+<li>[x] 21. <code>platforms/rtp-proxy/devstack/docker-compose.yml</code>: 1 Redis 7 + 2 Velocity (<code>proxy-a</code> / <code>proxy-b</code>, shared <code>RTP_NET_SECRET</code>) + 2 Paper (<code>backend-a</code> / <code>backend-b</code>). Paper-only per scope; Folia deferred per <code>MULTI_PLATFORM_PLAN.md</code>. itzg images, modern forwarding via shared <code>forwarding.secret</code>.</li>
+<li>[x] 22. Devstack <code>network.yml</code> templates - <code>proxy-a/</code>, <code>proxy-b/</code>, <code>backend-a/</code>, <code>backend-b/</code>, each with <code>secretEnv: RTP_NET_SECRET</code>, <code>transport.type: redis</code>, and <code>reservation.ttlMs: 30000</code> (shrunk from production 300000 so kill-mid-flight reaps within the harness budget).</li>
+<li>[x] 23. Devstack <code>README.md</code>: topology diagram, one-time setup (jar copy, <code>.env</code>, <code>forwarding.secret</code>), boot/teardown, headless-evidence matrix; <code>jars/README.md</code> covers shadowJar build + copy.</li>
+<li>[x] 24. <code>run-acceptance.ps1</code> - <code>Test-Boot</code> asserts all 5 services via <code>docker compose ps</code>; <code>Test-Heartbeat</code> polls <code>redis-cli KEYS 'rtp:net:heartbeat:*'</code> for &gt;=2 backend + &gt;=2 proxy keys within <code>WaitSeconds</code>. Writes structured evidence to <code>acceptance-evidence.log</code>.</li>
+<li>[x] 25. Acceptance round-trip - <code>Test-Roundtrip</code> is a manual checkpoint (a live MC client is required by design; <code>PlayerJoinEvent</code> cannot be synthesized headlessly without re-implementing the protocol). Harness prints the exact <code>/server</code> + <code>/rtp</code> commands, then captures <code>redis-cli KEYS rtp:net:reservation:*</code> + backend redeem audit lines. Documented limitation in <code>CROSS_SERVER_VERIFICATION.md</code> §Scenario 3.</li>
+<li>[x] 26. Negative case (kill mid-flight) - <code>Test-KillMidFlight</code> seeds a synthetic reservation via the claim Lua, <code>docker compose kill backend-a</code>, then polls until the reservation hash clears within <code>reservation.ttlMs + reapIntervalMs</code> (35s for the devstack). Restarts backend-a on exit.</li>
+<li>[x] 27. Negative case (kill switch) - <code>Test-KillSwitch</code> invokes the claim Lua with a control-plane sentinel and asserts rejection. Wiring smoke test only; the real proxy gate requires a live client and is documented as the authoritative procedure in <code>CROSS_SERVER_VERIFICATION.md</code> §Scenario 5.</li>
+<li>[x] 28. Evidence capture - harness writes <code>acceptance-evidence.log</code> per scenario with structured <code>==== &lt;ts&gt; &lt;tag&gt; ====</code> blocks; admin doc references it as the supplement to operator-visual confirmation.</li>
+<li>[x] 29. Gate: <strong>first runtime verification harness shipped</strong>. Live multi-host round-trip is unblocked; admin doc + headless harness in place. Actual round-trip dry-run with a real MC client is operator follow-up (no production code change required).</li>
+</ul>
+<h2 id="l4-rtp-test-network-crossserver-probe-025d-optional">L4. <code>/rtp test network crossserver</code> probe (~0.25d, optional)<a class="headerlink" href="#l4-rtp-test-network-crossserver-probe-025d-optional" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[ ] 30. D-005 proposal for L4 (affected: new <code>CrossServerProbeCmd</code> under <code>TestCmd</code>, extends <code>NetworkSimulationTestJob</code> patterns).</li>
+<li>[ ] 31. <code>crossserver</code> probe mode: publish a synthetic <code>ReservationToken</code> from this JVM with a peer's <code>serverId</code>, assert the peer's <code>JoinTriggerSource</code> redeems it within budget (observable via Redis <code>HGET state</code> flipping to <code>CONSUMED</code>).</li>
+<li>[ ] 32. Audit-row format mirrors heartbeat probe: <code>[RTP test/network] PASS: crossserver peer=&lt;id&gt; publish_us=... redeem_us=... total_us=... (RedisNetworkStateBinding)</code>.</li>
+<li>[ ] 33. Unit-level test (no live Redis required): probe class wiring is exercised the same way <code>NetworkSimulationTestJobTest</code> exercises the heartbeat/tokens modes.</li>
+<li>[ ] 34. Update <code>SINGLE_BACKEND_VERIFICATION.md</code> companion doc -&gt; new <code>CROSS_SERVER_VERIFICATION.md</code> mirroring the single-backend admin doc.</li>
+</ul>
+<h2 id="l5-adr-docs-cleanup-1h-ride-along-any-of-l1-l4">L5. ADR / docs cleanup (~1h, ride along any of L1-L4)<a class="headerlink" href="#l5-adr-docs-cleanup-1h-ride-along-any-of-l1-l4" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[ ] 35. Resolve OQ6 (<code>killSwitch</code> field placement - confirm on both <code>BackendHeartbeat</code> and <code>ProxyHeartbeat</code>, or proxy-only). <em>(Originally tracked in the now-deleted <code>PROPOSAL-velocity-redis-startup.md</code> §8 OQ6.)</em></li>
+<li>[ ] 36. Flip <code>rtp-proxy-ADR-006</code> (Velocity bootstrap) from current status to <code>Accepted</code> once L1 lands.</li>
+<li>[ ] 37. New <code>docs/admin/proxies/CROSS_SERVER_VERIFICATION.md</code> mirroring <code>SINGLE_BACKEND_VERIFICATION.md</code> shape.</li>
+<li>[ ] 38. <code>docs/admin/proxies/INDEX.md</code>: link new doc as <strong>Available</strong>.</li>
+<li>[ ] 39. <code>MULTI_SERVER_PLAN.md</code>: tick Phase 2 "2x Velocity + 2x Paper devstack" box, tick Phase 3 <code>JoinTriggerSource</code> box.</li>
+<li>[ ] 40. <code>CHANGELOG.md [3.0.0-beta.4] - Unreleased</code>: new bullet per slice.</li>
+<li>[ ] 41. <strong>(absorbed from metrics+multiserver F7)</strong> Update <code>InfoCmd</code> <em>Health - network</em> block per <code>METRICS_PLAN.md &gt; /rtp info Surface &gt; Health - network</code>. Block appears only when <code>network.enabled: true</code>; integration test confirms stale-backend listing.</li>
+<li>[x] 42. <strong>(PROPOSAL retirement)</strong> Migrated <code>PROPOSAL-velocity-redis-startup.md</code> §6 failure-mode policy table into <code>MULTI_SERVER_PLAN.md §Failure-Mode Policy (network-mode bootstrap)</code> as the canonical reference (2026-05-20); §4 HMAC ownership pattern already migrated via shipped code + ADR-010. <code>NetworkBindings.java</code> comments repointed to the new location.</li>
+<li>[x] 43. <strong>(PROPOSAL retirement)</strong> Deleted <code>docs/dev/scratch/PROPOSAL-velocity-redis-startup.md</code> 2026-05-20 per its own §11 lifecycle clause (OQ1/OQ3/OQ5/OQ6 resolved; OQ2 deferred to L1 row 5b as a tracked open box but no longer blocks deletion; OQ4 phase-ordering moot).</li>
+</ul>
+<h2 id="out-of-scope-defer">Out of scope (defer)<a class="headerlink" href="#out-of-scope-defer" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Network-aware backend command (<code>/rtp</code> on backend publishing a cross-server token directly) - deferred to Phase 3 follow-up; proxy-side <code>/rtp</code> is the L3 acceptance path.</li>
+<li>BungeeCord adapter - Phase 3 after Velocity stable.</li>
+<li>Postgres <code>LISTEN/NOTIFY</code> latency optimization.</li>
+<li>Multi-proxy split-brain hardening.</li>
+<li>HMAC key rotation.</li>
+</ul>
+<h2 id="estimate">Estimate<a class="headerlink" href="#estimate" title="Permanent link">&para;</a></h2>
+<p>~15-22h focused, comfortably 2-3 working days. L1+L2 together is the highest-value single commit; L3 turns it into demonstrable behavior.</p>
+<h2 id="delete-on-submit">Delete-on-submit<a class="headerlink" href="#delete-on-submit" title="Permanent link">&para;</a></h2>
+<p>Per <code>.junie/AGENTS.md</code> <em>Checklist-Based State Tracking</em>: delete this file once the cross-server frontier is shipped and L1-L5 are ticked.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

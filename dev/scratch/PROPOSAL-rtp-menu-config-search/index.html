@@ -1,0 +1,1889 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>PROPOSAL: rtp menu config search - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#proposal-rtp-menu-config-search" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              PROPOSAL: rtp menu config search
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Goal
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-user-confirmed-constraints-this-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. User-confirmed constraints (this session)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-affected-modules-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Affected modules / classes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-before-after" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Before / after
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-threading-safety" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Threading / safety
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-open-questions-verification-needed-before-writing-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Open questions / verification needed before writing code
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-risks-and-trade-offs" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Risks and trade-offs
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Tests
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-locale-strings-english-baseline-values-draft" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. Locale strings (English baseline values, draft)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-implementation-checklist-post-approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. Implementation checklist (post-approval)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      11. Out of scope
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="proposal-rtp-menu-config-search">PROPOSAL: <code>rtp menu</code> config search<a class="headerlink" href="#proposal-rtp-menu-config-search" title="Permanent link">&para;</a></h1>
+<p>Status: DRAFT, awaiting explicit user approval (Rule D-005).
+Author: Junie session 2026-05-19.
+Effective Issue: "A user had difficulty tracing a specific message. We should add a <code>search</code> option to our config stuff in <code>rtp menu</code> ... start with the <code>rtp menu</code> command ... cast off color for the text search otherwise it will be unusable with gradients."</p>
+<hr />
+<h2 id="1-goal">1. Goal<a class="headerlink" href="#1-goal" title="Permanent link">&para;</a></h2>
+<p>Add a first-class <strong>search</strong> entry to the <code>rtp menu config</code> flow that lets an operator find any config key or value across every loaded config file by typing a free-form substring, and jumps from each hit to the existing per-key config menu page.</p>
+<p>The motivating use case: an admin sees a message in chat (e.g. <code>"You are not allowed to RTP here."</code>) and wants to know which <code>messages.yml</code> key produced it without grepping the jar.</p>
+<h2 id="2-user-confirmed-constraints-this-session">2. User-confirmed constraints (this session)<a class="headerlink" href="#2-user-confirmed-constraints-this-session" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Search spans <strong>all</strong> config files at once (not a single file).</li>
+<li>Search matches both <strong>keys</strong> and <strong>values</strong> (comments excluded; the user explicitly noted "if we ignore comment lines" the corpus is small).</li>
+<li><strong>Case-insensitive</strong> substring match.</li>
+<li><strong>No result cap</strong> ("the sum of config files aren't that big").</li>
+<li>Render hits as a <strong>multi-page book</strong>, one row per hit, <strong>clickable</strong> to open the existing config-key page that manages that file/key (reuses <code>MenuAction.OpenConfigKey</code>).</li>
+<li>Visual: <strong>gray base text</strong> with <strong>off-blue highlight on the matched substring</strong>.</li>
+<li>Search must operate on <strong>color-stripped</strong> text for both the haystack and the needle. Legacy <code>&amp;</code>/<code>§</code> codes, modern hex (<code>&amp;#rrggbb</code>) and gradient spans must NOT break substring matching. Highlight runs are computed against the stripped form and projected back onto raw offsets.</li>
+<li><strong>Display the raw (un-rendered) text in each result row, not the colorized rendering</strong> (user update 2026-05-19: "we can display the raw text to the user so they know they can add or remove colors"). Operators must be able to see every <code>&amp;a</code>, <code>§l</code>, <code>&amp;#rrggbb</code>, gradient tag, etc. that is actually present in the config so they know what color codes exist and can decide to add or remove them. The off-blue highlight is overlaid on top of that raw text at the projected raw-offset ranges from §2.7. This is a deliberate departure from the file-view page (which renders colors) — search results are an <em>editing aid</em>, not a preview.</li>
+<li>Entry point: a <strong>search button</strong> on the config selector page <strong>plus</strong> an <strong>anvil-input prompt</strong> for the query string (same mechanism <code>PromptAnvilInput</code> already uses for param pickers).</li>
+</ol>
+<h2 id="3-affected-modules-classes">3. Affected modules / classes<a class="headerlink" href="#3-affected-modules-classes" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Class</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rtp-api</code></td>
+<td><code>MenuAction</code> (sealed interface)</td>
+<td>Add 2 records: <code>OpenConfigSearchPrompt</code>, <code>OpenConfigSearchResults(String query, int page)</code>.</td>
+</tr>
+<tr>
+<td><code>rtp-api</code> tests</td>
+<td><code>MenuModelSurfaceTest.menuActionSealedShape</code></td>
+<td>Bump permitted-subclasses count from 13 -&gt; 15; add the 2 new names to the expected set.</td>
+</tr>
+<tr>
+<td><code>rtp-api</code></td>
+<td><code>MessagesKeys</code></td>
+<td>Add keys: <code>menuConfigSearchButton</code>, <code>menuConfigSearchPromptTitle</code>, <code>menuConfigSearchEmpty</code>, <code>menuConfigSearchResultsHeader</code>, <code>menuConfigSearchResultRow</code>, <code>menuConfigSearchTooShort</code>.</td>
+</tr>
+<tr>
+<td><code>rtp-core</code></td>
+<td>new <code>ConfigSearchResultsBuilder</code></td>
+<td>Walks every <code>ConfigParser</code> + <code>MultiConfigParser</code>, color-strips keys+values, case-insensitive substring match, returns ordered <code>List&lt;Hit&gt;</code> with raw value, stripped value, and match offsets in stripped space.</td>
+</tr>
+<tr>
+<td><code>rtp-core</code></td>
+<td>new helper <code>ColorStrip</code> (or reuse existing — see §6 open question)</td>
+<td>Strips legacy <code>&amp;x</code>/<code>§x</code>, hex <code>&amp;#rrggbb</code>, and any MiniMessage-style <code>&lt;gradient:..&gt;...&lt;/gradient&gt;</code> / <code>&lt;color:..&gt;</code> runs. Returns the stripped string + an <code>int[]</code> offset map so highlight ranges can be projected back to raw offsets.</td>
+</tr>
+<tr>
+<td><code>rtp-core</code></td>
+<td><code>MenuRedeemSubcommand</code></td>
+<td>Two new dispatch arms: <code>dispatchOpenConfigSearchPrompt</code> (mints anvil-input action with continuation = <code>OpenConfigSearchResults(query, 0)</code>), <code>dispatchOpenConfigSearchResults</code> (builds page via <code>ConfigSearchResultsBuilder</code>, hands to <code>MenuRenderer</code>).</td>
+</tr>
+<tr>
+<td><code>rtp-core</code></td>
+<td><code>ConfigMenuConsumerProfile</code> (or its selector builder)</td>
+<td>Adds a "Search" button row on the config selector page emitting <code>OpenConfigSearchPrompt</code>.</td>
+</tr>
+<tr>
+<td><code>rtp-core</code> page builder</td>
+<td>new <code>ConfigSearchResultsPageBuilder</code></td>
+<td>Renders one <code>MenuRow</code> per hit: <code>&amp;7[file] key.path = &lt;raw literal value with off-blue highlight on the matched substring&gt;</code>; row click action = <code>OpenConfigKey(file, keyPath)</code>. Pagination via existing book-pagination machinery (same as the file view builder). <strong>Raw value is emitted as literal text</strong> — no legacy/hex code translation pass before the gray-base + off-blue-highlight component is built (constraint §2.8).</td>
+</tr>
+<tr>
+<td><code>rtp-plugin</code> (Bukkit family)</td>
+<td><code>AnvilInputOpener</code> wiring</td>
+<td>Already exists; the new prompt re-uses it. No new platform code, just a new continuation tag understood by the existing redeem path.</td>
+</tr>
+<tr>
+<td><code>rtp-plugin/src/main/resources/messages.yml</code> + every <code>lang/&lt;locale&gt;/messages.yml</code> via TSV pipeline</td>
+<td>Locale entries for the new <code>MessagesKeys</code>.</td>
+<td>Per the <em>Locale Config TSV Pipeline</em> section of <code>AGENTS.md</code>: edit baseline, run <code>locale-files-to-csv</code> -&gt; <code>reconcile-locale-csvs</code> -&gt; translate -&gt; <code>locale-files-from-csv</code> -&gt; <code>LocaleParityTest</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>No platform adapters beyond the Bukkit family need changes; Fabric and Folia inherit through <code>rtp-core</code> and the existing <code>AnvilInputOpener</code> abstraction (Fabric falls back to chat-prompt today, which is acceptable for a v1).</p>
+<h2 id="4-before-after">4. Before / after<a class="headerlink" href="#4-before-after" title="Permanent link">&para;</a></h2>
+<p><strong>Before</strong>: <code>/rtp menu config</code> opens a selector page. Each row is a config file; clicking opens that file's keys. To find the source of a specific message, the operator must page through <code>messages.yml</code> manually or grep the jar.</p>
+<p><strong>After</strong>: <code>/rtp menu config</code> selector gains a "Search" button at the top. Clicking it opens an anvil input prompt titled "Search all configs". On submit, <code>OpenConfigSearchResults(query, 0)</code> is redeemed; the renderer shows a paginated book of all hits across every loaded config. <strong>Each row shows the raw, literal text of the value (color codes visible as-is) so the operator can see what formatting is in place and decide whether to add or remove codes</strong> — the off-blue highlight overlays the matched substring at its projected raw offsets:</p>
+<div class="highlight"><pre><span></span><code>[messages.yml] notPermitted           = &amp;7You are not allowed to RTP &amp;9&amp;lhere&amp;7.
+[messages.yml] menuInvalid            = &amp;7Unknown menu command: &amp;9&amp;lsearch&amp;7
+[regions/default.yml] biome.whitelist  = &amp;#7f7f7fplains, &amp;9&amp;lforest&amp;7, jungle
+</code></pre></div>
+<p>The literal <code>&amp;7</code>, <code>&amp;9&amp;l</code>, <code>&amp;#7f7f7f</code>, etc. are displayed as text, not interpreted as color. The substring <code>here</code> / <code>search</code> / <code>forest</code> is rendered in the off-blue accent color (on top of the raw text); everything else in the row is the menu's gray base color. Each row is clickable; clicking jumps straight to the existing per-key config menu page (the same page <code>/rtp config &lt;file&gt; view</code> -&gt; click-on-row already opens). Back button returns to the search-results page; another Back returns to the selector.</p>
+<h2 id="5-threading-safety">5. Threading / safety<a class="headerlink" href="#5-threading-safety" title="Permanent link">&para;</a></h2>
+<ul>
+<li>All config reads happen on the dispatching thread inside the existing <code>MenuRedeemSubcommand</code> async pipeline (no main-thread chunk I/O — S-005 unaffected).</li>
+<li>The new dispatch arms gate on permission <code>rtp.config</code> and on <code>senderId != null</code> (consistent with the other <code>OpenConfig*</code> arms).</li>
+<li>Token registry: each result page render mints a fresh <code>OpenConfigSearchResults(query, page)</code> token for prev/next, and one <code>OpenConfigKey(file, key)</code> token per result row. Existing TTL / per-player isolation rules apply; no new registry primitives.</li>
+<li>No DB or chunk allocations; <code>MemoryTracker</code> unaffected.</li>
+</ul>
+<h2 id="6-open-questions-verification-needed-before-writing-code">6. Open questions / verification needed before writing code<a class="headerlink" href="#6-open-questions-verification-needed-before-writing-code" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Color-strip helper reuse</strong>: ~~does <code>SendMessage</code> or the MiniMessage renderer already expose a "strip every formatting code, return stripped string + offset map" helper?~~ <strong>Investigated 2026-05-19</strong>: there is <strong>no canonical platform-agnostic strip helper</strong> in <code>rtp-api</code> or <code>rtp-core</code> today. The existing strip implementations are:</li>
+<li><code>org.bukkit.ChatColor.stripColor(...)</code> — direct Bukkit call, used in <code>rtp-bukkit-common/SendMessage.java:428</code> and <code>rtp-paper-common/AnvilInputSession.java:148</code>. Bukkit-only, handles <code>§x</code> but not <code>&amp;x</code> legacy codes nor <code>&amp;#rrggbb</code> hex.</li>
+<li><code>FabricLegacyText.stripColor(String)</code> and <code>FabricAnsiText.stripColor(String)</code> (<code>rtp-fabric-common/tools/</code>) and <code>FabricLegacyText.stripColor(String)</code> in <code>rtp-fabric-common-unobf/tools/</code> — Fabric-side, handles <code>§x</code>, <code>&amp;x</code>, and <code>&amp;#RRGGBB</code> hex (via <code>normalise</code> -&gt; <code>HEX_PATTERN</code>). Not callable from <code>rtp-core</code> (Fabric module).</li>
+<li>No helper anywhere in the codebase returns a stripped-string-plus-offset-map.</li>
+</ol>
+<p><strong>Gap surfaced by user (Effective Issue 2026-05-19)</strong>: "I don't think we have a canonical way to strip without a direct call to bukkit yet. We should add that for multiple reasons if we're missing it." Confirmed; we don't.</p>
+<p><strong>Proposed resolution (part of this proposal, not a separate one)</strong>: add a new utility class <code>io.github.dailystruggle.rtp.common.text.LegacyColorStrip</code> in <code>rtp-core</code> (platform-agnostic, no Bukkit/Fabric imports) that:
+   - ports the strip logic from <code>FabricLegacyText.stripColor</code> + <code>normalise</code> (which already covers <code>&amp;x</code>, <code>§x</code>, and <code>&amp;#rrggbb</code> hex — the union we need),
+   - exposes two surfaces: <code>String strip(String)</code> (drop-in replacement for <code>ChatColor.stripColor</code>) and <code>StripResult strip2(String)</code> returning <code>{ String stripped, int[] strippedToRaw }</code> for the search-highlight projection,
+   - has a unit test (<code>LegacyColorStripTest</code>) covering each color syntax including a gradient-flavored input.
+   Once landed, follow-ups (recorded in <code>POTENTIAL_BUGS.md</code> if not done in-scope): migrate the Bukkit <code>ChatColor.stripColor</code> call sites in <code>SendMessage.java:428</code> and <code>AnvilInputSession.java:148</code> to the canonical helper; Fabric's three callers can stay (they're already in Fabric-internal code and the Fabric helper would just delegate).</p>
+<p>This is what the user's question in the Effective Issue is asking us to do, and it is the prerequisite for the search feature's color-stripped matching (constraint §2.7). Treat the strip helper as a checklist item ahead of <code>ConfigSearchResultsBuilder</code>, not a separate proposal.
+2. <strong>Sealed-shape test location</strong>: ~~confirm exact test path.~~ <strong>Investigated 2026-05-19</strong>: confirmed <code>rtp-api/src/test/java/io/github/dailystruggle/rtp/api/menu/MenuModelSurfaceTest.java</code>, method <code>menuActionSealedShape</code> (lines 41-59). It asserts <code>assertEquals(13, permitted.length)</code> and a sorted <code>List.of(...)</code> of simple class names. Bump to 15 and insert <code>"OpenConfigSearchPrompt"</code> and <code>"OpenConfigSearchResults"</code> in sorted position (between <code>OpenConfigSelector</code> / <code>OpenConfigSubParamPage</code> and <code>OpenExternalUrl</code>).
+3. <strong><code>OpenConfigKey</code> argument shape</strong>: ~~confirm it already accepts <code>(fileName, keyPath)</code> and resolves the key path~~ <strong>Investigated 2026-05-19</strong>: confirmed <code>record OpenConfigKey(String fileName, String paramName)</code> at <code>MenuAction.java:310</code>. Server-resolved by <code>MenuRedeemSubcommand.dispatchOpenConfigKey</code> against the live <code>CommandParameter</code> for <code>paramName</code> on the file. Search result rows can construct <code>OpenConfigKey(file, paramName)</code> directly and let the existing dispatch arm route to the same page that <code>/rtp config &lt;file&gt; view</code> -&gt; row-click opens. Caveat: <code>paramName</code> is the <em>typed</em> enum key name (e.g. <code>RegionKeys.shape</code>), not a free-form YAML path; the builder must look up matches against the parser's enum keys and yield the enum name. Values that live under nested YAML sections inside a single enum key (e.g. <code>vert.minY</code> under <code>RegionKeys.vert</code>) will still resolve at the enum-key level (one result row per enum key, not per nested sub-path) — acceptable for v1 (the key page already surfaces the nested form).
+4. <strong><code>PromptAnvilInput</code> continuation contract</strong>: ~~confirm the existing prompt action supports a typed continuation~~ <strong>Investigated 2026-05-19</strong>: confirmed it does <strong>not</strong>. <code>record PromptAnvilInput(String[] parentPath, String paramName, String prefill)</code> at <code>MenuAction.java:226</code> is resolved <em>entirely renderer-side</em> (per Javadoc: "Resolved entirely on the renderer side (Paper/Folia); never enters the <code>MenuRedeemSubcommand</code> dispatch path"); on submit the platform synthesizes <code>/rtp &lt;parentPath...&gt; &lt;paramName&gt;:&lt;typed&gt;</code> and runs it through the normal command pipeline. There is no carried next-action descriptor.</p>
+<p><strong>Implication for this feature</strong>: the proposed <code>OpenConfigSearchPrompt</code> action cannot reuse <code>PromptAnvilInput</code> as-is. Two viable shapes:
+   - <strong>(A)</strong> Mint the prompt as <code>PromptAnvilInput(parentPath=["menu","config","search"], paramName="query", prefill="")</code> and have the <code>menu config search</code> subcommand (a thin new <code>TreeCommand</code> leaf under <code>MenuRedeemSubcommand</code>) accept <code>query:&lt;text&gt;</code>, build the results model itself, and hand it to the renderer. This piggybacks on the existing pipeline (<code>/rtp menu config search query:foo</code>) and adds zero new menu-action variants on the prompt side — only <code>OpenConfigSearchResults(query, page)</code> remains needed for pagination + the selector-button entry. <strong>Preferred.</strong>
+   - <strong>(B)</strong> Add a small extension to <code>PromptAnvilInput</code> (or a sibling variant <code>PromptAnvilInputThen(parentPath, paramName, prefill, MenuAction continuation)</code>) so the post-submit action is carried by the prompt itself. Cleaner long-term but a wider API surface change; defer unless (A) hits a blocker.</p>
+<p><strong>Decision (this proposal)</strong>: adopt (A). The <code>OpenConfigSearchPrompt</code> record becomes a thin pointer that the renderer translates to <code>PromptAnvilInput(["menu","config","search"], "query", "")</code> client-side; the actual submit goes through the command pipeline, parses <code>query:&lt;text&gt;</code>, and routes to the same builder used by <code>dispatchOpenConfigSearchResults</code>. This keeps sealed-shape additions at 2 (prompt + results) and avoids extending <code>PromptAnvilInput</code>. The thin <code>menu config search</code> <code>TreeCommand</code> leaf is in scope for this proposal; add it to §3 and checklist item 5.
+5. <strong><code>MultiConfigParser</code> iteration</strong>: ~~confirm the public surface for "give me every (key, raw value)" pair~~ <strong>Investigated 2026-05-19</strong>: confirmed <code>listParsers(): Set&lt;String&gt;</code> + <code>getParser(name): ConfigParser&lt;E&gt;</code> at <code>MultiConfigParser.java:150-174</code>. Walk: for each <code>MultiConfigParser</code> in <code>RTP.configs.multiConfigParserMap</code>, call <code>listParsers()</code>, then for each name <code>getParser(name)</code> and enumerate that parser's enum keys + <code>getConfigValue(key, null)</code>. Each sub-parser carries its own <code>file/name</code>, so per-world overrides (<code>regions/&lt;world&gt;.yml</code>, <code>worlds/&lt;world&gt;.yml</code>) surface as distinct hit-source labels naturally.</p>
+<p>All §6 items now verified. Proposal is ready for implementation modulo Q4's Decision (A) above, which adds a <code>TreeCommand</code> leaf to the affected-classes list — apply when implementing.</p>
+<h2 id="7-risks-and-trade-offs">7. Risks and trade-offs<a class="headerlink" href="#7-risks-and-trade-offs" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Sealed <code>MenuAction</code> churn</strong>: every addition to <code>MenuAction</code> is an API event for addons that pattern-match on it. The two new records are additive and the existing sealed-shape test exists precisely to flag this; addons that use exhaustive <code>switch</code> on <code>MenuAction</code> will get an unhandled-arm warning. Acceptable; document in <code>CHANGELOG.md</code> under the next unreleased version.</li>
+<li><strong>Color-strip correctness</strong>: gradient/hex codes have several syntaxes in this codebase (legacy <code>&amp;x</code>, <code>§x</code>, <code>&amp;#rrggbb</code>, and the MiniMessage carry-over). Getting the strip wrong silently breaks highlight projection (highlight appears on the wrong characters). Mitigation: dedicated unit tests for the strip helper covering each syntax, plus a test that feeds a known gradient-wrapped value through <code>ConfigSearchResultsBuilder</code> and asserts the highlight offsets land on the correct raw characters.</li>
+<li><strong>Very short queries</strong>: a 1-char query would match almost everything. Mitigate with a minimum-length guard (proposed: &gt;= 2 chars) backed by <code>menuConfigSearchTooShort</code> locale string. If the user disagrees, drop the guard.</li>
+<li><strong>Per-world <code>regions.yml</code> duplication</strong>: a value present in 10 region overrides will produce 10 hits. Acceptable for v1 (the operator wants to know all the places); revisit if it becomes noisy.</li>
+<li><strong>No result cap</strong>: the user explicitly waived the cap. A pathological config (huge <code>worlds.yml</code> with thousands of override values) could produce a multi-hundred-page book. Acceptable; the book renderer already paginates and the cost is bounded by total config size which is small.</li>
+</ul>
+<h2 id="8-tests">8. Tests<a class="headerlink" href="#8-tests" title="Permanent link">&para;</a></h2>
+<p><strong>Test module placement (user direction, 2026-05-19)</strong>: new unit tests for this feature may live in <code>rtp-plugin/src/test/...</code> provisionally until the right canonical home is identified. Rationale: <code>rtp-plugin</code> already has the test infrastructure (<code>LocaleParityTest</code>, <code>ReqRtpF013SpanishLocaleContentTest</code>) and dependencies wired against <code>rtp-core</code> and <code>rtp-api</code>, so new tests can be authored there without spinning up additional test classpaths in lower modules. Once the feature lands and the right module home is clear (likely <code>rtp-core</code> for the builder tests, <code>rtp-api</code> for the sealed-shape bump), tests should be relocated in a follow-up. Until then, do <strong>not</strong> treat the <code>Eventual module</code> column below as final placement — the <strong>landing zone for v1 is <code>rtp-plugin</code></strong> for any test marked <code>(new)</code> unless otherwise noted.</p>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Eventual module</th>
+<th>Land in (v1)</th>
+<th>What it asserts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MenuModelSurfaceTest.menuActionSealedShape</code> (existing, bump)</td>
+<td><code>rtp-api</code></td>
+<td><code>rtp-api</code> (in place)</td>
+<td>Permitted-subclasses set now includes <code>OpenConfigSearchPrompt</code> and <code>OpenConfigSearchResults</code>; size = 15.</td>
+</tr>
+<tr>
+<td><code>ConfigSearchResultsBuilderTest</code> (new)</td>
+<td><code>rtp-core</code></td>
+<td><code>rtp-plugin</code></td>
+<td>Substring match is case-insensitive; matches across keys and values; gradient/hex/<code>&amp;</code> codes do not break matching; offsets project back to the correct raw characters; empty query and too-short query return empty result + correct sentinel.</td>
+</tr>
+<tr>
+<td><code>ColorStripTest</code> (new, only if a new helper is introduced per §6 Q1)</td>
+<td><code>rtp-core</code></td>
+<td><code>rtp-core</code> (already landed as <code>LegacyColorStripTest</code>)</td>
+<td>Each color syntax strips to the expected plain text and the offset map round-trips.</td>
+</tr>
+<tr>
+<td><code>MenuRedeemSubcommandConfigSearchDispatchTest</code> (new)</td>
+<td><code>rtp-core</code></td>
+<td><code>rtp-plugin</code></td>
+<td>The two new dispatch arms (a) reject when <code>senderId == null</code>, (b) reject when permission missing, (c) on prompt success mint a token whose redeem produces <code>OpenConfigSearchResults</code>, (d) on results success hand a <code>MenuModel</code> to the renderer with at least one row.</td>
+</tr>
+<tr>
+<td><code>LocaleParityTest</code> (existing)</td>
+<td><code>rtp-plugin</code></td>
+<td>All new <code>MessagesKeys</code> entries present in every shipped locale per <code>AGENTS.md</code> <em>Locale Parity Maintenance</em>.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>ReqRtpF013SpanishLocaleContentTest</code> (existing, untouched)</td>
+<td><code>rtp-plugin</code></td>
+<td>Sanity-check Spanish coverage still passes after baseline additions.</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-locale-strings-english-baseline-values-draft">9. Locale strings (English baseline values, draft)<a class="headerlink" href="#9-locale-strings-english-baseline-values-draft" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>English baseline</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>menuConfigSearchButton</code></td>
+<td><code>&amp;9Search all configs</code></td>
+</tr>
+<tr>
+<td><code>menuConfigSearchPromptTitle</code></td>
+<td><code>Search configs</code></td>
+</tr>
+<tr>
+<td><code>menuConfigSearchEmpty</code></td>
+<td><code>&amp;7No matches for &amp;f[query]&amp;7.</code></td>
+</tr>
+<tr>
+<td><code>menuConfigSearchResultsHeader</code></td>
+<td><code>&amp;7Results for &amp;f[query]&amp;7 ([count] hits)</code></td>
+</tr>
+<tr>
+<td><code>menuConfigSearchResultRow</code></td>
+<td><code>&amp;7[[file]] [key] = [value]</code></td>
+</tr>
+<tr>
+<td><code>menuConfigSearchTooShort</code></td>
+<td><code>&amp;7Query must be at least 2 characters.</code></td>
+</tr>
+</tbody>
+</table>
+<p>Highlight is applied by the renderer post-format, not encoded in the locale string (so translators don't have to think about color spans). The off-blue color used for the highlight is the existing menu accent color (resolve from the menu theme; do not hardcode a hex).</p>
+<h2 id="10-implementation-checklist-post-approval">10. Implementation checklist (post-approval)<a class="headerlink" href="#10-implementation-checklist-post-approval" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] 1. Verify §6 open questions; record answers inline in this proposal before writing code. — done; §6 closing note confirms all 5 questions resolved (Q4 adopts Decision (A)).</li>
+<li>[x] 2. Add 2 records to <code>MenuAction</code>; bump and update <code>MenuModelSurfaceTest</code>; run that test only. — landed: <code>OpenConfigSearchPrompt</code> + <code>OpenConfigSearchResults(query,page)</code> in <code>rtp-api</code>, sealed-shape bumped 13-&gt;15, <code>BookMenuRenderer</code> arms wired, <code>MenuModelSurfaceTest</code> 15/15 PASSED.</li>
+<li>[x] 3. Implement <code>ColorStrip</code> helper (or reuse) + <code>ColorStripTest</code>. — landed: <code>rtp-core/.../common/text/LegacyColorStrip.java</code> (<code>strip</code> + <code>strip2</code> with offset map); <code>LegacyColorStripTest</code> 11/11 PASSED.</li>
+<li>[x] 4. Implement <code>ConfigSearchResultsBuilder</code> + <code>ConfigSearchResultsBuilderTest</code> — landed 2026-05-19: <code>rtp-core/.../common/menu/search/ConfigSearchResultsBuilder.java</code> walks <code>RTP.configs.configParserMap</code> + <code>multiConfigParserMap</code>, color-strips both keys and values via <code>LegacyColorStrip.strip2</code>, projects match ranges back to raw offsets per §2.7; test in <code>rtp-plugin/src/test/.../menu/search/ConfigSearchResultsBuilderTest.java</code> (6/6 PASSED, covers short-query guard, case-insensitive match, key-vs-value attribution, hex-prefixed offset projection, null/empty configs).</li>
+<li>[x] 5. Implement <code>ConfigSearchResultsPageBuilder</code> + dispatch arms in <code>MenuRedeemSubcommand</code> + dispatch test (test lands in <code>rtp-plugin/src/test/...</code> per §8). <strong>Page builder must emit the raw value as literal text</strong> (no <code>&amp;</code>/<code>§</code>/hex translation) with the off-blue highlight overlaid at the projected raw offsets — see constraint §2.8.</li>
+<li>[x] 5a (turn 1, 2026-05-20): SAM <code>MenuRedeemSubcommand.MenuConfigSearchBuilder</code> (added after <code>MenuCuratedPageBuilder</code> per Option A); <code>configSearchBuilder</code> field with the same renderer-coupling collapse; new 10-arg ctor (existing 9-arg chains to it with <code>null</code>); 2 dispatch arms (<code>dispatchOpenConfigSearchPrompt</code> synthesizes <code>PromptAnvilInput(["menu","config","search"], "query", "")</code> per §6 Q4 Decision A; <code>dispatchOpenConfigSearchResults</code> mirrors <code>dispatchOpenConfigKey</code> shape with permission + builder-disabled + null-model + renderer-throw S-004 reject paths); 2 instanceof arms slotted next to <code>OpenConfigKey</code>. Scoped test <code>ConfigSearchDispatchTest</code> lives in <code>rtp-core/src/test/...</code> (same package as <code>MenuConfigSubtreeDispatchTest</code>) — 6/6 PASSED, covers happy path (builder receives query+page + renderer receives model), permission-denied reject (builder not invoked), builder-disabled (null) reject, null-model reject, prompt permission-denied reject, prompt synthesizes-and-walks-path. All 81 sibling menu tests still PASSED. <strong>Note on test landing zone</strong>: §8 marked <code>rtp-plugin</code> as provisional, but the existing <code>MenuConfigSubtreeDispatchTest</code> template and required <code>BaseRTPCmdImpl</code> / <code>LocalMenuTokenRegistry</code> access live in <code>rtp-core/src/test/...</code>, so the new test went there for consistency; revisit if <code>rtp-plugin</code> becomes the canonical home for menu dispatch tests.</li>
+<li>[x] 5b (landed 2026-05-20): production <code>MenuConfigSearchBuilder</code> inline in <code>rtp-plugin/.../RTPCmdBukkit.java</code> wrapping <code>ConfigSearchResultsBuilder.search(query)</code>; paginated <code>MenuModel</code> (8 rows/page) where each hit row is a multi-fragment <code>MenuLine</code> with gray base + <code>&amp;9&amp;l&lt;match&gt;&amp;r&amp;7</code> overlays at the raw-offset <code>Hit.matchRanges</code> (constraint §2.8 — raw text emitted verbatim, off-blue highlight only on matched substrings, every fragment shares the same <code>OpenConfigKey(file, key)</code> click action); tokens minted per render with 5-minute TTL. New <code>rtp-core/.../commands/config/ConfigSearchSubCmd.java</code> provides the <code>/rtp config search query:&lt;text&gt;</code> leaf with an injectable <code>Handler</code> SAM; <code>ConfigCmd.addCommands()</code> registers it (alongside <code>LanguageCmd</code>) so it lands on <code>ConfigCmd</code> before the 10-tick <code>MenuMirrorSubcommand</code> seeding catches it (resolving <code>dispatchPromptAnvilInput</code>'s walk for path <code>["menu","config","search"]</code>). <code>RTPCmdBukkit</code> schedules an 8-tick deferred handler attachment that wires renderer + search builder into the leaf so the anvil-submit path <code>/rtp menu config search query:&lt;typed&gt;</code> runs the search and renders the results book directly through <code>MenuMirrorSubcommand</code>. <code>:rtp-core:compileJava</code> + <code>:rtp-plugin:compileTestJava</code> BUILD SUCCESSFUL; 81/81 sibling menu tests still PASS.</li>
+<li>[x] 6. Wire search button onto the config selector page. — landed 2026-05-20: <code>CommandTreeMenuBuilder.buildConfigSelector</code> (rtp-core) now emits a Search row (<code>OpenConfigSearchPrompt</code>) immediately after the Back row and before the header on the curated config selector page. (Note: the wiring lives in <code>CommandTreeMenuBuilder.buildConfigSelector</code> rather than <code>ConfigMenuConsumerProfile</code> — the profile only supplies suggestion prefixes and comment lookup, while the selector page itself is built by <code>CommandTreeMenuBuilder</code>. Token mint happens via the existing per-fragment loop at the end of the method.) Tests updated in <code>MenuConfigSubtreeBuildersTest</code> (7/7 PASS); full menu package 81/81 PASS.</li>
+<li>[ ] 7. Add <code>MessagesKeys</code> baseline entries; run TSV pipeline (<code>locale-files-to-csv</code> -&gt; <code>reconcile-locale-csvs</code> -&gt; translate -&gt; <code>locale-files-from-csv</code>); run <code>LocaleParityTest</code>.</li>
+<li>[ ] 8. Update <code>CHANGELOG.md</code> under the current unreleased version (one bullet under <code>### Added</code>).</li>
+<li>[ ] 9. Full multi-module build (<code>.\gradlew build</code>) — required final verification per <code>AGENTS.md</code> <em>Final Full Build</em>.</li>
+<li>[ ] 10. Submit.</li>
+</ul>
+<h2 id="11-out-of-scope">11. Out of scope<a class="headerlink" href="#11-out-of-scope" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Searching comments (explicitly excluded per the user's "if we ignore comment lines" remark).</li>
+<li>Regex / fuzzy / token-aware search. v1 is plain case-insensitive substring.</li>
+<li>Cross-server search over the proxy network (proxy-aware search is a future item if it ever surfaces; not currently requested).</li>
+<li>A <code>/rtp config search &lt;query&gt;</code> chat command. The menu+anvil-input path is the only entry surface; if a non-menu entry is needed later, it can be added as a thin wrapper that mints the same <code>OpenConfigSearchResults</code> action.</li>
+</ul>
+<hr />
+<p><strong>Awaiting</strong>: explicit user "approved" before any code is written.</p>
+<p>;</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

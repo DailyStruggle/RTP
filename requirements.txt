@@ -1,0 +1,10 @@
+# Pinned toolchain for building the LeafRTP documentation site.
+#   pip install -r docs/requirements.txt
+#   mkdocs serve   # live preview at http://127.0.0.1:8000
+#   mkdocs build   # emit the static site/ folder
+#
+# mkdocs-material bundles a compatible mkdocs + pymdown-extensions, but both are
+# pinned explicitly so the site builds identically on CI and on a dev box.
+mkdocs-material==9.5.39
+pymdown-extensions==10.14.3
+pygments==2.18.0

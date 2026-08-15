@@ -1,0 +1,1987 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+        <link rel="prev" href="../CONFIGURATION/">
+      
+      
+        <link rel="next" href="../CROSS_SERVER_VERIFICATION/">
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>Single-backend verification - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#single-backend-network-verification-rtp-test-network-redis" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Single-backend verification
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-start-redis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 1: Start Redis
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-set-the-shared-secret-env-var" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 2: Set the shared-secret env var
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-edit-pluginsrtpnetworkyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 3: Edit plugins/RTP/network.yml
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-4-start-the-server-and-confirm-bootstrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 4: Start the server and confirm bootstrap
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-5-run-the-simulator" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 5: Run the simulator
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-6-verify-on-the-redis-side-optional-satisfying" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 6: Verify on the Redis side (optional, satisfying)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-this-does-not-verify" class="md-nav__link">
+    <span class="md-ellipsis">
+      What this does NOT verify
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tearing-down" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tearing down
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#promoting-to-multi-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      Promoting to multi-backend
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-start-redis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 1: Start Redis
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-set-the-shared-secret-env-var" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 2: Set the shared-secret env var
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-edit-pluginsrtpnetworkyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 3: Edit plugins/RTP/network.yml
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-4-start-the-server-and-confirm-bootstrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 4: Start the server and confirm bootstrap
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-5-run-the-simulator" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 5: Run the simulator
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-6-verify-on-the-redis-side-optional-satisfying" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 6: Verify on the Redis side (optional, satisfying)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-this-does-not-verify" class="md-nav__link">
+    <span class="md-ellipsis">
+      What this does NOT verify
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tearing-down" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tearing down
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#promoting-to-multi-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      Promoting to multi-backend
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="single-backend-network-verification-rtp-test-network-redis">Single-Backend Network Verification (<code>rtp test network</code> + Redis)<a class="headerlink" href="#single-backend-network-verification-rtp-test-network-redis" title="Permanent link">&para;</a></h1>
+<p>This page documents how a single Paper/Folia backend operator can verify the RTP network-mode SPI end-to-end against a real Redis instance, <strong>without</strong> standing up a proxy or a second backend. The verification uses <code>rtp test network</code>, an in-process Shape A simulator that publishes synthetic peers through the live <code>NetworkTransport</code>, asserts subscriber fan-out, and exercises the reservation-token claim/release/reap path.</p>
+<blockquote>
+<p>Scope: this is a <strong>single-JVM</strong> smoke test. It proves the Redis transport binding is reachable, the Lua scripts load, heartbeats round-trip, and reservation tokens claim atomically. It does <strong>not</strong> prove multi-server agreement, HMAC trust boundaries (Phase 4), or proxy-side routing. Multi-backend acceptance lives in <code>MULTI_SERVER_PLAN.md</code> Phase 2 acceptance row.</p>
+</blockquote>
+<p>Related design docs:</p>
+<ul>
+<li><a href="../../../dev/MULTI_SERVER_PLAN/"><code>docs/dev/MULTI_SERVER_PLAN.md</code></a> - phase status, Phase 2e-Redis A1/A2 slice notes.</li>
+<li><a href="../../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-005-redis-binding.md"><code>rtp-proxy-ADR-005</code></a> - Redis binding key layout and Lua scripts.</li>
+<li><a href="../../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-002-network-yml-schema.md"><code>rtp-proxy-ADR-002</code></a> - <code>network.yml</code> schema and validation rules.</li>
+<li><a href="../../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-010-security-hardening.md"><code>rtp-proxy-ADR-010</code></a> - HMAC + kill switch (deferred for single-backend).</li>
+<li>REQ-RTP-NET-002 (parity when disabled), REQ-RTP-PROXY-007 (<code>secretEnv</code> fail-fast).</li>
+</ul>
+<hr />
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<ul>
+<li>A running Paper or Folia backend on Java 21+, RTP plugin installed (full jar, not lite - lite strips Jedis and the SQL/Redis drivers per ADR-024).</li>
+<li>Docker available on the same host (or a reachable Redis 7+ instance on the network).</li>
+<li>Console / op access to run <code>/rtp test network</code> from the server console or an opped player.</li>
+</ul>
+<hr />
+<h2 id="step-1-start-redis">Step 1: Start Redis<a class="headerlink" href="#step-1-start-redis" title="Permanent link">&para;</a></h2>
+<p>The simplest local Redis is a single container:</p>
+<div class="highlight"><pre><span></span><code><span class="n">docker</span> <span class="n">run</span> <span class="n">-d</span> <span class="p">-</span><span class="n">-name</span> <span class="n">rtp-redis</span> <span class="n">-p</span> <span class="n">6379</span><span class="p">:</span><span class="n">6379</span> <span class="n">redis</span><span class="p">:</span><span class="n">7-alpine</span>
+</code></pre></div>
+<p>Verify:</p>
+<div class="highlight"><pre><span></span><code><span class="n">docker</span> <span class="n">exec</span> <span class="n">rtp-redis</span> <span class="n">redis-cli</span> <span class="n">PING</span>
+<span class="c"># expect: PONG</span>
+</code></pre></div>
+<p>For a Redis that already lives in your infrastructure, skip this step and use its host/port/password below.</p>
+<hr />
+<h2 id="step-2-set-the-shared-secret-env-var">Step 2: Set the shared-secret env var<a class="headerlink" href="#step-2-set-the-shared-secret-env-var" title="Permanent link">&para;</a></h2>
+<p>The plugin's network bootstrap fail-fasts at startup if <code>network.enabled: true</code> and the configured <code>secretEnv</code> is unset or empty. This guard is REQ-RTP-PROXY-007; it fires regardless of whether HMAC envelope enforcement is wired (the wire-level HMAC verifier is Phase 4, but the operator-discipline guard fires today).</p>
+<p>Generate a 32+ byte base64 secret and export it before launching the server JVM:</p>
+<div class="highlight"><pre><span></span><code><span class="c"># Generate (Windows PowerShell):</span>
+<span class="nv">$bytes</span> <span class="p">=</span> <span class="nb">New-Object</span> <span class="n">byte</span><span class="p">[]</span> <span class="n">32</span>
+<span class="no">[System.Security.Cryptography.RandomNumberGenerator]</span><span class="p">::</span><span class="n">Create</span><span class="p">().</span><span class="n">GetBytes</span><span class="p">(</span><span class="nv">$bytes</span><span class="p">)</span>
+<span class="no">[Convert]</span><span class="p">::</span><span class="n">ToBase64String</span><span class="p">(</span><span class="nv">$bytes</span><span class="p">)</span>
+<span class="c"># Copy the printed string.</span>
+
+<span class="c"># Export for the current shell (the server JVM inherits this):</span>
+<span class="nv">$env:RTP_NET_SECRET</span> <span class="p">=</span> <span class="s2">&quot;&lt;paste the base64 string&gt;&quot;</span>
+</code></pre></div>
+<p>On Linux:</p>
+<div class="highlight"><pre><span></span><code><span class="nv">RTP_NET_SECRET</span><span class="o">=</span><span class="k">$(</span>head<span class="w"> </span>-c<span class="w"> </span><span class="m">32</span><span class="w"> </span>/dev/urandom<span class="w"> </span><span class="p">|</span><span class="w"> </span>base64<span class="k">)</span>
+<span class="nb">export</span><span class="w"> </span>RTP_NET_SECRET
+</code></pre></div>
+<p>If you forget this step, the server log will print <code>network.secretEnv='RTP_NET_SECRET' is unset or empty ... (REQ-RTP-PROXY-007)</code> and network mode will refuse to enable. The rest of the plugin works normally.</p>
+<hr />
+<h2 id="step-3-edit-pluginsrtpnetworkyml">Step 3: Edit <code>plugins/RTP/network.yml</code><a class="headerlink" href="#step-3-edit-pluginsrtpnetworkyml" title="Permanent link">&para;</a></h2>
+<p>Boot the server once with default settings so the plugin writes the bundled <code>network.yml</code> into the data folder. Then stop the server and edit:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">network</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">schemaVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">  </span><span class="nt">serverId</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;test-1&quot;</span><span class="w">          </span><span class="c1"># any stable string; must be unique across the network</span>
+<span class="w">  </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">backend</span>
+<span class="w">  </span><span class="nt">secretEnv</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RTP_NET_SECRET</span>
+
+<span class="nt">transport</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis</span><span class="w">                 </span><span class="c1"># was &#39;sql&#39; by default</span>
+<span class="w">  </span><span class="nt">redis</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">localhost</span><span class="w">           </span><span class="c1"># or your Redis hostname</span>
+<span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">6379</span>
+<span class="w">    </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span><span class="w">              </span><span class="c1"># set if Redis has requirepass / ACL</span>
+
+<span class="nt">heartbeat</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">intervalMs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<span class="w">  </span><span class="nt">staleAfterMs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5000</span>
+</code></pre></div>
+<p>Keep <code>serverId</code> non-empty - two backends sharing one <code>serverId</code> would overwrite each other's heartbeat row. For a single-backend smoke test any string works (e.g. <code>"test-1"</code>).</p>
+<hr />
+<h2 id="step-4-start-the-server-and-confirm-bootstrap">Step 4: Start the server and confirm bootstrap<a class="headerlink" href="#step-4-start-the-server-and-confirm-bootstrap" title="Permanent link">&para;</a></h2>
+<p>Restart the server. Look for these log lines in order:</p>
+<div class="highlight"><pre><span></span><code>[NETWORK] Backend network mode enabled: serverId=&#39;test-1&#39; transport=redis intervalMs=1000 reapIntervalMs=30000
+</code></pre></div>
+<p>If you instead see:</p>
+<ul>
+<li><code>network.secretEnv='RTP_NET_SECRET' is unset or empty</code> -&gt; go back to Step 2.</li>
+<li><code>transport.type=redis requires transport.redis.host to be set</code> -&gt; <code>host</code> was blank; fix <code>network.yml</code>.</li>
+<li>A Jedis <code>JedisConnectionException</code> -&gt; the <code>host:port</code> is wrong or Redis isn't accepting connections.</li>
+</ul>
+<p>A correctly-booted backend will start publishing its own heartbeat to <code>rtp:net:backend:test-1</code> every second. You can verify externally:</p>
+<div class="highlight"><pre><span></span><code><span class="n">docker</span> <span class="n">exec</span> <span class="n">rtp-redis</span> <span class="n">redis-cli</span> <span class="n">HGETALL</span> <span class="n">rtp</span><span class="p">:</span><span class="n">net</span><span class="p">:</span><span class="n">backend</span><span class="p">:</span><span class="n">test</span><span class="p">-</span><span class="n">1</span>
+<span class="c"># expect: a hash with serverId, pluginState, lastSeenEpochMs, ...</span>
+</code></pre></div>
+<hr />
+<h2 id="step-5-run-the-simulator">Step 5: Run the simulator<a class="headerlink" href="#step-5-run-the-simulator" title="Permanent link">&para;</a></h2>
+<p>From the server console (or as an opped player):</p>
+<div class="highlight"><pre><span></span><code>/rtp test network all count=4
+</code></pre></div>
+<p>Probe-mode subcommands and their parameters (commands-api §2.2: bare tokens dispatch as subcommands; sizing is passed as <code>key=value</code> parameters):</p>
+<ul>
+<li><code>/rtp test network</code> - heartbeat round-trip with defaults (3 peers, 500ms observe window).</li>
+<li><code>/rtp test network heartbeat [count=N] [observeMs=M]</code> - publish N synthetic peers (default 3, max 16), assert snapshot + subscriber fan-out, clean up with <code>SHUTTING_DOWN</code>. <code>observeMs</code> clamps to 250..30000.</li>
+<li><code>/rtp test network tokens [count=N] [ttlMs=M]</code> - claim N reservation tokens (default 2, max 8), find them, release them, then verify a doomed 1ms-TTL token gets reaped within the observe window. <code>ttlMs</code> clamps to 250..30000.</li>
+<li><code>/rtp test network all [count=N] [observeMs=M]</code> - run heartbeat then tokens. Recommended for a first verification.</li>
+</ul>
+<p>The audit row appears in console output and the server log. A successful run on the Redis transport looks like:</p>
+<div class="highlight"><pre><span></span><code>[RTP test/network] PASS: peers=4 observed=4/4 latency=&lt;us&gt;us (RedisNetworkStateBinding)
+[RTP test/network] PASS: tokens peers=4 claim_us=&lt;us&gt; find_us=&lt;us&gt; release_us=&lt;us&gt; reap_us=&lt;us&gt; total_us=&lt;us&gt; (RedisNetworkStateBinding)
+</code></pre></div>
+<p>If the audit row reports <code>(InMemoryNetworkStateBinding)</code> instead of <code>(RedisNetworkStateBinding)</code>, the D3 slot resolved to the wrong transport - usually because <code>network.enabled: false</code> or because <code>transport.type</code> was not changed from <code>sql</code> / <code>in-memory</code>. Re-check <code>network.yml</code>.</p>
+<p>A <code>NOT-CONFIGURED</code> skip means the binding never opened. Look upstream in the log for the bootstrap warning.</p>
+<hr />
+<h2 id="step-6-verify-on-the-redis-side-optional-satisfying">Step 6: Verify on the Redis side (optional, satisfying)<a class="headerlink" href="#step-6-verify-on-the-redis-side-optional-satisfying" title="Permanent link">&para;</a></h2>
+<p>While the test is running you can watch the keyspace from a second terminal:</p>
+<div class="highlight"><pre><span></span><code><span class="n">docker</span> <span class="n">exec</span> <span class="n">rtp-redis</span> <span class="n">redis-cli</span> <span class="p">-</span><span class="n">-scan</span> <span class="p">-</span><span class="n">-pattern</span> <span class="s1">&#39;rtp:net:*&#39;</span>
+<span class="c"># expect rtp:net:backend:test-1 plus rtp:net:backend:rtp-sim-0-test ... -3-test</span>
+<span class="c">#   and (during tokens mode) rtp:net:tok:* and rtp:net:tokactive:* entries</span>
+
+<span class="n">docker</span> <span class="n">exec</span> <span class="n">rtp-redis</span> <span class="n">redis-cli</span> <span class="n">MONITOR</span>
+<span class="c"># expect HSET / EXPIRE / PUBLISH / EVALSHA traffic at ~1Hz</span>
+</code></pre></div>
+<p>The simulator cleans up its synthetic rows by republishing them with <code>pluginState=SHUTTING_DOWN</code> and a far-past <code>lastSeenEpochMs</code>, so the reaper drops them on the next pass. <code>redis-cli --scan</code> should converge back to a single <code>rtp:net:backend:test-1</code> row within <code>heartbeat.staleAfterMs</code> after the test finishes.</p>
+<hr />
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Likely cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>network.secretEnv='RTP_NET_SECRET' is unset</code> at startup</td>
+<td>Env var not exported to the server JVM</td>
+<td>Step 2; on systemd, set in the unit's <code>Environment=</code> block</td>
+</tr>
+<tr>
+<td><code>JedisConnectionException: Failed to connect</code></td>
+<td>Wrong host/port or Redis bound to <code>127.0.0.1</code> inside docker</td>
+<td>Use <code>host.docker.internal</code> or expose with <code>-p 0.0.0.0:6379:6379</code></td>
+</tr>
+<tr>
+<td>Audit row says <code>(InMemoryNetworkStateBinding)</code></td>
+<td><code>network.enabled: false</code> or <code>transport.type</code> not <code>redis</code></td>
+<td>Re-check <code>network.yml</code>; the bootstrap log line in Step 4 confirms transport type</td>
+</tr>
+<tr>
+<td>Audit row says <code>NOT-CONFIGURED</code></td>
+<td>Bootstrap failed silently; binding not installed on the D3 slot</td>
+<td>Look earlier in the log for <code>[NETWORK]</code> warnings; usually a config validation throw</td>
+</tr>
+<tr>
+<td><code>Lua script SHA mismatch</code> on first claim</td>
+<td>Redis was restarted mid-session and lost its script cache, OR the shipped <code>.sha1</code> sidecar drifted from <code>.lua</code></td>
+<td>Restart the server; the binding re-loads on construction. Persistent mismatch is a bug - file with the audit row attached</td>
+</tr>
+<tr>
+<td><code>tokens</code> step times out on TTL reap</td>
+<td>Reservation reaper interval is longer than the observe window</td>
+<td>Lower <code>reservation.reapIntervalMs</code> in <code>network.yml</code> (default 30000ms) or run the test with a larger observe argument</td>
+</tr>
+<tr>
+<td>Heartbeat row never appears in <code>HGETALL</code></td>
+<td>Server clock skew vs Redis past the TTL window</td>
+<td>Sync NTP on the host</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="what-this-does-not-verify">What this does NOT verify<a class="headerlink" href="#what-this-does-not-verify" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Multi-server agreement</strong>: a second backend reading the first backend's heartbeat. That requires two JVMs and is the Phase 2 acceptance row in <code>MULTI_SERVER_PLAN.md</code>.</li>
+<li><strong>Proxy-side routing</strong>: <code>/rtp</code> on a Velocity proxy dispatching to this backend. Requires a Velocity instance with <code>rtp-proxy-velocity</code> and the same <code>RTP_NET_SECRET</code>.</li>
+<li><strong>HMAC verification</strong>: ADR-010 Phase 4. The single-backend self-loop never crosses a trust boundary, so wire-level HMAC is not currently enforced even when Redis is the transport.</li>
+<li><strong>Kill switch propagation</strong>: ADR-010, deferred.</li>
+<li><strong>DragonflyDB compatibility</strong>: open Phase 2 acceptance row; the Lua scripts are written to RESP-compatible primitives but have not been exercised against Dragonfly.</li>
+<li><strong>Network partition recovery</strong>: A4 hardening turn, not yet implemented; the current binding logs and retries on reconnect via Jedis pool's default behaviour.</li>
+</ul>
+<hr />
+<h2 id="tearing-down">Tearing down<a class="headerlink" href="#tearing-down" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="c"># Stop the server normally so SHUTTING_DOWN heartbeats are published.</span>
+<span class="c"># Then:</span>
+<span class="n">docker</span> <span class="n">stop</span> <span class="n">rtp-redis</span>
+<span class="n">docker</span> <span class="nb">rm </span><span class="n">rtp-redis</span>
+</code></pre></div>
+<p>In <code>network.yml</code>, set <code>network.enabled: false</code> to return the backend to byte-identical pre-Phase-2 behaviour (REQ-RTP-NET-002). The <code>secretEnv</code> no longer needs to be exported once disabled.</p>
+<hr />
+<h2 id="promoting-to-multi-backend">Promoting to multi-backend<a class="headerlink" href="#promoting-to-multi-backend" title="Permanent link">&para;</a></h2>
+<p>Once a single-backend run is green:</p>
+<ol>
+<li>Start a second backend on a different <code>serverId</code>, same <code>RTP_NET_SECRET</code>, same Redis host. Confirm each sees the other's row in <code>HGETALL rtp:net:backend:&lt;other-serverId&gt;</code> and that <code>/rtp test network heartbeat count=1</code> observes the real peer in its snapshot alongside the synthetic one.</li>
+<li>Add a Velocity proxy with <code>rtp-proxy-velocity</code>, same secret, same Redis. The proxy publishes its own heartbeat on <code>rtp:net:proxy:&lt;proxyId&gt;</code> and reads backend snapshots for selection.</li>
+<li>The 2-proxy + 2-backend devstack acceptance harness is the next plan box (Phase 2, <code>MULTI_SERVER_PLAN.md</code>) and remains an open follow-up.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

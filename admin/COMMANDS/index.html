@@ -1,0 +1,2712 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+        <link rel="prev" href="../PREFABS/">
+      
+      
+        <link rel="next" href="../FAQ/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>Commands - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#command-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Commands
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-random-teleport" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp — Random Teleport
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-reload-reload-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp reload — Reload Configuration
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-config-edit-configuration-at-runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp config — Edit Configuration at Runtime
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-scan-map-the-teleport-region-spatial-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp scan — Map the Teleport Region (Spatial Memory)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="/rtp scan — Map the Teleport Region (Spatial Memory)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rtp-scan-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp scan start
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rtp-scan-reset" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp scan reset
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rtp-scan-pause" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp scan pause
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rtp-scan-resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp scan resume
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rtp-scan-cancel" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp scan cancel
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-info-plugin-information" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp info — Plugin Information
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-test-runtime-test-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp test — Runtime Test Suite
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-help-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp help — Help
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#placeholderapi-placeholders" class="md-nav__link">
+    <span class="md-ellipsis">
+      PlaceholderAPI Placeholders
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#full-permission-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Full Permission Reference
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-random-teleport" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp — Random Teleport
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-reload-reload-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp reload — Reload Configuration
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-config-edit-configuration-at-runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp config — Edit Configuration at Runtime
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-scan-map-the-teleport-region-spatial-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp scan — Map the Teleport Region (Spatial Memory)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="/rtp scan — Map the Teleport Region (Spatial Memory)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rtp-scan-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp scan start
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rtp-scan-reset" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp scan reset
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rtp-scan-pause" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp scan pause
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rtp-scan-resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp scan resume
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rtp-scan-cancel" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp scan cancel
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-info-plugin-information" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp info — Plugin Information
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-test-runtime-test-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp test — Runtime Test Suite
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-help-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp help — Help
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#placeholderapi-placeholders" class="md-nav__link">
+    <span class="md-ellipsis">
+      PlaceholderAPI Placeholders
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#full-permission-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Full Permission Reference
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="command-reference">Command Reference<a class="headerlink" href="#command-reference" title="Permanent link">&para;</a></h1>
+<p><strong>Applies to Plugin Version:</strong> <code>@version@</code></p>
+<p>All RTP commands are subcommands of <code>/rtp</code>. Parameters are passed in <code>key:value</code> format and can be combined freely unless noted otherwise. Tab-completion is available for all parameters and reflects live server state.</p>
+<hr />
+<h2 id="rtp-random-teleport"><code>/rtp</code> — Random Teleport<a class="headerlink" href="#rtp-random-teleport" title="Permanent link">&para;</a></h2>
+<p>Initiates a random teleportation sequence for the executing player (or a named target). Guards (permission, cooldown, duplicate-processing, reload-lock) run synchronously on the calling thread; the location search and teleport pipeline are dispatched asynchronously and never block the main server thread.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp
+/rtp [player:&lt;name&gt;] [world:&lt;name&gt;] [region:&lt;name&gt;]
+/rtp [biome:&lt;name&gt;]
+/rtp [shape:&lt;name&gt; [&lt;shape-key&gt;:&lt;value&gt; …]]
+/rtp [vert:&lt;name&gt;  [&lt;vert-key&gt;:&lt;value&gt;  …]]
+/rtp [worldBorderOverride:&lt;true|false&gt;]
+/rtp [toggletargetperms:&lt;true|false&gt;]
+</code></pre></div></p>
+<p><strong>Parameters</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required Permission</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>(none)</em></td>
+<td>—</td>
+<td><code>rtp.use</code></td>
+<td>Teleport the executing player using the default region for their current world.</td>
+</tr>
+<tr>
+<td><code>player:&lt;name&gt;</code></td>
+<td>String (online player name)</td>
+<td><code>rtp.use</code></td>
+<td>Teleport a named online player instead of (or in addition to) yourself. Repeat for multiple targets: <code>player:Alice player:Bob</code>.</td>
+</tr>
+<tr>
+<td><code>world:&lt;name&gt;</code></td>
+<td>String (loaded world name)</td>
+<td><code>rtp.use</code></td>
+<td>Derive the target region from this world's configuration rather than the sender's current world. Ignored when <code>region</code> is also supplied.</td>
+</tr>
+<tr>
+<td><code>region:&lt;name&gt;</code></td>
+<td>String (region name)</td>
+<td><code>rtp.use</code></td>
+<td>Teleport into a specific, named region. Takes priority over <code>world</code>. Repeat for multiple values; one is chosen at random each time.</td>
+</tr>
+<tr>
+<td><code>biome:&lt;name&gt;</code></td>
+<td>String (Minecraft biome key, upper-case)</td>
+<td><code>rtp.use</code></td>
+<td>Restrict the destination to locations inside the specified biome. Repeat to allow multiple biomes. Forces a fresh async search — pre-cached locations are not used.</td>
+</tr>
+<tr>
+<td><code>shape:&lt;name&gt;</code></td>
+<td>String (factory key)</td>
+<td><code>rtp.params</code></td>
+<td>Override the region's default shape for this single teleport. The region is cloned; its permanent definition is not changed. Sub-keys for the chosen shape type (e.g. <code>radius</code>, <code>weight</code>) may follow immediately.</td>
+</tr>
+<tr>
+<td><code>vert:&lt;name&gt;</code></td>
+<td>String (factory key)</td>
+<td><code>rtp.params</code></td>
+<td>Override the region's vertical adjustor for this single teleport. Sub-keys for the chosen vert type may follow.</td>
+</tr>
+<tr>
+<td><code>worldBorderOverride:&lt;bool&gt;</code></td>
+<td>Boolean</td>
+<td><code>rtp.params</code></td>
+<td>When <code>true</code>, replaces the region shape with the server's current world-border shape for this teleport. Incurs the <code>paramsPrice</code> economy charge.</td>
+</tr>
+<tr>
+<td><code>toggletargetperms:&lt;bool&gt;</code></td>
+<td>Boolean</td>
+<td><code>rtp.params</code></td>
+<td>When <code>true</code>, cooldown, delay, and economy checks are evaluated against each <em>target</em> player's attributes rather than the sender's.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples</strong>
+<div class="highlight"><pre><span></span><code>/rtp
+/rtp player:Steve
+/rtp world:world_nether
+/rtp region:mining
+/rtp region:default biome:BADLANDS
+/rtp region:default shape:SQUARE radius:256
+/rtp player:Steve toggletargetperms:true
+/rtp worldBorderOverride:true
+</code></pre></div></p>
+<blockquote>
+<p><strong>Threading note:</strong> Permission, cooldown, and duplicate-processing guards run synchronously. The <code>TeleportPipelineTask</code> is always dispatched via the async scheduler. Synchronous execution only occurs when a pre-cached (globally queued) location is available for the player <strong>and</strong> the teleport delay is ≤ 0. In that case <code>syncLoading</code> is implicitly treated as <code>true</code> because no chunk loading is required — the cached location is used directly without any I/O.</p>
+</blockquote>
+<hr />
+<h2 id="rtp-reload-reload-configuration"><code>/rtp reload</code> — Reload Configuration<a class="headerlink" href="#rtp-reload-reload-configuration" title="Permanent link">&para;</a></h2>
+<p>Reloads configuration files from disk without restarting the server. Sets a reload-lock that rejects incoming teleport requests for the duration of the reload; the lock is released via a synchronous 1-tick delayed task after a successful reload.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp reload
+/rtp reload &lt;config&gt;
+</code></pre></div></p>
+<p><strong>Required permission:</strong> <code>rtp.reload</code></p>
+<table>
+<thead>
+<tr>
+<th>Form</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/rtp reload</code></td>
+<td>Reload <strong>all</strong> configuration files. Region queues are rebuilt; any in-progress teleports that pass the reload-lock check will continue to their completion.</td>
+</tr>
+<tr>
+<td><code>/rtp reload &lt;config&gt;</code></td>
+<td>Reload a single config file or multi-config group by name (strip <code>.yml</code>). For <code>regions</code>, all <code>Region</code> objects are shut down and rebuilt from fresh file data. For <code>worlds</code>, each currently-loaded world's parser is refreshed.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples</strong>
+<div class="highlight"><pre><span></span><code>/rtp reload
+/rtp reload performance
+/rtp reload regions
+/rtp reload worlds
+/rtp reload economy
+</code></pre></div></p>
+<hr />
+<h2 id="rtp-config-edit-configuration-at-runtime"><code>/rtp config</code> — Edit Configuration at Runtime<a class="headerlink" href="#rtp-config-edit-configuration-at-runtime" title="Permanent link">&para;</a></h2>
+<p>Reads and writes individual keys in any loaded configuration file. One child sub-command is registered for every loaded <code>ConfigParser</code> and <code>MultiConfigParser</code> (file names with <code>.yml</code> stripped); tab-complete at position 1 enumerates the live set. Each successful write is <strong>atomic</strong> (temp + fsync + rename) and the affected parser is reloaded automatically — <code>/rtp reload</code> is only needed after hand-edits on disk.</p>
+<blockquote>
+<p>⚠️ <strong>Hardening in <code>3.0.0-beta.3</code>.</strong> This section describes the <strong>target</strong> behavior per the normative spec <a href="../../dev/CONFIG_COMMAND_SPEC/"><code>docs/dev/CONFIG_COMMAND_SPEC.md</code></a> (<a href="../../adr/ADR-037-harden-rtp-config-commands/">ADR-037</a> decision, <a href="../../adr/ADR-041-config-command-and-save-implementation/">ADR-041</a> implementation). Pre-beta.3 builds may still silently ignore unknown keys or skip validation; for production use on those builds, prefer hand-editing the YAML files followed by <code>/rtp reload</code>.</p>
+</blockquote>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp config &lt;file&gt; &lt;key&gt;:&lt;value&gt; [&lt;key&gt;:&lt;value&gt; …] [--dry-run]
+/rtp config &lt;file&gt; &lt;list-key&gt; add:&lt;value&gt; [add:&lt;value&gt; …] [remove:&lt;value&gt; …] [--dry-run]
+/rtp config &lt;multifile&gt; &lt;subfile&gt; &lt;key&gt;:&lt;value&gt; [--dry-run]
+/rtp config &lt;file&gt; view
+/rtp config &lt;file&gt; view &lt;key&gt; [&lt;key&gt; …]
+</code></pre></div></p>
+<p>One invocation targets <strong>exactly one</strong> file. Multiple <code>&lt;key&gt;:&lt;value&gt;</code> pairs (or <code>add:</code> / <code>remove:</code> operators on the same list key) within that file form one all-or-nothing transaction. The <code>--dry-run</code> token (default literal, configurable via <code>commands.config.dryRunFlag</code>) runs validation and renders the would-be diff without touching disk.</p>
+<p><strong>Required permissions</strong> (additive; the most-specific node wins):</p>
+<table>
+<thead>
+<tr>
+<th>Node</th>
+<th>Grants</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rtp.config</code></td>
+<td>Legacy alias retained for back-compat — equivalent to <code>rtp.config.view</code> + <code>rtp.config.set</code>.</td>
+</tr>
+<tr>
+<td><code>rtp.config.view</code></td>
+<td>The <code>view</code> sub-form against any file.</td>
+</tr>
+<tr>
+<td><code>rtp.config.set</code></td>
+<td>Any write against any file (umbrella).</td>
+</tr>
+<tr>
+<td><code>rtp.config.set.&lt;section&gt;</code></td>
+<td>Writes against the named section only (e.g. <code>rtp.config.set.regions</code>, <code>rtp.config.set.performance</code>). <code>set</code> implies <code>view</code> for the same section.</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Form</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/rtp config &lt;file&gt; &lt;key&gt;:&lt;value&gt;</code></td>
+<td>Set one or more scalar keys in the named config file. Validation is uniform; unknown keys, type mismatches, out-of-range values, and unknown region / world names are rejected with a <code>reasonCode</code> (see below) before any state mutates.</td>
+</tr>
+<tr>
+<td><code>/rtp config &lt;file&gt; &lt;list-key&gt; add:&lt;value&gt;</code> / <code>remove:&lt;value&gt;</code></td>
+<td>Append to / remove from a YAML list field. Duplicate <code>add:</code> and <code>remove:</code> of non-members are no-ops, not failures.</td>
+</tr>
+<tr>
+<td><code>/rtp config &lt;file&gt; view</code></td>
+<td>Interactive read-only inspection of every key in the file. Each rendered entry carries hover-text (when YAML comments are available; this is a substrate-dependent best-effort) and a click-suggest action that pre-fills an update command. Degrades to plain text on consoles.</td>
+</tr>
+<tr>
+<td><code>/rtp config &lt;file&gt; view &lt;key&gt;</code></td>
+<td>As above, but for one key (or one list-key's members).</td>
+</tr>
+<tr>
+<td>trailing <code>--dry-run</code></td>
+<td>Validate and compute the diff, but do not commit. The audit record is emitted with <code>outcome = DRY_RUN_OK</code>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Audit &amp; error reporting.</strong> Every invocation — success or failure, live or dry-run — emits exactly one audit record at <code>INFO</code> (success) or <code>WARNING</code> (failure) via <code>RTP.log</code>, carrying <code>actor</code>, <code>command</code>, <code>targetFile</code>, the per-mutation <code>oldValue</code> / <code>newValue</code> diff, <code>outcome</code>, and (on failure) a <code>reasonCode</code>. Failure messages render from <code>messages.yml → config.error.&lt;reasonCode&gt;</code> (REQ-RTP-F-013); the closed set of codes is documented in <a href="../../dev/CONFIG_COMMAND_SPEC/#52-reasoncode-enumeration"><code>CONFIG_COMMAND_SPEC.md</code> §5.2</a> and includes <code>UNKNOWN_FILE</code>, <code>UNKNOWN_KEY</code>, <code>WRONG_TYPE</code>, <code>OUT_OF_RANGE</code>, <code>UNKNOWN_REGION</code>, <code>UNKNOWN_WORLD</code>, <code>SCHEMA_INVARIANT</code>, <code>NO_PERMISSION</code>, <code>RELOAD_IN_PROGRESS</code>, <code>PERSIST_IO</code>, and others.</p>
+<blockquote>
+<p><strong>World-aware vertical clamping</strong> (applies on every write <strong>and</strong> every reload): when updating a region config that targets a <code>_nether</code> world, <code>maxY</code> is automatically clamped to 128, <code>vert</code> is forced to <code>LINEAR</code>, and <code>requireskylight</code> is set to <code>false</code>. For <code>_the_end</code> worlds, <code>requireskylight</code> is set to <code>false</code>. In all cases <code>maxY</code>/<code>minY</code> are clamped to the world's actual height limits. These run as composite schema invariants (see <a href="../../adr/ADR-034-memory-shape-catalog/">ADR-034</a>); a violation aborts the transaction with <code>reasonCode = SCHEMA_INVARIANT</code> and the on-disk file is unchanged.</p>
+<p><strong><code>language.yml</code> is not addressable</strong> through the generic <code>/rtp config language …</code> form because a locale change requires re-initializing every parser. The dedicated <code>LanguageCmd</code> path handles it (subject to the same audit, permission, and atomic-write contracts as this surface). Attempts via the generic path fail with <code>reasonCode = USE_DEDICATED_COMMAND</code>.</p>
+</blockquote>
+<p><strong>Examples</strong>
+<div class="highlight"><pre><span></span><code>/rtp config performance maxAttempts:20
+/rtp config economy price:100 --dry-run
+/rtp config regions nether world:world_nether
+/rtp config regions nether maxY:128
+/rtp config regions default biomeWhitelist add:FOREST add:PLAINS remove:OCEAN
+/rtp config regions default view shape
+/rtp config performance view
+</code></pre></div></p>
+<hr />
+<h2 id="rtp-scan-map-the-teleport-region-spatial-memory"><code>/rtp scan</code> — Map the Teleport Region (Spatial Memory)<a class="headerlink" href="#rtp-scan-map-the-teleport-region-spatial-memory" title="Permanent link">&para;</a></h2>
+<p>Iterates through every possible coordinate in a region's shape to identify and record safe vs. unsafe areas. This populates the "spatial memory" database so that the plugin knows where it can and cannot teleport players before it even tries. A bare <code>/rtp scan</code> (no sub-command) behaves identically to <code>/rtp scan resume</code>.</p>
+<p><strong>Actual Purpose:</strong>
+The <code>scan</code> command is used to proactively map out the world. While the standard teleport logic finds locations on-the-fly, a <code>scan</code> performs a comprehensive sweep of the entire region. It stores known-bad locations (oceans, solid blocks, claimed land) in spatial memory so that all future teleport selections, whether from the cache or a fresh search, can instantly skip these areas.</p>
+<p><strong>Required permission:</strong> <code>rtp.scan</code><br />
+<strong>Target region resolution:</strong> If <code>region</code> is omitted and the caller is a player, the player's current region is used. If the caller is the console, all permanent regions are targeted.</p>
+<blockquote>
+<p><strong>MemoryShape requirement:</strong> All scan sub-commands require the region's shape to be a <code>MemoryShape</code> implementation. Regions backed by other shape types are silently skipped with a <code>badArg</code> message.</p>
+</blockquote>
+<hr />
+<h3 id="rtp-scan-start"><code>/rtp scan start</code><a class="headerlink" href="#rtp-scan-start" title="Permanent link">&para;</a></h3>
+<p>Discards any existing spatial memory for the region and begins a full-space enumeration from the first coordinate. Use this when you have radically changed your <code>safety.yml</code> or added new protection plugins and want to re-verify the entire world.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp scan start [region:&lt;name&gt;]
+</code></pre></div></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>region:&lt;name&gt;</code></td>
+<td>Target a specific region. Omit to use the caller's current region (player) or all regions (console).</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>If a scan is already running for the region, an announcement is sent to all <code>rtp.scan</code> holders and the command aborts.</li>
+<li>The <code>ScanTask</code> is dispatched via the async scheduler; it never blocks the main thread or region tick threads.</li>
+</ul>
+<p><strong>Example</strong>
+<div class="highlight"><pre><span></span><code>/rtp scan start
+/rtp scan start region:mining
+</code></pre></div></p>
+<hr />
+<h3 id="rtp-scan-reset"><code>/rtp scan reset</code><a class="headerlink" href="#rtp-scan-reset" title="Permanent link">&para;</a></h3>
+<p>Clears all spatial memory and cached locations for a region without starting a new scan pass. This effectively "forgets" everything the plugin knows about safe/unsafe spots in that region.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp scan reset [region:&lt;name&gt;]
+</code></pre></div></p>
+<ul>
+<li>If a scan task is currently running for the region, it is cancelled, paused, and its persistence file deleted before the shape data is cleared.</li>
+<li>On completion, <code>MessagesKeys.scanReset</code> is broadcast to all <code>rtp.scan</code> holders.</li>
+</ul>
+<p><strong>Example</strong>
+<div class="highlight"><pre><span></span><code>/rtp scan reset region:default
+</code></pre></div></p>
+<hr />
+<h3 id="rtp-scan-pause"><code>/rtp scan pause</code><a class="headerlink" href="#rtp-scan-pause" title="Permanent link">&para;</a></h3>
+<p>Suspends an active scan task, preserving progress so it can be resumed later. The current <code>MemoryShape</code> state is persisted to disk immediately.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp scan pause [region:&lt;name&gt;]
+</code></pre></div></p>
+<ul>
+<li>If no scan task is running for the region, <code>MessagesKeys.scanNotRunning</code> is broadcast and no further action is taken.</li>
+</ul>
+<p><strong>Example</strong>
+<div class="highlight"><pre><span></span><code>/rtp scan pause region:mining
+</code></pre></div></p>
+<hr />
+<h3 id="rtp-scan-resume"><code>/rtp scan resume</code><a class="headerlink" href="#rtp-scan-resume" title="Permanent link">&para;</a></h3>
+<p>Resumes a paused scan task from its last saved position. If no task exists for the region, delegates automatically to <code>scan start</code>.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp scan resume [region:&lt;name&gt;]
+/rtp scan [region:&lt;name&gt;]
+</code></pre></div></p>
+<ul>
+<li>Clears the <code>pause</code> flag on the existing <code>ScanTask</code> and re-schedules it via the async scheduler.</li>
+</ul>
+<p><strong>Example</strong>
+<div class="highlight"><pre><span></span><code>/rtp scan resume
+/rtp scan resume region:mining
+</code></pre></div></p>
+<hr />
+<h3 id="rtp-scan-cancel"><code>/rtp scan cancel</code><a class="headerlink" href="#rtp-scan-cancel" title="Permanent link">&para;</a></h3>
+<p>Permanently stops an active or paused scan task and deletes its persistence file. Progress is lost.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp scan cancel [region:&lt;name&gt;]
+</code></pre></div></p>
+<ul>
+<li>If no scan task is running, <code>MessagesKeys.scanNotRunning</code> is broadcast.</li>
+<li>On success, the task is removed from the scan task registry and <code>MessagesKeys.scanCancel</code> is broadcast to all <code>rtp.scan</code> holders.</li>
+</ul>
+<p><strong>Example</strong>
+<div class="highlight"><pre><span></span><code>/rtp scan cancel region:mining
+</code></pre></div></p>
+<hr />
+<h2 id="rtp-info-plugin-information"><code>/rtp info</code> — Plugin Information<a class="headerlink" href="#rtp-info-plugin-information" title="Permanent link">&para;</a></h2>
+<p>Displays the current runtime state of the plugin: loaded worlds, permanent regions, queue statistics, and performance metrics.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp info
+/rtp info world:&lt;name&gt;
+/rtp info region:&lt;name&gt;
+</code></pre></div></p>
+<p><strong>Required permission:</strong> <code>rtp.info</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>(none)</em></td>
+<td>List all loaded worlds and permanent regions. In-game players receive clickable suggest-click entries; console receives full inline detail.</td>
+</tr>
+<tr>
+<td><code>world:&lt;name&gt;</code></td>
+<td>Display the <code>worldInfo</code> message template for each named world. Inactive or non-existent worlds are silently skipped.</td>
+</tr>
+<tr>
+<td><code>region:&lt;name&gt;</code></td>
+<td>Display the <code>regionInfo</code> message template for each named region, including queue depth, in-flight calculations, shape, cache cap, and a persistent learned-state summary (coverage, bad fraction, top rejection cause).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Persistent learned-state placeholders</strong> (usable in the <code>regionInfo</code> template in <code>messages.yml</code>): these summarize the region's persisted learned state - the same data written to <code>database/regionData/debug/&lt;region&gt;.json</code> on each scan. They resolve to <code>N/A</code> when the region's shape does not keep learned state or has not been scanned yet. No chunk loading is performed.</p>
+<table>
+<thead>
+<tr>
+<th>Placeholder</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[memCoveragePct]</code></td>
+<td>Percentage of the region's candidate cells that have been learned (flagged bad + recorded good).</td>
+</tr>
+<tr>
+<td><code>[memBadPct]</code></td>
+<td>Percentage of candidate cells currently flagged bad.</td>
+</tr>
+<tr>
+<td><code>[memBadCount]</code></td>
+<td>Number of cells currently flagged bad.</td>
+</tr>
+<tr>
+<td><code>[memTopCause]</code></td>
+<td>Rejection cause covering the most flagged cells (e.g. <code>safety</code>, <code>biome</code>, <code>worldBorder</code>), or <code>none</code>.</td>
+</tr>
+<tr>
+<td><code>[memTopCausePct]</code></td>
+<td>That cause's share of all flagged-bad cells.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Players with <code>rtp.admin</code> or <code>rtp.support</code> additionally see DRM/licensing metadata (downloader ID and download nonce) appended at the end of every <code>/rtp info</code> response.</p>
+</blockquote>
+<p><strong>Examples</strong>
+<div class="highlight"><pre><span></span><code>/rtp info
+/rtp info world:world_nether
+/rtp info region:default
+</code></pre></div></p>
+<hr />
+<h2 id="rtp-test-runtime-test-suite"><code>/rtp test</code> — Runtime Test Suite<a class="headerlink" href="#rtp-test-runtime-test-suite" title="Permanent link">&para;</a></h2>
+<p>Operator-facing self-test commands that exercise the teleport pipeline, queue, safety checks, verifiers, and scheduler against the live server. See <code>docs/dev/RUNTIME_TEST_SUITE_PLAN.md</code> for the full design and roadmap.</p>
+<p><strong>Required permission:</strong> <code>rtp.test</code></p>
+<table>
+<thead>
+<tr>
+<th>Sub-command</th>
+<th>Status</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/rtp test stress player:&lt;name&gt; [iterations:N] [intervalTicks:T] [region:&lt;name&gt;]</code></td>
+<td>Available</td>
+<td>Repeatedly teleports the listed player(s) through the real <code>/rtp</code> pipeline. <code>iterations</code> is clamped to <code>[1, 1000]</code> (default <code>10</code>); <code>intervalTicks</code> to <code>[10, 6000]</code> (default <code>40</code>).</td>
+</tr>
+<tr>
+<td><code>/rtp test queue</code>, <code>safety</code>, <code>verifiers</code>, <code>memory</code>, <code>platform</code>, <code>full</code></td>
+<td>Planned</td>
+<td>Documented in <code>RUNTIME_TEST_SUITE_PLAN.md §4</code>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples</strong>
+<div class="highlight"><pre><span></span><code>/rtp test stress player:leaf26
+/rtp test stress player:leaf26 iterations:50 intervalTicks:60
+/rtp test stress player:Alice player:Bob region:mining
+</code></pre></div></p>
+<blockquote>
+<p><strong>Threading note:</strong> The stress loop runs on <code>runTaskTimerAsynchronously</code> and delegates each iteration to the standard <code>/rtp</code> pipeline, so every safety guard (cooldown, economy, claim verifiers, async chunk I/O) remains active. Per-iteration failures are logged at <code>Level.WARNING</code> to satisfy REQ-RTP-S-004.</p>
+</blockquote>
+<hr />
+<h2 id="rtp-help-help"><code>/rtp help</code> — Help<a class="headerlink" href="#rtp-help-help" title="Permanent link">&para;</a></h2>
+<p>Displays a clickable, permission-filtered list of all available <code>/rtp</code> sub-commands. Only sub-commands for which the sender holds the required permission <strong>and</strong> which have a matching <code>MessagesKeys</code> entry are shown.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp help
+</code></pre></div></p>
+<p><strong>Required permission:</strong> <code>rtp.see</code></p>
+<p>Each displayed line is a clickable chat message; clicking it runs <code>/rtp &lt;subcommand&gt;</code>.</p>
+<hr />
+<h2 id="placeholderapi-placeholders">PlaceholderAPI Placeholders<a class="headerlink" href="#placeholderapi-placeholders" title="Permanent link">&para;</a></h2>
+<p>When PlaceholderAPI is installed, the following <code>%rtp_&lt;key&gt;%</code> placeholders are available. All placeholders resolve against the requesting player's UUID at call time, reflecting the player's current/last region context. The <strong>same keys</strong> also resolve inside <code>messages.yml</code> as <code>[key]</code> (square brackets) without PlaceholderAPI installed. A key with no value resolves to an empty string.</p>
+<table>
+<thead>
+<tr>
+<th>Placeholder</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>%rtp_delay%</code></td>
+<td>Remaining teleport delay in ticks</td>
+</tr>
+<tr>
+<td><code>%rtp_cooldown%</code></td>
+<td>Full cooldown period (ms)</td>
+</tr>
+<tr>
+<td><code>%rtp_remainingCooldown%</code></td>
+<td>Remaining cooldown time</td>
+</tr>
+<tr>
+<td><code>%rtp_queueLocation%</code></td>
+<td>Whether a cached location is queued for the player</td>
+</tr>
+<tr>
+<td><code>%rtp_teleports%</code></td>
+<td>Total teleports performed by this player</td>
+</tr>
+<tr>
+<td><code>%rtp_mspt%</code></td>
+<td>Current server MSPT</td>
+</tr>
+<tr>
+<td><code>%rtp_attempts%</code></td>
+<td>Location-search attempts for the current teleport</td>
+</tr>
+<tr>
+<td><code>%rtp_processingTime%</code></td>
+<td>Processing time for the current teleport</td>
+</tr>
+<tr>
+<td><code>%rtp_spot%</code></td>
+<td>Current target coordinates (<code>x y z</code>)</td>
+</tr>
+<tr>
+<td><code>%rtp_player%</code></td>
+<td>Player UUID</td>
+</tr>
+<tr>
+<td><code>%rtp_player_name%</code></td>
+<td>Player display name</td>
+</tr>
+<tr>
+<td><code>%rtp_player_status%</code></td>
+<td>Player teleport status</td>
+</tr>
+<tr>
+<td><code>%rtp_world%</code></td>
+<td>Player's current world</td>
+</tr>
+<tr>
+<td><code>%rtp_name%</code></td>
+<td>Player name</td>
+</tr>
+<tr>
+<td><code>%rtp_region%</code></td>
+<td>Player's current region name</td>
+</tr>
+<tr>
+<td><code>%rtp_displayName%</code></td>
+<td>Region's cosmetic display name (falls back to the region name)</td>
+</tr>
+<tr>
+<td><code>%rtp_shape%</code></td>
+<td>Region shape type</td>
+</tr>
+<tr>
+<td><code>%rtp_requirePermission%</code></td>
+<td>Whether the region requires <code>rtp.regions.&lt;name&gt;</code></td>
+</tr>
+<tr>
+<td><code>%rtp_override%</code></td>
+<td>The region's no-permission redirect target</td>
+</tr>
+<tr>
+<td><code>%rtp_worldBorderOverride%</code></td>
+<td>Whether the region honors the vanilla world border</td>
+</tr>
+<tr>
+<td><code>%rtp_pluginForced%</code></td>
+<td>Whether a plugin forced the region</td>
+</tr>
+<tr>
+<td><code>%rtp_serverForced%</code></td>
+<td>Whether the server forced the region</td>
+</tr>
+<tr>
+<td><code>%rtp_cacheCap%</code></td>
+<td>Region cache capacity</td>
+</tr>
+<tr>
+<td><code>%rtp_backlogCacheCap%</code></td>
+<td>L3 backlog cache capacity (ADR-028); 0 disables L3</td>
+</tr>
+<tr>
+<td><code>%rtp_cached%</code></td>
+<td>Total currently cached locations</td>
+</tr>
+<tr>
+<td><code>%rtp_keptCache%</code></td>
+<td>Locations whose chunks are kept loaded (hot/ready-to-serve)</td>
+</tr>
+<tr>
+<td><code>%rtp_unkeptCache%</code></td>
+<td>Verified locations whose chunks were released (warm)</td>
+</tr>
+<tr>
+<td><code>%rtp_backlogCache%</code></td>
+<td>Unverified backlog buffer depth</td>
+</tr>
+<tr>
+<td><code>%rtp_locationQueue%</code></td>
+<td>Number of players waiting on a coordinate</td>
+</tr>
+<tr>
+<td><code>%rtp_inFlightCalculations%</code></td>
+<td>In-flight async calculations</td>
+</tr>
+<tr>
+<td><code>%rtp_pipelineMsP50%</code></td>
+<td>Teleport-pipeline latency, 50th percentile (ms)</td>
+</tr>
+<tr>
+<td><code>%rtp_pipelineMsP75%</code></td>
+<td>Pipeline latency, 75th percentile (ms)</td>
+</tr>
+<tr>
+<td><code>%rtp_pipelineMsP90%</code></td>
+<td>Pipeline latency, 90th percentile (ms)</td>
+</tr>
+<tr>
+<td><code>%rtp_pipelineMsP95%</code></td>
+<td>Pipeline latency, 95th percentile (ms)</td>
+</tr>
+<tr>
+<td><code>%rtp_pipelineMsP99%</code></td>
+<td>Pipeline latency, 99th percentile (ms)</td>
+</tr>
+<tr>
+<td><code>%rtp_pipelineSampleCount%</code></td>
+<td>Number of latency samples in the current window</td>
+</tr>
+<tr>
+<td><code>%rtp_slowPipelineCount%</code></td>
+<td>Count of pipeline runs over the slow threshold</td>
+</tr>
+<tr>
+<td><code>%rtp_slowPipelineThresholdMs%</code></td>
+<td>The slow-pipeline threshold (ms)</td>
+</tr>
+<tr>
+<td><code>%rtp_queueGrowthWarnCount%</code></td>
+<td>How many times queue growth tripped the warning</td>
+</tr>
+<tr>
+<td><code>%rtp_queueGrowthWarnThreshold%</code></td>
+<td>The queue-growth warning threshold</td>
+</tr>
+<tr>
+<td><code>%rtp_memCoveragePct%</code></td>
+<td>Percentage of the region mapped by spatial memory</td>
+</tr>
+<tr>
+<td><code>%rtp_memBadPct%</code></td>
+<td>Percentage of mapped area marked unsafe</td>
+</tr>
+<tr>
+<td><code>%rtp_memBadCount%</code></td>
+<td>Count of known-bad cells</td>
+</tr>
+<tr>
+<td><code>%rtp_memTopCause%</code></td>
+<td>Most common rejection cause (biome, unsafe block, claim, ...)</td>
+</tr>
+<tr>
+<td><code>%rtp_memTopCausePct%</code></td>
+<td>Share of rejections attributable to <code>memTopCause</code></td>
+</tr>
+<tr>
+<td><code>%rtp_scan_chunks%</code></td>
+<td>Chunks processed across all active scans</td>
+</tr>
+<tr>
+<td><code>%rtp_scan_totalChunks%</code></td>
+<td>Total chunks to process across all active scans</td>
+</tr>
+<tr>
+<td><code>%rtp_scan_cps%</code></td>
+<td>Chunks processed per second (all active scans)</td>
+</tr>
+<tr>
+<td><code>%rtp_scan_regions%</code></td>
+<td>Comma-separated list of regions currently being scanned</td>
+</tr>
+<tr>
+<td><code>%rtp_scan_eta%</code></td>
+<td>Human-readable ETA for active scans (e.g. <code>2m 30s</code>)</td>
+</tr>
+<tr>
+<td><code>%rtp_scan_landPercentage%</code></td>
+<td>Percentage of valid land locations found so far</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="full-permission-reference">Full Permission Reference<a class="headerlink" href="#full-permission-reference" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Permission</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rtp.use</code></td>
+<td>op</td>
+<td>Use <code>/rtp</code> to teleport yourself</td>
+</tr>
+<tr>
+<td><code>rtp.see</code></td>
+<td>op</td>
+<td>See RTP related messages and <code>/rtp help</code></td>
+</tr>
+<tr>
+<td><code>rtp.free</code></td>
+<td>op</td>
+<td>Bypass all economy charges</td>
+</tr>
+<tr>
+<td><code>rtp.noCooldown</code></td>
+<td>op</td>
+<td>Bypass teleport cooldown</td>
+</tr>
+<tr>
+<td><code>rtp.noDelay</code></td>
+<td>op</td>
+<td>Bypass teleport delay</td>
+</tr>
+<tr>
+<td><code>rtp.noDelay.chunks</code></td>
+<td>op</td>
+<td>Bypass chunk-load delay</td>
+</tr>
+<tr>
+<td><code>rtp.noCancel</code></td>
+<td>op</td>
+<td>Prevent teleport from being cancelled</td>
+</tr>
+<tr>
+<td><code>rtp.other</code></td>
+<td>op</td>
+<td>Teleport another player with <code>player:&lt;name&gt;</code></td>
+</tr>
+<tr>
+<td><code>rtp.notme</code></td>
+<td>op</td>
+<td>Make yourself untargetable by other players' <code>/rtp player:&lt;name&gt;</code> - prevents forced RTP by other ops. Console is exempt and can always target any player.</td>
+</tr>
+<tr>
+<td><code>rtp.reload</code></td>
+<td>op</td>
+<td>Use <code>/rtp reload</code></td>
+</tr>
+<tr>
+<td><code>rtp.config</code></td>
+<td>op</td>
+<td>Legacy alias — grants <code>rtp.config.view</code> + <code>rtp.config.set</code>. Retained for back-compat; new deployments should grant the more specific nodes below.</td>
+</tr>
+<tr>
+<td><code>rtp.config.view</code></td>
+<td>op</td>
+<td>Use <code>/rtp config &lt;file&gt; view</code> (read-only inspection).</td>
+</tr>
+<tr>
+<td><code>rtp.config.set</code></td>
+<td>op</td>
+<td>Use <code>/rtp config &lt;file&gt; …</code> to write any config file (umbrella).</td>
+</tr>
+<tr>
+<td><code>rtp.config.set.&lt;section&gt;</code></td>
+<td>op</td>
+<td>Write only the named section (e.g. <code>rtp.config.set.regions</code>, <code>rtp.config.set.performance</code>). <code>set</code> implies <code>view</code> for the same section.</td>
+</tr>
+<tr>
+<td><code>rtp.update</code></td>
+<td>op</td>
+<td>Write individual config keys or list items via <code>SubConfigCmd</code> (legacy node; subsumed by <code>rtp.config.set</code> per <a href="../../dev/CONFIG_COMMAND_SPEC/"><code>CONFIG_COMMAND_SPEC.md</code></a>).</td>
+</tr>
+<tr>
+<td><code>rtp.info</code></td>
+<td>op</td>
+<td>Use <code>/rtp info</code></td>
+</tr>
+<tr>
+<td><code>rtp.admin</code></td>
+<td>op</td>
+<td>See DRM info in <code>/rtp info</code>; elevated admin access</td>
+</tr>
+<tr>
+<td><code>rtp.support</code></td>
+<td>op</td>
+<td>See DRM info in <code>/rtp info</code></td>
+</tr>
+<tr>
+<td><code>rtp.scan</code></td>
+<td>op</td>
+<td>Use all <code>/rtp scan</code> sub-commands</td>
+</tr>
+<tr>
+<td><code>rtp.test</code></td>
+<td>op</td>
+<td>Use all <code>/rtp test</code> runtime-test sub-commands</td>
+</tr>
+<tr>
+<td><code>rtp.params</code></td>
+<td>op</td>
+<td>Override <code>shape</code>, <code>vert</code>, and <code>worldBorderOverride</code> parameters</td>
+</tr>
+<tr>
+<td><code>rtp.unqueued</code></td>
+<td>op</td>
+<td>Teleport without consuming a pre-generated cached location</td>
+</tr>
+<tr>
+<td><code>rtp.personalqueue</code></td>
+<td>op</td>
+<td>Use a personal (per-player) location queue</td>
+</tr>
+<tr>
+<td><code>rtp.world</code></td>
+<td>op</td>
+<td>Use the <code>world</code> parameter</td>
+</tr>
+<tr>
+<td><code>rtp.worlds.&lt;name&gt;</code></td>
+<td>op</td>
+<td>Target a specific world by name</td>
+</tr>
+<tr>
+<td><code>rtp.worlds.*</code></td>
+<td>op</td>
+<td>Target any world</td>
+</tr>
+<tr>
+<td><code>rtp.region</code></td>
+<td>op</td>
+<td>Use the <code>region</code> parameter</td>
+</tr>
+<tr>
+<td><code>rtp.regions.&lt;name&gt;</code></td>
+<td>op</td>
+<td>Target a specific region by name</td>
+</tr>
+<tr>
+<td><code>rtp.regions.*</code></td>
+<td>op</td>
+<td>Target any region</td>
+</tr>
+<tr>
+<td><code>rtp.biome</code></td>
+<td>op</td>
+<td>Use the <code>biome</code> parameter</td>
+</tr>
+<tr>
+<td><code>rtp.biome.&lt;name&gt;</code></td>
+<td>op</td>
+<td>Restrict to a specific biome</td>
+</tr>
+<tr>
+<td><code>rtp.biome.free</code></td>
+<td>op</td>
+<td>Bypass extra economy cost for biome filtering</td>
+</tr>
+<tr>
+<td><code>rtp.biome.*</code></td>
+<td>op</td>
+<td>Use any biome</td>
+</tr>
+<tr>
+<td><code>rtp.onevent.join</code></td>
+<td>false</td>
+<td>Auto-RTP on first join</td>
+</tr>
+<tr>
+<td><code>rtp.onevent.firstJoin</code></td>
+<td>false</td>
+<td>Auto-RTP on every join</td>
+</tr>
+<tr>
+<td><code>rtp.onevent.respawn</code></td>
+<td>false</td>
+<td>Auto-RTP on death/respawn</td>
+</tr>
+<tr>
+<td><code>rtp.onevent.changeWorld</code></td>
+<td>false</td>
+<td>Auto-RTP on world change</td>
+</tr>
+<tr>
+<td><code>rtp.onevent.move</code></td>
+<td>false</td>
+<td>Auto-RTP on movement trigger</td>
+</tr>
+<tr>
+<td><code>rtp.onevent.teleport</code></td>
+<td>false</td>
+<td>Auto-RTP on teleport event</td>
+</tr>
+<tr>
+<td><code>rtp.onevent.*</code></td>
+<td>false</td>
+<td>All auto-RTP event triggers</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Typical setup:</strong> Grant <code>rtp.use</code> to your default player group. Grant <code>rtp.free</code> + <code>rtp.noCooldown</code> to your VIP/donor group. Grant the full <code>rtp.*</code> tree to server operators and administrators.</p>
+</blockquote>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

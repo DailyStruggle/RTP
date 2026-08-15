@@ -1,0 +1,1953 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-048 - Move menu page builders into rtp-api behind RTPServerAccessor - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-048-move-menu-page-builders-into-rtp-api-behind-rtpserveraccessor" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-048 - Move menu page builders into rtp-api behind RTPServerAccessor
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-fold-the-menu-platform-seams-into-rtpserveraccessor" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Fold the menu-platform seams into RTPServerAccessor
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-move-the-five-builders-into-rtp-apimenubuilders" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Move the five builders into rtp-api/.../menu/builders/
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-collapse-the-per-platform-command-root-wiring" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Collapse the per-platform command-root wiring
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-platform-adapter-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Platform adapter changes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-migration-mechanics" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Migration mechanics
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Consequences">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      Positive
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#negative" class="md-nav__link">
+    <span class="md-ellipsis">
+      Negative
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Limitations
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-plan-post-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      Implementation plan (post-acceptance)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-048-move-menu-page-builders-into-rtp-api-behind-rtpserveraccessor">ADR-048 - Move menu page builders into <code>rtp-api</code> behind <code>RTPServerAccessor</code><a class="headerlink" href="#adr-048-move-menu-page-builders-into-rtp-api-behind-rtpserveraccessor" title="Permanent link">&para;</a></h1>
+<ul>
+<li><strong>Status:</strong> Proposed (2026-05-23)</li>
+<li><strong>Scope:</strong> <code>rtp-api</code> (<code>menu/</code>, <code>server/RTPServerAccessor</code>), <code>rtp-core</code> (<code>common/commands/menu/</code>), <code>rtp-bukkit-common</code>, <code>rtp-fabric-common</code> (+ <code>-common-unobf</code>), <code>rtp-plugin</code> (Paper + Fabric command roots).</li>
+<li><strong>Supersedes:</strong> none. Amends the platform-shaped wiring contract assumed by <a href="../ADR-035-interactive-menus-book-first/">ADR-035</a>, <a href="../ADR-044-command-tree-menu-reflector/">ADR-044</a>, <a href="../ADR-045-rtp-docs-menu-consumer/">ADR-045</a>, <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md">rtp-fabric-ADR-012</a>.</li>
+<li><strong>Related:</strong> <a href="../ADR-035-interactive-menus-book-first/">ADR-035</a> (menu rollout - Paper book renderer + Fabric chat renderer), <a href="../ADR-044-command-tree-menu-reflector/">ADR-044</a> (<code>MenuModel</code> reflector), <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md">rtp-fabric-ADR-011</a> (Fabric effective-permission resolver, feeds the accessor), <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md">rtp-fabric-ADR-012</a> (Fabric chat-first renderer; ADR-012 will be amended to consume the accessor introduced here).</li>
+</ul>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>The interactive-menu rollout is split across two layers today:</p>
+<ul>
+<li><strong>Platform-neutral SPI</strong> in <code>rtp-api/.../menu/</code>: <code>MenuModel</code>, <code>MenuPage</code>, <code>MenuLine</code>, <code>MenuFragment</code>, <code>MenuAction</code>, <code>MenuRenderer</code>, <code>MenuTokenRegistry</code>, <code>MenuConsumerProfile</code>, <code>MenuOpenRequest</code>, <code>YamlCommentLookup</code>. These are pure value types and SPIs and are correctly factored - third-party-renderer-friendly, no platform imports.</li>
+<li><strong>Page builders</strong> in <code>rtp-core/.../common/commands/menu/</code>: <code>FrontPageBuilder</code>, <code>AdminPanelBuilder</code>, <code>CommandTreeMenuBuilder</code>, <code>MultiConfigMenuBuilder</code>, <code>PrefabConfirmationMenuBuilder</code>. These build <code>MenuModel</code> instances from the live command tree, configuration files, and per-player state.</li>
+</ul>
+<p>The builders are <em>nominally</em> platform-neutral (they live in <code>rtp-core</code>, which forbids <code>org.bukkit.*</code> imports) but in practice they couple to platform-shaped data through ad-hoc seams:</p>
+<ol>
+<li><strong>Permission visibility filter.</strong> Every builder filters command-tree rows by a <code>Predicate&lt;String&gt;</code> permission probe. Today the probe is constructed inline at each command-root call site (Paper: <code>RTPCmdBukkit</code> lines 213 / 239 / 246 / 259 / 303; Fabric per <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md">rtp-fabric-ADR-012</a> plan). The construction logic differs per platform (Paper delegates to <code>Player#hasPermission</code>; Fabric routes through the three-tier chain from <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md">rtp-fabric-ADR-011</a>).</li>
+<li><strong>Effective-permission enumeration.</strong> <code>AdminPanelBuilder</code> and the param-picker page need the granted-node set to decide what config rows / param values to expose. Available on <code>RTPPlayer#getEffectivePermissions()</code> today, but each builder reaches for the player via <code>RTP.serverAccessor.getPlayer(uuid)</code> ad-hoc and assumes the result is non-empty - a Fabric pre-<a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md">rtp-fabric-ADR-011</a> regression that the ADR-011 resolver fixed but did not lift to a stable accessor surface.</li>
+<li><strong>Player locale.</strong> Builders embed strings through <code>LangParser</code> / <code>messages.yml</code>. The lookup is platform-neutral, but the <em>fallback chain</em> (client locale -&gt; world default -&gt; server default) is not - Paper reads <code>Player#getLocale()</code>, Fabric resolves through the carrier split.</li>
+<li><strong>Region / world descriptor.</strong> <code>FrontPageBuilder</code> shows a "you are here" line. On a single-server backend this reads <code>Player#getWorld()</code>; on a network-mode backend (ADR-036) the answer is proxy-routed. Each builder currently reaches for whatever it can find.</li>
+</ol>
+<p>The result is that <em>each</em> platform's command root re-wires the same seven things inline: build a <code>LocalMenuTokenRegistry</code>, construct a <code>menuPermissionProbe</code>, attach <code>MenuRedeemSubcommand</code>, instantiate each builder, and connect them to the renderer. Adding a new platform (the Fabric work in <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md">rtp-fabric-ADR-012</a>, or any future Forge / Sponge port) means re-implementing that wiring from scratch. The five builders themselves are mostly platform-neutral, but the platform-shaped seams keep them from being directly reusable.</p>
+<p>The user-raised question - "can we extract this into a <code>menu-api</code> module and use the <code>RTPServerAccessor</code> / <code>effects-api</code> model?" - distils to: where do the platform-shaped seams belong, and is a new Gradle module warranted? This ADR answers both.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Adopt the <strong>accessor-extension</strong> path. No new Gradle module.</p>
+<h3 id="1-fold-the-menu-platform-seams-into-rtpserveraccessor">1. Fold the menu-platform seams into <code>RTPServerAccessor</code><a class="headerlink" href="#1-fold-the-menu-platform-seams-into-rtpserveraccessor" title="Permanent link">&para;</a></h3>
+<p>Add four default methods to <code>RTPServerAccessor</code> (in <code>rtp-api/.../server/RTPServerAccessor.java</code>). They have safe defaults so the existing Bukkit and Fabric implementations compile without immediate changes; platforms override progressively.</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// In RTPServerAccessor</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Returns a permission probe scoped to the given player. The probe answers</span>
+<span class="cm"> * {@code hasPermission(node)} for menu-visibility filtering. Implementations</span>
+<span class="cm"> * should respect the same three-tier resolution as</span>
+<span class="cm"> * {@link RTPPlayer#hasPermission(String)}.</span>
+<span class="cm"> *</span>
+<span class="cm"> * @param player the player UUID; the probe is bound to this player&#39;s view</span>
+<span class="cm"> * @return a non-null predicate; default delegates to</span>
+<span class="cm"> *         {@code getPlayer(player).hasPermission(node)} and falls back to</span>
+<span class="cm"> *         {@code n -&gt; false} if the player is offline / unresolved</span>
+<span class="cm"> */</span>
+<span class="k">default</span><span class="w"> </span><span class="n">Predicate</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">menuPermissionProbe</span><span class="p">(</span><span class="n">UUID</span><span class="w"> </span><span class="n">player</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Returns the set of effective permissions granted to {@code player} for</span>
+<span class="cm"> * the menu-relevant {@code rtp.*} namespaces (effects, on-event, numeric</span>
+<span class="cm"> * tails where enumerable). Delegates to</span>
+<span class="cm"> * {@link RTPPlayer#getEffectivePermissions()} by default.</span>
+<span class="cm"> *</span>
+<span class="cm"> * @param player the player UUID</span>
+<span class="cm"> * @return an immutable snapshot; empty if unresolved</span>
+<span class="cm"> */</span>
+<span class="k">default</span><span class="w"> </span><span class="n">Set</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">menuEffectivePermissions</span><span class="p">(</span><span class="n">UUID</span><span class="w"> </span><span class="n">player</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Returns the BCP-47 locale tag the menu should render in for the given</span>
+<span class="cm"> * player (e.g. {@code &quot;en_us&quot;}, {@code &quot;es_es&quot;}). Default returns the</span>
+<span class="cm"> * server&#39;s configured default locale.</span>
+<span class="cm"> *</span>
+<span class="cm"> * @param player the player UUID; may be {@link RTPPlayer#consoleUuid()}</span>
+<span class="cm"> *               for console-issued menu commands</span>
+<span class="cm"> * @return a non-null locale tag</span>
+<span class="cm"> */</span>
+<span class="k">default</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">menuLocale</span><span class="p">(</span><span class="n">UUID</span><span class="w"> </span><span class="n">player</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Returns a short descriptor of where the player currently is, for the</span>
+<span class="cm"> * &quot;you are here&quot; line in {@code FrontPageBuilder}. The descriptor is</span>
+<span class="cm"> * intentionally string-shaped (not a {@code World} reference) so that</span>
+<span class="cm"> * network-mode backends (ADR-036) can answer with a proxy-routed server</span>
+<span class="cm"> * id or region name.</span>
+<span class="cm"> *</span>
+<span class="cm"> * @param player the player UUID</span>
+<span class="cm"> * @return a non-null short descriptor; default is the empty string,</span>
+<span class="cm"> *         which causes the &quot;you are here&quot; line to be omitted</span>
+<span class="cm"> */</span>
+<span class="k">default</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">menuRegionDescriptor</span><span class="p">(</span><span class="n">UUID</span><span class="w"> </span><span class="n">player</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>These methods live on <code>RTPServerAccessor</code> (not a new sibling accessor) because:</p>
+<ul>
+<li>The five builders already depend on <code>RTPServerAccessor</code> transitively through <code>RTP.serverAccessor</code>. Adding methods on the existing accessor avoids a second injection point.</li>
+<li>Each method is the <em>menu-shaped projection</em> of an existing accessor / <code>RTPPlayer</code> capability. They are not a new subsystem, they are convenience views.</li>
+<li><code>effects-api</code> has a separate <code>EffectFactory</code> because effects are third-party-registerable. Menu builders are not third-party-registerable (per <a href="../ADR-044-command-tree-menu-reflector/">ADR-044</a> the model reflects the command tree, not user-registered pages), so the symmetry does not apply.</li>
+</ul>
+<p>If a fifth or sixth method joins the list (e.g. <code>boolean isViewingMenu(UUID)</code> for <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md">rtp-fabric-ADR-012</a>'s chat-prompt callback, or <code>void runOnPlayerThread(UUID, Runnable)</code> for Folia region-affinity actions), this ADR is amended to split the menu surface into a sibling <code>RTPMenuAccessor</code> retrieved via <code>RTPServerAccessor#menuAccessor()</code>. The split threshold is documented as <strong>&gt;=5 menu-specific methods on <code>RTPServerAccessor</code></strong>; today's four sit below it.</p>
+<h3 id="2-move-the-five-builders-into-rtp-apimenubuilders">2. Move the five builders into <code>rtp-api/.../menu/builders/</code><a class="headerlink" href="#2-move-the-five-builders-into-rtp-apimenubuilders" title="Permanent link">&para;</a></h3>
+<p>Relocate (not rewrite):</p>
+<table>
+<thead>
+<tr>
+<th>From (<code>rtp-core/.../common/commands/menu/</code>)</th>
+<th>To (<code>rtp-api/.../menu/builders/</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FrontPageBuilder</code></td>
+<td><code>FrontPageBuilder</code></td>
+</tr>
+<tr>
+<td><code>AdminPanelBuilder</code></td>
+<td><code>AdminPanelBuilder</code></td>
+</tr>
+<tr>
+<td><code>CommandTreeMenuBuilder</code></td>
+<td><code>CommandTreeMenuBuilder</code></td>
+</tr>
+<tr>
+<td><code>MultiConfigMenuBuilder</code></td>
+<td><code>MultiConfigMenuBuilder</code></td>
+</tr>
+<tr>
+<td><code>PrefabConfirmationMenuBuilder</code></td>
+<td><code>PrefabConfirmationMenuBuilder</code></td>
+</tr>
+</tbody>
+</table>
+<p>Constructor signatures change to take the platform seams from the accessor rather than reaching for <code>RTP.serverAccessor</code> ad-hoc:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">public</span><span class="w"> </span><span class="nf">FrontPageBuilder</span><span class="p">(</span><span class="n">MenuPlatformView</span><span class="w"> </span><span class="n">view</span><span class="p">,</span><span class="w"> </span><span class="n">MenuTokenRegistry</span><span class="w"> </span><span class="n">tokens</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>where <code>MenuPlatformView</code> is a tiny record assembled from the accessor at call time:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">public</span><span class="w"> </span><span class="kd">record</span> <span class="nc">MenuPlatformView</span><span class="p">(</span>
+<span class="w">    </span><span class="n">Predicate</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">hasPermission</span><span class="p">,</span>
+<span class="w">    </span><span class="n">Set</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">effectivePermissions</span><span class="p">,</span>
+<span class="w">    </span><span class="n">String</span><span class="w"> </span><span class="n">locale</span><span class="p">,</span>
+<span class="w">    </span><span class="n">String</span><span class="w"> </span><span class="n">regionDescriptor</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="n">MenuPlatformView</span><span class="w"> </span><span class="nf">of</span><span class="p">(</span><span class="n">RTPServerAccessor</span><span class="w"> </span><span class="n">accessor</span><span class="p">,</span><span class="w"> </span><span class="n">UUID</span><span class="w"> </span><span class="n">player</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">MenuPlatformView</span><span class="p">(</span>
+<span class="w">            </span><span class="n">accessor</span><span class="p">.</span><span class="na">menuPermissionProbe</span><span class="p">(</span><span class="n">player</span><span class="p">),</span>
+<span class="w">            </span><span class="n">accessor</span><span class="p">.</span><span class="na">menuEffectivePermissions</span><span class="p">(</span><span class="n">player</span><span class="p">),</span>
+<span class="w">            </span><span class="n">accessor</span><span class="p">.</span><span class="na">menuLocale</span><span class="p">(</span><span class="n">player</span><span class="p">),</span>
+<span class="w">            </span><span class="n">accessor</span><span class="p">.</span><span class="na">menuRegionDescriptor</span><span class="p">(</span><span class="n">player</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The <code>MenuPlatformView</code> lives in <code>rtp-api/.../menu/</code>. It is a <em>snapshot</em> per build call, not a long-lived reference - this keeps builders pure (same input -&gt; same <code>MenuModel</code>) and avoids cross-thread races on permission / locale changes mid-render.</p>
+<p>Why <code>rtp-api</code> rather than leaving in <code>rtp-core</code>: <code>rtp-api</code> is the only module both <code>rtp-core</code> and platform adapters depend on. Builders in <code>rtp-api</code> can be invoked from the platform-side command roots without a <code>rtp-core</code> round-trip, and the <code>MenuPlatformView</code> record sits next to <code>MenuModel</code> / <code>MenuPage</code> where it naturally belongs.</p>
+<h3 id="3-collapse-the-per-platform-command-root-wiring">3. Collapse the per-platform command-root wiring<a class="headerlink" href="#3-collapse-the-per-platform-command-root-wiring" title="Permanent link">&para;</a></h3>
+<p>After the move, <code>RTPCmdBukkit</code> and <code>RTPCmdFabricRoot</code> shrink to:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// Once at boot</span>
+<span class="n">LocalMenuTokenRegistry</span><span class="w"> </span><span class="n">tokens</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">LocalMenuTokenRegistry</span><span class="p">();</span>
+<span class="n">MenuRendererRegistry</span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="s">&quot;book&quot;</span><span class="p">,</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">BookMenuRenderer</span><span class="p">(...));</span><span class="w">     </span><span class="c1">// Paper</span>
+<span class="c1">// or new ChatMenuRenderer(...) on Fabric per rtp-fabric-ADR-012</span>
+<span class="n">attachSubcommand</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">MenuRedeemSubcommand</span><span class="p">(</span><span class="n">tokens</span><span class="p">));</span>
+
+<span class="c1">// Per /rtp invocation</span>
+<span class="n">MenuPlatformView</span><span class="w"> </span><span class="n">view</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MenuPlatformView</span><span class="p">.</span><span class="na">of</span><span class="p">(</span><span class="n">RTP</span><span class="p">.</span><span class="na">serverAccessor</span><span class="p">,</span><span class="w"> </span><span class="n">callerUuid</span><span class="p">);</span>
+<span class="n">MenuModel</span><span class="w"> </span><span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">FrontPageBuilder</span><span class="p">(</span><span class="n">view</span><span class="p">,</span><span class="w"> </span><span class="n">tokens</span><span class="p">).</span><span class="na">build</span><span class="p">();</span>
+<span class="n">RTP</span><span class="p">.</span><span class="na">serverAccessor</span><span class="p">.</span><span class="na">openMenu</span><span class="p">(</span><span class="n">callerUuid</span><span class="p">,</span><span class="w"> </span><span class="n">model</span><span class="p">);</span><span class="w">  </span><span class="c1">// existing dispatch path</span>
+</code></pre></div>
+<p>The seven inline construction sites in <code>RTPCmdBukkit</code> (token registry + permission probe + redeem subcommand + four builder call sites) collapse to one accessor lookup per build call. The same pattern applies to Fabric, which lets <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md">rtp-fabric-ADR-012</a>'s <code>RTPCmdFabricRoot</code> wiring section be drastically simplified - the ADR will be amended to delete its <code>menuPermissionProbe</code> sub-item (now subsumed) and reference this ADR for the builder wiring.</p>
+<h3 id="4-platform-adapter-changes">4. Platform adapter changes<a class="headerlink" href="#4-platform-adapter-changes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Adapter delta</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BukkitServerAccessor</code> (rtp-bukkit-common)</td>
+<td>Override the four default methods. <code>menuPermissionProbe(uuid)</code> -&gt; <code>node -&gt; Bukkit.getPlayer(uuid).hasPermission(node)</code>. <code>menuEffectivePermissions(uuid)</code> -&gt; walks <code>Player#getEffectivePermissions()</code>. <code>menuLocale(uuid)</code> -&gt; <code>Player#getLocale()</code>. <code>menuRegionDescriptor(uuid)</code> -&gt; <code>Player#getWorld().getName()</code> (or empty string when network mode is active and the player is on a different backend).</td>
+</tr>
+<tr>
+<td><code>FabricServerAccessor</code> (rtp-fabric-common + -common-unobf)</td>
+<td>Override the four default methods. <code>menuPermissionProbe(uuid)</code> and <code>menuEffectivePermissions(uuid)</code> delegate to <code>FabricEffectivePermissionsResolver</code> from <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md">rtp-fabric-ADR-011</a>. <code>menuLocale(uuid)</code> reads <code>ServerPlayer#clientInformation().language()</code> through the carrier split. <code>menuRegionDescriptor(uuid)</code> reads <code>ServerPlayer#serverLevel().dimension().location().toString()</code>.</td>
+</tr>
+<tr>
+<td>Folia</td>
+<td>Inherits <code>BukkitServerAccessor</code>. No delta in this ADR; a follow-up may add <code>runOnPlayerThread(UUID, Runnable)</code> for region-affinity click actions, but the four methods above are platform-thread-agnostic.</td>
+</tr>
+<tr>
+<td><code>rtp-proxy-*</code></td>
+<td>Out of scope. The proxy SPI in <code>rtp-proxy-common</code> does not implement <code>RTPServerAccessor</code> and does not render menus directly - menus on proxy-routed players are still rendered backend-side per the 2026-05-15 ADR-035 amendment.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="5-migration-mechanics">5. Migration mechanics<a class="headerlink" href="#5-migration-mechanics" title="Permanent link">&para;</a></h3>
+<p>The move is mechanical but non-trivial because the builders are referenced from <code>RTPCmdBukkit</code>, <code>MenuRedeemSubcommand</code>, and (planned) <code>RTPCmdFabricRoot</code>. Sequence:</p>
+<ol>
+<li><strong>Land the accessor methods first</strong> (default implementations + Bukkit / Fabric overrides). No behavioural change yet - existing call sites still work because the inline <code>menuPermissionProbe</code> constructions are byte-equivalent to the new defaults.</li>
+<li><strong>Add <code>MenuPlatformView</code></strong> as a record in <code>rtp-api/.../menu/</code>.</li>
+<li><strong>Copy</strong> the five builders into <code>rtp-api/.../menu/builders/</code> with the new constructor signature, alongside the existing copies in <code>rtp-core</code>. Both work for one cycle.</li>
+<li><strong>Switch call sites</strong> in <code>RTPCmdBukkit</code> to the new builders + <code>MenuPlatformView.of(...)</code>.</li>
+<li><strong>Delete</strong> the old builders from <code>rtp-core</code>. ArchUnit guard (<a href="../../dev/MULTI_PLATFORM_PLAN/">MULTI_PLATFORM_PLAN.md Step H</a>) is unchanged - the new package is in <code>rtp-api</code>, which is under neither <code>bukkit/</code> nor <code>fabric/</code>.</li>
+<li><strong>Wire Fabric</strong> in <code>RTPCmdFabricRoot</code> per the amended <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md">rtp-fabric-ADR-012</a>.</li>
+</ol>
+<p>Steps 1-2 are independently committable; steps 3-6 land together to avoid split-brain builders.</p>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<h3 id="positive">Positive<a class="headerlink" href="#positive" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Each new platform adds one accessor subclass + four overrides</strong> to gain full menu support. Forge / Sponge / hypothetical Mod Loader X get the menu surface for free as long as they ship a <code>RTPServerAccessor</code>.</li>
+<li><strong><code>RTPCmdBukkit</code> and <code>RTPCmdFabricRoot</code> shrink substantially</strong>: seven inline constructions per root collapse to one accessor lookup per build call.</li>
+<li><strong>Cross-cutting menu concerns funnel through one surface.</strong> Any future "show 'you are here' as proxy-routed server id" change is a single override in the network-mode-aware accessor variant, not five builders.</li>
+<li><strong>Aligns with the existing <code>RTPServerAccessor</code> convention.</strong> No new accessor pattern for contributors to learn.</li>
+<li><strong>No new Gradle module.</strong> Build times, publish coordinates, and ArchUnit guards unchanged.</li>
+<li><strong>Retroactively cleans Paper's <code>menuPermissionProbe</code> ad-hoc field</strong> (the implicit pattern that <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md">rtp-fabric-ADR-012</a> inherits).</li>
+</ul>
+<h3 id="negative">Negative<a class="headerlink" href="#negative" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>rtp-api</code> grows.</strong> Five builder classes (~600-1200 LOC each in their current form) move from <code>rtp-core</code> to <code>rtp-api</code>. This is acceptable because they are leaf consumers of <code>rtp-api</code> types and have no dependency on <code>rtp-core</code> business logic that would force a circular dependency - confirmed by inspection (the builders consume <code>MenuModel</code>, <code>MenuTokenRegistry</code>, <code>LangParser</code>, <code>YamlCommentLookup</code>, all of which are in <code>rtp-api</code>). If a circular dep is uncovered during step 3 of the migration, the offending dep is pulled up to <code>rtp-api</code> (<code>LangParser</code> is the most likely candidate; it is already a viable <code>rtp-api</code> resident).</li>
+<li><strong><code>RTPServerAccessor</code> interface widens by four methods.</strong> Each has a safe default, so out-of-tree implementers (addons that ship a stub accessor for tests) are not broken. The widening is documented in CHANGELOG under <code>[3.0.0-beta.4]</code> when the implementation lands.</li>
+<li><strong>The four default implementations need careful documentation.</strong> Default <code>menuPermissionProbe</code> returning <code>n -&gt; false</code> for offline players is a subtle behavioural choice (no rows visible vs all rows visible). The chosen default (no rows visible) is conservative; documented in the method Javadoc.</li>
+</ul>
+<h3 id="limitations">Limitations<a class="headerlink" href="#limitations" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong><code>MenuPlatformView</code> is a snapshot.</strong> Permission or locale changes during a long-rendering page do not propagate. Acceptable because pages render in milliseconds; documented as a Javadoc note on the record.</li>
+<li><strong>No third-party builder registration.</strong> This ADR keeps builders project-internal. Per <a href="../ADR-044-command-tree-menu-reflector/">ADR-044</a> the model reflects the command tree, not user-registered content, so third-party builders are out of scope. If that requirement materializes, the migration target (<code>rtp-api/.../menu/builders/</code>) is already in a publishable module.</li>
+<li><strong>No coverage for proxy-side menu rendering.</strong> Proxy JVMs (<code>rtp-proxy-velocity</code>, <code>rtp-proxy-bungee</code>) do not host <code>RTPServerAccessor</code>. Menus on proxy-routed players continue to render on the destination backend per ADR-035's 2026-05-15 amendment. A future "proxy-rendered menu" ADR would need its own seam.</li>
+<li><strong><code>menuRegionDescriptor</code> is intentionally a <code>String</code>.</strong> Avoids leaking a <code>World</code> reference into <code>rtp-api</code>. Callers that want richer structure can parse the descriptor or call a future typed method.</li>
+</ol>
+<h2 id="implementation-plan-post-acceptance">Implementation plan (post-acceptance)<a class="headerlink" href="#implementation-plan-post-acceptance" title="Permanent link">&para;</a></h2>
+<p>The implementation is a separate change after this ADR is accepted. Sketch:</p>
+<ol>
+<li>Add four <code>default</code> methods to <code>RTPServerAccessor</code>. Add <code>MenuPlatformView</code> record under <code>rtp-api/.../menu/</code>.</li>
+<li>Override the four methods in <code>BukkitServerAccessor</code> and <code>FabricServerAccessor</code> (+ <code>-common-unobf</code> variant). Wire Fabric overrides to the existing <code>FabricEffectivePermissionsResolver</code>.</li>
+<li>Move the five builders from <code>rtp-core/.../common/commands/menu/</code> to <code>rtp-api/.../menu/builders/</code>. Update constructors to take <code>MenuPlatformView</code> + <code>MenuTokenRegistry</code>.</li>
+<li>Update <code>RTPCmdBukkit</code> call sites to <code>MenuPlatformView.of(...)</code> + new builder package.</li>
+<li>Amend <a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md">rtp-fabric-ADR-012</a>: delete the <code>menuPermissionProbe</code> sub-item, simplify the <code>RTPCmdFabricRoot</code> wiring section to reference ADR-048, keep the chat-renderer decision intact.</li>
+<li>New <code>ServerAccessorMenuSurfaceTest</code> in <code>rtp-api/src/test/</code>: pins the four-method contract against a mock accessor; asserts <code>MenuPlatformView.of</code> snapshots correctly; asserts default <code>menuPermissionProbe</code> is conservative for unresolved players.</li>
+<li>New <code>BukkitMenuPlatformViewParityTest</code> and <code>FabricMenuPlatformViewParityTest</code>: each builds a known <code>MenuModel</code> against a real platform accessor and asserts the rendered page set matches an oracle (covers the regression where Fabric's permission probe was always-true pre-<a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md">rtp-fabric-ADR-011</a>).</li>
+<li>CHANGELOG entry under <code>[3.0.0-beta.4] - Unreleased</code>: "Menu page builders moved from <code>rtp-core</code> to <code>rtp-api</code>; platform-shaped seams (permission probe, effective permissions, locale, region descriptor) lifted to <code>RTPServerAccessor</code> default methods. Out-of-tree accessor implementations gain the new surface via defaults; explicit overrides recommended for production platforms."</li>
+<li><code>TRACEABILITY.md</code> rows added if the new tests target a REQ-* (likely a new <code>REQ-RTP-MENU-NNN</code> for "menu visibility filter shall use the platform's effective-permission view"; needs a REQ wording pass first).</li>
+</ol>
+<h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why rejected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>New <code>menu-api</code> Gradle module</strong> (the user's original framing)</td>
+<td>No third-party menu registration on the roadmap; the <code>effects-api</code> symmetry is superficial (effects are third-party-registerable, menus are not per ADR-044). Gradle module overhead (publish coordinates, ArchUnit updates, transitive-dep wiring on five other modules) without an API-surface win. Can be split out later if requirements change; the migration target (<code>rtp-api/.../menu/builders/</code>) is already publishable.</td>
+</tr>
+<tr>
+<td><strong>Separate <code>RTPMenuAccessor</code> sibling, retrieved via <code>RTPServerAccessor#menuAccessor()</code></strong></td>
+<td>Premature with only four menu-shaped methods. Adds an indirection (<code>accessor.menuAccessor().permissionProbe(uuid)</code>) that buys no clarity at this size. Documented threshold for revisiting: &gt;=5 menu-specific methods on <code>RTPServerAccessor</code>.</td>
+</tr>
+<tr>
+<td><strong>Keep builders in <code>rtp-core</code>, pass <code>RTPServerAccessor</code> directly</strong></td>
+<td>Builders would still reach into the accessor for four different concerns each, scattering the call sites and forcing every platform to implement the four methods even if they are not menu-rendering yet. The <code>MenuPlatformView</code> snapshot record is the right intermediate object.</td>
+</tr>
+<tr>
+<td><strong>Pass a <code>RTPPlayer</code> to builders instead of <code>MenuPlatformView</code></strong></td>
+<td><code>RTPPlayer</code> is too coarse - locale and region descriptor are not on it today, and adding them re-creates the same widening problem one level deeper. <code>MenuPlatformView</code> is a menu-shaped projection, not a player abstraction.</td>
+</tr>
+<tr>
+<td><strong>Refactor <code>RTPServerAccessor</code> into a <code>ServiceLocator</code> keyed by capability</strong></td>
+<td>Out of scope and far heavier than required. The four methods do not warrant a service-locator pattern; the existing default-method convention on the interface is sufficient.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../ADR-035-interactive-menus-book-first/">ADR-035 - Interactive Menus via Written Book</a></li>
+<li><a href="../ADR-044-command-tree-menu-reflector/">ADR-044 - Command-Tree Menu Reflector</a></li>
+<li><a href="../ADR-045-rtp-docs-menu-consumer/">ADR-045 - <code>rtp-docs</code> Menu Consumer</a></li>
+<li><a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md">rtp-fabric-ADR-011 - Effective-permission enumeration on Fabric</a></li>
+<li><a href="../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md">rtp-fabric-ADR-012 - Menu renderer parity on Fabric</a></li>
+<li><a href="../../dev/MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> (Step I gating context)</li>
+<li><a href="../../rtp-api/src/main/java/io/github/dailystruggle/rtp/api/server/RTPServerAccessor.java"><code>RTPServerAccessor.java</code></a> (the interface being extended)</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

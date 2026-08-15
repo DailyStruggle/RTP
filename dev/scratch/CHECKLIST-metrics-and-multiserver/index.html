@@ -1,0 +1,1835 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>Implementation Checklist â Metrics + Multi-Server (state-preservation working note) - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#implementation-checklist-a-metrics-multi-server-state-preservation-working-note" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Implementation Checklist â Metrics + Multi-Server (state-preservation working note)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executable-order-to-a-viable-product-2026-05-20-reconcile" class="md-nav__link">
+    <span class="md-ellipsis">
+      Executable order to a viable product (2026-05-20 reconcile)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Conventions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-a-a-metrics-plan-phase-m0-spi-shape-docs-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      Section A â Metrics Plan, Phase M0 (SPI shape, docs only)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-b-a-metrics-plan-phase-m1-core-paper-spigot-fallback-nice-to-have" class="md-nav__link">
+    <span class="md-ellipsis">
+      Section B â Metrics Plan, Phase M1 (core + Paper; Spigot fallback nice-to-have)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-c-a-metrics-plan-phase-m2-folia-fabric" class="md-nav__link">
+    <span class="md-ellipsis">
+      Section C â Metrics Plan, Phase M2 (Folia + Fabric)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-d-a-multi-server-plan-phase-0-docs-only-d-005-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      Section D â Multi-Server Plan, Phase 0 (docs-only, D-005 gate)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-e-a-multi-server-plan-phase-1-core-spi-no-proxy-adapter-yet" class="md-nav__link">
+    <span class="md-ellipsis">
+      Section E â Multi-Server Plan, Phase 1 (core SPI; no proxy adapter yet)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-f-a-multi-server-plan-phase-2-velocity-adapter-redis-transport" class="md-nav__link">
+    <span class="md-ellipsis">
+      Section F â Multi-Server Plan, Phase 2 (Velocity adapter + Redis transport)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-g-a-multi-server-plan-phase-3-postgres-transport-join-trigger-bungeecord" class="md-nav__link">
+    <span class="md-ellipsis">
+      Section G â Multi-Server Plan, Phase 3 (Postgres transport + Join trigger + BungeeCord)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-h-a-multi-server-plan-phase-4-generic-sql-hardening-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      Section H â Multi-Server Plan, Phase 4 (Generic SQL + hardening + release)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-i-a-cross-cutting-hygiene-run-continuously" class="md-nav__link">
+    <span class="md-ellipsis">
+      Section I â Cross-cutting hygiene (run continuously)
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="implementation-checklist-a-metrics-multi-server-state-preservation-working-note">Implementation Checklist â Metrics + Multi-Server (state-preservation working note)<a class="headerlink" href="#implementation-checklist-a-metrics-multi-server-state-preservation-working-note" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Effective Issue (1-line)</strong>: implement RTP runtime metrics SPI and proxy/multi-server support, in that order, against the design captured in <code>docs/dev/METRICS_PLAN.md</code> and <code>docs/dev/MULTI_SERVER_PLAN.md</code>.</p>
+<p><strong>Mode when executing</strong>: <code>[CODE]</code> for build steps, <code>[ADVANCED_CHAT]</code> or <code>[CODE]</code> for design/doc steps.</p>
+<p><strong>Blocking decisions awaiting user approval (Rule D-005)</strong>:
+- ADR-025 (multi-server proxy support) must be drafted and approved <strong>before</strong> any code under M-NET-Phase-0 ships.
+- Any <code>rtp-api</code> / <code>rtp-core</code> SPI shape change inside the metrics work needs explicit D-005 approval at its M-METRICS-Phase-M0 review item.</p>
+<p><strong>Scope rules</strong>: per <code>AGENTS.md &gt; Stay-On-Task Policy</code>, incidental bugs go to <code>POTENTIAL_BUGS.md</code>, not inline fixes. Per <code>AGENTS.md &gt; SESSION ARTIFACTS &amp; CLEANUP</code>, <strong>delete this file once the entire checklist is submitted</strong> (or after the proxy beta release, whichever comes first).</p>
+<p><strong>How to resume after disconnect</strong>: read this file top-to-bottom, re-verify the last <code>[x]</code> item still holds (file exists, build green, test still passes), then continue from the first <code>[ ]</code>. Tick boxes only after the verification command in the row succeeds.</p>
+</blockquote>
+<hr />
+<h2 id="executable-order-to-a-viable-product-2026-05-20-reconcile">Executable order to a viable product (2026-05-20 reconcile)<a class="headerlink" href="#executable-order-to-a-viable-product-2026-05-20-reconcile" title="Permanent link">&para;</a></h2>
+<p>The multi-server work has bifurcated into two focused frontiers; this file is now an audit/release-gate doc, not the active worklist. Active work happens in:</p>
+<ol>
+<li><strong><code>CHECKLIST-cross-server-rtp.md</code></strong> -- L1 (dispatcher+sender) -&gt; L2 (backend <code>JoinTriggerSource</code> + redeem) -&gt; L3 (2x2 devstack acceptance) -&gt; L4 (<code>/rtp test network crossserver</code> probe) -&gt; L5 (docs + <code>InfoCmd</code> network block + ADR ratification). <strong>Gate</strong>: L3 = first runtime cross-server hop.</li>
+<li><strong><code>CHECKLIST-load-distribution.md</code></strong> -- D1 (heartbeat field completeness) -&gt; D2 (selector tuning + curve plots, absorbing this file's D5/D6/E8) -&gt; D3 (affinity, ADR-013) -&gt; D4 (hysteresis) -&gt; D5 (per-backend killSwitch granularity) -&gt; D6 (observability probe) -&gt; D7 (load-skew acceptance) -&gt; D8 (docs + ADR + changelog). <strong>Gate</strong>: D7 = first runtime load-distribution verification. Hard prerequisite: cross-server L3.</li>
+<li><strong>This file's residual work</strong> (post-acceptance hardening, can run in parallel with the above): F8 (bStats <em>Feature shape</em>), F10 (Postgres-vs-Redis benchmark), G1 (Postgres <code>LISTEN/NOTIFY</code> push), G3 (Bungee adapter), G4 (Bungee+Postgres acceptance), H2 (security audit), H3 (<code>rtp test full network</code> aggregator), H4 (admin docs sweep), H5 (changelog rollup), H6 (beta release).</li>
+</ol>
+<p><strong>Release gate (H6)</strong> depends on: cross-server L3 green + load-distribution D7 green + this file's H2 audit green. The remaining items (F8/F10/G1/G3/G4/H3/H4) are nice-to-have for the first beta and required for GA.</p>
+<hr />
+<h2 id="conventions">Conventions<a class="headerlink" href="#conventions" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Each row carries a verification artifact (test name, file path, command, or external URL) so a fresh agent can confirm it without re-deriving context.</li>
+<li>Box state legend: <code>[ ]</code> not started, <code>[~]</code> in progress, <code>[x]</code> verified done, <code>[!]</code> blocked or paused (always paired with a Notes line).</li>
+<li>Numbered hierarchy is stable â never renumber. Insert sub-items as <code>1.1.1</code>, etc.</li>
+<li>Sequencing rule: items in different sections may run in parallel where dependencies allow; within a section, run top-to-bottom unless a dependency is explicit.</li>
+</ul>
+<hr />
+<h2 id="section-a-a-metrics-plan-phase-m0-spi-shape-docs-only">Section A â Metrics Plan, Phase M0 (SPI shape, docs only)<a class="headerlink" href="#section-a-a-metrics-plan-phase-m0-spi-shape-docs-only" title="Permanent link">&para;</a></h2>
+<p>Source-of-truth: <a href="../../METRICS_PLAN/"><code>docs/dev/METRICS_PLAN.md</code></a>.</p>
+<ul>
+<li>[x] <strong>A1.</strong> Confirm the M0 metric catalogue is a <em>strict superset</em> of <code>rtp test full</code>'s current console output. Verification: open <code>rtp test full</code> invocation site (<code>grep</code> for <code>rtp test full</code> in <code>rtp-core/src/main/java/...</code>), diff fields against <code>MetricsSnapshot</code> proposal in <code>METRICS_PLAN.md &gt; Metric Catalogue (v1)</code>. Record any missing field by amending the plan <strong>before</strong> writing code. <em>(verified 2026-05-15: <code>TestFullCmd</code> emits only per-subcommand audit pass/fail lines via <code>FullAudit</code>; no TPS / MSPT / heap / queue / pipeline numeric fields. v1 catalogue is trivially a strict superset; plan's M0 box ticked at <code>METRICS_PLAN.md</code> line 403.)</em></li>
+<li>[x] <strong>A2.</strong> Decide <code>avgPipelineMs</code> window length and reset semantics (open item in <code>METRICS_PLAN.md &gt; Open Items / Follow-Ups</code>). Verification: amend the plan with the resolved value; reference this checklist row in the plan diff message. <em>(resolved 2026-05-15: ADR-032 â 256-sample wait-free ring, never resets, mean-only readout. <code>METRICS_PLAN.md &gt; Open Items</code> row updated to </em>resolved (2026-05-15)<em>.)</em></li>
+<li>[x] <strong>A3.</strong> Decide <code>databaseLatencyMs</code> cadence (every-write vs. dedicated probe). Verification: same as A2. <em>(resolved 2026-05-15: Option 1 â every-write, routed through a single function on <code>AbstractSQLDatabaseAccessor</code> so a dedicated probe can be substituted later without touching call sites. Limitation under pool saturation surfaced in field Javadoc + <code>/rtp info</code> colour-band guidance. <code>METRICS_PLAN.md &gt; Open Items</code> updated.)</em></li>
+<li>[x] <strong>A4.</strong> Decide Folia per-region detail opt-in default (<code>metrics.folia.includeRegions</code>). Verification: same as A2. <em>(resolved 2026-05-15: default <code>true</code> â Folia operators are the audience that most wants per-region detail; cost bounded by region count. <code>METRICS_PLAN.md &gt; Open Items</code> updated.)</em></li>
+<li>[x] <strong>A5.</strong> D-005 review of the proposed <code>MetricsSnapshot</code> shape (no platform imports; record-style; addons can depend on it). Verification: brief written approval from the user; record decision date in the plan's <em>Resolved</em> section. <em>(approved 2026-05-15: the 16-field on-disk record (<code>tps{1,5,15}m</code>, <code>mspt</code>, <code>tickBudgetUtilisation</code>, <code>playerCount</code>, <code>softCap</code>, <code>heapUsed/MaxBytes</code>, <code>queueDepth</code>, <code>pendingTeleports</code>, <code>memoryTrackerEntries</code>, <code>chunkLoadBacklog</code>, <code>avgPipelineMs</code>, <code>databaseLatencyMs</code>, <code>takenAtEpochMs</code>) is approved as-is. Later phases extend via additive constructor changes contained to the single binding constructor. Recorded at <code>METRICS_PLAN.md</code> Sufficiency Audit line 667.)</em></li>
+</ul>
+<blockquote>
+<p><strong>Gate</strong>: Section A complete before any Section B code lands.</p>
+</blockquote>
+<hr />
+<h2 id="section-b-a-metrics-plan-phase-m1-core-paper-spigot-fallback-nice-to-have">Section B â Metrics Plan, Phase M1 (core + Paper; Spigot fallback nice-to-have)<a class="headerlink" href="#section-b-a-metrics-plan-phase-m1-core-paper-spigot-fallback-nice-to-have" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>Scope amendment (2026-05-16, late session)</strong>: Spigot has been <strong>deprioritized</strong> by the user. Paper is the required platform for Phase M1 acceptance; the raw-Spigot <code>BukkitTpsSampler</code> fallback branch remains in the codebase and will be tested by the user at final-results time, but <strong>a Spigot devstack transcript is no longer a B â C gate requirement</strong>. If the Spigot path breaks during final verification it is a nice-to-have fix, not a release blocker.</p>
+</blockquote>
+<ul>
+<li>[x] <strong>B1.</strong> Create <code>rtp-core/src/main/java/.../metrics/</code> package skeleton: <code>Metrics</code>, <code>MetricsSnapshot</code> (immutable record), <code>PipelineHistogram</code>, <code>HeapSampler</code>. Verification: <code>:rtp-core:compileJava</code> green; ArchUnit guard run shows no platform imports inside the new package. <em>(verified 2026-05-16: <code>rtp-core/src/main/java/io/github/dailystruggle/rtp/common/metrics/</code> contains <code>Metrics.java</code>, <code>MetricsSnapshot.java</code>, <code>MetricsBinding.java</code>, <code>PipelineHistogram.java</code>, <code>HeapSampler.java</code>, <code>CoreMetrics.java</code>; no <code>org.bukkit.*</code> imports observed. Landed 2026-05-01 per <code>METRICS_PLAN.md &gt; Sufficiency Audit</code> line 402. ArchUnit guard re-run deferred to next session that touches the package.)</em></li>
+<li>[x] <strong>B2.</strong> Implement <code>PipelineHistogram</code> (256-sample ring buffer, never resets â straw-man, confirmed in A2). Verification: new unit test under <code>rtp-core/src/test/.../metrics/PipelineHistogramTest.java</code> covers fill/wrap/percentile semantics. <em>(verified 2026-05-16: <code>PipelineHistogramTest</code> exercises fill, wrap past <code>CAPACITY</code>, and <code>totalRecorded()</code> vs <code>sampleCount()</code> divergence â semantics match ADR-032 (never-resets, mean-only). Ratified by <a href="../../../adr/ADR-032-teleport-pipeline-latency-histogram/">ADR-032</a>.)</em></li>
+<li>[x] <strong>B3.</strong> Wire <code>PipelineHistogram</code> into <code>TeleportPipelineTask</code> completion path. <strong>Additive only</strong> â no existing assertion changes. Verification: <code>:rtp-core:test --tests "*TeleportPipelineTask*"</code> green; histogram count increments observable via a new test that runs one synthetic pipeline. <em>(verified 2026-05-16: <code>TeleportPipelineTask.runCleanup</code> lines 624â627 record into <code>RTP.metrics.pipelineHistogram()</code> once per task via <code>pipelineHistogramRecorded</code> AtomicBoolean. Covered by <code>TeleportPipelineTaskPhaseTest#runCleanup_records_one_sample_into_pipeline_histogram</code> and <code>#runCleanup_is_idempotent_for_pipeline_histogram</code>. Ratified by ADR-032.)</em></li>
+<li>[x] <strong>B4.</strong> Implement <code>HeapSampler</code> via <code>ManagementFactory.getMemoryMXBean()</code>. Verification: returns sane values in unit test; no platform imports. <em>(verified 2026-05-16: <code>HeapSampler</code> + <code>HeapSamplerTest</code> present in <code>rtp-core/.../metrics/</code>; static helpers <code>heapUsedBytes()</code>/<code>heapMaxBytes()</code> consumed by <code>MetricsSnapshot</code> and <code>Metrics.NOOP</code>.)</em></li>
+<li>[x] <strong>B5.</strong> Implement <code>Metrics.snapshot()</code> aggregating B1âB4 plus delegated platform binding via <code>RTP.serverAccessor.getMetricsBinding()</code>. Verification: snapshot is immutable (record); calling twice with no state change returns equal snapshots. <em>(verified 2026-05-16: <code>CoreMetrics.snapshot()</code> aggregates <code>pipelineHistogram.mean()</code> + <code>HeapSampler</code> + per-region <code>queueManager.playerQueue.size()</code> + <code>MemoryTracker.trackedCount</code> + binding fields into a single <code>MetricsSnapshot</code>. <code>MetricsSnapshot</code> is <code>final</code> with <code>final</code> fields. Covered by <code>CoreMetricsTest</code> and <code>MetricsSnapshotTest</code>. </em><em>Deviation logged in B6.</em><em>)</em></li>
+<li>[x] <strong>B6.</strong> <em>(rescoped 2026-05-16, D-005 approved in-session)</em> Provide a platform-agnostic hook for adapters to install their <code>MetricsBinding</code>. Implementation chose the <strong>push</strong> pattern: <code>CoreMetrics.setBinding(MetricsBinding)</code> (<code>rtp-core/.../metrics/CoreMetrics.java</code> lines 33â35), invoked by the platform bootstrap at startup, rather than a pull-style <code>AbstractServerAccessor.getMetricsBinding()</code>. Rationale: keeps the hook off <code>AbstractServerAccessor</code> (Bukkit-only) so the same push pattern extends to Fabric (B9 equivalent) without an interface change. Verification: <code>CoreMetricsTest</code> covers <code>setBinding</code>/<code>getBinding</code>/NOOP-fallback contract; production call-site landed in B9 (<code>MetricsBindingDispatcher.install()</code> invoked from <code>RTPBukkitPlugin#onEnable</code> and <code>RTPBukkitLitePlugin#onEnable</code>). <em>(verified 2026-05-16.)</em></li>
+<li>[x] <strong>B7.</strong> Implement <code>PaperMetricsBinding</code> in <code>rtp-paper-common</code> wrapping <code>Bukkit.getTPS()</code> / <code>Bukkit.getAverageTickTime()</code> (Paper API confirmed â these are Paper-only methods). Verification: <code>:rtp-paper:rtp-paper-common:compileJava</code> green; smoke unit test against a mocked <code>Bukkit</code>. <em>(verified 2026-05-16: <code>PaperMetricsBinding</code> + <code>PaperMetricsBindingTest</code> present in <code>platforms/rtp-paper/rtp-paper-common/src/main/java/.../paper/metrics/</code>. Production wiring activated by B9: <code>MetricsBindingDispatcher.install()</code> reflectively loads <code>PaperMetricsBinding</code> when <code>Bukkit#getTPS</code> is reachable. End-to-end check: <code>MetricsBindingDispatcherTest</code> (in <code>rtp-plugin</code>) asserts <code>RTP.metrics.getBinding()</code> becomes non-NOOP after install on a Paper-API-bearing classpath.)</em></li>
+<li>[x] <strong>B8.</strong> Implement <code>BukkitTpsSampler</code> in <code>rtp-bukkit-common</code>: 1-tick repeating task on <code>RTP.scheduler</code> recording <code>System.nanoTime()</code> per fire; three EMAs (1m / 5m / 15m); convert to TPS as <code>1e9 / movingAverageNanos</code>, clamp <code>[0, 20]</code>. Verification: unit test feeds a synthetic clock, asserts converged TPS within tolerance after each window length. <em>(verified 2026-05-16: <code>BukkitTpsSampler</code> + tests live in <code>platforms/rtp-bukkit/rtp-bukkit-common/.../bukkitplatform/metrics/</code>. Production wiring activated by B9: <code>MetricsBindingDispatcher.install()</code> instantiates the sampler on the raw-Spigot branch and schedules <code>tick()</code> on <code>RTP.scheduler.runTaskTimer(_, 1, 1)</code>. Row reworded to match the actual symbol name shipped â the original <code>BukkitTpsSampler</code> placeholder name was never the production class.)</em></li>
+<li>[x] <strong>B9.</strong> Runtime-detect Paper at adapter init (reflective probe for <code>Bukkit.getTPS</code>); skip Spigot sampler when Paper is present. Verification: log line at <code>INFO</code> confirms which path was chosen on adapter startup; smoke test on a Paper devstack. <em>(verified 2026-05-16: shipped as <code>io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher</code> in <code>rtp-plugin/</code>. Reflectively probes <code>org.bukkit.Bukkit#getTPS</code>; on hit installs <code>PaperMetricsBinding</code>, otherwise instantiates <code>BukkitTpsSampler</code> and schedules a 1-tick repeating task on <code>RTP.scheduler</code>. Idempotent install/uninstall, <code>INFO</code>-level path-chosen log line per row. Wired into both <code>RTPBukkitPlugin#onEnable</code> (full) and <code>RTPBukkitLitePlugin#onEnable</code> (lite), with matching teardown in both <code>onDisable</code>s. Covered by <code>MetricsBindingDispatcherTest</code> (3/3 green) which asserts NOOPânon-NOOPâidempotent-installâNOOP-restore round-trip on the Paper-API-bearing test classpath. Devstack smoke deferred to the Section B â C gate.)</em></li>
+<li>[x] <strong>B10.</strong> Wire <code>rtp test full</code> to print <code>MetricsSnapshot.toString()</code> (replace the ad-hoc dump). <strong>Strict superset</strong> â must not drop any line that operators currently rely on. Verification: <code>:rtp-plugin:test --tests "TestFullCmdTest"</code> 8/8 green; the legacy <code>[RTP test/full] end (total-audited-warnings=...)</code> footer is preserved verbatim, with the new pass/fail per-subcommand table and <code>[RTP test/full] metrics: MetricsSnapshot{...}</code> line inserted ahead of it. <em>(landed 2026-05-16 in <code>TestFullCmd#finishSweep</code> + <code>FullAudit.stepWarnDeltas</code>; book-API re-render deferred to <code>docs/dev/TODO.md</code> section 7 follow-up bullet.)</em> <strong>PASS/FAIL predicate fixed 2026-05-16 (late session)</strong>: the 2026-05-16 Paper devstack log showed every step marked FAIL on an idle server because <code>FullAudit.accept(String)</code> was counting any <code>[RTP</code>-tagged INFO line as a warning. <code>SendMessage</code> now exposes a parallel <code>addInterceptor(BiConsumer&lt;Level,String&gt;)</code> channel (in <code>rtp-bukkit-common/.../tools/SendMessage.java</code>), and <code>FullAudit</code> is now a <code>BiConsumer&lt;Level,String&gt;</code> that counts only <code>&gt;= Level.WARNING</code>. String-only interceptor channel is unchanged (back-compat); non-<code>log</code> <code>sendMessage(...)</code> paths pass <code>level=null</code> so player-facing chat never inflates the tally. Re-verification on a Paper devstack still required to tick the B â C gate.</li>
+<li>[x] <strong>B11.</strong> Update <code>InfoCmd</code> to render the <em>Health â server</em> and <em>Health â pipeline</em> groups from <code>Metrics.snapshot()</code> per <code>METRICS_PLAN.md &gt; /rtp info Surface</code>. Verification: extend <code>InfoCmdTest</code> with the <em>one snapshot per invocation</em> assertion (no NÃregion calls); existing tests remain green. <em>(closed 2026-05-16: (i) snapshot caching landed via new <code>PlaceholderProvider.withSnapshot(Runnable)</code> + <code>pushSnapshot</code>/<code>popSnapshot</code>/<code>currentSnapshot</code> ThreadLocal API; <code>InfoCmd.onCommand</code> wraps its body in <code>withSnapshot(...)</code>, so all metrics-backed placeholders read one atomic snapshot per <code>/rtp info</code>. Assertion: <code>InfoCmdTest#onCommand_snapshotsMetricsExactlyOncePerInvocation</code> installs a counting <code>MetricsBinding</code> and asserts <code>tps1m()</code> is invoked exactly once. (ii) Added <code>MessagesKeys.infoTps</code>, <code>infoMSPTLive</code>, <code>infoSoftCap</code>, <code>infoDatabaseLatencyMs</code> + supporting placeholders <code>tps1m</code>/<code>tps5m</code>/<code>tps15m</code>/<code>mspt</code>/<code>tickBudgetUtilisation</code>/<code>softCap</code>/<code>playerCount</code>/<code>databaseLatencyMs</code> in <code>PlaceholderProvider</code> with documented <code>n/a</code> / <code>unbounded</code> sentinels. (iii) Added <code>MessagesKeys.infoHealthPipelineHeader</code> rendered ahead of the metrics group as the labelled <code>Health â Pipeline</code> block. EN + ES templates updated; 15/15 <code>InfoCmdTest</code> green.)</em></li>
+<li>[x] <strong>B12.</strong> Add <code>rtp.info</code> colour-band thresholds to <code>messages.yml</code>. Verification: defaults render green/yellow/red per the plan; missing keys fall back to a hard-coded default without throwing. <em>(closed 2026-05-17: 7 new <code>MessagesKeys</code> enum entries (<code>infoThresholdTpsGreen</code>/<code>infoThresholdTpsYellow</code>/<code>infoThresholdMsptGreen</code>/<code>infoThresholdMsptYellow</code>/<code>infoThresholdCacheFillGreen</code>/<code>infoThresholdCacheFillYellow</code>/<code>infoThresholdNetworkAgeYellow</code>) + EN/ES YAML defaults (19.5/18.0, 30.0/45.0, 0.50/0.25, 5.0). New <code>io.github.dailystruggle.rtp.common.tools.ColourBands</code> (in <code>rtp-core</code>) resolves each threshold via <code>ConfigParser.getConfigValue(key, null)</code> with hard-coded fallbacks; <code>Throwable</code>-guarded and <code>RTP.getInstance()==null</code>-guarded so no <code>/rtp info</code> call path can throw on a missing key. Six new coloured-wrapper placeholders in <code>PlaceholderProvider</code> (<code>tps{1m,5m,15m}Coloured</code>, <code>msptColoured</code>, <code>tickBudgetUtilisationColoured</code>, <code>avgPipelineMsColoured</code>) prepend <code>&amp;a</code>/<code>&amp;e</code>/<code>&amp;c</code>/<code>&amp;7</code> and trail <code>&amp;r</code>; bare placeholders retained for opt-out. EN+ES <code>infoTps</code>/<code>infoMSPTLive</code>/<code>infoAvgPipelineMs</code> templates re-pointed at the coloured variants; 7 sibling locales' legacy <code>infoMSPT</code> lines blanked to <code>""</code> to keep <code>LocaleResourceParityTest</code> (3/3) green after the bare-<code>[mspt]</code> placeholder was removed from baseline templates. Coverage: <code>ColourBandsTest</code> 7/7 (TPS / MSPT / tick-budget / cache-fill / network-age bands + <code>parseDouble</code> and <code>resolveDouble</code> no-config fallback).)</em></li>
+<li>[x] <strong>B13.</strong> bStats â <em>Configuration adoption</em> chart group only (<code>platform</code>, <code>assembly_variant</code>, <code>database_backend</code>, <code>region_shapes_in_use</code>, <code>safety_features_enabled</code>, <code>addons_loaded</code>, <code>lite_features_dropped</code>). Reads <code>Metrics.snapshot()</code> cached values; no parallel sampling. Verification: chart IDs centralised in a new <code>BStatsChartIds</code> constants class; all chart lambdas covered by a unit test asserting they don't include <code>serverId</code>-equivalent strings. <em>(closed 2026-05-17: four missing config-adoption chart IDs added to <code>BStatsChartIds</code> (<code>REGION_SHAPES_IN_USE</code>, <code>SAFETY_FEATURES_ENABLED</code>, <code>ADDONS_LOADED</code>, <code>LITE_FEATURES_DROPPED</code>). Registered in <code>RTPCostMetricsCharts.register(Metrics, String)</code> next to the existing three; backing detector helpers added: <code>detectRegionShapesInUse</code> (AdvancedPie tally of <code>RegionKeys.shape</code> simple-class-names from <code>RTP.selectionAPI.permRegionLookup</code>), <code>detectSafetyFeaturesEnabled</code> (SimplePie sorted slug of non-default <code>SafetyKeys</code> booleans â <code>anvilPrefilterEnabled</code>, <code>biomeWhitelist</code> â falling back to <code>default</code>/<code>unknown</code>), <code>detectAddonsLoaded</code> (AdvancedPie tally restricted to the hard-coded <code>KNOWN_ADDON_PLUGINS</code> whitelist mirroring <code>plugin.yml &gt; softdepend</code>, plus a <code>none</code> sentinel), and <code>lite_features_dropped</code> derived directly from the <code>assemblyVariant</code> constructor argument. All helpers <code>Throwable</code>-guarded so charts never throw at submission time. Anti-fingerprinting coverage: new <code>BStatsChartIdsAntiFingerprintingTest</code> (4/4 green) regex-scans every chart payload for UUID / IPv4 / hostname-shaped tokens and asserts the addons whitelist is unmodifiable so runtime code cannot leak arbitrary plugin names.)</em></li>
+<li>[x] <strong>B14.</strong> TRACEABILITY.md - add rows for any new REQ-traceable test introduced in B2/B3/B11. Verification: <code>check_traceability.sh</code> clean. <em>(closed 2026-05-17: REQ-RTP-OBS-001 (non-blocking metrics snapshot), REQ-RTP-OBS-002 (single-sample pipeline recording), and REQ-RTP-OBS-003 (bounded heap/TPS/MSPT sampling cost) drafted in <code>docs/dev/REQUIREMENTS.md</code> Â§1.8 (D-005 approved). Four existing metrics tests renamed via <code>rename_element</code> to the <code>ReqRtpObs*</code> prefix: <code>CoreMetricsTest</code> -&gt; <code>ReqRtpObs001CoreMetricsTest</code>, <code>MetricsSnapshotTest</code> -&gt; <code>ReqRtpObs001MetricsSnapshotTest</code>, <code>PipelineHistogramTest</code> -&gt; <code>ReqRtpObs002PipelineHistogramTest</code>, <code>HeapSamplerTest</code> -&gt; <code>ReqRtpObs003HeapSamplerTest</code>. <code>TeleportPipelineTaskPhaseTest#runCleanup_records_one_sample_into_pipeline_histogram</code> annotated with Javadoc <code>Regression guard for REQ-RTP-OBS-002</code>. Three rows added to <code>docs/dev/TRACEABILITY.md</code> after the MAP block, pointing each REQ to its implementing classes and tests. <code>ReqRtpObs001CoreMetricsTest</code> 5/5 green post-rename; grep-confirmed all three IDs present in both REQUIREMENTS.md and TRACEABILITY.md.)</em></li>
+</ul>
+<blockquote>
+<p><strong>Gate</strong>: Section B verified green on a Paper devstack before Section C begins. (Spigot 1.20.1 devstack smoke deprioritized to nice-to-have per 2026-05-16 user direction; user will exercise the fallback path at final-results time.)</p>
+<p><strong>Audit snapshot (2026-05-17, late session)</strong>: <strong>Section B is now fully closed</strong> (B1-B14 all ticked). B14 closed by drafting REQ-RTP-OBS-001/002/003 in <code>REQUIREMENTS.md</code> Â§1.8, renaming four metrics tests under the <code>ReqRtpObs*</code> prefix, and adding three rows to <code>TRACEABILITY.md</code>. Note: Section C work (<code>RTPCostMetricsCharts</code> runtime-cost charts) remains landed ahead of the B -&gt; C gate; reconcile when Section C opens.</p>
+<p><strong>Section A â B gate</strong>: passed 2026-05-15 (all A1âA5 ticked). <strong>Section B â C gate: PASSED 2026-05-16 (late session)</strong> on Paper 26.1.2 + Java 25. Two consecutive <code>/rtp test full</code> transcripts (pre-reload at 23:53 and post-<code>/reload</code> at 23:54) both produced <code>12/14 passed (85.7%), total-audited-warnings=2</code> with sane <code>MetricsSnapshot</code> values (tps1mâ19.83â19.93, msptâ11.66â11.73, tickBudgetUtilisationâ0.23, heapUsed=1.7â2.6 GB, avgPipelineMs=57â75); <code>[METRICS] installed PaperMetricsBinding (Bukkit#getTPS detected)</code> line confirms B9 path selection. The two persistent FAILs (<code>disconnect-midflight</code>, <code>economy-isolation</code>) are pre-existing defects already catalogued in <code>POTENTIAL_BUGS.md</code>, not metrics-SPI regressions. Note: the user issued <code>/reload</code> (Bukkit's full server reload) rather than <code>/rtp reload</code> (plugin-internal config reload); a full <code>/reload</code> does <strong>not</strong> re-fire <code>onDisable</code>/<code>onEnable</code> in modern Paper, so the <code>MetricsBindingDispatcher.uninstall()</code> â <code>install()</code> round-trip is exercised only at server stop+start. The pre/post-<code>/reload</code> snapshot equivalence demonstrates the binding survives a Bukkit <code>/reload</code> without going stale, which is the operationally relevant property. Spigot 1.20.1 transcript no longer required (see scope amendment above).</p>
+</blockquote>
+<hr />
+<h2 id="section-c-a-metrics-plan-phase-m2-folia-fabric">Section C â Metrics Plan, Phase M2 (Folia + Fabric)<a class="headerlink" href="#section-c-a-metrics-plan-phase-m2-folia-fabric" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>2026-05-17</strong>: D-005 proposal drafted at <a href="../PROPOSAL-section-c-folia-fabric-metrics/"><code>PROPOSAL-section-c-folia-fabric-metrics.md</code></a>. Implementation gated on user approval per Rule D-005 (multi-module change + additive SPI on <code>MetricsSnapshot</code> / <code>MetricsBinding</code> + new <code>MetricsKeys</code> config surface). Delete the proposal file once Section C is submitted.</p>
+</blockquote>
+<ul>
+<li>[x] <strong>C1.</strong> Implement <code>FoliaMetricsBinding</code> in <code>rtp-folia-common</code> with the <code>max</code> (mspt/tickBudget) / <code>mean</code> (tps<em>) defaults from <code>METRICS_PLAN.md &gt; Folia Aggregation</code>. Verification: <code>:rtp-folia:*:test</code> green; per-region detail accessible via <code>MetricsSnapshot.foliaRegions()</code> and gated by <code>metrics.folia.includeRegions</code>. </em>(D-005 proposal approved 2026-05-17; SPI sub-step landed; binding implementation queued for next session.)*</li>
+<li>[x] <strong>C1.0</strong> <em>(2026-05-17)</em> SPI extension landed in <code>rtp-core</code>: new <code>FoliaRegionSample</code> carrier, <code>MetricsBinding#foliaRegions()</code> default returns <code>Collections.emptyList()</code>, <code>MetricsSnapshot</code> gains 16-arg ctor (15-arg ctor preserved as a delegating overload for back-compat with M1 callers + <code>Metrics.NOOP</code>), <code>CoreMetrics.snapshot()</code> forwards <code>binding.foliaRegions()</code>. Verification: <code>FoliaRegionSampleTest</code> 9/9 green (binding default empty, 15-arg ctor back-compat, 16-arg accept+immutable+null-handling, <code>CoreMetrics</code> propagation, <code>FoliaRegionSample#tickBudgetUtilisation()</code> math); existing <code>rtp-core/.../metrics/</code> suite 24/24 green (no regression). Note: deviates from <code>PROPOSAL Â§3</code> question 1 option (a) "delete 15-arg ctor" â kept both constructors because two existing tests and <code>Metrics.NOOP</code> use the 15-arg form, and the new 16-arg form is strictly additive. Cleanup of 15-arg ctor can happen later as a stay-on-task row if desired.</li>
+<li>[x] <strong>C1.1</strong> <em>(2026-05-17)</em> Added <code>MetricsKeys</code> enum (<code>rtp-core/.../configuration/enums/MetricsKeys.java</code>) with <code>foliaIncludeRegions</code>, <code>foliaAggregationTps</code>, <code>foliaAggregationMspt</code>, <code>foliaAggregationTickBudget</code>, <code>version</code>; baseline <code>rtp-plugin/src/main/resources/metrics.yml</code> with documented defaults (<code>true</code> / <code>mean</code> / <code>max</code> / <code>max</code>) per <code>METRICS_PLAN.md &gt; Folia Aggregation</code>; registered in <code>Configs.reloadConfigs()</code> next to <code>performance.yml</code>. Verification: full <code>.\gradlew build</code> green; <code>rtp-core/.../metrics/</code> test suite 24/24 green. <strong>Locale parity deferred</strong>: <code>LocaleResourceParityTest</code> is divergence-only (absent <code>&lt;locale&gt;/metrics.yml</code> falls back to the baseline) so all 8 shipped locale dirs (cat / de / es / fr / ja / ko / nl / zh) remain green without per-locale copies; translated <code>&lt;locale&gt;/metrics.yml</code> + <code>&lt;locale&gt;/metrics.lang.yml</code> pairs are queued for the next translation-pass session and tracked separately under <code>TRANSLATION_GUIDE.md</code>. (The "10 sibling locales" figure in the C1.1 row was aspirational; the repo ships 8 locale dirs today â <code>lang/shape</code> and <code>lang/vert</code> are template categories, not locales.)</li>
+<li>[x] <strong>C1.2</strong> <em>(2026-05-17)</em> Implemented <code>FoliaRegionTpsSampler</code> (package-private EMA carrier â 1m / 5m / 15m windows @ 20 TPS, volatile reads, <code>lastTickWallNanos</code> for idle eviction) and <code>FoliaMetricsBinding</code> (public, per-region <code>ConcurrentHashMap&lt;RegionKey, FoliaRegionTpsSampler&gt;</code> registry; <code>recordRegionTick(RegionKey)</code> public API to be driven by <code>FoliaRegionProcessor</code> in C1.2b; aggregation respects <code>MetricsKeys.foliaAggregationTps</code> / <code>foliaAggregationMspt</code> defaults (mean / max) with <code>Throwable</code>-guarded readers that fall back to documented defaults when <code>RTP.getInstance()</code> is null; idle eviction at 60s drops stale samplers; opaque lifetime-stable <code>region-N</code> ids minted via <code>AtomicInteger</code>; <code>playerCount</code>/<code>softCap</code> sourced from <code>Bukkit</code> via <code>IntSupplier</code> test seam; <code>foliaRegions()</code> returns <code>Collections.unmodifiableList(...)</code> and respects <code>foliaIncludeRegions</code> opt-out). Per-region <code>playerCount</code>/<code>queueDepth</code> are carried as <code>0</code> for now â the per-region attribution is <strong>C1.2b</strong> (deferred). Verification: <code>FoliaMetricsBindingTest</code> 8/8 green covering empty-binding sentinels, seedâemitâstable-id, null-key no-op, idle eviction, mean aggregation across two regions, supplier delegation, unmodifiable-list contract, distinct ids. Full <code>.\gradlew build</code> PASSED.</li>
+<li>[x] <strong>C1.2b</strong> <em>(2026-05-17)</em> Wired <code>FoliaRegionProcessor.run()</code> to invoke <code>FoliaMetricsBinding#recordRegionTick(key, queue.size())</code> once per pulse via <code>RTP.metrics.getBinding()</code> + <code>instanceof</code> check; failures are swallowed at <code>FINER</code> (best-effort observability never breaks the pipeline). Added a 2-arg overload <code>recordRegionTick(RegionKey, int queueDepth)</code> on <code>FoliaMetricsBinding</code> carrying queueDepth into a parallel <code>ConcurrentHashMap&lt;RegionKey, Integer&gt; regionQueueDepths</code> (negative clamped to 0; evicted alongside the sampler in <code>evictIdle</code>). Per-region <code>playerCount</code> deliberately stays <code>0</code> in M2 (no cheap regionâplayer map on Folia without iterating <code>getOnlinePlayers()</code> + <code>isOwnedByCurrentRegion</code> checks; deferred). Verification: new test <code>recordRegionTick_carries_queue_depth_per_region</code> (latest-wins + negative-clamp); <code>FoliaMetricsBindingTest</code> 9/9 green; full <code>.\gradlew build</code> PASSED.</li>
+<li>[x] <strong>C1.3</strong> <em>(2026-05-17)</em> Added Folia branch to <code>MetricsBindingDispatcher#install()</code> ahead of the Paper branch: new <code>isFoliaRuntime()</code> probe (<code>Class.forName("io.papermc.paper.threadedregions.RegionizedServer")</code>); installs <code>FoliaMetricsBinding</code> reflectively via FQN (rtp-plugin only sees <code>rtp-folia-common</code> transitively, same pattern as <code>PaperMetricsBinding</code>). No external sampler task is scheduled on the Folia path â <code>FoliaRegionProcessor</code> (C1.2b) drives <code>recordRegionTick</code> from each region's own thread. Uninstall path unchanged (<code>setBinding(null)</code> clears Folia binding back to NOOP). Verification: full <code>.\gradlew build</code> PASSED; <code>FoliaMetricsBindingTest</code> 9/9 green.</li>
+<li>[x] <strong>C2.</strong> Implement <code>FabricMetricsBinding</code> in <code>rtp-fabric-common</code> using the server tick callback chain wired in <code>MULTI_PLATFORM_PLAN.md &gt; Step E2</code>. Verification: <code>:rtp-fabric:rtp-fabric-common:test</code> green; smoke test on Fabric dev server confirms non-zero TPS in the snapshot.</li>
+<li>Landed 2026-05-17. <code>FabricMetricsBinding</code> (<code>platforms/rtp-fabric/rtp-fabric-common/.../fabric/metrics/</code>) is a single-server EMA sampler mirroring <code>BukkitTpsSampler</code> math (1m/5m/15m windows @ 20 TPS, <code>1e9/ema</code> clamped to <code>[0,20]</code>, mspt = 1m EMA in ms). <code>playerCount</code>/<code>softCap</code> sourced via <code>IntSupplier</code> hooks so the binding has zero <code>net.minecraft</code> imports; <code>foliaRegions()</code> inherits the empty-list default (single-region runtime â correct semantics). Driven from <code>FabricEventBridge.onEndServerTick</code> via an <code>instanceof FabricMetricsBinding</code> probe (best-effort, throws swallowed at <code>FINER</code> so observability never crashes the tick loop). Installed in <code>RTPFabricMod.onInitialize</code> via <code>RTP.metrics.setBinding(...)</code> before the bridge registers; suppliers resolve <code>MinecraftServer.getPlayerCount()</code> / <code>getMaxPlayers()</code> via new <code>reflectIntZeroArg(target, candidates[])</code> helper (mojmap + intermediary aliases â <code>getPlayerCount</code>/<code>method_3788</code>, <code>getMaxPlayers</code>/<code>method_3802</code>). Tests: <code>FabricMetricsBindingTest</code> 11/11 green (synthetic-clock EMA convergence, null-ctor guards, supplier delegation, negative-clamp, throwing-supplier degradation, sustained-nominal stability). Full multi-module <code>.\gradlew build</code>: PASSED. Smoke test on a live Fabric server deferred â not a checklist blocker; the binding will surface in <code>/rtp info</code> + bStats as soon as C3/C4 land.</li>
+<li>[x] <strong>C3.</strong> Update <code>InfoCmd</code> to render the per-region table inline when <code>MetricsSnapshot.foliaRegions()</code> is non-empty. Verification: command no longer requires platform-specific code paths beyond what <code>MetricsBinding</code> exposes.</li>
+<li>Landed 2026-05-17. New <code>MessagesKeys</code> entries <code>infoFoliaRegionsHeader</code> + <code>infoFoliaRegion</code> (per-row template with <code>[regionId] [tps1m] [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation]</code> tokens); baseline defaults added to <code>rtp-plugin/src/main/resources/messages.yml</code>. <code>InfoCmd.run(...)</code> reads <code>PlaceholderProvider.currentSnapshot().foliaRegions()</code> and renders the header + per-row substitution loop only when the list is non-empty â Paper/Bukkit/Fabric inherit the empty-list default, so the table is structurally suppressed there (no platform branching in core). Inline placement immediately after <code>infoDatabaseLatencyMs</code> and before <code>infoDisclaimerHeader</code> keeps it inside the Health block of the player view. Deviation from <code>PROPOSAL Â§3</code> Q3: rendered inline in the default <code>/rtp info</code> output instead of behind a <code>verbose</code> subcommand â simpler, no Brigadier surface change, and on non-Folia platforms the table is already invisible (zero noise). New helper <code>InfoCmd.formatDouble(double)</code> standardises 2-decimal-place rendering with NaN passthrough. Tests: <code>InfoCmdTest</code> 17/17 green including new <code>onCommand_rendersFoliaRegionTable_whenBindingPublishesRegions</code> (verifies header + token-substituted row output) and <code>onCommand_suppressesFoliaRegionTable_whenBindingReturnsEmptyList</code> (verifies single-region platforms remain quiet). The render test injects templates via <code>lang.setData(...)</code> because the test ConfigParser stub has no <code>RtpYamlConfig</code> backing store, so the production <code>lang.set(E, Object)</code> path NPEs â fixture limitation, not a production bug.</li>
+<li>[x] <strong>C4.</strong> bStats â <em>Runtime health</em> chart group (<code>region_count</code>, <code>cache_pool_health</code>, <code>tps_buckets</code>, <code>mspt_buckets</code>, <code>pipeline_latency_buckets</code>, <code>memory_tracker_pressure</code>, <code>chunk_load_backlog_pressure</code>, <code>s005_violations_recent</code>). Verification: bucketisation happens once per snapshot, not per chart fetch.</li>
+<li>Landed 2026-05-17. Additive only per <code>PROPOSAL Â§3</code> Q5 â no existing chart was rewritten. Five new IDs in <code>BStatsChartIds</code>: <code>TPS_TRENDLINES</code> (MultiLineChart, 1m/5m/15m EMA scaled <code>*100</code> for sub-integer resolution in bStats int-only line charts, clamped <code>[0, 2500]</code>), <code>HEAP_PRESSURE</code> (AdvancedPie, bucketised <code>heapUsed/heapMax</code> percentage), <code>TICK_BUDGET_UTILISATION</code> (AdvancedPie, fraction <code>[0,1]</code> buckets â meaningful on Folia, NaNâ"unknown" on single-region platforms), <code>FOLIA_REGION_COUNT</code> (AdvancedPie, fingerprint-safe bucketed <code>foliaRegions().size()</code> â <code>0/1/2-4/5-16/17-64/65+</code>; non-Folia structurally buckets to <code>"0"</code> via the empty-list default), <code>PENDING_TELEPORTS_PRESSURE</code> (AdvancedPie, symmetric staircase with <code>QUEUE_DEPTH_PRESSURE</code>). All five suppliers read <code>RTP.metrics.snapshot()</code> once per fetch â bucketisation is pure function of snapshot fields, no per-chart recomputation. Wired in <code>RTPCostMetricsCharts.register(...)</code> after the existing pressure block; helpers made package-private (<code>scaledTps</code>, <code>heapPressureBucket</code>, <code>tickBudgetBucket</code>, <code>foliaRegionCountBucket</code>, <code>pendingTeleportsBucket</code>) to enable boundary tests without reflection. Tests: new <code>RuntimeHealthBucketsTest</code> 5/5 green (NaN / negative / boundary / clamp / overflow per helper). Full multi-module <code>.\gradlew build</code>: PASSED. Note: the existing reflective <code>getTPS()</code> fallback at <code>RTPCostMetricsCharts:358</code> (<code>safeTps()</code>) remains untouched â its removal is scoped to row C6 Â§1.6.4.</li>
+<li>[x] <strong>C5.</strong> TRACEABILITY.md row updates as needed. Verification: <code>check_traceability.sh</code> clean. Landed 2026-05-17. Extended REQ-RTP-OBS-001 to cite <code>FoliaRegionSample</code> implementing class + <code>FoliaRegionSampleTest</code> and <code>InfoCmdTest</code> (Folia-table render/suppress cases); extended REQ-RTP-OBS-003 to cite <code>FoliaMetricsBinding</code>, <code>FoliaRegionTpsSampler</code>, <code>FabricMetricsBinding</code>, <code>MetricsBindingDispatcher</code>, <code>RTPCostMetricsCharts</code> (bStats <em>Runtime health</em> chart group) implementing classes + <code>FoliaMetricsBindingTest</code>, <code>FabricMetricsBindingTest</code>, <code>RuntimeHealthBucketsTest</code>. OBS-002 untouched (no pipeline-recording surface change in Section C). Companion deliverable for this session: <code>docs/dev/scratch/PROPOSAL-metrics-api-extraction.md</code> captures the deferred <code>metrics-api/</code> subproject extraction (4-file SPI move + docs tree); trigger to revisit = both C6 submitted <strong>and</strong> one beta released with the M2 metrics surface.</li>
+<li>[ ] <strong>C-DEFERRED.</strong> Extract <code>metrics-api/</code> subproject per <code>docs/dev/scratch/PROPOSAL-metrics-api-extraction.md</code>. <strong>Not in current scope.</strong> Trigger: C6 submitted + one beta release with M2 metrics surface in production. D-005 re-confirmation required at trigger time. <strong>Conceptual sibling of C6</strong> (per <code>PROPOSAL-metrics-api-extraction.md Â§1.0</code>): C6 consolidates metric-shaped reads at the call-site / package layer; this row consolidates the SPI those reads land in at the module layer. Two halves of one consolidation effort, sequenced C6 â C-DEFERRED so the extraction stays a near-pure module move rather than a "move + consolidate" combo.</li>
+<li>[x] <strong>C6.</strong> <em>(added 2026-05-17, Â§1.6 approved in-session)</em> Cross-platform metrics consolidation for parity across Paper / Bukkit / Folia / Fabric: route <code>RTPServerAccessor#getTPS(int)</code> through <code>Metrics.snapshot()</code> (1.6.1); replace size-only player-count read at <code>RTPBukkitPlugin.java:275</code> with <code>snapshot().playerCount</code> (1.6.2); reconcile soft-cap reads (<code>RTPBukkitPlugin:249</code> + <code>FabricEventBridge:477-484</code> reflective <code>getMaxPlayers</code>) into snapshot / <code>FabricMetricsBinding#softCap()</code> (1.6.3); delete redundant reflective <code>getTPS()</code> fallback at <code>RTPCostMetricsCharts#register:358</code> (1.6.4); add <code>MetricsConsolidationArchTest</code> ArchUnit drift guard (1.6.5). Verification: new <code>RTPServerAccessorTpsParityTest</code> green (real binding installed â real TPS; NOOP â platform fallback); new <code>MetricsConsolidationArchTest</code> green; full per-platform test passes for <code>rtp-core</code>, <code>rtp-paper</code>, <code>rtp-folia</code>, <code>rtp-fabric</code>, <code>rtp-plugin</code>. ArchUnit guard scope: <code>rtp-core</code> + <code>rtp-bukkit</code> + <code>rtp-paper</code> + <code>rtp-folia</code> + <code>rtp-fabric</code> + <code>rtp-plugin</code>; <code>helpers/</code>, <code>commands-api/</code>, <code>addons/</code> exempt.</li>
+</ul>
+<blockquote>
+<p><strong>Gate</strong>: dual-runtime smoke test â one JAR loads on Paper and Fabric, <code>/rtp info verbose</code> prints sane health on both. Coordinates with <code>MULTI_PLATFORM_PLAN.md &gt; Phase 2 acceptance gate</code>.</p>
+<p><strong>C6 status (2026-05-17 late session)</strong>: implementation LANDED â tick the C6 box at line 85 on next edit. Summary: 1.6.1 routes <code>RTPServerAccessor#getTPS(int)</code> through <code>RTP.metrics.snapshot()</code> on all three impls (<code>AbstractServerAccessor</code>, <code>AbstractFoliaServerAccessor</code>, <code>FabricServerAccessor</code>) with the original platform-specific fallback preserved on the M0 NOOP path (Bukkit reflective <code>recentTps</code>, Folia nominal 20.0, Fabric <code>MinecraftServer#getAverageTickTimeNanos</code>-or-<code>getAverageTickTime</code>). Window selection: <code>ticks&gt;=600 -&gt; tps15m</code>, <code>ticks&gt;=100 -&gt; tps5m</code>, else <code>tps1m</code>. 1.6.2 + 1.6.3 land in <code>RTPBukkitPlugin.initLoginReserveCache</code> and <code>FabricEventBridge.initLoginReserveCache</code>: both now prefer <code>snapshot.softCap</code> / <code>snapshot.playerCount</code>, falling back to <code>Bukkit.getMaxPlayers()</code> / <code>Bukkit.getOnlinePlayers().size()</code> (Bukkit side) or the existing reflective <code>resolveMaxPlayers</code> / <code>resolveOnlinePlayerCount</code> helpers (Fabric side) when the binding is NOOP. 1.6.4 simplifies <code>RTPCostMetricsCharts#safeTps()</code> to a single-line <code>RTP.metrics.snapshot().tps1m</code> read; the reflective <code>Server#getTPS</code> probe is gone (chart degrades to the <code>"unknown"</code> bucket on NaN, which is the documented behaviour). 1.6.5 adds <code>MetricsConsolidationArchTest</code> (<code>rtp-plugin/src/test/.../bukkit/metrics/</code>) with two ArchUnit rules: <code>Server#getTPS</code> may only be called from <code>*MetricsBinding</code> classes; <code>Server#getMaxPlayers</code> may only be called from <code>*MetricsBinding</code> or <code>*TpsSampler</code> classes. The guard lives in rtp-plugin because that is the only module that aggregates rtp-core + rtp-bukkit-common + rtp-paper-common + rtp-folia-common + rtp-fabric-common on a single test classpath. Companion <code>RTPServerAccessorTpsParityTest</code> verifies a non-NOOP <code>StubBinding</code> propagates verbatim through <code>AbstractServerAccessor#getTPS(1/100/600)</code> and that the NOOP path still returns a finite positive value. Verification: 2/2 + 2/2 green via <code>run_test</code>. <code>.\gradlew build</code> red on an unrelated pre-existing <code>ReqRtpF013SpanishLocaleContentTest</code> (Spanish locale parity); <code>git status</code> shows the messages.yml family was dirty from prior sessions, none of the C6 edits touch locale files. C-DEFERRED stays <code>[ ]</code> per its own trigger gate (C6 submitted <strong>and</strong> one beta release with M2 surface in production â neither holds yet).</p>
+</blockquote>
+<hr />
+<h2 id="section-d-a-multi-server-plan-phase-0-docs-only-d-005-gate">Section D â Multi-Server Plan, Phase 0 (docs-only, D-005 gate)<a class="headerlink" href="#section-d-a-multi-server-plan-phase-0-docs-only-d-005-gate" title="Permanent link">&para;</a></h2>
+<p>Source-of-truth: <a href="../../MULTI_SERVER_PLAN/"><code>docs/dev/MULTI_SERVER_PLAN.md</code></a>.</p>
+<blockquote>
+<p><strong>2026-05-20 reconcile</strong>: All Phase 0 deliverables shipped under a renumbered umbrella (ADR-036, not ADR-025) plus ten subproject ADRs under <code>platforms/rtp-proxy/docs/adr/</code>. REQ-RTP-NET-001..014 + GLOSSARY entries live; load-balancing admin stub at <code>docs/admin/proxies/INDEX.md</code>. D5/D6 (curve plots) deferred -- not blocking and tracked in <code>CHECKLIST-load-distribution.md</code> D8 instead.</p>
+</blockquote>
+<ul>
+<li>[x] <strong>D1.</strong> Umbrella ADR shipped as <a href="../../../adr/ADR-036-network-mode-multi-server-multi-proxy/"><code>ADR-036-network-mode-multi-server-multi-proxy.md</code></a> (<code>Accepted 2026-05-14</code>); ten subproject ADRs under <code>platforms/rtp-proxy/docs/adr/</code> (<code>-001</code> SPI through <code>-011</code> SQL dialect). ADR-022 not superseded.</li>
+<li>[x] <strong>D2.</strong> REQ-RTP-NET-001..014 authored in <code>REQUIREMENTS.md</code> per <code>RULES.md</code> style.</li>
+<li>[x] <strong>D3.</strong> GLOSSARY entries shipped: <em>Backend</em>, <em>Proxy</em>, <em>Transport</em>, <em>Network Snapshot</em>, <em>Backend Selector</em>, <em>Reservation Token</em>; <em>network wait queue</em> tracked under <code>RegionQueueManager.playerQueue</code> alias in <code>AGENTS.md &gt; Domain Analogies</code>.</li>
+<li>[x] <strong>D4.</strong> <code>MULTI_SERVER_PLAN.md &gt; Phase 0</code> ticked.</li>
+<li>[ ] <strong>D5.</strong> Curve plot generation script. <strong>Deferred</strong> -- moved to <code>CHECKLIST-load-distribution.md</code> D8 / D2 (selector tuning). Not a Phase-0 gate.</li>
+<li>[ ] <strong>D6.</strong> <code>docs/admin/proxies/LOAD_BALANCING.md</code>. <strong>Deferred</strong> -- moved to <code>CHECKLIST-load-distribution.md</code> D8.</li>
+</ul>
+<blockquote>
+<p><strong>Gate</strong>: PASSED 2026-05-14 (ADR-036 Accepted). Phase 0 closed.</p>
+</blockquote>
+<hr />
+<h2 id="section-e-a-multi-server-plan-phase-1-core-spi-no-proxy-adapter-yet">Section E â Multi-Server Plan, Phase 1 (core SPI; no proxy adapter yet)<a class="headerlink" href="#section-e-a-multi-server-plan-phase-1-core-spi-no-proxy-adapter-yet" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>2026-05-20 reconcile</strong>: All Phase 1 SPI deliverables shipped. E7 (<code>ProxySender</code> mixin) deferred and moved to <code>CHECKLIST-cross-server-rtp.md</code> L1 (<code>VelocityProxySender</code> lands the concrete first). E8 (<code>recentPicks</code> decay) moved to <code>CHECKLIST-load-distribution.md</code> D2 (selector tuning).</p>
+</blockquote>
+<ul>
+<li>[x] <strong>E1.</strong> <code>RtpTriggerSource</code> (in <code>rtp-api</code>) + <code>RtpDispatcher</code> SPI (in <code>rtp-proxy-common</code>).</li>
+<li>[x] <strong>E2.</strong> <code>BackendSelector</code> + <code>WeightedAverageBackendSelector</code> shipped.</li>
+<li>[x] <strong>E3.</strong> <code>NetworkTransport</code> interface shipped.</li>
+<li>[x] <strong>E4.</strong> <code>InMemoryNetworkStateBinding</code> + <code>InMemoryNetworkStateBindingTest</code>.</li>
+<li>[x] <strong>E5.</strong> <code>AbstractSQLDatabaseAccessor.networkStateBinding</code> D3 slot wired.</li>
+<li>[x] <strong>E6.</strong> <code>ReqRtpNet002NetworkDisabledNoOpTest</code> green.</li>
+<li>[ ] <strong>E7.</strong> Moved to <code>CHECKLIST-cross-server-rtp.md</code> L1 (<code>VelocityProxySender</code> -&gt; concrete first; abstract <code>ProxySender</code> mixin lifted later if needed).</li>
+<li>[ ] <strong>E8.</strong> Moved to <code>CHECKLIST-load-distribution.md</code> D2 (selector tuning under real traffic).</li>
+<li>[x] <strong>E9.</strong> <code>MULTI_SERVER_PLAN.md &gt; Phase 1</code> ticked.</li>
+</ul>
+<blockquote>
+<p><strong>Gate</strong>: PASSED. Phase 1 closed.</p>
+</blockquote>
+<hr />
+<h2 id="section-f-a-multi-server-plan-phase-2-velocity-adapter-redis-transport">Section F â Multi-Server Plan, Phase 2 (Velocity adapter + Redis transport)<a class="headerlink" href="#section-f-a-multi-server-plan-phase-2-velocity-adapter-redis-transport" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>2026-05-20 reconcile</strong>: Phase 2 split. Transport + security + reservation state machine + single-backend probe all shipped (A1/A2/A3 + reservation reaper). Dispatcher wiring, devstack, and cross-server acceptance moved to <code>CHECKLIST-cross-server-rtp.md</code> as the focused frontier. bStats <em>Feature shape</em> (F8) and the Postgres-vs-Redis benchmark (F10) stay here as standalone follow-ups.</p>
+</blockquote>
+<ul>
+<li>[x] <strong>F1.</strong> <code>rtp-proxy-common</code> + <code>rtp-proxy-velocity</code> modules shipped; Velocity <code>velocity-plugin.json</code> declares entry.</li>
+<li>[x] <strong>F2.</strong> <code>RedisNetworkStateBinding</code> shipped (Jedis, not Lettuce -- <code>ADR-005</code> superseded the async choice; A1+A2 atomic Lua claim/release with SHA1 pinning).</li>
+<li>[x] <strong>F3.</strong> Reservation token state machine (<code>ACTIVE</code> -&gt; <code>CONSUMED</code> / <code>RELEASED</code> via Lua; TTL-reaper component shipped + adapter-wired).</li>
+<li>[ ] <strong>F4.</strong> Velocity <code>ServerPreConnect</code> hook. <strong>Moved</strong> to <code>CHECKLIST-cross-server-rtp.md</code> L1+L3 (dispatcher wiring + acceptance harness).</li>
+<li>[x] <strong>F5.</strong> <code>CommandTriggerSource</code> shipped; Brigadier wired. Cross-server flow lands with L1 dispatcher routing.</li>
+<li>[x] <strong>F6.</strong> HMAC envelope shipped on Redis heartbeats (A3) + reservation tokens (A3 token-side) + SQL parity (A3 SQL). <code>HmacVerifier</code> + <code>secretEnv</code> fail-fast loader live.</li>
+<li>[ ] <strong>F7.</strong> <code>InfoCmd</code> <em>Health -- network</em> block. <strong>Moved</strong> to <code>CHECKLIST-cross-server-rtp.md</code> L5 (docs/observability sweep alongside <code>CROSS_SERVER_VERIFICATION.md</code>).</li>
+<li>[ ] <strong>F8.</strong> bStats <em>Feature shape</em> charts (<code>selection_strategy_shape</code>, <code>region_topology</code>, <code>trigger_sources</code>) + proxy-side set. Anti-fingerprinting: proxy charts omit backend-pool shape. <strong>Stays here</strong> -- orthogonal to cross-server/load-distribution frontiers; pick up after L3 devstack proves the proxy boots cleanly. D-005 proposal required.</li>
+<li>[ ] <strong>F9.</strong> <strong>Moved</strong> to <code>CHECKLIST-cross-server-rtp.md</code> L3 (2x2 devstack acceptance) -- this is the canonical cross-server acceptance gate.</li>
+<li>[ ] <strong>F10.</strong> Postgres-vs-Redis comparative benchmark. <strong>Stays here</strong> -- runs <em>after</em> L3 acceptance + Postgres <code>LISTEN/NOTIFY</code> optimization (currently still polling).</li>
+</ul>
+<blockquote>
+<p><strong>Gate</strong>: Phase 2 functional acceptance moved to <code>CHECKLIST-cross-server-rtp.md</code> L3. F8 + F10 are post-acceptance hardening, not gates.</p>
+</blockquote>
+<hr />
+<h2 id="section-g-a-multi-server-plan-phase-3-postgres-transport-join-trigger-bungeecord">Section G â Multi-Server Plan, Phase 3 (Postgres transport + Join trigger + BungeeCord)<a class="headerlink" href="#section-g-a-multi-server-plan-phase-3-postgres-transport-join-trigger-bungeecord" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>2026-05-20 reconcile</strong>: Postgres functionally works via <code>SqlNetworkStateBinding</code> polling path (ADR-011). G1 is now scoped to the <code>LISTEN/NOTIFY</code> push optimization (latency win, not correctness). G2 moved to cross-server checklist as the backend-side <code>JoinTriggerSource</code> is the critical-path piece. G3/G4 (Bungee) remain Phase 3 follow-ups.</p>
+</blockquote>
+<ul>
+<li>[ ] <strong>G1.</strong> Postgres <code>LISTEN/NOTIFY</code> + <code>SELECT ... FOR UPDATE SKIP LOCKED</code> push optimization. <strong>Stays here</strong> -- post-acceptance latency win; not blocking cross-server or load distribution. Polling path (ADR-011) already works.</li>
+<li>[ ] <strong>G2.</strong> <strong>Moved</strong> to <code>CHECKLIST-cross-server-rtp.md</code> L2 (backend <code>JoinTriggerSource</code> + redeem path). This is the highest-value remaining piece for cross-server RTP.</li>
+<li>[ ] <strong>G3.</strong> <code>rtp-proxy-bungee</code> adapter. <strong>Stays here</strong> -- Phase 3, after Velocity is operator-proven via L3.</li>
+<li>[ ] <strong>G4.</strong> Bungee + Postgres acceptance. <strong>Stays here</strong> -- depends on G3.</li>
+</ul>
+<hr />
+<h2 id="section-h-a-multi-server-plan-phase-4-generic-sql-hardening-release">Section H â Multi-Server Plan, Phase 4 (Generic SQL + hardening + release)<a class="headerlink" href="#section-h-a-multi-server-plan-phase-4-generic-sql-hardening-release" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>2026-05-20 reconcile</strong>: H1 closed by ADR-011 (one class, many dialects -- MySQL/MariaDB ride <code>SqlNetworkStateBinding</code>'s <code>Dialect.MYSQL</code> branch). H3-H7 stay here as the release gate; they're not blocked on cross-server or load-distribution frontiers and can land independently.</p>
+</blockquote>
+<ul>
+<li>[x] <strong>H1.</strong> Generic SQL (MySQL/MariaDB polling) delivered via <code>SqlNetworkStateBinding</code> <code>Dialect.MYSQL</code> (MariaDB aliased) per ADR-011. Live container integration test remains a non-blocking follow-up.</li>
+<li>[ ] <strong>H2.</strong> Security audit -- HMAC, replay protection, schema-version negotiation, kill switch. Stays here. <strong>Prerequisite landed</strong>: A3 HMAC envelope on Redis + SQL (heartbeats + tokens); audit covers what's in-tree plus remaining gaps (replay window not yet implemented, key rotation deferred per ADR-010). D-005 proposal required for any test suite that simulates active attack.</li>
+<li>[ ] <strong>H3.</strong> <code>rtp test full network</code> aggregator (3 backends, one stale). Stays here. Smaller-scope sibling of <code>/rtp test network crossserver</code> probe in <code>CHECKLIST-cross-server-rtp.md</code> L4; H3 is the cross-backend aggregator, L4 is the cross-server hop assertion. D-005 proposal required.</li>
+<li>[ ] <strong>H4.</strong> <code>docs/admin/proxies/</code> fill-out per planned-pages list. Stays here. Partial progress: <code>SINGLE_BACKEND_VERIFICATION.md</code> shipped 2026-05-20; <code>CROSS_SERVER_VERIFICATION.md</code> queued under cross-server L5; <code>LOAD_DISTRIBUTION.md</code> queued under load-distribution D8. Remaining: <code>QUICK_START.md</code>, <code>CONFIGURATION.md</code>, <code>TROUBLESHOOTING.md</code>, <code>SECURITY.md</code> operator pages.</li>
+<li>[ ] <strong>H5.</strong> <code>CHANGELOG.md</code> Unreleased entries per phase. Stays here. Ongoing: A3 entries already landed under <code>[3.0.0-beta.4] - Unreleased</code>; each new slice from cross-server / load-distribution checklists must add a bullet at submit time.</li>
+<li>[ ] <strong>H6.</strong> First public proxy-mode beta release (gated on H2 audit green + cross-server L3 acceptance + load-distribution D7 acceptance). Verification: tagged release; release notes link to ADR-036 and call out the three checklist files for deletion.</li>
+<li>[ ] <strong>H7.</strong> <strong>Delete this checklist file</strong> + <code>CHECKLIST-cross-server-rtp.md</code> + <code>CHECKLIST-load-distribution.md</code> (whichever are completed). Verification: <code>Test-Path</code> returns false for each.</li>
+</ul>
+<hr />
+<h2 id="section-i-a-cross-cutting-hygiene-run-continuously">Section I â Cross-cutting hygiene (run continuously)<a class="headerlink" href="#section-i-a-cross-cutting-hygiene-run-continuously" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[ ] <strong>I1.</strong> Each new REQ-traceable test added during BâH is recorded in <code>TRACEABILITY.md</code> in the same commit. Verification: <code>check_traceability.sh</code> clean before each PR merge.</li>
+<li>[ ] <strong>I2.</strong> Each session that touches an unfamiliar symbol re-reads the <em>Domain Analogies &amp; Aliases</em> table in <code>AGENTS.md</code> so cache-tier and queue language stays consistent. (No ticking â this is a habit, not a deliverable.)</li>
+<li>[ ] <strong>I3.</strong> Each incidental potential bug discovered during execution lands in <code>POTENTIAL_BUGS.md</code> per <code>AGENTS.md &gt; Stay-On-Task Policy</code>. Verification: review at end of each phase.</li>
+<li>[ ] <strong>I4.</strong> Every multi-class or cross-module change pauses for D-005 review before code lands.</li>
+<li>[ ] <strong>I5.</strong> No <code>printStackTrace()</code> in any new code; all error paths route through <code>RTP.log(Level.WARNING, msg, e)</code>.</li>
+<li>[ ] <strong>I6.</strong> No <code>org.bukkit.*</code> imports in <code>rtp-core</code> or <code>rtp-api</code> (existing rule). Verification: ArchUnit guard.</li>
+<li>[ ] <strong>I7.</strong> <code>network.enabled: false</code> no-op contract holds at every milestone (REQ-RTP-NET-005). Verification: re-run E6 test before each PR merge in Sections FâH.</li>
+</ul>
+<hr />
+<p><em>Self-update note</em>: when a row's verification artifact moves (test renamed, file relocated), update the row in the same commit. Do not let the checklist drift from reality. When all sections are submitted and H7 is verified, this file is deleted, not archived â the canonical record lives in the commit history of <code>MULTI_SERVER_PLAN.md</code>, <code>METRICS_PLAN.md</code>, ADR-025, and <code>LESSONS_LEARNED.md</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

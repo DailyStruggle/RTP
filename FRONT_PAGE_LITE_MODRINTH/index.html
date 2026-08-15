@@ -1,0 +1,1914 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>FRONT PAGE LITE MODRINTH - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#why-operators-pick-leafrtp" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              FRONT PAGE LITE MODRINTH
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-operators-pick-leafrtp" class="md-nav__link">
+    <span class="md-ellipsis">
+      Why operators pick LeafRTP
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#install-30-seconds" class="md-nav__link">
+    <span class="md-ellipsis">
+      Install (30 seconds)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-the-engine-work-and-watch-it-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      See the engine work, and watch it live
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      Requirements
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#platform-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      Platform support
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#links" class="md-nav__link">
+    <span class="md-ellipsis">
+      Links
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+  <h1>FRONT PAGE LITE MODRINTH</h1>
+
+<!--
+Markdown mirror of FRONT_PAGE_LITE.bbcode (free LeafRTP front page).
+Kept in sync with the BBCode source by hand; update both when changing copy.
+
+Marketplace listing metadata (current, for SEO reference):
+  Title:   "LeafRTP"
+  Tagline: "Deterministic Random Teleportation engine"
+-->
+
+<div align="center">
+
+# LeafRTP - Random Teleport for Paper, Spigot, Folia, Fabric, NeoForge & Velocity
+
+*Once upon a time, I wanted to explore a minecraft world. I asked for `/rtp` in servers I played on. They told me "no, that's laggy", and I took that personally.*
+
+</div>
+
+<p><strong>Random teleport that's easy to set up, easy to tune, and fast.</strong> Drop the jar in and <code>/rtp</code> works with zero config, tune it in-game with <code>/rtp menu</code>, or build on the public <code>rtp-api</code>.</p>
+<p><strong>At a glance:</strong></p>
+<ul>
+<li>🚀 <strong>Plug-and-play:</strong> drop the jar in, type <code>/rtp</code>, done. Zero config.</li>
+<li>🛠️ <strong>No YAML required:</strong> tune regions, safety, and effects in-game with <code>/rtp menu</code>.</li>
+<li>🧩 <strong>One jar, every platform:</strong> build on the public <code>rtp-api</code> and ship a single addon for all of them.</li>
+<li>⚡ <strong>No "Finding a safe location..." wait:</strong> destinations are pre-verified off-tick, never on the main thread.</li>
+<li>📈 <strong>Measured on a public harness:</strong> 19.8 TP/s on Paper, 4 ms worst tick (next-best: 70 ms).</li>
+<li>🛡️ <strong>Audited safety:</strong> no unsafe blocks, no force-loaded chunks, no claim bypass, no silent failures.</li>
+</ul>
+<div align="center">
+
+*Minecraft 1.20.x / 1.21.x / 26.x. Legacy Forge isn't native; run this jar under Arclight / Mohist.*
+
+**Trusted since 2021: 4.6 stars over 30+ reviews, 430k+ downloads.**
+
+</div>
+
+<hr />
+<h2 id="why-operators-pick-leafrtp">Why operators pick LeafRTP<a class="headerlink" href="#why-operators-pick-leafrtp" title="Permanent link">&para;</a></h2>
+<p>Everything below ships in the free build, no add-ons:</p>
+<ul>
+<li><strong>12 claim integrations bundled</strong> (GriefDefender, GriefPrevention, WorldGuard, Towny, Lands, +7 more). No teleport into protected land.</li>
+<li><strong>Vault economy:</strong> optional charge per teleport, per-region pricing, auto-refund on cancel.</li>
+<li><strong>Effects engine:</strong> particles, sounds, fireworks, potions on every teleport phase.</li>
+<li><strong>Per-player cooldowns &amp; usage limits</strong> out of the box.</li>
+<li><strong>PvP/combat-tag gate, PlaceholderAPI, live map heatmaps, multi-world overrides.</strong></li>
+<li><strong>Extend it without a fork:</strong> the <code>rtp-api</code> hooks take one-line suppliers to veto destinations, charge economy, add placeholders, override the world border, gate combat, replace the bare <code>/rtp</code> action, or build custom arrival platforms. The bundled rtp menu addon does exactly this, swapping bare <code>/rtp</code> for its own picker.</li>
+</ul>
+<p>(How each feature stays cheap: <a href="https://github.com/dailystruggle/RTP/wiki/Architecture">Architecture</a>.)</p>
+<div align="center">
+
+<img src="https://cdn.modrinth.com/data/TZNIQSHX/images/e349e726cc4e9ecfcd7823a3bc3c4bf0eeb85f0b.png" alt="The clickable /rtp menu: players pick a world or region by clicking, no commands to memorize">
+
+*The clickable `/rtp menu`: players pick a world or region by clicking, no commands to memorize.*
+
+</div>
+
+<hr />
+<h2 id="install-30-seconds">Install (30 seconds)<a class="headerlink" href="#install-30-seconds" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Drop <code>LeafRTP-x.y.z.jar</code> into <code>plugins/</code>.</li>
+<li>Start the server. A <code>default</code> region is generated for you.</li>
+<li>Type <strong>/rtp</strong>.</li>
+<li>Run <strong>/rtp menu</strong> to browse regions, worlds, and configuration in-game (book on Paper / Folia, chat-paginated elsewhere).</li>
+</ol>
+<p>Tune <code>plugins/RTP/config.yml</code> and <code>plugins/RTP/regions/*.yml</code> later. Full guide: <a href="https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md"><strong>admin guide</strong></a>.</p>
+<p><strong>Bundled addons unpack themselves on first run.</strong> Four addon jars ride inside the LeafRTP jar and self-extract into <code>plugins/RTP/addons/</code> the first time the plugin starts - no second download. Delete one from that folder to turn it off (the folder then exists, so it is never re-extracted):</p>
+<ul>
+<li><strong>LeafRTPGuiAddon</strong> (GUI demo) - a clickable chest destination-picker. It binds the bare <code>/rtp</code> root action, so with a GUI renderer present typing <code>/rtp</code> opens the picker instead of teleporting immediately (instant teleport stays reachable from the menu and as a fallback), and adds <code>/rtp gui</code> (<code>rtp.gui</code>).</li>
+<li><strong>LeafRTPClaimAddon</strong> (claim integrations) - the 12 claim/protection checkers, so claim-aware teleport works out of the box on the Bukkit family.</li>
+<li><strong>LeafRTPRiftAddon</strong> (effect demo) - registers a "Virtual Rift" teleport effect that tears the terrain open into a void during warmup (presentation-only client-side blocks, so it can never compromise safety), usable by name in <code>effects/*.yml</code>.</li>
+<li><strong>LeafRTPCountdownAddon</strong> (addon-system reference demo) - live teleport and queue-position countdowns, and the canonical copy-paste reference addon.</li>
+</ul>
+<p>For those interested in writing their own: every one of these is shipped as a worked coding example. Their full source lives under <code>addons/</code> in the repo, and the Rift and Countdown demos are pure <code>rtp-api</code> / <code>effects-api</code> (zero platform imports), so they double as copy-paste starting points for your own addon.</p>
+<hr />
+<details>
+<summary><b>Verification & sources</b></summary>
+
+Every number on this page is anchored in the repo:
+
+- **Reproducible benchmarks** with raw CSVs and per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP)
+- **Requirements traced to tests:** every requirement, including the safety prohibitions, has an implementing class and regression test: [`TRACEABILITY.md`](https://github.com/dailystruggle/RTP/blob/V3/docs/dev/TRACEABILITY.md)
+- **Every design decision is documented:** dated, linkable notes on why teleports are queued, how the Anvil pre-filter skips chunk loads, and more: [`docs/adr/`](https://github.com/dailystruggle/RTP/tree/V3/docs/adr)
+- **bStats** enabled. Anonymous usage stats help prioritize platform work.
+
+</details>
+
+<hr />
+<h2 id="see-the-engine-work-and-watch-it-live">See the engine work, and watch it live<a class="headerlink" href="#see-the-engine-work-and-watch-it-live" title="Permanent link">&para;</a></h2>
+<p>LeafRTP isn't a black box. <code>/rtp scan</code> paints region safety onto a real in-game map (green safe, red unsafe) <strong>as it verifies it</strong>. <code>/rtp info</code> reports live TPS/MSPT, heap, latency percentiles, and rejection causes, no metrics add-on needed.</p>
+<p><a href="https://youtu.be/Ftjy1zw_S04">Watch the scan paint a region live (video)</a>. Details: <a href="https://github.com/dailystruggle/RTP/wiki/Scan-and-Spatial-Memory">Scan &amp; spatial memory</a>, <a href="https://github.com/dailystruggle/RTP/wiki/Diagnostics">Diagnostics</a>.</p>
+<hr />
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<p>Hard requirements. If any are a <strong>no</strong>, EssentialsX <code>/rtp</code> or HuskHomes are fine alternatives.</p>
+<ul>
+<li>✅ <strong>Java 21+</strong> (REQ-RTP-SYS-001, non-negotiable).</li>
+<li>✅ <strong>Paper, Spigot, or a Bukkit-family fork</strong>, or Fabric / NeoForge (1.21.x / 26.1.x). Arclight / Mohist for Forge bridges.</li>
+<li>✅ <strong>Vault</strong> (optional) for the economy charge; dormant when not installed.</li>
+</ul>
+<hr />
+<details>
+<summary><b>Full feature list (full reference on the wiki)</b></summary>
+
+Deterministic spiral selection, persistent spatial memory, pre-generated location queue, full safety pipeline, per-region/per-world config and shapes, arrival schematics, the effects engine, Vault economy, 12 claim integrations, PvP/combat-tag gate, the public `rtp-api`, platform-agnostic addons, live heatmaps, `/rtp info` diagnostics, and 12 parity-enforced locales. Full reference: [Home](https://github.com/dailystruggle/RTP/wiki/Home) | [Commands](https://github.com/dailystruggle/RTP/wiki/Commands) | [Economy](https://github.com/dailystruggle/RTP/wiki/Economy) | [Effects](https://github.com/dailystruggle/RTP/wiki/Effects) | [Integrations](https://github.com/dailystruggle/RTP/wiki/Integrations) | [API](https://github.com/dailystruggle/RTP/wiki/API).
+
+</details>
+
+<hr />
+<h2 id="platform-support">Platform support<a class="headerlink" href="#platform-support" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Paper</strong> (+ forks: Purpur, Pufferfish, Leaf, Leaves, DivineMC)</td>
+<td>✅ Recommended</td>
+<td>Fully async via native <code>getChunkAtAsync</code>.</td>
+</tr>
+<tr>
+<td><strong>Spigot</strong> (+ Spigot forks)</td>
+<td>✅ Supported</td>
+<td>Off-tick <code>.mca</code> Anvil pre-filter -&gt; Paper-class throughput on plain Spigot.</td>
+</tr>
+<tr>
+<td><strong>Arclight / Mohist</strong> (Forge bridges)</td>
+<td>✅ Officially supported</td>
+<td>Use the Spigot/Paper jar. Recommended way to run on Forge.</td>
+</tr>
+<tr>
+<td><strong>Folia</strong></td>
+<td>✅ Supported (free)</td>
+<td>Regionized scheduling + async teleport, zero config. Out-teleports every other Folia <code>/rtp</code> I tested (latest run: 12.5 TP/s, 100% success, 4.15 ms main-thread/teleport) with zero region-watchdog stalls.</td>
+</tr>
+<tr>
+<td><strong>Multi-server / proxy</strong> (Velocity)</td>
+<td>✅ proxy-direct</td>
+<td><code>proxy-direct</code> transport ships in the free build: cross-server <code>/rtp</code> over a lightweight TCP socket, no Redis/SQL.</td>
+</tr>
+<tr>
+<td><strong>Fabric</strong></td>
+<td>✅ Supported</td>
+<td>First-class, stable, in-scope platform; tested regularly, at feature parity with the Bukkit family in the latest builds.</td>
+</tr>
+<tr>
+<td><strong>Native NeoForge</strong></td>
+<td>✅ Supported</td>
+<td>First-class adapter on Minecraft 1.21.x / 26.1.x.</td>
+</tr>
+<tr>
+<td><strong>Native Forge</strong></td>
+<td>🔁 Use Arclight / Mohist</td>
+<td>No native adapter planned.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<details>
+<summary><b>Full benchmark vs. alternative random teleport plugins on Paper, Spigot, and Folia</b></summary>
+
+*Paper rows: 2 OPed clients spamming `/rtp` back-to-back, queues enabled where the plugin offers them, cooldowns/delays zeroed. Folia run: 3 OPed clients, radius equalized to 4096 blocks, ~600 s per plugin.*
+
+**Confidence legend:** 🧪 = measured locally · 📖 = read from plugin docs · ❓ = inferred from architecture.
+
+**Metrics:** Throughput (TP/s, higher better) · MSPT p99 (worst 1-in-100 main-thread tick in ms, lower better) · Min TPS (lowest TPS observed; 20.00 = no hiccup) · CPU / TP (main-thread CPU per successful teleport).
+
+**Paper 1.20.1 / 1.21.11** is the reference dataset. Eight plugins, same harness, same world, same two OPed clients.
+
+| Plugin                  | TP/s     | MSPT p99 (ms) | Min TPS   | CPU / TP (ms) | Success    |
+|-------------------------|----------|---------------|-----------|----------------|------------|
+| **🧪 LeafRTP**              | **19.8** | **4**         | **20.00** | **16.9**       | **100 %**  |
+| 🧪 JakesRTP             | 20.0     | 70            | 20.00     | 26.0           | 100 %      |
+| 🧪 BetterRTP            | 7.3      | 852           | 20.00     | 53.6           | 100 %      |
+| 🧪 HuskHomes            | 6.2      | 372           | 20.00     | 52.2           | 100 %      |
+| 🧪 AdvancedRTP          | 2.16     | 2 100         | 19.95     | 92.1           | 96.3 %     |
+| 🧪 EzRTP                | 1.76     | 2 903         | 19.95     | 139.6          | 100 %      |
+| 🧪 AsyRTP               | 1.67     | 4 534         | 19.95     | 38.8           | 100 %      |
+| 🧪 EssentialsX `/tpr`   | 0.96     | 4 504         | 19.95     | 88.9           | 75.9 % §   |
+
+§ EssentialsX `/tpr` is a teleport-*request* command (handshake + accept), not a teleport-*do* command; the harness's 5 s per-attempt deadline times out a fraction of the request-accept latencies. Numbers are dispatch-shaped, not plugin-broken.
+
+**Spigot 1.20.1**: Spigot's platform-wide chunk-gen ceiling caps everyone in the 1-1.5 TP/s range during the burst; the latency tail is what matters.
+
+| Plugin       | TP/s     | MSPT p99 (ms) | Min TPS  |
+|--------------|----------|---------------|----------|
+| **🧪 LeafRTP**   | **1.52** | **3**         | **6.4**  |
+| 🧪 JakesRTP  | 1.04     | 2 252         | 7.5*     |
+| 🧪 BetterRTP | 1.33     | 3 790         | 2.18     |
+| 🧪 HuskHomes | 0.93     | 4 939         | 2.59     |
+
+**Folia 26.1**: the free build alone, no Pro adapter; on Folia, throughput plus the server-emitted region watchdog are the discriminators (global MSPT is a single-region sample and not meaningful).
+
+| Plugin         | TP/s     | CPU / TP (ms) | Watchdog stalls       | Success     |
+|----------------|----------|---------------|-----------------------|-------------|
+| **🧪 LeafRTP** | **12.5** | **4.15**      | **0**                 | **100 %**   |
+| 🧪 EzRTP       | 5.3      | 6.34          | 7 (one region 20.4 s) | 96.2 %      |
+
+EzRTP's 7 watchdog stalls (one region unresponsive 20.4 s) are the server's own record of synchronous `World.loadChunk` calls on region threads; LeafRTP issued none. For reference, the Pro Folia adapter cleared the same run at 13.5 TP/s. The shared `rtp-core` engine, not a Pro-only adapter, carries the free build's Folia result.
+
+**Architecture support matrix** *(Spigot / Paper-and-forks / Folia)*
+
+- **LeafRTP** - ✅🧪 Off-tick Anvil pre-filter · ✅🧪 Fully async via `getChunkAtAsync` · ✅🧪 Region Scheduler + off-tick pre-filter, no 1-tick stalls
+- **BetterRTP** - ⚠️📖 Sync chunk load on miss · ⚠️📖 No off-tick safety pre-filter · ✅🧪 Folia 1.21.11 functional, p99 ~1.2 s
+- **EzRTP** - ❌🧪 `NoSuchMethodError` on Spigot 1.20.1 (Paper-only API) · ✅🧪 Works on Paper, no off-tick pre-filter · ⚠️🧪 Folia: sync `World.loadChunk` on region threads, 7 watchdog stalls, 20.4 s freeze
+- **AsyRTP** - ❌🧪 Fails to enable on Spigot 1.20.1 (Paper-only API in `onEnable`) · ✅📖 Paper · ✅📖 Folia
+- **SorekillRTP** - ⚠️❓ Designed for Redis cross-server, not single-server perf · ⚠️❓ Same · ❓📖
+- **AdvancedRTP** - ⚠️📖 Safety-first, sync chunk load · ⚠️📖 Same · ❌📖
+- **JakesRTP** - ⚠️📖 Async via flag; 10-slot cache · ✅📖 Same · ❌📖 No Folia
+- **EssentialsX /rtp** - ✅📖 Main-thread chunk load per candidate · ✅📖 Same · ❌📖
+- **HuskHomes RTP** - ✅📖 Bundled with homes suite · ⚠️📖 Same · ✅🧪 Folia functional, p99 ~900 ms
+
+**Caveats.** Small client counts only (2 on Paper, 3 on Folia; the number is a floor, not a ceiling); hardware, view distance, world state, and other plugins will move them. Paper rows are 2-client runs (LeafRTP reproduced n=2; others n=1 on a single rig); the Folia run used 3 clients and its EzRTP failure is corroborated by the server's own watchdog log, independent of the harness. Competitor plugins update frequently; corrections welcome via GitHub issue with a contradicting repro or doc link. This table measures performance only; feature breadth is not benchmarked here. LeafRTP ships the clickable GUI menu, Vault economy, the lifecycle effects engine, and twelve bundled claim integrations alongside these numbers. It does not trade features for speed.
+
+Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP). Video benchmark of `/rtp` on a custom world generator: [youtu.be/V0NyNK9JydM](https://youtu.be/V0NyNK9JydM).
+
+</details>
+
+<details>
+<summary><b>Commands, placeholders, soft-deps</b></summary>
+
+**Commands** (full reference: [admin guide](https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md))
+
+- **/rtp**: teleport to the default region for your current world.
+- **/rtp [parameter]:[value]**: specify `region:`, `world:`, `player:`, or temporary overrides.
+- **/rtp reload**: reload all configuration from disk.
+- **/rtp scan start|pause|resume|reset|cancel**: pre-warm spatial memory by walking a region (renamed from `/rtp fill` in 2.x). Demo: [youtu.be/Ftjy1zw_S04](https://youtu.be/Ftjy1zw_S04).
+- **/rtp menu**: interactive admin menu; book on Paper / Folia, chat-paginated fallback elsewhere. Hardened in `3.0.0-beta.3`.
+
+**PlaceholderAPI**
+
+- **%rtp_player_status%**: idle, waiting, teleporting, ...
+- **%rtp_total_queue_length%**, **%rtp_public_queue_length%**, **%rtp_personal_queue_length%**
+- **%rtp_teleport_world%**, **%rtp_teleport_x%**, **%rtp_teleport_y%**, **%rtp_teleport_z%**
+
+**Soft dependencies (all optional):** Vault (for the optional economy charge), PlaceholderAPI, ProtocolLib. *PaperLib is no longer required.*
+
+</details>
+
+<details>
+<summary><b>FAQ</b></summary>
+
+**Q: How do I stop `/rtp` from lagging my server, and why is LeafRTP faster?**
+A: Destinations are pre-verified and chunk-loaded into a queue before you type the command, so `/rtp` serves instantly without loading chunks on the main thread. Persistent spatial memory skips known-bad ground, and an off-tick Anvil pre-filter rejects unsafe spots before any chunk loads.
+
+**Q: Is it hard to set up, and does it have economy, a menu, and effects?**
+A: No, and yes. It works zero-config out of the box; regions, safety, and effects are optional to tune later. The clickable menu, Vault economy, effects engine, heatmaps, and twelve claim integrations all ship in the free build.
+
+**Q: Why is it called "LeafRTP" now instead of just "RTP"?**
+A: "RTP" is the generic term for random teleport, so the old name was nearly impossible to find. It collided with every other random-teleport plugin, command, and forum thread in search and marketplace indexes. "LeafRTP" is a distinct, indexable name that points unambiguously at this plugin while keeping the `/rtp` command, `rtp-api`, config paths, and data files exactly as they were. Nothing changes for existing installs, only the public name.
+
+**Q: Does it work with Iris / Terra / custom datapack generators?**
+A: Yes. Region files are read directly, so modded and namespaced biome and block IDs are preserved, no configuration needed. `/rtp biome:<x>` stays correct even on pregenerated or version-migrated worlds, since biome data comes from the `.mca` files rather than a seed lookup.
+
+**Q: Do you support triangle / diamond region shapes?**
+A: Use the `Polygon` shape. A triangle is a 3-vertex polygon and a diamond is a rotated square, so both are already expressible without a separate shape type.
+
+**Q: Do I need Chunky or another pre-generator?**
+A: No. `/rtp scan` is a built-in, off-tick generator that walks a region and builds persistent spatial memory. Rather than loading every chunk up front, LeafRTP pre-verifies and remembers which sectors are unsafe so it avoids loading bad ground at all. Run Chunky alongside it if you still want a fully pre-generated map.
+
+**Q: I'm on NeoForge.**
+A: NeoForge is a first-class supported platform on Minecraft 1.21.x / 26.1.x. Just drop the mod in.
+
+**Q: I'm on Forge.**
+A: Run **Arclight** or **Mohist** (officially supported) and use this jar. A native Forge adapter is not planned.
+
+**Q: Memory and MSPT: should I worry?**
+A: LeafRTP trades a bounded amount of RAM (the queue, bounded by `cacheCap`) for speed. TPS should not drop below ~19 from LeafRTP alone on a healthy server; MSPT spikes during new-area generation are expected. That's the cost of generating chunks, not RTP.
+
+**Q: How do I report a bug?**
+A: GitHub issue with server version, LeafRTP version, platform, relevant config files, and the error log section. See the [admin guide](https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md) for the full reproduction template.
+
+</details>
+
+<details>
+<summary><b>Community Support Policy (read before filing an issue)</b></summary>
+
+Support for the free build is **community-tier and best-effort**. I ship fixes when properly-reported issues land. Respecting this is how the plugin stays fast and current.
+
+- **Support covers bugs and configuration questions,** after you've read the admin guide.
+- **Bug reports need a reproduction:** server version, LeafRTP version, platform (Spigot / Paper / fork), `config.yml`, `regions/`, `safety.yml`, and the relevant `server.log` section. Reports without these are asked for them once, then closed.
+- **"It doesn't work" is not a bug report.** Tell me what you did, what you expected, and what actually happened.
+- **Unsupported on the free tier:** native Forge (use Arclight / Mohist), plugin conflicts I can't reproduce, general MC-server admin questions.
+- **Response time:** no SLA on the free build. Critical safety issues jump the queue regardless.
+- **Feature requests** via GitHub issues. Priority follows the published roadmap, not ticket volume.
+
+</details>
+
+<details>
+<summary><b>Lite build boundaries & known issues</b></summary>
+
+- `safety.yml` accepts flat material names (`LAVA`, `MAGMA_BLOCK`, `CACTUS`, `FIRE`). Block tag / state-predicate grammar (`#minecraft:leaves`, `OAK_SLAB[waterlogged=true]`, wildcards) and SQL/Redis shared-state backends are not part of this build.
+- Edits to `safety.yml` and biome filters do not yet invalidate the persisted shape cache. Workaround: `/rtp scan reset <region>`.
+- Emergency landing platform default is now `platformRadius: -1` (disabled). Set to `0` or higher to restore legacy 2.x behavior.
+
+Live list: [CHANGELOG](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md#known-issues).
+
+</details>
+
+<hr />
+<h2 id="links">Links<a class="headerlink" href="#links" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_SERVER_ADMINS.md"><strong>LeafRTP admin &amp; configuration guide</strong></a>: install, configure, command reference</li>
+<li><a href="https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md"><strong>LeafRTP addon / API developer guide</strong></a>: <code>rtp-api</code> and examples</li>
+<li><a href="https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md"><strong>LeafRTP changelog &amp; roadmap</strong></a></li>
+<li><a href="https://github.com/dailystruggle/RTP"><strong>LeafRTP source on GitHub</strong></a>: star, watch, contribute, file issues</li>
+</ul>
+<hr />
+<p><em>If block tag / state-predicate safety rules or SQL/Redis shared-state backends matter to your setup, a higher-tier build is available separately on BuiltByBit. Same engine, same config, same data files, drop-in compatible.</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

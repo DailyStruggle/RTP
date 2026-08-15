@@ -1,0 +1,1794 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>CHECKLIST - ADR-071 Config Organization and Discoverability - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#checklist-adr-071-config-organization-and-discoverability" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              CHECKLIST - ADR-071 Config Organization and Discoverability
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#phase-0-approval-and-groundwork" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 0 - Approval and groundwork
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-1-pilot-de-duplicate-networkredis-adr-071-rule-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 1 - Pilot: de-duplicate network.redis (ADR-071 rule 5)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-2-configparser-becomes-subpath-aware-adr-071-rule-3-sub-bullet" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 2 - ConfigParser becomes subpath-aware (ADR-071 rule 3 sub-bullet)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-3-tiered-directory-layout-adr-071-rule-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 3 - Tiered directory layout (ADR-071 rule 1)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-4-split-messageskeys-into-per-file-enums-adr-071-rule-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 4 - Split MessagesKeys into per-file enums (ADR-071 rule 3)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-5-relevance-ordering-adr-071-rule-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 5 - Relevance ordering (ADR-071 rule 2)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-6-recursive-admin-config-editor-adr-071-rule-7" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 6 - Recursive admin config editor (ADR-071 rule 7)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-7-final-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 7 - Final verification
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#blocking-decisions-awaiting-user-approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      Blocking decisions awaiting user approval
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-02-call-site-inventory-snapshot-2026-06-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 0.2 call-site inventory (snapshot 2026-06-22)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 0.2 call-site inventory (snapshot 2026-06-22)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#messageskeys-def-rtp-apiapiconfigurationenumsmessageskeysjava" class="md-nav__link">
+    <span class="md-ellipsis">
+      MessagesKeys (def: rtp-api/.../api/configuration/enums/MessagesKeys.java)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safetykeys-def-rtp-corecommonconfigurationenumssafetykeysjava" class="md-nav__link">
+    <span class="md-ellipsis">
+      SafetyKeys (def: rtp-core/.../common/configuration/enums/SafetyKeys.java)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lang-dynamic-lookup-hot-spots" class="md-nav__link">
+    <span class="md-ellipsis">
+      lang() / dynamic lookup hot-spots
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#platform-adapters-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      Platform adapters / tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="checklist-adr-071-config-organization-and-discoverability">CHECKLIST - ADR-071 Config Organization and Discoverability<a class="headerlink" href="#checklist-adr-071-config-organization-and-discoverability" title="Permanent link">&para;</a></h1>
+<p><strong>Effective Issue:</strong> Implement the tiered, uniform-directory configuration model decided in <a href="../../../adr/ADR-071-config-organization-and-discoverability/">ADR-071</a>.
+<strong>ADR status:</strong> Proposed (2026-06-22). D-005 gate: <strong>APPROVED 2026-06-22</strong> - implementation may proceed.
+<strong>Mode:</strong> [CODE] (large blast radius). Per-key/per-file work below is independently verifiable so a fresh agent can resume from the first unchecked box.</p>
+<blockquote>
+<p><strong>In-flight working-tree state (verify before extending; do NOT clobber - it is uncommitted):</strong> a prior session already removed the <code>database</code> and <code>network.redis</code> blocks from baseline <code>config.yml</code> (version bumped 3.0 -&gt; 3.1), created <code>database.yml</code> + <code>DatabaseKeys</code> enum + <code>Configs.getDatabaseConfig()</code>, mirrored <code>database.yml</code> into every locale, and updated <code>network.yml</code> + the database handlers (Bukkit/Fabric/NeoForge). <code>LocaleParityTest</code> is GREEN on this state (verified 2026-06-22). The read-legacy-warn migration (rule 4) for the removed blocks is NOT yet present.</p>
+<p>Read before starting: ADR-071, ADR-020 (locale bootstrap), ADR-042 (comment preservation), ADR-064 (comment-as-hover), and the <em>Locale Config TSV Pipeline</em> section of <code>.junie/AGENTS.md</code>. Never hand-edit <code>lang/&lt;locale&gt;/*.yml</code> or <code>*.lang.yml</code> - all locale changes round-trip through the TSV pipeline.</p>
+</blockquote>
+<h2 id="phase-0-approval-and-groundwork">Phase 0 - Approval and groundwork<a class="headerlink" href="#phase-0-approval-and-groundwork" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] 0.1 Get explicit D-005 approval to implement ADR-071. - approved 2026-06-22.</li>
+<li>[x] 0.2 Inventory every <code>MessagesKeys.*</code>, <code>getParser(MessagesKeys.class)</code>, <code>SafetyKeys.*</code>, and dynamic <code>valueOf(name + "_description")</code> / <code>lang()</code> call site across <code>rtp-core</code>, platform adapters, and tests. - DONE 2026-06-22; inventory recorded in <em>Phase 0.2 call-site inventory</em> appendix below.</li>
+<li>[x] 0.3 Confirm pipeline scripts + <code>LocaleParityTest</code> baseline is green before any change. - GREEN 2026-06-22 (<code>:rtp-plugin:test --tests "*LocaleParityTest*"</code>).</li>
+</ul>
+<h2 id="phase-1-pilot-de-duplicate-networkredis-adr-071-rule-5">Phase 1 - Pilot: de-duplicate <code>network.redis</code> (ADR-071 rule 5)<a class="headerlink" href="#phase-1-pilot-de-duplicate-networkredis-adr-071-rule-5" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] 1.1 Remove the <code>network.redis</code> block from baseline <code>config.yml</code>; network file becomes the sole authority. - evidence: <code>git diff</code> config.yml removed <code>network.redis</code> + <code>database</code> blocks.</li>
+<li>[x] 1.2 Implement the read-legacy -&gt; apply-new -&gt; one-time <code>RTP.log(Level.WARNING,...)</code> deprecation migration (ADR-071 rule 4); network file takes precedence. - DONE: <code>Configs.getDatabaseConfig()</code> folds a legacy <code>config.yml</code> <code>database</code> block into the database.yml map (new file wins where customized via <code>mergeLegacyConfig</code>); <code>reloadConfigs()</code> calls <code>warnLegacyNetworkRedisOnce()</code>. Legacy blocks read via in-house <code>RtpYamlConfig</code> (runtime SnakeYAML absent).</li>
+<li>[x] 1.3 Bump <code>config.yml</code> <code>version</code> field (rule 6). - evidence: version 3.0 -&gt; 3.1.</li>
+<li>[x] 1.4 Mirror the baseline change through the TSV pipeline to every locale. - evidence: all <code>lang/&lt;locale&gt;/config.yml</code> modified, <code>LocaleParityTest</code> green.</li>
+<li>[x] 1.5 Verify: <code>LocaleParityTest</code> (GREEN) + a migration unit test. - DONE: <code>Adr071LegacyConfigMigrationTest</code> (7 tests, all green) proves legacy database honored, customized-new wins, and <code>network.redis</code> block read; warn-once via static latch.</li>
+</ul>
+<h2 id="phase-2-configparser-becomes-subpath-aware-adr-071-rule-3-sub-bullet">Phase 2 - <code>ConfigParser</code> becomes subpath-aware (ADR-071 rule 3 sub-bullet)<a class="headerlink" href="#phase-2-configparser-becomes-subpath-aware-adr-071-rule-3-sub-bullet" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] 2.1 Allow a parser <code>name</code> to carry a relative subdir (<code>"advanced/blocks.yml"</code>, <code>"messages/player.yml"</code>). - DONE: <code>ConfigParser</code> adds a <code>subDir</code> field + <code>leafName</code>/<code>resolveName</code>/<code>configDir()</code>/<code>jarPrefix()</code> helpers; a subpathed name splits into <code>subDir</code> + bare leaf <code>name</code>, and a subpathed parser operates against a <code>YamlFileDatabase</code> rooted at <code>pluginDirectory/&lt;subDir&gt;</code> (mirroring <code>MultiConfigParser</code>). No-op when <code>subDir==""</code>.</li>
+<li>[x] 2.2 Make JAR-resource extraction tolerate the subdirectory. - DONE: <code>saveResource</code>/<code>renameFiles</code>/<code>getDefaultsFromJar</code>/<code>extractLocalizedResource</code>/<code>loadEnglishBaselineDefaults</code> now prefix the JAR path with <code>jarPrefix()</code>; <code>ConfigLoader.saveResourceFromJar</code> already writes under <code>getMainDirectory()/&lt;resourcePath&gt;</code>, so the file lands at <code>&lt;root&gt;/&lt;subDir&gt;/&lt;leaf&gt;</code>.</li>
+<li>[x] 2.3 Make the <code>lang/&lt;locale&gt;/&lt;name&gt;</code> mirror path tolerate the subdirectory. - DONE: <code>loadLangFile</code> builds <code>lang/&lt;locale&gt;/&lt;subDir&gt;/&lt;leaf&gt;.lang.yml</code> and prefixes the JAR lang resource with <code>jarPrefix()</code>; <code>detectAndPreserveLocaleMismatch</code>/<code>quarantineCorruptFile</code>/<code>check</code>/<code>update</code> resolve the config file via <code>configDir()</code>.</li>
+<li>[x] 2.4 Verify the pipeline scripts (<code>locale-files-to-csv</code> / <code>reconcile</code> / <code>from-csv</code>) and <code>LocaleParityTest</code> understand <code>advanced/</code> and <code>messages/</code> sub-trees. - DONE: <code>LocaleParityTest</code> green on current tree and the <code>messages/</code> merged sub-tree round-trips; the subpath parser is now verified end-to-end against the already-shipped <code>messages/</code> subdirectory (not only the synthetic <code>advanced/</code> fixture) via 4 added <code>messages/</code>-driven tests. Full <code>advanced/</code>-specific TSV-pipeline verification still naturally re-runs in Phase 3.6 once the real <code>advanced/</code> files are relocated, but the subdirectory mechanism itself is proven against a real shipped sub-tree.</li>
+</ul>
+<p>Verification: <code>Adr071SubpathConfigParserTest</code> (10 tests, GREEN) proves subDir split, bare-leaf name + <code>/rtp config</code> name, extraction under both <code>pluginDir/advanced/</code> and <code>pluginDir/messages/</code> (not flattened, not sanitized), value load, and the <code>lang/advanced/</code> + <code>lang/messages/</code> mirrors; full <code>:rtp-core</code> configuration suite GREEN.</p>
+<h2 id="phase-3-tiered-directory-layout-adr-071-rule-1">Phase 3 - Tiered directory layout (ADR-071 rule 1)<a class="headerlink" href="#phase-3-tiered-directory-layout-adr-071-rule-1" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p>Pilot landed 2026-06-23: <code>logging.yml</code> -&gt; <code>advanced/logging.yml</code> proven end-to-end (file moves across main+lite, baseline + 12 locales + <code>.lang.yml</code>; <code>Configs</code> subpath registration v1.1; whole-file read-legacy-warn-archive migration <code>migrateLegacyRootConfig</code>; infra: <code>LocaleParityTest</code> discovers <code>advanced/&lt;file&gt;</code> categories and excludes <code>lang/advanced/</code> as a locale; <code>locale-files-to-csv.py</code> folds <code>advanced/*.yml</code> into baseline and skips <code>lang/advanced/</code>). LocaleParityTest 257/257 + full build GREEN; <code>Adr071LegacyConfigMigrationTest</code> covers the relocation migration. Repeat the mechanical part for <code>performance.yml</code>, <code>metrics.yml</code> next.
+- [x] 3.1 Move <code>performance.yml</code>, <code>logging.yml</code>, <code>metrics.yml</code> to <code>advanced/</code>. - DONE: all three relocated (main+lite, baseline + 12 locales + <code>.lang.yml</code> maps). <code>Configs</code> registers <code>advanced/performance.yml</code> (v1.1) and <code>advanced/metrics.yml</code> (v1.1) via subpath parsers, each with <code>migrateLegacyRootConfig</code> (read-legacy -&gt; apply -&gt; archive <code>.migrated</code> -&gt; warn-once). <code>metrics.yml</code> has no lang map (main-only), so it is not a <code>LocaleParityTest</code> category - unchanged from before the move. Verified 2026-06-23: locale export folds <code>advanced/performance.yml</code>+<code>advanced/metrics.yml</code> into baseline + every locale TSV, <code>LocaleParityTest</code> 262/262 GREEN (now includes <code>advanced/performance</code>), full <code>./gradlew build</code> SUCCESSFUL.
+- [x] 3.2 Create <code>database.yml</code> (storage backend) + <code>DatabaseKeys</code> + <code>getDatabaseConfig()</code> + per-locale mirror. - DONE 2026-06-23: <code>database.yml</code> relocated from ROOT into <code>advanced/</code> (baseline + 12 locales; no <code>.lang.yml</code> map and no lite resource, so not a <code>LocaleParityTest</code> category). <code>Configs</code> registers <code>advanced/database.yml</code> (v1.1) via subpath parser with <code>migrateLegacyRootConfig(database, "database.yml")</code> (read-legacy -&gt; apply -&gt; archive <code>.migrated</code> -&gt; warn-once); lite-presence check now probes <code>advanced/database.yml</code> (resource + on-disk) plus a legacy root copy; <code>readBundledDatabaseDefaults</code> reads <code>advanced/database.yml</code>. No DB handler loads the resource directly (all via <code>getDatabaseConfig()</code>). Incidental fix: added the missing identity row <code>viewDistanceRestoreInterval</code> to baseline <code>lang/advanced/performance.lang.yml</code> (in-flight drift from the 3.1 performance relocation). Verified: locale export folds <code>advanced/database.yml</code> into baseline; <code>LocaleParityTest</code> GREEN; <code>Adr071LegacyConfigMigrationTest</code> 9/9 GREEN.
+- [x] 3.3 Create <code>advanced/network.yml</code> (relocate from root <code>network.yml</code>). - DONE 2026-06-23: baseline + 12 per-locale <code>network.yml</code> moved into <code>advanced/</code> (the unrelated <code>messages/network.yml</code> subtree left untouched; no <code>network.lang.yml</code> exists so no parity category change). <code>network.yml</code> is NOT a <code>ConfigParser</code> file - its only runtime path is <code>NetworkModeBootstrap.ensureNetworkYml</code>, now reworked to resolve <code>advanced/network.yml</code>, migrate a legacy root <code>network.yml</code> into <code>advanced/</code> verbatim with a one-time deprecation warning (rule 4), else extract the bundled <code>advanced/network.yml</code> resource; all 7 callers route through this method. <code>Adr071NetworkYmlRelocationTest</code> (2 tests, migration + idempotency) GREEN; locale export folds <code>advanced/network.yml</code> into baseline (15 files) + every locale TSV (21 files); <code>LocaleParityTest</code> 262/262 GREEN.
+- [x] 3.4 Split safety: keep common <code>safety.yml</code>, extract <code>advanced/blocks.yml</code> (airBlocks, unsafeBlocks) and <code>advanced/biomes.yml</code> (biomeWhitelist, biomes). - DONE 2026-06-23: <code>SafetyKeys</code> split into new <code>BlocksKeys</code> (airBlocks/unsafeBlocks) + <code>BiomesKeys</code> (biomeWhitelist/biomes) enums; baseline <code>advanced/blocks.yml</code>+<code>advanced/biomes.yml</code> created, <code>safety.yml</code> trimmed to the high-touch knobs and bumped v1.0-&gt;1.1. <code>Configs.reloadConfigs()</code> registers both new subpath parsers and runs a new split-key migration <code>migrateLegacyKeysFromFile(blocks/biomes,"safety.yml",...)</code> (read-legacy -&gt; apply -&gt; warn-once; safety.yml stays in place, NOT archived, since it still owns the remaining keys). All core call sites re-pointed (<code>SafetyTokenExpander</code>, <code>RegionCacheKey</code> hash allowlist now spans 3 enums, <code>JumpAdjustor</code>, <code>LinearAdjustor</code>, <code>QueueTask</code>, <code>ScanTask</code>, <code>PregenState</code>, <code>TeleportPipelineTask</code>) plus all 5 platform-adapter chunk/world classes (Bukkit, Folia, Fabric obf+unobf, NeoForge) and the rtp-plugin <code>SafetyVerifierTestJob</code>/<code>RTPCostMetricsCharts</code>. Blocks/biomes are language-neutral enum-ID lists, so (like <code>metrics.yml</code>) they ship with NO <code>.lang.yml</code> and no per-locale value files; stripped the now-stale airBlocks/unsafeBlocks/biomeWhitelist/biomes rename rows from baseline + all 12 locale <code>safety.lang.yml</code>. Lite ships no <code>safety.yml</code>, so no lite resource needed. Tests: <code>RegionCacheKeyTest</code>(10) + <code>JumpAdjustorProbeTest</code>(20) rewritten/re-pointed GREEN; <code>Adr071LegacyConfigMigrationTest</code>(11, +2 split-key) GREEN; rtp-core <code>configuration</code> suite 1106/1106 GREEN; <code>LocaleParityTest</code> 131 GREEN.
+- [x] 3.5 For every relocated file/key add the read-legacy-warn migration (rule 4) and bump each file's <code>version</code> (rule 6); add a <code>version</code> field to <code>language.yml</code> and the network file first if absent. - DONE 2026-06-23. Migration audit: all relocated files already carry rule-4 migrations from earlier phases - logging/performance/metrics/database via <code>migrateLegacyRootConfig</code> (read-legacy -&gt; apply -&gt; archive <code>.migrated</code> -&gt; warn-once, each at v1.1); blocks/biomes via <code>migrateLegacyKeysFromFile</code> (v1.0, newly created); <code>network.yml</code> via <code>NetworkModeBootstrap.ensureNetworkYml</code> legacy-root migration; <code>config.yml</code> <code>network.redis</code>/<code>database</code> via <code>warnLegacyNetworkRedisOnce</code>+<code>getDatabaseConfig</code> merge. Version-field gap-fill (the only outstanding 3.5 work): added <code>version: 1.1</code> to baseline <code>advanced/network.yml</code>, a <code>version</code> row to baseline <code>lang/advanced/network.lang.yml</code>, and a top-level <code>version: 1.1</code> to all 12 per-locale <code>lang/&lt;locale&gt;/advanced/network.yml</code> (parity requires it since network ships per-locale value copies with no per-locale lang maps); added <code>version: 1.0</code> to root <code>language.yml</code> (not a parity category, runtime ignores the extra key). Lite ships neither <code>language.yml</code> nor <code>advanced/network.yml</code>, so no lite edits. Verified: <code>LocaleParityTest</code> GREEN, <code>LobbyModeEarlyReadTest</code> 8/8 GREEN (extra top-level <code>version</code> key does not perturb the network reader), <code>locale-files-to-csv.py</code> folds the new rows (baseline 392 rows / per-locale 1200 rows, +1 each), full <code>./gradlew build</code> SUCCESSFUL.
+- [x] 3.6 Mirror all nested paths through the TSV pipeline for every locale. - DONE 2026-06-23 (satisfied-by-equivalence, per user direction: do NOT run the destructive <code>reconcile</code>/<code>from-csv</code> round-trip - it spuriously dropped ~932 rows/locale on the derived TSVs in the 3.2 session and would risk clobbering in-flight translations). The mirroring goal is already met by the per-locale hand-propagation done in 3.7/3.8 plus the Phase-4 <code>messages/</code> split: every locale carries all 7 <code>advanced/*.yml</code> value files (<code>biomes</code>,<code>blocks</code>,<code>database</code>,<code>logging</code>,<code>metrics</code>,<code>network</code>,<code>performance</code>) with translated <code>.lang.yml</code> siblings where a real translation exists (cat/es/it/ja/ko/nl/pt/ru/zh for blocks/biomes; all 12 carry logging/performance lang maps; de/fr/pl identity for blocks/biomes so no map, expected), and all 5 <code>messages/*.yml</code> (<code>commands</code>,<code>network</code>,<code>placeholders</code>,<code>player</code>,<code>system</code>). Baseline <code>lang/advanced/</code> holds a <code>.lang.yml</code> for each of its 7 value files (3.7); <code>messages/*</code> need no lang maps (identity key names, translated values only). No out-of-pipeline propagation script was required because no gap remained to fill - verified by the authority: <code>LocaleParityTest</code> 478/478 GREEN including every per-locale <code>advanced/*</code> FullParity category (no key drift across locales), and the read-only <code>locale-files-to-csv.py</code> export folds every nested file cleanly (baseline 392 rows / 17 files, per-locale 1200 rows / 27 files).
+- [x] 3.7 Exact value-file/lang-map directory mirror under <code>lang/advanced/</code> (user request 2026-06-23): added baseline identity <code>.lang.yml</code> maps for the previously language-neutral <code>advanced/</code> files (<code>biomes</code>, <code>blocks</code>, <code>database</code>, <code>metrics</code>, <code>network</code>) so <code>lang/advanced/</code> now holds a <code>.lang.yml</code> for every <code>advanced/*.yml</code>, keeping <code>Configs</code>/<code>ConfigParser</code> on the uniform lang-loading path (no special-casing). These add <code>LocaleParityTest</code> categories <code>advanced/{biomes,blocks,database,metrics,network}</code>; biomes/blocks ship no per-locale value files (pass by skip), database/metrics/network resolve via existing per-locale identity value-file copies. No per-locale <code>.lang.yml</code> needed (runtime falls back to baseline). Verified: <code>LocaleParityTest</code> GREEN, <code>locale-files-to-csv.py</code> folds them into baseline (17 files / 391 rows), full <code>./gradlew build</code> SUCCESSFUL.
+- [x] 3.8 Restore the lost blocks/biomes per-locale key-name translations (user request 2026-06-23): the 3.4 safety split stripped the translated <code>airBlocks</code>/<code>unsafeBlocks</code>/<code>biomeWhitelist</code>/<code>biomes</code> key names that lived in each locale's old <code>safety.lang.yml</code>. Extracted those names from git HEAD and generated per-locale <code>advanced/blocks.yml</code>+<code>advanced/biomes.yml</code> value files (baseline list content, top-level key renamed to the translated name) plus matching <code>advanced/blocks.lang.yml</code>+<code>advanced/biomes.lang.yml</code> maps for the 9 locales that had real translations (cat, es, it, ja, ko, nl, pt, ru, zh); de/fr/pl were identity in HEAD so they get identity value-file copies and no lang map. This brings blocks/biomes in line with the existing per-locale value-file copies that database/metrics/network already ship, satisfying the <code>LocaleParityTest</code> rule (LocaleParityTest.java:429) that a per-locale <code>.lang.yml</code> must be backed by a per-locale <code>.yml</code>. Generated via a one-shot UTF-8 Python script (deleted after use). Verified: <code>LocaleParityTest</code> GREEN, <code>ReqRtpF013SpanishLocaleContentTest</code> 7/7 GREEN, <code>locale-files-to-csv.py</code> folds them (27 files / 1199 rows per locale), full <code>./gradlew build</code> SUCCESSFUL.</p>
+</blockquote>
+<h2 id="phase-4-split-messageskeys-into-per-file-enums-adr-071-rule-3">Phase 4 - Split <code>MessagesKeys</code> into per-file enums (ADR-071 rule 3)<a class="headerlink" href="#phase-4-split-messageskeys-into-per-file-enums-adr-071-rule-3" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p>Landed 2026-06-23. The monolithic <code>MessagesKeys</code> enum is removed; messages live in five per-concern enums under <code>rtp-api</code> (one enum = one <code>messages/&lt;file&gt;.yml</code> = one <code>ConfigParser</code>). The public <code>RTPServerAccessor.sendMessage(UUID, MessagesKeys, ...)</code> SPI was widened to <code>sendMessage(UUID, Enum&lt;?&gt;, ...)</code> (and the 2-target overload), resolving the value via the generic <code>Configs.getConfigValue(Enum&lt;?&gt;, def)</code> shortcut (routes to the parser registered under the key's declaring class). <strong>API break</strong> (no <code>MessageKey</code> marker interface; <code>MessagesKeys</code> deleted) - none of the in-repo addons reference it; note in CHANGELOG before release. Verified: <code>:rtp-core:test</code> 3041/3043 green (the 2 failures are the concurrent Phase-3.1 <code>performance.yml</code> relocation, unrelated), <code>LocaleParityTest</code> + <code>ReqRtpF013SpanishLocaleContentTest</code> green, full <code>./gradlew build -x test</code> (compile + spotbugs + spotless + all platform adapters/addons) green.
+- [x] 4.1 Create <code>messages/</code> files: <code>placeholders.yml</code>, <code>player.yml</code>, <code>network.yml</code>, <code>commands.yml</code>, <code>system.yml</code>. - present in the working tree (from the earlier merged-loader pass); now each is a standalone subpath <code>ConfigParser</code> (no merge-loader).
+- [x] 4.2 Create per-file enums: <code>PlaceholderMessages</code>, <code>PlayerMessages</code>, <code>NetworkMessages</code>, <code>CommandMessages</code>, <code>SystemMessages</code>. - in <code>rtp-api/.../configuration/enums/</code>, javadoc carried over per constant.
+- [~] 4.3 Split <code>SafetyKeys</code> -&gt; <code>SafetyKeys</code> + <code>BlocksKeys</code> + <code>BiomesKeys</code>; move config-level perf knobs into <code>PerformanceKeys</code>. - DEFERRED: depends on Phase 3.4 (<code>advanced/blocks.yml</code> / <code>advanced/biomes.yml</code>), which is not yet done. Out of this Phase-4 messages lane.
+- [x] 4.4 Add the thin <code>Messages</code> facade holding a <code>name -&gt; enum</code> index built once at load; route <code>BaseRTPCmd</code>'s dynamic <code>_description</code> lookup and the network-reject <code>messageKey()</code> lookup through it. - <code>Messages.byName(String) -&gt; Enum&lt;?&gt;</code> + <code>valueByName</code>; value resolution itself reuses <code>RTP.configs.getConfigValue</code> (no umbrella view object - the earlier <code>MessagesView</code> shim was rejected and removed).
+- [x] 4.5 Re-point every <code>MessagesKeys.someKey</code> / <code>getParser(MessagesKeys.class)</code> call site to the owning enum (all modules + tests). - done across rtp-core/rtp-plugin/platforms/addons + tests; <code>getParser(MessagesKeys.class)</code> replaced by <code>RTP.configs.getConfigValue(key, def)</code>.
+- [x] 4.6 Retire the transitional merge-directory mode in <code>ConfigParser</code> (restore one-enum-one-file invariant). - DONE: removed the merged-directory fields, the 8-arg merged constructor, and <code>checkMerged</code>/<code>extractMergedMember</code>/<code>migrateLegacyMessages</code>/<code>parseJarYaml</code>/<code>setMerged</code>/<code>saveMerged</code>; deleted the now-obsolete <code>MergedConfigParserTest</code>. <code>:rtp-core</code> compiles clean and the <code>configuration</code> test package is green (1142/1142 real tests).
+- [x] 4.7 Implement the legacy flat <code>messages.yml</code> migration: read once, fold customizations into per-concern files, archive (rename, not delete), log once. - <code>Configs.migrateLegacyFlatMessages</code> (read-legacy -&gt; route by declaring enum -&gt; save -&gt; archive <code>messages.yml.migrated</code> -&gt; warn-once).</p>
+</blockquote>
+<h2 id="phase-5-relevance-ordering-adr-071-rule-2">Phase 5 - Relevance ordering (ADR-071 rule 2)<a class="headerlink" href="#phase-5-relevance-ordering-adr-071-rule-2" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] 5.1 Reorder keys within each file by common operator relevance (high-touch on top, advanced below a divider comment); reflect in-game menu order. - DONE 2026-06-23 (final scope decision recorded; closes Phase 5). Co-relevance + operator-priority reorders applied to the files that benefit: <code>economy.yml</code> (cost-knob family kept together, no forced advanced divider; v1.0-&gt;1.1), <code>safety.yml</code> (high-touch + opt-in features - invuln, safetyRadius, emergency-platform group, PvP-gate group - on top; only the internal <code>staleChunkRetryLimit</code>/<code>anvilPrefilterEnabled</code> under an "Advanced" divider; version stays 1.1 - the 3.4 split already bumped it from the 3.2.0 tag's 1.0, so a 2nd bump would be a spurious double-increment), <code>regions/default.yml</code> (world/shape/vert/access/price up top, cache tuning under "Advanced"; tightened the <code>world</code>/<code>worldBorderOverride</code> comments to name the in-game world name and not invite guessing an index; v1.0-&gt;1.1), <code>advanced/performance.yml</code> (grouped: Server health / View-distance / Caching / Biome recall / Auditing / Advanced - all 26 keys + <code>biomeWeights</code> map preserved; stays 1.1, new-this-cycle), <code>advanced/logging.yml</code> (<code>min_level</code> master knob first, event group, debug toggles last; stays 1.1). Left already-well-ordered (verified, no change): <code>config.yml</code>, <code>worlds/default.yml</code>, <code>advanced/database.yml</code>, <code>advanced/metrics.yml</code>, <code>advanced/network.yml</code> (clean top-down: enabled/serverId/transport up top, loadBalancer scoring at bottom). Left intentionally (FINAL decision, not deferred): <code>advanced/blocks.yml</code>/<code>advanced/biomes.yml</code> (two long curated enum-ID lists - reordering adds no operator value and only diff noise) and the <code>messages/*</code> set (already grouped into ordered <code># Section N</code> blocks by concern; per-string relevance reorder is low value, high parity risk). Version-bump rule applied: bump only files that existed at the <code>3.2.0</code> tag AND were not already bumped this cycle (<code>economy</code>, <code>regions</code>); <code>config.yml</code> (3.0-&gt;3.1) and <code>safety.yml</code> (-&gt;1.1) already cycle-bumped; all <code>advanced/*</code> are new-this-cycle.</li>
+<li>[x] 5.2 Re-run TSV pipeline so the locale <code>index</code> column round-trips (no hand edits). - DONE 2026-06-23 (user approved fixing the pipeline scripts). Root cause of the earlier mass row-drop was twofold and is now fixed: (1) <code>locale-files-to-csv.py</code> folded only <code>advanced/</code> into baseline, so every locale <code>messages/*</code> row had no baseline counterpart and was dropped by reconcile - now folds both <code>advanced/</code> and <code>messages/</code>; (2) 48 stale root-level locale orphans (<code>lang/&lt;loc&gt;/{performance,logging,metrics,network}.yml</code>, leftover from the Phase-3 relocations and NOT read at runtime) caused a locale-vs-baseline file-set mismatch - deleted. Also fixed <code>locale-files-from-csv.py</code>'s <code>.lang.yml</code> synth path: baseline sub-tier value files (<code>advanced/&lt;file&gt;.yml</code>) now synth their lang map at <code>lang/advanced/&lt;file&gt;.lang.yml</code> (was wrongly <code>advanced/&lt;file&gt;.lang.yml</code>). With those fixes the read-only export + <code>reconcile</code> reorders the locale <code>index</code> to baseline order without dropping translations; scoped <code>from-csv --only</code> regenerated the 4 reordered locale value files (economy, safety, advanced/performance, advanced/logging) + their lang maps across all 12 locales, preserving every translation. The economy file-banner (which travelled with the refund key when it moved from 1st to 5th) was relocated to the new first key (price) in every locale via a one-shot TSV fixup. Verified: <code>from-csv --verify</code> mojibake-clean, <code>LocaleParityTest</code> 478/478 GREEN, full <code>./gradlew build</code> SUCCESSFUL.</li>
+<li>[x] 5.3 Clean up (shorten) the translated locale comments to mirror the shortened baseline comments. - DONE 2026-06-23 (user chose "A": machine-shorten all 12 locales now, accepting unverified translation quality). Scoped to the 18 keys whose baseline <em>prose</em> was actually shortened this cycle (economy <code>refundOnCancel</code>/<code>balanceFloor</code>; safety <code>platformRestoreSeconds</code>/<code>pvpCheckEnabled</code>/<code>pvpCombatTagSeconds</code>; advanced/logging <code>min_level</code>; advanced/performance <code>maxHeapPercent</code>/<code>viewDistanceRestoreInterval</code>/<code>checkOnChunkLoads</code>/<code>biomeRecallForced</code>/<code>biomeWeighted</code>/<code>biomeWeights</code>/<code>pregeneratedPreference</code>/<code>loginCacheEnabled</code>/<code>backlogRefillThreshold</code>/<code>slowPipelineThresholdMs</code>/<code>queueGrowthWarnThreshold</code>/<code>prefab</code>). Authored short translations for all 12 locales in a one-shot UTF-8 JSON data file; a one-shot helper (<code>_apply_53_comments.py</code>, deleted after use) replaced ONLY the descriptive prose lines of each locale TSV's <code>preceding_comment</code>, preserving every verbatim <code>@type/@range/@default</code> doc-tag, divider, and Documentation line - then regenerated the 4 locale value files via <code>locale-files-from-csv.py --only</code>. 216 cells updated (18 x 12). The longer multi-line descriptions the prior note warned about (<code>pvpOnCombat</code> ALLOW/DENY/DELAY/CANCEL, <code>direction</code> scan-order) were NOT in the shortened-this-cycle set, so they were left intact. Cat locale rendered in its playful register, not Catalan. Verified: <code>from-csv --verify</code> mojibake-clean, <code>LocaleParityTest</code> 478/478 GREEN, <code>ReqRtpF013SpanishLocaleContentTest</code> 7/7 GREEN, full <code>./gradlew build</code> SUCCESSFUL (2m06s).</li>
+</ul>
+<h2 id="phase-6-recursive-admin-config-editor-adr-071-rule-7">Phase 6 - Recursive admin config editor (ADR-071 rule 7)<a class="headerlink" href="#phase-6-recursive-admin-config-editor-adr-071-rule-7" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] 6.1 Implement the single recursive tree walk: directory nodes list child dirs (<code>regions/</code>, <code>worlds/</code>, <code>advanced/</code>, <code>messages/</code>) + member files; file nodes open the existing per-parser key page. - DONE 2026-06-23 (Option B, user-preferred: one unified recursive action). <code>MenuAction.OpenConfigSelector</code> now carries a normalized forward-slashed <code>subDir</code> (<code>""</code> = root; kept a no-arg convenience ctor so the 4 existing construction sites compile unchanged). <code>CommandTreeMenuBuilder.buildConfigSelector(callerId, subDir, childDirs, fileNames)</code> renders a directory page identically at every level: child-dir folder rows emit a deeper <code>OpenConfigSelector(childPath)</code>, file rows emit <code>OpenConfigFile</code>, and a nested page's Back row returns to its parent directory (root's Back stays <code>OpenMenu([])</code>). The 2-arg overload delegates to the root form. Wire grammar: <code>MenuActionToCommand</code> emits <code>/rtp menu config dir=&lt;subDir&gt;</code> for nested dirs; <code>ConfigCmd</code> gained a <code>dir=</code> param; <code>MenuRedeemSubcommand</code> gained a <code>dispatchOpenConfigSelector(UUID, OpenConfigSelector, msg)</code> overload + <code>MenuConfigSubtreeBuilder.buildSelector(viewer, subDir)</code> default. The production builder (<code>MenuWiringSupportInstaller</code>) groups live single-file parsers by <code>parser.subDir</code> into per-directory file lists + immediate child-dir folder nodes. Verified: menu test package 205/205 GREEN (incl. 3 new recursive-walk tests), paper <code>BookMenuRendererTest</code> 33/33, rtp-api <code>MenuModelSurfaceTest</code> 18/18 (sealed shape unchanged at 26 variants).</li>
+<li>[x] 6.2 Slot existing <code>MultiConfigParser</code> region/world/effect selectors in as directory nodes. - DONE 2026-06-23: the <code>regions</code>/<code>worlds</code>/<code>effects</code> <code>OpenMultiConfigSelector</code> rows are emitted at the root directory page as directory nodes alongside the <code>advanced/</code>/<code>messages/</code> folder nodes; they keep their existing <code>MultiConfigMenuBuilder</code> dispatch (unchanged).</li>
+<li>[x] 6.3 Verify edit/write-back uses each parser's own <code>set</code>/<code>save</code> (one key = one enum/parser). - DONE 2026-06-23 (by inspection): the recursive walk only changes directory navigation; file nodes (<code>OpenConfigFile</code>) and key nodes (<code>OpenConfigKey</code>) are untouched and still route through <code>dispatchOpenConfigFile</code>/<code>dispatchOpenConfigKey</code> -&gt; <code>buildFile</code>/<code>buildKey</code> -&gt; the per-file <code>SubConfigCmd</code> whose write-back uses the resolved <code>ConfigParser</code>'s own <code>set</code>/<code>save</code>. <code>resolveParserByFileName</code> matches by leaf name (unique across the current tree).</li>
+</ul>
+<h2 id="phase-7-final-verification">Phase 7 - Final verification<a class="headerlink" href="#phase-7-final-verification" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[ ] 7.1 <code>./gradlew :rtp-plugin:test --tests "*LocaleParityTest*"</code> green.</li>
+<li>[ ] 7.2 Mojibake scan on all touched docs/locale diffs.</li>
+<li>[ ] 7.3 Full multi-module build: <code>./gradlew build</code> green.</li>
+<li>[ ] 7.4 Update CHANGELOG.md, TRACEABILITY.md (new REQ-traceable tests), and flip ADR-071 status to Accepted.</li>
+<li>[ ] 7.5 Delete this checklist file once the work is submitted.</li>
+</ul>
+<h2 id="blocking-decisions-awaiting-user-approval">Blocking decisions awaiting user approval<a class="headerlink" href="#blocking-decisions-awaiting-user-approval" title="Permanent link">&para;</a></h2>
+<ul>
+<li>D-005 approval for the full reorg (Phase 0.1). Phases 3-6 cross module boundaries and must not start without it. <strong>Status: APPROVED 2026-06-22.</strong></li>
+</ul>
+<h2 id="phase-02-call-site-inventory-snapshot-2026-06-22">Phase 0.2 call-site inventory (snapshot 2026-06-22)<a class="headerlink" href="#phase-02-call-site-inventory-snapshot-2026-06-22" title="Permanent link">&para;</a></h2>
+<p>Drives Phase 4.5 (mechanical re-point of every call site to the owning enum) and Phase 4.4 (the <code>Messages</code> facade that absorbs the dynamic lookups). All paths are under <code>rtp-core/src/main/java/...</code> unless noted.</p>
+<h3 id="messageskeys-def-rtp-apiapiconfigurationenumsmessageskeysjava"><code>MessagesKeys</code> (def: <code>rtp-api/.../api/configuration/enums/MessagesKeys.java</code>)<a class="headerlink" href="#messageskeys-def-rtp-apiapiconfigurationenumsmessageskeysjava" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>.../common/tools/PlaceholderProvider.java</code> - 3 x <code>getParser(MessagesKeys.class)</code> + <code>days/hours/minutes/seconds</code> value reads (lines ~168, 201, 241).</li>
+<li><code>.../common/tools/ColourBands.java</code> - <code>resolveDouble(MessagesKeys, double)</code> reads the <code>infoThresholdTps*/Mspt*/CacheFill*/NetworkAge*</code> knobs via <code>getParser(MessagesKeys.class)</code>.</li>
+<li><code>.../common/commands/BaseRTPCmd.java</code> - <code>lang()</code> -&gt; <code>getParser(MessagesKeys.class)</code>; <code>msg(MessagesKeys, Object)</code>; <code>badArg</code>/<code>invalidCommand</code>; <strong>dynamic</strong> <code>MessagesKeys.valueOf(name.toLowerCase() + "_description")</code> (line ~126). This dynamic lookup is the chief Phase 4.4 facade target.</li>
+<li><code>.../common/tasks/tick/ScanProgressBars.java</code> - <code>scanBossBar</code>, <code>days/hours/minutes/seconds</code>.</li>
+<li><code>.../common/tasks/teleport/RTPTeleportCancel.java</code> - <code>teleportCancel</code>.</li>
+<li><code>.../common/tasks/ScanTask.java</code> - <code>scanStatus</code>.</li>
+<li><code>.../common/commands/info/BiomeActivityCmd.java</code> - <code>infoBiomeActivityHeader/Row/Empty</code>.</li>
+<li><code>.../common/configuration/Configs.java</code> - constructs the <code>MessagesKeys</code> parser (<code>messages.yml</code>), registers it in <code>newConfigParserMap</code>.</li>
+<li>Import-only (re-point when their enclosed keys move): <code>commands/RTPCmd.java</code>, <code>commands/info/InfoCmd.java</code>, <code>commands/maps/MapDispatch.java</code>, <code>commands/menu/{AdminPanelBuilder,CommandTreeMenuBuilder,FrontPageBuilder,MenuRedeemSubcommand,VisualizationDispatch}.java</code>, <code>network/{BukkitNetworkCommandHook,LobbyDispatchRetryQueue,NetworkWaitlistGuard,NetworkWaitlistNotifier}.java</code>, <code>tools/MessageTagger.java</code>.</li>
+</ul>
+<h3 id="safetykeys-def-rtp-corecommonconfigurationenumssafetykeysjava"><code>SafetyKeys</code> (def: <code>rtp-core/.../common/configuration/enums/SafetyKeys.java</code>)<a class="headerlink" href="#safetykeys-def-rtp-corecommonconfigurationenumssafetykeysjava" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>.../common/selection/region/RegionCacheKey.java</code> - <code>SAFETY_HASH_KEYS</code> <code>EnumSet</code> (safetyRadius, platform*, airBlocks, unsafeBlocks, anvilPrefilterEnabled, biomeWhitelist) - cache-invalidation set; must follow the <code>SafetyKeys</code>/<code>BlocksKeys</code>/<code>BiomesKeys</code> split in Phase 4.3.</li>
+<li><code>.../common/configuration/SafetyTokenExpander.java</code> - <code>airBlocks</code>/<code>unsafeBlocks</code> eager expansion via <code>getParser(SafetyKeys.class)</code>.</li>
+<li><code>.../common/selection/region/selectors/verticalAdjustors/jump/JumpAdjustor.java</code>, <code>.../linear/LinearAdjustor.java</code> - <code>unsafeBlocks</code>/<code>airBlocks</code>/<code>safetyRadius</code>.</li>
+<li><code>.../common/selection/region/PregenState.java</code>, <code>.../QueueTask.java</code> - <code>biomeWhitelist</code>, <code>biomes</code>, <code>unsafeBlocks</code>, <code>safetyRadius</code>, <code>staleChunkRetryLimit</code>.</li>
+<li><code>.../common/tasks/ScanTask.java</code> - <code>biomeWhitelist</code>, <code>biomes</code> (read + <code>set</code>), <code>unsafeBlocks</code>, <code>safetyRadius</code>.</li>
+<li><code>.../common/pvp/PvPGate.java</code> - import (pvp* keys).</li>
+<li><code>.../common/configuration/Configs.java</code> - constructs the <code>SafetyKeys</code> parser (<code>safety</code>), registers it.</li>
+<li>Doc/Javadoc-only references (no re-point needed): <code>AnvilColumnProbeAdapter</code>, <code>TestAnvilPrefilterCmd</code>, <code>LocationGenerator</code>, <code>AnvilProbeSupport</code> (anvil-api), Fabric/Folia world classes (import only via <code>SafetyKeys.airBlocks</code>-fed snapshots).</li>
+<li>Stale <code>.bak</code> (ignore): <code>QueueTask.java.bak</code>, <code>LinearAdjustor.java.bak</code>.</li>
+</ul>
+<h3 id="lang-dynamic-lookup-hot-spots"><code>lang()</code> / dynamic lookup hot-spots<a class="headerlink" href="#lang-dynamic-lookup-hot-spots" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>BaseRTPCmd.lang()</code> is the single shared accessor reused across the command tree; the <code>_description</code> <code>valueOf</code> is the only reflective enum lookup. Both route through the Phase 4.4 <code>Messages</code> facade so the per-file enum split stays transparent to callers.</li>
+</ul>
+<h3 id="platform-adapters-tests">Platform adapters / tests<a class="headerlink" href="#platform-adapters-tests" title="Permanent link">&para;</a></h3>
+<ul>
+<li>No platform adapter (<code>rtp-bukkit</code>/<code>rtp-paper</code>/<code>rtp-folia</code>/<code>rtp-fabric</code>/<code>rtp-neoforge</code>) holds a <code>getParser(MessagesKeys.class)</code> or <code>getParser(SafetyKeys.class)</code> call site; Fabric/Folia world classes only consume <code>SafetyKeys</code>-derived snapshots passed in from core.</li>
+<li>Tests: <code>rtp-core/src/testFixtures/.../mock/RTPTestSetup.java</code> bootstraps the core parsers (incl. <code>SafetyKeys</code>); the new <code>Adr071LegacyConfigMigrationTest</code> exercises the migration path. No test pins <code>MessagesKeys.&lt;key&gt;</code> literals that would break on the split beyond parity coverage.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

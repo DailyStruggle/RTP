@@ -1,0 +1,1896 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-016 — Anvil Read-Only Subsystem (Prefilter, Backed Chunk View, Shared Module) - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-016-anvil-read-only-subsystem-prefilter-backed-chunk-view-shared-module" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-016 — Anvil Read-Only Subsystem (Prefilter, Backed Chunk View, Shared Module)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-applicability-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Applicability gate
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Applicability gate">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-call-site-ordering-on-paper-chunk-system-v2-and-folia" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.1 Call-site ordering on Paper chunk-system-v2 and Folia
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-format-detection-with-fallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Format detection with fallback
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-verdict-enum-advisory-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Verdict enum (advisory only)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-data-source-routing-in-platform-adapters" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Data-source routing in platform adapters
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-authoritative-re-check-preserved" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Authoritative re-check preserved
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-source-union-rtpchunk" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Source-union RTPChunk
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-palette-identifier-reconciliation" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Palette identifier reconciliation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-shared-module-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Shared module layout
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-thread-placement" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. Thread placement
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-req-rtp-s-004-attribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. REQ-RTP-S-004 attribution
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#11-chunk-data-precedence-over-live-world-getters" class="md-nav__link">
+    <span class="md-ellipsis">
+      11. Chunk-data precedence over live world getters
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Chunk-data precedence over live world getters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#111-vanilla-generator-exemption" class="md-nav__link">
+    <span class="md-ellipsis">
+      11.1 Vanilla-generator exemption
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#112-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      11.2 Enforcement
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-biome-filter-evaluation-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      12. Biome-filter evaluation model
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-observational-cache-fill-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      13. Observational cache-fill mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-telemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      14. Telemetry
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-016-anvil-read-only-subsystem-prefilter-backed-chunk-view-shared-module">ADR-016 — Anvil Read-Only Subsystem (Prefilter, Backed Chunk View, Shared Module)<a class="headerlink" href="#adr-016-anvil-read-only-subsystem-prefilter-backed-chunk-view-shared-module" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>RTP's selection pipeline samples blocks, biomes, heightmaps, and sky-light for candidate chunks. On vanilla Spigot, only <code>Consumer</code>-based async chunk APIs exist and they dispatch the load back onto the tick thread; Paper/Folia expose <code>World#getChunkAtAsync(int,int)</code> returning a <code>CompletableFuture</code> that resolves off-tick. Even with the async overload, Folia's region-thread affinity forces each live-chunk read onto the owning region scheduler, and every platform pays a full generation pass for candidates that will be rejected.</p>
+<p>For a chunk already persisted on disk, the block / biome / heightmap / sky-light data RTP needs is in the Anvil region file (<code>&lt;world&gt;/region/r.&lt;x&gt;.&lt;z&gt;.mca</code>). Reading it is pure file I/O — no tick or region thread is required. The on-disk palette is also <em>strictly more accurate</em> than the live view: closed enums (<code>org.bukkit.Material</code>, <code>org.bukkit.block.Biome</code>) collapse modded and generator-native identifiers (<code>create:crushing_wheel</code>, <code>iris:volcanic_ash_plains</code>) to their nearest vanilla cousin, while the <code>.mca</code> palette preserves full namespaced identifiers. Persisted palettes also remain consistent with what the client renders after a Minecraft version upgrade shifts Mojang's seed-based biome assignment; live <code>getBiome(...)</code> does not.</p>
+<p>In the nether, <code>WORLD_SURFACE</code> resolves at the lava column for essentially every chunk. Any design that short-circuits <code>REJECT</code> verdicts (e.g. by returning a null chunk) produces a false-negative storm even though the vert adjustor would find a safe Y below the surface. The verdict must be advisory, not a gate.</p>
+<p>Minimum supported Minecraft version is 1.20.1 (REQ-RTP-SYS-002); format adapters target 1.20.1 and later.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>RTP ships a <strong>read-only Anvil subsystem</strong> that serves selection-phase reads from the on-disk region file as an advisory data source. The live <code>chunk.isSafe(...)</code> re-check at teleport-commit time remains the authoritative arbiter. The subsystem lives in a platform-neutral Gradle module, <code>rtp-anvil</code>, consumed by every Bukkit-family adapter (Spigot, Paper, Folia).</p>
+<h3 id="1-applicability-gate">1. Applicability gate<a class="headerlink" href="#1-applicability-gate" title="Permanent link">&para;</a></h3>
+<p>The subsystem runs for a candidate chunk <code>(cx, cz)</code> iff all of:</p>
+<ul>
+<li><code>RTPWorld.isChunkLoaded(cx, cz) == false</code> — loaded chunks may hold unflushed edits that disagree with the region file; skipping them is the only cheap, correct way to avoid read/write desync without coordinating with the chunk I/O thread.</li>
+<li>The region file for <code>(cx, cz)</code> exists on disk. An absent file means the chunk is ungenerated; the candidate falls through to the real-load path, which drives generation through the platform's native scheduler.</li>
+</ul>
+<p>Custom-generator worlds (Iris, Terra, datapacks) are in scope: populated-on-disk ⇒ <code>.mca</code> is authoritative; not populated ⇒ <code>Verdict.UNKNOWN</code> ⇒ live-load fallback. The live re-check (§5) bounds any residual divergence to "extra retries", never "unsafe teleport".</p>
+<h4 id="11-call-site-ordering-on-paper-chunk-system-v2-and-folia">1.1 Call-site ordering on Paper chunk-system-v2 and Folia<a class="headerlink" href="#11-call-site-ordering-on-paper-chunk-system-v2-and-folia" title="Permanent link">&para;</a></h4>
+<p>Paper's chunk-system-v2 (and Folia's region scheduler) resolve <code>World#getChunkAtAsync(cx, cz)</code> by handing back a live — though non-ticking — <code>Chunk</code> reference; Paper's own post-load unloading behaviour then becomes a liveness concern for downstream stages (see ADR-015). As a consequence, any invocation of <code>RTPWorld#getChunkAt(cx, cz)</code> that follows an upstream <code>getChunkAtAsync</code> resolution observes <code>isChunkLoaded(cx, cz) == true</code> at the §1 gate and skips the Anvil probe with <code>reason=chunk-already-loaded</code>. The prefilter therefore delivers its intended benefit — <em>reject the candidate before paying the live-load cost</em> — only when the probe runs <strong>upstream</strong> of <code>getChunkAtAsync</code>, not inside the adapter's <code>getChunkAt</code> path.</p>
+<p><code>LocationGenerator</code> invokes <code>AnvilPrefilter.probeAndPublish(world, cx, cz, ForkJoinPool.commonPool(), PaletteNormalizer::reconcile)</code> as the first chunk-touching stage of each attempt, ahead of any <code>world.getChunkAtAsync(cx, cz)</code> call. The <code>AnvilProbeSupport</code> cache publishes the view before the adapter's <code>getChunkAt</code> is reached; when the publisher returns a non-null view the attempt short-circuits through the source-union <code>RTPChunk</code> (§6) without a live load; when it returns <code>UNKNOWN</code> the attempt proceeds to <code>getChunkAtAsync</code>. The adapter-internal §4 gate remains as a defensive no-op for direct adapter callers that bypass <code>LocationGenerator</code> (e.g. <code>RegionCacheTask</code> observational mode, future API consumers), and is expected to record <code>reason=chunk-already-loaded</code> at <code>FINE</code> on the Paper/Folia common path where <code>LocationGenerator</code> has already resolved the chunk upstream.</p>
+<h3 id="2-format-detection-with-fallback">2. Format detection with fallback<a class="headerlink" href="#2-format-detection-with-fallback" title="Permanent link">&para;</a></h3>
+<p>The reader probes chunk NBT for a <code>DataVersion</code> tag and dispatches to a registered format adapter. <code>DataVersionSupport.isSupported</code> accepts any value in <code>[MIN_SUPPORTED_DATA_VERSION (3454), MAX_SUPPORTED_DATA_VERSION (5000)]</code>, covering 1.20.x, 1.21.x, and 26.x with headroom for forward patch releases. Unsupported DataVersions, I/O errors, corrupted sections, or thread interruption produce <code>Verdict.UNKNOWN</code> with a null view; the candidate falls through, never rejected, never a false positive. Format adapters are additive.</p>
+<h3 id="3-verdict-enum-advisory-only">3. Verdict enum (advisory only)<a class="headerlink" href="#3-verdict-enum-advisory-only" title="Permanent link">&para;</a></h3>
+<p><code>AnvilPrefilter.probeSyncDetailed(...)</code> returns one of:</p>
+<ul>
+<li><code>ACCEPT</code> — read succeeded, heightmap-surface column is safe under the normalized unsafe-block set.</li>
+<li><code>REJECT</code> — read succeeded, heightmap-surface column contains a configured-unsafe block.</li>
+<li><code>UNKNOWN</code> — no decode was possible.</li>
+</ul>
+<p>The verdict is advisory telemetry. Adapters route on <code>view != null</code>, not on verdict: <code>ACCEPT</code> and <code>REJECT</code> both carry the decoded <code>AnvilChunkView</code>; only <code>UNKNOWN</code> carries a null view. <code>AnvilPrefilterMetrics</code> counts <code>ACCEPT</code> / <code>REJECT</code> / <code>UNKNOWN</code> for <code>/rtp test anvil-prefilter</code>; <code>REJECT</code> reads as "surface-unsafe column handed to the vert adjustor", not "candidate dropped". There is no null-key short-circuit on any platform.</p>
+<h3 id="4-data-source-routing-in-platform-adapters">4. Data-source routing in platform adapters<a class="headerlink" href="#4-data-source-routing-in-platform-adapters" title="Permanent link">&para;</a></h3>
+<p>Every Bukkit-family <code>RTPWorld#getChunkAt(cx, cz)</code> implementation:</p>
+<ol>
+<li>If the applicability gate (§1) fails, delegate to the adapter's native async/sync live-load path.</li>
+<li>Otherwise call <code>AnvilPrefilter.probeSyncDetailed(...)</code> (or the async <code>probeDetailed(...)</code> on Folia) on <code>ForkJoinPool.commonPool()</code>, with the platform-supplied <code>PaletteNormalizer::reconcile</code>.</li>
+<li>If the probe returns a non-null view (<code>ACCEPT</code> or <code>REJECT</code>), publish it into the adapter's <code>anvilCache</code> (bounded LRU) and return a completed future with the live-shaped chunk key. The immediately-following <code>getCachedChunk(key)</code> call in <code>LocationGenerator</code> receives a source-union <code>RTPChunk</code>.</li>
+<li>If the probe returns a null view (<code>UNKNOWN</code>), fall through to the adapter's native live-load path.</li>
+</ol>
+<p><code>BukkitRTPWorld#getChunkAt</code> is the canonical implementation. <code>PaperRTPWorld</code> and <code>FoliaRTPWorld</code> inherit this orchestration (Paper extends <code>BukkitRTPWorld</code>; Folia reimplements the same structure atop its native async overload).</p>
+<p>On Paper chunk-system-v2 and Folia, this adapter-internal routing is a defensive fallback; the effective prefilter entry point for the selection pipeline is the call-site-level probe in <code>LocationGenerator</code> specified in §1.1. The adapter path still runs for direct adapter callers (observational cache-fill, addon API consumers) and for Spigot vanilla where no upstream <code>getChunkAtAsync</code> resolution precedes the call.</p>
+<h3 id="5-authoritative-re-check-preserved">5. Authoritative re-check preserved<a class="headerlink" href="#5-authoritative-re-check-preserved" title="Permanent link">&para;</a></h3>
+<p>At teleport-commit time, <code>LocationGenerator</code> force-loads the selected chunk via <code>ChunkSet</code> and the live <code>chunk.isSafe(...)</code> re-check runs against the live world. REQ-RTP-S-001 is satisfied by the live re-check; the Anvil subsystem only ever strengthens the rejection side. An Anvil-backed chunk is <strong>never</strong> handed to the teleport-commit path.</p>
+<h3 id="6-source-union-rtpchunk">6. Source-union <code>RTPChunk</code><a class="headerlink" href="#6-source-union-rtpchunk" title="Permanent link">&para;</a></h3>
+<p>Each Bukkit-family adapter ships an <code>RTPChunk</code> implementation (<code>BukkitRTPChunk</code>, <code>FoliaRTPChunk</code>) that is a source-union over a live <code>org.bukkit.Chunk</code> and/or an <code>AnvilChunkView</code>:</p>
+<ul>
+<li>Anvil-mode answers <code>isAir / isSafe / getSkyLight / getSurfaceHeight</code> from the view across the full decoded Y range (including palette sections below the heightmap surface), so the vert adjustor can locate a safe air pocket below a lava surface without loading the chunk or hopping onto a region thread.</li>
+<li>Queries outside the decoded Y window, or arriving after the live chunk has loaded, fall through to the live <code>Chunk</code>. Cache promotion on live load evicts the Anvil entry — disk is never a source of truth for a loaded chunk.</li>
+<li><code>RTPChunk#isSelfContained()</code> returns <code>true</code> for Anvil-mode instances so the stale-chunk guard (ADR-015) does not mis-attribute Anvil-backed candidates to the <code>nullChunk</code> bucket when <code>world.isChunkLoaded(cx, cz) == false</code>.</li>
+</ul>
+<h3 id="7-palette-identifier-reconciliation">7. Palette identifier reconciliation<a class="headerlink" href="#7-palette-identifier-reconciliation" title="Permanent link">&para;</a></h3>
+<p>Reconciliation is symmetric:</p>
+<ul>
+<li>Palette entries shaped <code>minecraft:lava</code> are resolved via the platform registry (Bukkit <code>Material.matchMaterial(...)</code>, <code>Registry.BIOME</code>) to the canonical enum <code>.name()</code> (<code>LAVA</code>). Unresolved entries (modded identifiers on Mohist, Arclight) fall back to namespace-strip + <code>Locale.ROOT</code> upper-case.</li>
+<li>User-supplied <code>SafetyKeys.unsafeBlocks</code> and biome lists go through the identical normalization once at config load, so <code>LAVA</code>, <code>minecraft:lava</code>, and <code>MINECRAFT:LAVA</code> compare equal.</li>
+</ul>
+<p><code>rtp-anvil</code> ships a platform-neutral <code>DEFAULT_RECONCILER</code> (namespace-strip + upper-case). Platform adapters needing a registry-aware reconciler (<code>PaletteNormalizer</code> in <code>rtp-bukkit-common</code>) supply it as a <code>UnaryOperator&lt;String&gt;</code> on the reconciler-aware overloads of <code>probeDetailed</code> / <code>probeSyncDetailed</code>.</p>
+<h3 id="8-shared-module-layout">8. Shared module layout<a class="headerlink" href="#8-shared-module-layout" title="Permanent link">&para;</a></h3>
+<p>The decode stack lives in <code>rtp-anvil</code> (peer of <code>commands-api</code> and <code>effects-api</code>), package <code>io.github.dailystruggle.rtp.anvil</code>.</p>
+<p><strong>Module invariants</strong> — <code>rtp-anvil</code> shall not import:</p>
+<ul>
+<li>any RTP module (<code>rtp-api</code>, <code>rtp-core</code>, <code>commands-api</code>, <code>effects-api</code>, any platform adapter);</li>
+<li>any platform package (<code>org.bukkit.*</code>, <code>io.papermc.*</code>, <code>net.minecraft.*</code>, <code>net.fabricmc.*</code>).</li>
+</ul>
+<p>Public types exchange only platform-neutral values: <code>byte[]</code>, <code>java.nio.file.Path</code>, <code>java.util.Optional</code>, primitives, and the module's own decode types. Enforced at the bytecode level by <code>AnvilPackageBoundaryArchTest</code>.</p>
+<p>Contents: <code>AnvilReader</code>, <code>AnvilChunkView</code>, <code>AnvilPrefilter</code>, <code>AnvilPrefilterMetrics</code>, <code>BiomeSourceMetrics</code>, <code>PackedPaletteDecoder</code>, <code>PaletteSection</code>, <code>BiomePaletteSection</code>, <code>DataVersionSupport</code>, <code>Verdict</code>, <code>Nbt</code>, <code>UnsupportedAnvilFormatException</code>, <code>AnvilRegionScanner</code> (diagnostic), plus test fixtures (<code>r.X.Z.mca</code>) for 1.20.1 / 1.21.1 / 26.1. <code>PaletteNormalizer</code> and <code>dimensionRegionSubpath(World)</code> stay in <code>rtp-bukkit-common</code> (Bukkit-coupled).</p>
+<h3 id="9-thread-placement">9. Thread placement<a class="headerlink" href="#9-thread-placement" title="Permanent link">&para;</a></h3>
+<p>All region-file I/O runs on <code>ForkJoinPool.commonPool()</code> (or an explicit RTP async executor) and never on the tick or region thread. Each adapter holds a bounded LRU <code>anvilCache</code>; REQ-RTP-S-002 is unaffected — the subsystem allocates no chunk tickets.</p>
+<h3 id="10-req-rtp-s-004-attribution">10. REQ-RTP-S-004 attribution<a class="headerlink" href="#10-req-rtp-s-004-attribution" title="Permanent link">&para;</a></h3>
+<p>The <code>FailTypes.nullChunk</code> bucket (sub-keys <code>reason=asyncLoadNull</code> / <code>reason=neighborNull</code>) in <code>LocationGenerator</code> covers every <code>chunk == null</code> exit in the pregen summary. Since §4 has no null-key short-circuit, the bucket attributes only genuine async-load failures; <code>prefilterReject</code> is not a reachable sub-key. Regression guard: <code>ReqRtpS004NullChunkAttributionTest</code>.</p>
+<h3 id="11-chunk-data-precedence-over-live-world-getters">11. Chunk-data precedence over live world getters<a class="headerlink" href="#11-chunk-data-precedence-over-live-world-getters" title="Permanent link">&para;</a></h3>
+<p>Every Bukkit-family adapter resolves chunk-scoped data — blocks, biomes, heightmaps, light — in strict priority order:</p>
+<ol>
+<li><strong>A currently loaded <code>org.bukkit.Chunk</code></strong> cached in the adapter's live <code>chunkCache</code> (<code>WeakReference&lt;Chunk&gt;</code>).</li>
+<li><strong>An <code>AnvilChunkView</code></strong> decoded from <code>.mca</code> and held in the per-world <code>AnvilProbeSupport</code> cache.</li>
+<li><strong>A live <code>org.bukkit.World</code> getter</strong> — permitted only under the vanilla-generator exemption below.</li>
+</ol>
+<p>The rule applies uniformly to <code>getBiome</code>, block reads, and any future chunk-scoped getter on <code>RTPWorld</code> / <code>RTPChunk</code>. A decoded <code>.mca</code> palette is a strictly more faithful representation of what the player will see than any live-getter answer synthesised from the current seed — the on-disk bytes are what the client receives when it streams the chunk.</p>
+<h4 id="111-vanilla-generator-exemption">11.1 Vanilla-generator exemption<a class="headerlink" href="#111-vanilla-generator-exemption" title="Permanent link">&para;</a></h4>
+<p>Falling back to a live getter is permitted only when <strong>all</strong> of:</p>
+<ol>
+<li>The world's <code>ChunkGenerator</code> is the vanilla Minecraft generator.</li>
+<li>The world's biome source yields no custom / namespaced biomes outside <code>minecraft:*</code>.</li>
+<li>The Anvil source has returned <code>UNKNOWN</code> for the target chunk.</li>
+<li>The target chunk has <strong>not</strong> yet been generated and persisted to disk (<code>RTPWorld#isChunkGenerated(cx,cz)</code> returns <code>false</code>).</li>
+</ol>
+<p><code>RTPWorld#isVanilla()</code> (default <code>false</code>; overridden on Bukkit/Folia as <code>world.getGenerator() == null &amp;&amp; world.getBiomeProvider() == null</code> with <code>Throwable → false</code> safety) and <code>RTPWorld#isChunkGenerated(cx,cz)</code> (default <code>true</code>; overridden on Bukkit/Folia to delegate to the native non-blocking <code>World#isChunkGenerated</code> with <code>Throwable → true</code> safety) supply the runtime signals. When any of 1, 2, or 4 is unknown at runtime, the adapter treats the world / chunk as <strong>non-exempt</strong>. Detection of mods that replace generation via NMS mixins without touching the public Bukkit hooks is out of scope — such worlds are misidentified as vanilla; the post-load re-check still corrects the answer, so the only cost is a wasted chunk load for candidates where the seed-biome passes the filter while the palette biome does not.</p>
+<p>Fabric is out of scope for this ADR; an equivalent contract for <code>rtp-fabric</code> shall be specified in a separate ADR.</p>
+<h4 id="112-enforcement">11.2 Enforcement<a class="headerlink" href="#112-enforcement" title="Permanent link">&para;</a></h4>
+<p>New code introducing a live <code>world.getBiome(...)</code> or equivalent from <code>rtp-bukkit-common</code>, <code>rtp-paper-*</code>, or <code>rtp-folia-*</code> shall be rejected at review unless gated on the §11.1 exemption <strong>and</strong> on an <code>AnvilProbeSupport</code> <code>UNKNOWN</code> outcome. Any ADR that narrows §11 shall explicitly supersede this section. Regression guard: <code>ReqRtpAnvilFirstTest</code> under <code>rtp-paper-v1_20_R1</code> asserts <code>PaperRTPWorld</code> does not re-declare <code>getChunkAt</code> / <code>getBiome</code>.</p>
+<h3 id="12-biome-filter-evaluation-model">12. Biome-filter evaluation model<a class="headerlink" href="#12-biome-filter-evaluation-model" title="Permanent link">&para;</a></h3>
+<p><code>LocationGenerator</code>'s biome filter evaluates the user/config-supplied set <strong>directly</strong> against each candidate's biome with a <code>biomeWhitelist</code> polarity flag — enumeration-free and correct on cold start on every platform. The post-load biome read is the sole biome-validation site; the pre-chunk-load biome pre-check is retained as dead code behind <code>PRE_CHUNK_BIOME_PRECHECK_ENABLED = false</code> so it can be re-enabled for workloads (e.g. bounded biome-targeted search on very large regions) that need the short-circuit. <code>AnvilRegionScanner</code> remains available as an admin-command diagnostic.</p>
+<h3 id="13-observational-cache-fill-mode">13. Observational cache-fill mode<a class="headerlink" href="#13-observational-cache-fill-mode" title="Permanent link">&para;</a></h3>
+<p><code>RegionCacheTask</code> carries an <code>observationalOnly</code> flag. When set:</p>
+<ul>
+<li>Runs only when <code>queueManager.unkeptLocations.size() &gt;= cacheCap</code> (strict inversion of default-mode gate, so default-mode cache fill has priority for queue headroom).</li>
+<li>Selects a candidate via the existing <code>MemoryShape.select()</code> + <code>LocationGenerator.getLocation(...)</code> pipeline.</li>
+<li>On a safe candidate, <strong>discards</strong> the result — not pushed to <code>unkeptLocations</code>, not handed to any teleport pipeline.</li>
+<li>Emits no new sink calls. Existing side effects (<code>MemoryShape#addBadLocation(long)</code> for rejected cells, <code>biomePrefixSumsCache</code> updates for every evaluated candidate) are inherited from <code>LocationGenerator</code> and <code>MemoryShape.select()</code> under default mode.</li>
+</ul>
+<p>Gated by <code>PerformanceKeys.visitorEnabled</code>. Observational mode inherits the §11 precedence chain automatically, so biome observations reflect on-disk palettes whenever disk has an answer on every Bukkit-family platform.</p>
+<h3 id="14-telemetry">14. Telemetry<a class="headerlink" href="#14-telemetry" title="Permanent link">&para;</a></h3>
+<p><code>BiomeSourceMetrics</code> exposes two process-global <code>AtomicLong</code> totals (<code>anvilHits</code>, <code>liveHits</code>) plus a reason-keyed <code>ConcurrentHashMap&lt;String, AtomicLong&gt;</code> with canonical reasons <code>anvil-hit</code>, <code>no-view-cached</code>, <code>view-missing-biome</code>, <code>anvil-throw</code>. <code>BukkitRTPWorld#getBiome</code> and <code>FoliaRTPWorld#getBiome</code> call <code>record(reason)</code> exactly once per read and emit a rate-limited <code>[RTP] Anvil biome fallthrough reason=&lt;reason&gt; world=&lt;w&gt; chunk=(cx,cz)</code> line per <code>BIOME_LOG_BUDGET_PER_REASON = 200</code> (INFO, then FINE). <code>AnvilPrefilter.DIAG_LOG_BUDGET_PER_REASON</code> and the adapter <code>GATE_SKIP_BUDGET_PER_REASON</code> constants share the same budget. Surfaced at runtime by <code>rtp test biome-source</code> and <code>rtp test full</code>.</p>
+<p>The adapter <code>logGateSkip</code> suppresses <code>reason=chunk-already-loaded</code> entirely — the <code>RTP.log(...)</code> call is skipped while the counter in <code>GATE_SKIP_COUNTERS</code> still increments, preserving the metric surface for <code>rtp test/anvil-prefilter</code> and future telemetry consumers. On Paper/Folia this reason is the steady-state outcome for every candidate that reaches the adapter path after <code>LocationGenerator</code>'s call-site probe (§1.1), so surfacing it at any operator-visible level carries no diagnostic signal and drowns the log. All other gate-skip reasons (<code>dimension-unsupported</code>, <code>world-save-disabled</code>, <code>config-disabled(...)</code>) retain the rate-limited INFO→FINE budget and remain operator-actionable.</p>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<p><strong>Positive:</strong></p>
+<ul>
+<li>Selection-phase <code>isAir / isSafe / getSkyLight / getSurfaceHeight</code> and the vert adjustor run off-tick (Spigot/Paper) or off-region (Folia) for candidates whose region file exists and decodes. The nether false-negative storm is closed because surface-unsafe chunks carry a usable view for sub-surface scanning.</li>
+<li>Ungenerated chunks drive generation through the platform's native scheduler; the subsystem is additive.</li>
+<li>Loaded chunks are never read from disk — desync class eliminated by construction (§1 gate).</li>
+<li>Format detection with fall-through means new Minecraft versions never regress teleport correctness; the subsystem abstains until an adapter is written.</li>
+<li><code>rtp-anvil</code> is reusable by any Bukkit-family adapter without code duplication.</li>
+<li>REQ-RTP-S-004 attribution is complete: every <code>chunk == null</code> path increments a descriptive <code>failMap</code> bucket.</li>
+<li>Upgrade-drift correctness (player-visible biome after a Paper/Folia MC upgrade) is preserved by construction via §11.</li>
+<li>Cold-start biome filtering is correct on every platform without a one-shot startup scan (§12).</li>
+</ul>
+<p><strong>Negative / trade-offs:</strong></p>
+<ul>
+<li>Anvil bytes are decoded for candidates that will ultimately be rejected at the live re-check, which is worse than a pure surface-unsafe short-circuit for purely surface-unsafe rejections. Net CPU cost is off-tick and off-region and is paid back by eliminating the sync <code>getChunkAt(...)</code> or region-thread hop.</li>
+<li>Hand-rolled Anvil decoding is maintenance-bearing: palette encoding, heightmap long-packing width, and biome storage layout have changed across Minecraft versions. A stale adapter wrongly claiming to support a newer <code>DataVersion</code> could produce <code>ACCEPT</code> on misread data; mitigated by the post-load authoritative re-check.</li>
+<li>Modded identifiers go through namespace-strip + upper-case fallback; the reconciler does not assume the vanilla namespace.</li>
+<li>Two adapter <code>*RTPChunk</code> source-unions must track any future refinement of the §6 invariants. Mitigated by keeping implementations structurally identical and covering both under the same ArchUnit boundary test.</li>
+<li>Observational mode contributes to <code>pendingBadLocations</code> without an originating teleport request, and claim-plugin predicates run on observational candidates. Escape hatch: <code>visitor.enabled: false</code>.</li>
+</ul>
+<p><strong>Neutral:</strong></p>
+<ul>
+<li><code>AnvilPrefilterMetrics</code> counters retain their prior cardinality; only their operational reading changes (§3).</li>
+<li>The stale-chunk guard (ADR-015) and async queue pre-generation (ADR-006) are unaffected — the subsystem allocates no chunk tickets.</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>REQ-RTP-S-001 (no unsafe-block teleport destinations) — <code>docs/dev/REQUIREMENTS.md §3</code>.</li>
+<li>REQ-RTP-S-002 (no permanently force-loaded chunks) — <code>docs/dev/REQUIREMENTS.md §3</code>.</li>
+<li>REQ-RTP-S-004 (no silently discarded teleport failures) — <code>docs/dev/REQUIREMENTS.md §3</code>.</li>
+<li>REQ-RTP-S-005 (no chunk loading on the main thread) — <code>docs/dev/REQUIREMENTS.md §3</code>.</li>
+<li>REQ-RTP-SYS-002 (Spigot support) — <code>docs/dev/REQUIREMENTS.md §0</code>.</li>
+<li>ADR-004 "Count-Bound Task Pipe on Folia".</li>
+<li>ADR-006 "Async Queue Pre-Generation".</li>
+<li>ADR-015 "Stale-Chunk Guard for Count-Bound Pipes".</li>
+<li>Regression guards: <code>AnvilPrefilterTest</code>, <code>AnvilFixtureParityTest</code>, <code>AnvilChunkViewTest</code>, <code>PaletteNormalizerTest</code>, <code>AnvilPackageBoundaryArchTest</code>, <code>ReqRtpS004NullChunkAttributionTest</code>, <code>ReqRtpAnvilFirstTest</code>, <code>TestBiomeSourceCmdTest</code>, <code>TestFullCmdTest</code>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

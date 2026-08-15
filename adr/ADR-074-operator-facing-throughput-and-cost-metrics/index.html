@@ -1,0 +1,1806 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-074 - Operator-Facing RTP Throughput and Cost Metrics (Paired Rates, EWMA Windows, Color-Coded Readout) - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-074-operator-facing-rtp-throughput-and-cost-metrics-paired-rates-ewma-windows-color-coded-readout" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-074 - Operator-Facing RTP Throughput and Cost Metrics (Paired Rates, EWMA Windows, Color-Coded Readout)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-metric-set-four-axes-plus-derived-indicators" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Metric set (four axes plus derived indicators)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1a-cost-per-valid-location-attribution-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      1a. Cost-per-valid-location attribution model
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-refill-is-always-presented-paired-with-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Refill is always presented paired with usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-rate-representation" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Rate representation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-color-coding" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Color coding
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-surfaces-and-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Surfaces and configuration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-074-operator-facing-rtp-throughput-and-cost-metrics-paired-rates-ewma-windows-color-coded-readout">ADR-074 - Operator-Facing RTP Throughput and Cost Metrics (Paired Rates, EWMA Windows, Color-Coded Readout)<a class="headerlink" href="#adr-074-operator-facing-rtp-throughput-and-cost-metrics-paired-rates-ewma-windows-color-coded-readout" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Proposed
+<strong>Date:</strong> 2026-07-23</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p><a href="../ADR-032-teleport-pipeline-latency-histogram/">ADR-032</a> established the <code>PipelineHistogram</code>: a process-wide, 256-sample, wait-free, never-reset ring of <code>TeleportPipelineTask</code> completion times, exposing a mean readout. <a href="../ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> extended it with on-demand percentiles and a slow-teleport audit, and confirmed the operator surface: a <code>/rtp info performance</code> readout aggregated through <code>Metrics.snapshot()</code> / <code>CoreMetrics</code>, mirrored into <code>PlaceholderProvider</code> and bStats. <a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/">ADR-052</a> covers per-outcome/bad-location attribution.</p>
+<p>These give a developer-grade view of <em>pipeline latency</em>, but they do not answer the questions a server operator actually asks about RTP behavior:</p>
+<ol>
+<li><strong>How long does the whole command take?</strong> <code>avgPipelineMs</code> measures from <code>TeleportPipelineTask</code> construction to cleanup, which (per ADR-053) folds in queue-wait time for at-rate players. It is not the same as the end-to-end wall-clock a player experiences from running <code>/rtp</code> to arriving.</li>
+<li><strong>How expensive is a good destination in this world?</strong> There is no cost-per-accepted-location signal, which is the number that exposes a badly-configured world (ocean, void, heavy claims) as expensive-to-serve.</li>
+<li><strong>Is RTP keeping up?</strong> There is no usage rate, no refill rate, and therefore no way to see whether the cache is draining faster than it refills.</li>
+</ol>
+<p>The architecture charts under <code>docs/architecture/</code> name the individual behaviors (SETUP, LOAD, safety-eval, teleport, cleanup, cache refill). Full per-chart-node profiling was considered (see <em>Alternatives</em>), but the operator-facing need is coarser and more legible: a small fixed set of "behavior time" and "throughput/cost" figures, not a stage-by-stage flame graph.</p>
+<p><strong>Bursty refill is the hard representation problem.</strong> The L3 backlog refill loop (<code>Region.processBacklog</code>, ADR-028) is hysteresis-gated: <code>backlogRefillActive</code> latches off once the backlog reaches <code>backlogRefillThreshold * capacity</code> and back on once it drains below the dead-band. Consequently refill runs in bursts and its rate legitimately falls to zero at steady state. A standalone "refill rate" is therefore ambiguous: <code>0/s</code> can mean "cache full and healthy" or "refill starved and failing." Precedent for making a bursty rate legible converges on one pattern:</p>
+<ul>
+<li><strong>Unix load average</strong> shows the same quantity over three EWMA windows (1/5/15 min); the reader infers trend/burstiness from the divergence between windows.</li>
+<li><strong>Prometheus <code>rate()</code> vs <code>irate()</code></strong> defaults to a windowed average (smooth) and reserves the last-two-sample instantaneous form for zoom; the counter is stored, the rate is derived over an explicit window.</li>
+<li><strong>Token-bucket fill level</strong> surfaces current fill percent rather than instantaneous refill rate, because fill level is stable and directly answers "are we about to run dry?"</li>
+<li><strong>RRDtool / Grafana / interface throughput meters</strong> store a monotonic counter and compute rate = delta / interval at read time.</li>
+</ul>
+<p>The common lesson: never show a lone instantaneous rate for a bursty source; show a smoothed figure with a stated window, pair it against the demand it serves, and add a stable level/state gauge so a zero rate is not misread.</p>
+<p>Constraints carried forward from ADR-032 / ADR-053 / <code>METRICS_PLAN.md</code>:</p>
+<ul>
+<li><strong>S-005 spirit.</strong> Sampling runs on whatever thread completes the work; recording must be allocation-free, lock-free, and contention-free on hot paths.</li>
+<li><strong>Snapshot-not-stream.</strong> Rates and derived indicators are computed on demand at read time; the snapshot stays an immutable carrier.</li>
+<li><strong>Bounded cost.</strong> No per-uptime or per-player growth in state.</li>
+<li><strong>No platform imports in <code>rtp-core/metrics/</code>.</strong> Enforced by the existing ArchUnit guard.</li>
+<li><strong>No new sampling subsystem.</strong> Reuse the <code>MetricsSnapshot</code> / <code>CoreMetrics</code> aggregation and the <code>RTPMetricsExtension</code> carrier.</li>
+</ul>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Add a compact, operator-facing "RTP throughput and cost" readout as an additive extension of the ADR-032/ADR-053 metrics, surfaced through the existing <code>/rtp info performance</code>, <code>PlaceholderProvider</code>, and bStats channels.</p>
+<h3 id="1-metric-set-four-axes-plus-derived-indicators">1. Metric set (four axes plus derived indicators)<a class="headerlink" href="#1-metric-set-four-axes-plus-derived-indicators" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Command latency (end-to-end).</strong> Wall-clock from <code>/rtp</code> to teleport completion, recorded into an ADR-032-style ring. This value already exists per teleport: <code>TeleportPipelineTask.runTeleport</code> computes <code>teleportData.processingTime = System.currentTimeMillis() - teleportData.time</code> and surfaces it to the player via the <code>[processingTime]</code> placeholder in <code>teleportMessage</code>; today it is discarded after the message. The metric simply records that existing value into a ring at the same completion point (ideally next to the <code>pipelineHistogramRecorded</code> single-shot CAS). Note that <code>teleportData.time</code> is stamped at pipeline-task construction, so the captured window matches what the player is shown; a true dispatch-to-arrival window would require stamping the time in the <code>commands-api</code> handler instead. Labeled distinctly from pipeline latency so the queue-wait-inclusive <code>avgPipelineMs</code> is not confused with the player-perceived number.</li>
+<li><strong>Cost per valid location.</strong> Compute cost amortized per <em>valid location</em> - a location classified safe-enough-to-teleport that reaches the user, whether served directly or via the L1 cache. Backed by cumulative counters, computed as a ratio at read time. The attribution model is non-trivial (L3 is batch-shaped, not per-location) and is specified in detail in section 1a.</li>
+<li><strong>Usage rate.</strong> Teleports served per unit time (with a served-from-cache vs generated-on-demand split), as an EWMA over a named window.</li>
+<li><strong>Refill rate.</strong> Locations refilled per unit time, as an EWMA over the <strong>same named window</strong> as usage rate.</li>
+</ol>
+<p>Derived, read-time-only indicators:</p>
+<ul>
+<li><strong>Usage/refill ratio</strong> (acute:chronic style): the headline "keeping up?" number over the shared window. <code>&lt;= 1</code> keeping up, <code>&gt; 1</code> draining.</li>
+<li><strong>Backlog fill percent</strong> and a <strong>refill state label</strong> (<code>full</code> / <code>refilling</code> / <code>draining</code> / <code>starved</code>) read from the backlog level and the <code>backlogRefillActive</code> latch, so a zero refill rate is disambiguated by a stable gauge rather than by the rate alone.</li>
+</ul>
+<h3 id="1a-cost-per-valid-location-attribution-model">1a. Cost-per-valid-location attribution model<a class="headerlink" href="#1a-cost-per-valid-location-attribution-model" title="Permanent link">&para;</a></h3>
+<p>"Valid location" is defined at the <strong>accept boundary</strong>: a coordinate is counted once, at the moment it is confirmed teleport-safe and handed to the player, regardless of which tier produced it. A location promoted L3 -&gt; L2 -&gt; L1 is therefore counted exactly once, avoiding double-counting.</p>
+<p>Two producers of valid locations, both incrementing the same <code>acceptedLocations</code> denominator:</p>
+<ol>
+<li><strong>Search pipeline (common path):</strong> L3 backlog -&gt; L2 unkept -&gt; L1 kept -&gt; final-verification. A location becomes valid when it passes final-verification and is served. This is the first implementation target.</li>
+<li><strong>Direct computation (special case):</strong> the unqueued path. Rare per current bStats observation, but it still produces a valid location, so it must increment <code>acceptedLocations</code> or the cost denominator undercounts. Operators may promote it to the common path, so it is kept as a first-class-but-flagged axis via a separate <code>directComputeCount</code> / <code>directComputeNanos</code> pair, letting the readout show the direct-vs-search split (and confirm the "exceedingly rare" observation at runtime).</li>
+</ol>
+<p>The numerator (cost) is <strong>staged and split by attribution shape</strong>, because not all compute is per-location-attributable:</p>
+<ul>
+<li><strong>L3 is batch/amortized, not per-location.</strong> The L3 stage does not search per coordinate; it multi-selects and performs binned verification one <code>.mca</code> file at a time. The file open/close overhead and every failed selection check are real compute that no single successful location owns. Attributing them to a specific accepted coordinate would be arbitrary. They are therefore accumulated into a separate <code>l3OverheadNanos</code> batch counter (wrapping the whole binned-verification span in each <code>Region.execute()</code> bin pulse - pass and fail alike) and reported as <strong>amortized L3 cost = <code>l3OverheadNanos / acceptedLocations</code></strong>. This naturally spikes for badly-configured worlds where most bins fail, which is the intended operator signal. Like refill, L3 overhead is bursty (one bin per pulse, stops when the backlog is full), so an EWMA-over-window view pairs with the accept rate the same way usage pairs with refill.</li>
+<li><strong>Direct search cost (L2/L1/final-verification) is per-location-attributable</strong> and accumulated into <code>searchNanos</code>, reported as <strong>direct search cost = <code>searchNanos / acceptedLocations</code></strong>.</li>
+<li><strong>Command-pipeline sections fold in later.</strong> The user-side pipeline is minimal; once search cost lands, the SETUP/LOAD/teleport spans attributable per served location are added into a <code>commandNanos</code> counter as a small delta.</li>
+</ul>
+<p>The amortized-L3 and direct-search figures are reported as <strong>two separate cost numbers, never summed into one</strong>: they have different attribution shapes (batch vs per-location) and diagnose different problems (high amortized-L3 = prefilter thrashing bins / config-biome problem; high direct-search = chunk-load/final-verify expense / disk-generation problem). Summing them would misrepresent the batch overhead as per-location and lose that diagnostic split.</p>
+<p>All figures are ratios-of-counters computed at read time (no stored averages), consistent with the ADR-053 percentiles and the usage/refill rates, and S-005-safe.</p>
+<h3 id="2-refill-is-always-presented-paired-with-usage">2. Refill is always presented paired with usage<a class="headerlink" href="#2-refill-is-always-presented-paired-with-usage" title="Permanent link">&para;</a></h3>
+<p>Usage rate and refill rate are a single presentation unit: they are computed over the same window, rendered on the same readout line, and never shown independently. The backlog fill percent / state label travels with the pair. This makes every steady state legible:</p>
+<table>
+<thead>
+<tr>
+<th>usage</th>
+<th>refill</th>
+<th>reading</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>~0</td>
+<td>~0</td>
+<td>idle at cap - healthy</td>
+</tr>
+<tr>
+<td>&gt;0</td>
+<td>~0 (fill high)</td>
+<td>serving a full cache, no refill needed - healthy</td>
+</tr>
+<tr>
+<td>&gt;0</td>
+<td>&gt;0, refill &gt;= usage</td>
+<td>refill burst keeping up - healthy</td>
+</tr>
+<tr>
+<td>&gt;0</td>
+<td>&gt;0, refill &lt; usage (fill low)</td>
+<td>refill cannot keep pace - the one bad state</td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-rate-representation">3. Rate representation<a class="headerlink" href="#3-rate-representation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Rates are EWMAs (single field each, O(1), lock-free), computed from cumulative counters, exposed over a <strong>named, documented window</strong> so the readout is self-explanatory (the recurring mistake being a rate with no stated interval). Optionally a short and a long window are shown side by side (load-average style) to surface burstiness as the divergence.</li>
+<li>The <code>PipelineHistogram</code> distribution machinery from ADR-032/053 is reused for the two latency metrics (command latency, cost-per-location); only the rate/ratio/level fields are new EWMA/counter/gauge additions.</li>
+</ul>
+<h3 id="4-color-coding">4. Color coding<a class="headerlink" href="#4-color-coding" title="Permanent link">&para;</a></h3>
+<p>The readout is color-coded on the lower-is-better / keeping-up axes, reusing the existing <code>messages.yml</code> color-band threshold mechanism already established for the ADR-053 <code>/rtp info</code> health block (and the <code>avgPipelineMsColoured</code> placeholder). Bands: green (healthy), amber (warning), red (unhealthy). The usage/refill ratio and command latency drive the headline band; per-field coloring follows the same threshold configuration so operators can retune without code changes. Color thresholds ship as configurable keys, consistent with REQ-RTP-F-013 (all user-facing messages configurable).</p>
+<h3 id="5-surfaces-and-configuration">5. Surfaces and configuration<a class="headerlink" href="#5-surfaces-and-configuration" title="Permanent link">&para;</a></h3>
+<ul>
+<li>New fields are carried on <code>RTPMetricsExtension</code> and read via <code>snapshot.extension(RTPMetricsExtension.class)</code>, exactly like the existing health signals.</li>
+<li>Rendered through <code>/rtp info performance</code>, new <code>PlaceholderProvider</code> placeholders, and bStats charts.</li>
+<li>New <code>messages.yml</code> keys (labels + color-band thresholds) are added to the English baseline and mirrored into every shipped locale per <em>Locale Parity Maintenance</em> (identity rows acceptable for first-pass), gated by <code>LocaleParityTest</code>.</li>
+</ul>
+<h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why Rejected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Full per-chart-node profiling (one ring per architecture-chart behavior)</td>
+<td>Higher memory/complexity, couples the operator readout to the developer charts, and answers a developer question, not the operator's "is RTP fast and keeping up?" The coarse set is cheaper and more legible. Can still be layered later without conflicting with this ADR.</td>
+</tr>
+<tr>
+<td>Show refill rate as a standalone number</td>
+<td>Ambiguous: hysteresis (<code>backlogRefillActive</code>) makes <code>0/s</code> a legitimate healthy steady state indistinguishable from starvation without the paired usage rate and fill/state gauge.</td>
+</tr>
+<tr>
+<td>Instantaneous (last-two-sample) rate only</td>
+<td>Flickers between hysteresis bursts; unreadable. EWMA over a named window (Prometheus <code>rate()</code> precedent) is the smooth default.</td>
+</tr>
+<tr>
+<td>Reuse <code>avgPipelineMs</code> as "command latency"</td>
+<td>Includes queue-wait for at-rate players (per ADR-053); it is not the player-perceived end-to-end time. A distinct sample point is required.</td>
+</tr>
+<tr>
+<td>No color coding (numbers only)</td>
+<td>Operators triage at a glance; a green/amber/red band on the headline is the fastest legible signal and reuses the ADR-053 threshold mechanism at near-zero cost.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Positive:</strong> Operators get four independent, legible axes - fast (command latency), efficient (cost per valid location), busy (usage rate), sustainable (usage/refill ratio) - plus an at-a-glance color band. Bursty refill becomes self-documenting via the paired usage rate and fill/state gauge. Reuses existing sampling, aggregation, rendering, and threshold-config machinery; no new subsystem.</li>
+<li><strong>Negative / Trade-offs:</strong> New fields on <code>RTPMetricsExtension</code> and its constructors (backward-compatible overloads required, as with the ADR-053 additions). New <code>messages.yml</code> keys incur locale-parity work across all shipped locales. Command latency reuses the already-computed <code>teleportData.processingTime</code>, so it adds only one recording call at the existing teleport-completion site (no new <code>commands-api</code> sample point unless a true dispatch-to-arrival window is later desired). Cost-per-location introduces several cumulative counters spread across the search pipeline (<code>acceptedLocations</code>, <code>searchNanos</code>, <code>commandNanos</code>) and the L3 bin pulse (<code>l3OverheadNanos</code>), plus the direct-compute split (<code>directComputeCount</code>, <code>directComputeNanos</code>); each increment must stay lock-free/allocation-free on the hot path. Cross-module change surface (<code>rtp-core/metrics</code>, <code>rtp-core</code> region/queue paths, <code>rtp-api</code> message keys, placeholders, bStats, locales) makes this D-005 gated.</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../ADR-032-teleport-pipeline-latency-histogram/">ADR-032</a> - Teleport Pipeline Latency Histogram (the reused ring contract).</li>
+<li><a href="../ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/">ADR-053</a> - Pipeline Latency Percentiles and Slow-Teleport Audit (the <code>/rtp info performance</code> surface and color-band mechanism this extends).</li>
+<li><a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/">ADR-052</a> - Outcome Metrics and Cause-Tagged Bad Locations (related attribution signals).</li>
+<li><a href="../ADR-028-l3-backlog-cache/">ADR-028</a> - L3 Backlog Cache (the hysteresis-gated refill loop; <code>backlogRefillThreshold</code>, <code>backlogRefillActive</code>).</li>
+<li><a href="../../dev/METRICS_PLAN/"><code>docs/dev/METRICS_PLAN.md</code></a> - Metric Catalogue and the metrics SPI.</li>
+<li><code>rtp-core/.../metrics/RTPMetricsExtension.java</code>, <code>PlaceholderProvider.java</code>, <code>commands/info/InfoCmd.java</code> - existing carrier and render sites.</li>
+<li><code>rtp-core/.../tasks/teleport/TeleportPipelineTask.java</code> (<code>teleportData.processingTime</code> computation at the completion site) - the already-computed command-latency value to record.</li>
+<li><code>rtp-core/.../selection/region/Region.java</code> (<code>execute</code> bin pulse / <code>processBacklog</code>) and the <code>RegionQueueManager</code> L1/L2/L3 accept boundaries - the counter-increment sites for cost-per-location, usage, and refill.</li>
+<li>Prior art: Unix load average (multi-window EWMA), Prometheus <code>rate()</code>/<code>irate()</code>, token-bucket fill level, RRDtool/Grafana counter-rate rendering.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

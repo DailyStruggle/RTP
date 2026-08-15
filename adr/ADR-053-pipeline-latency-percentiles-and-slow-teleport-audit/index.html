@@ -1,0 +1,1795 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-053 — Pipeline Latency Percentiles and Slow-Teleport Audit - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-053-pipeline-latency-percentiles-and-slow-teleport-audit" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-053 — Pipeline Latency Percentiles and Slow-Teleport Audit
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-percentile-readout-on-pipelinehistogram-additive" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Percentile readout on PipelineHistogram (additive)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-latency-backpressure-audit-queue-aware-two-distinct-signals" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Latency / backpressure audit (queue-aware, two distinct signals)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Latency / backpressure audit (queue-aware, two distinct signals)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2a-slow-teleport-threshold-counter-and-warn-audit-immediate-teleports-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      2a. Slow-teleport threshold counter and WARN audit (immediate teleports only)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2b-queue-growth-threshold-counter-and-warn-audit-queued-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      2b. Queue-growth threshold counter and WARN audit (queued path)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-user-facing-rtp-info-performance-readout" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. User-facing /rtp info performance readout
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-053-pipeline-latency-percentiles-and-slow-teleport-audit">ADR-053 — Pipeline Latency Percentiles and Slow-Teleport Audit<a class="headerlink" href="#adr-053-pipeline-latency-percentiles-and-slow-teleport-audit" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted
+<strong>Date:</strong> 2026-05-29</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p><a href="../ADR-032-teleport-pipeline-latency-histogram/">ADR-032</a> ratified the <code>PipelineHistogram</code> contract: a single process-wide, 256-sample, wait-free, never-reset ring of <code>TeleportPipelineTask</code> completion times in milliseconds, exposing a <strong>mean-only</strong> readout (<code>mean()</code>) plus two counters (<code>sampleCount()</code>, <code>totalRecorded()</code>). ADR-032 deliberately deferred percentiles, recording the reasons in its <em>Alternatives Considered</em> table: no v1 consumer requested them, and a sortable readout costs <code>O(n log n)</code> per call.</p>
+<p>Two new operator-facing needs have since been confirmed (issue: <em>Slow-RTP warnings + user-facing performance stats</em>):</p>
+<ol>
+<li><strong>Percentile readout.</strong> A mean alone hides tail latency. An operator triaging "RTP feels slow for some players" needs the distribution shape (P50/P75/P90/P95/P99), not a single average that a handful of slow chunk-loads can drag without revealing how many players are affected. The raw data already exists in the ring; only a read path is missing.</li>
+<li><strong>Slow-teleport audit.</strong> Operators want to be told <em>when</em> a teleport crossed an unacceptable latency, not only that the rolling mean drifted. A per-completion threshold check that emits a <code>WARN</code> log and a cumulative counter turns a silent slow path into an auditable event, consistent with the no-silent-failure posture of REQ-RTP-S-004.</li>
+</ol>
+<p><strong>A naive per-completion threshold misattributes queue wait as pipeline latency.</strong> The recorded sample is <code>System.nanoTime() - pipelineStartNanos</code>, and <code>pipelineStartNanos</code> is fixed at <code>TeleportPipelineTask</code> <em>construction</em>. For a player who is enrolled in the public queue and served <strong>at-rate</strong> (the normal flow without <code>rtp.unqueued</code>), that window includes the time the request sat waiting for the rate-limited dequeue, not just the search/chunk-load/safety work. A busy queue would therefore trip a fixed latency threshold on essentially <em>every</em> queued teleport, drowning the operator in <code>WARN</code> lines that say nothing about pipeline health — the slowness is a throughput/backpressure condition, not a slow individual teleport. The correct signal for the queued path is <strong>queue growth/backpressure</strong>, not per-teleport latency. The audit must therefore distinguish the two regimes (see <em>Decision</em> §2).</p>
+<p>Both feed a new <code>/rtp info performance</code> readout (the user-chosen surface; see <em>Decision</em>), reusing the existing <code>Metrics.snapshot()</code> / <code>CoreMetrics</code> aggregation. No new sampling subsystem and no new data collection are introduced — this ADR adds <strong>read paths and a threshold counter over data the M0/M1 histogram already records</strong>.</p>
+<p>Constraints carried forward from ADR-032 and <code>METRICS_PLAN.md</code>:</p>
+<ul>
+<li><strong>S-005 spirit (no main-thread blocking).</strong> The recorder (<code>TeleportPipelineTask.runCleanup</code>) runs on whatever thread completes the pipeline (Folia region thread, Paper/Spigot tick thread, Fabric server thread). The added threshold check must remain allocation-free, lock-free, and contention-free on that path.</li>
+<li><strong>Single-shot recording.</strong> The slow-count increment must ride the existing <code>pipelineHistogramRecorded</code> single-shot guard so each task contributes at most one slow-event count, mirroring REQ-RTP-OBS-002.</li>
+<li><strong>Snapshot-not-stream readout.</strong> Percentiles are computed on demand at read time, never streamed; the snapshot stays an immutable carrier.</li>
+<li><strong>Bounded cost.</strong> Percentile computation is bounded by the fixed ring capacity (256), so it is <code>O(256 log 256)</code> — a constant independent of uptime, player count, or teleport history (REQ-RTP-OBS-003).</li>
+<li><strong>No platform imports in <code>rtp-core/metrics/</code>.</strong> Enforced by the existing ArchUnit guard.</li>
+</ul>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<h3 id="1-percentile-readout-on-pipelinehistogram-additive">1. Percentile readout on <code>PipelineHistogram</code> (additive)<a class="headerlink" href="#1-percentile-readout-on-pipelinehistogram-additive" title="Permanent link">&para;</a></h3>
+<p><code>PipelineHistogram</code> gains read-only methods alongside the existing <code>mean()</code>:</p>
+<ol>
+<li><code>percentile(double p)</code> — <code>p</code> in <code>[0.0, 100.0]</code>; returns the value at the requested percentile over the currently-populated portion of the ring, or <code>Double.NaN</code> when no samples have been recorded.</li>
+<li>A convenience accessor that returns the standard set <strong>P50, P75, P90, P95, P99</strong> plus <code>min</code> and <code>max</code> in a single immutable carrier, so a caller computing the full performance readout sorts the snapshot <strong>once</strong> rather than once per percentile.</li>
+</ol>
+<p>Implementation contract:</p>
+<ul>
+<li>Reads take a point-in-time <strong>copy</strong> of the populated slots into a local <code>long[]</code>, sort the copy, and index by the nearest-rank method (<code>ceil(p/100 × n)</code>, 1-indexed, clamped to <code>[1, n]</code>). The ring itself is never mutated, sorted in place, or locked.</li>
+<li>Percentile reads tolerate concurrent <code>record(...)</code> writes: a copy taken during a write observes either the old or the new slot value, both valid samples. Temporal ordering within the copy is irrelevant to a percentile, exactly as it is irrelevant to the existing <code>mean()</code>.</li>
+<li><code>record(long)</code> is <strong>unchanged</strong>: still a single <code>getAndIncrement</code> plus an <code>AtomicLongArray#set</code>. The wait-free write contract of ADR-032 is preserved verbatim.</li>
+<li>The window remains the same fixed 256-sample never-reset ring of ADR-032. Percentiles describe the same window the mean already describes.</li>
+</ul>
+<p>This <strong>supersedes only item 5 of ADR-032's Decision</strong> ("Mean-only readout for v1") and the corresponding <em>Alternatives Considered</em> row. The ring shape, capacity, never-reset semantics, wait-free writes, and single-shot recording of ADR-032 are unchanged. ADR-032's rejection of a third-party percentile <strong>sketch</strong> (HdrHistogram, t-digest, KLL) still stands: percentiles here are computed by sorting the existing bounded ring, pulling in no new dependency.</p>
+<h3 id="2-latency-backpressure-audit-queue-aware-two-distinct-signals">2. Latency / backpressure audit (queue-aware, two distinct signals)<a class="headerlink" href="#2-latency-backpressure-audit-queue-aware-two-distinct-signals" title="Permanent link">&para;</a></h3>
+<p>The audit splits into two <strong>mutually exclusive per-teleport regimes</strong>, chosen by whether the teleport bypassed the public queue. A teleport is treated as <strong>immediate (unqueued)</strong> when it was served without enrolling in the public wait queue — i.e. the <code>unqueuedFast</code> path in <code>QueueTask</code> (a custom-location request, or a sender holding <code>rtp.unqueued</code>). Otherwise it is a <strong>queued</strong> teleport served at-rate. The <code>TeleportPipelineTask</code> already knows which path produced it; the regime is carried as an immutable boolean on the task, set at construction, not re-derived at cleanup.</p>
+<h4 id="2a-slow-teleport-threshold-counter-and-warn-audit-immediate-teleports-only">2a. Slow-teleport threshold counter and <code>WARN</code> audit (immediate teleports only)<a class="headerlink" href="#2a-slow-teleport-threshold-counter-and-warn-audit-immediate-teleports-only" title="Permanent link">&para;</a></h4>
+<p>For <strong>immediate/unqueued</strong> teleports the recorded window contains no queue-wait time, so the elapsed duration is a faithful measure of pipeline latency and a fixed threshold is meaningful:</p>
+<ol>
+<li><strong>Config key</strong> <code>performance.yml &gt; slowPipelineThresholdMs</code> (long, milliseconds). Default <code>5000</code>. A value <code>&lt;= 0</code> <strong>disables</strong> this audit entirely (no comparison, no log, no counter increment) so operators who do not want the log noise pay nothing.</li>
+<li>At the existing single-shot recorder site in <code>TeleportPipelineTask.runCleanup</code> (the <code>pipelineHistogramRecorded.compareAndSet(false, true)</code> branch that already calls <code>RTP.metrics.pipelineHistogram().record(elapsedMs)</code>), when the audit is enabled, <strong>the teleport was immediate/unqueued</strong>, and <code>elapsedMs &gt; slowPipelineThresholdMs</code>:</li>
+<li>increment a process-wide <code>slowPipelineCount</code> (<code>AtomicLong</code>/<code>LongAdder</code>) owned by <code>CoreMetrics</code>, and</li>
+<li>emit <code>RTP.log(Level.WARNING, ...)</code> identifying the elapsed time, the threshold, and the player/region context already available at that site.</li>
+<li>Queued teleports are <strong>never</strong> counted by <code>slowPipelineCount</code> and never emit this <code>WARN</code> — their elapsed time is contaminated by at-rate queue wait and would produce false positives. (They still contribute their sample to the <code>PipelineHistogram</code> exactly as before; only the <em>threshold audit</em> is gated. The percentile/mean readout is unchanged, since for the distribution the queue-wait inclusion is a pre-existing ADR-032 property, not introduced here.)</li>
+<li>The counter is <strong>cumulative since process start</strong> (consistent with the never-reset histogram and the other cumulative counters in <code>METRICS_PLAN.md</code>); operators compute deltas across reads.</li>
+<li><code>slowPipelineCount</code> and the resolved <code>slowPipelineThresholdMs</code> are surfaced on <code>RTPMetricsExtension</code> so they travel with <code>Metrics.snapshot()</code> like the other RTP-specific counters.</li>
+</ol>
+<p>This is <strong>not</strong> an S-004 failure (a slow teleport may still succeed); the <code>WARN</code> log is an operational audit of degraded latency, deliberately at the same severity floor S-004 mandates for failures so that a single log filter catches both classes.</p>
+<h4 id="2b-queue-growth-threshold-counter-and-warn-audit-queued-path">2b. Queue-growth threshold counter and <code>WARN</code> audit (queued path)<a class="headerlink" href="#2b-queue-growth-threshold-counter-and-warn-audit-queued-path" title="Permanent link">&para;</a></h4>
+<p>For the <strong>queued at-rate</strong> path the meaningful degradation signal is the wait queue outgrowing the rate at which locations are served, i.e. backpressure. This is surfaced as a separate, queue-depth-driven audit that does <strong>not</strong> depend on any single teleport's latency:</p>
+<ol>
+<li><strong>Config key</strong> <code>performance.yml &gt; queueGrowthWarnThreshold</code> (int, number of players waiting). Default <code>0</code> = <strong>disabled</strong> (opt-in, since acceptable queue depth is highly server- and rate-dependent). A positive value <code>N</code> arms the audit.</li>
+<li>The existing snapshot already carries <code>queueDepth</code> (total <code>RegionQueueManager.playerQueue</code> size summed across regions). When the audit is armed and a snapshot observes <code>queueDepth &gt;= queueGrowthWarnThreshold</code>, the system increments a cumulative <code>queueGrowthWarnCount</code> and emits one <code>RTP.log(Level.WARNING, ...)</code> reporting the current depth and the threshold. To avoid log spam while the queue stays above the bound, the <code>WARN</code> is <strong>edge-triggered</strong>: it fires on the transition from below-threshold to at-or-above-threshold and re-arms only after the depth drops back below it. The counter still increments only on the arming edge.</li>
+<li>The evaluation rides the existing metrics snapshot cadence (the periodic <code>CoreMetrics.snapshot()</code> publish), so it adds no work to the teleport hot path and no new scheduled task.</li>
+<li><code>queueGrowthWarnCount</code> and the resolved <code>queueGrowthWarnThreshold</code> are surfaced on <code>RTPMetricsExtension</code> alongside the slow-teleport pair.</li>
+</ol>
+<p>Like §2a, this is an operational <code>WARN</code>-level audit, not an S-004 failure, and is cumulative since process start.</p>
+<h3 id="3-user-facing-rtp-info-performance-readout">3. User-facing <code>/rtp info performance</code> readout<a class="headerlink" href="#3-user-facing-rtp-info-performance-readout" title="Permanent link">&para;</a></h3>
+<p>Per the maintainer's direction, the readout is surfaced under the existing <strong><code>/rtp info</code></strong> command (permission <code>rtp.info</code>) rather than as a new top-level <code>stats</code> verb:</p>
+<ul>
+<li>The <code>/rtp info</code> health-pipeline block renders recorded server-and-plugin state from a single cached <code>Metrics.snapshot()</code> plus <code>pipelineHistogram().percentiles()</code>: TPS 1m/5m/15m, MSPT + tick-budget utilisation, heap used/max, queue depth, pending teleports, <strong>avg + P50/P75/P90/P95/P99 pipeline ms</strong>, chunk-load backlog, DB latency, <code>memoryTrackerEntries</code>, the new <code>slowPipelineCount</code> (with its threshold, §2a), and the new <code>queueGrowthWarnCount</code> (with its threshold, §2b). Folia per-region samples are surfaced when present (<code>MetricsSnapshot.foliaRegions()</code>).</li>
+<li>The new percentile / slow-count / queue-growth fields ride the immutable snapshot extension, so the planned <code>/rtp info json</code> machine-readable flag (see <code>METRICS_PLAN.md &gt; /rtp info Surface &gt; Verbosity</code>) carries them automatically once that flag is implemented — no parallel schema.</li>
+<li>All user-facing strings route through <code>messages.yml</code> per REQ-RTP-F-013; the new keys are mirrored into every shipped locale per the <em>Locale Parity Maintenance</em> contract.</li>
+</ul>
+<p><strong>Implementation note (2026-05-29):</strong> per the maintainer's "append simple entries to <code>rtp info</code> where it fits" direction, the readout is implemented as additive rows folded into the existing <code>/rtp info</code> health-pipeline block (<code>infoPipelinePercentiles</code>, <code>infoSlowPipeline</code>, <code>infoQueueGrowth</code>) rather than a distinct <code>performance</code> sub-selector — no new command tree or permission node. The regime flag is realised as an immutable <code>immediateTeleport</code> boolean on <code>TeleportPipelineTask</code>, set <code>false</code> only by the 4-arg constructor used exclusively by the <code>Region.execute</code> queue-drain serve path and <code>true</code> for every other (immediate/unqueued/on-event) construction. The <code>/rtp info json</code> machine-readable flag is not yet implemented and remains deferred per <code>METRICS_PLAN.md</code>.</p>
+<p>This readout reads <code>CoreMetrics.snapshot()</code>; it introduces <strong>no new sampling</strong>.</p>
+<h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why Rejected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Keep mean-only; add no percentiles</td>
+<td>Mean hides tail latency. The triage question ("how many players see a slow teleport, and how slow?") is unanswerable from a mean. The raw samples already exist; refusing to read them leaves the operator blind for no saving.</td>
+</tr>
+<tr>
+<td>Pull in a percentile sketch (HdrHistogram / t-digest / KLL)</td>
+<td>Already rejected by ADR-032 for the same reasons: a third-party dependency and an <code>O(log n)</code> write path for a readout served just as well by sorting a fixed 256-element copy at read time. The bounded ring makes the sort a constant-cost operation.</td>
+</tr>
+<tr>
+<td>Maintain a running sorted structure so reads are <code>O(1)</code></td>
+<td>Moves cost onto the wait-free <code>record(...)</code> write path, violating ADR-032's wait-free write contract. Read-side sorting of a 256-element copy is cheap and keeps writes untouched.</td>
+</tr>
+<tr>
+<td>New top-level <code>/rtp stats performance</code> verb</td>
+<td>The maintainer chose to fold the readout under the existing <code>/rtp info</code> (either inline rows or an <code>info performance</code> sub-selector) to avoid a new command tree and a new permission node. Reuses <code>rtp.info</code>.</td>
+</tr>
+<tr>
+<td>Track slow-teleport latency as an S-004 failure</td>
+<td>A slow teleport is not a failed teleport; conflating the two would distort <code>pipelineFailureRate</code> and the failure breakdown. The audit is a distinct <code>WARN</code>-level latency signal with its own counter.</td>
+</tr>
+<tr>
+<td>Apply one fixed latency threshold to <em>all</em> teleports (queued and unqueued alike)</td>
+<td>The recorded window starts at <code>TeleportPipelineTask</code> construction, so a queued teleport's elapsed time includes at-rate queue wait. A single threshold would fire on essentially every queued teleport on a busy server — a backpressure condition mis-reported as per-teleport slowness, producing <code>WARN</code> spam that hides genuine slow unqueued teleports. Gating the latency audit to the immediate/unqueued path and using a separate queue-depth audit for the queued path keeps each signal honest.</td>
+</tr>
+<tr>
+<td>Subtract queue-wait time so a latency threshold <em>can</em> apply to queued teleports</td>
+<td>Requires threading a "dequeue timestamp" through the queue/pipeline boundary and re-defining the histogram sample, contradicting ADR-032's construction-time start. Even with a corrected latency, the operator-actionable signal for the queued path is depth/backpressure (add capacity or raise the serve rate), not a per-teleport latency the operator cannot influence per-player. Deferred as an additive future refinement if demand appears.</td>
+</tr>
+<tr>
+<td>Rate-limit the slow-teleport <code>WARN</code> instead of splitting the signal</td>
+<td>A blanket rate-limit would still misattribute the <em>cause</em> (queue backpressure vs a genuinely slow search) and would silently drop real slow-unqueued events to stay under the limit. The split addresses the root cause; the queue-growth audit is additionally edge-triggered to bound its own log volume.</td>
+</tr>
+<tr>
+<td>Reset <code>slowPipelineCount</code> per snapshot read</td>
+<td>Couples the producer to consumer cadence and races multiple consumers, the same defect ADR-032 calls out for reset-on-read histograms. Cumulative counter, consumers compute deltas.</td>
+</tr>
+<tr>
+<td>Per-region percentile histograms</td>
+<td>All current consumers want the fleet-wide distribution, matching ADR-032's process-wide aggregation decision. Per-region detail stays an additive future change.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Positive:</strong></li>
+<li>Tail latency (P50…P99) becomes a first-class operator-visible signal sourced from the same single histogram, with no new data collection and no change to the wait-free write path.</li>
+<li>Slow teleports become auditable events (<code>WARN</code> log + cumulative counter) instead of a silent drift in the mean, consistent with the REQ-RTP-S-004 severity floor.</li>
+<li>The latency audit is gated to immediate/unqueued teleports, so it no longer fires spuriously on every at-rate queued teleport; queue backpressure gets its own dedicated, edge-triggered <code>queueGrowthWarnCount</code> signal sourced from the existing <code>queueDepth</code>.</li>
+<li>Percentile cost is bounded by the fixed ring capacity (<code>O(256 log 256)</code>), independent of uptime/players/history — satisfies REQ-RTP-OBS-003.</li>
+<li>The slow-threshold audit is opt-out (<code>&lt;= 0</code> disables) and defaults conservatively, so quiet servers incur no log noise.</li>
+<li><code>/rtp info performance</code> and <code>/rtp info json</code> reuse existing command, permission, snapshot, and locale machinery; no new subsystem.</li>
+<li><strong>Negative / Trade-offs:</strong></li>
+<li>Each <code>/rtp info performance</code> / JSON read sorts a 256-element copy. This is off the teleport hot path (operator command cadence) and bounded, but it is non-zero work versus the mean-only readout.</li>
+<li>Percentiles inherit ADR-032's window caveats: the effective wall-clock window depends on teleport throughput, and sub-millisecond completions register as <code>0</code>. The percentile readout is therefore meaningful only once <code>sampleCount()</code> is non-trivial; the readout surfaces <code>sampleCount</code> so operators can judge stability.</li>
+<li>Two new baseline config keys (<code>slowPipelineThresholdMs</code>, <code>queueGrowthWarnThreshold</code>) and new <code>messages.yml</code> keys must be mirrored across every shipped locale (locale-parity maintenance cost).</li>
+<li>The two audits answer different questions (a single slow unqueued teleport vs sustained queue backpressure); operators must understand the split. The <code>/rtp info performance</code> readout labels each counter with its threshold to make the distinction self-documenting.</li>
+<li>The queued path retains no per-teleport latency alarm. An operator who wants to know a specific queued teleport was slow must read the percentile/mean readout (which still includes queued samples) rather than expecting a <code>WARN</code>. This is an accepted trade-off: per-queued-teleport latency is dominated by queue wait the operator tunes via rate/capacity, not per-player.</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../ADR-032-teleport-pipeline-latency-histogram/">ADR-032</a> — the histogram contract this ADR extends; specifically supersedes its Decision item 5 ("Mean-only readout for v1") and the matching <em>Alternatives Considered</em> row, leaving every other ADR-032 contract intact.</li>
+<li><a href="../../dev/METRICS_PLAN/"><code>docs/dev/METRICS_PLAN.md</code></a> — <em>Metric Catalogue (v1)</em> (new <code>pipelineMsP*</code>, <code>slowPipelineThresholdMs</code>, <code>slowPipelineCount</code> rows), <em><code>/rtp info</code> Surface</em> (the <code>performance</code> sub-selector), <em>Open Items / Follow-Ups</em> (percentile open item resolution), and phasing.</li>
+<li><a href="../../dev/REQUIREMENTS/"><code>docs/dev/REQUIREMENTS.md</code></a> §1.8 — REQ-RTP-OBS-004 (percentile readout), REQ-RTP-OBS-005 (slow-teleport audit, immediate/unqueued only), and REQ-RTP-OBS-006 (queue-growth audit).</li>
+<li>REQ-RTP-S-004 (no silent failure), REQ-RTP-F-013 (configurable user messages), REQ-RTP-OBS-001/002/003 (non-blocking snapshot, single-sample recording, bounded sampling cost).</li>
+<li><code>rtp-core/src/main/java/io/github/dailystruggle/rtp/common/metrics/PipelineHistogram.java</code>, <code>CoreMetrics.java</code>, <code>RTPMetricsExtension</code>; <code>rtp-core/.../tasks/teleport/TeleportPipelineTask.java</code> <code>runCleanup</code> recorder site and the <code>unqueuedFast</code>/immediate-vs-queued regime flag carried from <code>rtp-core/.../selection/region/QueueTask.java</code>; <code>rtp-core/.../commands/info/InfoCmd.java</code>.</li>
+<li><a href="../../metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md">metrics-api-ADR-001</a> — extension-slot pattern that carries <code>slowPipelineCount</code> on <code>RTPMetricsExtension</code>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

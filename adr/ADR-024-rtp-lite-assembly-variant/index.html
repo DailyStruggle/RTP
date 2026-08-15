@@ -1,0 +1,2051 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-024 — RTP-lite Assembly Variant - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-024-rtp-lite-assembly-variant" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-024 — RTP-lite Assembly Variant
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#2026-08-14-amendment-lite-inherits-the-pro-config-and-operator-docs-textual-parity" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-08-14 amendment - lite inherits the Pro config and operator docs (textual parity)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-06-20-amendment-lite-inherits-the-full-base-safetyyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-06-20 amendment — lite inherits the full base safety.yml
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-06-12-amendment-plugin-message-cross-server-rtp-in-scope-for-lite" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-06-12 amendment — plugin-message cross-server RTP in scope for lite
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-06-10-amendment-basic-folia-support-in-scope-for-lite" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-06-10 amendment — basic Folia support in scope for lite
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-06-01-amendment-vault-economy-in-scope-for-lite" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-06-01 amendment — Vault economy in scope for lite
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-05-11b-amendment-language-options-in-scope-for-lite" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-05-11(b) amendment — language options in scope for lite
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-05-11-amendment-claim-plugin-integrations-in-scope-for-lite" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-05-11 amendment — claim-plugin integrations in scope for lite
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-05-07-amendment-fabric-in-scope-for-lite" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-05-07 amendment — Fabric in scope for lite
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inactive-prior-adrs-in-the-lite-assembly" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inactive prior ADRs in the lite assembly
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-024-rtp-lite-assembly-variant">ADR-024 — RTP-lite Assembly Variant<a class="headerlink" href="#adr-024-rtp-lite-assembly-variant" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted (amended 2026-08-14 - lite inherits the Pro <code>config.yml</code>, <code>advanced/*</code> tuning files, and operator <code>docs/</code> for textual parity)
+<strong>Date:</strong> 2026-04-30</p>
+<h2 id="2026-08-14-amendment-lite-inherits-the-pro-config-and-operator-docs-textual-parity">2026-08-14 amendment - lite inherits the Pro config and operator docs (textual parity)<a class="headerlink" href="#2026-08-14-amendment-lite-inherits-the-pro-config-and-operator-docs-textual-parity" title="Permanent link">&para;</a></h2>
+<p>The original decision below shipped lite a reduced, hand-diverged <code>config.yml</code>
+(no <code>database:</code>/<code>network:</code> blocks, book-only menu renderer list) plus reduced
+<code>advanced/performance.yml</code> and <code>advanced/logging.yml</code> overlays, and a separate
+hand-stripped <code>lite-docs/</code> documentation tree that <code>RTPBukkitLitePlugin</code> copied
+to <code>&lt;data&gt;/docs/</code>. Maintaining those parallel copies was pure redundancy: the
+dropped <code>database:</code>/<code>network:</code> blocks are inert in lite anyway (no JDBC/Redis
+classes are on the classpath), and the stripped docs drifted from the Pro
+originals they were derived from. As of 2026-08-14 that redundancy is removed:
+<strong>lite inherits the Pro <code>config.yml</code>, <code>advanced/*</code> tuning files, and the Pro
+operator <code>docs/</code> tree verbatim, for perfect textual parity.</strong> <code>plugin.yml</code> is
+the only resource lite still overlays (it names the lite entry point
+<code>RTPBukkitLitePlugin</code>).</p>
+<p>Concretely:</p>
+<ul>
+<li><code>rtp-plugin/src/lite/resources/config.yml</code>, <code>advanced/performance.yml</code>, and
+  <code>advanced/logging.yml</code> are <strong>removed</strong>. <code>shadowLiteJar</code> no longer excludes the
+  main <code>config.yml</code> / <code>performance.yml</code> / <code>logging.yml</code>, so the lite jar bundles
+  the full Pro copies verbatim. The <code>database:</code>/<code>network:</code> blocks in the Pro
+  <code>config.yml</code> are inert in lite (the SQL/Redis classes and JDBC drivers are
+  still excluded per the drops below), so shipping them changes no runtime
+  behavior.</li>
+<li>The <code>lite-docs/</code> resource tree is <strong>removed</strong>. Lite now bundles the same
+  <code>docs/**</code> tree as Pro (staged by the <code>copyDocs</code> task) and extracts it through
+  the shared <code>JarUtils.extractDocs(...)</code>, identical to the Pro bootstrap. The
+  <code>liteJarStructureCheck</code> audit no longer forbids <code>docs/**</code>.</li>
+<li>Because <code>config.yml</code> is no longer a reduced lite baseline, there is nothing
+  left to prune from the locale tree: lite's key set is identical to Pro's. The
+  lite-specific <code>rtp-plugin/src/lite/resources/lang/</code> tree, the
+  <code>repackLiteLocales</code> Gradle task, and the <code>scripts/repack-lite-locales.*</code>
+  scripts are <strong>removed</strong>. <code>shadowLiteJar</code> no longer excludes the main
+  <code>lang/**</code>, so the lite jar inherits the Pro <code>lang/&lt;loc&gt;/</code> tree verbatim.</li>
+<li><code>plugin.yml</code> remains a lite overlay (lite entry point) and is still the only
+  resource excluded from the main source-set contribution.</li>
+</ul>
+<p>Bullets below that describe a reduced lite <code>config.yml</code> (omitted <code>database:</code> /
+<code>network:</code> blocks, book-only menu), reduced <code>performance.yml</code> / <code>logging.yml</code>
+baselines, or a stripped <code>lite-docs/</code> tree are superseded by this amendment.
+The SQL/Redis class and driver drops still apply in full.</p>
+<hr />
+<h2 id="2026-06-20-amendment-lite-inherits-the-full-base-safetyyml">2026-06-20 amendment — lite inherits the full base <code>safety.yml</code><a class="headerlink" href="#2026-06-20-amendment-lite-inherits-the-full-base-safetyyml" title="Permanent link">&para;</a></h2>
+<p>The original decision below shipped lite a trimmed, lite-specific <code>safety.yml</code> (a flat
+material allow/deny list with no ADR-017 tag or state-predicate tokens), on the grounds
+that the tag grammar was newer and lite favored the minimum operator-facing surface. The
+full ADR-017 parser (<code>SafetyTokenParser</code>, <code>SafetyCompilationCache</code>, <code>SafetyTokenExpander</code>)
+lives in <code>rtp-api</code> / <code>rtp-core</code> and already ships in the lite jar — only the bundled
+<code>safety.yml</code> content differed. Both the vanilla block-tag grammar (<code>#minecraft:&lt;tag&gt;</code>)
+and the state-predicate grammar are now sufficiently stable, so there is no longer any
+reason to maintain a separate lite copy.</p>
+<p>Concretely:</p>
+<ul>
+<li><code>rtp-plugin/src/lite/resources/safety.yml</code> is <strong>removed</strong>. Lite no longer overlays its
+  own <code>safety.yml</code>; the <code>shadowLiteJar</code> task no longer excludes the main <code>safety.yml</code>, so
+  the lite jar bundles the <strong>full base <code>rtp-plugin/src/main/resources/safety.yml</code></strong>
+  verbatim — block tags <strong>and</strong> state predicates included. No build, code, or driver
+  change beyond the dropped exclude is required — the parser was already present in lite.</li>
+<li>Because <code>safety.yml</code> is no longer a reduced lite baseline, <code>repackLiteLocales</code> no longer
+  emits a lite-specific <code>lang/&lt;loc&gt;/safety.yml</code> locale tree; lite simply reads the base
+  <code>safety.yml</code> (its values are material/biome tokens, not translated prose).</li>
+<li><code>tags/</code> and <code>tagsRefresh.yml</code> (the <code>rtp-tags</code> module) remain excluded from lite.</li>
+</ul>
+<p>Bullets below that describe <code>safety.yml</code> as a "flat material allow/deny list (no tag /
+state-predicate sections)", and that list ADR-017 as inactive in lite, are superseded by
+this amendment; only the <code>rtp-tags</code> module stays Pro.</p>
+<hr />
+<h2 id="2026-06-12-amendment-plugin-message-cross-server-rtp-in-scope-for-lite">2026-06-12 amendment — plugin-message cross-server RTP in scope for lite<a class="headerlink" href="#2026-06-12-amendment-plugin-message-cross-server-rtp-in-scope-for-lite" title="Permanent link">&para;</a></h2>
+<p>The original decision below dropped all network/proxy coordination from lite: SQL/Redis
+persistence and their drivers are excluded (still are), and cross-server RTP was treated
+as a Pro-only, database-backed feature. That left the free build with no cross-server
+story at all, a visible gap against competitors (EzRTP) that ship a DB-free proxy
+selector for free. As of 2026-06-12, ratified by repo owner leaf from the approved
+D-005 proposal <code>docs/dev/scratch/PROPOSAL-plugin-message-network-default.md</code> (and the
+ADR-036 <em>Amendment: Plugin-Message Promoted to Tier-1 Default</em>): <strong>the tier-1,
+non-durable plugin-message network transport ships in lite.</strong></p>
+<p>Concretely:</p>
+<ul>
+<li>The <code>plugin-message</code> <code>NetworkTransport</code> binding (and the <code>transport.type: auto</code>
+  proxy auto-detect resolver) ships in lite. It adds <strong>no JDBC/Redis driver</strong> — it
+  rides the proxy's built-in plugin-messaging vocabulary (<code>Connect</code> for the move,
+  <code>Forward</code> for <code>BackendHeartbeat</code> region-availability gossip) over an online player's
+  connection, so lite's "no SQL / no Redis" stance is unchanged.</li>
+<li>The durable Pro tiers (<code>SqlNetworkStateBinding</code>, <code>RedisNetworkStateBinding</code>) and their
+  drivers stay <strong>excluded</strong> from lite, exactly as the SQL/Redis drops below specify.
+  Durable reservation tokens, atomic claims, multi-proxy fan-out, and load-balanced
+  selection at scale remain Pro.</li>
+<li>A trimmed <code>network.yml</code> (transport + optional per-server policy overlay; no hand-typed
+  server list, no <code>host</code>/<code>port</code>) ships in lite.</li>
+<li><code>liteJarStructureCheck</code> is extended only to <strong>assert no Redis/SQL transport class
+  leaks</strong> (<code>RedisNetworkStateBinding</code>, <code>SqlNetworkStateBinding</code>, JDBC/Jedis drivers)
+  while <strong>permitting</strong> the plugin-message binding and the <code>auto</code> resolver.</li>
+<li>S-00x unchanged: the destination always runs the normal local pipeline (spiral -&gt;
+  chunk -&gt; safety); lite transports <em>intent</em>, not a coordinate. Move failures are
+  logged, never swallowed (S-004); busy/invalid messages are configurable (S-007).</li>
+</ul>
+<p>Contract detail: subproject ADR
+<code>platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-016-plugin-message-default-transport.md</code>.
+Bullets below that imply <em>all</em> network/proxy support is a lite drop are superseded for
+the <strong>plugin-message tier only</strong>; the SQL/Redis persistence drops still apply in full.</p>
+<hr />
+<h2 id="2026-06-10-amendment-basic-folia-support-in-scope-for-lite">2026-06-10 amendment — basic Folia support in scope for lite<a class="headerlink" href="#2026-06-10-amendment-basic-folia-support-in-scope-for-lite" title="Permanent link">&para;</a></h2>
+<p>The original decision below, and the 2026-05-07 Fabric amendment, scoped Folia as
+<strong>full/Pro-only</strong>: the lite <code>plugin.yml</code> declared <code>folia-supported: false</code>, and on a
+Folia host the lite jar failed to wire (it resolves <code>folia_v*</code> adapter classes that
+are excluded from the lite jar). That left the free build unable to even start on
+Folia — a harder wall than the competition, which runs on Folia for free. As of
+2026-06-10 that scope is widened: <strong>the free build runs on Folia with a basic,
+correctness-first regionized path; the tuned <code>rtp-folia</code> adapter stays Pro.</strong></p>
+<p>Concretely:</p>
+<ul>
+<li>A new <code>FoliaAwareScheduler</code> (<code>io.github.dailystruggle.rtp.paper.scheduling</code>, in the
+  lite-bundled <code>rtp-paper-common</code> module) implements <code>RTPScheduler</code> against paper-api's
+  regionized scheduler statics (<code>getGlobalRegionScheduler</code> / <code>getRegionScheduler</code> /
+  <code>getAsyncScheduler</code>) and the per-entity scheduler for player work. It is
+  correctness-first: it always hops to the correct region/global thread (no
+  <code>isGlobalTickThread</code> inline-run optimization, which paper-api does not expose).</li>
+<li><code>BukkitRTPPlayer.setLocation</code> (Spigot-classpath <code>rtp-bukkit-common</code>) detects Folia by
+  class-probe and routes the teleport through <code>Entity#teleportAsync</code> reflectively (the
+  Spigot API has no <code>teleportAsync</code>); a cross-region sync <code>teleport()</code> would throw on
+  Folia. Failures are logged, never swallowed (REQ-RTP-S-004).</li>
+<li><code>BukkitServerProvider.resolveServerModel</code> prefers the tuned <code>folia_v*</code> adapter when it
+  is on the classpath (Pro) and falls back to the Paper accessor + <code>FoliaAwareScheduler</code>
+  when it is not (lite).</li>
+<li>The lite <code>plugin.yml</code> sets <code>folia-supported: true</code>.</li>
+<li>Because the new class lives in the <code>io.github.dailystruggle.rtp.paper.*</code> package, the
+  existing <code>io/.../folia/**</code> + <code>folia_*</code> lite excludes and the <code>liteJarStructureCheck</code>
+  audit are unchanged — the tuned <code>rtp-folia</code> adapter remains excluded from the lite jar,
+  so no PolyForm-licensed Pro source leaks into the MIT lite binary (ADR-061).</li>
+</ul>
+<p>This keeps the Pro value on Folia (the tuned, throughput-optimized adapter ships first in
+Pro, per the early-access framing) while removing the "won't run on Folia at all" wall
+from the free build. Bullets below referring to "Folia drop" / "no Folia" as a lite
+packaging drop are superseded by this amendment for the <strong>scheduler/teleport</strong> path; the
+tuned <code>rtp-folia</code> adapter classes remain a lite drop.</p>
+<hr />
+<h2 id="2026-06-01-amendment-vault-economy-in-scope-for-lite">2026-06-01 amendment — Vault economy in scope for lite<a class="headerlink" href="#2026-06-01-amendment-vault-economy-in-scope-for-lite" title="Permanent link">&para;</a></h2>
+<p>The original decision below, and the 2026-05-11 claim-plugin amendment, scoped
+Vault economy as Pro-only — lite shipped no <code>economy.yml</code> and did not wire the
+Vault hook. That gating was never an intentional monetization boundary: optional
+per-teleport charging is a baseline expectation on the small Spigot/Paper servers
+lite primarily serves, costs nothing at runtime when Vault is absent, and the
+<code>VaultChecker</code> class already shipped in the lite jar. As of 2026-06-01 that scope
+is corrected: <strong>Vault economy ships in lite</strong>.</p>
+<p>Concretely:</p>
+<ul>
+<li><code>RTPBukkitLitePlugin.onEnable</code> wires <code>VaultChecker.setupEconomy()</code> /
+  <code>setupPermissions()</code> and binds <code>VaultChecker</code> through the <code>RTPHooks</code> economy
+  facade when Vault is present, identically to the full bootstrap
+  (<code>RTPBukkitPlugin.setupIntegrations</code>).</li>
+<li><code>economy.yml</code> ships in the lite jar so the economy parser reads its defaults
+  from the classpath.</li>
+<li>The <code>liteJarStructureCheck</code> audit no longer forbids <code>economy.yml</code>.</li>
+<li>When Vault is not installed the economy hook is dormant (zero runtime cost),
+  mirroring the claim-plugin integrations.</li>
+</ul>
+<p>Bullets below (and in the 2026-05-11 claim-plugin amendment) referring to
+"economy / Vault" as a lite drop, and to <code>economy.yml</code> as a packaging drop, are
+superseded by this amendment. The remainder of the ADR (SQL/Redis drops, Folia
+drop, login cache, visitor mode, etc.) still applies.</p>
+<hr />
+<h2 id="2026-05-11b-amendment-language-options-in-scope-for-lite">2026-05-11(b) amendment — language options in scope for lite<a class="headerlink" href="#2026-05-11b-amendment-language-options-in-scope-for-lite" title="Permanent link">&para;</a></h2>
+<p>The original decision below scoped lite as <strong>English-only</strong> — <code>LanguageBootstrap</code>,
+<code>LanguageCmd</code>, <code>lang/**</code>, and <code>language.yml</code> were dropped from the lite assembly,
+and the locale-aware ConfigParser path (ADR-020) was unreachable on lite.
+Operators wanting non-English message strings, or wanting to use <code>/rtp lang</code> to
+hot-switch locales, were routed to the full edition. As of 2026-05-11 that scope
+is widened: <strong>the multilingual bootstrap (ADR-020) ships in lite</strong>.</p>
+<p>Concretely:</p>
+<ul>
+<li><code>lang/**</code> and <code>language.yml</code> ship in the lite jar.</li>
+<li><code>LanguageBootstrap.resolve(pluginDirectory)</code> is invoked unconditionally from
+  <code>Configs#reloadConfigs()</code>; no edition-specific bootstrap call is required, and
+  the lite bootstrap (<code>RTPBukkitLitePlugin.onEnable</code>) inherits the behavior the
+  moment the resources are on the classpath.</li>
+<li><code>LanguageCmd</code> (the user-facing <code>/rtp lang</code> subcommand) lives in <code>rtp-core</code> and
+  is registered through the shared command tree, so it is available on lite
+  identically to Pro.</li>
+<li>The lite <code>messages.yml</code> is no longer trimmed: lite ships the full
+  <code>messages.yml</code> from <code>rtp-plugin/src/main/resources</code>. Lite-irrelevant keys
+  (e.g. <code>notEnoughMoney</code>, PAPI status, SQL-persistence messages) are simply
+  unreachable at runtime because the corresponding subsystems are not wired —
+  the keys' presence in the file is harmless and matches the "lite contains the
+  featureset, simply not configured by default" stance.</li>
+<li>The <code>liteJarStructureCheck</code> audit no longer forbids <code>lang/**</code> or
+  <code>language.yml</code>.</li>
+</ul>
+<p>Bullets below referring to "Multilingual support (ADR-020)" as a lite drop,
+and to <code>lang/**</code> / <code>language.yml</code> / trimmed <code>messages.yml</code> as packaging drops,
+are superseded by this amendment. The remainder of the ADR (SQL/Redis drops,
+Folia drop, login cache, visitor mode, economy/Vault, etc.) still applies.</p>
+<hr />
+<h2 id="2026-05-11-amendment-claim-plugin-integrations-in-scope-for-lite">2026-05-11 amendment — claim-plugin integrations in scope for lite<a class="headerlink" href="#2026-05-11-amendment-claim-plugin-integrations-in-scope-for-lite" title="Permanent link">&para;</a></h2>
+<p>The original decision below scoped lite as having no claim-plugin softdepend
+integrations (ADR-019) — operators wanting GriefDefender, GriefPrevention,
+Lands, WorldGuard, Towny, Factions, HuskTowns, or RedProtect compatibility were
+routed to the full edition. As of 2026-05-11 that scope is widened: <strong>the
+bundled claim-plugin integrations ship in lite</strong>. Pro remains the superset
+target for large-scale deployments (proxy networks, Folia regionized servers,
+SQL/Redis persistence); claim-protection support is a baseline operator
+expectation on the small Spigot/Paper servers that lite primarily serves, and
+withholding it pushed those operators to Pro for an integration that has zero
+runtime cost when no claim plugin is installed.</p>
+<p>Concretely:</p>
+<ul>
+<li><code>ClaimIntegrations.setup</code> is invoked from <code>RTPBukkitLitePlugin.onEnable</code>
+  (deferred tick+1, mirroring the full bootstrap).</li>
+<li>The lite <code>plugin.yml</code> declares <code>softdepend: [ GriefDefender, GriefPrevention,
+  Towny, HuskTowns, Factions, Lands, RedProtect, WorldGuard ]</code>.</li>
+<li><code>integrations.yml</code> ships in the lite jar so <code>ClaimIntegrations#buildParser</code>
+  can load its defaults from the classpath.</li>
+<li>Vault/economy wiring was scoped Pro-only at the time of this amendment, but
+  that gating is superseded by the 2026-06-01 amendment above: lite now ships
+  <code>economy.yml</code> and wires the Vault hook.</li>
+</ul>
+<p>Bullets below referring to "claim-plugin softdepend integrations" as a lite
+drop, and to <code>integrations.yml</code> as a packaging drop, are superseded by this
+amendment. The remainder of the ADR (SQL/Redis drops, Folia drop, locale,
+login cache, visitor mode, etc.) still applies.</p>
+<hr />
+<h2 id="2026-05-07-amendment-fabric-in-scope-for-lite">2026-05-07 amendment — Fabric in scope for lite<a class="headerlink" href="#2026-05-07-amendment-fabric-in-scope-for-lite" title="Permanent link">&para;</a></h2>
+<p>The original decision below scoped lite as <strong>Spigot+Paper only</strong>, with Folia and
+Fabric routed to the full edition. As of 2026-05-07 that scope is widened:
+<strong>Fabric is supported in lite</strong>. Folia remains full-only.</p>
+<p>Concretely:</p>
+<ul>
+<li><code>RTPFabricMod</code> and <code>rtp-fabric-common</code> classes (<code>io/github/dailystruggle/rtp/fabric/**</code>)
+  ship in the lite jar.</li>
+<li><code>fabric.mod.json</code> ships in the lite jar so Fabric Loader discovers
+  <code>RTPFabricMod</code> as the entrypoint.</li>
+<li><strong>JDBC drivers stay stripped from lite</strong> (no H2, SQLite, MySQL, or PostgreSQL).
+  Fabric+lite operators land on <code>FabricDatabaseHandler.setupDatabase</code>'s flat-file
+  YAML fallback (a loud warning is logged) — consistent with lite's "no SQL"
+  stance below.</li>
+<li>The <code>liteJarStructureCheck</code> audit no longer forbids <code>io/github/dailystruggle/rtp/fabric/**</code>
+  or <code>fabric.mod.json</code>.</li>
+<li>Folia (<code>io/github/dailystruggle/rtp/folia/**</code>) remains forbidden in lite —
+  Folia operators continue to use the full edition.</li>
+</ul>
+<p>The rest of the original ADR (drops, alternatives, consequences) still applies
+to the lite edition; only the "Spigot+Paper only" framing is superseded.</p>
+<hr />
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>The full RTP plugin bundles features that a sizeable share of operators do not use: SQL/Redis persistence (H2, SQLite, MySQL, PostgreSQL, Jedis), a Folia adapter, the anvil pre-filter (ADR-016), block-tag / state-predicate safety parsing (ADR-017), the login reserve cache (ADR-023), claim-plugin integrations (ADR-019), economy / Vault, multilingual support (ADR-020), bundled documentation, and a number of advanced <code>performance.yml</code> toggles (<code>visitorEnabled</code>, <code>loginCacheEnabled</code>, <code>loginCacheCap</code>, <code>effectParsing</code>, <code>onEventParsing</code>).</p>
+<p>These features carry two costs:</p>
+<ol>
+<li><strong>JAR size.</strong> Bundled SQL drivers, Jedis, the localized <code>lang/**</code> tree, and the in-JAR <code>docs/**</code> copy account for a non-trivial fraction of the shaded artifact.</li>
+<li><strong>Support load.</strong> Each toggle, integration, and locale-aware migration is a documented source of operator questions and edge cases (<code>docs/dev/LESSONS_LEARNED.md</code>, <code>docs/admin/RUNBOOK.md</code>, <code>docs/adr/ADR-020</code>, <code>docs/adr/ADR-023</code>).</li>
+</ol>
+<p>A second audience — small servers that want random-teleport behavior with the minimum possible operator-facing complexity — is poorly served by the full JAR.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Ship two build variants from the same source tree, both produced on every <code>:rtp-plugin:assemble</code> run:</p>
+<ul>
+<li><strong>RTP</strong> (lite, default) — produced by <code>:rtp-plugin:shadowLiteJar</code> as the unclassified <code>RTP-&lt;version&gt;.jar</code>.</li>
+<li><strong>RTP-Pro</strong> (full) — produced by the existing <code>:rtp-plugin:shadowJar</code> as <code>RTP-Pro-&lt;version&gt;.jar</code>.</li>
+</ul>
+<p>The lite artifact takes the unclassified default name because lite is the recommended starting point for new operators; Pro is the opt-in upgrade for users who need SQL persistence, Folia, claim integrations, multilingual support, etc. Both Bukkit <code>plugin.yml</code> descriptors keep <code>name: RTP</code> so the plugin data folder is interchangeable across editions.</p>
+<p>RTP-lite:</p>
+<ol>
+<li><strong>Build mechanism.</strong> A new Gradle source set <code>rtp-plugin/src/lite/{java,resources}</code> with its own bootstrap class <code>io.github.dailystruggle.rtp.bukkit.lite.RTPBukkitLitePlugin</code> and its own <code>plugin.yml</code>. ShadowJar exclude rules physically remove lite-droppable classes and resources from the lite artifact. No Java-level conditional compilation.</li>
+<li><strong>Drops, runtime.</strong></li>
+<li>Persistent storage backends: <code>H2DatabaseAccessor</code>, <code>SQLiteDatabaseAccessor</code>, <code>MySQLDatabaseAccessor</code>, <code>PostgreSQLDatabaseAccessor</code>, <code>AbstractSQLDatabaseAccessor</code>, <code>RedisManager</code>, and the corresponding shaded driver jars (<code>com.h2database</code>, <code>org.xerial:sqlite-jdbc</code>, <code>mysql</code>, <code>org.postgresql</code>, <code>redis.clients</code>). Lite uses <code>YamlFileDatabase</code> (or an in-memory no-op accessor) only.</li>
+<li>Shutdown-flush lifecycle (<code>docs/architecture/10</code>).</li>
+<li>Tags module (<code>rtp-tags</code>).</li>
+<li>Folia adapter (<code>platforms/rtp-folia/**</code>). Lite is Spigot+Paper only.</li>
+<li>~~Economy / Vault hook + <code>economy.yml</code>.~~ (superseded — see the 2026-06-01 amendment above; Vault economy ships in lite.)</li>
+<li>Login reserve cache (ADR-023): <code>LoginCacheTask</code>, <code>RegionQueueManager.enableLoginCache</code>/<code>disableLoginCache</code>, the join-prime hook in <code>OnEventTeleports</code>, and <code>PerformanceKeys.loginCacheEnabled</code> / <code>loginCacheCap</code>.</li>
+<li>Visitor / observation mode: <code>PerformanceKeys.visitorEnabled</code> and the <code>Region.isObservationalModeEnabled</code> branch.</li>
+<li><code>effectParsing</code> startup permission parse (<code>BukkitEffectsHandler</code> permission-tree build).</li>
+<li><code>onEventParsing</code> startup permission parse — fully removed, with no replacement boolean. Lite does not ship a <code>firstJoinTeleport</code> toggle. Operators who need first-join teleport behavior use the full edition.</li>
+<li>Multilingual support (ADR-020): <code>LanguageBootstrap</code>, <code>LanguageCmd</code>, <code>lang/**</code>, <code>language.yml</code>, <code>ConfigParser.detectAndPreserveLocaleMismatch</code> invocation. Locale hardcoded to English.</li>
+<li>Claim-plugin softdepend integrations (ADR-019): GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect.</li>
+<li><strong>Drops, packaging.</strong></li>
+<li><code>lang/**</code>, <code>language.yml</code>, <code>economy.yml</code>, <code>integrations.yml</code>, <code>logging.yml</code> are not shipped.</li>
+<li><code>docs/**</code> and root markdown (<code>README.md</code>, <code>CHANGELOG.md</code>, <code>CONTRIBUTING.md</code>, <code>SUPPORT.md</code>, etc.) are not shipped. <code>LICENSE</code> is retained.</li>
+<li><code>performance.yml</code> is shipped trimmed: no <code>visitorEnabled</code>, <code>loginCacheEnabled</code>, <code>loginCacheCap</code>, <code>effectParsing</code>, <code>onEventParsing</code>.</li>
+<li><code>safety.yml</code> is <strong>not</strong> overlaid by lite; the lite jar bundles the full base <code>safety.yml</code> (block tags and state predicates included, ADR-017). (Amended 2026-06-20 — see the inherit-base-<code>safety.yml</code> amendment above.)</li>
+<li><code>messages.yml</code> is shipped trimmed to the keys actually consumed by lite (~6 entries).</li>
+<li><strong>Kept.</strong></li>
+<li><code>rtp-api</code> surface intact (third-party addons that hook the API still work; they are responsible for not depending on lite-excluded subsystems).</li>
+<li><code>rtp-core</code> selection: Archimedean spiral mapping (ADR-001), async chunk acquisition, <code>MemoryTracker</code> lifecycle, the S-005 stale-chunk guard (<code>ReqRtpS004NullChunkAttributionTest</code>-protected logic), and <strong>biomeRecall</strong> as the showcase feature.</li>
+<li><strong>Anvil pre-filter (<code>rtp-anvil</code>).</strong> Retained in lite — needed to keep selection performance demonstrable on cold-chunk worlds. Iris compatibility benefits directly.</li>
+<li><strong>Scan / spatial memory subsystem</strong> (<code>MemoryShape</code>, <code>/rtp scan</code> command tree). Retained in lite — required for performance comparison against the full edition; removing it would conflate "lite" with "slow" and defeat A/B benchmarking.</li>
+<li><strong>Full selection surface.</strong> All shapes (<code>Circle</code>, <code>Square</code>, <code>Rectangle</code>, <code>Circle_Normal</code>, <code>Square_Normal</code>), all selection modes, and all vertical adjustors remain available in lite. Required so operators can A/B identical region configs across lite and full.</li>
+<li><strong>Pregen queue with all tunables.</strong> Per-region queue + <code>cache cap</code> + queue tuning keys remain in lite, identical to full.</li>
+<li><code>commands-api</code> + Brigadier bridge (commands-api-ADR-001).</li>
+<li><code>effects-api</code> runtime, without the per-permission startup parse.</li>
+<li><strong>Spigot and Paper adapters</strong> across all currently supported NMS revisions, to maintain parity with RTP v2's Paper-native chunk-load path. Lite does not ship the Folia adapter; Folia operators must use the full edition. PaperLib is <strong>not</strong> reintroduced (ADR-005 still applies — its sync fallback violates S-005). Paper-native async chunk loading is reached through the existing Paper adapter, not through PaperLib.</li>
+<li>bStats, configured with a distinct <code>pluginId</code> so lite installs are tracked independently.</li>
+<li><strong>Bootstrap.</strong> <code>RTPBukkitLitePlugin.onEnable()</code> mirrors the surviving steps of <code>RTPBukkitPlugin.onEnable()</code> — server-model resolve (Spigot or Paper accessor; no Folia branch), accessor wiring, <code>RTP</code> construction, region / queue / <code>MemoryTracker</code> setup, anvil pre-filter wiring, scan-task wiring, command registration (including <code>/rtp scan</code>), <code>setupBukkitEvents</code> — and <strong>omits</strong> every step listed under "Drops, runtime" above. It does not call <code>LanguageBootstrap</code>, does not probe <code>org.sqlite.JDBC</code>, does not branch on <code>isFolia()</code>, does not call <code>initLoginReserveCache()</code>, and does not invoke <code>setupIntegrations()</code> (claim plugin wiring). The <code>isPaper()</code> branch is retained so Paper servers use Paper's native async chunk API, matching v2 behavior.</li>
+</ol>
+<h3 id="inactive-prior-adrs-in-the-lite-assembly">Inactive prior ADRs in the lite assembly<a class="headerlink" href="#inactive-prior-adrs-in-the-lite-assembly" title="Permanent link">&para;</a></h3>
+<p>The following ADRs remain authoritative for the <strong>full</strong> edition but describe subsystems that are absent from the lite artifact:</p>
+<ul>
+<li>ADR-002 (H2/SQLite over flat-file).</li>
+<li>ADR-017 — superseded for lite by the 2026-06-20 amendment above: lite inherits the full base <code>safety.yml</code>, so both block tags and state predicates ship in lite; only the <code>rtp-tags</code> module stays Pro.</li>
+<li>ADR-019 (Claim plugin integrations folded into plugin).</li>
+<li>ADR-020 (Language bootstrap and locale-aware ConfigParser).</li>
+<li>ADR-022 (Single-JAR multi-loader packaging — Folia/Fabric branches).</li>
+<li>ADR-023 (Login reserve cache).</li>
+</ul>
+<p>ADR-024 is <strong>additive</strong>, not a superseder: each prior ADR continues to govern the full edition.</p>
+<h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why Rejected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Java-level conditional compilation (annotation-processor stripping, <code>-ALite=true</code>)</td>
+<td>Java has no preprocessor; APT-based bytecode stripping is fragile, breaks IDE call-site verification, and obscures which classes ship in which artifact.</td>
+</tr>
+<tr>
+<td>Single shaded JAR with all features behind runtime config flags</td>
+<td>Does not reduce JAR size or driver footprint, and does not reduce the operator-facing surface (the toggles themselves generate support load).</td>
+</tr>
+<tr>
+<td>Two source sets <code>src/main/java</code> + <code>src/lite/java</code> <em>with the lite source set duplicating the bootstrap and replacing main entirely</em></td>
+<td>Adopted in the form below: lite ships a separate bootstrap class (<code>RTPBukkitLitePlugin</code>) only, while reusing <code>rtp-core</code> and the platform adapters. The maintenance tax is bounded because the lite bootstrap is small and intentionally divergent.</td>
+</tr>
+<tr>
+<td>Separate Gradle subproject <code>rtp-plugin-lite</code> consuming a subset of dependencies</td>
+<td>Doubles the build configuration and CI matrix without giving anything that an additional shadow task plus a source set does not already give, since <code>rtp-plugin/build.gradle</code> already demonstrates per-task configuration filtering (the Loom <code>minecraft</code> configuration strip).</td>
+</tr>
+<tr>
+<td>Maintain a separate <code>lite</code> git branch</td>
+<td>Rejected — long-lived divergent branches drift; defeats the purpose of "research which features are candidates to drop".</td>
+</tr>
+<tr>
+<td>Java 9 module system (<code>module-info.java</code> with <code>requires static</code>)</td>
+<td>Bukkit's classloader history makes JPMS adoption impractical for plugins.</td>
+</tr>
+<tr>
+<td>Reintroduce PaperLib for the Spigot adapter to bridge Paper's async chunk API</td>
+<td>Rejected — ADR-005 removed PaperLib precisely because its sync fallback on Spigot violates S-005. Bundling the Paper adapter directly is the parity-preserving option.</td>
+</tr>
+<tr>
+<td>Lite as Spigot-only, Paper operators run the Spigot adapter</td>
+<td>Rejected — confounds lite-vs-full benchmarks on Paper hosts (Paper-native chunk-load throughput would only appear in the full JAR), and breaks v2 parity for Paper users.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Positive.</strong></li>
+<li>Lite users cannot mis-configure features that do not exist in the lite JAR. Whole categories of <code>LESSONS_LEARNED.md</code> entries (database/shutdown-flush, login-cache promotion races, locale-switch reload mismatches) become unreachable on lite.</li>
+<li>Smaller artifact: removal of H2/SQLite/MySQL/Postgres/Jedis drivers, the <code>lang/**</code> tree, the bundled <code>docs/**</code> copy, the Folia adapter, and <code>rtp-tags</code> outputs visibly shrinks the JAR. The anvil module and the Paper adapter are retained.</li>
+<li><strong>Performance comparability.</strong> Because lite keeps the anvil pre-filter, the scan/spatial-memory subsystem, the full selection surface (shapes / modes / adjustors / pregen knobs), and both the Spigot and Paper adapters, lite-vs-full benchmarks isolate the subsystems lite actually drops (persistence, Folia regionized scheduling, login cache, visitor mode, permission parsing) rather than conflating them with raw selection throughput or Paper-vs-Spigot chunk-load differences. Paper parity with v2 is preserved.</li>
+<li>bStats split (distinct <code>pluginId</code>) gives empirical evidence of lite-vs-full adoption, informing future scope decisions.</li>
+<li>The full edition retains every existing feature; no operator is forced to migrate.</li>
+<li><strong>Negative / Trade-offs.</strong></li>
+<li>Two bootstrap classes (<code>RTPBukkitPlugin</code>, <code>RTPBukkitLitePlugin</code>) must be kept in sync for the steps both editions perform. Mitigation: the shared steps live in helper methods on the bootstrap or in <code>rtp-core</code>; both classes call the same helpers. Genuine divergence (login cache, language bootstrap, integrations) belongs only to the full bootstrap and never appears in lite.</li>
+<li>CI matrix grows: lite needs its own assembly + smoke test. Mitigation: a single <code>liteJarStructureTest</code> task that asserts the produced lite JAR contains no classes / resources from the lite-exclude list (<code>tags/</code>, <code>folia/</code>, <code>H2*</code>, <code>SQLite*</code>, <code>MySQL*</code>, <code>PostgreSQL*</code>, <code>AbstractSQLDatabaseAccessor</code>, <code>RedisManager</code>, <code>LoginCacheTask</code>, <code>lang/</code>, <code>docs/</code>, <code>economy.yml</code>, <code>integrations.yml</code>, <code>logging.yml</code>, <code>language.yml</code>). The anvil package (<code>rtp-anvil</code>) and the Paper adapter (<code>platforms/rtp-paper/**</code>) are allowed in lite.</li>
+<li>Hidden hard-imports in <code>rtp-core</code> to lite-excluded classes would cause <code>NoClassDefFoundError</code> at runtime in lite. Mitigation: a pre-flight audit (<code>search_project</code> over <code>rtp-core</code> for <code>import io.github.dailystruggle.rtp.tags</code>, <code>H2DatabaseAccessor</code>, <code>RedisManager</code>, <code>import dev.folia</code>) is required before this ADR is accepted; any hits other than legitimate strategy-pattern wiring are blocking refactors. Imports of <code>io.github.dailystruggle.rtp.anvil</code>, <code>io.papermc</code>, and <code>com.destroystokyo.paper</code> are explicitly allowed because the Paper adapter and anvil module ship in lite.</li>
+<li>Lite cannot run on Folia; operators on Folia must use the full JAR. Paper operators get full Paper-native behavior via the bundled Paper adapter, matching v2 parity.</li>
+<li>Iris compatibility on lite is functionally equivalent to full, because the anvil pre-filter is retained in lite.</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>rtp-plugin/build.gradle</code> — existing ShadowJar configuration with per-configuration filtering (Loom <code>minecraft</code> strip) used as the model for <code>shadowLiteJar</code>.</li>
+<li><code>rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/RTPBukkitPlugin.java</code> — full bootstrap; lite bootstrap mirrors only the surviving steps.</li>
+<li>ADR-002, ADR-005, ADR-016, ADR-017, ADR-019, ADR-020, ADR-022, ADR-023 — prior ADRs whose subsystems are excluded from lite (or, in the case of ADR-005 / ADR-016, whose conclusions are reaffirmed for lite).</li>
+<li><code>docs/dev/LESSONS_LEARNED.md</code> — entries on database/shutdown-flush, login-cache promotion, and locale-switch reload that motivated the lite scope.</li>
+<li><code>docs/dev/REQUIREMENTS.md</code> §3 — S-001…S-007 prohibitions; lite must satisfy all of them, identically to full.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

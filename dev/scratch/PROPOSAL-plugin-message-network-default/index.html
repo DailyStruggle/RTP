@@ -1,0 +1,1789 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>PROPOSAL - Plugin-Message Network Transport as the Default Tier (DB-free cross-server RTP, proxy auto-detect, lite-shipped) - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#proposal-plugin-message-network-transport-as-the-default-tier-db-free-cross-server-rtp-proxy-auto-detect-lite-shipped" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              PROPOSAL - Plugin-Message Network Transport as the Default Tier (DB-free cross-server RTP, proxy auto-detect, lite-shipped)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-thesis" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Thesis
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-transport-tiers-one-spi-four-implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Transport tiers (one SPI, four implementations)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-pluginmessagenetworkbinding-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. PluginMessageNetworkBinding shape
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-proxy-auto-detection-transporttype-auto" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Proxy auto-detection (transport.type: auto)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-networkyml-lite-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. network.yml (lite) shape
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-honest-limitations-document-loudly-they-define-the-pro-upgrade-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Honest limitations (document loudly; they define the Pro upgrade boundary)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-tab-completion-validation-cross-server-region-parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Tab-completion / validation (cross-server region parameter)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-what-this-does-not-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. What this does NOT change
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-resolved-decisions-formerly-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. Resolved decisions (formerly open questions)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9a-self-pausing-backends-fabric-neoforge" class="md-nav__link">
+    <span class="md-ellipsis">
+      9a. Self-pausing backends (Fabric / NeoForge)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-verdict-ratification-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. Verdict (ratification status)
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="proposal-plugin-message-network-transport-as-the-default-tier-db-free-cross-server-rtp-proxy-auto-detect-lite-shipped">PROPOSAL - Plugin-Message Network Transport as the Default Tier (DB-free cross-server RTP, proxy auto-detect, lite-shipped)<a class="headerlink" href="#proposal-plugin-message-network-transport-as-the-default-tier-db-free-cross-server-rtp-proxy-auto-detect-lite-shipped" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Approved (design-only; no code in scope; D-005 gate cleared 2026-06-12 by repo owner leaf)
+<strong>Date:</strong> 2026-06-12
+<strong>Owner:</strong> leaf (repo owner)
+<strong>Effective Issue:</strong> give the free/lite edition a competitive cross-server RTP story against EzRTP without sacrificing the large-network optimizations (durable reservation tokens, atomic claims, load-balanced selection) that justify the Pro Redis/SQL tiers. Make a <strong>plugin-messaging</strong> transport the default so that <em>a database is not required</em> for most operators, and <strong>auto-detect</strong> the proxy so the operator config shrinks to near-nothing.
+<strong>Refines:</strong> <code>MULTI_SERVER_PLAN.md</code> (plugin-message transport currently "dev-only", D2); <code>ADR-024</code> (lite assembly scope); <code>ADR-036</code> (network-mode umbrella); <code>rtp-proxy-ADR-*</code> transport-binding family.
+<strong>Reuses (no SPI changes):</strong> <code>NetworkTransport</code>, <code>BackendHeartbeat</code>, <code>NetworkSnapshot</code>, <code>BackendSelector</code> in <code>rtp-proxy-common</code>.</p>
+<hr />
+<h2 id="1-thesis">1. Thesis<a class="headerlink" href="#1-thesis" title="Permanent link">&para;</a></h2>
+<p>EzRTP's "network" feature is a <strong>backend-only server selector</strong>: a static, hand-maintained <code>servers:</code> list per backend, online/offline detected by direct <code>host:port</code> server-list pings, and player movement performed by speaking the proxy's built-in plugin-messaging vocabulary (<code>Connect</code>) over the issuing player's connection. It needs no proxy plugin and no database. Its ceiling: it transmits only <em>server up/down</em>, never <em>which regions/worlds are servable</em>, and the server list drifts because every backend is configured by hand.</p>
+<p>We can match its zero-infra baseline and beat its capability by shipping a <strong><code>PluginMessageNetworkBinding</code></strong> that implements the <em>existing</em> <code>NetworkTransport</code> SPI over the proxy's plugin-messaging channel, carrying our richer <code>BackendHeartbeat</code> (region availability, warm-cache counts, load) instead of a bare ping. Backends <strong>self-advertise</strong>, so the network assembles itself with no hand-typed server list.</p>
+<p>This is purely an additive transport tier. The durable Pro tiers (<code>RedisNetworkStateBinding</code>, <code>SqlNetworkStateBinding</code>) remain unchanged behind the same SPI; the dispatcher, selector, and command/tab-complete layer do not know which transport is underneath.</p>
+<h2 id="2-transport-tiers-one-spi-four-implementations">2. Transport tiers (one SPI, four implementations)<a class="headerlink" href="#2-transport-tiers-one-spi-four-implementations" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th><code>NetworkTransport</code> impl</th>
+<th>Availability source</th>
+<th>Reservation / atomic claim</th>
+<th>Durable</th>
+<th>Edition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td><code>InMemoryNetworkStateBinding</code> (existing)</td>
+<td>in-JVM</td>
+<td>yes (in-JVM)</td>
+<td>no</td>
+<td>dev/test</td>
+</tr>
+<tr>
+<td>1 (<strong>new default</strong>)</td>
+<td><code>PluginMessageNetworkBinding</code></td>
+<td><code>BackendHeartbeat</code> relayed via proxy <code>Forward</code> sub-channel</td>
+<td><strong>best-effort / none</strong> (player re-issues on miss)</td>
+<td>no</td>
+<td><strong>lite + Pro</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>SqlNetworkStateBinding</code> (existing)</td>
+<td>DB <code>UPSERT</code> + poll (Postgres <code>LISTEN/NOTIFY</code>)</td>
+<td>yes</td>
+<td>yes</td>
+<td>Pro</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>RedisNetworkStateBinding</code> (existing)</td>
+<td>pub/sub</td>
+<td>yes (atomic Lua + HMAC token)</td>
+<td>yes</td>
+<td>Pro</td>
+</tr>
+</tbody>
+</table>
+<p>MySQL is the free durable tier (tier 2); Postgres is the higher-performance tier-2 variant via <code>LISTEN/NOTIFY</code>. Redis (tier 3) is the lowest-latency, atomic-claim tier.</p>
+<p>Selection precedence in <code>network.yml</code>: explicit <code>transport.type</code> wins; <code>transport.type: auto</code> (the lite default) resolves to tier 1 when a proxy is detected and to "disabled" when standalone.</p>
+<h2 id="3-pluginmessagenetworkbinding-shape">3. <code>PluginMessageNetworkBinding</code> shape<a class="headerlink" href="#3-pluginmessagenetworkbinding-shape" title="Permanent link">&para;</a></h2>
+<p>Keep <strong>as much as possible in <code>rtp-core</code></strong> behind a thin <code>NetworkBridge</code> seam, and only drop down to a platform/proxy adapter at the exact points where the platform plugin-messaging API must be called. This is <strong>not Bukkit-specific</strong>: a Fabric (or NeoForge) backend fronted by Velocity must reach the same binding, so the message framing, heartbeat assembly, TTL expiry, snapshot maintenance, and the <code>auto</code> state machine all live in <code>rtp-core</code>; only the raw "send these bytes on <code>bungeecord:main</code> over player P's connection" / "receive bytes" primitive is delegated to the adapter (<code>Bukkit#sendPluginMessage</code>, Fabric custom-payload, etc.).</p>
+<p>Backend-side binding (<code>rtp-core</code> <code>NetworkBridge</code> + a small per-platform send/receive shim). Implements <code>NetworkTransport</code>:</p>
+<ul>
+<li><code>publishBackendHeartbeat(BackendHeartbeat row)</code> -&gt; serialize the record (already carries <code>serverId</code>, <code>regionsAvailable</code>, <code>worldsLoaded</code>, <code>regions</code>, <code>regionKeptCounts</code>, <code>acceptingRequests</code>, <code>pluginState</code>, <code>killSwitch</code>, <code>keptCount</code>) and emit it on the proxy <code>Forward</code> (or <code>ForwardToPlayer</code>) sub-channel of <code>bungeecord:main</code>, throttled to a heartbeat interval (default 200 ticks, the EzRTP <code>ping-interval-ticks</code> analogue).</li>
+<li><code>subscribeBackendHeartbeats(sink)</code> / <code>readSnapshot()</code> -&gt; maintain the last-seen <code>BackendHeartbeat</code> per <code>serverId</code>; expire entries on a TTL (the plugin-message analogue of <code>ping-timeout-millis</code>); invoke <code>sink</code> on change. <code>readSnapshot()</code> returns the assembled <code>NetworkSnapshot</code>.</li>
+<li><strong>Move</strong>: the dispatcher's connect step emits <code>Connect &lt;serverId&gt;</code> (or <code>ConnectOther &lt;player&gt; &lt;serverId&gt;</code>) on the issuing player's connection. The destination backend detects the join and runs a normal local <code>/rtp</code>.</li>
+<li><code>claim</code> / <code>redeem</code> / <code>release</code> / <code>reapExpired</code> / <code>findReservation</code> -&gt; <strong>best-effort / no-op</strong>. There is no durable token store. On a miss (region drained, world unloaded, backend gone), the destination's local pipeline bounces with an S-007 configurable "busy / no such region" message and the player re-issues. This is the same correctness posture EzRTP lives with, but with real region data.</li>
+</ul>
+<p>No <code>rtp-proxy-common</code> SPI surface changes: this is a peer of <code>InMemoryNetworkStateBinding</code>.</p>
+<h2 id="4-proxy-auto-detection-transporttype-auto">4. Proxy auto-detection (<code>transport.type: auto</code>)<a class="headerlink" href="#4-proxy-auto-detection-transporttype-auto" title="Permanent link">&para;</a></h2>
+<p>Two layers:</p>
+<p><strong>Layer 1 - passive probe (gate, not source of truth).</strong> Read whether proxy forwarding is enabled:
+- Spigot: <code>settings.bungeecord: true</code> in <code>spigot.yml</code>.
+- Paper: <code>proxies.bungee-cord</code> / <code>proxies.velocity</code> in <code>paper-global.yml</code>.
+This arms network mode but supplies neither this backend's proxy name nor the sibling list.</p>
+<p><strong>Layer 2 - active handshake (the real detect + topology learn).</strong> Register <code>bungeecord:main</code> always; on the first player join, send:
+- <code>GetServer</code> -&gt; proxy replies with this backend's own proxy name (operator never hand-types it).
+- <code>GetServers</code> -&gt; proxy replies with the full backend-name list.</p>
+<p>State machine: <code>UNKNOWN</code> -&gt; (passive probe true) <code>ARMED</code> -&gt; (first join: send handshake) <code>PROBING</code> -&gt; (reply within timeout, default <code>ping-timeout-millis: 1500</code>) <code>ENABLED</code>; else <code>DISABLED</code> (standalone). Heartbeat gossip begins only in <code>ENABLED</code>. Re-probe on proxy reconnect.</p>
+<p>Result: drop the jar on every backend, the network assembles itself - strictly better than EzRTP's static per-server <code>servers:</code> list.</p>
+<h2 id="5-networkyml-lite-shape">5. <code>network.yml</code> (lite) shape<a class="headerlink" href="#5-networkyml-lite-shape" title="Permanent link">&para;</a></h2>
+<p>Minimal; mirrors EzRTP's <code>servers.&lt;name&gt;</code> vocabulary only where an operator must still express policy a backend cannot self-discover.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">network</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">transport</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span><span class="w">        </span><span class="c1"># auto | plugin-message | sql | redis | inMemory | disabled</span>
+<span class="w">    </span><span class="nt">heartbeatTicks</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">staleTimeoutMillis</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1500</span>
+<span class="w">  </span><span class="c1"># Optional per-server policy overlay; absent =&gt; discovered server is offered with defaults.</span>
+<span class="w">  </span><span class="nt">servers</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">skyblock</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">permission</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span><span class="w">           </span><span class="c1"># gate visibility/use of this destination</span>
+<span class="w">      </span><span class="nt">display-name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Skyblock&quot;</span>
+<span class="w">      </span><span class="nt">hide-when-unavailable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">      </span><span class="nt">allow-when-unavailable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<p>There is <strong>no hand-typed server list required</strong> in <code>auto</code> mode: <code>servers:</code> is an optional policy overlay keyed by the discovered names. <code>host</code>/<code>port</code> are gone (availability is the heartbeat, not a socket ping).</p>
+<h2 id="6-honest-limitations-document-loudly-they-define-the-pro-upgrade-boundary">6. Honest limitations (document loudly; they define the Pro upgrade boundary)<a class="headerlink" href="#6-honest-limitations-document-loudly-they-define-the-pro-upgrade-boundary" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Everything rides a player connection.</strong> <code>GetServers</code>, <code>Forward</code>, and <code>Connect</code> require an online player on the sending backend. Auto-detect completes only on first join (acceptable). A player-empty backend cannot broadcast its heartbeat, so its availability goes stale/unknown.</li>
+<li><strong>Unknown -&gt; accept.</strong> <code>isRelevant</code> (execute-time region validation) must <strong>accept</strong> when the snapshot is unknown/stale and let the destination decide; suggestion filtering may stay strict. Otherwise transport lag becomes user-visible command failures.</li>
+<li><strong>Single-proxy fan-out.</strong> <code>Forward</code> only reaches backends visible to one proxy. Multi-proxy (RedisBungee-style) networks need tier 2/3 - the clean, honest upgrade boundary.</li>
+<li><strong>Non-durable.</strong> No reservation survives a proxy restart (D2). Worst case is a re-issued <code>/rtp</code>. Operators needing atomic, durable, load-balanced cross-server reservation move to MySQL/Postgres/Redis.</li>
+<li><strong>Optional proxy companion (future).</strong> The existing <code>rtp-proxy-velocity</code> / <code>rtp-proxy-bungee</code> plugins can hold the channel open independent of player presence and relay heartbeats reliably - an enhancement, not a baseline requirement.</li>
+</ol>
+<h2 id="7-tab-completion-validation-cross-server-region-parameter">7. Tab-completion / validation (cross-server region parameter)<a class="headerlink" href="#7-tab-completion-validation-cross-server-region-parameter" title="Permanent link">&para;</a></h2>
+<p>A <code>NetworkRegionParameter</code> whose <code>values()</code> returns the cached availability snapshot for the chosen target server and whose <code>isRelevant</code> validates against the same snapshot with the §6.2 "unknown -&gt; accept" grace. The snapshot provider is pluggable (config overlay / plugin-message / SQL / Redis) so the command layer is transport-agnostic. Pure-config operators (no transport) get a static declared list (EzRTP parity); the heartbeat tiers eliminate the drift.</p>
+<h2 id="8-what-this-does-not-change">8. What this does NOT change<a class="headerlink" href="#8-what-this-does-not-change" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>rtp-proxy-common</code> SPI: zero changes. Tier 1 is a peer implementation.</li>
+<li>Pro selector / claim / token logic: reused unchanged behind the SPI.</li>
+<li>ADR-024 lite excludes (SQL drivers, Redis, Folia adapter classes): unchanged. Tier 1 adds no driver; the binding lives in a backend-reachable module and ships in lite. <code>liteJarStructureCheck</code> extended only to assert no Redis/SQL transport class leaks while permitting <code>PluginMessageNetworkBinding</code>.</li>
+<li>S-00x: the destination always runs the normal local pipeline (spiral -&gt; chunk -&gt; safety), so S-001/S-004/S-005 hold; tier 1 transports <em>intent</em>, not a coordinate. Move failures are logged, never swallowed (S-004); busy/invalid messages are configurable (S-007).</li>
+</ul>
+<h2 id="9-resolved-decisions-formerly-open-questions">9. Resolved decisions (formerly open questions)<a class="headerlink" href="#9-resolved-decisions-formerly-open-questions" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Heartbeat serialization format - RESOLVED: reuse.</strong> <code>Forward</code> payloads reuse the existing Redis flat-field encoder (<code>encodeBackend</code>/<code>decodeBackend</code>) over the proxy channel, so tier 1/2/3 share one decoder and the <code>BackendHeartbeat</code> field set is identical across transports. No new wire format.</li>
+<li><strong>Module ownership - RESOLVED: maximise <code>rtp-core</code>.</strong> The binding lives in <code>rtp-core</code> behind a <code>NetworkBridge</code> seam; only the raw platform plugin-messaging send/receive primitive is delegated to a per-platform shim (see §3). This is deliberately <strong>not</strong> a Bukkit-only adapter because Fabric/NeoForge backends can also sit behind Velocity. Backend-specific code appears only if/when we depend on the Bungee API directly; BungeeCord support is layered on top of the existing Velocity support <strong>later</strong> and is not required for this tier.</li>
+<li><strong>Heartbeat delivery / cost - RESOLVED: use the proxy as the store.</strong> Rather than treating availability as a per-backend database status, the proxy itself is the rendezvous point - backends gossip <code>BackendHeartbeat</code> through it and origins read the last-seen snapshot from it. This is the DB-free analogue of the tier-2/3 status table; throttle stays at the default 200-tick heartbeat interval and is revisited only if chatty at large N.</li>
+<li><strong>Velocity channel handling - DECISION: implement if absent.</strong> Confirm <code>GetServer</code>/<code>GetServers</code>/<code>Connect</code>/<code>Forward</code> are honored on current Velocity; we do not appear to exercise all of these yet, so any missing piece (notably the modern namespaced-channel registration and the <code>GetServers</code>/topology handshake) is <strong>in scope to add</strong>.</li>
+<li><strong><code>auto</code> re-probe - RESOLVED: re-probe.</strong> A standalone server that later joins a proxy must <strong>re-probe</strong> live (on first join and on proxy reconnect) rather than requiring a restart.</li>
+</ol>
+<h2 id="9a-self-pausing-backends-fabric-neoforge">9a. Self-pausing backends (Fabric / NeoForge)<a class="headerlink" href="#9a-self-pausing-backends-fabric-neoforge" title="Permanent link">&para;</a></h2>
+<p>Fabric and NeoForge backends are valid proxy targets but <strong>self-pause after ~60 s of no player activity</strong> (Minecraft's idle-tick pause). Consequences for tier 1:</p>
+<ul>
+<li>A paused backend stops ticking, so it cannot emit heartbeats <em>and</em> its <code>auto</code> handshake/gossip stalls - its snapshot entry goes stale exactly as the §6.1 player-presence limitation predicts. Treat "stale/unknown" the same as player-empty: <strong>unknown -&gt; accept</strong> (§6.2), let the move + destination decide.</li>
+<li>The <code>Connect</code> move still wakes a paused backend (the proxy transfer resumes ticking on player arrival), so cross-server RTP into a paused Fabric/NeoForge backend works; only its <em>advertised availability</em> is unreliable while paused.</li>
+<li>Do not rely on a paused backend to answer a synchronous availability query. The staleTimeout must tolerate the idle-pause window (default 1500 ms is far shorter than 60 s, so a paused backend is correctly shown stale). Operators wanting always-fresh availability for idle backends are pointed at the durable tier-2/3 store (which survives independent of backend ticking) or the optional proxy companion (§6.5).</li>
+</ul>
+<h2 id="10-verdict-ratification-status">10. Verdict (ratification status)<a class="headerlink" href="#10-verdict-ratification-status" title="Permanent link">&para;</a></h2>
+<p>Approved by repo owner leaf 2026-06-12; the docs-only ratification (steps 1-4) is <strong>done</strong> this turn.</p>
+<ol>
+<li>[DONE] Amended <code>MULTI_SERVER_PLAN.md</code>: plugin-message promoted from "dev-only" to <strong>tier-1 default (non-durable)</strong> per §2-§6 (new <em>Amendment: Plugin-Message Default Tier</em> section; D2, reservation, transport-order, config, and risk lines updated); player-presence limitation and tier-2/3 upgrade boundary documented.</li>
+<li>[DONE] Amended <code>ADR-036</code> (network-mode umbrella): D2 reframed, transport tiers updated, new <em>Amendment: Plugin-Message Promoted to Tier-1 Default</em> section recording the default tier and the <code>auto</code> detection mode.</li>
+<li>[DONE] Amended <code>ADR-024</code> (lite assembly): new 2026-06-12 amendment — lite ships <code>PluginMessageNetworkBinding</code> + the trimmed <code>network.yml</code>; <code>liteJarStructureCheck</code> extension scoped (Redis/SQL transport classes stay forbidden, plugin-message binding permitted).</li>
+<li>[DONE] Authored subproject ADR <code>platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-016-plugin-message-default-transport.md</code> (Accepted) holding the binding contract (§3) and the <code>auto</code> state machine (§4); added rows to both ADR README tables.</li>
+<li>[PENDING] Land code in a follow-up D-005 turn (still gated): <code>PluginMessageNetworkBinding</code>, <code>auto</code> resolver, <code>NetworkRegionParameter</code>, <code>network.yml</code> schema, lite bootstrap wiring, audit extension, tests.</li>
+</ol>
+<p>No source changes in this turn (docs-only ratification).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

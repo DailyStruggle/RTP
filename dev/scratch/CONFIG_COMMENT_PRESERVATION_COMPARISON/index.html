@@ -1,0 +1,1899 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>Config Comment-Preservation: v1 vs v2 vs v3 - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#config-comment-preservation-v1-vs-v2-vs-v3" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Config Comment-Preservation: v1 vs v2 vs v3
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/why/" class="md-tabs__link">
+        
+  
+    
+  
+  Why
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/intended-usage/" class="md-tabs__link">
+        
+  
+    
+  
+  Intended usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../site/what-not-to-do/" class="md-tabs__link">
+        
+  
+    
+  
+  What NOT to do
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tldr" class="md-nav__link">
+    <span class="md-ellipsis">
+      TL;DR
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v1-surgical-line-level-rewriting-on-top-of-a-comment-stripping-library" class="md-nav__link">
+    <span class="md-ellipsis">
+      v1 — surgical line-level rewriting on top of a comment-stripping library
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v1 — surgical line-level rewriting on top of a comment-stripping library">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how" class="md-nav__link">
+    <span class="md-ellipsis">
+      How
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-it-preserved" class="md-nav__link">
+    <span class="md-ellipsis">
+      What it preserved
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-it-broke" class="md-nav__link">
+    <span class="md-ellipsis">
+      Where it broke
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lessons-for-v3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Lessons for v3
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v2-outsource-to-simpleyaml-accept-its-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      v2 — outsource to simpleyaml; accept its limits
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v2 — outsource to simpleyaml; accept its limits">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      How
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-it-preserved_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      What it preserved
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-it-broke-or-remained-brittle" class="md-nav__link">
+    <span class="md-ellipsis">
+      Where it broke (or remained brittle)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lessons-for-v3_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Lessons for v3
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v3-current-same-simpleyaml-core-more-elaborate-update-path-same-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      v3 (current) — same simpleyaml core, more elaborate update path, same gaps
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v3 (current) — same simpleyaml core, more elaborate update path, same gaps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-delta-from-v2" class="md-nav__link">
+    <span class="md-ellipsis">
+      How (delta from v2)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-it-preserves" class="md-nav__link">
+    <span class="md-ellipsis">
+      What it preserves
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-it-still-breaks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Where it still breaks
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-we-should-take-into-adr-a12-followup" class="md-nav__link">
+    <span class="md-ellipsis">
+      What we should take into ADR-A12-followup
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions-to-ask-before-opening-the-a12-adr" class="md-nav__link">
+    <span class="md-ellipsis">
+      Open questions to ask before opening the A12 ADR
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      File references
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="config-comment-preservation-v1-vs-v2-vs-v3">Config Comment-Preservation: v1 vs v2 vs v3<a class="headerlink" href="#config-comment-preservation-v1-vs-v2-vs-v3" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> scratch / research note, 2026-05-14
+<strong>Motivation:</strong> <code>CONFIG_COMMAND_SPEC.md</code> Appendix A12 — the spec's <code>view</code> UX (hover-text shows the YAML comment for each key) depends on round-trip comment preservation through save. Today the round-trip is not guaranteed. Before designing a fix, look at what v1 and v2 attempted, what worked, and what broke.
+<strong>Scope:</strong> comment fate through <code>&lt;load → mutate → save&gt;</code> for the user's installed config (not the jar-shipped default). Backup rotation and atomic-write are noted in passing where they intersect with comment handling.</p>
+<p><strong>Scope decision (2026-05-14, user):</strong> <strong>Block (above-line) comments are the in-scope problem to solve.</strong> Inline (same-line <code>key: value  # comment</code>) comments are <strong>explicitly out of scope</strong> — the A12 ADR will declare them unsupported. This narrows the design problem substantially: comment ownership only needs to be stable for <em>whole-line comment blocks attached to a following key</em>, not for trailing tails of rewritten value lines. Everything below should be read with that constraint in mind; sections discussing inline-comment fragility remain as historical evidence for <em>why</em> we are dropping inline support, not as problems still to be solved.</p>
+<hr />
+<h2 id="tldr">TL;DR<a class="headerlink" href="#tldr" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>YAML substrate</th>
+<th>Comment-preservation strategy</th>
+<th>What it actually preserved</th>
+<th>Main failure modes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>v1</strong></td>
+<td>Bukkit <code>YamlConfiguration</code> (strips comments on load)</td>
+<td>Re-read the <strong>user's file</strong> as plain text lines; for each line, if it <code>startsWith("&lt;node&gt;:")</code>, replace the value tail and keep the rest of the line; pass other lines (incl. comment lines) through untouched.</td>
+<td>Block comments and inline comments on <strong>top-level scalar</strong> keys, plus all standalone comment lines.</td>
+<td>Nested keys not addressed (the <code>startsWith</code> match is anchored at column 0). Lists are rebuilt from scratch — any inline/per-item comment inside a list is lost. Manual quoting heuristics for <code>Material</code> vs free strings. No atomic write. Version line hardcoded into the rewrite.</td>
+</tr>
+<tr>
+<td><strong>v2</strong></td>
+<td><code>org.simpleyaml.configuration.file.YamlFile</code> (<code>simpleyaml</code>), invoked as <code>loadWithComments()</code> + <code>save()</code></td>
+<td>Library does the round-trip; v2 caches one <code>YamlFile</code> per file in <code>YamlFileDatabase</code> and saves the cached instance. On version bump, <code>renameFiles()</code> rotates the user's file to <code>.old1..N</code> and re-extracts the jar default (<strong>user comments lost on version bump</strong>, by design).</td>
+<td>Above-line block comments and (mostly) inline comments on simple scalar keys, on <strong>both top-level and nested keys</strong>, as long as the file is <em>never</em> round-tripped through a path that goes back to the jar default.</td>
+<td>(a) Inline (<code># trailing</code>) comments on lines whose value gets rewritten by <code>set(...)</code> are unreliable — simpleyaml's comment-binding heuristic can detach the trailing comment from the line when the scalar is re-emitted. (b) Comments inside list bodies (per-item or between items) get reordered or dropped. (c) Any <code>ConfigurationSection</code> path that goes through <code>setSection(...)</code> recursion (used for <code>shape</code>/<code>vert</code> factory values) replaces the whole subtree and drops the section's interior comments. (d) Version-bump path re-extracts from jar (intentional, but a real user-comment loss event). (e) No atomic temp+rename — <code>YamlFile.save()</code> writes in place.</td>
+</tr>
+<tr>
+<td><strong>v3 (current)</strong></td>
+<td>Same simpleyaml <code>YamlFile</code>, same <code>loadWithComments</code> + <code>save</code> (inherited from v2).</td>
+<td>Same as v2, with the same caching layer (<code>YamlFileDatabase.cachedLookup</code>). Update path uses an intermediate <code>baseline.loadWithComments()</code> to merge jar defaults with the on-disk file before re-saving.</td>
+<td>Same surface as v2. The merge-from-baseline path was an improvement intent (avoid wholesale jar re-extraction on version bump) but its comment fidelity is bounded by the same simpleyaml inline/list limitations.</td>
+<td>Same a–d as v2. Plus: <code>SubConfigCmd</code> / <code>ListCmd</code> mutate via <code>YamlFile.set(...)</code> without re-loading-with-comments first, so any path that has lost the cached <code>YamlFile</code>'s comment side-table (e.g. a write that went through <code>getMapValues(true)</code> then a <code>set</code>, or a clone path) saves a comment-free file.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>One-sentence lesson for the spec:</strong>
+Library-level "preserve comments" support (v2/v3 via simpleyaml) is necessary but <strong>not sufficient</strong> — inline comments on rewritten scalars, comments inside lists, and any path that replaces a whole <code>ConfigurationSection</code> will still lose comments regardless of the library's nominal capability. The robust fix is the same one v1 stumbled onto in primitive form: never re-emit the file from a data model; instead, mutate the <strong>on-disk text</strong> with surgical line/range edits and only fall back to a full re-emit when the user file diverges from a parseable shape.</p>
+<hr />
+<h2 id="v1-surgical-line-level-rewriting-on-top-of-a-comment-stripping-library">v1 — surgical line-level rewriting on top of a comment-stripping library<a class="headerlink" href="#v1-surgical-line-level-rewriting-on-top-of-a-comment-stripping-library" title="Permanent link">&para;</a></h2>
+<h3 id="how">How<a class="headerlink" href="#how" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Library: Bukkit <code>YamlConfiguration</code>, which discards comments on load.</li>
+<li>Save path (<code>Config.update()</code> in <code>leafcraft/rtp/tools/configuration/Config.java</code>):</li>
+<li>Call <code>FileStuff.renameFiles(plugin, "config")</code> to rotate older <code>.old*</code> files.</li>
+<li>Snapshot the in-memory values into <code>oldValues = config.getValues(false)</code>.</li>
+<li>Re-open the <strong>user's <code>config.yml</code></strong> with a <code>Scanner</code> and load every line into <code>ArrayList&lt;String&gt; linesInDefaultConfig</code> (note: misnamed — these are the user's lines, not the shipped default).</li>
+<li>For each line:<ul>
+<li>If <code>startsWith("version:")</code>, replace with the new version literal.</li>
+<li>Else if <code>startsWith("  -")</code> (a list item), drop it — list items are rebuilt from the in-memory list when the parent key line is rewritten.</li>
+<li>Else, for each known top-level key, if <code>line.startsWith(node + ":")</code> replace the value tail by stringifying <code>oldValues.get(node)</code>:</li>
+<li>For lists: rebuild as <code>&lt;node&gt;: \n  - item1\n  - item2 …</code>, with per-item quoting heuristic (<code>Material.getMaterial(item) == null ? "\"…\"" : item</code>) to keep enums unquoted and string values quoted.</li>
+<li>For strings: emit <code>node: "value"</code>.</li>
+<li>For everything else: emit <code>node: value</code>.</li>
+</ul>
+</li>
+<li>Write the resulting lines back to <code>config.yml</code> with a <code>FileWriter</code> (no temp file, no rename, no fsync).</li>
+</ul>
+<h3 id="what-it-preserved">What it preserved<a class="headerlink" href="#what-it-preserved" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Standalone comment lines</strong> anywhere in the file: passed through untouched.</li>
+<li><strong>Inline trailing comments on a scalar top-level key</strong> — because the rewrite only replaces from <code>&lt;node&gt;:</code> to the end-of-value; the trailing <code># comment</code> is part of the same line <strong>only if</strong> the rewrite logic doesn't blindly overwrite from <code>&lt;node&gt;:</code> to end-of-line. Looking at the actual code (<code>newline = new StringBuilder(node + ": " + ...)</code>) it <strong>does</strong> overwrite the entire line — so v1's inline-comment story is worse than the file-format would in principle allow.</li>
+<li><strong>Block comments above a line</strong>: yes, preserved.</li>
+</ul>
+<h3 id="where-it-broke">Where it broke<a class="headerlink" href="#where-it-broke" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Nested keys</strong>: a key inside a section was matched by <code>startsWith("section:")</code> at column 0 and rebuilt as a top-level entry. The result was either a no-op (no match) or a corrupted file. v1's config schema was almost entirely flat, which is why this didn't blow up in production.</li>
+<li><strong>Lists with inline comments</strong>: lost. Lists were dropped and rebuilt; only the values survived, and only as bare items with the auto-quote heuristic.</li>
+<li><strong>Quoting heuristic</strong>: <code>Material.getMaterial(str) == null ? quote : noquote</code> is fragile across MC versions (a previously-known Material becoming unknown re-quotes its serialization).</li>
+<li><strong>Atomicity</strong>: none. A crash mid-<code>FileWriter</code> truncated the user's config in place.</li>
+<li><strong>Backup</strong>: <code>FileStuff.renameFiles</code> rotated <code>config.yml</code> → <code>config.old1</code> → <code>config.old2 …</code> before writing, so a partial save could be recovered manually. Not the same thing as atomic rename, but it did mean the previous good copy was always one filename away.</li>
+</ul>
+<h3 id="lessons-for-v3">Lessons for v3<a class="headerlink" href="#lessons-for-v3" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Standalone comment lines are easy</strong> — pass-through works as long as you don't blow away the whole file. v1 got this right despite using a comment-stripping library.</li>
+<li><strong>Per-key surgical edits</strong> beat "deserialize-then-re-emit" if you want inline comments. v1 did this in the crudest possible way (<code>startsWith</code> line match) and still preserved more than a naive <code>YamlConfiguration.save()</code> would.</li>
+<li><strong>Lists are the hard part.</strong> v1 chose to drop and rebuild; v2/v3 inherited the same compromise via simpleyaml.</li>
+</ol>
+<hr />
+<h2 id="v2-outsource-to-simpleyaml-accept-its-limits">v2 — outsource to simpleyaml; accept its limits<a class="headerlink" href="#v2-outsource-to-simpleyaml-accept-its-limits" title="Permanent link">&para;</a></h2>
+<h3 id="how_1">How<a class="headerlink" href="#how_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Library: <code>org.simpleyaml:simpleyaml</code>, which has a documented "load/save with comments" mode (<code>YamlFile.loadWithComments()</code>).</li>
+<li>Save path (<code>ConfigParser.save()</code> in <code>src/main/java/io/github/dailystruggle/rtp/common/configuration/ConfigParser.java</code>):</li>
+<li><code>YamlFileDatabase.connect()</code> walks <code>pluginDirectory</code>, opens each <code>.yml</code> as a <code>YamlFile</code>, calls <code>loadWithComments()</code> on it, and caches the instance in <code>cachedLookup</code> (an <code>AtomicReference&lt;Map&lt;String, YamlFile&gt;&gt;</code>).</li>
+<li><code>set(E key, Object value)</code> mutates the <strong>cached YamlFile instance</strong> via <code>yamlFile.set(key.name(), value)</code>. For <code>ConfigurationSection</code> values (e.g. <code>shape</code>, <code>vert</code>) it recurses via a private <code>setSection(...)</code> that re-walks the subtree and <code>set</code>s each leaf.</li>
+<li><code>save()</code> calls <code>cachedLookup.get().get(name).save()</code> — the library serializes the in-memory <code>YamlFile</code>, comments and all, back to disk in place.</li>
+<li>Version-bump path (<code>check(...)</code> → <code>update()</code> → <code>renameFiles()</code>):</li>
+<li>On a version mismatch, the user's file is rotated to <code>.old1..N</code> (rotating the existing <code>.old*</code> chain upward, top-down to avoid overwrites) and the shipped jar default is re-extracted as the new <code>name</code>. The user's comments are lost intentionally — the assumption is that the <strong>jar default's</strong> comments are more useful than a stale custom file.</li>
+</ul>
+<h3 id="what-it-preserved_1">What it preserved<a class="headerlink" href="#what-it-preserved_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Above-line block comments</strong> on scalar keys at any nesting depth: well preserved by simpleyaml across <code>set → save</code> round-trips.</li>
+<li><strong>Most inline trailing comments on simple top-level scalars</strong> that are not touched by a <code>set</code>: preserved.</li>
+<li><strong>Inline trailing comments on scalars that ARE touched by a set</strong>: <strong>fragile</strong> — simpleyaml's comment-binding code attaches the trailing <code># …</code> to a "comment side-table" keyed by node identity; when the scalar value is re-emitted with a different lexical form (e.g. <code>123</code> → <code>"123"</code> due to a type-narrowing <code>set</code>), the rebinding heuristic sometimes drops the trailing comment.</li>
+</ul>
+<h3 id="where-it-broke-or-remained-brittle">Where it broke (or remained brittle)<a class="headerlink" href="#where-it-broke-or-remained-brittle" title="Permanent link">&para;</a></h3>
+<p>a. <strong>Inline comments on rewritten scalars</strong> — as above. The user-visible symptom is "I edited one value via <code>/rtp config</code> and the <code># explanation</code> next to a different, neighboring value disappeared," because simpleyaml re-emits the section, not just the one line.
+b. <strong>Comments inside list bodies</strong> — simpleyaml's list-comment support is partial; comments interspersed between list items (e.g. <code># vanilla biomes ↓</code>) can move, fuse with the next item, or vanish when the list is re-emitted.
+c. <strong><code>setSection(...)</code> recursion for factory values</strong> (<code>shape</code>, <code>vert</code>) replaces a whole subtree by reconstructing it from a <code>Map&lt;String, Object&gt;</code> — <em>interior</em> comments of that subtree are not in the side-table the same way (the subtree's <code>ConfigurationSection</code> is replaced wholesale) and are lost.
+d. <strong>Version-bump rotation</strong> intentionally discards the user's file in favour of the jar default. Comments the user added between releases are lost on every minor version bump.
+e. <strong>No atomic write</strong>: <code>YamlFile.save()</code> truncates and writes in place. A crash mid-save corrupts the file; <code>.old1</code> may be a useful previous snapshot if <code>renameFiles()</code> ran in this cycle (only on version bumps — not on routine <code>/rtp config set</code>).</p>
+<h3 id="lessons-for-v3_1">Lessons for v3<a class="headerlink" href="#lessons-for-v3_1" title="Permanent link">&para;</a></h3>
+<ol>
+<li><code>loadWithComments</code> is a <strong>necessary</strong> primitive but not a complete solution. Treat its output as best-effort: covers most above-line block comments, partial inline, near-zero coverage on intra-list and replaced-section interiors.</li>
+<li>The <code>setSection</code> factory-value path is the single biggest in-process comment loser. If we want to keep comments on the interior of <code>shape</code>/<code>vert</code> sections, we must avoid wholesale subtree replacement and instead set individual leaf scalars under the section.</li>
+<li>The version-bump rebase-to-jar-default policy is a deliberate user-comment loss event. If users care about their inline notes surviving a release, this policy must change (3-way merge, or explicit "keep user, discard jar").</li>
+<li>Backup rotation <code>.old1..N</code> is good provenance even without atomic-rename, but <strong>only fires on version bump</strong>, not on routine writes — so a crash mid-<code>save()</code> during a <code>/rtp config set</code> has no recovery path.</li>
+</ol>
+<hr />
+<h2 id="v3-current-same-simpleyaml-core-more-elaborate-update-path-same-gaps">v3 (current) — same simpleyaml core, more elaborate update path, same gaps<a class="headerlink" href="#v3-current-same-simpleyaml-core-more-elaborate-update-path-same-gaps" title="Permanent link">&para;</a></h2>
+<h3 id="how-delta-from-v2">How (delta from v2)<a class="headerlink" href="#how-delta-from-v2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Same <code>simpleyaml YamlFile</code> + <code>loadWithComments()</code> + <code>save()</code> substrate (see <code>rtp-core/.../configuration/ConfigParser.java</code>).</li>
+<li>Same <code>YamlFileDatabase.cachedLookup</code> caching pattern.</li>
+<li>New: an intermediate "baseline" path inside <code>extractLocalizedResource</code> / the update logic that copies the jar resource to a temp <code>YamlFile</code>, <code>loadWithComments()</code>s it, and merges keys back, instead of v2's wholesale rotate-and-re-extract. This was intended to <strong>reduce</strong> the v2-era version-bump comment loss.</li>
+<li><code>LanguageBootstrap</code> pre-parser bootstrap loads <code>language.yml</code> before the rest of the parser graph (ADR-020) — a special path that historically didn't go through the cached <code>YamlFile</code>.</li>
+</ul>
+<h3 id="what-it-preserves">What it preserves<a class="headerlink" href="#what-it-preserves" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Same surface as v2: above-line block on scalars, most untouched inline comments, partial-to-nothing on rewritten scalars, lists, and replaced sections.</li>
+</ul>
+<h3 id="where-it-still-breaks">Where it still breaks<a class="headerlink" href="#where-it-still-breaks" title="Permanent link">&para;</a></h3>
+<ul>
+<li>All of a–e from the v2 list, plus:</li>
+<li><strong>Mutations that bypass the cached <code>YamlFile</code>'s comment side-table</strong>: any code path that loads values via <code>getMapValues(true)</code>, mutates a primitive map, and then writes back, loses comments — because the side-table is keyed on the original <code>YamlFile</code> instance. Suspect paths: <code>SubConfigCmd</code> / <code>ListCmd</code> mutate the cached <code>YamlFile</code> directly today, but the <strong><code>clone()</code> path</strong> (<code>ConfigParser.clone()</code> calls <code>check(...)</code> again on the clone, which can reopen the file fresh) re-binds the comment side-table to a new instance, leaving the original (still-cached, still-mutated) instance's comment data stale.</li>
+<li><strong>No atomic write</strong> still: same in-place truncate-and-rewrite as v2. This intersects directly with the planned <code>ConfigTransaction</code> / <code>AtomicConfigWriter</code> work in ADR-041 — the temp+fsync+rename has to happen <strong>inside</strong> the simpleyaml save call (i.e. <code>save(File tempFile); atomicMove(tempFile, finalFile)</code>) rather than letting simpleyaml write the final path directly.</li>
+<li><strong>The user's prior partial-fix attempt for above-line comments</strong> (noted by the user, not visible in current source as a finished feature) suggests there is or was an experimental path that tried to capture the block-comment above a key independently and reattach it on save; it was abandoned because the same heuristic doesn't generalize to inline (same-line) comments, where the comment is lexically inside the same line being rewritten.</li>
+</ul>
+<hr />
+<h2 id="what-we-should-take-into-adr-a12-followup">What we should take into ADR-A12-followup<a class="headerlink" href="#what-we-should-take-into-adr-a12-followup" title="Permanent link">&para;</a></h2>
+<p>(For when we open the dedicated YAML-substrate ADR that closes <code>CONFIG_COMMAND_SPEC.md</code> Appendix A12.)</p>
+<ol>
+<li><strong>Don't expect any off-the-shelf YAML library to perfectly round-trip inline comments through <code>set + save</code> on rewritten scalars.</strong> simpleyaml is the best of a weak field; snakeyaml-engine has experimental comment preservation but the same inline-on-rewrite caveat; SnakeYAML 2.x classic does not preserve at all.</li>
+<li><strong>The robust strategy is text-surgery, not data-model-round-trip.</strong> Treat the on-disk file as the source of truth; the in-memory model is a <em>query</em> view. For a <code>set</code>:</li>
+<li>Locate the key's line range in the existing file text (line and column).</li>
+<li>Rewrite only the value portion, leaving the <code># trailing</code> tail intact unless the user explicitly clears it.</li>
+<li>For lists, rewrite item-by-item with a stable diff, preserving comment-only lines between items.</li>
+<li>For section replacement (factory values), surgical-delete the old block and emit the new block plus the section's preceding block-comment header (if any).
+   This is essentially v1's idea, generalized to nested keys via a real YAML AST. The right tool is a comment-aware YAML AST library (e.g. a custom layer on top of snakeyaml-engine's Parser+Emitter exposing the <code>CommentEvent</code> stream) — <strong>not</strong> simpleyaml's serialized data-model.</li>
+<li><strong>Specific things v1 and v2 each got right and we should keep:</strong></li>
+<li>From v1: pass-through of standalone comment lines that aren't part of any key's rewrite range; backup-rotation <code>.old1..N</code> chain (independent of atomic-rename, useful for forensics).</li>
+<li>From v2: a single library-managed comment side-table is fine as a <em>read</em> model (for the <code>view</code> hover-text); just don't trust it as the <em>write</em> model.</li>
+<li><strong>Specific things to </strong>stop<strong> doing:</strong></li>
+<li><code>setSection(...)</code> wholesale subtree replacement for factory values. Either set leaves individually, or accept that the section's interior comments are gone (and document the choice in <code>messages.yml</code>'s explanatory text for that section).</li>
+<li>Re-extracting the jar default as the new user file on version bump. Replace with a 3-way merge (jar default ⊕ user changes ⊕ previous user file).</li>
+<li>In-place <code>YamlFile.save()</code>. Always temp+fsync+atomic-rename, owned by <code>AtomicConfigWriter</code>.</li>
+</ol>
+<hr />
+<h2 id="open-questions-to-ask-before-opening-the-a12-adr">Open questions to ask before opening the A12 ADR<a class="headerlink" href="#open-questions-to-ask-before-opening-the-a12-adr" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Are we willing to take a hard dependency on snakeyaml-engine (or a similar low-level parser) and write the comment-aware surgical-edit layer in-house, <strong>or</strong> do we accept "inline-comment loss on rewritten scalars" as a permanent limitation and document it in <code>messages.yml</code>?</li>
+<li>Do we want comment preservation to be a <strong>hard requirement</strong> for <code>view</code> hover-text (i.e. <code>view</code> falls back to declared-type+bounds whenever the comment is missing), or do we want to ship a <strong>shipped-default comment dictionary</strong> keyed by config key, baked into the jar, so <code>view</code> always has <em>something</em> to show even when the user's edits have wiped the on-disk comment?</li>
+<li>(Probably yes to the dictionary regardless of the parser decision — it's the right primary source for <code>view</code>, and the on-disk comment is a fallback override.)</li>
+</ul>
+<hr />
+<h2 id="file-references">File references<a class="headerlink" href="#file-references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>v1: <code>origin/V1:src/main/java/leafcraft/rtp/tools/configuration/Config.java</code> (lines ~160–230, <code>update()</code> method).</li>
+<li>v2: <code>origin/V2:src/main/java/io/github/dailystruggle/rtp/common/configuration/ConfigParser.java</code> (lines ~120–340), <code>…/database/options/YamlFileDatabase.java</code> (lines ~76–125).</li>
+<li>v3 (current): <code>rtp-core/src/main/java/io/github/dailystruggle/rtp/common/configuration/ConfigParser.java</code>, <code>…/MultiConfigParser.java</code>, <code>…/database/options/YamlFileDatabase.java</code>, <code>…/commands/config/SubConfigCmd.java</code>, <code>…/commands/config/list/ListCmd.java</code>.</li>
+<li>Spec gap this addresses: <code>docs/dev/CONFIG_COMMAND_SPEC.md</code> Appendix A12.</li>
+</ul>
+<p><strong>Delete this file</strong> once the A12 ADR has been opened and references its content where needed.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>
