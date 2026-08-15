@@ -76,6 +76,7 @@ The `vert` block controls the Y-coordinate (height) selection.
 #### `JUMP`
 Scans vertically using fixed steps. Efficient for finding the first safe surface.
 - `step`: Number of blocks to skip per search iteration. Default `16`.
+- **Caveat**: Because it advances in fixed `step`-block jumps, it can skip over thin (one- or two-block-thick) platforms. In the Nether, where such platforms are common, prefer `vert: LINEAR` (see *Tips for Customization*).
 
 #### `LINEAR`
 A thorough scan of every Y level in a specific order.
@@ -121,7 +122,7 @@ The backlog cache (controlled by `backlogCacheCap`) is an optional **unverified*
 
 ## Tips for Customization
 
-1. **Nether Support**: Use `vert: JUMP` with `maxY: 120` and `requireSkyLight: false` to land on the nether floor rather than the roof.
+1. **Nether Support**: Use `vert: LINEAR` with `direction: 0` (bottom-up), `maxY: 120`, and `requireSkyLight: false` to land on the nether floor rather than the roof. Avoid `vert: JUMP` here: its coarse `step` (default `16`) skips over the thin one- and two-block-thick platforms that are common in the Nether, so it frequently fails to find otherwise-valid footing. `LINEAR` scans every Y level and reliably catches those thin platforms.
 2. **Cave Teleports**: Use `vert: LINEAR` with `direction: 0` (bottom-up) and a low `maxY` to favor underground locations.
 3. **Massive Radii**: If your radius is > 50,000 blocks, use `mode: NONE` to avoid long pre-calculation times on startup.
 4. **Skyblock / Mid-Air Drops**: Use `vert: FIXED` with `y: 128` and a platform tool enabled. The platform spawns under the player so they don't fall through the void.

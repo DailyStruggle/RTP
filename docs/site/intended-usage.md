@@ -26,13 +26,17 @@ LeafRTP is built around one idea: **a region is a pre-defined area with its own 
 
 ```yaml
 # in the overworld region's config (see the Regions page for the file)
-shape: CIRCLE
-radius: 10000
-centerX: 0
-centerZ: 0
+shape:
+  name: CIRCLE
+  radius: 625      # in CHUNKS: 625 * 16 = 10,000 blocks
+  centerX: 0       # center, in chunks
+  centerZ: 0
 ```
 
 Then point the overworld at that region ([Worlds](https://github.com/DailyStruggle/RTP/wiki/Worlds)), warm it with `/rtp scan start region=overworld` (watch `/rtp scan info`), and you are done. A player typing `/rtp` gets a cached, pre-verified coordinate.
+
+!!! note "`radius`, `centerX`, and `centerZ` are measured in chunks"
+    They live *inside* the `shape:` block (not at the top level), and their unit is **chunks**, not blocks - 1 chunk is 16 blocks. A `radius` of `625` therefore reaches 10,000 blocks. See [Regions](https://github.com/DailyStruggle/RTP/wiki/Regions) for the full field reference.
 
 !!! note "That is the whole loop"
     Configure a region -> point a world at it -> scan to warm it -> players run plain `/rtp`. The rest of this page explains *why*.
