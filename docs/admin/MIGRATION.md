@@ -48,7 +48,7 @@ This is a **MAJOR** bump. You must recompile your addon against the new `rtp-api
 
 ## Upgrading from 2.0.18 to 3.0.0-beta.1
 
-> The changes that shipped in the `2.0.18` tag are now fully documented under [Upgrading to 3.0.0-beta.1](#upgrading-to-300-beta) above. `2.0.18` was the last 2.x release; its changes (PaperLib removal, Folia adapter, platform target upgrade) were subsequently re-tagged as `3.0.0-beta.1` due to the breaking `rtp-api` changes introduced at the same time. Follow the 3.0.0-beta.1 instructions above.
+> The changes that shipped in the `2.0.18` tag are now fully documented under [Upgrading to 3.0.0-beta.1](#upgrading-to-300-beta1) above. `2.0.18` was the last 2.x release; its changes (PaperLib removal, Folia adapter, platform target upgrade) were subsequently re-tagged as `3.0.0-beta.1` due to the breaking `rtp-api` changes introduced at the same time. Follow the 3.0.0-beta.1 instructions above.
 
 ---
 
