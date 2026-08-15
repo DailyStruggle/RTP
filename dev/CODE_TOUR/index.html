@@ -1577,7 +1577,7 @@
 <blockquote>
 <p><strong>Audience.</strong> Minecraft plugin developers at roughly CS-student level (and AI agents) whose job is to locate <em>where</em> RTP might need repair given a reported behavior — a laggy teleport, a stuck queue, a leaked chunk, a rejected safe spot, a cancelled <code>/rtp</code> with no feedback.</p>
 <p><strong>This doc is not a reference.</strong> It is a guided walk through the diagrams in <a href="../architecture/"><code>docs/architecture/</code></a> and the module graph in <a href="../ARCHITECTURE/"><code>ARCHITECTURE.md</code></a>, narrating each arrow with <em>what can go wrong there</em> and <em>which rule or ADR governs the answer</em>. Detailed explanations live in the linked docs; read them only when the tour points you at them.</p>
-<p><strong>Before you change code</strong>, run the pre-flight checklist in <a href="https://github.com/DailyStruggle/RTP/blob/main/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> (S-00x rules, Folia threading, <code>.bak</code> policy).</p>
+<p><strong>Before you change code</strong>, run the pre-flight checklist in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> (S-00x rules, Folia threading, <code>.bak</code> policy).</p>
 </blockquote>
 <hr />
 <h2 id="how-to-use-this-tour">How to use this tour<a class="headerlink" href="#how-to-use-this-tour" title="Permanent link">&para;</a></h2>
@@ -1656,7 +1656,7 @@
 </code></pre></div>
 <p><strong>Repair rule of thumb.</strong> Ask <em>"is the bug behavior different on Folia vs Paper vs Spigot?"</em></p>
 <ul>
-<li><strong>Same on every platform</strong> → the defect lives in <code>rtp-core</code> or <code>rtp-api</code>. Never put <code>org.bukkit.*</code> imports there — <code>RTPServerAccessor</code> is the only bridge (see <a href="https://github.com/DailyStruggle/RTP/blob/main/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Logging &amp; Feedback</a>).</li>
+<li><strong>Same on every platform</strong> → the defect lives in <code>rtp-core</code> or <code>rtp-api</code>. Never put <code>org.bukkit.*</code> imports there — <code>RTPServerAccessor</code> is the only bridge (see <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Logging &amp; Feedback</a>).</li>
 <li><strong>One platform only</strong> → the defect lives in that platform adapter. Do <strong>not</strong> "fix" it in core by branching on platform; push the difference behind an abstraction.</li>
 <li><strong>Only in addons</strong> → the addon calls <code>rtp-api</code> incorrectly, or <code>rtp-api</code> needs a new capability (propose via ADR first — see <a href="../../adr/"><code>docs/adr/README.md</code></a>).</li>
 </ul>
@@ -1693,7 +1693,7 @@
 <p><strong><code>EvalBlocks</code> — TELEPORT-prep safety.</strong> Runs on the region-owning thread (Folia) or main thread (Paper/Spigot). <em>Break:</em> if a "safe" spot turns out to be in lava or a claim, inspect <code>Region.isSafe</code> plus the verticalAdjustor and the <code>badLocation</code> predicates — see <a href="../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/">ADR-017</a>. S-001 forbids <em>unsafe-block destinations</em>; S-003 forbids <em>claim-protected land</em>. Never add a "second" block check in an adapter — keep all checks in <code>rtp-core</code>.</p>
 </li>
 <li>
-<p><strong><code>EvalBlocks → GenRandom</code> retry / <code>Teardown</code> max-retries.</strong> Bounded by configuration (<code>maxAttempts</code>). <em>Break:</em> silent exhaustion → see §7, and the regression guard <code>ReqRtpS004NullChunkAttributionTest</code> mentioned in <a href="https://github.com/DailyStruggle/RTP/blob/main/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a>.</p>
+<p><strong><code>EvalBlocks → GenRandom</code> retry / <code>Teardown</code> max-retries.</strong> Bounded by configuration (<code>maxAttempts</code>). <em>Break:</em> silent exhaustion → see §7, and the regression guard <code>ReqRtpS004NullChunkAttributionTest</code> mentioned in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a>.</p>
 </li>
 <li>
 <p><strong><code>MovePlayer</code> — Entity Scheduler.</strong> On Folia, player mutations go through the Entity Scheduler, not the Region Scheduler. <em>Break:</em> teleport "succeeds" but the player ends up at spawn → wrong scheduler or a pre/post-teleport event handler threw and the pipeline swallowed it (S-004 violation).</p>
@@ -1734,7 +1734,7 @@
 <li><code>Chunk.setForceLoaded(true)</code> used instead of plugin tickets — permanent leak, not reclaimed on disable. Hard prohibition.</li>
 </ul>
 <blockquote>
-<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md §Chunk Allocation Management</code></a>, <a href="https://github.com/DailyStruggle/RTP/blob/main/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Code &amp; Testing Conventions</a>.</p>
+<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md §Chunk Allocation Management</code></a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Code &amp; Testing Conventions</a>.</p>
 </blockquote>
 <hr />
 <h2 id="5-active-gc-sweep">5. Active GC sweep<a class="headerlink" href="#5-active-gc-sweep" title="Permanent link">&para;</a></h2>
@@ -1770,7 +1770,7 @@
 </ul>
 <p>Where to look when a user reports "nothing happens":</p>
 <ol>
-<li>Command layer (<code>commands-api</code>, Bukkit <code>BukkitBaseRTPCmd</code> and friends). Platform overrides of <code>msgInvalidCommand</code> / <code>msgBadParameter</code> <strong>must</strong> call <code>RTP.log(Level.WARNING, msg)</code> — this is required for auditing and for <code>rtp test full</code> to observe the failure (see <a href="https://github.com/DailyStruggle/RTP/blob/main/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Logging &amp; Feedback</a>).</li>
+<li>Command layer (<code>commands-api</code>, Bukkit <code>BukkitBaseRTPCmd</code> and friends). Platform overrides of <code>msgInvalidCommand</code> / <code>msgBadParameter</code> <strong>must</strong> call <code>RTP.log(Level.WARNING, msg)</code> — this is required for auditing and for <code>rtp test full</code> to observe the failure (see <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Logging &amp; Feedback</a>).</li>
 <li>Pipeline cleanup (<code>runCleanup()</code>) — did the failure reach an action list that reports to the player? Silent <code>return</code> inside a phase is the classic S-004 violation.</li>
 <li>Config loader — a missing or malformed <code>messages.yml</code> key reads as empty string. Check the fallback.</li>
 </ol>
@@ -1789,7 +1789,7 @@
 </ul>
 <p>When a bug reproduces only on Folia, the answer is almost always one of the above.</p>
 <blockquote>
-<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md §rtp-folia Implementation Notes</code></a>, <a href="https://github.com/DailyStruggle/RTP/blob/main/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Folia Threading</a>.</p>
+<p>Deep read (optional): <a href="../DESIGN/"><code>DESIGN.md §rtp-folia Implementation Notes</code></a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Folia Threading</a>.</p>
 </blockquote>
 <hr />
 <h2 id="9-your-first-repair-checklist">9. Your first repair — checklist<a class="headerlink" href="#9-your-first-repair-checklist" title="Permanent link">&para;</a></h2>
@@ -1798,10 +1798,10 @@
 <li>Identify the section above that matches the symptom.</li>
 <li>From the diagram, name the <em>arrow</em> where behavior diverges from the spec.</li>
 <li>Find the enclosing S-00x rule / REQ-* via <a href="../TRACEABILITY/"><code>TRACEABILITY.md</code></a>.</li>
-<li>Edit the correct module per <a href="#1-module-map-where-does-my-change-go">§1</a>. Before editing any <em>uncommitted code</em> file, make a <code>.bak</code> copy (<a href="https://github.com/DailyStruggle/RTP/blob/main/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Backup Policy</a>).</li>
+<li>Edit the correct module per <a href="#1-module-map-where-does-my-change-go">§1</a>. Before editing any <em>uncommitted code</em> file, make a <code>.bak</code> copy (<a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Backup Policy</a>).</li>
 <li>Add or extend a REQ-traceable test (class name or <code>@DisplayName</code> referencing <code>REQ-*</code> / <code>S-00x</code>) and update <a href="../TRACEABILITY/"><code>TRACEABILITY.md</code></a> if new.</li>
 <li>Run the targeted test via <code>.\gradlew :&lt;module&gt;:test --tests "&lt;pattern&gt;"</code> (PowerShell, <code>;</code> not <code>&amp;&amp;</code>).</li>
-<li>If the change crosses a module boundary or touches more than one class, <strong>stop and propose first</strong> per <a href="https://github.com/DailyStruggle/RTP/blob/main/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Propose Before Refactoring</a>.</li>
+<li>If the change crosses a module boundary or touches more than one class, <strong>stop and propose first</strong> per <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code> Propose Before Refactoring</a>.</li>
 </ol>
 <hr />
 <h2 id="10-plugin-setup-lifecycle">10. Plugin setup lifecycle<a class="headerlink" href="#10-plugin-setup-lifecycle" title="Permanent link">&para;</a></h2>

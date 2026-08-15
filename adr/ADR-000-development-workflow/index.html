@@ -1612,7 +1612,7 @@
 <li><a href="../"><code>docs/adr/README.md</code></a> and <a href="../ADR-TEMPLATE/"><code>ADR-TEMPLATE.md</code></a> - what an ADR is, sequential numbering, subproject ADR directories, and the never-delete/supersede convention.</li>
 <li><a href="../../dev/REQUIREMENTS/"><code>docs/dev/REQUIREMENTS.md</code></a> and the requirement-authoring style rules - <code>shall</code>/<code>shall not</code> phrasing, absolute state, what-not-how.</li>
 <li><a href="../../dev/TRACEABILITY/"><code>docs/dev/TRACEABILITY.md</code></a> - the REQ-* to class to test binding that closes the loop.</li>
-<li><a href="https://github.com/DailyStruggle/RTP/blob/main/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> <em>Self-Updating Protocol</em> - the discovery-to-destination table that keeps the doc system itself current.</li>
+<li><a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> <em>Self-Updating Protocol</em> - the discovery-to-destination table that keeps the doc system itself current.</li>
 </ul>
 <p>None of those answers "why is the workflow shaped this way, and what were the alternatives?" - which is exactly an ADR's job. <a href="../ADR-018-agents-md-public-release-structure/">ADR-018</a> established precedent for meta-level ADRs.</p>
 <p>This record is a meta document: how a developer ought to work in this repository (assuming a working style similar to the maintainer's), and why. It describes the entire lifecycle at rationale level; the operational rules stay in their canonical homes per D-003.</p>
@@ -1645,7 +1645,7 @@
 <h3 id="7-communication-surfaces">7. Communication surfaces<a class="headerlink" href="#7-communication-surfaces" title="Permanent link">&para;</a></h3>
 <p>Completed work is reflected outward at registers appropriate to each audience (Rule D-004): <code>CHANGELOG.md</code> (net delta against the last released tag, Pro-only entries tagged), wiki and <code>docs/admin/</code> operator docs, locale parity for every user-facing string (the English baseline mirrored into every shipped locale in the same change), and maintainer-voice prose for listings and front pages. These surfaces are downstream of the record layer - they describe what shipped, they do not decide anything.</p>
 <h3 id="8-self-maintenance">8. Self-maintenance<a class="headerlink" href="#8-self-maintenance" title="Permanent link">&para;</a></h3>
-<p>The doc system maintains itself through the Self-Updating Protocol in <a href="https://github.com/DailyStruggle/RTP/blob/main/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a>: every durable discovery has a designated destination (environment fixes, engineering pitfalls, glossary terms, aliases, plan-status updates, traceability rows, new ADRs), so knowledge lands where the next reader will look for it instead of decaying in chat history or memory.</p>
+<p>The doc system maintains itself through the Self-Updating Protocol in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a>: every durable discovery has a designated destination (environment fixes, engineering pitfalls, glossary terms, aliases, plan-status updates, traceability rows, new ADRs), so knowledge lands where the next reader will look for it instead of decaying in chat history or memory.</p>
 <h3 id="constraints-applied-to-the-workflow">Constraints applied to the workflow<a class="headerlink" href="#constraints-applied-to-the-workflow" title="Permanent link">&para;</a></h3>
 <p>The lifecycle operates under the following constraints (canonical definitions live in <a href="../../dev/RULES/"><code>RULES.md</code></a>; summarized here because they shape the workflow itself):</p>
 <ul>
@@ -1657,14 +1657,14 @@
 <li><strong>S-00x prohibitions.</strong> The safety prohibitions in <code>REQUIREMENTS.md</code> section 3 are absolute at every stage of the lifecycle; no proposal, ADR, or implementation may relax them without a superseding requirement change.</li>
 <li><strong>Requirement-authoring style.</strong> Requirements state <em>what</em>, not <em>how</em>; no class names, no temporal framing, legal phrasing (<code>shall</code>). Implementation detail belongs in <code>DESIGN.md</code> or an ADR.</li>
 </ul>
-<p>Constraints that apply only to AI agents (pre-flight checklist, stay-on-task/record-don't-chase, git safety, checklist-based state tracking, encoding hygiene) are operational rules on the tool, not on the workflow; they live in <a href="https://github.com/DailyStruggle/RTP/blob/main/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> and are covered under <em>Optional AI tooling</em> below.</p>
+<p>Constraints that apply only to AI agents (pre-flight checklist, stay-on-task/record-don't-chase, git safety, checklist-based state tracking, encoding hygiene) are operational rules on the tool, not on the workflow; they live in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> and are covered under <em>Optional AI tooling</em> below.</p>
 <h3 id="optional-ai-tooling">Optional AI tooling<a class="headerlink" href="#optional-ai-tooling" title="Permanent link">&para;</a></h3>
 <p>AI tooling (agentic LLM assistants) is an <em>optional</em> executor of human-directed work, never a design participant. Its use is bounded:</p>
 <ul>
 <li><strong>The workflow regulates the tool, not the other way around.</strong> The requirement/ADR discipline predates AI use and originates from human-safety-systems practice. Its shape - explicit what, explicit why, explicit trade-offs, numbered records that cannot be quietly retconned - is what makes LLM output auditable. An AI-produced change enters the codebase through the same D-005 gate, ADR record, and traceability row as any other; the human owns the design and approves the result. That gate is what establishes quality and human provenance.</li>
 <li><strong>Where AI is used</strong>: mechanical instances of human-designed patterns (the Nth <code>Shape</code>, platform adapter wrappers), locally-specified unit tests, filling narrow API-knowledge gaps, and formatting human-directed prose into the document templates.</li>
 <li><strong>Where AI is not used</strong>: system design, code review, automated git operations, and independently-authored requirements or ADRs. Design happens in human brainstorming; AI formats the result. An AI-written ADR or requirement whose substance was not human-directed is a defect.</li>
-<li><strong>Operational rules for agents</strong> live in <a href="https://github.com/DailyStruggle/RTP/blob/main/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> (pre-flight checklist, checklist-based state tracking, git safety, encoding hygiene). The full rationale, boundaries, and honest failure modes of AI use are documented in <a href="../../dev/AI_USAGE/"><code>docs/dev/AI_USAGE.md</code></a>, which is the canonical source for this topic per D-003.</li>
+<li><strong>Operational rules for agents</strong> live in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> (pre-flight checklist, checklist-based state tracking, git safety, encoding hygiene). The full rationale, boundaries, and honest failure modes of AI use are documented in <a href="../../dev/AI_USAGE/"><code>docs/dev/AI_USAGE.md</code></a>, which is the canonical source for this topic per D-003.</li>
 </ul>
 <h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
 <table>
@@ -1713,7 +1713,7 @@
 <li><a href="../../dev/TRACEABILITY/"><code>docs/dev/TRACEABILITY.md</code></a> - REQ-* to class to test matrix.</li>
 <li><a href="../../dev/LESSONS_LEARNED/"><code>docs/dev/LESSONS_LEARNED.md</code></a> - dated engineering findings.</li>
 <li><a href="../../dev/AI_USAGE/"><code>docs/dev/AI_USAGE.md</code></a> - canonical AI-tooling rationale and boundaries.</li>
-<li><a href="https://github.com/DailyStruggle/RTP/blob/main/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> - agent-operational guide (Self-Updating Protocol, D-005 gate restatement).</li>
+<li><a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> - agent-operational guide (Self-Updating Protocol, D-005 gate restatement).</li>
 <li><a href="../ADR-018-agents-md-public-release-structure/">ADR-018</a> - precedent for meta-level ADRs.</li>
 <li><a href="../ADR-TEMPLATE/">ADR-TEMPLATE.md</a> - the record format this workflow produces.</li>
 </ul>
