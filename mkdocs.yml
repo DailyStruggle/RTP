@@ -77,12 +77,11 @@ hooks:
 # trees (dev/, adr/, architecture/) are intentionally left out of nav.
 nav:
   - Home: index.md
-  - Why: site/why.md
-  - Intended usage: site/intended-usage.md
-  - What NOT to do: site/what-not-to-do.md
   - Getting started:
       - Server administrators: FOR_SERVER_ADMINS.md
       - Quick start: admin/QUICK_START.md
+      - Intended usage: site/intended-usage.md
+      - What NOT to do: site/what-not-to-do.md
       - Prefabs: admin/PREFABS.md
       - Commands: admin/COMMANDS.md
       - FAQ: admin/FAQ.md
@@ -116,6 +115,7 @@ nav:
       - Single-backend verification: admin/proxies/SINGLE_BACKEND_VERIFICATION.md
       - Cross-server verification: admin/proxies/CROSS_SERVER_VERIFICATION.md
   - Developers:
+      - Why LeafRTP exists: site/why.md
       - Addon developers: FOR_ADDON_DEVELOPERS.md
       - Addon quickstart: ADDON_QUICKSTART.md
       - Contributors: FOR_CONTRIBUTORS.md
