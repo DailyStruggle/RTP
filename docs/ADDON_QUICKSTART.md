@@ -67,13 +67,15 @@ com.example.myrtpaddon.MyRtpAddon
 
 ## 3. Register a custom shape in ~20 lines
 
-`onLoad()` runs once, after `rtp-core` has finished initialising, on an RTP task thread.
-That is the moment to register your shape. A genuine custom shape is a subclass that changes
-the geometry *in code*, not just a re-configured clone of a built-in one. The example below
-subclasses the built-in `Square` and overrides `select()` to rotate every chosen point 45
-degrees about the region centre, turning the axis-aligned square ring into a diamond-oriented
-one. It is a pure coordinate transform: still bounded, no reroll loop (see
-[ADR-001](adr/ADR-001-archimedean-spiral-1d-mapping.md)).
+Register your shape from `onLoad()` (runs once, after `rtp-core` is up). A genuine custom
+shape changes the geometry *in code*, not just a re-configured clone. Below, `DiamondShape`
+subclasses `Square` and overrides `select()` to rotate each pick 45 degrees into a diamond -
+a bounded transform, no reroll ([ADR-001](adr/ADR-001-archimedean-spiral-1d-mapping.md)).
+
+Because bounds are Chebyshev (max-axis), rotation alone overshoots `radius` by ~1.41x, so
+`select()` also divides by `sqrt(2)` to refit. And since the base bounds test
+`Shape.contains(int x, int z)` still speaks the square parameterization, override it to invert
+the rotation first - exactly as the built-in `Polygon` refines `super.contains(...)`.
 
 ```java
 package com.example.myrtpaddon;
@@ -91,14 +93,19 @@ public final class DiamondShape extends Square {
 
   @Override
   public int[] select() {
-    // Start from the built-in square distribution, then rotate the picked
-    // (x, z) by 45 degrees. Rotation preserves magnitude, so the result stays
-    // inside the same bounded range - no unbounded reroll.
+    // Rotate the square pick 45 degrees; the extra 1/sqrt(2) refits the
+    // diamond onto the configured radius (max-axis bounds), no reroll.
     int[] xz = super.select();
-    double inv = 1.0 / Math.sqrt(2.0);
+    double inv = 1.0 / 2.0; // (1/sqrt(2)) for the rotation, times (1/sqrt(2)) to re-fit bounds
     int rx = (int) Math.round((xz[0] - xz[1]) * inv);
     int rz = (int) Math.round((xz[0] + xz[1]) * inv);
     return new int[] {rx, rz};
+  }
+
+  @Override
+  public boolean contains(int x, int z) {
+    // Invert select()'s rotation, then use the parent's square bounds test.
+    return super.contains(x + z, z - x);
   }
 }
 ```

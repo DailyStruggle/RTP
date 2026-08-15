@@ -19,9 +19,18 @@ algorithm.
 
 ## Supported platforms
 
-Paper, Folia, Spigot, Fabric, and NeoForge (Minecraft 1.20.x / 1.21.x / 26.x). Java 21+
-is required. Legacy Forge is not native - run the Spigot/Paper jar under Arclight /
-Mohist.
+**Backend servers** (where the plugin/mod jar runs and teleports happen): Paper, Folia,
+Spigot, Fabric, and NeoForge (Minecraft 1.20.x / 1.21.x / 26.x). Java 21+ is required.
+Legacy Forge is not native - run the Spigot/Paper jar under Arclight / Mohist.
+
+**Proxy** (a different role, not another backend): the same jar also runs on a **Velocity**
+proxy, where it acts as the router/transport for cross-server "network mode" rather than
+teleporting players itself. Drop the jar in the proxy's `plugins/`, install RTP on each
+backend as usual, and a bare `/rtp` on one server can send a player to a region on
+another. The free build ships the `proxy-direct` transport: a lightweight TCP socket that
+needs no Redis or SQL, so cross-server `/rtp` works with just the jar on the proxy and each
+backend. (Redis and SQL shared-state transports are not bundled in the free jar - they are
+LeafRTP-Pro extras.) See [Proxy mode](admin/proxies/INDEX.md).
 
 ## Install
 

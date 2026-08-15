@@ -2,7 +2,7 @@
 
 To find safe teleport destinations without loading (and generating) chunks on the server thread, RTP reads Minecraft's region files (`.mca`, the "anvil" format) **directly from disk, read-only, off the main thread**. This page documents exactly which on-disk format RTP understands, and - just as importantly - what it does when it encounters data it does *not* understand. That pass-through behavior is what keeps RTP safe if a future Minecraft version changes its save format.
 
-The feature is controlled by `anvilPrefilterEnabled` in [`safety.yml`](SAFETY.md) (default `true`). Turning it off makes every candidate skip the disk pre-filter and reach the live-load stage un-screened; it does not change safety, only speed.
+The feature is controlled by `anvilPrefilterEnabled` in [`safety.yml`](configuration/SAFETY.md) (default `true`). Turning it off makes every candidate skip the disk pre-filter and reach the live-load stage un-screened; it does not change safety, only speed.
 
 ---
 
@@ -75,13 +75,13 @@ This is the scenario the fallback is designed for. If a new release changes the 
 1. The affected chunks decode as `UNKNOWN`, so the reader stops screening them and passes them through to the live-load safety check. Teleports keep working and stay safe; you may see the pre-filter's hit rate drop and teleports take a little longer.
 2. RTP logs a rate-limited diagnostic naming the cause (e.g. `unsupported-dataversion=...`, `missing-heightmap`, or an unknown-compression message). These appear at `FINE` level; the first few per cause are surfaced and the rest are suppressed to avoid log spam.
 
-To confirm what the pre-filter is doing on your server, run the built-in diagnostics (`/rtp test biome-source` / `/rtp test anvil-prefilter`) and watch the `anvil-hit` counter: a healthy server shows hits climbing, while a stuck `anvil-hits=0` alongside the `UNKNOWN:*` log lines points at exactly which fallback cause is firing. See [COMMANDS.md](../COMMANDS.md) for the diagnostic commands.
+To confirm what the pre-filter is doing on your server, run the built-in diagnostics (`/rtp test biome-source` / `/rtp test anvil-prefilter`) and watch the `anvil-hit` counter: a healthy server shows hits climbing, while a stuck `anvil-hits=0` alongside the `UNKNOWN:*` log lines points at exactly which fallback cause is firing. See [COMMANDS.md](COMMANDS.md) for the diagnostic commands.
 
 ---
 
 ## See also
 
-- [SAFETY.md](SAFETY.md) - `anvilPrefilterEnabled` and the landing safety pipeline.
-- [REGIONS.md](REGIONS.md#backlog-cache-l3) - how the backlog cache verifies one `.mca` bin at a time using this reader.
-- [ADR-016](../../adr/ADR-016-anvil-subsystem.md) - the design decision behind the read-only anvil pre-filter and the `UNKNOWN` -> pass-through (resolved at the live-load stage) contract.
-- [ADR-028](../../adr/ADR-028-l3-backlog-cache.md) - the L3 backlog cache and its one-`.mca`-per-pulse screening.
+- [SAFETY.md](configuration/SAFETY.md) - `anvilPrefilterEnabled` and the landing safety pipeline.
+- [REGIONS.md](configuration/REGIONS.md#backlog-cache-l3) - how the backlog cache verifies one `.mca` bin at a time using this reader.
+- [ADR-016](../adr/ADR-016-anvil-subsystem.md) - the design decision behind the read-only anvil pre-filter and the `UNKNOWN` -> pass-through (resolved at the live-load stage) contract.
+- [ADR-028](../adr/ADR-028-l3-backlog-cache.md) - the L3 backlog cache and its one-`.mca`-per-pulse screening.
