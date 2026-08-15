@@ -79,6 +79,9 @@ menu:
 defaults:
   # Forma e dimensione predefinite dell'area. radius/centerRadius = quanto lontano atterri, misurato in chunk.
   shape:
+    # Landing area shape algorithm.
+    # @type: enum
+    # @source: shape
     name: "CIRCLE"
     mode: "ACCUMULATE"
     radius: 256
@@ -91,6 +94,9 @@ defaults:
     expand: false
   # Default high/low landing window.
   vert:
+    # Vertical placement algorithm.
+    # @type: enum
+    # @source: vert
     name: "LINEAR"
     minY: 32
     maxY: 255

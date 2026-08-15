@@ -1879,6 +1879,20 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             String entryName = fileName.substring(slash + 1);
             String prefill = resolveCurrentMultiConfigValueAsString(
                     kind, entryName, paramName);
+            // Finite-domain short-circuit (ADR-064 amendment): when the key's
+            // in-memory YAML block comment declares an @options list or an
+            // @source registry (e.g. shape/vert), render a picker instead of
+            // the free-text anvil so arbitrary input is structurally
+            // impossible. Falls through to the anvil when no finite domain is
+            // declared or the renderer is unavailable.
+            java.util.List<String> slashOptions = resolveFiniteOptions(fileName, paramName);
+            if (!slashOptions.isEmpty() && renderer != null) {
+                MenuModel slashPicker = new CommandTreeMenuBuilder()
+                        .buildOptionsPicker(senderId, fileName, paramName, prefill, slashOptions);
+                return MenuDrawer.draw(renderer, senderId, slashPicker, messageMethod,
+                        this::reject, "config-options",
+                        "file=" + fileName + " param=" + paramName);
+            }
             MenuAction.PromptAnvilInput slashPrompt = new MenuAction.PromptAnvilInput(
                     new String[]{"config", kind, entryName},
                     paramName,
@@ -1934,12 +1948,132 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         // are replacing rather than the previous empty-space placeholder;
         // anything unresolvable falls back to empty string.
         String prefill = resolveCurrentConfigValueAsString(bare, paramName);
+        // Finite-domain short-circuit (ADR-064 amendment): see the slash-path
+        // note above. Render a finite-value picker when the key declares an
+        // @options list or @source registry; otherwise open the anvil.
+        java.util.List<String> options = resolveFiniteOptions(bare, paramName);
+        if (!options.isEmpty() && renderer != null) {
+            MenuModel picker = new CommandTreeMenuBuilder()
+                    .buildOptionsPicker(senderId, bare, paramName, prefill, options);
+            return MenuDrawer.draw(renderer, senderId, picker, messageMethod,
+                    this::reject, "config-options",
+                    "file=" + bare + " param=" + paramName);
+        }
         MenuAction.PromptAnvilInput prompt = new MenuAction.PromptAnvilInput(
                 new String[]{"config", subSegment},
                 paramName,
                 prefill,
                 MenuAction.Mode.STAGE);
         return dispatchPromptAnvilInput(senderId, prompt, messageMethod);
+    }
+
+    /**
+     * Resolve the finite value domain declared for {@code paramName} in the
+     * config file {@code fileName} (bare or {@code kind/entryName} multiconfig
+     * form), reading the key's in-memory YAML block comment
+     * ({@link io.github.dailystruggle.rtp.common.configuration.ConfigDirectives})
+     * with no file I/O. Returns the {@code @options} literal list when present,
+     * or the resolved registry values for a recognized {@code @source}:
+     * {@code shape} / {@code vert} (static factories, {@link RTP#factoryMap}),
+     * {@code world} (live server worlds, {@link RTP#serverAccessor}) or
+     * {@code region} (loaded regions, {@link RTP#selectionAPI}). The world and
+     * region registries are server-derived values that change at runtime but
+     * are not authored by this plugin, so they are enumerated live on each
+     * menu open rather than baked into an {@code @options} list. Returns an
+     * empty list when no finite domain is declared, the comment is
+     * unavailable, or resolution fails - the caller then falls back to the
+     * free-text anvil prompt.
+     */
+    private static java.util.List<String> resolveFiniteOptions(String fileName, String paramName) {
+        if (paramName == null || paramName.isEmpty()) return java.util.List.of();
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection yamlRoot =
+                resolveYamlRootForFile(fileName);
+        if (yamlRoot == null) return java.util.List.of();
+        String comment;
+        try {
+            comment = yamlRoot.getComment(paramName);
+        } catch (RuntimeException ignored) {
+            return java.util.List.of();
+        }
+        io.github.dailystruggle.rtp.common.configuration.ConfigDirectives directives =
+                io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(comment);
+        if (!directives.options().isEmpty()) {
+            return directives.options();
+        }
+        String source = directives.source();
+        if (source == null || source.isEmpty()) return java.util.List.of();
+        java.util.Collection<String> keys = null;
+        try {
+            String s = source.toLowerCase(java.util.Locale.ROOT);
+            switch (s) {
+                case "shape" ->
+                        keys = RTP.factoryMap.get(RTP.factoryNames.shape).map.keySet();
+                case "vert" ->
+                        keys = RTP.factoryMap.get(RTP.factoryNames.vert).map.keySet();
+                case "world" -> keys = RTP.serverAccessor.getRTPWorlds().stream()
+                        .map(io.github.dailystruggle.rtp.api.world.RTPWorld::name)
+                        .collect(java.util.stream.Collectors.toList());
+                case "region" -> keys = RTP.selectionAPI.regionNames();
+                default -> { /* unknown source — no finite domain */ }
+            }
+        } catch (RuntimeException ignored) {
+            return java.util.List.of();
+        }
+        if (keys == null || keys.isEmpty()) return java.util.List.of();
+        java.util.List<String> out = new java.util.ArrayList<>(keys);
+        java.util.Collections.sort(out);
+        return out;
+    }
+
+    /**
+     * Resolve the loaded in-memory YAML root for {@code fileName}, accepting
+     * both a bare single-config file name (matched against
+     * {@link RTP#configs} {@code configParserMap}, {@code .yml}-tolerant) and a
+     * {@code kind/entryName} multiconfig form (matched against the multiconfig
+     * sub-parsers by entry name). Returns {@code null} when configs are not
+     * loaded or no parser matches.
+     */
+    private static io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection
+            resolveYamlRootForFile(String fileName) {
+        if (fileName == null || fileName.isEmpty()) return null;
+        if (RTP.configs == null) return null;
+        try {
+            int slash = fileName.indexOf('/');
+            if (slash > 0 && slash < fileName.length() - 1) {
+                String entry = stripYmlLower(fileName.substring(slash + 1));
+                for (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> mcp
+                        : RTP.configs.multiConfigParserMap.values()) {
+                    if (mcp == null) continue;
+                    for (String name : mcp.listParsers()) {
+                        io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> sub =
+                                mcp.getParser(name);
+                        if (sub == null || sub.name == null) continue;
+                        if (stripYmlLower(sub.name).equals(entry)) {
+                            return sub.getYamlRoot();
+                        }
+                    }
+                }
+                return null;
+            }
+            String target = stripYmlLower(fileName);
+            for (io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> p
+                    : RTP.configs.configParserMap.values()) {
+                if (p == null || p.name == null) continue;
+                if (stripYmlLower(p.name).equals(target)) {
+                    return p.getYamlRoot();
+                }
+            }
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private static String stripYmlLower(String s) {
+        if (s == null) return "";
+        String v = s.toLowerCase(java.util.Locale.ROOT);
+        if (v.endsWith(".yml")) v = v.substring(0, v.length() - 4);
+        return v;
     }
 
     // ------------------------------------------------------------------------

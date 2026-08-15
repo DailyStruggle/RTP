@@ -584,7 +584,8 @@ public class Configs {
               "1.0",
               multiConfigParser.myDirectory,
               multiConfigParser.langMap,
-              multiConfigParser.fileDatabase));
+              multiConfigParser.fileDatabase,
+              multiConfigParser.locale));
     }
 
     ConfigParser<WorldKeys> parser = multiConfigParser.getParser(worldName);
@@ -616,7 +617,8 @@ public class Configs {
               "1.0",
               multiConfigParser.myDirectory,
               multiConfigParser.langMap,
-              multiConfigParser.fileDatabase));
+              multiConfigParser.fileDatabase,
+              multiConfigParser.locale));
     }
 
     ConfigParser<WorldKeys> parser = multiConfigParser.getParser(worldName);
@@ -790,14 +792,20 @@ public class Configs {
     // operator's authored region files are not stranded (rule 4).
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/regions/*.yml");
     migrateLegacyMultiDir("regions", "definitions/regions");
+    // The shared shape/vertical-adjustor rename-map catalogs now live hidden inside the
+    // regions folder (definitions/regions/.shape and definitions/regions/.vert). Relocate
+    // any older definitions/shape and definitions/vert dotfiles so an operator's authored
+    // catalog translations are not stranded on upgrade.
+    migrateLegacyMultiDir("definitions/shape", "definitions/regions/.shape");
+    migrateLegacyMultiDir("definitions/vert", "definitions/regions/.vert");
     MultiConfigParser<RegionKeys> regions =
-            new MultiConfigParser<>(RegionKeys.class, "regions", "1.1", pluginDirectory, "definitions/regions");
+            new MultiConfigParser<>(RegionKeys.class, "regions", "1.1", pluginDirectory, "definitions/regions", locale);
     newMultiConfigParserMap.put(RegionKeys.class, regions);
 
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/worlds/*.yml");
     migrateLegacyMultiDir("worlds", "definitions/worlds");
     MultiConfigParser<WorldKeys> worlds =
-            new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory, "definitions/worlds");
+            new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory, "definitions/worlds", locale);
     newMultiConfigParserMap.put(WorldKeys.class, worlds);
 
     // effects-api-ADR-005: declarative effect groups under <pluginDir>/effects/<group>.yml.
@@ -808,7 +816,7 @@ public class Configs {
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/effects/*.yml");
     migrateLegacyMultiDir("effects", "definitions/effects");
     MultiConfigParser<EffectsGroupKeys> effectsGroups =
-            new MultiConfigParser<>(EffectsGroupKeys.class, "effects", "1.0", pluginDirectory, "definitions/effects");
+            new MultiConfigParser<>(EffectsGroupKeys.class, "effects", "1.0", pluginDirectory, "definitions/effects", locale);
     newMultiConfigParserMap.put(EffectsGroupKeys.class, effectsGroups);
 
     // ADR-076: region arrival schematics (.schem files, resolved by file presence -

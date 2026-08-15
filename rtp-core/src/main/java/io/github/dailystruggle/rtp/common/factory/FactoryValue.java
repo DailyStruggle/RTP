@@ -356,7 +356,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     File langFile;
     if (RTP.serverAccessor == null) return;
     // ADR-076: the shared catalog rename map is a co-located dotfile sibling under the
-    // catalog directory itself (e.g. definitions/shape/.CIRCLE.lang.yml), not
+    // catalog directory itself (e.g. definitions/regions/.shape/.CIRCLE.lang.yml), not
     // lang/<subDir>/<name>.lang.yml.
     String subPart = subDir.replace('/', File.separatorChar);
     String langDirStr =

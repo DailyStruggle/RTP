@@ -1,7 +1,51 @@
 # ADR-024 — RTP-lite Assembly Variant
 
-**Status:** Accepted (amended 2026-06-20 — lite inherits the full base `safety.yml`)
+**Status:** Accepted (amended 2026-08-14 - lite inherits the Pro `config.yml`, `advanced/*` tuning files, and operator `docs/` for textual parity)
 **Date:** 2026-04-30
+
+## 2026-08-14 amendment - lite inherits the Pro config and operator docs (textual parity)
+
+The original decision below shipped lite a reduced, hand-diverged `config.yml`
+(no `database:`/`network:` blocks, book-only menu renderer list) plus reduced
+`advanced/performance.yml` and `advanced/logging.yml` overlays, and a separate
+hand-stripped `lite-docs/` documentation tree that `RTPBukkitLitePlugin` copied
+to `<data>/docs/`. Maintaining those parallel copies was pure redundancy: the
+dropped `database:`/`network:` blocks are inert in lite anyway (no JDBC/Redis
+classes are on the classpath), and the stripped docs drifted from the Pro
+originals they were derived from. As of 2026-08-14 that redundancy is removed:
+**lite inherits the Pro `config.yml`, `advanced/*` tuning files, and the Pro
+operator `docs/` tree verbatim, for perfect textual parity.** `plugin.yml` is
+the only resource lite still overlays (it names the lite entry point
+`RTPBukkitLitePlugin`).
+
+Concretely:
+
+- `rtp-plugin/src/lite/resources/config.yml`, `advanced/performance.yml`, and
+  `advanced/logging.yml` are **removed**. `shadowLiteJar` no longer excludes the
+  main `config.yml` / `performance.yml` / `logging.yml`, so the lite jar bundles
+  the full Pro copies verbatim. The `database:`/`network:` blocks in the Pro
+  `config.yml` are inert in lite (the SQL/Redis classes and JDBC drivers are
+  still excluded per the drops below), so shipping them changes no runtime
+  behavior.
+- The `lite-docs/` resource tree is **removed**. Lite now bundles the same
+  `docs/**` tree as Pro (staged by the `copyDocs` task) and extracts it through
+  the shared `JarUtils.extractDocs(...)`, identical to the Pro bootstrap. The
+  `liteJarStructureCheck` audit no longer forbids `docs/**`.
+- Because `config.yml` is no longer a reduced lite baseline, there is nothing
+  left to prune from the locale tree: lite's key set is identical to Pro's. The
+  lite-specific `rtp-plugin/src/lite/resources/lang/` tree, the
+  `repackLiteLocales` Gradle task, and the `scripts/repack-lite-locales.*`
+  scripts are **removed**. `shadowLiteJar` no longer excludes the main
+  `lang/**`, so the lite jar inherits the Pro `lang/<loc>/` tree verbatim.
+- `plugin.yml` remains a lite overlay (lite entry point) and is still the only
+  resource excluded from the main source-set contribution.
+
+Bullets below that describe a reduced lite `config.yml` (omitted `database:` /
+`network:` blocks, book-only menu), reduced `performance.yml` / `logging.yml`
+baselines, or a stripped `lite-docs/` tree are superseded by this amendment.
+The SQL/Redis class and driver drops still apply in full.
+
+---
 
 ## 2026-06-20 amendment — lite inherits the full base `safety.yml`
 

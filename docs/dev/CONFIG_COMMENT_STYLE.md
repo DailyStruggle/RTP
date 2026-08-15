@@ -71,8 +71,16 @@ Reserved directive keys:
 - `@source` — when the valid values come from a runtime registry rather
   than a fixed enumeration, name the registry: `material` → Bukkit
   `Material` enum, `biome` → Bukkit `Biome` registry, `world` → loaded
-  worlds, `tag` → `#minecraft:<tag>` resolver. Mutually exclusive with
-  `@options`.
+  worlds (`RTP.serverAccessor.getRTPWorlds()`), `region` → loaded RTP
+  regions (`RTP.selectionAPI.regionNames()`), `tag` →
+  `#minecraft:<tag>` resolver, `shape` → registered RTP shape factories
+  (`ShapeParameter.values()`), `vert` → registered RTP vertical-adjustor
+  factories (`VertParameter.values()`). Mutually exclusive with
+  `@options`. Prefer `@source` over a hardcoded `@options` list for any
+  discriminator whose valid values come from a live registry — shape/vert
+  type discriminators, and server-derived values that change at runtime
+  but are not authored by this plugin such as `world` / `region` — so the
+  menu stays authoritative against the registry and cannot drift.
 
 Rules:
 

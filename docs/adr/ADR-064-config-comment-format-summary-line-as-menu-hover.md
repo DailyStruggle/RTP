@@ -1,6 +1,6 @@
 # ADR-064 — Config-Comment Format: Summary Line as Menu Hover Text
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-08-14)
 **Date:** 2026-06-11
 
 ## Context
@@ -102,6 +102,50 @@ change, not bundled with behavior changes (per the *Stay-On-Task Policy*).
   in bulk by this ADR — they are brought into line opportunistically as options
   are edited, so heterogeneity persists during the transition.
 
+## Amendment (2026-08-14): directives drive finite-value pickers
+
+When this ADR was accepted, the `# @…` directive lines were consumed only by
+build-time tooling (the locale TSV pipeline) and by the hover-summary contract;
+no runtime code parsed them. The approved proposal
+[`docs/dev/scratch/PROPOSAL-config-menu-options-picker.md`](../dev/scratch/PROPOSAL-config-menu-options-picker.md)
+(D-005, approved 2026-08-14) makes the in-game config editor the **first runtime
+consumer** of the directive tags, resolving the earlier issue that finite-domain
+keys (e.g. `shape.name`, `database.type`) accepted confusing arbitrary free-text
+input.
+
+This amendment records the following, without changing the comment format itself:
+
+1. **Runtime directive consumer.** A small in-memory directive parser reads the
+   `@type` / `@options` / `@source` lines from the already-cached YAML block
+   comment (`ConfigParser#getYamlRoot` → `RtpYamlSection#getComment`, the same
+   in-memory path `resolveConfigHover` uses — no new file I/O). When a key
+   declares a finite domain, the config menu routes it to a generic option
+   picker instead of the free-text anvil prompt; keys with no directives (or an
+   unparseable directive line) fall back to free text and never break the menu.
+2. **`@source` registry vocabulary extended.** In addition to the existing
+   runtime registries (`material`, `biome`, `tag`), the config editor resolves
+   `@source: shape` / `@source: vert` (from `RTP.factoryMap` —
+   `ShapeParameter.values()` / `VertParameter.values()`) and the live
+   server-derived registries `@source: world`
+   (`RTP.serverAccessor.getRTPWorlds()`) and `@source: region`
+   (`RTP.selectionAPI.regionNames()`). The latter two are the "server value"
+   case: values that are not static and change at runtime, yet are not authored
+   by this plugin — so the picker enumerates them live on each menu open rather
+   than baking a fixed `@options` list that would immediately drift. This
+   annotates the region/world discriminator keys (`world`, region redirect
+   `override`, per-world `region`, per-region `override`) in the shipped region
+   and world templates. Using `@source` keeps every finite domain authoritative
+   against its registry, preventing drift that a hardcoded `@options` list
+   would risk. `@options` and `@source` remain mutually exclusive.
+3. **No format change.** The two-part template, first-line-as-hover rule, and
+   locale-parity handling of directive lines are unchanged. `@options` /
+   `@source` continue to be the single machine-readable source of truth for a
+   key's valid values; the menu now honors that source of truth at runtime.
+
+The amendment is additive: existing files remain valid, and finite keys are
+annotated with directives incrementally (un-annotated finite keys keep free text
+until annotated).
+
 ## References
 
 - [`docs/dev/CONFIG_COMMENT_STYLE.md`](../dev/CONFIG_COMMENT_STYLE.md) — canonical style guide (examples, parsing contract, layout).
@@ -110,3 +154,4 @@ change, not bundled with behavior changes (per the *Stay-On-Task Policy*).
 - [ADR-020](ADR-020-language-bootstrap-and-locale-aware-configparser.md) — locale-aware ConfigParser / YAML baseline.
 - `rtp-core/.../commands/menu/ConfigMenuConsumerProfile.java`, `CommandTreeMenuBuilder#resolveParamHover` — hover source.
 - `scripts/locale-files-to-csv.ps1`, `scripts/reconcile-locale-csvs.ps1`, `scripts/locale-files-from-csv.ps1` — locale comment pipeline.
+- [`docs/dev/scratch/PROPOSAL-config-menu-options-picker.md`](../dev/scratch/PROPOSAL-config-menu-options-picker.md) — approved D-005 proposal introducing the runtime directive-driven picker (this amendment).

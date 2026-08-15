@@ -1057,59 +1057,15 @@ tasks.named('compileLiteJava') {
     dependsOn tasks.named('compileJava')
 }
 
-// ADR-024 locale parity: lite ships reduced English baselines for
-// config.yml / performance.yml / logging.yml / regions/default.yml
-// (Pro baselines minus lite-irrelevant keys). safety.yml is no longer a
-// reduced lite baseline: as of the 2026-06-20 ADR-024 amendment lite
-// inherits the full base safety.yml (block tags and state predicates are
-// in scope for lite), so it is not pruned and has no lite-specific locale
-// tree. The Pro lang/ tree under
-// `rtp-plugin/src/main/resources/lang/<loc>/` still carries the full Pro
-// key set, so without trimming, every lite install would ship locale
-// translations for keys (`visitorEnabled`, `loginCacheEnabled`,
-// `loginCacheCap`, `onEventParsing`, `pregeneratedPreference`,
-// `backlogRefillThreshold`, `prefab`, ...) that have no counterpart in
-// lite's English baseline.
-//
-// `repackLiteLocales` regenerates `src/lite/resources/lang/` from the Pro
-// lang tree, dropping any locale row whose base_key is not present in the
-// matching lite English baseline. messages.yml is copied through unchanged
-// (per the ADR-024 2026-05-11(b) amendment lite ships the full
-// messages.yml). The script is `scripts/repack-lite-locales.ps1`.
-//
-// `processLiteResources` depends on this so the lite source set's resource
-// copy picks up the freshly-regenerated tree.
-tasks.register('repackLiteLocales', Exec) {
-    group = 'build'
-    description = 'Regenerates rtp-plugin/src/lite/resources/lang/ from the ' +
-            'Pro lang tree, pruned to lite\'s reduced baseline key set (ADR-024).'
-
-    def proMain   = file("${project.projectDir}/src/main/resources")
-    def liteMain  = file("${project.projectDir}/src/lite/resources")
-    def liteLang  = file("${liteMain}/lang")
-    def scriptDir = rootProject.file('scripts')
-    def script    = file("${scriptDir}/repack-lite-locales.ps1")
-
-    // Inputs: the Pro lang tree, every lite-shipped baseline YAML, and the
-    // script itself. Any change to these triggers a re-run.
-    inputs.dir("${proMain}/lang").withPropertyName('proLangTree')
-    inputs.files(fileTree(liteMain) { include '*.yml'; include 'regions/*.yml' })
-            .withPropertyName('liteBaselines')
-    inputs.file(script).withPropertyName('repackScript')
-
-    // Output: the regenerated lite lang/ tree.
-    outputs.dir(liteLang).withPropertyName('liteLangTree')
-
-    // PowerShell on Windows; on other hosts fall back to pwsh (PowerShell
-    // Core) which is shipped with modern Linux/macOS dev images and CI.
-    def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
-    def shell = isWindows ? 'powershell' : 'pwsh'
-    commandLine shell, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script.absolutePath
-}
-
-tasks.named('processLiteResources') {
-    dependsOn tasks.named('repackLiteLocales')
-}
+// ADR-024 locale parity: as of the 2026-08-14 config/docs-parity amendment
+// lite inherits the full Pro `config.yml` (and `advanced/*` + `safety.yml`),
+// so its locale key set is identical to Pro's. The lite jar therefore ships
+// the Pro `lang/<loc>/` tree verbatim (inherited from the main source set --
+// the `exclude 'lang/**'` on the main contribution is gone) and there is no
+// lite-specific locale tree to maintain or prune. The former
+// `repackLiteLocales` task (which trimmed the lite lang tree down to a
+// reduced lite baseline) and its `scripts/repack-lite-locales.*` scripts are
+// removed -- with a full-parity `config.yml` there is nothing left to prune.
 
 // The root build.gradle configures `processResources` (main sourceSet) to
 // expand ${version} in plugin.yml / fabric.mod.json, but the `lite` sourceSet
@@ -1154,10 +1110,11 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // there for the /rtp-menu-disabled regression this prevents.
     mergeServiceFiles()
 
-    // Lite source set first so its plugin.yml/config.yml/etc. are the lite
-    // overlay copies. The conflicting main copies are excluded explicitly from
-    // the main source-set contribution below (do not rely on
-    // DuplicatesStrategy first-seen ordering -- it is not stable here).
+    // Lite source set first so its plugin.yml is the lite overlay copy. As of
+    // the config/docs-parity amendment, plugin.yml is the ONLY resource lite
+    // overlays (it names the lite entry point RTPBukkitLitePlugin); config.yml,
+    // the advanced/* tuning files, and the operator docs are inherited verbatim
+    // from the Pro (main) source set for perfect textual parity.
     from sourceSets.lite.output
     // Include main source set output (bukkit bootstrap helpers, listeners, server
     // provider, command classes). A freshly-registered ShadowJar task does NOT
@@ -1175,14 +1132,13 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // candidate for these paths, so the result is deterministic regardless of
     // visit order.
     from(sourceSets.main.output) {
+        // plugin.yml is the only resource lite overlays (it names the lite
+        // entry point); the Pro copy is dropped so the lite overlay wins.
         exclude 'plugin.yml'
-        exclude 'config.yml'
-        exclude 'performance.yml'
-        // safety.yml is intentionally NOT excluded: lite inherits the full
-        // base safety.yml (ADR-024 2026-06-20 amendment -- block tags and
-        // state predicates are in scope for lite), so the main copy is bundled.
-        exclude 'logging.yml'
-        exclude 'lang/**'
+        // config.yml, advanced/performance.yml, advanced/logging.yml,
+        // safety.yml, and the lang/** locale tree are all inherited verbatim
+        // from the Pro source set for config/locale parity -- lite no longer
+        // ships reduced overlays of them.
     }
     // The lite binary is MIT-licensed (ADR-061): ship the MIT text as the
     // in-jar LICENSE, not the repo-root PolyForm Noncommercial LICENSE (which
@@ -1368,7 +1324,10 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // no min_level filter loads and every FINE/FINER/FINEST log call prints.
     // fabric.mod.json is INTENTIONALLY KEPT in lite as of the 2026-05-07 ADR-024 amendment
     // so Fabric Loader can discover RTPFabricMod from the lite jar.
-    exclude 'docs/**'
+    // docs/** is inherited verbatim from Pro (copyDocs stages docs/admin/** +
+    // the audience landing pages into the main resources output) so the lite
+    // jar carries the same operator docs and RTPBukkitLitePlugin extracts them
+    // via JarUtils.extractDocs, identical to the Pro bootstrap.
     exclude 'README.md'
     exclude 'CHANGELOG.md'
     exclude 'CONTRIBUTING.md'
@@ -1403,7 +1362,9 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // Relocate to avoid clashing with any other plugin shading the same lib.
     relocate 'net.jpountz', 'io.github.dailystruggle.rtp.lz4'
 
-    // Lite intentionally does NOT depend on `copyDocs` -- lite ships no docs.
+    // Lite ships the same operator docs as Pro; copyDocs (a processResources
+    // dependency) stages them into the main resources output that this jar
+    // pulls from, so depending on processResources is sufficient.
     dependsOn tasks.named('processResources')
     dependsOn tasks.named('compileJava')
     dependsOn tasks.named('compileLiteJava')
@@ -1558,7 +1519,8 @@ tasks.register('liteJarStructureCheck') {
             // logging.yml intentionally present in lite -- see shadowLiteJar comment.
             // fabric.mod.json intentionally present in lite as of the 2026-05-07
             // ADR-024 amendment -- see shadowLiteJar comment.
-            ~'^docs/.*$',
+            // docs/** intentionally present in lite as of the config/docs-parity
+            // amendment -- lite ships the same operator docs as Pro.
             ~'^README\\.md$',
             ~'^CHANGELOG\\.md$',
             ~'^org/h2/.*$',

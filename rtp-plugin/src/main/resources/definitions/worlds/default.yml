@@ -2,6 +2,8 @@
 # Documentation: https://github.com/DailyStruggle/RTP/wiki/Worlds
 
 # Region used for this world
+# @type: enum
+# @source: region
 region: "default"
 # true = need permission rtp.worlds.<worldname>. "@config" inherits
 # defaults.requirePermission from config.yml.
@@ -10,6 +12,8 @@ region: "default"
 #   requirePermission: true
 requirePermission: "@config"
 # World to send to if no permission
+# @type: enum
+# @source: world
 override: "[0]"
 
 # DO NOT TOUCH VERSION NUMBER

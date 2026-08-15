@@ -1,4 +1,4 @@
-# RTP Network Mode (multi-server / multi-proxy) Disabled by default; flipping `network.enabled: true` opts this backend into the cross-server network.
+# Modo de red de RTP (multi-servidor / multi-proxy) Desactivado por defecto; cambiar `network.enabled: true` inscribe este backend en la red entre servidores.
 
 network:
   # Si es false, este archivo se lee y valida, luego se ignora: no se abren hilos, tablas ni transporte.
@@ -14,7 +14,7 @@ network:
   # @default: "RTP_NET_SECRET"
   secretEnv: "RTP_NET_SECRET"
 
-# Backing store for cross-process state.
+# Almacen de respaldo para el estado entre procesos.
 transport:
   # Almacen de respaldo del transporte.
   # @type: enum
@@ -40,7 +40,7 @@ transport:
     # @default: ""
     password: ""
 
-# Backend heartbeat / peer-staleness cadence (shared by every transport tier).
+# Cadencia de latido del backend / caducidad de pares (compartida por cada nivel de transporte).
 heartbeat:
   # Con que frecuencia este backend publica su fila de estado (ms).
   # @type: integer
@@ -51,7 +51,7 @@ heartbeat:
   # @default: 5000
   staleAfterMs: 5000
 
-# Backend-side router.
+# Enrutador del lado del backend.
 routing:
   # Modo del enrutador: local (solo canalizacion local), auto (local primero, si no la cola de espera) o always (siempre inscribir).
   # @type: enum
@@ -63,7 +63,7 @@ routing:
   # @default: false
   lobbyMode: false
 
-# Cross-server wait queue.
+# Cola de espera entre servidores.
 queue:
   # Maximo de inscripciones almacenadas localmente antes de que la contrapresion rechace nuevas llamadas /rtp (QUEUE_FULL).
   # @type: integer
@@ -94,7 +94,7 @@ queue:
   # @default: 1
   workerThreads: 1
 
-# Reservation-token lifecycle.
+# Ciclo de vida del token de reserva.
 reservation:
   # Cadencia del recolector por TTL del lado del proxy (ms); barre tokens caducados y libera sus coordenadas.
   # @type: integer
@@ -105,7 +105,7 @@ reservation:
   # @default: 60000
   ttlMs: 60000
 
-# Region-collision policy.
+# Politica de colisiones de regiones.
 regionCollision:
   # Politica de colisiones aplicada al iniciar.
   # @type: enum
@@ -113,34 +113,34 @@ regionCollision:
   # @default: "warn"
   policy: "warn"
 
-# Optional per-destination policy overlay (matched by serverId); leave commented for the common case.
+# Superposicion opcional de politica por destino (emparejada por serverId); dejala comentada para el caso comun.
 #servers:
 #  example-backend:
-#    # Permission required to target this destination (empty = none).
+#    # Permiso requerido para apuntar a este destino (vacio = ninguno).
 #    # @type: string
 #    # @default: "
 #    permission: "
-#    # Label shown in menus / suggestions (default: serverId).
+#    # Etiqueta mostrada en menus / sugerencias (por defecto: serverId).
 #    # @type: string
 #    # @default: "
 #    display-name: "Example"
-#    # Hide from tab-completion when it has no servable region.
+#    # Ocultar del autocompletado cuando no tiene ninguna region servible.
 #    # @type: boolean
 #    # @default: false
 #    hide-when-unavailable: false
-#    # Allow targeting it even when it reports no servable region.
+#    # Permitir apuntar a el incluso cuando no reporta ninguna region servible.
 #    # @type: boolean
 #    # @default: true
 #    allow-when-unavailable: true
-# Load balancer scoring table.
+# Tabla de puntuacion del balanceador de carga.
 loadBalancer:
   # Peso del termino integrado de escasez de regiones; 0 porque el termino `region` explicito de abajo posee esa senal.
   # @type: number
   # @default: 0
   regionScarcityWeight: 0
-  # Scoring terms, one per metric.
+  # Terminos de puntuacion, uno por metrica.
   terms:
-    # Tick pressure; sigmoid knee at 0.6.
+    # Presion de tick; codo sigmoide en 0.6.
     mspt:
       # Entrada de metrica.
       # @type: enum
@@ -167,7 +167,7 @@ loadBalancer:
         # @range: [0, 1]
         # @default: 0.6
         x0: 0.6
-    # Queue depth; small queues silent, large ones explode.
+    # Profundidad de cola; las colas pequenas silenciosas, las grandes explotan.
     queue:
       # Entrada de metrica.
       # @type: enum
@@ -189,7 +189,7 @@ loadBalancer:
         # @range: [0.1, 20]
         # @default: 3.0
         k: 3.0
-    # Heap gate; fires at >= 85% used.
+    # Compuerta de heap; se activa a >= 85% usado.
     heap:
       # Entrada de metrica.
       # @type: enum
@@ -211,7 +211,7 @@ loadBalancer:
         # @range: [0, 1]
         # @default: 0.85
         threshold: 0.85
-    # Region gate; fires when the kept pool is >= 95% full.
+    # Compuerta de region; se activa cuando el pool conservado esta >= 95% lleno.
     region:
       # Entrada de metrica.
       # @type: enum
@@ -233,7 +233,7 @@ loadBalancer:
         # @range: [0, 1]
         # @default: 0.95
         threshold: 0.95
-    # Gentle tie-breaker on kept count.
+    # Desempate suave sobre el conteo conservado.
     kept:
       # Entrada de metrica.
       # @type: enum

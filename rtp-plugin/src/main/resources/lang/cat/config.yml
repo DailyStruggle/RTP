@@ -87,6 +87,9 @@ menu:
 defaults:
   # Default pounce-ground shape and size. radius/centerRadius = how far the kitty pounces, measured in chunks.
   shape:
+    # Pounce-ground shape algorithm.
+    # @type: enum
+    # @source: shape
     name: "CIRCLE"
     mode: "ACCUMULATE"
     radius: 256
@@ -99,6 +102,9 @@ defaults:
     expand: false
   # Default high/low landing window.
   vert:
+    # Vertical pounce placement algorithm.
+    # @type: enum
+    # @source: vert
     name: "LINEAR"
     minY: 32
     maxY: 255
