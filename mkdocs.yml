@@ -130,6 +130,7 @@ exclude_docs: |
 # not warn about them being absent from nav.
 not_in_nav: |
   /dev/
+  /adr/
   /architecture/
   /assets/
   /site/README.md

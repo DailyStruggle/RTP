@@ -46,7 +46,7 @@ teleports or stalling the whole server.
     unconfigured region has no warmed cache, so the first teleports do all the expensive
     chunk loading and safety checking on demand. Do a test run on your PC first, configure
     your regions, then warm them with `/rtp scan start region=<name>` before players
-    arrive. See [Scan and spatial memory](https://github.com/DailyStruggle/RTP/wiki/Scan-and-Spatial-Memory).
+    arrive. See the [Quick start](../admin/QUICK_START.md) scan step.
 
 !!! warning "Don't wire override parameters into player commands, signs, or portals"
     *Override* parameters (`shape=`, `radius=`, `centerX=`, ...) build a throwaway
@@ -67,7 +67,7 @@ teleports or stalling the whole server.
 ## See also
 
 - [Intended usage](intended-usage.md) - the model these anti-patterns violate.
-- [Scan and spatial memory](https://github.com/DailyStruggle/RTP/wiki/Scan-and-Spatial-Memory) -
+- [Quick start](../admin/QUICK_START.md) -
   warm the cache so first teleports are not slow.
-- [Performance](https://github.com/DailyStruggle/RTP/wiki/Performance) - the
+- [Performance](../admin/configuration/PERFORMANCE.md) - the
   symptom-to-knob tuning playbook.

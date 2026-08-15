@@ -6,9 +6,8 @@ the GUI destination picker. This page explains, from an operator's point of view
 ways an addon can be loaded, how the addons RTP bundles inside its own jar behave, and
 how to turn an addon off.
 
-> Writing your own addon? See the [Addon Development](https://github.com/DailyStruggle/RTP/wiki/Addon-Development)
-> and [Addon Loading](https://github.com/DailyStruggle/RTP/wiki/Addon-Loading) wiki pages,
-> and the worked [Example Addon](https://github.com/DailyStruggle/RTP/wiki/Example-Addon).
+> Writing your own addon? See the [addon developers guide](../FOR_ADDON_DEVELOPERS.md)
+> and the worked [addon quickstart](../ADDON_QUICKSTART.md).
 > This page is for server administrators.
 
 ---
@@ -89,7 +88,7 @@ gets the visual menu immediately.
   renderer is available (e.g. wrong platform) or the caller is not a resolvable player -
   it never silently does nothing.
 - To revert bare `/rtp` to the classic immediate teleport while keeping the addon, change
-  the menu style in the GUI addon's config (see the [Menu](https://github.com/DailyStruggle/RTP/wiki/Menu) wiki page).
+  the menu style in the GUI addon's config (see the GUI addon's README).
 - To remove the GUI entirely, delete its jar from `plugins/RTP/addons/` and restart.
 
 ---
@@ -108,7 +107,6 @@ gets the visual menu immediately.
 ## See also
 
 - [FAQ.md](FAQ.md) - Development & Addons section.
-- [Addon Loading](https://github.com/DailyStruggle/RTP/wiki/Addon-Loading) - how RTP discovers, loads, and unloads addons.
-- [Addon Troubleshooting](https://github.com/DailyStruggle/RTP/wiki/Addon-Troubleshooting) - diagnosing addons that fail to load.
+- [Addon developers guide](../FOR_ADDON_DEVELOPERS.md) - how RTP discovers, loads, and extends addons.
 - [configuration/INTEGRATIONS.md](configuration/INTEGRATIONS.md) - bundled claim-plugin
   integrations (folded into the jar, not loaded as addons).

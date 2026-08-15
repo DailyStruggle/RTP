@@ -95,7 +95,7 @@ be shaded.
 >    footprint promise of ADR-024 by extension.
 >
 > Combined with the 2026-05-15 YAML feature audit (see
-> [`docs/dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md`](../dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md)),
+> `docs/dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md`),
 > which bounds the YAML subset RTP actually uses to a tractable
 > hand-rollable grammar, the conclusion is to replace simpleyaml with
 > an in-house parser rather than a SnakeYAML wrapper.
@@ -431,7 +431,7 @@ Fabric mod jar gets the same in-house parser as every other variant.
 - [`docs/dev/scratch/CONFIG_COMMENT_PRESERVATION_COMPARISON.md`](../dev/scratch/CONFIG_COMMENT_PRESERVATION_COMPARISON.md)
   — v1/v2/v3 failure-mode analysis that motivated the surgical
   line-edit save strategy.
-- [`docs/dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md`](../dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md)
+- `docs/dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md`
   — 2026-05-15 audit over 187 shipped `.yml` files; bounds the parser
   subset.
 - SnakeYAML 2.x comment APIs (`LoaderOptions#setProcessComments`,

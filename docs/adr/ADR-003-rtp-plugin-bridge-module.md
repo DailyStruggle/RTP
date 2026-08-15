@@ -36,7 +36,7 @@ This keeps `rtp-core` a pure logic layer, easing the addition of new server plat
 
 ## References
 
-- Architecture overview: [`ARCHITECTURE.md` — Module Breakdown](../ARCHITECTURE.md)
+- Architecture overview: [`ARCHITECTURE.md` — Module Breakdown](../dev/ARCHITECTURE.md)
 - ArchUnit enforcement: `RTPArchitectureTest#core_must_not_depend_on_platform_apis` (`rtp-core`)
 - Implementing class: `RTPBukkitPlugin.java` (`rtp-plugin`)
 - Requirements: `REQ-RTP-S-001` (platform compatibility), `REQ-CORE-NF-001` (platform agnosticism)

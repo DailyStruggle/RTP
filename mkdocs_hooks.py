@@ -26,6 +26,24 @@ from pathlib import Path
 _TOKEN = "@version@"
 _FALLBACK = "unknown"
 
+# Repo location for rewriting links that escape docs_dir (see
+# _rewrite_external_links). The published site only serves pages under docs/,
+# so any relative link that resolves to a repo file outside docs/ (source code,
+# CHANGELOG, sibling-module docs/ADRs, etc.) has no page on the site and 404s.
+# Those links do resolve when the Markdown is read on GitHub, so rewrite them to
+# the equivalent GitHub URL instead of leaving a dead link.
+_REPO_URL_BASE = "https://github.com/DailyStruggle/RTP"
+_REPO_BRANCH = "V3"
+_MD_LINK_RE = re.compile(r"\]\(\s*([^)\s]+?)((?:\s+\"[^\"]*\")?)\s*\)")
+_SKIP_LINK_PREFIXES = (
+    "http://",
+    "https://",
+    "mailto:",
+    "tel:",
+    "ftp://",
+    "//",
+)
+
 # Directory holding the project-wide ADRs, relative to this file / docs_dir.
 _ADR_DIR = Path(__file__).parent / "docs" / "adr"
 _H1_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
@@ -128,6 +146,56 @@ def on_config(config):
     return config
 
 
+def _rewrite_external_links(markdown: str, page, config) -> str:
+    """Rewrite relative links that escape docs_dir to absolute GitHub URLs.
+
+    Pages under docs/ (notably the internal dev/adr/architecture trees) link to
+    repo files outside docs/ with repo-relative paths like
+    `../../platforms/rtp-fabric/docs/adr/...` or `../../CHANGELOG.md`. Those
+    resolve fine when the Markdown is browsed on GitHub, but the published site
+    has no page for them, so they render as dead links (404). Map any link whose
+    resolved target lands outside docs_dir - but still inside the repo - to the
+    matching `blob`/`tree` URL on GitHub. Links that stay inside docs_dir, are
+    already absolute, or point outside the repo are left untouched.
+    """
+    docs_dir = Path(config["docs_dir"]).resolve()
+    repo_root = docs_dir.parent
+    page_dir = (docs_dir / page.file.src_uri).parent
+
+    def repl(match: "re.Match") -> str:
+        target = match.group(1)
+        title = match.group(2) or ""
+        lowered = target.lower()
+        if (
+            lowered.startswith(_SKIP_LINK_PREFIXES)
+            or target.startswith("#")
+            or target.startswith("/")
+        ):
+            return match.group(0)
+
+        path_part, sep, frag = target.partition("#")
+        frag = f"#{frag}" if sep else ""
+        if not path_part:
+            return match.group(0)
+
+        resolved = (page_dir / path_part).resolve()
+        try:
+            resolved.relative_to(docs_dir)
+            return match.group(0)  # stays inside the published site
+        except ValueError:
+            pass
+        try:
+            rel = resolved.relative_to(repo_root).as_posix()
+        except ValueError:
+            return match.group(0)  # outside the repo entirely; leave as-is
+
+        kind = "tree" if path_part.endswith("/") else "blob"
+        url = f"{_REPO_URL_BASE}/{kind}/{_REPO_BRANCH}/{rel}"
+        return f"]({url}{frag}{title})"
+
+    return _MD_LINK_RE.sub(repl, markdown)
+
+
 def on_page_markdown(markdown, page, config, files):
     """Drop the scattered per-page version stamp; expand any stray token."""
     markdown = _STAMP_RE.sub("", markdown)
@@ -136,4 +204,5 @@ def on_page_markdown(markdown, page, config, files):
     markdown = _AGENTS_LINK_RE.sub(
         lambda m: f"]({_AGENTS_URL}{m.group(1) or ''})", markdown
     )
+    markdown = _rewrite_external_links(markdown, page, config)
     return markdown

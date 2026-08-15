@@ -44,8 +44,11 @@ One jar covers every platform - there is no per-platform download.
    `config/rtp/` on Fabric / NeoForge.
 
 !!! note
-    Folia, multi-server / proxy, and SQL/Redis shared state are LeafRTP-Pro features. The
-    free jar runs on Paper / Spigot / Fabric / NeoForge as-is. Optional soft dependencies
+    The free jar runs on Paper, Spigot, Folia, Fabric, and NeoForge as-is - including
+    single-jar cross-server `/rtp` through the bundled `proxy-direct` transport. LeafRTP-Pro
+    adds the shaded database drivers (the SQL/Redis shared-state transports) and a
+    parallelized Folia scheduler tuned for regionised threading; on the free build Folia
+    runs on the Paper-optimized scheduler and still performs well. Optional soft dependencies
     (all auto-detected): Vault (economy charge), PlaceholderAPI, ProtocolLib.
 
 ## Where to start

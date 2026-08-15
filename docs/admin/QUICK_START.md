@@ -10,27 +10,27 @@ Get RTP running on your server in under 5 minutes, then follow the rest of the s
 
 ## Step 0 — Prerequisites & Pregenerate the World
 
-Before installing RTP, get the environment ready. RTP does not ship its own pregenerator; it loads chunks asynchronously on demand (S-005 — never sync chunk I/O on the main thread), so a cold world makes the first teleports slow and the first `/rtp scan` (Step 9) chunkgen-bound.
+Before installing RTP, get the environment ready. RTP does not ship its own pregenerator; it loads chunks asynchronously on demand (it never does synchronous chunk I/O on the main thread), so a cold world makes the first teleports slow and the first `/rtp scan` (Step 9) chunkgen-bound.
 
-1. **Java 21+** is required (REQ-RTP-SYS-001).
-2. **Pick your platform:** Spigot, Paper, Folia, or Fabric. Fabric is unstable — see [`MULTI_PLATFORM_PLAN.md`](../dev/MULTI_PLATFORM_PLAN.md).
+1. **Java 21+** is required.
+2. **Pick your platform:** Paper, Spigot, Folia, Fabric, or NeoForge.
 3. **Install Vault + an economy plugin first** if you plan to charge for `/rtp` (Step 7).
-4. **Install your claim plugin first** (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, …) if you want claim-aware teleport (S-003). RTP autodetects them at load.
+4. **Install your claim plugin first** (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, …) if you want claim-aware teleport. RTP autodetects them at load.
 5. **Pregenerate** every world you'll add to RTP, sized to match the region you'll configure in Step 4. A region with `shape.radius: 256` (chunks) needs ~4 096 blocks pregenerated from `centerX, centerZ`, plus a small margin.
    - **Chunky** (Paper/Spigot/Folia): `/chunky world <world>`, `/chunky radius <blocks>`, `/chunky start`.
    - **WorldBorder** (legacy): `/wb <world> set <radius>`, `/wb fill`.
 
-> Pregenerating now means Step 9's `/rtp scan` only validates safety, instead of also generating chunks. See [`docs/architecture/05-scan-task-crawler.md`](../architecture/05-scan-task-crawler.md) for why scan throughput is bound by chunk-load latency.
+> Pregenerating now means Step 9's `/rtp scan` only validates safety, instead of also generating chunks. Scan throughput is bound by chunk-load latency, so pregenerating first keeps it fast.
 
 ---
 
 ## Step 1 — Install the Plugin
 
-1. Download the latest `RTP-<version>.jar` from the [SpigotMC resource page](https://www.spigotmc.org/resources/rtp.94812/).
-2. Drop the jar into your server's `plugins/` folder.
+1. Download the jar from [Modrinth](https://modrinth.com/plugin/leafrtp) (free build) or [BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/) (Pro).
+2. Drop the jar into your server's `plugins/` folder (or `mods/` on Fabric / NeoForge).
 3. Restart the server (rather than using `/reload`), as a full restart ensures all hooks register correctly.
 
-After the first start, RTP creates its config folder at `plugins/RTP/` containing `regions/default.yml`, one `worlds/<world>.yml` per loaded world, plus `safety.yml`, `economy.yml`, `performance.yml`, `messages.yml`, and more.
+After the first start, RTP creates its config folder at `plugins/RTP/` containing `definitions/regions/default.yml`, one `definitions/worlds/<world>.yml` per loaded world, plus `safety.yml`, `economy.yml`, `performance.yml`, `messages.yml`, and more. (On Fabric / NeoForge the folder is `config/rtp/` instead of `plugins/RTP/`.)
 
 ---
 
@@ -120,7 +120,7 @@ RTP uses a permission-based system. Assign these to your permission plugin (e.g.
 | `rtp.see` | See RTP messages and `/rtp help` |
 | `rtp.free` | Bypass economy cost |
 | `rtp.noCooldown` | Bypass cooldown |
-| `rtp.other` | Teleport another player (`/rtp player:<player>`) |
+| `rtp.other` | Teleport another player (`/rtp player=<player>`) |
 | `rtp.reload` | Use `/rtp reload` |
 | `rtp.config.view` | Use `/rtp config <file> view` (read-only inspection) |
 | `rtp.config.set` | Use `/rtp config <file> …` to write any config file (umbrella) |
@@ -172,21 +172,21 @@ To create a second region (e.g., for a nether world):
      minY: 32
      maxY: 120
    ```
-3. Update or create `plugins/RTP/worlds/world_nether.yml` so the world points at the new region (`region: "nether"`).
+3. Update or create `plugins/RTP/definitions/worlds/world_nether.yml` so the world points at the new region (`region: "nether"`).
 4. Run `/rtp reload` to apply the new region.
 
-Players can now target it with `/rtp region:nether` (requires `rtp.region` + `rtp.regions.nether` permissions).
+Players can now target it with `/rtp region=nether` (requires `rtp.region` + `rtp.regions.nether` permissions).
 
 ### Programmatic / In-Game Edits with `/rtp config`
 
-> ⚠️ **Hardening in `3.0.0-beta.3`.** The `/rtp config` surface is being hardened against a normative spec ([`docs/dev/CONFIG_COMMAND_SPEC.md`](../dev/CONFIG_COMMAND_SPEC.md), decided in [ADR-037](../adr/ADR-037-harden-rtp-config-commands.md), implemented per [ADR-041](../adr/ADR-041-config-command-and-save-implementation.md)). Behavior described here is the **target**; earlier builds may still silently ignore unknown keys or skip validation. For production use on pre-beta.3 builds, prefer hand-editing the YAML files plus `/rtp reload`.
+> ⚠️ **Hardening in `3.0.0-beta.3`.** Behavior described here is the **target**; earlier builds may still silently ignore unknown keys or skip validation. For production use on pre-beta.3 builds, prefer hand-editing the YAML files plus `/rtp reload`.
 
 Instead of editing files by hand, you can read or change any region key at runtime using the `/rtp config` command:
 
 ```
-/rtp config <file> <key>:<value> [<key>:<value> …] [--dry-run]
-/rtp config <file> <list-key> add:<value> [remove:<value>] [--dry-run]
-/rtp config <multifile> <subfile> <key>:<value> [--dry-run]
+/rtp config <file> <key>=<value> [<key>=<value> …] [--dry-run]
+/rtp config <file> <list-key> add=<value> [remove=<value>] [--dry-run]
+/rtp config <multifile> <subfile> <key>=<value> [--dry-run]
 /rtp config <file> view              # inspect current state interactively
 /rtp config <file> view <key>
 ```
@@ -196,16 +196,16 @@ Permissions are additive (see [COMMANDS.md](COMMANDS.md) §`/rtp config`): `rtp.
 For example, to update the nether region's world after the file already exists:
 
 ```
-/rtp config regions nether world:world_nether
-/rtp config regions nether shape.radius:128 --dry-run    # preview, no change
-/rtp config regions nether shape.radius:128              # commit
-/rtp config regions nether biomeWhitelist add:FOREST add:PLAINS remove:OCEAN
+/rtp config regions nether world=world_nether
+/rtp config regions nether shape.radius=128 --dry-run    # preview, no change
+/rtp config regions nether shape.radius=128              # commit
+/rtp config regions nether biomeWhitelist add=FOREST add=PLAINS remove=OCEAN
 /rtp config regions nether view shape                    # show the current shape block
 ```
 
-Each successful `/rtp config` write is **atomic** (write-to-temp → fsync → rename) and the affected parser is reloaded automatically — no `/rtp reload` is required after a `/rtp config` write. Use `/rtp reload` only when you have hand-edited YAML on disk. Every invocation — success or failure, live or dry-run — emits exactly one audit record (`INFO` on success, `WARNING` on failure) with a `reasonCode` you can match against [`messages.yml`](../dev/CONFIG_COMMAND_SPEC.md#5-validation-model-and-reasoncode-catalog) for translation.
+Each successful `/rtp config` write is **atomic** (write-to-temp → fsync → rename) and the affected parser is reloaded automatically — no `/rtp reload` is required after a `/rtp config` write. Use `/rtp reload` only when you have hand-edited YAML on disk. Every invocation — success or failure, live or dry-run — emits exactly one audit record (`INFO` on success, `WARNING` on failure) with a `reasonCode` you can match against `messages.yml` for translation.
 
-> **Tip for automation:** Scripts, RCON clients, and addon plugins can issue `/rtp config` commands programmatically. Use `--dry-run` to preview the diff before committing; the audit record's `outcome` field (`COMMITTED` / `DRY_RUN_OK` / `REJECTED` / `ROLLED_BACK`) tells you what happened without parsing chat output. See [COMMANDS.md](COMMANDS.md) for the full syntax and the [spec](../dev/CONFIG_COMMAND_SPEC.md) for the error matrix.
+> **Tip for automation:** Scripts, RCON clients, and addon plugins can issue `/rtp config` commands programmatically. Use `--dry-run` to preview the diff before committing; the audit record's `outcome` field (`COMMITTED` / `DRY_RUN_OK` / `REJECTED` / `ROLLED_BACK`) tells you what happened without parsing chat output. See [COMMANDS.md](COMMANDS.md) for the full syntax and error codes.
 
 ---
 
@@ -217,19 +217,19 @@ Once worlds are pregenerated (Step 0) and regions are configured (Steps 4 and 8)
 
 ```
 /rtp scan start                       # caller's region (player) or all (console)
-/rtp scan start  region:mining
-/rtp scan pause  region:mining
-/rtp scan resume region:mining
-/rtp scan cancel region:mining        # stop without clearing memory
-/rtp scan reset  region:mining        # forget everything; required after safety.yml changes
+/rtp scan start  region=mining
+/rtp scan pause  region=mining
+/rtp scan resume region=mining
+/rtp scan cancel region=mining        # stop without clearing memory
+/rtp scan reset  region=mining        # forget everything; required after safety.yml changes
 ```
 
-- Requires the region's shape to be a `MemoryShape` (the built-in shapes are).
-- Console without a `region:` argument scans **all** permanent regions.
+- Requires a region shape that supports spatial memory (the built-in shapes do).
+- Console without a `region=` argument scans **all** permanent regions.
 - Monitor progress live via PlaceholderAPI: `%rtp_scan_chunks%`, `%rtp_scan_totalChunks%`, `%rtp_scan_cps%`, `%rtp_scan_eta%`, `%rtp_scan_landPercentage%`.
 - If a scan is too heavy on the server, lower `performance.yml > scanTaskCount`, then `/rtp scan resume`.
 
-Full sub-command reference: [COMMANDS.md](COMMANDS.md) §`/rtp scan`. Architecture: [`docs/architecture/05-scan-task-crawler.md`](../architecture/05-scan-task-crawler.md). Operational playbook (after-safety-edit, chunk-leak, oversized memory file): [RUNBOOK.md](RUNBOOK.md).
+Full sub-command reference: [COMMANDS.md](COMMANDS.md) §`/rtp scan`. Operational playbook (after-safety-edit, chunk-leak, oversized memory file): [RUNBOOK.md](RUNBOOK.md).
 
 ---
 
@@ -239,20 +239,20 @@ Inspect runtime state:
 
 ```
 /rtp info                              # all loaded worlds and permanent regions
-/rtp info world:world_nether
-/rtp info region:default               # queue depth, in-flight calcs, shape, cacheCap
+/rtp info world=world_nether
+/rtp info region=default               # queue depth, in-flight calcs, shape, cacheCap
 ```
 
 Exercise the full pipeline against a real player (every safety guard remains active — cooldown, economy, claim verifiers, async chunk I/O):
 
 ```
-/rtp test stress player:Alice
-/rtp test stress player:Alice iterations:50 intervalTicks:60
-/rtp test stress player:Alice player:Bob region:mining
+/rtp test stress player=Alice
+/rtp test stress player=Alice iterations=50 intervalTicks=60
+/rtp test stress player=Alice player=Bob region=mining
 ```
 
 - `iterations` is clamped to `[1, 1000]` (default `10`); `intervalTicks` to `[10, 6000]` (default `40`).
-- Per-iteration failures log at `WARNING` (REQ-RTP-S-004) — watch the console.
+- Per-iteration failures log at `WARNING` — watch the console.
 - `stress` is the only sub-command available today; `queue`, `safety`, `verifiers`, `memory`, `platform`, `full` are planned.
 
 Full reference: [COMMANDS.md](COMMANDS.md) §`/rtp test`.
@@ -261,9 +261,9 @@ Manual smoke checks:
 
 ```
 /rtp                       # default region in current world
-/rtp region:mining
-/rtp world:world_nether
-/rtp player:<name>         # other-player teleport (rtp.other)
+/rtp region=mining
+/rtp world=world_nether
+/rtp player=<name>         # other-player teleport (rtp.other)
 ```
 
 ---
@@ -295,7 +295,7 @@ Once Steps 0–10 are green, the recurring loop is small:
 
 ## Next Steps
 
-- [CONCEPTS.md](../dev/CONCEPTS.md) — how RTP works under the hood (queue, shapes, pipeline)
+- [Intended usage](../site/intended-usage.md) — how RTP works under the hood (queue, shapes, pipeline)
 - [COMMANDS.md](COMMANDS.md) — full command and permission reference
 - [WORLDS.md](configuration/WORLDS.md) — every `worlds/<world>.yml` key
 - [REGIONS.md](configuration/REGIONS.md) — every `regions/<name>.yml` key

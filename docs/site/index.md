@@ -35,27 +35,27 @@ One jar covers every platform - there is no per-platform download.
    `config/rtp/` on Fabric / NeoForge.
 
 !!! note
-    Folia, multi-server / proxy, and SQL/Redis shared state are LeafRTP-Pro features. The
-    free jar runs on Paper / Spigot / Fabric / NeoForge as-is. Optional soft dependencies
+    The free jar runs on Paper, Spigot, Folia, Fabric, and NeoForge as-is - including
+    single-jar cross-server `/rtp` through the bundled `proxy-direct` transport. LeafRTP-Pro
+    adds the shaded database drivers (the SQL/Redis shared-state transports) and a
+    parallelized Folia scheduler tuned for regionised threading; on the free build Folia
+    runs on the Paper-optimized scheduler and still performs well. Optional soft dependencies
     (all auto-detected): Vault (economy charge), PlaceholderAPI, ProtocolLib.
 
 ## Where to start
 
 - Read [Intended usage](intended-usage.md) first - it is the mental model the rest of the
   documentation assumes.
-- [Commands](https://github.com/DailyStruggle/RTP/wiki/Commands), the interactive
-  [Menu](https://github.com/DailyStruggle/RTP/wiki/Menu), and
-  [Permissions](https://github.com/DailyStruggle/RTP/wiki/Permissions)
-- [Core Configuration](https://github.com/DailyStruggle/RTP/wiki/Core-Configuration) and
-  the [Typical Configuration Order](https://github.com/DailyStruggle/RTP/wiki/Typical-Configuration-Order)
-- [Regions](https://github.com/DailyStruggle/RTP/wiki/Regions),
-  [Shapes](https://github.com/DailyStruggle/RTP/wiki/Shapes), and
-  [Biome Controls](https://github.com/DailyStruggle/RTP/wiki/Biome-Controls)
+- [Commands](../admin/COMMANDS.md), the interactive menu, and permissions
+- [Core Configuration](../admin/configuration/CORE_CONFIG.md) and the
+  [Configuration overview](../admin/configuration/CONFIGURATION.md)
+- [Regions](../admin/configuration/REGIONS.md),
+  [Schematics / shapes](../admin/configuration/SCHEMATICS.md), and
+  [Safety](../admin/configuration/SAFETY.md)
 - [What NOT to do!](what-not-to-do.md)
 
 ## Beyond the basics
 
 Recent versions also add a multi-server / proxy "network mode" (cross-server `/rtp` via
-Velocity with SQL/Redis shared state), runtime metrics, Vault economy, a lifecycle
-[Effects](https://github.com/DailyStruggle/RTP/wiki/Effects) engine, and a cross-platform
-addon [API](https://github.com/DailyStruggle/RTP/wiki/API).
+Velocity), runtime metrics, Vault economy, a lifecycle effects engine, and a
+cross-platform addon [API](../FOR_ADDON_DEVELOPERS.md).
