@@ -2,7 +2,7 @@
 
 This directory hosts admin-facing documentation for running RTP across **multiple backend servers behind a proxy** (Velocity primary, BungeeCord/Waterfall secondary).
 
-> Status: **Stub.** Proxy mode is not yet released. The design plan lives in [`../../dev/MULTI_SERVER_PLAN.md`](../../dev/MULTI_SERVER_PLAN.md) and is gated by Rule D-005 (see [`AGENTS.md`](../../../.junie/AGENTS.md)). This directory will be populated as Phase 2/3 of that plan lands.
+> Status: **Stub.** Proxy mode is not yet released. The design plan lives in [`../../dev/MULTI_SERVER_PLAN.md`](../../dev/MULTI_SERVER_PLAN.md) and is gated by Rule D-005 (see [`AGENTS.md`](https://github.com/dailystruggle/RTP/blob/V3/.junie/AGENTS.md)). This directory will be populated as Phase 2/3 of that plan lands.
 
 This is **distinct from** multi-platform support (Spigot/Paper/Folia/Fabric) — see [`../../dev/MULTI_PLATFORM_PLAN.md`](../../dev/MULTI_PLATFORM_PLAN.md) for that axis.
 
@@ -15,7 +15,7 @@ Each row links to the design source until the admin doc is authored.
 | File | Topic | Source / status |
 |------|-------|-----------------|
 | [`SINGLE_BACKEND_VERIFICATION.md`](SINGLE_BACKEND_VERIFICATION.md) | Single-backend operator smoke test: `rtp test network` against real Redis (no proxy required) | **Available** (Phase 2e-Redis A1/A2 shipped) |
-| [`CROSS_SERVER_VERIFICATION.md`](CROSS_SERVER_VERIFICATION.md) | Multi-proxy / multi-backend round-trip verification (claim → transfer → redeem); paired devstack at [`platforms/rtp-proxy/devstack/`](../../../platforms/rtp-proxy/devstack/README.md) | **Available** (Phase 2 L3) |
+| [`CROSS_SERVER_VERIFICATION.md`](CROSS_SERVER_VERIFICATION.md) | Multi-proxy / multi-backend round-trip verification (claim → transfer → redeem); paired devstack at [`platforms/rtp-proxy/devstack/`](https://github.com/dailystruggle/RTP/tree/V3/platforms/rtp-proxy/devstack) | **Available** (Phase 2 L3) |
 | `QUICK_START.md` | Minimal Velocity + 2× Paper setup with Redis transport | Phase 2 |
 | `CONFIGURATION.md` | `network.yml` reference (transport, triggers, reservation, security) | Phase 2 |
 | `LOAD_BALANCING.md` | Configurable weighted-average heuristics, curve catalogue, **rendered curve plots** | Phase 2 spec / Phase 3 visuals (see *Documentation follow-up* in `MULTI_SERVER_PLAN.md`) |

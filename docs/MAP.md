@@ -118,7 +118,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`architecture/10-shutdown-and-flush-lifecycle.md`](architecture/10-shutdown-and-flush-lifecycle.md)
 
 ## Public site - narrative pages (`site/`)
-- [`site/README.md`](site/README.md) — purpose + conventions for the narrative/non-functional page set.
+- [`site/README.md`](https://github.com/dailystruggle/RTP/blob/V3/docs/site/README.md) — purpose + conventions for the narrative/non-functional page set (repo-only; not published to the site).
 - [`site/index.md`](site/index.md) — home / landing page.
 - [`site/why.md`](site/why.md) — motivation and the distribution algorithm.
 - [`site/intended-usage.md`](site/intended-usage.md) — the region mental model and recommended workflow.

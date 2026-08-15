@@ -38,6 +38,6 @@ Rather than attempting to predict and budget execution time — which is unrelia
 ## References
 
 - Implementing classes: `CountBoundTaskPipe`, `TimeBoundTaskPipe` (`rtp-core`); Folia scheduler wiring (`rtp-folia`)
-- Design reference: [`DESIGN.md` §2 — Concurrency and Platform-Specific Thread Safety](../DESIGN.md)
+- Design reference: [`DESIGN.md` §2 — Concurrency and Platform-Specific Thread Safety](../dev/DESIGN.md)
 - Folia regional threading model: https://github.com/PaperMC/Folia
 - Requirements: `REQ-FOLIA-F-001`, `REQ-FOLIA-NF-001` (thread safety on regional threads)

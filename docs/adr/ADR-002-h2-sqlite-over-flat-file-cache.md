@@ -31,6 +31,6 @@ Both H2 and SQLite are zero-configuration embedded databases that ship as a sing
 ## References
 
 - Implementing classes: `MemoryShape`, database integration layer (`rtp-core`)
-- Design reference: [`DESIGN.md` §4 — Persistent State and Fault Tolerance](../DESIGN.md)
+- Design reference: [`DESIGN.md` §4 — Persistent State and Fault Tolerance](../dev/DESIGN.md)
 - Requirements: `REQ-CORE-NF-003` (restart resilience), `REQ-CORE-F-005` (stateful memory tracking)
-- Upgrade notes: [`MIGRATION.md`](../MIGRATION.md)
+- Upgrade notes: [`MIGRATION.md`](../admin/MIGRATION.md)

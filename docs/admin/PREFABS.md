@@ -127,4 +127,3 @@ If you have players mid-teleport when the confirm runs, their in-flight pipeline
 - [REGIONS.md](configuration/REGIONS.md) - reference for every knob a prefab might set in `regions/<id>.yml`.
 - [RUNBOOK.md](RUNBOOK.md) - what to run when things go wrong after an apply (`/rtp info`, `/rtp test`, `/rtp scan reset`).
 - [`docs/adr/ADR-024-rtp-lite-assembly-variant.md`](../adr/ADR-024-rtp-lite-assembly-variant.md) - the `lightweight` prefab is the pro-portable subset of the lite assembly's `regions/default.yml`; as of 2026-06-18 lite inherits the full `regions/default.yml` (including `backlogCacheCap: 1000`).
-- [`docs/dev/scratch/PROPOSAL-admin-panel-prefabs.md`](../dev/scratch/PROPOSAL-admin-panel-prefabs.md) - design rationale.

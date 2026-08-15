@@ -5,7 +5,7 @@
 This is the shortest path from nothing to a working RTP addon that registers a custom
 region shape. It is the "hello world" companion to the router in
 [`FOR_ADDON_DEVELOPERS.md`](FOR_ADDON_DEVELOPERS.md) and the fuller walkthrough in
-[`../addons/LeafRTPCountdownAddon/README.md`](../addons/LeafRTPCountdownAddon/README.md).
+[`addons/LeafRTPCountdownAddon/README.md`](https://github.com/dailystruggle/RTP/blob/V3/addons/LeafRTPCountdownAddon/README.md).
 
 An RTP addon is platform-agnostic: it implements the `RTPAddon` SPI, is discovered via
 `ServiceLoader`, and runs unchanged on Bukkit / Spigot / Paper / Folia and Fabric. No
@@ -160,6 +160,6 @@ public void onUnload() {
 ## Where to go next
 
 - [`FOR_ADDON_DEVELOPERS.md`](FOR_ADDON_DEVELOPERS.md) - recommended reading order and the API stability contract.
-- [`../addons/LeafRTPCountdownAddon/`](../addons/LeafRTPCountdownAddon/) - a working reference addon covering config (`ConfigParser`), safety verifiers (`RTPAPI.hooks()`), and teleport-lifecycle callbacks.
+- [`addons/LeafRTPCountdownAddon/`](https://github.com/dailystruggle/RTP/tree/V3/addons/LeafRTPCountdownAddon) - a working reference addon covering config (`ConfigParser`), safety verifiers (`RTPAPI.hooks()`), and teleport-lifecycle callbacks.
 - [`dev/ADDON_LOADING.md`](dev/ADDON_LOADING.md) - how RTP discovers, loads, and unloads addons per platform.
 - [`dev/EXTERNAL_HOOKS.md`](dev/EXTERNAL_HOOKS.md) - the `RTP.addShape` / `RTP.addVerticalAdjustor` factory entry points and the hook catalog.
