@@ -404,13 +404,18 @@ Hard rules:
 ## Environment & Execution
 
 - **Gradle**: run through the wrapper (`./gradlew`). Run one command per line; do not rely on a specific shell's command-chaining operator.
+- **Cross-platform note**: this repository is developed on both Windows and Linux (the primary dev box is in the process of migrating Windows -> Linux). Pick the invocation column below that matches the box you are actually running on. When authoring examples in docs or scripts, prefer the portable POSIX form (`./gradlew`, `python3 scripts/<name>.py`, `bash devstack/<name>.sh`) unless a Windows-only detail is the point.
 - **Build & test invocation (copy-paste ready)**:
   - **Windows / PowerShell (this dev box)**: invoke the wrapper as `.\gradlew.bat`. The bare `./gradlew` form is a POSIX shell idiom; in PowerShell use `.\gradlew.bat` (or `& .\gradlew.bat`). Examples:
     - Full multi-module build (the mandatory final step, see *Final Full Build*): `.\gradlew.bat build`
     - One module build: `.\gradlew.bat :<module>:build` (e.g. `.\gradlew.bat :rtp-core:build`)
     - Targeted tests: `.\gradlew.bat :<module>:test --tests "<pattern>"` (e.g. `.\gradlew.bat :rtp-core:test --tests "*MenuConfigSubtreeBuildersTest*"`)
     - Clean rebuild when stale state is suspected: `.\gradlew.bat clean build`
-  - **Linux / macOS / other boxes**: the POSIX form `./gradlew build`, `./gradlew :<module>:build`, `./gradlew :<module>:test --tests "<pattern>"` is correct.
+  - **Linux / macOS / other boxes (bash/zsh)**: the POSIX form is correct and is the preferred form for examples. `gradlew` is committed LF with the executable bit set, so invoke it directly:
+    - Full multi-module build (the mandatory final step, see *Final Full Build*): `./gradlew build`
+    - One module build: `./gradlew :<module>:build` (e.g. `./gradlew :rtp-core:build`)
+    - Targeted tests: `./gradlew :<module>:test --tests "<pattern>"` (e.g. `./gradlew :rtp-core:test --tests "*MenuConfigSubtreeBuildersTest*"`)
+    - Clean rebuild when stale state is suspected: `./gradlew clean build`
   - Run one Gradle command per line; do not chain with `&&` / `;`. Use `--no-daemon` if a daemon/JDK mismatch is suspected (see `LESSONS_LEARNED.md`).
 - **Multi-module Gradle**:
   - One module build: `./gradlew :<module>:build`
@@ -428,7 +433,9 @@ Hard rules:
     ```
     C:\Users\lxgol\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\python.exe
     ```
-    Invoke the pipeline scripts via that absolute path, e.g. `& "C:\Users\lxgol\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\python.exe" scripts/locale-files-to-csv.py`. On Linux/macOS / other boxes, `python scripts/<name>.py` is correct.
+    Invoke the pipeline scripts via that absolute path, e.g. `& "C:\Users\lxgol\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\python.exe" scripts/locale-files-to-csv.py`.
+  - **Linux / macOS interpreter (post-migration):** the Windows Store-alias trap above does not apply. Use the standard `python3` (or `python`) on `PATH` directly, e.g. `python3 scripts/locale-files-to-csv.py`. Every script under `scripts/` and the `devstack/*.py` helpers are stdlib-only Python 3.12+, so they run unchanged. Where a `.ps1` helper has no `.py`/`.sh` sibling (currently `scripts/apply-locale-translations.ps1`), fall back to reading the PowerShell source and porting the step, or run it under `pwsh` if PowerShell Core is installed.
+  - **Devstack / shell helpers**: the `.ps1` devstack helpers documented elsewhere in this file (e.g. `reset-rtp-config.ps1`) ship a `.sh`/`.py` sibling; on Linux use `bash devstack/<name>.sh` or `python3 devstack/<name>.py`.
 - **Known-harmless warnings**, **Gradle daemon / JDK mismatch**, **`run_test` stdout suppression**, **`rtp test full` interpretation** — see [`LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md).
 - **Database / shutdown-flush / command-pipeline pitfalls** — see [`LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md).
 
