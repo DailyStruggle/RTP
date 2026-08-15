@@ -12,7 +12,7 @@
 
 ## Bundled locales
 
-`en`, `cat`, `de`, `es`, `fr`, `it`, `ja`, `ko`, `nl`, `pl`, `pt`, `ru`, `zh`.
+`en`, `de`, `es`, `fr`, `it`, `ja`, `ko`, `nl`, `pl`, `pt`, `ru`, `zh`.
 
 ## Adding your own locale
 

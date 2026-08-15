@@ -91,6 +91,7 @@ nav:
   - Operations:
       - Runbook: admin/RUNBOOK.md
       - Hazard register: admin/HAZARDS.md
+      - Region file reading: admin/REGION_FILE_READING.md
       - Addons: admin/ADDONS.md
   - Configuration:
       - Overview: admin/configuration/CONFIGURATION.md
@@ -100,7 +101,6 @@ nav:
       - Worlds: admin/configuration/WORLDS.md
       - Schematics: admin/configuration/SCHEMATICS.md
       - Safety: admin/configuration/SAFETY.md
-      - Region file reading: admin/configuration/REGION_FILE_READING.md
       - Performance: admin/configuration/PERFORMANCE.md
       - Economy: admin/configuration/ECONOMY.md
       - Events & effects: admin/configuration/EVENTS_AND_EFFECTS.md
