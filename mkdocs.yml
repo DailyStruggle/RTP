@@ -73,6 +73,7 @@ nav:
       - Prefabs: admin/PREFABS.md
       - Commands: admin/COMMANDS.md
       - FAQ: admin/FAQ.md
+      - Common recipes: admin/RECIPES.md
       - Migration guide: admin/MIGRATION.md
       - Documentation map: MAP.md
   - Operations:

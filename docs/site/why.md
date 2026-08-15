@@ -99,3 +99,27 @@ here are the differences:
 A square spiral was harder to conceptualize, but it came out pretty clean and just as evenly distributed
 ![](https://i.imgur.com/hfu5i4H.png)
 ![](https://i.imgur.com/c8CkwPd.png)
+
+## Compared to other RTP plugins
+
+I took up this project as a challenge to solve a single problem with random teleportation that often gets brushed over - nondeterministic search time due to duplicate selections and the time each selection takes when loading chunks.
+
+The model I used to solve this problem seemed difficult to work into a pre-existing plugin, so I put together my own plugin with some programming know-how. I wanted to represent that plugin as a foundation for random teleportation, so I chose a simple name, `RTP`.
+
+The other plugins I consider rivals are mainly BetterRTP and JakesRTP - BetterRTP for its popularity and documentation, JakesRTP for its flexible configuration, location caching, and interesting selection models.
+
+### Selection
+
+The selection mechanisms for each of these encapsulate easy mathematical models for selection followed almost immediately by chunk loading and placement testing.
+
+- BetterRTP uses a basic width/height geometric calculation, sometimes splitting up a shape to avoid rejection sampling before chunk loading.
+- JakesRTP offers more flexible configuration and adds gaussian distributions to the x-z coordinate selection via `Random.nextGaussian()` calls, using rejection sampling to exclude selections outside the selected range.
+- RTP uses more complex mathematical concepts to map and recall bad selections in a 2D plane, which helps prevent duplicate selections and reduces chunk loading as region usage increases. RTP also approximates both exponential and gaussian distributions.
+
+### Background processing and memory
+
+BetterRTP has historically had some difficulty with an attempted queue system, and carries a few extra time costs between command and teleportation. It leans toward file interactions over memory allocation; RTP prefers the opposite, which is reflected in the timing and memory-usage differences.
+
+Like JakesRTP, RTP adds a location cache system, operating at a configurable rate (defined in `performance.yml`) and capped per-region. Unlike JakesRTP, selected chunks are force-loaded until used in order to achieve millisecond response times on commands - the cost of 10-100 extra chunks is less than one online player, which I consider acceptable. To resolve the possibility of changes to the chunk between selection and usage, a second safety check runs when the location is picked up from the cache.
+
+RTP also adds player queues, operating at cache rate, to prevent overlapping selection tasks by default. That means `/rtp` cannot easily be used to DDoS the server via chunk loading.
