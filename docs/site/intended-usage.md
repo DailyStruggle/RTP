@@ -10,9 +10,9 @@ LeafRTP is built around one idea: **a region is a pre-defined area with its own 
 ## The happy path
 
 1. **Install** and start the server once to write the default config.
-2. **Configure** a region's geometry (shape, size, center) - see [Regions](https://github.com/DailyStruggle/RTP/wiki/Regions).
-3. **Point each world at a region** in its config - see [Worlds](https://github.com/DailyStruggle/RTP/wiki/Worlds).
-4. **Warm the cache**: `/rtp scan start region=<name>` per reasonably-sized region - see [Scan and spatial memory](https://github.com/DailyStruggle/RTP/wiki/Scan-and-Spatial-Memory).
+2. **Configure** a region's geometry (shape, size, center) - see [Regions](../admin/configuration/REGIONS.md).
+3. **Point each world at a region** in its config - see [Worlds](../admin/configuration/WORLDS.md).
+4. **Warm the cache**: `/rtp scan start region=<name>` per reasonably-sized region - see the [Quick start](../admin/QUICK_START.md) scan step.
 5. Players run a plain **`/rtp`**, which resolves to their world's region.
 
 !!! tip "Plain `/rtp` is the supported path"
@@ -33,10 +33,10 @@ shape:
   centerZ: 0
 ```
 
-Then point the overworld at that region ([Worlds](https://github.com/DailyStruggle/RTP/wiki/Worlds)), warm it with `/rtp scan start region=overworld` (watch `/rtp scan info`), and you are done. A player typing `/rtp` gets a cached, pre-verified coordinate.
+Then point the overworld at that region ([Worlds](../admin/configuration/WORLDS.md)), warm it with `/rtp scan start region=overworld` (watch `/rtp scan info`), and you are done. A player typing `/rtp` gets a cached, pre-verified coordinate.
 
 !!! note "`radius`, `centerX`, and `centerZ` are measured in chunks"
-    They live *inside* the `shape:` block (not at the top level), and their unit is **chunks**, not blocks - 1 chunk is 16 blocks. A `radius` of `625` therefore reaches 10,000 blocks. See [Regions](https://github.com/DailyStruggle/RTP/wiki/Regions) for the full field reference.
+    They live *inside* the `shape:` block (not at the top level), and their unit is **chunks**, not blocks - 1 chunk is 16 blocks. A `radius` of `625` therefore reaches 10,000 blocks. See [Regions](../admin/configuration/REGIONS.md) for the full field reference.
 
 !!! note "That is the whole loop"
     Configure a region -> point a world at it -> scan to warm it -> players run plain `/rtp`. The rest of this page explains *why*.
@@ -101,7 +101,7 @@ The same model scales from a one-world survival server to a large, multi-world, 
 
     Larger servers commonly run **many worlds at once** - separate overworld, nether, end, a resource world that resets, minigame worlds, and modded dimensions - and on regionised-threading platforms those worlds (and even areas within one world) run on **parallel threads**.
 
-    - Define **one region per place you want `/rtp` to send players** (overworld, resource world, each dimension), then point each world file at the right region. See [Worlds](https://github.com/DailyStruggle/RTP/wiki/Worlds) and [Regions](https://github.com/DailyStruggle/RTP/wiki/Regions).
+    - Define **one region per place you want `/rtp` to send players** (overworld, resource world, each dimension), then point each world file at the right region. See [Worlds](../admin/configuration/WORLDS.md) and [Regions](../admin/configuration/REGIONS.md).
     - Warm each static region with its own `/rtp scan start region=<name>`. Skip warming worlds that reset often (a resource world) - their memory would be invalidated on every reset.
     - Because the engine does all chunk work off the main thread, it stays compatible with regionised, multi-threaded servers - no world's RTP traffic stalls another's.
 
@@ -133,8 +133,8 @@ You *can* pass *override* parameters (custom `shape`, `radius`, `centerX`/`cente
 
 ## Where to go next
 
-- [Regions](https://github.com/DailyStruggle/RTP/wiki/Regions) / [Worlds](https://github.com/DailyStruggle/RTP/wiki/Worlds) - configure the model.
-- [Typical configuration order](https://github.com/DailyStruggle/RTP/wiki/Typical-Configuration-Order) - the recommended sequence.
-- [Scan and spatial memory](https://github.com/DailyStruggle/RTP/wiki/Scan-and-Spatial-Memory) - warm the cache.
+- [Regions](../admin/configuration/REGIONS.md) / [Worlds](../admin/configuration/WORLDS.md) - configure the model.
+- [Quick start](../admin/QUICK_START.md) - the recommended end-to-end setup sequence.
+- [Commands](../admin/COMMANDS.md) - the `/rtp scan` reference for warming the cache.
 - [What NOT to do!](what-not-to-do.md) - the anti-patterns.
-- [Behavior](https://github.com/DailyStruggle/RTP/wiki/Behavior) - the runtime story in depth.
+- [Why LeafRTP exists](why.md) - the runtime story and distribution algorithm in depth.

@@ -1,6 +1,6 @@
 # ADR-NNN — Title
 
-**Status:** Proposed | Accepted | Deprecated | Superseded by [ADR-NNN](ADR-NNN-title.md)
+**Status:** Proposed | Accepted | Deprecated | Superseded by `ADR-NNN-title.md`
 **Date:** YYYY-MM-DD
 
 ## Context

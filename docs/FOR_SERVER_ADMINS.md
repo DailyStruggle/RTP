@@ -3,7 +3,7 @@
 **Current Plugin Version:** `@version@`
 
 This page guides server operators through the RTP documentation in the recommended reading order.
-If you install, configure, or maintain RTP on a Bukkit/Spigot/Paper/Folia server, this is your entry point.
+If you install, configure, or maintain RTP on a Paper, Spigot, Folia, Fabric, or NeoForge server, this is your entry point.
 
 ---
 
@@ -12,7 +12,7 @@ If you install, configure, or maintain RTP on a Bukkit/Spigot/Paper/Folia server
 RTP trades memory for tick time. The pre-warmed location queue, per-region spatial memory, and the Anvil pre-filter caches all consume heap so that teleports resolve without loading chunks on demand. On a heap-starved host the JVM spends its time garbage-collecting and the server appears to hang - that is an under-provisioned deployment, not a plugin fault.
 
 - **Java 21+** (hard requirement).
-- **Heap headroom for the caches.** `cacheCap` and `activeChunkCap` (in your region files) are *absolute* per-region caps: each region costs a fixed amount of heap (roughly `cacheCap + activeChunkCap` cached entries), so total cache memory scales with your region count, not with radius. Radius changes only the size of the per-region spatial memory (the `MemoryShape` land/bad-sector map), not the queue or ticket pool. RTP ships a heap-pressure gate (`performance.yml` -> `maxHeapPercent`, default 85%) that pauses *background cache generation* and logs a warning while the heap is under pressure; already-cached teleports keep serving. A gate that trips persistently means the host cannot afford the configured `cacheCap` - lower it or raise `-Xmx`.
+- **Heap headroom for the caches.** `cacheCap` and `activeChunkCap` (in your region files) are *absolute* per-region caps: each region costs a fixed amount of heap (roughly `cacheCap + activeChunkCap` cached entries), so total cache memory scales with your region count, not with radius. Radius changes only the size of the per-region spatial memory (the land/bad-sector map), not the queue or ticket pool. RTP ships a heap-pressure gate (`performance.yml` -> `maxHeapPercent`, default 85%) that pauses *background cache generation* and logs a warning while the heap is under pressure; already-cached teleports keep serving. A gate that trips persistently means the host cannot afford the configured `cacheCap` - lower it or raise `-Xmx`.
 
 **Reference environment (measured, not a certified minimum).** The in-repo devstack and stress harness run on a **Ryzen 9 3900X with 16 GiB allocated to the server**. Treat this as a known-good baseline rather than a floor - a single small region needs far less. A properly-sourced minimum (heap per region at a given `cacheCap`) is planned once opt-in telemetry lands to measure real deployments; until then, provision generously and watch the console for `maxHeapPercent` warnings.
 
@@ -50,5 +50,5 @@ Companion to the Runbook — use this when you know *what* failed but not *why*,
 
 ## Also Useful
 
-- [CONCEPTS.md](dev/CONCEPTS.md) — plain-language explanation of how RTP's queue, shapes, and teleport pipeline work. Helpful for understanding *why* certain config values behave the way they do.
-- [docs/adr/](adr/README.md) — architecture decision records explaining key design choices and the alternatives that were rejected.
+- [Intended usage](site/intended-usage.md) — plain-language explanation of how RTP's regions, queue, shapes, and teleport pipeline work. Helpful for understanding *why* certain config values behave the way they do.
+- [Why LeafRTP exists](site/why.md) — the motivation and the distribution algorithm behind the plugin.

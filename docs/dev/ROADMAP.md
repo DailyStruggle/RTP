@@ -178,7 +178,7 @@ reproducible by readers".
     work landed; plan a sectioned/sub-grouped layout (or documented sub-files) so message keys are
     findable. Any restructure must round-trip through the locale TSV pipeline and keep
     `LocaleParityTest` green across all 12 locales (see *Locale Config TSV Pipeline* in `AGENTS.md`).
-  - **Constraints.** Honor [ADR-020](../adr/ADR-020-locale-bootstrap-and-yaml-baseline.md) (locale
+  - **Constraints.** Honor [ADR-020](../adr/ADR-020-language-bootstrap-and-locale-aware-configparser.md) (locale
     bootstrap), keep config-key re-keying intact, and ship a migration path for existing installs
     rather than silently relocating keys. The in-game search/prefab surface is the near-term mitigation;
     the file reorg is the durable fix.
