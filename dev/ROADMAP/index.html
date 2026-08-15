@@ -1,0 +1,3851 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>RTP Roadmap - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#rtp-roadmap" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              RTP Roadmap
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../site/why/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../adr/" class="md-tabs__link">
+          
+  
+  Architecture decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Architecture decisions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture decisions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-000-development-workflow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-000 - Development Workflow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-001 — Archimedean Spiral 1D Mapping for Location Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-002 — H2/SQLite for Spatial Memory Persistence Over Flat-File Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-003 — rtp-plugin as a Separate Bridge Module from rtp-core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-004 — CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-005-paperlib-removal/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-005 — Removal of PaperLib in Favour of Native Paper APIs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-006-async-queue-pre-generation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-006 — Async Queue Pre-Generation Over On-Demand Async Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-007-per-user-isolated-queues/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-007 — Per-User Isolated Queues Alongside the Global Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-008 — MemoryTracker as Active Task GC with WeakReference Deallocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-009 — Configurable Spatial Distributions: Flat, Normal, Exponential
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-010 — Versioned Platform Adapter Submodules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-011-rtp-api-separate-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-011 — `rtp-api` as a Separately Published Addon Interface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-012 — `ChunkReservation` as an Internal Chunk Ticket Abstraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-013 — Addons as External Gradle Projects Rather Than Built-In Optional Modules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-015 — Stale-Chunk Guard for Count-Bound Pipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-016-anvil-subsystem/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-016 — Anvil Read-Only Subsystem
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-017 — Block Tags and Block-State Predicates in Safety Lists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-018 — `AGENTS.md` Public Release Structure: Thin Router + Canonical Sources
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-019 — Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-020 — Language Bootstrap and Locale-Aware ConfigParser
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-021 — Legacy Minecraft and Java Support Are Out of Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-022 — Region Shape Cache Key: Seed + Canonical Config Hash
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-023-login-reserve-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-023 — Login Reserve Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-024 — RTP-lite Assembly Variant
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-026-external-hook-api-surface/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-026 — Unified External-Hook API Surface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-028-l3-backlog-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-028 — L3 Backlog Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-032 — Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-033 — NeoForge Platform In-Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-034-memory-shape-catalog/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-034 — Memory Shape Catalog and Polygon Shape
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-035-interactive-menus-book-first/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-035 — Interactive Menus via Written Book
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-036 — Network Mode: Multi-Server, Multi-Proxy RTP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-037 — Harden RTP Config Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-038 — `/rtpadmin` Setup Wizards
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-039 — `/rtpadmin` Diagnostic Surfaces
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-040 — Cross-Backend Metric Time-Series Publication via `MemoryTracker` Tier Promotion
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-041-config-command-and-save-implementation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-042 — YAML Comment Preservation: Block-Only, Surgical Text-Edit Substrate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-043 — `rtp.personalqueue` Permission Semantics: Bucket-Only Opt-In
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-044 — `menu-api` Module for Generalized Interactive Menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-045 — `/rtp docs` Menu Consumer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-046-maps-api-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-046 — `maps-api` Module for Runtime Cartography Chart Generation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-047 - Declarative Chart Composition Bridge
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-048 - Move menu page builders into `rtp-api` behind `RTPServerAccessor`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-049 - Network-mode plumbing in `rtp-core`, platform-specific via `PlayerLifecycleHook` SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-050 - Concrete Menu Commands Supersede Token Registries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-051 - Two-Tier API Model: Thin `rtp-api` Contract + `rtp-core` Extension API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-052 — Always-on generation outcome metrics and cause-tagged bad-location persistence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-053 — Pipeline Latency Percentiles and Slow-Teleport Audit
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-054 — RTPRunnable Self-Scheduling Thread Routing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-055-pvp-combat-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-055 - Optional PvP / combat-tag pre-flight gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-056-bare-rtp-root-action/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-056 - Pluggable bare-`/rtp` root action
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-057 — Platform-agnostic addon SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-058 — Region-Specific Schematic
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-059 — Relative Ground-Distance Safety Predicate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-060 — Emergency-Platform Block-Restoration Timeout
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-061-open-core-dual-licensing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-061 — Open-Core Dual Licensing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-062-biome-probability-weighting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-062 — Biome-probability weighting for location selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-063 — Biome-First Menu with Auto-Region Selection by Biome Availability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-064 — Config-Comment Format: Summary Line as Menu Hover Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-065 — World-Override Regions and the `/rtp` World Menu
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-066-foreign-config-importer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-066 - Foreign Config Importer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-067 — Automatic PRESCAN, Adaptive Scan Rate Control, and `.mca`-Header Generation Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-068 - Cross-Server Persisted Teleport Limits
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-069 - Claim-Plugin Integrations Extracted to the Bundled `LeafRTPClaimAddon`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-070 - Platform-neutral `/rtp` command root
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-071 - Config Organization and Discoverability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-072: Teleport View-Distance Clamp and Steady Restore
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-073-config-default-inheritance-references/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-073 - Config Default Inheritance via `@<file>` References
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-074 - Operator-Facing RTP Throughput and Cost Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-075 - Platform-Neutral Player-Move Event SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-076-config-folder-consolidation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-076 - Config Folder Consolidation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-NNN — Title
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tier-0-release-blockers-for-300-final" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tier 0 — Release blockers for 3.0.0 final
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-1-caveat-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tier 1 — Caveat mitigations
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 1 — Caveat mitigations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1a-spigot-fallback-one-on-tick-getchunkat" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.A — Spigot fallback: one on-tick getChunkAt
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1b-folia-fallback-one-region-scheduler-hop" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.B — Folia fallback: one Region-Scheduler hop
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1c-un-populated-chunks-fall-through-to-live-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.C — Un-populated chunks fall through to live load
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1d-fabric-supported-stable-as-of-2026-05-26" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.D — Fabric: supported (stable as of 2026-05-26)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1e-unsourced-statistics-on-the-front-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.E — Unsourced statistics on the front page
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-2-upcoming-features-not-caveat-driven" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tier 2 — Upcoming features (not caveat-driven)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-3-polish-and-long-tail" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tier 3 — Polish and long tail
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-update-this-document" class="md-nav__link">
+    <span class="md-ellipsis">
+      How to update this document
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="rtp-roadmap">RTP Roadmap<a class="headerlink" href="#rtp-roadmap" title="Permanent link">&para;</a></h1>
+<p><strong>Scope:</strong> This roadmap tracks known shortfalls in the current release and the concrete work planned
+to address them, plus forward-looking features that are not driven by a known caveat. Version
+anchor: <code>3.1.2</code> (see <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md</code></a>).</p>
+<p>Each item is expressed as a checklist line so completed work can be struck through with the
+commit/ADR that closed it.</p>
+<p>Tier ordering reflects priority, not chronology:</p>
+<ul>
+<li><strong>Tier 0</strong> — must-ship items before <code>3.0.0</code> loses the <code>-beta.1</code> tag. <em>(All Tier 0 items complete; <code>3.0.0</code> shipped.)</em></li>
+<li><strong>Tier 1</strong> — directly narrows a caveat currently documented in <code>docs/FRONT_PAGE.bbcode</code> or
+  <code>docs/admin/</code>.</li>
+<li><strong>Tier 2</strong> — new capability that earns a <code>3.1.0</code> / <code>3.1.x</code> release note.</li>
+<li><strong>Tier 3</strong> — polish, long-tail, and infrastructure.</li>
+</ul>
+<hr />
+<h2 id="tier-0-release-blockers-for-300-final">Tier 0 — Release blockers for <code>3.0.0</code> final<a class="headerlink" href="#tier-0-release-blockers-for-300-final" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] ~~<strong>Record current-release demo footage.</strong> The "Historical Demonstrations" section on the
+  front page is self-labelled as dated. Produce two ≤30s clips on <code>3.0.0-beta.1</code> showing (a) the
+  Anvil pre-filter's effect on MSPT under Spigot, (b) queue saturation and per-player isolation on
+  Folia. Replace the YouTube IDs in <code>docs/FRONT_PAGE.bbcode</code> and retitle the section back to
+  "Performance Proofs &amp; Demos".~~</li>
+<li>[x] ~~<strong>Close out every <code>@Ignored</code> / <code>@Disabled</code> test.</strong> Per project guidelines, releases must not
+  ship with muted tests. Audit <code>rtp-core</code>, all platform adapters, and <code>rtp-plugin</code> before tagging.~~</li>
+<li>[x] ~~<strong>Freeze the ADR set for 3.0.0.</strong> Any architectural work started after <code>beta.1</code> either lands
+  before the final tag or is deferred to a <code>3.1.0</code> ADR file. Mixed-state ADRs confuse external
+  reviewers reading the repo top-down.~~</li>
+<li>[x] ~~<strong><code>CHANGELOG.md</code> Keep-A-Changelog pass.</strong> The <code>3.0.0</code> entry should read as a release
+  announcement, not a git log — grouped by Added / Changed / Fixed / Removed with operator-visible
+  framing.~~</li>
+</ul>
+<hr />
+<h2 id="tier-1-caveat-mitigations">Tier 1 — Caveat mitigations<a class="headerlink" href="#tier-1-caveat-mitigations" title="Permanent link">&para;</a></h2>
+<p>Each subsection below matches a caveat that the front page currently admits. The goal for each is to
+convert the caveat from a trust claim ("bounded in practice") to an observable one ("here is the
+number, bound it yourself").</p>
+<h3 id="1a-spigot-fallback-one-on-tick-getchunkat">1.A — Spigot fallback: one on-tick <code>getChunkAt</code><a class="headerlink" href="#1a-spigot-fallback-one-on-tick-getchunkat" title="Permanent link">&para;</a></h3>
+<p>The Anvil pre-filter falls through to a live load only when the probe returns <code>UNKNOWN</code> (no region
+file, unsupported data version, decode error, or un-populated chunk). On vanilla Spigot this costs
+one on-tick chunk load per fallback.</p>
+<ul>
+<li>[x] ~~<strong>Document un-populated-chunk warming as the operator remedy.</strong> The <code>REQ-RTP-F-012</code>
+  world-scan lifecycle (<code>start</code> / <code>pause</code> / <code>resume</code> / <code>reset</code> / <code>cancel</code>) populates every candidate
+  on disk and collapses the fallback to near-zero for warmed regions. Write this up in
+  <code>docs/admin/QUICK_START.md</code> as the recommended cold-start workflow.~~</li>
+<li>[x] ~~<strong>Add a <code>--until-populated</code> convenience flag to the admin scan command</strong> (if not already
+  present) so the cold-start workflow is one command, not a cron job.~~</li>
+<li>[x] ~~<strong>Tick-budget telemetry.</strong> Surface a rolling counter — fallbacks/minute and total μs spent
+  on the main thread per fallback — via <code>/rtp test full</code> and a dedicated stats subcommand. A
+  <code>SpigotPrefilterStats</code> companion to <code>MemoryTracker</code> is the likely shape.~~</li>
+<li>[x] ~~<strong>Optional "reject on unknown" mode.</strong> Config flag (default off) that skips candidates when
+  the probe returns <code>UNKNOWN</code> instead of paying the on-tick fallback. For operators who prefer a
+  guaranteed zero main-thread cost over maximum throughput.~~</li>
+</ul>
+<h3 id="1b-folia-fallback-one-region-scheduler-hop">1.B — Folia fallback: one Region-Scheduler hop<a class="headerlink" href="#1b-folia-fallback-one-region-scheduler-hop" title="Permanent link">&para;</a></h3>
+<p>On Folia, a confirmed candidate that the Anvil probe could not resolve pays one Region-Scheduler hop
+to the authoritative live load.</p>
+<ul>
+<li>[x] ~~<strong>Measure the hop cost.</strong> Add a traceable timing test (<code>FoliaRegionHopTimingTest</code>, traceable
+  to <code>REQ-RTP-NF-002</code>) that captures nanoseconds between Anvil-probe-complete and
+  Region-Scheduler-ready on a representative candidate. Publish the p50/p95 numbers in the release
+  notes; until then the caveat is unquantified.~~</li>
+<li>[x] ~~<strong>Investigate hop amortization.</strong> Can consecutive candidates within the same region share a
+  single Region-Scheduler entry? If yes, implement and document with an ADR. If no, write the ADR
+  explaining why — closing the question is as valuable as fixing it.~~</li>
+</ul>
+<h3 id="1c-un-populated-chunks-fall-through-to-live-load">1.C — Un-populated chunks fall through to live load<a class="headerlink" href="#1c-un-populated-chunks-fall-through-to-live-load" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] ~~<strong>Regression test: live-load safety net cannot re-admit a prior reject.</strong> Assert that a
+  chunk the Anvil probe rejected on populated data is never subsequently accepted by the live-load
+  path. Must hold under Folia region-stealing and concurrent player teleports.~~</li>
+<li>[x] ~~<strong>Failure attribution bucket.</strong> Extend the <code>FailTypes</code> taxonomy (or the equivalent telemetry
+  surface) with <code>unpopulatedFallthrough</code> so <code>/rtp test full</code> can report its frequency distinctly
+  from other fallbacks. Currently invisible.~~</li>
+</ul>
+<h3 id="1d-fabric-supported-stable-as-of-2026-05-26">1.D — Fabric: supported (stable as of 2026-05-26)<a class="headerlink" href="#1d-fabric-supported-stable-as-of-2026-05-26" title="Permanent link">&para;</a></h3>
+<p>Fabric (<code>rtp-fabric</code>) is a first-class, in-scope, stable platform. The three standing blockers
+documented in prior revisions of this section are resolved; the front page and <code>REQUIREMENTS.md §0</code>
+should be updated to reflect that Fabric is supported, not out of scope.</p>
+<ul>
+<li>[x] ~~<strong>Resolve the three standing blockers in <code>MULTI_PLATFORM_PLAN.md</code>:</strong>~~</li>
+<li>[x] ~~<strong>S-005 violation in <code>FabricRTPWorld.getChunkAt</code>.</strong>~~ — <code>getChunkAt</code> returns
+    <code>CompletableFuture&lt;Long&gt;</code> and routes through an async chunk-load path; S-005 compliant.</li>
+<li>[x] ~~<strong>Null stub in <code>FabricServerAccessor.getLocationGenerator</code>.</strong>~~ — fully wired; throws
+    <code>IllegalStateException</code> per <code>REQ-RTP-S-006</code> when called pre-init.</li>
+<li>[x] ~~<strong>Unresolved Loom dependency.</strong>~~ — resolved via the obf/unobf carrier split
+    (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md">rtp-fabric-ADR-009</a>).</li>
+<li>[x] ~~<strong>Update front-page / requirements wording.</strong> <code>docs/FRONT_PAGE.bbcode</code> and <code>REQUIREMENTS.md
+  §0 Out of Scope</code> still describe Fabric as unsupported; reframe to first-class supported
+  platform.~~</li>
+<li>[x] ~~<strong>Re-run the <code>rtp-api</code> interface-sufficiency analysis</strong> and record the result as an ADR
+  (April 2026 gap analysis concluded interfaces are sufficient; promote the finding from
+  <code>MULTI_PLATFORM_PLAN.md</code> to an Accepted ADR).~~</li>
+</ul>
+<h3 id="1e-unsourced-statistics-on-the-front-page">1.E — Unsourced statistics on the front page<a class="headerlink" href="#1e-unsourced-statistics-on-the-front-page" title="Permanent link">&para;</a></h3>
+<p>The Spatial Memory paragraph now cites a concrete ~45% Overworld-safe figure from a local profiling
+pass on a vanilla 1.21 seed set; Nether and End ratios remain qualitative ("dominated by lava seas",
+"almost entirely void"). The caveat has narrowed from "no numbers anywhere" to "one number, not yet
+reproducible by readers".</p>
+<ul>
+<li>[x] ~~<strong>Publish the reference profiling run</strong> in <code>docs/admin/BENCHMARKS.md</code> — seed list, sample
+  size, methodology, and per-dimension safe-fraction columns for Overworld / Nether / End. Until
+  this exists, the ~45% figure is an author claim, not a reproducible one.~~</li>
+<li>[x] ~~<strong>Extend the existing bStats integration with custom charts.</strong> Default metrics are already
+  wired (<code>RTPBukkitPlugin</code> → bStats ID <code>30865</code>, relocated <code>org.bstats</code> →
+  <code>io.github.dailystruggle.rtp.bstats</code>); what is missing is <code>addCustomChart(...)</code> for RTP-specific
+  aggregates — platform split, region count, queue depth, and observed safe-fraction histograms per
+  dimension.~~</li>
+<li>[x] ~~<strong>Replace the qualitative Nether/End phrasing</strong> on the front page with measured figures once
+  either path above lands.~~</li>
+</ul>
+<hr />
+<h2 id="tier-2-upcoming-features-not-caveat-driven">Tier 2 — Upcoming features (not caveat-driven)<a class="headerlink" href="#tier-2-upcoming-features-not-caveat-driven" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[ ] <strong>Party/group teleport addon (<code>LeafRTPPartyAddon</code>).</strong> Module skeleton landed as a
+  platform-neutral <code>RTPAddon</code> (config + lifecycle only; loads as a safe no-op). Remaining work:
+  party detection, coordinate reservation, and grouped teleport dispatch (serve one prepared
+  coordinate to N members, or draw a small adjacent cluster) - all consuming the existing supply
+  pipeline rather than searching per member. Specified in
+  <a href="https://github.com/DailyStruggle/RTP/blob/V3/addons/LeafRTPPartyAddon/REQUIREMENTS.md"><code>addons/LeafRTPPartyAddon/REQUIREMENTS.md</code></a> and
+  <a href="https://github.com/DailyStruggle/RTP/blob/V3/addons/LeafRTPPartyAddon/docs/adr/leafrtp-party-addon-ADR-001-party-teleport-shared-destination.md">leafrtp-party-addon-ADR-001</a>
+  (Proposed).</li>
+<li>[ ] <strong>Region-confinement (tether) addon (<code>LeafRTPTetherAddon</code>).</strong> Module skeleton landed as a
+  platform-neutral <code>RTPAddon</code> (config + lifecycle only; loads as a safe no-op). Replaces the earlier
+  "named-zone" framing: a "zone" is ~90% just an existing RTP region, so the non-redundant capability
+  is keeping a player <em>inside</em> the region they were teleported into - a cross-platform "tether". It
+  uses RTP's own region geometry (chunk-free containment) and teleport events for membership, enforces
+  by safe pull-back (never movement-veto), and optionally persists via the core database. Remaining
+  work is gated on a new core primitive - a platform-neutral player-move event SPI - proposed under
+  D-005 (see below). Any WorldGuard/claim-mod bound stays optional via the rtp-api hook surface
+  (ADR-026), never required. Specified in
+  <a href="https://github.com/DailyStruggle/RTP/blob/V3/addons/LeafRTPTetherAddon/REQUIREMENTS.md"><code>addons/LeafRTPTetherAddon/REQUIREMENTS.md</code></a> and
+  <a href="https://github.com/DailyStruggle/RTP/blob/V3/addons/LeafRTPTetherAddon/docs/adr/leafrtp-tether-addon-ADR-001-cross-platform-region-confinement.md">leafrtp-tether-addon-ADR-001</a>
+  (Proposed).</li>
+<li>[ ] <strong>Platform-neutral player-move event SPI (core, D-005 gated).</strong> A normalized block-granularity
+  move signal in <code>rtp-api</code>, dispatched by <code>rtp-core</code>, implemented per adapter (Bukkit <code>PlayerMoveEvent</code>,
+  Fabric/NeoForge server-tick position diff), with opt-in per-player subscription so cost scales with
+  watched players rather than total. Unblocks the tether addon above and is a reusable primitive for
+  future move-driven features, with no WorldGuard dependency. Proposed in
+  <a href="../PROPOSAL-tether-and-move-event-spi/"><code>docs/dev/PROPOSAL-tether-and-move-event-spi.md</code></a> and
+  <a href="../../adr/ADR-075-platform-neutral-player-move-event-spi/">ADR-075</a> (Proposed) - awaiting approval
+  before any core code lands.</li>
+<li>[ ] <strong>Investigate: spectator-during-wait (deferred, low priority).</strong> Some competitor plugins place
+  a player in spectator mode while a destination is resolved. This is a poor architectural fit here -
+  the default model is search-and-serve-else-queue (destinations are prepared ahead of time, so there
+  is no command-then-search "limbo" window to paper over) - and forced spectator carries real risk
+  (fall-through, exploit windows, gamemode restoration on disconnect/crash). Kept as a future
+  investigation only; if pursued at all it belongs as an optional effect, not a core behavior.</li>
+<li>[ ] <strong>Config-file organization + discoverability (operator feedback).</strong> Recurring operator
+  feedback (e.g. the public thread where a user who praised the plugin's performance still found the
+  config "could use some work - there are a lot of different files and it can get confusing"): the
+  split-by-file config tree is hard to navigate, related knobs are scattered, and there is no obvious
+  ordering by how commonly a setting is touched. Partial progress already shipped - the in-game config
+  surface (prefab/recipe configurations + a search tool, surfaced via the <code>/rtp</code> config menu) - but the
+  on-disk experience still needs work. Concretely, to be settled in a D-005 ADR before any file moves
+  (config-file renames/moves are a migration + locale-parity event, so they cannot be done casually):</li>
+<li><strong>Order settings by common relevance</strong>, not alphabetically or by internal grouping - the knobs an
+    operator changes most (range, shape, world, cooldown, cost) should sort to the top of their file
+    and the menu, with advanced/rarely-touched settings below.</li>
+<li><strong>Group all teleportation-related settings in one place.</strong> Operators expect "everything about a
+    teleport" (distance, shape, vertical window, biome/block exclusions, cooldown, warmup, cost) to be
+    co-located rather than spread across <code>config.yml</code>, <code>safety.yml</code>, <code>economy.yml</code>, <code>regions.yml</code>, etc.
+    Evaluate a logical/virtual grouping (in-menu and in docs) that does not necessarily require
+    physically merging the YAML files, so the on-disk parity contract and per-file comments stay intact.</li>
+<li><strong><code>messages.yml</code> reorganization.</strong> <code>messages.yml</code> has outgrown a single flat file since the menu
+    work landed; plan a sectioned/sub-grouped layout (or documented sub-files) so message keys are
+    findable. Any restructure must round-trip through the locale TSV pipeline and keep
+    <code>LocaleParityTest</code> green across all 12 locales (see <em>Locale Config TSV Pipeline</em> in <code>AGENTS.md</code>).</li>
+<li><strong>Constraints.</strong> Honor <a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/">ADR-020</a> (locale
+    bootstrap), keep config-key re-keying intact, and ship a migration path for existing installs
+    rather than silently relocating keys. The in-game search/prefab surface is the near-term mitigation;
+    the file reorg is the durable fix.</li>
+<li>[x] ~~<strong>World-scan UX polish.</strong> The admin lifecycle exists; operator affordances around it do not.
+  Concretely: progress indication (both console and in-game bossbar), resume-across-restart
+  semantics, and a per-region "warmth report" export. This is what converts the feature from
+  <em>implemented</em> to <em>sellable</em>.~~ Resolved: the boss-bar progress indicator landed, resume-across-restart
+  was already shipped (<code>ScanTask.save</code>/<code>loadProgress</code> + <code>Region</code> wiring), and the "warmth report" need
+  is covered by the delivered learned-state inspector. See the sub-items below.</li>
+<li>[x] ~~<strong>In-game boss-bar progress indicator.</strong> A <code>BossBar</code> (green, solid) is shown to all
+    players with the <code>rtp.scan</code> permission while any world scan is active. The bar fills from 0
+    to 1 as <code>latestAbsolutePos / latestAbsoluteTotal</code> across all active <code>ScanTask</code>s; the title
+    is the configurable <code>scanBossBar</code> key in <code>messages.yml</code> (same placeholders as <code>scanStatus</code>:
+    <code>[scan_regions]</code>, <code>[scan_chunks]</code>, <code>[scan_totalChunks]</code>, <code>[scan_cps]</code>,
+    <code>[scan_landPercentage]</code>, <code>[scan_eta]</code>). Set <code>scanBossBar</code> to an empty string to disable.
+    Bars are removed automatically when the scan finishes or is cancelled. Implemented in
+    <code>ScanTaskProcessing</code> (Bukkit-family adapter); Fabric uses the existing console/chat path.~~</li>
+<li>[x] ~~<strong>Resume-across-restart semantics.</strong>~~ Already shipped. <code>ScanTask.save()</code> persists scan
+    progress (<code>scanIter</code>, <code>spatialResolution</code>, <code>currentOffset</code>, <code>isFine</code>, <code>scanPhase</code>; transient
+    <code>GENSCAN</code> collapsed to <code>PRESCAN</code> on disk so a resumed scan skips the chunk-generation pre-pass)
+    to <code>database/regionData/&lt;region&gt;_&lt;cacheKey&gt;.scan</code>, and <code>ScanTask.loadProgress()</code> reads it back.
+    <code>Region</code> reschedules a partial scan at construction and again in <code>rebindWorld(...)</code> when
+    <code>0 &lt; iter &lt; range</code>; the <code>cacheKey()</code> suffix (ADR-022) invalidates the resume on a config/seed
+    change, and the <code>MemoryShape</code> bad-location bitmap survives the restart alongside it.</li>
+<li>[ ] ~~Per-region "warmth report" export.~~ Dropped: the operator-facing "how warmed-up is this
+    region" need is already met by the delivered learned-state inspector on <code>/rtp info
+    region:&lt;name&gt;</code> (<code>[memCoveragePct]</code>, <code>[memBadPct]</code>, <code>[memBadCount]</code>, <code>[memTopCause]</code>,
+    <code>[memTopCausePct]</code>) plus the auto-exported <code>database/regionData/debug/&lt;region&gt;.json</code> scan dump.
+    No distinct "warmth report" artifact was ever specified; reopen with a concrete definition (e.g.
+    per-region L1/L2/L3 queue depths + coverage % to JSON) if a separate export is actually wanted.</li>
+<li>[x] ~~<strong>Persistent learned-state inspector.</strong> A <code>/rtp memory dump &lt;region&gt;</code> subcommand producing a
+  human-readable summary — flagged-bad sector count, coverage %, age of oldest entry, last-write
+  timestamp. The H2/SQLite persistence is a front-page promise; inspection is the operator's
+  confirmation.~~ Delivered as a per-region learned-state summary on the existing <code>/rtp info
+  region:&lt;name&gt;</code> surface rather than a redundant dump command (raw runs are already auto-exported to
+  <code>database/regionData/debug/&lt;region&gt;.json</code> on every scan). <code>MemoryShape.learnedStateSummary()</code>
+  feeds new <code>regionInfo</code> placeholders <code>[memCoveragePct]</code>, <code>[memBadPct]</code>, <code>[memBadCount]</code>,
+  <code>[memTopCause]</code>, <code>[memTopCausePct]</code>; documented in <code>docs/admin/COMMANDS.md</code>.</li>
+<li>[ ] <strong>(v3.2) Region-sampled scan: region-major traversal + Hilbert-within-region.</strong> Planned for
+  <code>3.2</code>. A full <code>/rtp scan</code> over a large world is expensive in both pregeneration cost and in the
+  storage/memory footprint of the persisted bad-location map. Two related changes, to be settled in
+  a D-005 ADR before implementation:</li>
+<li><strong>Region-major traversal.</strong> Today the spiral index is the primary scan unit and <code>.mca</code> binning
+    (<code>ScanTask</code> PR-14, <code>key = (cursor.x &gt;&gt; 5) &lt;&lt; 32 | (cursor.z &gt;&gt; 5)</code>) is a per-batch cache
+    optimization layered on top. Invert this so a whole <code>r.X.Z.mca</code> region is the primary unit (and
+    can be <em>sampled</em> - scan a representative subset of regions rather than all of them), bounding the
+    working-set memory to one region's bins at a time instead of the 6-10 files the spiral frontier
+    can straddle.</li>
+<li><strong>Hilbert curve within each region.</strong> Walk the 32x32 chunks of a region along a Hilbert curve so
+    consecutive scan steps are spatially adjacent. The motivation is the storage/memory win: the
+    <code>MemoryShape</code> bad-location map is run-length / prefix-sum encoded over the traversal order, so a
+    locality-preserving walk clusters safe/unsafe runs and compresses far better than spiral order.</li>
+<li><strong>Constraints carried over from the design discussion.</strong> The existing <code>spatialResolution</code> field
+    already drives a coarse-to-fine stride (<code>ScanTask</code> line ~442: <code>stride = max(1, spatialResolution)</code>
+    with the <code>currentOffset</code> / <code>range</code> multi-pass), so the cheap "scan less" lever exists today and
+    can ship first by surfacing resolution on the <code>/rtp scan</code> verb with no format change. The bigger
+    change must keep verdicts recorded under the spiral index the live selector draws (or it changes
+    the teleport distribution guaranteed by <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>);
+    decide explicitly whether the bitmap <em>storage</em> becomes region-major (compression win, selector
+    contract in scope) or only the <em>traversal</em> order changes (selector untouched). The <code>.scan</code>
+    persistence format (<code>ScanTask.save</code>/<code>loadProgress</code>: <code>scanIter | spatialResolution | currentOffset
+    | isFine | scanPhase</code>) needs a versioned region-major cursor, and rim regions only partially
+    inside the shape/world border still need the existing per-position border math.</li>
+<li>[ ] <strong>Anvil PRESCAN accuracy measurement → conditional FULLSCAN retirement.</strong> Instrument the
+  Anvil PRESCAN correct-rejection rate against the authoritative FULLSCAN verdict, then use the
+  measured rate to decide whether the FULLSCAN trimming pass can be dropped from the scan path.
+  Scan only <em>trims the selectable set</em> (<code>MemoryShape</code> bad-location map); it is <strong>not</strong> a placement
+  safety gate, because every teleport still loads and re-verifies the chunk in the L2→L1 flow
+  (S-001 is enforced there, on the real loaded chunk). A PRESCAN miss therefore only costs a later
+  placement-time rejection, never an unsafe landing, so the gate is purely an attempts-per-RTP
+  (yield) question, not a safety one.</li>
+<li><strong>The model.</strong> At an Overworld acceptance rate <code>p = 1/3</code> (two thirds of ground unacceptable),
+    a PRESCAN correct-rejection rate <code>r</code> leaves a post-trim candidate pool of <code>1/3</code> acceptable +
+    <code>2/3 * (1 - r)</code> slipped-through, so expected attempts <code>= (1/3 + 2/3*(1-r)) / (1/3)</code>. That gives
+    <code>r = 95% → ~1.10</code> attempts/RTP (the floor) and <code>r = 98% → ~1.04</code> attempts/RTP.</li>
+<li><strong>Decision.</strong> Drop FULLSCAN from the scan path once PRESCAN measures <strong>≥ 98% correct-rejection</strong>
+    (cleanly under 1.1 attempts/RTP). <strong>95% is the minimum acceptable floor</strong> (lands exactly on 1.1
+    at <code>p = 1/3</code>). Below 95%, keep FULLSCAN.</li>
+<li><strong>Per-world caveat.</strong> <code>p</code> is per-world (ocean-heavy worlds have lower <code>p</code>, where the
+    slipped-through term dominates faster and <code>r</code> matters more; flat custom worlds have higher <code>p</code>).
+    The instrumentation must therefore track <em>realized</em> attempts/RTP per region rather than
+    inferring it from <code>r</code> alone, and the retirement decision should hold against the lowest-<code>p</code>
+    region in scope. Likely surfaced through the existing <code>/rtp test full</code> / <code>FailTypes</code> telemetry.</li>
+<li>[ ] <strong>Chunky-driven generation pass for <code>/rtp scan</code> (near-term focus, D-005 + ADR gated).</strong> Today
+  the FULLSCAN sub-step of a scan forces generation on an Anvil miss one chunk at a time through the
+  server chunk manager (<code>ScanTask.runFullLoadPath</code> → <code>RTPWorld.getOrLoadChunk</code>). When Chunky (or any
+  bulk pre-generator) is present, drive/sequence <em>it</em> to lay the region's chunks down on disk first,
+  then let scan walk the already-written <code>.mca</code> through the cheap off-tick Anvil PRESCAN path instead
+  of paying per-chunk worldgen stalls. The throughput win comes entirely from the pre-generator's own
+  speed (a faster — incl. future GPU/CPU-accelerated — Chunky build makes it strictly better); the
+  RTP-side value is <strong>UX/orchestration</strong>, not raw generation speed. Design constraints:</li>
+<li><strong>Soft-depend only, no hard dependency.</strong> Reuse the existing Chunky integration seam
+    (<code>ChunkyChecker</code> / <code>ChunkyRTPShape</code>) and route through <code>RTPHooks</code> per
+    <a href="../../adr/ADR-026-external-hook-api-surface/">ADR-026</a>; degrade cleanly to the current
+    generate-as-you-go FULLSCAN when Chunky is absent. Do not put inline pre-generator calls in the
+    scan pipeline.</li>
+<li><strong>One command surface.</strong> Let an admin kick off + size a Chunky pregen for a region and then run
+    the scan consistently sized to it, instead of juggling <code>/chunky</code> and <code>/rtp scan</code> separately
+    (progress display, auto-sizing scan to the pregen radius).</li>
+<li><strong>Honest framing.</strong> Advertise as a convenience/sequencing hook, never as "Chunky makes scan
+    faster" — the speedup is a property of the installed Chunky build, available with or without the
+    hook.</li>
+<li><strong>Gating.</strong> Crosses the external-integration surface and module boundaries → D-005 proposal +
+    dedicated ADR (sibling to <a href="../../adr/ADR-026-external-hook-api-surface/">ADR-026</a>) before
+    implementation.</li>
+<li>[ ] <strong>Accelerated Anvil verification compute (exploration, D-005 + ADR gated).</strong> Offload the bulk
+  biome/material rejection sweep over <em>decoded</em> <code>.mca</code> tiles to a high-throughput compute backend.
+  The backend is deliberately <strong>left open</strong> — a native SIMD/vectorized pass, a GPU/OpenCL kernel,
+  or an external accelerated generator/verifier (e.g. a standalone Rust worldgen+verify engine, the
+  kind of project reportedly hitting ~17k cps on CPU alone) are all candidates; the headline is "go
+  faster", not "use a GPU". This does <strong>not</strong> require LeafRTP to write a chunk generator: worldgen
+  stays the server's / Chunky's job, and this only accelerates LeafRTP's own off-tick verification
+  pass over already-written region files. The accelerable workload is the wide, data-parallel
+  "score N columns against the <code>unsafeBlocks</code> / target-biome predicate sets" pass in <code>rtp-anvil</code>;
+  the output is the same bad-location bitmap the CPU PRESCAN already produces. Boundaries and
+  gating:</li>
+<li>The NBT/<code>.mca</code> decode stays on the CPU (branchy, I/O-bound; already parallelized across
+    <code>AnvilIoPool</code>); only the decoded arrays are handed to the accelerated backend.</li>
+<li>FULLSCAN / live-load paths cannot move (S-005 threading + server chunk manager).</li>
+<li>Any accelerated path is a new subsystem with its own pool/contract; a GPU or external-process
+    backend additionally introduces a hard external dependency surface (OpenCL runtime/driver, or
+    an out-of-process engine + IPC) that must degrade gracefully to the current CPU path when
+    absent — D-005 proposal + a dedicated ADR (sibling to
+    <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>) required before any implementation.</li>
+<li>Profile first: only worthwhile if predicate evaluation (not NBT decode, not disk) is shown to
+    be the bottleneck on large scans. The backend choice should follow that profile (a native
+    vectorized pass may close the gap with none of the GPU/IPC dependency cost).</li>
+<li>[ ] <strong>Safety-list grammar expansion.</strong> The token grammar shipped in <code>3.0.0-beta.1</code> is the
+  foundation; follow-ups:</li>
+<li>[ ] Tag-group composition with set subtraction (<code>#minecraft:slabs - OAK_SLAB</code>).</li>
+<li>[x] ~~Numeric range predicates (<code>[level&gt;=5]</code>) for fluids and light levels.~~ — ADR-017 amendment
+    (2026-05-30); operators <code>&gt;=</code>/<code>&lt;=</code>/<code>&gt;</code>/<code>&lt;</code> with integer bounds, fail-open on absent/non-numeric
+    live values.</li>
+<li>[ ] Hot-reload on <code>safety.yml</code> file edit (currently requires <code>/rtp reload</code>).</li>
+<li>[ ] Relative ground-distance predicate (<code>#minecraft:leaves[_groundDistance&gt;3]</code>) so ground-level
+    leaves/roots stay safe while tall-tree canopy is rejected. Design ADR accepted as Proposed:
+    <a href="../../adr/ADR-059-relative-ground-distance-safety-predicate/">ADR-059</a> — a synthetic,
+    pipeline-injected <code>_groundDistance</code> block-state property consumed by the numeric-range grammar
+    above; lazily computed (zero cost when unused), bounded probe
+    (<code>safety.yml::groundDistanceMaxProbe</code>), fail-open, full-edition only.</li>
+<li>[ ] <strong>Claim-plugin integration audit.</strong> The front page lists seven integrations. Audit each
+  against current upstream releases (Factions forks, GriefDefender 2.x, Lands 7.x, HuskTowns 3.x,
+  TownyAdvanced 0.x, WorldGuard 7.x, GriefPrevention 16.x) and publish
+  <code>docs/admin/CLAIM_PLUGIN_COMPATIBILITY.md</code> with per-plugin version matrices. At least one
+  integration is almost certainly lagging.</li>
+<li>[ ] <strong>CI matrix across platforms.</strong> The Jenkinsfile builds, but <code>rtp test full</code> should run against
+  Spigot + Paper + Folia + Fabric in parallel matrix form, even with mock servers where necessary.
+  This is the step that converts <code>TRACEABILITY.md</code> from "documented" to "continuously enforced".</li>
+<li>[x] ~~<strong>Addon-developer quickstart.</strong> <code>docs/FOR_ADDON_DEVELOPERS.md</code> is linked from the front
+  page, but a one-page <em>"register a custom shape in 20 lines"</em> tutorial is the document that
+  actually drives third-party adoption.~~ Added <a href="../../ADDON_QUICKSTART/"><code>docs/ADDON_QUICKSTART.md</code></a>
+  (Gradle dep + <code>ServiceLoader</code> descriptor + <code>RTPAddon.onLoad()</code> calling <code>RTP.addShape(...)</code>),
+  linked from <code>FOR_ADDON_DEVELOPERS.md</code>.</li>
+<li>[x] ~~<strong>Region-specific schematic (<code>.schem</code>) support.</strong> Per-region arrival structures (small
+  platform, lobby pad, arrival shrine) pasted at the chosen <code>RTPLocation</code> from a <code>.schem</code> file.~~
+  Design ADR accepted: <a href="../../adr/ADR-058-region-specific-schematic-paste/">ADR-058</a> (Amendment 1,
+  2026-05-30: single cross-platform <code>.schem</code> format decoded in-house; native block-state paste; no
+  WorldEdit hard-dependency; the <code>.nbt</code>-on-Fabric split is withdrawn). <strong>Foundation landed:</strong> the
+  platform-neutral <code>SchematicPaster</code> SPI (<code>SchematicPaster</code>, <code>LoadedSchematic</code>, <code>SchematicSource</code>,
+  <code>PasteOptions</code>, <code>PasteAnchor</code>, <code>PasteResult</code>, <code>NoOpSchematicPaster</code>) plus the swappable
+  per-adapter <code>setSchematicPaster</code>/<code>getSchematicPaster</code> holder (mirroring <code>setBiomeGetter</code>) on
+  <code>BukkitRTPWorld</code>, <code>FoliaRTPWorld</code>, <code>FabricRTPWorld</code>. <strong>Decode + plan landed (Amendment 1):</strong> the
+  dependency-free <code>SpongeSchematicDecoder</code> (Sponge v2/v3) + <code>DecodedSchematic</code> + <code>BlockEntityData</code>,
+  the platform-neutral <code>SchematicPlacementPlanner</code> (anchor math + air-skip),
+  <code>AbstractFileSchematicPaster</code> base, and the shared
+  <code>io.github.dailystruggle.rtp.api.block.BlockStateString</code> tokenizer extracted from
+  <code>SafetyTokenParser</code> (ADR-017); pinned by <code>SpongeSchematicDecoderTest</code> +
+  <code>SkyblockIslandFixtureTest</code> against the committed <code>skyblock_island.schem</code>. <strong>Bukkit-family native
+  paster landed:</strong> <code>BukkitSchematicPaster</code> (native <code>Bukkit.createBlockData</code>, S-004 audited)
+  installed at bootstrap via <code>AbstractServerAccessor</code> (inert until core invokes it). <strong>Core wiring
+  landed (no config knob - the presence of a file is the knob):</strong> <code>RegionSchematicService</code> resolves
+  <code>&lt;pluginDir&gt;/schematics/&lt;region&gt;.schem</code> (or <code>.schematic</code>) by file presence, and
+  <code>TeleportPipelineTask</code> loads/decodes it off the region thread (<code>runLoad</code>) then pastes it at
+  <code>SURFACE_CENTER</code> on the arrival region's owning thread (<code>runTeleport</code>, dispatched via
+  <code>RTP.scheduler.runTask(location, ...)</code> for Folia region-safety) in place of the emergency
+  platform, falling back to the platform whenever nothing is pasted (S-004); core reaches the active
+  paster through a new instance accessor <code>RTPWorld.schematicPaster()</code> (default no-op, overridden on
+  <code>BukkitRTPWorld</code>/<code>FoliaRTPWorld</code>/<code>FabricRTPWorld</code>). Verified end-to-end by
+  <code>RegionSchematicServiceTest</code> against the committed <code>skyblock_island.schem</code>. <strong>Also landed:</strong> the
+  Folia native paster (<code>BukkitSchematicPaster</code> installed by <code>AbstractFoliaServerAccessor</code>; the
+  support gate keys on the underlying <code>org.bukkit.World</code> so <code>FoliaRTPWorld</code> is accepted); container
+  block-entity restore (chest inventories rebuilt from the decoded <code>Items</code> NBT straight into the
+  live tile); the <code>SURFACE_CENTER</code> anchor (drops the structure to a standable surface in one pass,
+  no re-paste, keeping players inside roofed structures); and a decode cache in
+  <code>AbstractFileSchematicPaster</code> (each <code>.schem</code> decoded once, cleared on <code>/rtp reload</code>).
+  <strong>Deferred follow-ups (tracked separately):</strong> the footprint claim check (S-003) ahead of the paste;
+  non-container block-entity NBT (sign text, custom data - still placed as empty blocks, audited);
+  and a <code>docs/admin/</code> page plus traceability rows for the paste-on-region-thread regression test.
+  The Fabric native paster landed in <code>3.1.2</code> via the platform-neutral <code>WorldBlockSchematicPaster</code>
+  (<code>rtp-api</code>) driving <code>RTPWorld.setBlocks</code> / <code>restoreBlockEntities</code>; the deobf 26.x Fabric carriers
+  implement <code>setBlocks</code> via <code>BlockStateParser</code> + <code>ServerLevel.setBlock</code> on the server thread
+  (S-005-clean). The former <code>BukkitSchematicPaster</code> was removed and collapsed onto the same shared
+  translator (<code>BukkitBlockWriter</code>).</li>
+<li>[x] ~~<strong>Optional PvP / combat-tag check.</strong> Optional pre-flight check that refuses (or delays)
+  <code>/rtp</code> when the requesting player has recently taken or dealt PvP damage, so players cannot <code>/rtp</code>
+  to escape mid-fight. Off by default.~~ Delivered via
+  <a href="../../adr/ADR-055-pvp-combat-gate/">ADR-055</a>: a <code>PvPCombatStateRegistry</code> SPI + <code>PvPCombatAction</code>
+  in
+  <code>rtp-api</code>, the native <code>NativePvPCombatTracker</code>, and the <code>PvPGate</code> evaluator in <code>rtp-core</code>, gated
+  by
+  <code>safety.yml</code> knobs (<code>pvpCheckEnabled</code> default false, <code>pvpCombatTagSeconds</code>, <code>pvpOnCombat</code>
+  DENY/DELAY, and a combat-state source preference) and the configurable <code>messages.yml#pvpInCombat</code>
+  (locale TSV pipeline, REQ-RTP-F-013). The gate is consulted at the <code>/rtp</code> pre-dispatch surface
+  (<code>RTPCmd.compute</code>) and again in <code>TeleportPipelineTask</code> ahead of enrolment, fails open, and emits
+  an
+  S-004 audit on refusal. Soft-depend adapters for PvPManager / CombatLogX / Simple Combat Log
+  (<code>PvPIntegrations</code> + per-plugin checkers) with a catalog row in
+  <a href="../EXTERNAL_HOOKS/"><code>EXTERNAL_HOOKS.md</code></a> per
+  <a href="../../adr/ADR-026-external-hook-api-surface/">ADR-026</a>. Tests: <code>PvPGateTest</code>,
+  <code>NativePvPCombatTrackerTest</code>, <code>RTPCmdPvPGateTest</code>, <code>PvPCombatAdapterTest</code>.</li>
+<li>
+<p>[x] ~~<strong>NeoForge platform (<code>rtp-neoforge</code>).</strong> First-class NeoForge support as a fifth platform
+  family.~~ <strong>Complete as of 2026-06-13 — NeoForge is a complete, runtime-functional, first-class
+  platform.</strong> Phase N0 (scope unlock, D-005 approval, <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a>,
+  <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md">rtp-neoforge-ADR-001</a>)
+  complete 2026-06-01. Phase N1 module skeleton (<code>rtp-neoforge-common</code> + <code>rtp-neoforge-v1_21_R1</code>,
+  <code>RTPNeoForgeMod</code>, <code>NeoForgeScheduler</code>, <code>NeoForgeCommandRegistrar</code>) landed 2026-06-02. All Phase N2
+  steps (NA async chunk load, NB <code>getLocationGenerator</code>, NC scheduler, ND database, NE event bridge,
+  NE-perf anvil parity, NF permissions, NG Brigadier command tree, NH stabilization + runtime smoke,
+  NI book-menu + chat-prompt, NJ network-mode backend parity incl. live boot + reservation-token
+  redemption, NK maps API + metrics binding + backend-state sampler) and Phase N3 (docs,
+  traceability, beta release) are complete. See
+  <a href="../MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> Phase 4 for the full step breakdown.</p>
+</li>
+<li>
+<p>[ ] <strong>Rich book-menu drawing via resource-pack soft-dependencies.</strong> The written-book menu renderer
+  (Paper's <code>BookMenuRenderer</code>, Fabric's <code>FabricBookMenuRenderer</code> on the 1.21+ / deobf 26.x carriers)
+  currently renders text, colour, and click/hover only. Native books cannot draw images; plugins
+  like vBestiary achieve "images in a book" purely through resource-pack glyph fonts supplied by
+  ItemsAdder / Nexo / Oraxen. Add optional soft-dependencies on those glyph providers and, when one
+  is detected at runtime, conditionally substitute their custom-font glyphs (icons, dividers, region
+  thumbnails) into the book menu fragments; when none is present, fall back to the current
+  text-and-numbered rendering with no behaviour change. Scope notes: soft-depend only (no hard
+  dependency, no bundled assets), catalog each provider in
+  <a href="../EXTERNAL_HOOKS/"><code>EXTERNAL_HOOKS.md</code></a> per <a href="../../adr/ADR-026-external-hook-api-surface/">ADR-026</a>,
+  and route detection through <code>RTPHooks</code> so the chat renderer and unsupported carriers degrade
+  cleanly. Fabric 1.20.x stays on the chat renderer (book renderer off there for performance
+  reasons) and therefore opts out of this feature.</p>
+</li>
+<li>[ ] <strong>Claim/faction-anchored RTP (<code>/rtp faction</code>-style).</strong> EzRTP exposes RTP around a selected
+  faction/claim center; this is the one EzRTP destination feature with no RTP equivalent (named
+  centers, GUI selector, and <code>/rtp fake</code> are deliberately out of scope or already covered).
+  Settled design (pending a D-005 ADR before implementation):</li>
+<li><strong>Pin the center on first use.</strong> Resolve the faction's claim centroid once, snap it to a usable
+    center, and cache it keyed by faction ID. Reuse on every later request; recompute only on a real
+    faction-change event (claim/unclaim/sethome/disband) or a cheap lazy fingerprint mismatch, not
+    per call. Evict via a capped LRU so thousands of factions cannot grow unbounded (evicted ones
+    re-pin on next use).</li>
+<li><strong>Keep full <code>MemoryShape</code>, not a memoryless variant.</strong> Because the center is pinned (no drift),
+    the persisted bad-sector / biome index stays valid and drift-aware learning is retained.</li>
+<li><strong>Vary outer radius freely; never the center point or inner/center radius.</strong> The Archimedean
+    spiral 1D mapping keys each (x,z) off the center + parameterization, so growing/shrinking the
+    outer <code>getRange()</code> bound only appends/truncates the tail of the same 1D sequence: every key,
+    prefix sum, and <code>.bin</code> run keeps its meaning. The radius can therefore track the faction's claim
+    extent dynamically with no remap. A center move or disband is the only event that forces a full
+    rebuild (rare, by design).</li>
+<li>Reuses the existing <code>RegionQueueManager</code> caches (kept/unkept/backlog) and the <code>rtp-anvil</code>
+    prefilter unchanged; route faction lookup through <code>RTPHooks</code> soft-depend per
+    <a href="../../adr/ADR-026-external-hook-api-surface/">ADR-026</a>, keeping the selection path free of a hard
+    faction-plugin dependency (S-003 / <a href="../../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/">ADR-019</a>).</li>
+<li><strong>Out of scope for this item:</strong> transferring bad-location memory across overlapping regions. It
+    is mechanically possible on overlap but not common enough in practice to be worth the
+    complexity; the pinned-center model above avoids needing it.</li>
+<li>[ ] <strong>Cross-platform destination-selector seam + bundled default menu.</strong> EzRTP ships an inventory
+  GUI world selector and BetterRTP relies on third-party menu plugins built against it; RTP should
+  lower that operator burden by shipping its own menu rather than outsourcing it. Two deliverables:</li>
+<li><strong>(1) Platform-neutral selector API</strong> (<code>rtp-api</code> / <code>commands-api</code>): expose the
+    world/destination choice + <code>RTP</code>-side resolution path so a server or addon can render selection
+    in any UI (chat, book, inventory, web, external). This is the single source of truth both the
+    bundled menu and any third-party UI bind to, so they cannot drift apart.</li>
+<li><strong>(2) Bundled, opt-in default destination menu</strong> built on the existing book/chat
+    <code>CommandTreeMenuBuilder</code> (and the Fabric 1.21+ book renderer): lists the worlds/regions a player
+    may RTP into with price/cooldown shown, click-to-teleport, working cross-platform out of the box
+    with no second plugin. Because the menu foundation already exists, this is largely a new view
+    over data we already model (worlds, regions, permissions, prices), not new infrastructure.
+  RTP should <em>not</em> bundle or endorse an inventory GUI; inventory-GUI rendering, if anyone wants it,
+  lives in an addon against deliverable (1), never in core.</li>
+<li>[ ] <strong>BetterRTP API compatibility shim (absorb the inventory-GUI menu ecosystem).</strong> Inventory-GUI
+  menu plugins (which capture more admin attention than book menus) are commonly built against
+  BetterRTP. Rather than rebuild that ecosystem, RTP can register a stand-in for BetterRTP's public
+  surface so those menu plugins transparently drive RTP. Design constraints:</li>
+<li><strong>Absent-only, default off.</strong> Register only when BetterRTP is not installed/enabled
+    (<code>!isPluginEnabled("BetterRTP")</code>) to avoid command/service collisions; stand down completely if
+    the real plugin is present. Never shadow BetterRTP.</li>
+<li><strong>Thin adapter, correct module.</strong> Translate BetterRTP's public entry points (its <code>/rtp [player]
+    [world]</code> command forms and any Bukkit-Services API menu plugins call) into our existing <code>RTPCmd</code>
+    / selection path. Lives in <code>rtp-plugin</code> (Bukkit-family) or an addon, never in <code>rtp-core</code> /
+    <code>rtp-api</code>.</li>
+<li><strong>Pin a documented subset.</strong> Emulate only the API surface menu plugins actually call (player /
+    world targeting, biome / price flags), not all of BetterRTP; document the emulated version.</li>
+<li><strong>Permissions + honesty.</strong> Map <code>betterrtp.*</code> permission checks onto our permission model (or
+    honor both); be explicit in logs/metrics that RTP is serving the request, not BetterRTP.</li>
+<li><strong>Catalog + ADR.</strong> Third-party-accommodating surface: catalog in
+    <a href="../EXTERNAL_HOOKS/"><code>EXTERNAL_HOOKS.md</code></a> per
+    <a href="../../adr/ADR-026-external-hook-api-surface/">ADR-026</a>; emulating a competitor's API is a
+    cross-module, D-005-gated decision requiring a dedicated ADR before implementation. Complements
+    (does not replace) the selector seam + bundled menu item above.</li>
+<li>[ ] <strong>BetterRTP parity: cooldown usage cap (<code>LockAfter</code> equivalent).</strong> BetterRTP can lock a player
+  in an indefinite cooldown after a configured number of RTPs. Adds a per-player success counter to
+  the existing cooldown surface; reset semantics (per session, per day, never) are the real design
+  question, not the counter itself. Usability is debatable (see analysis below); implement only
+  behind a default-off knob, with a configurable reset window so it is a rate cap rather than a
+  permanent ban. Pairs with <code>messages.yml</code> (REQ-RTP-F-013).</li>
+<li>[ ] <strong>BetterRTP parity: persist RTP destination as a permanent spawn anchor (<code>SetAsRespawn</code>
+  equivalent).</strong> On a first-join (or any configured event) RTP, optionally set the landed location as
+  the player's persistent spawn/bed anchor, not just the respawn-event location. Default off; one
+  config flag. Minor, low-risk.</li>
+<li>[ ] <strong>BetterRTP parity: widen built-in claim-plugin coverage.</strong> BetterRTP ships ~18 respect-targets
+  out of the box; RTP ships 12 (<code>ClaimIntegrations</code>: SaberFactions, FactionsBridge, GriefDefender,
+  GriefPrevention, Lands, RedProtect, Residence, CrashClaim, HuskClaims, KingdomsX, TownyAdvanced,
+  WorldGuard). This is integration breadth, not architecture: each new target is a
+  soft-depend adapter on the existing claim-exclusion seam (S-003 /
+  <a href="../../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/">ADR-019</a>), cataloged in
+  <a href="../EXTERNAL_HOOKS/"><code>EXTERNAL_HOOKS.md</code></a> per <a href="../../adr/ADR-026-external-hook-api-surface/">ADR-026</a>.
+  Candidate gap list (audit each for current upstream API before adding; already-shipped targets
+  pruned): MinePlots, hClaims, UltimateClaims, Pueblos. Folds into the existing "Claim-plugin
+  integration audit" item above — same workstream, this just sharpens the target list.</li>
+<li>[ ] <strong>Locale coverage expansion (close the gap with BetterRTP, weighted by real server traffic).</strong>
+  RTP ships 12 parity-enforced locales (<code>en</code>, <code>de</code>, <code>es</code>, <code>fr</code>, <code>it</code>, <code>ja</code>, <code>ko</code>, <code>nl</code>, <code>pl</code>, <code>pt</code>,
+  <code>ru</code>, <code>zh</code>) plus the <code>cat</code> novelty dialect, against BetterRTP's ~21 community-contributed locales.
+  RTP's depth advantages stand (re-keying config keys via <code>&lt;file&gt;.lang.yml</code> rename maps across every
+  config file, and CI-enforced parity via <code>LocaleParityTest</code>), so this item is purely about breadth.
+  Weighting candidate languages by two observed "Server Location" distributions (rather than raw
+  count or global speaker totals) shows RTP already covers ~70-82% of measurable server traffic with
+  its 12 locales, and the whole gap to BetterRTP (4-6 points) is driven by the same short list:</li>
+<li><strong>Add the highest-value missing locales:</strong> <code>vi</code> (Vietnamese), <code>tr</code> (Turkish), <code>cs</code> (Czech), and
+    <code>fi</code> (Finnish - the single largest language <em>neither</em> plugin ships, ~3.4% of servers in one
+    sampled distribution). Lower-priority follow-ups: <code>id</code> (Indonesian), <code>th</code> (Thai), and splitting
+    <code>zh</code> into Simplified/Traditional if demand warrants.</li>
+<li><strong>Caveat (do not over-trust server-location data):</strong> location charts measure where the <em>server</em>
+    is hosted, not where players/admins are. Remote/cloud-hosted communities (Korea is the clearest
+    example - large player base, frequently hosted in Singapore/Japan/US hubs or folded into "Other")
+    are systematically undercounted, so <code>ko</code> and similar locales carry latent value the charts cannot
+    see. Treat the per-distribution weighting as a <em>floor</em> on a language's value, not the value
+    itself; do not drop or deprioritize an existing locale on the strength of a location chart alone.</li>
+<li>Each new locale follows the existing TSV pipeline (<code>locale-files-to-csv</code> -&gt; <code>reconcile-locale-csvs</code>
+    -&gt; translate in <code>scripts/out/locale-&lt;lang&gt;.tsv</code> -&gt; <code>locale-files-from-csv</code>), must pass
+    <code>LocaleParityTest</code>, and should prefer native-speaker review over machine translation per
+    <code>TRANSLATION_GUIDE.md</code>. No architecture change; pure content + parity work.</li>
+<li>[ ] <strong>Foreign config importer (<code>rtp config import &lt;plugin&gt;</code>, one-shot migration aid).</strong> Design
+  settled in <a href="../../adr/ADR-066-foreign-config-importer/">ADR-066</a> (Proposed, D-005). Lower the
+  switching cost for operators moving off a competitor by translating its on-disk config into RTP's
+  config tree. This is a <em>migration aid</em>, not the live API shim above: it reads the competitor's YAML
+  once, writes our files, and then RTP owns the config. A generic <code>ConfigImporter</code> seam (in <code>rtp-core</code>,
+  since file-only reading via the in-house <code>RtpYamlConfig</code> parser is platform-neutral) with BetterRTP
+  as the first source and EzRTP / JakesRTP to follow; <code>rtp config import</code> with no argument auto-detects
+  when exactly one source's files are present. Design constraints:</li>
+<li><strong>Explicit, non-destructive, dry-run-first.</strong> Trigger via an explicit <code>rtp config import &lt;plugin&gt;</code>
+    (never silent auto-overwrite on startup); <code>rtp config import</code> with no argument auto-detects when
+    exactly one source is present, else lists candidates. Default to a preview that lists every mapped
+    key, every approximation, every deferred mapping, and every dropped key; only write on a <code>confirm</code>
+    second phase (parallel to <code>rtp prefab</code> <code>apply</code>/<code>confirm</code>). Back up any RTP file we touch (reuse the
+    <code>prefab</code> <code>&lt;file&gt;.yml.bak.&lt;epochMillis&gt;</code> mechanism). Refuse to clobber a customized RTP config
+    without confirmation.</li>
+<li><strong>No hard dependency.</strong> Parse the competitor's YAML straight off disk via the in-house
+    <code>RtpYamlConfig</code> parser; do not link competitor classes or soft-depend on the plugin being
+    installed. Because file-only reading is platform-neutral, the <code>ConfigImporter</code> seam lives in
+    <code>rtp-core</code>. Target each competitor's latest config schema.</li>
+<li><strong>Honest, lossy translation.</strong> Competitors and RTP model regions differently; classify each key
+    <code>MAPPED</code> / <code>APPROXIMATED</code> / <code>DEFERRED</code> / <code>DROPPED</code> and log every approximation rather than implying
+    parity. Known <strong>clean</strong> (<code>MAPPED</code>) mappings: BetterRTP <code>Shape: square</code> → RTP <code>SQUARE</code> shape (RTP
+    ships both square and circle); arbitrary outlines → <code>Polygon</code> (ADR-034) vertices (<code>APPROXIMATED</code>);
+    <code>CenterX</code>/<code>CenterZ</code>, <code>MaxRadius</code>/<code>MinRadius</code> → region center + radius/minRadius; <code>Cooldown</code>/<code>Delay</code>
+    → <code>teleportCooldown</code>/<code>teleportDelay</code> (seconds, 1:1); <code>MaxAttempts</code> → <code>performance.yml#maxAttempts</code>
+    (1:1, same default 32); <code>PreloadRadius</code> → <code>performance.yml#viewDistanceSelect</code>/<code>viewDistanceTeleport</code>;
+    per-world enable list → worlds/regions; <code>Price</code>/economy → <code>economy.yml</code>; biome/block blocklists →
+    <code>safety.yml</code> filters.</li>
+<li><strong>Parity-dependent keys (<code>DEFERRED</code>, not dropped).</strong> <code>SetAsRespawn</code> (persistent spawn anchor) and
+    <code>LockAfter</code> (cooldown usage cap) map onto RTP parity features that are planned but not yet landed
+    (their own ROADMAP items above). Until each target ships, the importer reports the key as
+    <code>DEFERRED</code> ("recognized, target not yet available"); when the parity feature lands, flip its row
+    from <code>DEFERRED</code> to <code>MAPPED</code> in the same change.</li>
+<li>
+<p><strong>D-005 + ADR.</strong> Design settled in
+    <a href="../../adr/ADR-066-foreign-config-importer/">ADR-066</a> (Proposed): generic <code>ConfigImporter</code> seam
+    with BetterRTP first, EzRTP / JakesRTP to follow.</p>
+</li>
+<li>
+<p>[ ] <strong>3D Archimedean helix coordinate generator (1.18+ vertical biome targeting).</strong> Extend the
+  existing 1D Archimedean spiral mapping (<a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>)
+  with a vertical pitch term: <code>y_n = round(c * theta_n + y_start)</code>, producing a 3D helix that maps
+  directly onto the same 1D index. The original pitch was that combining this with the <code>rtp-anvil</code>
+  prefilter (<a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>) would let the helix skip vertical intervals
+  without chunk loads for vertical biomes (Deep Dark, Lush Caves, Sky Islands).</p>
+</li>
+</ul>
+<p><strong>Likely redundant - demote/close unless a coverage-loss-tolerant use case is shown.</strong> Two
+  objections, both raised in review, undercut the headline:
+  - <strong>Coverage is already config, not code.</strong> RTP cleanly separates horizontal placement (the shape's
+    1D spiral over X/Z) from vertical placement (<code>VerticalAdjustor</code>, which only ever picks a Y inside
+    <code>[minY(), maxY()]</code>). "Reach the Deep Dark" vs "reach Sky Islands" is therefore just a
+    <code>VerticalAdjustor</code> with a different <code>miny</code>/<code>maxy</code> window today; N stacked vertical bands over the
+    same footprint = N regions (or adjustor configs). No new generator is needed to <em>reach</em> a vertical
+    biome band.
+  - <strong>A Y-coupled index segments the biome.</strong> Because <code>y_n</code> is a monotonic function of the index, the
+    helix corkscrews upward as it spirals outward; it only intersects any fixed Y band over the
+    contiguous index slice where <code>c * theta_n + y_start</code> falls inside the band, then climbs out of it
+    while X/Z in that band is still unsearched. The result is a thin helical ribbon through the target
+    biome (coverage shrinks as the pitch <code>c</code> grows), a coverage regression versus a fixed-<code>[minY,maxY]</code>
+    region that searches the whole X/Z footprint at every Y in the band. The "skip" the helix buys is a
+    1D interval skip on the index, and the <em>win and the bug are the same property</em> (you only skip the
+    out-of-band indices by accepting the coverage loss). The cheap "is this column's band acceptable"
+    NBT check it claimed is already provided, decoupled from the spiral, by the existing probe fast-path
+    (<code>VerticalAdjustor.adjustFromProbe</code>, one NBT column read, no chunk load).</p>
+<p>Net: for coverage, stacked <code>minY</code>/<code>maxY</code> regions win (no segmentation); for performance, the anvil
+  probe fast-path already wins (same NBT prune, no coverage loss). The only defensible residue is
+  deterministic <em>sparse sampling</em> of a vertical biome when full coverage is explicitly not wanted - a
+  niche affordance, not the "vertical biome targeting" headline. Do not open an ADR unless that
+  coverage-loss-tolerant use case is demonstrated and a benchmark shows the per-column vertical scan
+  (not chunk I/O) is the actual bottleneck; the <code>c</code> pitch parameter and <code>y_start</code> anchor would be
+  per-region configurable if it is ever pursued.
+- [ ] <strong>"Virtual Rift" warmup effects addon (<code>addons/rtp-effects-rift</code>).</strong> During the standing
+  warmup countdown, send fake client-side block packets to the player making the surrounding terrain
+  appear to dissolve - processed entirely client-side with zero physical block updates, zero physics
+  checks, and zero chunk loads on any region thread. Delivered as an optional addon under <code>addons/</code>
+  depending only on <code>rtp-api</code> + a ProtocolLib soft-depend (Paper/Spigot only; Folia requires the
+  entity scheduler for per-player packet sends; Fabric/NeoForge out of scope for this addon). The
+  <code>effects-api</code> SPI already provides warmup start/tick/end hooks; the addon must restore original
+  block state (re-send real block packets) on teleport or warmup cancel to avoid visual corruption.
+  Catalog the ProtocolLib soft-depend in <a href="../EXTERNAL_HOOKS/"><code>EXTERNAL_HOOKS.md</code></a> per
+  <a href="../../adr/ADR-026-external-hook-api-surface/">ADR-026</a>.
+- [ ] <strong>Adaptive queue demand scaler (in-memory, zero-config).</strong> Track the rate of change of queue
+  consumption (dQ/dt) and player connection frequency in-memory using an exponentially-weighted
+  moving average. When a surge is detected, dynamically scale up <code>AnvilIoPool</code>'s thread count (via
+  <code>ThreadPoolExecutor.setMaximumPoolSize</code>) and expand <code>backlogCacheCap</code> on-the-fly; throttle back
+  when command velocity returns to baseline. No new dependencies - <code>AnvilIoPool</code> is already a
+  documented carve-out from the raw-executor prohibition (<a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>)
+  and <code>MetricsBinding</code> already captures queue depth and TPS data the scaler would consume. The scaler
+  reads from <code>RTP.metrics</code> and writes only to the pool size and the existing <code>backlogCacheCap</code> knob;
+  all periodic work routes through <code>RTP.scheduler</code> (no raw threads). Requires a D-005 proposal before
+  implementation; the EWMA window and floor/ceiling pool sizes must be configurable with safe defaults.</p>
+<hr />
+<h2 id="tier-3-polish-and-long-tail">Tier 3 — Polish and long tail<a class="headerlink" href="#tier-3-polish-and-long-tail" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[ ] <strong>Standalone <code>rtp-anvil</code> publication.</strong> The module is genuinely reusable outside RTP (any
+  plugin wanting off-tick region-file reads could depend on it). If pursued, add a Maven Central
+  publish target and write the "why this lives alone" ADR.</li>
+<li>[ ] <strong><code>SECURITY.md</code> audit before release traffic hits.</strong> Confirm contact address, disclosure
+  window, and scope are all current.</li>
+<li>[ ] <strong>Glossary hygiene.</strong> Now that Fabric is an in-scope, supported platform (see 1.D), audit
+  <code>docs/dev/GLOSSARY.md</code> and the Multipurpose Terms table for platform-specific terms that now need
+  disambiguation (<code>Region</code> means different things on Folia and Fabric).</li>
+<li>[ ] <strong><code>README.md</code> shapes section refresh.</strong> The <code>user-images.githubusercontent.com</code> URLs for the
+  shape-distribution plots are pinned to a legacy account hash; re-host in the repo's own
+  <code>docs/img/</code> to survive future GitHub UI changes.</li>
+<li>[ ] <strong>Retire <code>.bak</code> files after every release.</strong> Project policy is to keep <code>.bak</code> copies during
+  in-flight edits only; a release tag is a natural cleanup checkpoint.</li>
+</ul>
+<hr />
+<h2 id="how-to-update-this-document">How to update this document<a class="headerlink" href="#how-to-update-this-document" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Completed items: do <strong>not</strong> delete the line. Strike it through and append the commit short-SHA or
+  ADR number that closed it. This preserves the velocity signal.</li>
+<li>New caveats discovered between releases: add under the appropriate Tier 1 subsection and mirror
+  the front-page entry in <code>docs/FRONT_PAGE.bbcode</code>'s "Roadmap" block with a vague, non-technical
+  summary (no REQ-*, no ADR identifiers — those stay in this document).</li>
+<li>Features requested by operators: land in Tier 2 with the requesting issue linked, or get
+  explicitly declined with a one-line rationale.</li>
+<li>This file is the only TODO source of truth for release planning. Do not duplicate it into
+  CHANGELOG or per-module requirements.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.2.1
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

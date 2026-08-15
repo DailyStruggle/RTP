@@ -1,0 +1,3754 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+        <link rel="prev" href="../ADR-040-cross-backend-metric-time-series-publication/">
+      
+      
+        <link rel="next" href="../ADR-042-yaml-comment-preservation-block-only/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-041-rtp-config-command-and-save-mechanics-implementation-strategy" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../site/why/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  Architecture decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Architecture decisions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture decisions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-000-development-workflow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-000 - Development Workflow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-001 — Archimedean Spiral 1D Mapping for Location Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-002 — H2/SQLite for Spatial Memory Persistence Over Flat-File Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-003 — rtp-plugin as a Separate Bridge Module from rtp-core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-004 — CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-005-paperlib-removal/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-005 — Removal of PaperLib in Favour of Native Paper APIs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-006-async-queue-pre-generation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-006 — Async Queue Pre-Generation Over On-Demand Async Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-007-per-user-isolated-queues/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-007 — Per-User Isolated Queues Alongside the Global Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-008 — MemoryTracker as Active Task GC with WeakReference Deallocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-009 — Configurable Spatial Distributions: Flat, Normal, Exponential
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-010 — Versioned Platform Adapter Submodules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-011-rtp-api-separate-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-011 — `rtp-api` as a Separately Published Addon Interface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-012 — `ChunkReservation` as an Internal Chunk Ticket Abstraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-013 — Addons as External Gradle Projects Rather Than Built-In Optional Modules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-015 — Stale-Chunk Guard for Count-Bound Pipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-016-anvil-subsystem/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-016 — Anvil Read-Only Subsystem
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-017 — Block Tags and Block-State Predicates in Safety Lists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-018 — `AGENTS.md` Public Release Structure: Thin Router + Canonical Sources
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-019 — Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-020 — Language Bootstrap and Locale-Aware ConfigParser
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-021 — Legacy Minecraft and Java Support Are Out of Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-022 — Region Shape Cache Key: Seed + Canonical Config Hash
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-023-login-reserve-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-023 — Login Reserve Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-024 — RTP-lite Assembly Variant
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-026-external-hook-api-surface/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-026 — Unified External-Hook API Surface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-028-l3-backlog-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-028 — L3 Backlog Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-032 — Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-033 — NeoForge Platform In-Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-034-memory-shape-catalog/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-034 — Memory Shape Catalog and Polygon Shape
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-035-interactive-menus-book-first/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-035 — Interactive Menus via Written Book
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-036 — Network Mode: Multi-Server, Multi-Proxy RTP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-037 — Harden RTP Config Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-038 — `/rtpadmin` Setup Wizards
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-039 — `/rtpadmin` Diagnostic Surfaces
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-040 — Cross-Backend Metric Time-Series Publication via `MemoryTracker` Tier Promotion
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#module-placement" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module placement
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-classes-under-commandsconfiginternal" class="md-nav__link">
+    <span class="md-ellipsis">
+      New classes (under commands/config/internal/)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactor-of-existing-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Refactor of existing classes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#startup-hook-appendix-a11-closure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Startup hook (Appendix A11 closure)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#concurrency-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Concurrency model
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-scaffolding" class="md-nav__link">
+    <span class="md-ellipsis">
+      Test scaffolding
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-sequencing-within-beta3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Migration sequencing (within beta.3)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#out-of-scope-for-this-adr" class="md-nav__link">
+    <span class="md-ellipsis">
+      Out of scope for this ADR
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Consequences">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      Positive
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#negative-trade-offs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Negative / Trade-offs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migration-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      Migration / Rollout
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-042 — YAML Comment Preservation: Block-Only, Surgical Text-Edit Substrate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-043 — `rtp.personalqueue` Permission Semantics: Bucket-Only Opt-In
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-044 — `menu-api` Module for Generalized Interactive Menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-045 — `/rtp docs` Menu Consumer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-046-maps-api-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-046 — `maps-api` Module for Runtime Cartography Chart Generation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-047 - Declarative Chart Composition Bridge
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-048 - Move menu page builders into `rtp-api` behind `RTPServerAccessor`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-049 - Network-mode plumbing in `rtp-core`, platform-specific via `PlayerLifecycleHook` SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-050 - Concrete Menu Commands Supersede Token Registries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-051 - Two-Tier API Model: Thin `rtp-api` Contract + `rtp-core` Extension API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-052 — Always-on generation outcome metrics and cause-tagged bad-location persistence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-053 — Pipeline Latency Percentiles and Slow-Teleport Audit
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-054 — RTPRunnable Self-Scheduling Thread Routing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-055-pvp-combat-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-055 - Optional PvP / combat-tag pre-flight gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-056-bare-rtp-root-action/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-056 - Pluggable bare-`/rtp` root action
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-057 — Platform-agnostic addon SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-058 — Region-Specific Schematic
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-059 — Relative Ground-Distance Safety Predicate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-060 — Emergency-Platform Block-Restoration Timeout
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-061-open-core-dual-licensing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-061 — Open-Core Dual Licensing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-062-biome-probability-weighting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-062 — Biome-probability weighting for location selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-063 — Biome-First Menu with Auto-Region Selection by Biome Availability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-064 — Config-Comment Format: Summary Line as Menu Hover Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-065 — World-Override Regions and the `/rtp` World Menu
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-066-foreign-config-importer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-066 - Foreign Config Importer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-067 — Automatic PRESCAN, Adaptive Scan Rate Control, and `.mca`-Header Generation Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-068 - Cross-Server Persisted Teleport Limits
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-069 - Claim-Plugin Integrations Extracted to the Bundled `LeafRTPClaimAddon`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-070 - Platform-neutral `/rtp` command root
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-071 - Config Organization and Discoverability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-072: Teleport View-Distance Clamp and Steady Restore
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-073-config-default-inheritance-references/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-073 - Config Default Inheritance via `@<file>` References
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-074 - Operator-Facing RTP Throughput and Cost Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-075 - Platform-Neutral Player-Move Event SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-076-config-folder-consolidation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-076 - Config Folder Consolidation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-TEMPLATE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-NNN — Title
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#module-placement" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module placement
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-classes-under-commandsconfiginternal" class="md-nav__link">
+    <span class="md-ellipsis">
+      New classes (under commands/config/internal/)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactor-of-existing-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Refactor of existing classes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#startup-hook-appendix-a11-closure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Startup hook (Appendix A11 closure)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#concurrency-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Concurrency model
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-scaffolding" class="md-nav__link">
+    <span class="md-ellipsis">
+      Test scaffolding
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-sequencing-within-beta3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Migration sequencing (within beta.3)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#out-of-scope-for-this-adr" class="md-nav__link">
+    <span class="md-ellipsis">
+      Out of scope for this ADR
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Consequences">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      Positive
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#negative-trade-offs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Negative / Trade-offs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migration-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      Migration / Rollout
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-041-rtp-config-command-and-save-mechanics-implementation-strategy">ADR-041 — <code>/rtp config</code> Command and Save Mechanics: Implementation Strategy<a class="headerlink" href="#adr-041-rtp-config-command-and-save-mechanics-implementation-strategy" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Proposed
+<strong>Date:</strong> 2026-05-14
+<strong>Target release:</strong> <code>3.0.0-beta.3</code>
+<strong>Companion documents:</strong> <a href="../ADR-037-harden-rtp-config-commands/">ADR-037</a> (decision / eight contracts), <a href="../../dev/CONFIG_COMMAND_SPEC/"><code>docs/dev/CONFIG_COMMAND_SPEC.md</code></a> (target-state normative spec).</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p><a href="../ADR-037-harden-rtp-config-commands/">ADR-037</a> records the <strong>decision</strong> to harden the <code>/rtp config</code> command surface around eight contracts (validator, atomic <code>ConfigTransaction</code>, dry-run, uniform audit, configurable messages, scoped permissions, schema-checked reload, single parse/complete grammar). <a href="../../dev/CONFIG_COMMAND_SPEC/"><code>CONFIG_COMMAND_SPEC.md</code></a> records the <strong>target behavior</strong> as observable user-facing semantics and an exhaustive error matrix. Neither commits to a concrete class layout, package boundary, or migration order.</p>
+<p>This ADR is the <em>how</em> alongside ADR-037's <em>what</em>. It commits to:</p>
+<ul>
+<li>The exact set of new classes and the package they live in.</li>
+<li>How existing classes (<code>SubConfigCmd</code>, <code>ViewSubConfigCmd</code>, <code>ReloadCmd</code>, <code>LanguageCmd</code>, <code>BukkitBaseRTPCmd</code>) are refactored to consume them.</li>
+<li>The order in which the eight contracts ship within beta.3, so each unit of work is independently mergeable and testable.</li>
+<li>The test classes named in ADR-037 mapped to file paths and to the spec sections they exercise.</li>
+</ul>
+<p>No new contracts beyond ADR-037 are introduced here. No spec behavior beyond <code>CONFIG_COMMAND_SPEC.md</code> is added. If a tension arises during implementation, this ADR loses to the spec; the spec is the contract.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<h3 id="module-placement">Module placement<a class="headerlink" href="#module-placement" title="Permanent link">&para;</a></h3>
+<p>All implementation lands in <code>rtp-core</code>. The existing command classes are already in <code>rtp-core/src/main/java/io/github/dailystruggle/rtp/common/commands/</code>; the hardening stays in that tree.</p>
+<ul>
+<li><code>rtp-core/.../commands/config/internal/</code> — <strong>new package</strong>. Houses the hardening primitives. Internal-stable for beta.3; not promoted to <code>rtp-api</code> (deliberate per ADR-037 <em>Alternatives Considered</em>).</li>
+<li><code>rtp-core/.../commands/config/</code> — existing package. <code>SubConfigCmd</code>, <code>ViewSubConfigCmd</code>, <code>ListAddParameter</code>, <code>ListRemoveParameter</code>, <code>LanguageCmd</code> are refactored in place to delegate into <code>internal/</code>.</li>
+<li><code>rtp-core/.../commands/reload/</code> — existing package. <code>ReloadCmd</code> / <code>SubReloadCmd</code> are wired through <code>ConfigParameterValidator</code> before swap.</li>
+<li><code>rtp-plugin/.../commands/BukkitBaseRTPCmd.java</code> — only the <code>msgInvalidCommand</code> / <code>msgBadParameter</code> path is touched; routes through the new <code>config.error.*</code> keys. No business logic moves here.</li>
+<li><code>commands-api/</code> — no surface change. Brigadier bridge (<a href="https://github.com/DailyStruggle/RTP/blob/V3/commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md">commands-api-ADR-001</a>) carries the unchanged subcommand grammar; <code>--dry-run</code> is an ordinary trailing argument from its perspective.</li>
+<li><code>rtp-api</code> — no surface change in beta.3, per ADR-037's deliberate decision.</li>
+</ul>
+<h3 id="new-classes-under-commandsconfiginternal">New classes (under <code>commands/config/internal/</code>)<a class="headerlink" href="#new-classes-under-commandsconfiginternal" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Responsibility</th>
+<th>Spec anchor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ConfigReasonCode</code> (enum)</td>
+<td>Closed set of failure codes from the spec's §5.2 table. Each constant carries its <code>messages.yml</code> key (<code>config.error.&lt;lowercase&gt;</code>) and a default English fallback.</td>
+<td>§5.2</td>
+</tr>
+<tr>
+<td><code>ConfigValidationFailure</code></td>
+<td>Immutable record: <code>parameterPath</code>, <code>attemptedValue</code>, <code>reasonCode</code>, optional <code>detail</code>. Thrown / returned from validators; never <code>null</code>, never <code>return false</code>.</td>
+<td>§3.3, §5.1</td>
+</tr>
+<tr>
+<td><code>ConfigParameterValidator</code></td>
+<td>Strategy interface: <code>validate(parameterPath, attemptedValue, snapshot) → Optional&lt;ConfigValidationFailure&gt;</code>. Implementations per parameter type (numeric range, enum, type, region-name, world-name, shape-specific). Composite invariants implement a separate <code>CompositeInvariant</code> interface invoked after per-parameter validators pass.</td>
+<td>§5.1</td>
+</tr>
+<tr>
+<td><code>ConfigParameterGrammar</code></td>
+<td>Single source of truth for parse + tab-complete. One <code>GrammarNode</code> per parameter position; both <code>onCommand</code> and <code>onTabComplete</code> walk the same tree.</td>
+<td>§9, §2</td>
+</tr>
+<tr>
+<td><code>ConfigTransaction</code></td>
+<td>Owns: snapshot map (<code>FactoryValue</code> → captured value), mutation list, target file. Methods: <code>addMutation</code>, <code>validateAll</code>, <code>apply</code>, <code>persistAtomically</code>, <code>rollback</code>, <code>audit</code>. Single-file at the command surface (spec §2.2).</td>
+<td>§3.4–§3.7</td>
+</tr>
+<tr>
+<td><code>AtomicConfigWriter</code></td>
+<td>The temp+fsync+rename helper. Method <code>write(targetFile, serializedContent)</code>: writes <code>&lt;target&gt;.tmp</code> in same directory, fsyncs, renames over <code>&lt;target&gt;</code>, best-effort parent-dir fsync. Throws <code>IOException</code> only; never swallows. Also exposes <code>cleanupStaleTempFiles(directory)</code> for the startup hook.</td>
+<td>§4.2, §4.3</td>
+</tr>
+<tr>
+<td><code>ConfigAuditRecord</code></td>
+<td>Immutable record carrying every field of spec §6.1.</td>
+<td>§6.1</td>
+</tr>
+<tr>
+<td><code>ConfigAuditFormatter</code></td>
+<td>Pure function <code>format(ConfigAuditRecord) → String</code>. Deterministic; consumed by tests via <code>SendMessage.addInterceptor</code>.</td>
+<td>§6.2</td>
+</tr>
+<tr>
+<td><code>ConfigCommandExecutor</code></td>
+<td>Orchestrates the seven-stage lifecycle of spec §3. Owned by <code>SubConfigCmd</code>; one instance per invocation. Reduces <code>SubConfigCmd#onCommand</code> to "parse → executor.run → render result."</td>
+<td>§3</td>
+</tr>
+</tbody>
+</table>
+<h3 id="refactor-of-existing-classes">Refactor of existing classes<a class="headerlink" href="#refactor-of-existing-classes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>SubConfigCmd</code></strong> — the 245-line <code>onCommand</code> body collapses to: parse via <code>ConfigParameterGrammar</code> → build <code>ConfigTransaction</code> → invoke <code>ConfigCommandExecutor</code> → render the resulting <code>ConfigAuditRecord</code> to the caller. <code>onTabComplete</code> calls the same <code>ConfigParameterGrammar</code> (parity test enforces). The world-aware vertical clamping noted in <code>docs/admin/COMMANDS.md</code> (nether <code>maxY=128</code>, vert→LINEAR, etc.) moves into a <code>CompositeInvariant</code> so it is applied uniformly on both <code>/rtp config</code> writes and <code>/rtp reload</code> paths (spec §8.2).</li>
+<li><strong><code>ViewSubConfigCmd</code></strong> — becomes the renderer for spec §2.4's interactive view. Reads from the current parser snapshot, produces a sequence of <code>ChatComponent</code>-style entries with hover (when comments are available; see Appendix A12) and click-suggest. Emits a single <code>INFO</code> audit record with empty <code>mutations</code>.</li>
+<li><strong><code>ListAddParameter</code> / <code>ListRemoveParameter</code></strong> — collapsed into the grammar's list-operator nodes; the standalone classes either become thin grammar adapters or are deleted, decided during implementation.</li>
+<li><strong><code>ConfigCmd</code></strong> — gains tab-complete delegation to the registered <code>SubConfigCmd</code> set; no semantic change.</li>
+<li><strong><code>LanguageCmd</code></strong> — hardened to the spec's lifecycle (§3) <strong>plus</strong> a <code>reInitializeAllParsers()</code> step in §3.7 that replaces the standard targeted-reload, per spec §4.4 / the user's clarification. Permission node: <code>rtp.config.set.language</code> (additive, falls back to <code>rtp.config.set</code>).</li>
+<li><strong><code>ReloadCmd</code> / <code>SubReloadCmd</code></strong> — interpose <code>ConfigParameterValidator.validateAll(parsedConfig)</code> between "read from disk" and "swap into <code>Configs</code>." On failure: abort the swap, restore the previous map, emit one <code>WARNING</code> audit record (<code>outcome = REJECTED</code>), surface to caller.</li>
+<li><strong><code>BukkitBaseRTPCmd#msgInvalidCommand</code> / <code>msgBadParameter</code></strong> — resolve via <code>messages.yml → config.error.&lt;reasonCode&gt;</code> with the same <code>Level.WARNING</code> REQ-RTP-F-013 enforcement on missing keys. The existing <code>RTP.log</code> audit emission for REQ-RTP-S-004 stays; the new audit record subsumes it.</li>
+</ul>
+<h3 id="startup-hook-appendix-a11-closure">Startup hook (Appendix A11 closure)<a class="headerlink" href="#startup-hook-appendix-a11-closure" title="Permanent link">&para;</a></h3>
+<p>On plugin enable, after <code>Configs.reload</code> builds the initial parser map and before any command is dispatchable, <code>AtomicConfigWriter.cleanupStaleTempFiles</code> is invoked once per registered config directory (<code>plugins/RTP/</code>, <code>plugins/RTP/regions/</code>, <code>plugins/RTP/worlds/</code>, <code>plugins/RTP/safety/</code>). Each stray <code>&lt;name&gt;.yml.tmp</code> is deleted; one <code>INFO</code> log line per deletion (<code>reasonCode = STALE_TEMP_FILE</code>). No retry on failure to delete (a locked <code>.tmp</code> likely means a parallel plugin instance is mid-write; logged but tolerated).</p>
+<h3 id="concurrency-model">Concurrency model<a class="headerlink" href="#concurrency-model" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Writes execute on the caller thread (or, on Folia, dispatched through <code>RTP.scheduler.runTaskAsynchronously</code> per platform-adapter convention). No background batcher. Per-file write lock is a <code>ReentrantLock</code> held by <code>ConfigTransaction</code> for the duration of §3.4–§3.7; lock acquisition is <code>tryLock(0)</code> so a contended <code>/rtp config</code> returns <code>RELOAD_IN_PROGRESS</code> rather than blocking.</li>
+<li><code>/rtp reload</code> acquires the same per-file write lock (or a global lock for <code>/rtp reload</code> without arguments). A reload in progress causes incoming writes to fast-reject (spec §4.6 / §5.2 <code>RELOAD_IN_PROGRESS</code>); a write in progress causes a concurrent reload to await the write's completion (single deferral, no stacking).</li>
+<li><code>ConfigParameterValidator</code> instances are pure and stateless; no locking required.</li>
+<li><code>AtomicConfigWriter</code> is stateless; safe to use from any thread.</li>
+</ul>
+<h3 id="test-scaffolding">Test scaffolding<a class="headerlink" href="#test-scaffolding" title="Permanent link">&para;</a></h3>
+<p>ADR-037 names the test classes. This ADR pins their paths and the spec sections they exercise:</p>
+<table>
+<thead>
+<tr>
+<th>Test class (path: <code>rtp-core/src/test/java/...commands/config/</code>)</th>
+<th>Exercises</th>
+<th>Spec section</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ReqRtpS004ConfigCommandAuditTest</code></td>
+<td>Every failure path emits exactly one audit record with the right <code>outcome</code> and <code>reasonCode</code>.</td>
+<td>§6 + §10</td>
+</tr>
+<tr>
+<td><code>ConfigTransactionAtomicRollbackTest</code></td>
+<td>A simulated <code>PERSIST_IO</code> failure leaves in-memory state unchanged and removes the temp file.</td>
+<td>§3.6, §4.2</td>
+</tr>
+<tr>
+<td><code>ConfigDryRunDiffTest</code></td>
+<td><code>--dry-run</code> produces the diff and never touches disk; live mode does both.</td>
+<td>§3.7</td>
+</tr>
+<tr>
+<td><code>ReloadCmdSchemaValidationTest</code></td>
+<td>An offline-edited shape-invariant violation (Polygon <code>expand=true</code>) is caught at reload time, not at sample time.</td>
+<td>§8</td>
+</tr>
+<tr>
+<td><code>ConfigPermissionScopeTest</code></td>
+<td>Holder of <code>rtp.config.set.regions</code> may mutate <code>regions/*.yml</code> but not <code>performance.yml</code>; umbrella holder may mutate everything.</td>
+<td>§7</td>
+</tr>
+<tr>
+<td><code>ConfigParameterGrammarParseCompleteParityTest</code></td>
+<td>Every tab-complete suggestion at every grammar position round-trips through the parser.</td>
+<td>§9</td>
+</tr>
+<tr>
+<td><code>ReqRtpF013ConfigMessageCoverageTest</code></td>
+<td>Every <code>ConfigReasonCode</code> has a <code>messages.yml → config.error.&lt;code&gt;</code> entry, and vice versa.</td>
+<td>§5.3</td>
+</tr>
+<tr>
+<td><code>AtomicConfigWriterRenameAtomicityTest</code></td>
+<td>A crash simulated between fsync and rename leaves <code>&lt;target&gt;</code> unchanged; subsequent startup cleans <code>&lt;target&gt;.tmp</code>.</td>
+<td>§4.2, §A11 closure</td>
+</tr>
+</tbody>
+</table>
+<p>Traceability (<a href="../../dev/TRACEABILITY/">TRACEABILITY.md</a>) gains one row per test, keyed to REQ-RTP-S-004 / REQ-RTP-S-007 / REQ-RTP-F-013 / REQ-RTP-S-006 as appropriate.</p>
+<h3 id="migration-sequencing-within-beta3">Migration sequencing (within beta.3)<a class="headerlink" href="#migration-sequencing-within-beta3" title="Permanent link">&para;</a></h3>
+<p>The work ships as ordered, independently-reviewable units. Each unit lands its own commit / PR; later units assume earlier ones are in.</p>
+<ol>
+<li><strong>Codes + messages.</strong> Land <code>ConfigReasonCode</code> enum and the corresponding <code>messages.yml → config.error.*</code> keys (with English defaults). <code>ReqRtpF013ConfigMessageCoverageTest</code> enforces the bijection. No behavior change yet; the codes are unused.</li>
+<li><strong>Validators (scalar).</strong> Land <code>ConfigParameterValidator</code> interface and the easy implementations: numeric range, type, enum. Wire them into <code>SubConfigCmd#onCommand</code> as an <em>additive</em> pre-check that emits a <code>WARNING</code> audit record but does <strong>not</strong> block the legacy path. This is the "audit-first" intermediate state: real failures are now visible without changing externally-observed behavior.</li>
+<li><strong>Atomic writer + startup cleanup.</strong> Land <code>AtomicConfigWriter</code> and the startup <code>cleanupStaleTempFiles</code> hook. Swap the YAML save path in <code>ConfigParser#saveToFile</code> (or its equivalent) to route through the writer. <code>AtomicConfigWriterRenameAtomicityTest</code> enforces correctness. Closes spec gaps A9 + A11.</li>
+<li><strong>Transaction + audit.</strong> Land <code>ConfigTransaction</code>, <code>ConfigAuditRecord</code>, <code>ConfigAuditFormatter</code>, <code>ConfigCommandExecutor</code>. Refactor <code>SubConfigCmd#onCommand</code> to delegate to <code>ConfigCommandExecutor</code>. The legacy per-type branches collapse. <code>ReqRtpS004ConfigCommandAuditTest</code> and <code>ConfigTransactionAtomicRollbackTest</code> go green.</li>
+<li><strong>Dry-run.</strong> Add the <code>--dry-run</code> token to <code>ConfigParameterGrammar</code> (still embryonic at this point) and the executor; <code>ConfigDryRunDiffTest</code> goes green.</li>
+<li><strong>Scoped permissions.</strong> Add <code>rtp.config.set.&lt;section&gt;</code> resolution in <code>ConfigCommandExecutor#authorize</code>; the umbrella <code>rtp.config.set</code> remains valid. <code>ConfigPermissionScopeTest</code> goes green.</li>
+<li><strong>Grammar unification.</strong> Replace the hand-written <code>onTabComplete</code> branches with <code>ConfigParameterGrammar</code> walks. <code>ConfigParameterGrammarParseCompleteParityTest</code> goes green. Closes spec gap A8.</li>
+<li><strong>Schema-checked reload.</strong> Wire <code>ConfigParameterValidator.validateAll</code> into <code>ReloadCmd</code> / <code>SubReloadCmd</code>. <code>ReloadCmdSchemaValidationTest</code> goes green. Closes spec gap A7.</li>
+<li><strong><code>LanguageCmd</code> hardening.</strong> Apply the same lifecycle to <code>LanguageCmd</code> with the <code>reInitializeAllParsers</code> step in §3.7. Closes spec gap A10.</li>
+<li><strong>Composite invariants.</strong> Register <code>Polygon.expand=false</code>, <code>Polygon.vertices</code> validity, <code>Rectangle</code> / <code>Ellipse</code> extent positivity (ADR-034) as composite invariants. Run on every write and every reload. Closes the last piece of contract 7.</li>
+</ol>
+<p>Each unit's PR description shall link the spec section(s) it implements and the test class(es) it adds or makes green.</p>
+<h3 id="out-of-scope-for-this-adr">Out of scope for this ADR<a class="headerlink" href="#out-of-scope-for-this-adr" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>LanguageCmd</code>'s detailed re-init algorithm — recorded as a single bullet here ("§3.7 calls <code>reInitializeAllParsers</code>"). If the re-init turns out to be non-trivial (locale switching mid-flight, in-flight teleports holding old locale-aware messages), a separate ADR covers it.</li>
+<li>YAML-comment preservation through the write-back round-trip (spec Appendix A12). Closing A12 requires either upgrading the YAML substrate (extension of <a href="../ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/">ADR-025</a>) or replacing it with an in-house parser. Separate ADR; tracked but not addressed in beta.3.</li>
+<li>Wizard concerns. The wizard ADR (<a href="../ADR-038-rtpadmin-setup-wizards/">ADR-038</a>) consumes these primitives in a later release; this ADR does not commit any of them to a public-API surface.</li>
+<li>Cross-server propagation of config changes (<a href="../../dev/MULTI_SERVER_PLAN/">MULTI_SERVER_PLAN.md</a>). Each backend persists locally; cross-backend fan-out is independent work.</li>
+</ul>
+<h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why Rejected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Put validators on the <code>FactoryValue</code> itself rather than in a separate <code>ConfigParameterValidator</code> interface</td>
+<td>Couples validation logic to the data carrier, leaks platform-agnostic invariants (shape coherence, region-name validity) into a class whose primary job is value transport. Also makes composite invariants (cross-parameter) awkward — they have no natural single owner. External validators are testable in isolation and let composite invariants live as first-class entities.</td>
+</tr>
+<tr>
+<td>Make <code>ConfigTransaction</code> a decorator over <code>Configs</code> rather than its own type</td>
+<td>The decorator path turns every read on <code>Configs</code> during a transaction into a snapshot-aware lookup, which is the wrong cost model — reads vastly outnumber writes. A separate transaction object owns the snapshot, leaves the read path untouched, and confines transactional complexity to the write path.</td>
+</tr>
+<tr>
+<td>Skip <code>ConfigParameterGrammar</code> and write parser/completer parity tests instead</td>
+<td>Parity tests can only enforce parity for cases the test author thought to enumerate; the grammar enforces it by construction. The parity test still ships as a regression guard, but it is checking a single source of truth, not two hand-aligned implementations.</td>
+</tr>
+<tr>
+<td>Land all eight contracts in one commit</td>
+<td>The diff would be unreviewable (<code>SubConfigCmd</code> alone is 435 lines; full hardening touches it + <code>ViewSubConfigCmd</code> + <code>ListAdd/Remove</code> + <code>ReloadCmd</code> + <code>LanguageCmd</code> + <code>BukkitBaseRTPCmd</code> + <code>messages.yml</code> + 8 test classes). The sequencing in <em>Migration sequencing</em> above produces an audit-first intermediate state at step 2 that is itself an improvement; each later step is an additive guarantee.</td>
+</tr>
+<tr>
+<td>Use a global write lock instead of per-file</td>
+<td>Simpler to reason about, but it makes concurrent writes to unrelated files (<code>/rtp config performance maxAttempts:20</code> and <code>/rtp config regions nether maxY:128</code>) serialize when they shouldn't. The per-file lock keeps the contention surface small; it costs a <code>ConcurrentHashMap&lt;Path, ReentrantLock&gt;</code> lookup per write.</td>
+</tr>
+<tr>
+<td>Background save queue with a shutdown drain</td>
+<td>Adds a category of failure mode the spec explicitly designs out (shutdown-flush ordering, per §4.6 and <code>LESSONS_LEARNED.md</code>). Writes-on-caller-thread are bounded — the atomic-rename pattern's hot path is two syscalls plus a fsync — and the spec's "exactly one record per invocation" rule is much easier to enforce without a queue.</td>
+</tr>
+<tr>
+<td><code>ConfigAuditRecord</code> as a JSON-serializing record (vs. formatter-rendered string)</td>
+<td>JSON is appealing for downstream log scrapers but binds the audit format to a serialization library and turns every audit emission into an allocation that is only needed if a consumer is attached. The single-formatter / interceptor pattern (<code>SendMessage.addInterceptor</code>) is the project's existing convention and keeps the hot path allocation-free for the default no-scraper case. A JSON renderer can be a separate interceptor when a scraper exists.</td>
+</tr>
+<tr>
+<td>Promote the primitives to <code>rtp-api</code> in beta.3</td>
+<td>Same reason as ADR-037: no in-tree consumer has exercised the interface yet. Premature SPI commits us to a shape that hasn't been pressure-tested. The wizard ADR will be the consumer that justifies promotion (or doesn't).</td>
+</tr>
+<tr>
+<td>Land <code>LanguageCmd</code> hardening before the rest</td>
+<td><code>LanguageCmd</code>'s re-init step depends on <code>ConfigTransaction</code> and the schema-checked reload (step 8). Sequencing it after step 8 means each step's contracts are stable when the language path consumes them.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<h3 id="positive">Positive<a class="headerlink" href="#positive" title="Permanent link">&para;</a></h3>
+<ul>
+<li>One concentrated refactor of <code>SubConfigCmd</code> (the 245-line <code>onCommand</code>) replaces a class of subtle bugs (silent fail, partial writes, audit gaps) with one composable lifecycle. The same lifecycle services <code>/rtp reload</code>, <code>/rtp config view</code>, <code>LanguageCmd</code>, and any future config-mutating command.</li>
+<li>The migration sequencing produces an <em>audit-first</em> intermediate state at step 2 that is independently useful: real failures become visible without changing externally-observed behavior. Steps 3–10 each tighten one specific guarantee.</li>
+<li>The startup <code>cleanupStaleTempFiles</code> hook closes the only durability hole the atomic-rename pattern can leave (crash between temp-write and rename). The spec is fully self-recovering from crashes.</li>
+<li>The wizard ADR (<a href="../ADR-038-rtpadmin-setup-wizards/">ADR-038</a>) can be small. It composes <code>ConfigTransaction</code> + <code>ConfigParameterGrammar</code> + the audit stream + ADR-035's menu primitive. None of validation, persistence, rollback, audit, or message rendering belongs in the wizard layer.</li>
+<li><code>rtp test full</code> gains a clean assertion surface (audit-record shape, transaction commit/rollback pairing) that does not depend on string-matching log output.</li>
+</ul>
+<h3 id="negative-trade-offs">Negative / Trade-offs<a class="headerlink" href="#negative-trade-offs" title="Permanent link">&para;</a></h3>
+<ul>
+<li>One concentrated refactor of <code>SubConfigCmd</code>. Risk is regression in obscure parameter paths; mitigated by <code>ConfigParameterGrammarParseCompleteParityTest</code> and the existing <code>TestConfigSetCmd</code>-driven coverage.</li>
+<li>The atomic-rename pattern depends on the filesystem honoring <code>rename</code> atomicity (every supported deployment target does, exotic networked filesystems may not). Documented in the spec; matches the existing assumption baseline for <a href="../ADR-002-h2-sqlite-over-flat-file-cache/">ADR-002</a>.</li>
+<li><code>messages.yml</code> grows by one entry per <code>reasonCode</code> plus the dry-run keys. Acceptable given REQ-RTP-F-013.</li>
+<li>Once beta.3 ships and the wizard ADR consumes the primitives, removing or renaming any of them becomes a breaking change for the wizard (even though they are not on <code>rtp-api</code>). The wizard ADR will record its own assumptions; this ADR records that the primitives are deliberately internal-stable for beta.3.</li>
+<li>The audit log is more verbose. Every successful set emits an <code>INFO</code> record; high-frequency scripted use will produce log volume. Mitigated by the existing log-level config.</li>
+<li>Spec Appendix A12 (YAML comment preservation) is <strong>not</strong> closed in beta.3. The <code>view</code> hover-text feature degrades to declared type + bounds where comments are unavailable; the rest of the spec is fully achievable on the current YAML substrate.</li>
+</ul>
+<h2 id="migration-rollout">Migration / Rollout<a class="headerlink" href="#migration-rollout" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Beta.3 ships steps 1–10 of <em>Migration sequencing</em>. The <code>/rtpadmin</code> setup wizard does <strong>not</strong> ship in beta.3 unless a separate wizard ADR is accepted and implemented in the same window. The contracts are independently valuable for direct admin use.</li>
+<li>New config keys: <code>commands.config.dryRunFlag</code> (default <code>--dry-run</code>); new <code>messages.yml → config.error.&lt;reasonCode&gt;</code> and <code>messages.yml → config.dryRun.*</code> sections.</li>
+<li>No breaking changes to existing command grammar. <code>--dry-run</code> is additive; existing forms continue to commit-on-success. Existing permission nodes continue to grant all; scoped nodes are additive.</li>
+<li>Traceability (<a href="../../dev/TRACEABILITY/">TRACEABILITY.md</a>): add rows for every test class in <em>Test scaffolding</em>.</li>
+<li>CHANGELOG: no entry until implementation lands, per the CHANGELOG hygiene rule in <code>AGENTS.md</code>. Each migration-sequencing step gets its own changelog bullet under <code>[3.0.0-beta.3] — Unreleased</code> as it merges.</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../ADR-037-harden-rtp-config-commands/">ADR-037</a> — decision (the eight contracts). This ADR is the <em>how</em> to ADR-037's <em>what</em>.</li>
+<li><a href="../../dev/CONFIG_COMMAND_SPEC/"><code>docs/dev/CONFIG_COMMAND_SPEC.md</code></a> — target-state normative spec. If any class layout in this ADR conflicts with the spec, the spec wins.</li>
+<li><a href="../ADR-002-h2-sqlite-over-flat-file-cache/">ADR-002</a> — H2/SQLite persistence. Same filesystem-assumption baseline as the atomic-rename pattern here.</li>
+<li><a href="../ADR-020-language-bootstrap-and-locale-aware-configparser/">ADR-020</a> — Locale-aware parser. <code>LanguageCmd</code> re-init in spec §4.4 composes on top of this.</li>
+<li><a href="../ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/">ADR-025</a> — Internal SnakeYAML wrapper. Current YAML substrate; comment-preservation gap tracked at spec Appendix A12.</li>
+<li><a href="../ADR-034-memory-shape-catalog/">ADR-034</a> — Memory shape catalog. Composite invariants (Polygon <code>expand=false</code>, Rectangle / Ellipse extents) plug into <code>ConfigParameterValidator</code>.</li>
+<li><a href="../ADR-035-interactive-menus-book-first/">ADR-035</a> — Interactive menus. Menu redeems that dispatch a config command inherit all of this ADR's primitives for free.</li>
+<li><a href="../ADR-038-rtpadmin-setup-wizards/">ADR-038</a> — <code>/rtpadmin</code> setup wizards. The future consumer that justifies (or doesn't) promotion of any of these primitives to <code>rtp-api</code>.</li>
+<li><a href="https://github.com/DailyStruggle/RTP/blob/V3/commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md">commands-api-ADR-001</a> — Brigadier bridge. Carries the unchanged subcommand grammar.</li>
+<li><a href="../../dev/TRACEABILITY/"><code>docs/dev/TRACEABILITY.md</code></a> — REQ-* → class → test mapping.</li>
+<li><a href="../../architecture/09-configuration-load-and-reload/"><code>docs/architecture/09-configuration-load-and-reload.md</code></a> — read path (companion).</li>
+<li><a href="../../architecture/11-configuration-write-and-persist/"><code>docs/architecture/11-configuration-write-and-persist.md</code></a> — write path (companion).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.2.1
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

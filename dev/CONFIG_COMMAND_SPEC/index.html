@@ -1,0 +1,4143 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>/rtp config Command and Config Save Mechanics — Specification - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#rtp-config-command-and-config-save-mechanics-specification" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              /rtp config Command and Config Save Mechanics — Specification
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../site/why/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../adr/" class="md-tabs__link">
+          
+  
+  Architecture decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MAP/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation map
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/REGION_FILE_READING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Region file reading
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Architecture decisions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture decisions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-000-development-workflow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-000 - Development Workflow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-001 — Archimedean Spiral 1D Mapping for Location Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-002 — H2/SQLite for Spatial Memory Persistence Over Flat-File Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-003 — rtp-plugin as a Separate Bridge Module from rtp-core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-004 — CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-005-paperlib-removal/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-005 — Removal of PaperLib in Favour of Native Paper APIs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-006-async-queue-pre-generation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-006 — Async Queue Pre-Generation Over On-Demand Async Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-007-per-user-isolated-queues/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-007 — Per-User Isolated Queues Alongside the Global Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-008 — MemoryTracker as Active Task GC with WeakReference Deallocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-009 — Configurable Spatial Distributions: Flat, Normal, Exponential
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-010 — Versioned Platform Adapter Submodules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-011-rtp-api-separate-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-011 — `rtp-api` as a Separately Published Addon Interface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-012 — `ChunkReservation` as an Internal Chunk Ticket Abstraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-013 — Addons as External Gradle Projects Rather Than Built-In Optional Modules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-015 — Stale-Chunk Guard for Count-Bound Pipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-016-anvil-subsystem/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-016 — Anvil Read-Only Subsystem
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-017 — Block Tags and Block-State Predicates in Safety Lists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-018 — `AGENTS.md` Public Release Structure: Thin Router + Canonical Sources
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-019 — Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-020 — Language Bootstrap and Locale-Aware ConfigParser
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-021 — Legacy Minecraft and Java Support Are Out of Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-022 — Region Shape Cache Key: Seed + Canonical Config Hash
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-023-login-reserve-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-023 — Login Reserve Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-024 — RTP-lite Assembly Variant
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-026-external-hook-api-surface/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-026 — Unified External-Hook API Surface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-028-l3-backlog-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-028 — L3 Backlog Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-032 — Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-033 — NeoForge Platform In-Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-034-memory-shape-catalog/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-034 — Memory Shape Catalog and Polygon Shape
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-035-interactive-menus-book-first/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-035 — Interactive Menus via Written Book
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-036 — Network Mode: Multi-Server, Multi-Proxy RTP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-037 — Harden RTP Config Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-038 — `/rtpadmin` Setup Wizards
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-039 — `/rtpadmin` Diagnostic Surfaces
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-040 — Cross-Backend Metric Time-Series Publication via `MemoryTracker` Tier Promotion
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-041-config-command-and-save-implementation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-042 — YAML Comment Preservation: Block-Only, Surgical Text-Edit Substrate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-043 — `rtp.personalqueue` Permission Semantics: Bucket-Only Opt-In
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-044 — `menu-api` Module for Generalized Interactive Menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-045 — `/rtp docs` Menu Consumer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-046-maps-api-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-046 — `maps-api` Module for Runtime Cartography Chart Generation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-047 - Declarative Chart Composition Bridge
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-048 - Move menu page builders into `rtp-api` behind `RTPServerAccessor`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-049 - Network-mode plumbing in `rtp-core`, platform-specific via `PlayerLifecycleHook` SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-050 - Concrete Menu Commands Supersede Token Registries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-051 - Two-Tier API Model: Thin `rtp-api` Contract + `rtp-core` Extension API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-052 — Always-on generation outcome metrics and cause-tagged bad-location persistence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-053 — Pipeline Latency Percentiles and Slow-Teleport Audit
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-054 — RTPRunnable Self-Scheduling Thread Routing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-055-pvp-combat-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-055 - Optional PvP / combat-tag pre-flight gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-056-bare-rtp-root-action/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-056 - Pluggable bare-`/rtp` root action
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-057 — Platform-agnostic addon SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-058 — Region-Specific Schematic
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-059 — Relative Ground-Distance Safety Predicate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-060 — Emergency-Platform Block-Restoration Timeout
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-061-open-core-dual-licensing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-061 — Open-Core Dual Licensing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-062-biome-probability-weighting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-062 — Biome-probability weighting for location selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-063 — Biome-First Menu with Auto-Region Selection by Biome Availability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-064 — Config-Comment Format: Summary Line as Menu Hover Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-065 — World-Override Regions and the `/rtp` World Menu
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-066-foreign-config-importer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-066 - Foreign Config Importer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-067 — Automatic PRESCAN, Adaptive Scan Rate Control, and `.mca`-Header Generation Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-068 - Cross-Server Persisted Teleport Limits
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-069 - Claim-Plugin Integrations Extracted to the Bundled `LeafRTPClaimAddon`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-070 - Platform-neutral `/rtp` command root
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-071 - Config Organization and Discoverability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-072: Teleport View-Distance Clamp and Steady Restore
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-073-config-default-inheritance-references/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-073 - Config Default Inheritance via `@<file>` References
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-074 - Operator-Facing RTP Throughput and Cost Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-075 - Platform-Neutral Player-Move Event SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-076-config-folder-consolidation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-076 - Config Folder Consolidation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-NNN — Title
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-scope-and-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Scope and Non-Goals
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Scope and Non-Goals">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-in-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.1 In scope
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.2 Out of scope
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-cross-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.3 Cross-references
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-command-grammar" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Command Grammar
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Command Grammar">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-top-level-forms" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1 Top-level forms
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-one-file-per-invocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.2 One file per invocation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-multiple-mutations-per-invocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.3 Multiple mutations per invocation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-view-sub-form" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.4 view sub-form
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-reserved-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.5 Reserved tokens
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-lifecycle-of-a-single-invocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Lifecycle of a Single Invocation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Lifecycle of a Single Invocation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-parse" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.1 Parse
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-authorize" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.2 Authorize
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-validate" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.3 Validate
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.4 Snapshot
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-apply-in-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.5 Apply (in-memory)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-persist-if-not-dry-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.6 Persist (if not dry-run)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#37-audit-reload-or-audit-reject" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.7 Audit + Reload (or Audit + Reject)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-save-mechanics" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Save Mechanics
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Save Mechanics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-one-file-per-write" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.1 One file per write
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-atomic-rename-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.2 Atomic rename pattern
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-filesystem-assumptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.3 Filesystem assumptions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-per-file-scope-which-files-are-writable" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.4 Per-file scope (which files are writable)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-tab-complete-enumeration" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.5 Tab-complete enumeration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-ordering-vs-in-flight-reload" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.6 Ordering vs. in-flight reload
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-validation-model-and-reasoncode-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Validation Model and reasonCode Catalog
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Validation Model and reasonCode Catalog">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-validator-chain" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.1 Validator chain
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-reasoncode-enumeration" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.2 reasonCode enumeration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-message-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.3 Message resolution
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-audit-record-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Audit Record Schema
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Audit Record Schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-record-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.1 Record fields
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-single-formatter-single-sink" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.2 Single formatter, single sink
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-permission-grammar" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Permission Grammar
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Permission Grammar">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-node-hierarchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      7.1 Node hierarchy
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      7.2 Resolution
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-schema-checked-reload" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Schema-Checked Reload
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Schema-Checked Reload">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-failure-semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      8.1 Failure semantics
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-shape-invariants" class="md-nav__link">
+    <span class="md-ellipsis">
+      8.2 Shape invariants
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-tab-complete-contract-parsecomplete-parity" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. Tab-Complete Contract (Parse/Complete Parity)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-error-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. Error Matrix
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appendix-a-current-gaps-vs-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      Appendix A: Current Gaps vs. Spec
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="rtp-config-command-and-config-save-mechanics-specification"><code>/rtp config</code> Command and Config Save Mechanics — Specification<a class="headerlink" href="#rtp-config-command-and-config-save-mechanics-specification" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Target-state normative specification. Implementation tracked by <a href="../../adr/ADR-037-harden-rtp-config-commands/">ADR-037</a> (decision) and <a href="../../adr/ADR-041-config-command-and-save-implementation/">ADR-041</a> (implementation strategy).
+<strong>Audience:</strong> Contributors modifying anything under <code>rtp-core/.../commands/config/</code>, <code>rtp-core/.../commands/reload/</code>, the YAML save path, or downstream consumers (<code>/rtpadmin</code> wizards per ADR-038, menu redeems per ADR-035).
+<strong>Companion docs:</strong> <a href="../../architecture/09-configuration-load-and-reload/"><code>docs/architecture/09-configuration-load-and-reload.md</code></a> (read path), <a href="../../architecture/11-configuration-write-and-persist/"><code>docs/architecture/11-configuration-write-and-persist.md</code></a> (write path).</p>
+<blockquote>
+<p><strong>Scope note.</strong> This document specifies the <strong>target</strong> behavior of <code>/rtp config</code> and the YAML save mechanics after the ADR-037 / ADR-041 hardening ships (planned for <code>3.0.0-beta.3</code>, alongside proxy support and other beta.3 work). Where the current pre-hardening implementation diverges, the gap is enumerated in <em>Appendix A: Current Gaps vs. Spec</em>. The spec is the contract the implementation is held against; the appendix shrinks to zero as contracts ship.</p>
+</blockquote>
+<hr />
+<h2 id="1-scope-and-non-goals">1. Scope and Non-Goals<a class="headerlink" href="#1-scope-and-non-goals" title="Permanent link">&para;</a></h2>
+<h3 id="11-in-scope">1.1 In scope<a class="headerlink" href="#11-in-scope" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The user-facing grammar, behavior, and exit semantics of <code>/rtp config &lt;file&gt; …</code> and its <code>--dry-run</code> variant.</li>
+<li>The on-disk save mechanics for every YAML file under <code>plugins/RTP/</code> (write-to-temp → fsync → atomic rename, per-file scope, ordering vs. in-flight reload).</li>
+<li>Validation, audit, permission, and reload semantics that the command shall satisfy.</li>
+<li>Tab-complete contract (single grammar with the parser).</li>
+<li>Error model: <code>reasonCode</code> enumeration, message resolution path, audit-record schema.</li>
+</ul>
+<h3 id="12-out-of-scope">1.2 Out of scope<a class="headerlink" href="#12-out-of-scope" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>/rtpadmin</code> wizard flow design — see <a href="../../adr/ADR-038-rtpadmin-setup-wizards/">ADR-038</a>. The wizard is a <em>consumer</em> of this spec.</li>
+<li>Interactive menu / book redeems — see <a href="../../adr/ADR-035-interactive-menus-book-first/">ADR-035</a>. Menu redeems that dispatch a config command inherit this spec unchanged.</li>
+<li>The on-disk YAML <em>shape</em> (key names, nested structure). Unchanged from the pre-hardening implementation.</li>
+<li>Read-path / reload internals — see architecture diagram 09.</li>
+<li>Cross-server / proxy fan-out of config changes — see <a href="../MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a>. Each backend persists locally; cross-backend propagation is a separate axis.</li>
+<li>Translation of new <code>messages.yml</code> keys — handled at the project's normal translation cadence (<a href="../TRANSLATION_GUIDE/"><code>TRANSLATION_GUIDE.md</code></a>).</li>
+</ul>
+<h3 id="13-cross-references">1.3 Cross-references<a class="headerlink" href="#13-cross-references" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Decision: <a href="../../adr/ADR-037-harden-rtp-config-commands/">ADR-037</a> — the eight contracts. This spec is the long-form, normative restatement of those contracts as observable behavior.</li>
+<li>Implementation strategy: <a href="../../adr/ADR-041-config-command-and-save-implementation/">ADR-041</a> — concrete class layout, package, test scaffolding.</li>
+<li>Requirements: <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md</code></a> — REQ-RTP-S-004 (no silently discarded failures), REQ-RTP-S-007 / REQ-RTP-F-013 (configurable failure messages), REQ-RTP-S-006 (require-by-contract API entry points).</li>
+<li>Shape invariants: <a href="../../adr/ADR-034-memory-shape-catalog/">ADR-034</a> — plug into the validator chain.</li>
+<li>Persistence assumption baseline: <a href="../../adr/ADR-002-h2-sqlite-over-flat-file-cache/">ADR-002</a> (atomic-rename / fsync assumption already in force for the DB layer).</li>
+<li>YAML I/O substrate: <a href="../../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/">ADR-025</a>.</li>
+</ul>
+<hr />
+<h2 id="2-command-grammar">2. Command Grammar<a class="headerlink" href="#2-command-grammar" title="Permanent link">&para;</a></h2>
+<p>The grammar is <strong>flat</strong> (no nested operator precedence), <strong>single-file</strong> per invocation, and <strong>derived from the parameter registry</strong> — never hand-rolled per command. The same grammar object drives <code>onCommand</code> and <code>onTabComplete</code> (contract §9).</p>
+<h3 id="21-top-level-forms">2.1 Top-level forms<a class="headerlink" href="#21-top-level-forms" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>/rtp config &lt;file&gt; &lt;key&gt;:&lt;value&gt; [&lt;key&gt;:&lt;value&gt; …] [--dry-run]
+/rtp config &lt;file&gt; &lt;list-key&gt; add:&lt;value&gt; [add:&lt;value&gt; …] [remove:&lt;value&gt; …] [--dry-run]
+/rtp config &lt;file&gt; view &lt;key&gt; [&lt;key&gt; …]
+/rtp config &lt;file&gt; view
+</code></pre></div>
+<ul>
+<li><code>&lt;file&gt;</code> shall be the basename (without <code>.yml</code>) of a config file that the running plugin has registered. The set of accepted values is exactly the set of <code>ConfigParser</code> and <code>MultiConfigParser</code> instances live in <code>Configs</code> at parse time, plus, for multi-config groups, the form <code>&lt;group&gt; &lt;subfile&gt;</code> (e.g. <code>regions nether</code>, <code>worlds world_nether</code>).</li>
+<li><code>&lt;key&gt;</code> is the parameter name as declared in the file's enum registry (e.g. <code>ConfigKeys</code>, <code>PerformanceKeys</code>, <code>RegionKeys</code>, …). Case-insensitive on input; canonical case is preserved in audit and on disk.</li>
+<li><code>&lt;value&gt;</code> is a single whitespace-free token. Values containing spaces are not supported by the command surface in the beta.3 hardening; admins requiring whitespace shall edit YAML directly and <code>/rtp reload</code>. This is a deliberate limitation of this release; relaxing it is out of scope for ADR-037.</li>
+<li><code>&lt;list-key&gt;</code> is a <code>&lt;key&gt;</code> whose parameter type is <code>List&lt;T&gt;</code>. Scalar-key invocations with <code>add:</code> / <code>remove:</code> operators shall be rejected with <code>reasonCode = WRONG_OPERATOR_FOR_TYPE</code>.</li>
+<li><code>--dry-run</code> is the literal token configured by <code>commands.config.dryRunFlag</code> (default <code>--dry-run</code>, REQ-RTP-F-013). Position-independent within the tail; the parser scans for it once before validation.</li>
+</ul>
+<h3 id="22-one-file-per-invocation">2.2 One file per invocation<a class="headerlink" href="#22-one-file-per-invocation" title="Permanent link">&para;</a></h3>
+<p>A single <code>/rtp config</code> invocation shall mutate <strong>exactly one</strong> target file (<code>&lt;file&gt;</code> or <code>&lt;group&gt; &lt;subfile&gt;</code> pair). Multi-file batching is not exposed at the command surface; admins requiring atomic cross-file changes shall sequence invocations and accept per-file atomicity. The implementation's internal transaction primitive (per <a href="../../adr/ADR-037-harden-rtp-config-commands/">ADR-037</a> contract 2) is single-file at the command surface and remains an internal API; any future cross-file-batch consumer requires its own ADR.</p>
+<h3 id="23-multiple-mutations-per-invocation">2.3 Multiple mutations per invocation<a class="headerlink" href="#23-multiple-mutations-per-invocation" title="Permanent link">&para;</a></h3>
+<p>Within the one targeted file, an invocation may carry <strong>multiple <code>&lt;key&gt;:&lt;value&gt;</code> pairs</strong> and/or <strong>multiple <code>add:</code> / <code>remove:</code> operators</strong> against the same <code>&lt;list-key&gt;</code>. All such mutations form one transaction:</p>
+<ul>
+<li>All-or-nothing: if any mutation fails validation, none are persisted.</li>
+<li>Order-preserving: <code>add:</code> operators are appended in argument order; <code>remove:</code> operators are applied after all <code>add:</code> operators in argument order.</li>
+<li>Idempotent within an invocation: a duplicate <code>add:</code> of an existing list element is a no-op (not a failure). A <code>remove:</code> of a non-member is a no-op (not a failure).</li>
+</ul>
+<h3 id="24-view-sub-form">2.4 <code>view</code> sub-form<a class="headerlink" href="#24-view-sub-form" title="Permanent link">&para;</a></h3>
+<p><code>view</code> is a <strong>per-<code>SubConfigCmd</code> sub-sub-command</strong>, modeled on <code>help</code> rather than a flat option. Forms:</p>
+<div class="highlight"><pre><span></span><code>/rtp config &lt;file&gt; view              # list every key in the file with its current value
+/rtp config &lt;file&gt; view &lt;key&gt;        # show one key&#39;s current value, type, declared bounds, and YAML comment
+/rtp config &lt;file&gt; view &lt;list-key&gt;   # list-typed keys render their current members one per line
+</code></pre></div>
+<p>The view is <strong>interactive</strong> on platforms whose chat renderer supports it:</p>
+<ul>
+<li>Each rendered key <strong>may</strong> carry a <strong>hover-text</strong> tooltip showing the parameter's YAML comment from the on-disk file. Comment preservation through the temp+rename round-trip is <strong>not guaranteed by the current YAML substrate</strong> (see Appendix A row A12); when a comment is unavailable the tooltip degrades to the parameter's declared type + bounds. A future YAML-parser upgrade (or in-house replacement) is the precondition for full comment-preserving hover text; see <a href="../../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/">ADR-025</a> for the current substrate and Appendix A12 for the open gap.</li>
+<li>Each rendered value carries a <strong>click-suggest</strong> action that pre-fills the caller's chat with <code>/rtp config &lt;file&gt; &lt;key&gt;:</code> ready for the new value (or <code>/rtp config &lt;file&gt; &lt;list-key&gt; add:</code> / <code>remove:</code> for list-typed keys), so the admin's next keystroke is the new value.</li>
+<li>On consoles and platforms without interactive chat, the view degrades to plain text; the click-suggest and hover are simply absent. No audit-record shape change between modes.</li>
+</ul>
+<p><code>view</code> is read-only: it takes no <code>ConfigTransaction</code>, never opens a temp file, never enters §3.4–§3.6, and is unaffected by <code>RELOAD_IN_PROGRESS</code> (it reads whichever parser snapshot is current at the moment it serializes its output). Failure modes are limited to <code>NO_PERMISSION</code>, <code>UNKNOWN_FILE</code>, and <code>UNKNOWN_KEY</code>.</p>
+<h3 id="25-reserved-tokens">2.5 Reserved tokens<a class="headerlink" href="#25-reserved-tokens" title="Permanent link">&para;</a></h3>
+<p>The literal tokens <code>add:</code>, <code>remove:</code>, <code>view</code>, and the configured <code>dryRunFlag</code> are reserved at the grammar level. A <code>&lt;key&gt;</code> that collides with a reserved token (none currently do; this is forward-defensive) shall be rejected with <code>reasonCode = RESERVED_TOKEN_COLLISION</code> at parse time.</p>
+<hr />
+<h2 id="3-lifecycle-of-a-single-invocation">3. Lifecycle of a Single Invocation<a class="headerlink" href="#3-lifecycle-of-a-single-invocation" title="Permanent link">&para;</a></h2>
+<p>Every mutating invocation proceeds through a fixed seven-stage lifecycle. No stage may be reordered, skipped, or short-circuited; failure at any stage routes to <em>Audit + Reject</em> (§3.7) without leaving in-memory or on-disk state mutated.</p>
+<h3 id="31-parse">3.1 Parse<a class="headerlink" href="#31-parse" title="Permanent link">&para;</a></h3>
+<p>The raw argument list is tokenized against the grammar (§2). Output: a <code>ParsedInvocation { targetFile, mutations[], dryRun }</code>. Parse-time failures (<code>UNKNOWN_FILE</code>, <code>WRONG_OPERATOR_FOR_TYPE</code>, <code>RESERVED_TOKEN_COLLISION</code>, <code>MALFORMED_ARGUMENT</code>) are reported with the offending token's index for tab-complete attribution.</p>
+<h3 id="32-authorize">3.2 Authorize<a class="headerlink" href="#32-authorize" title="Permanent link">&para;</a></h3>
+<p>The caller's permissions are checked against the most-specific node implied by <code>targetFile</code> (§7). All mutations in one invocation target one file, so authorization is a single check, not per-mutation. Failure → <code>NO_PERMISSION</code>.</p>
+<h3 id="33-validate">3.3 Validate<a class="headerlink" href="#33-validate" title="Permanent link">&para;</a></h3>
+<p>Each mutation is run through <code>ConfigParameterValidator</code> (§5). Validators are pure functions over <code>(parameterPath, attemptedValue, currentInMemoryState)</code>. No mutation has been applied yet. First failure short-circuits the stage; subsequent mutations are not validated (their state in the audit record is <code>NOT_REACHED</code>).</p>
+<h3 id="34-snapshot">3.4 Snapshot<a class="headerlink" href="#34-snapshot" title="Permanent link">&para;</a></h3>
+<p>A snapshot of every <code>FactoryValue</code> the mutations will touch is captured into the transaction. The snapshot is the rollback source-of-truth (§3.7) and the <code>oldValue</code> source for the audit record (§6).</p>
+<h3 id="35-apply-in-memory">3.5 Apply (in-memory)<a class="headerlink" href="#35-apply-in-memory" title="Permanent link">&para;</a></h3>
+<p>Mutations are applied to the in-memory parser state in argument order. Re-validation against schema invariants that depend on multiple keys (e.g. <code>Polygon.expand == false</code>, <code>Rectangle</code> half-extent positivity per <a href="../../adr/ADR-034-memory-shape-catalog/">ADR-034</a>) runs after all mutations are applied but before any disk write. Failure here triggers immediate rollback from the snapshot.</p>
+<h3 id="36-persist-if-not-dry-run">3.6 Persist (if not dry-run)<a class="headerlink" href="#36-persist-if-not-dry-run" title="Permanent link">&para;</a></h3>
+<p>The targeted file is written via the atomic save mechanics of §4. On any I/O failure (temp-file write, fsync, rename), the snapshot is restored to the in-memory parser and the temp file is deleted; the invocation fails with <code>reasonCode = PERSIST_IO</code>.</p>
+<h3 id="37-audit-reload-or-audit-reject">3.7 Audit + Reload (or Audit + Reject)<a class="headerlink" href="#37-audit-reload-or-audit-reject" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Success (live).</strong> A targeted reload of the affected parser is dispatched (per architecture diagram 09). One <code>INFO</code> audit record is emitted (§6).</li>
+<li><strong>Success (dry-run).</strong> No reload. The would-be diff is rendered to the caller via <code>messages.yml → config.dryRun.*</code> and an <code>INFO</code> audit record is emitted with <code>dryRun = true</code>.</li>
+<li><strong>Failure (any stage).</strong> Rollback is complete (no in-memory mutation survives, no temp file survives), one <code>WARNING</code> audit record is emitted with the failing <code>reasonCode</code>, and the configurable failure message (§5.2) is delivered to the caller.</li>
+</ul>
+<blockquote>
+<p><strong>S-004 (no silently discarded failures).</strong> Every exit path of this lifecycle emits exactly one audit record. Catch-and-swallow, silent <code>return false</code>, and <code>null</code> returns are prohibited.</p>
+</blockquote>
+<hr />
+<h2 id="4-save-mechanics">4. Save Mechanics<a class="headerlink" href="#4-save-mechanics" title="Permanent link">&para;</a></h2>
+<h3 id="41-one-file-per-write">4.1 One file per write<a class="headerlink" href="#41-one-file-per-write" title="Permanent link">&para;</a></h3>
+<p>Each successful invocation writes <strong>exactly one</strong> YAML file. The write is independent of any other file's state. There is no cross-file fsync barrier; the per-file atomic rename is the unit of durability.</p>
+<h3 id="42-atomic-rename-pattern">4.2 Atomic rename pattern<a class="headerlink" href="#42-atomic-rename-pattern" title="Permanent link">&para;</a></h3>
+<p>The write proceeds:</p>
+<ol>
+<li>Serialize the post-mutation parser state to a sibling temp file <code>&lt;target&gt;.tmp</code> in the same directory as <code>&lt;target&gt;</code>. Same-directory siblings guarantee the rename is intra-filesystem (atomic-rename precondition on POSIX and NTFS).</li>
+<li><code>fsync</code> the temp file's contents.</li>
+<li><code>rename(&lt;target&gt;.tmp, &lt;target&gt;)</code> — atomic replace.</li>
+<li>Best-effort <code>fsync</code> of the parent directory (POSIX); no-op on NTFS where directory metadata is journaled.</li>
+</ol>
+<p>A crash between steps 1 and 3 leaves <code>&lt;target&gt;</code> untouched and a stray <code>&lt;target&gt;.tmp</code> on disk; startup shall log and delete <code>*.tmp</code> siblings of registered config files (<code>reasonCode = STALE_TEMP_FILE</code>, <code>Level.INFO</code>).</p>
+<h3 id="43-filesystem-assumptions">4.3 Filesystem assumptions<a class="headerlink" href="#43-filesystem-assumptions" title="Permanent link">&para;</a></h3>
+<p>The pattern requires that <code>rename</code> over an existing file is atomic on the deployment filesystem. This holds for all officially supported targets (POSIX local filesystems, Windows NTFS). Networked or exotic filesystems (NFS without <code>rename</code> atomicity, some FUSE drivers, certain container-overlay configurations) are not supported for in-place config edits; admins on such filesystems shall edit YAML offline. This matches the existing assumption baseline already in force for <a href="../../adr/ADR-002-h2-sqlite-over-flat-file-cache/">ADR-002</a>'s H2/SQLite persistence.</p>
+<h3 id="44-per-file-scope-which-files-are-writable">4.4 Per-file scope (which files are writable)<a class="headerlink" href="#44-per-file-scope-which-files-are-writable" title="Permanent link">&para;</a></h3>
+<p>Writable via <code>/rtp config</code>:</p>
+<ul>
+<li><code>config.yml</code>, <code>performance.yml</code>, <code>economy.yml</code>, <code>logging.yml</code></li>
+<li>Every file under <code>safety/</code> (currently <code>safety/safety.yml</code> and any future siblings)</li>
+<li>Every file under <code>regions/</code> (multi-config; addressed as <code>regions &lt;subfile&gt;</code>)</li>
+<li>Every file under <code>worlds/</code> (multi-config; addressed as <code>worlds &lt;subfile&gt;</code>)</li>
+<li><code>messages.yml</code> (subject to the same lifecycle; key existence checked against the active <code>MessagesKeys</code> registry)</li>
+</ul>
+<p>Not writable via the <strong>general</strong> <code>/rtp config &lt;file&gt; &lt;key&gt;:&lt;value&gt;</code> path:</p>
+<ul>
+<li><code>language.yml</code> — read by <code>LanguageBootstrap</code> before any <code>ConfigParser</code> exists (<a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/">ADR-020</a>). A live mutation requires re-initializing <strong>every</strong> parser (because the locale-aware <code>ConfigParser</code> resolves keys against the active locale at construction), which is a heavier operation than the per-file lifecycle of §3. Therefore <code>language.yml</code> is <strong>not</strong> exposed as a generic <code>SubConfigCmd</code> target; instead, a dedicated path (the existing <code>LanguageCmd</code> family under <code>commands/config/</code>, hardened to the same audit + permission + atomic-write contracts as this spec) handles locale changes by running the lifecycle of §3 <strong>and then</strong> triggering a full <code>Configs.reload</code>-equivalent re-init in §3.7 of its own invocation. Attempts to address <code>language</code> through the generic <code>/rtp config language …</code> path shall be <strong>redirected</strong> to the dedicated <code>LanguageCmd</code> (not failed) when the grammar allows; if the syntax is ambiguous, the command shall fail with <code>reasonCode = USE_DEDICATED_COMMAND</code> and the configurable message shall name the right command.</li>
+<li>Any non-registered <code>.yml</code> file under <code>plugins/RTP/</code> (third-party drop-ins, addon configs not exposed through <code>Configs</code>). Tab-complete enumerates only registered files; explicit invocation against an unregistered file fails with <code>UNKNOWN_FILE</code>.</li>
+</ul>
+<h3 id="45-tab-complete-enumeration">4.5 Tab-complete enumeration<a class="headerlink" href="#45-tab-complete-enumeration" title="Permanent link">&para;</a></h3>
+<p>Tab-complete for <code>&lt;file&gt;</code> shall list every registered <code>ConfigParser</code> and <code>MultiConfigParser</code> name as it appears in <code>Configs</code>. For multi-config groups, tab-completing <code>&lt;file&gt;</code> returns the group name (e.g. <code>regions</code>); a second tab on the next position returns the live set of <code>&lt;subfile&gt;</code> names discovered on disk at completion time. No cross-server data appears in this completion — cross-server data sources (see <a href="../MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a>) supply tab-complete only for cross-server <em>region names</em> under other subcommands (e.g. a future <code>/rtp &lt;region&gt;</code> resolver), never for the local config file enumeration.</p>
+<h3 id="46-ordering-vs-in-flight-reload">4.6 Ordering vs. in-flight reload<a class="headerlink" href="#46-ordering-vs-in-flight-reload" title="Permanent link">&para;</a></h3>
+<p>A <code>/rtp config</code> write and a <code>/rtp reload</code> are mutually serialized:</p>
+<ul>
+<li>A reload in progress (i.e. between the in-memory swap and the post-swap region rebuild of architecture diagram 09) shall reject incoming writes with <code>reasonCode = RELOAD_IN_PROGRESS</code>. The reject is fast (no temp file is opened).</li>
+<li>A write in progress (i.e. between §3.4 <em>Snapshot</em> and §3.7 <em>Reload</em>) shall block a concurrently-issued reload by deferring it until the write's reload-affected step completes. The deferral is a single short await on the per-file write lock; reloads do not stack.</li>
+<li>In-flight teleports holding a pre-write parser snapshot are unaffected — they see the old values until they finish, exactly as documented in architecture diagram 09. This is the same invariant the read path already provides.</li>
+</ul>
+<blockquote>
+<p><strong>No background save queue.</strong> Writes are dispatched on the command's caller thread (or its scheduled platform handoff for Folia per the platform adapter's <code>RTP.scheduler</code> runAsync), never queued behind unrelated work. There is no risk of a config save being lost on shutdown because none are pending: every successful invocation has already completed §4.2 before the audit record is emitted.</p>
+</blockquote>
+<hr />
+<h2 id="5-validation-model-and-reasoncode-catalog">5. Validation Model and <code>reasonCode</code> Catalog<a class="headerlink" href="#5-validation-model-and-reasoncode-catalog" title="Permanent link">&para;</a></h2>
+<h3 id="51-validator-chain">5.1 Validator chain<a class="headerlink" href="#51-validator-chain" title="Permanent link">&para;</a></h3>
+<p>Validation is centralized in <code>ConfigParameterValidator</code> (per <a href="../../adr/ADR-037-harden-rtp-config-commands/">ADR-037</a> contract 1). One validator instance per parameter type. The validator receives <code>(parameterPath, attemptedValue, inMemoryStateSnapshot)</code> and returns either <code>Ok</code> or <code>ConfigValidationFailure(parameterPath, attemptedValue, reasonCode, detail)</code>.</p>
+<p>Validators are pure: no I/O, no chunk access, no scheduling. They run on the calling thread. Composite invariants (cross-parameter, e.g. <code>Polygon.expand</code> vs. <code>Polygon.vertices</code>) run as a second pass after per-parameter validators pass, before §3.5 <em>Apply</em> commits the in-memory state.</p>
+<h3 id="52-reasoncode-enumeration">5.2 <code>reasonCode</code> enumeration<a class="headerlink" href="#52-reasoncode-enumeration" title="Permanent link">&para;</a></h3>
+<p>Every failure mode is exactly one <code>reasonCode</code>. The set is closed; adding a new code requires updating this spec and adding the corresponding <code>messages.yml → config.error.&lt;reasonCode&gt;</code> key.</p>
+<table>
+<thead>
+<tr>
+<th><code>reasonCode</code></th>
+<th>Raised by</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>UNKNOWN_FILE</code></td>
+<td>Parse</td>
+<td><code>&lt;file&gt;</code> (or <code>&lt;group&gt; &lt;subfile&gt;</code>) does not name a registered config.</td>
+</tr>
+<tr>
+<td><code>UNKNOWN_KEY</code></td>
+<td>Parse</td>
+<td><code>&lt;key&gt;</code> is not declared in the target file's parameter registry.</td>
+</tr>
+<tr>
+<td><code>MALFORMED_ARGUMENT</code></td>
+<td>Parse</td>
+<td>An argument did not match the <code>&lt;key&gt;:&lt;value&gt;</code> / <code>add:&lt;value&gt;</code> / <code>remove:&lt;value&gt;</code> shape.</td>
+</tr>
+<tr>
+<td><code>WRONG_OPERATOR_FOR_TYPE</code></td>
+<td>Parse</td>
+<td><code>add:</code> / <code>remove:</code> used against a non-list key, or <code>&lt;key&gt;:&lt;value&gt;</code> against a list key.</td>
+</tr>
+<tr>
+<td><code>RESERVED_TOKEN_COLLISION</code></td>
+<td>Parse</td>
+<td>A <code>&lt;key&gt;</code> collides with a reserved grammar token.</td>
+</tr>
+<tr>
+<td><code>NO_PERMISSION</code></td>
+<td>Authorize</td>
+<td>Caller lacks both the scoped node (<code>rtp.config.set.&lt;section&gt;</code>) and the umbrella node (<code>rtp.config.set</code>).</td>
+</tr>
+<tr>
+<td><code>OUT_OF_RANGE</code></td>
+<td>Validate</td>
+<td>Numeric value outside the declared bounds.</td>
+</tr>
+<tr>
+<td><code>WRONG_TYPE</code></td>
+<td>Validate</td>
+<td>Value did not parse to the declared type (e.g. non-integer for <code>int</code> key, non-enum for enum key).</td>
+</tr>
+<tr>
+<td><code>UNKNOWN_REGION</code></td>
+<td>Validate</td>
+<td>A region-name-typed parameter references a region not in <code>permRegionLookup</code>.</td>
+</tr>
+<tr>
+<td><code>UNKNOWN_WORLD</code></td>
+<td>Validate</td>
+<td>A world-name-typed parameter references a world neither loaded nor in <code>worlds/</code>.</td>
+</tr>
+<tr>
+<td><code>IMMUTABLE_AT_RUNTIME</code></td>
+<td>Validate</td>
+<td>The parameter cannot be mutated at runtime (e.g. a key marked startup-only by its declaring registry).</td>
+</tr>
+<tr>
+<td><code>USE_DEDICATED_COMMAND</code></td>
+<td>Parse/Authorize</td>
+<td>The target file requires its own command (e.g. <code>language.yml</code> routes through the dedicated <code>LanguageCmd</code>, not the generic <code>SubConfigCmd</code>). Message names the right command.</td>
+</tr>
+<tr>
+<td><code>SCHEMA_INVARIANT</code></td>
+<td>Validate (composite pass)</td>
+<td>A multi-key invariant failed (e.g. <code>Polygon.expand=true</code>, mismatched <code>minY</code>/<code>maxY</code>).</td>
+</tr>
+<tr>
+<td><code>RELOAD_IN_PROGRESS</code></td>
+<td>Authorize/Apply</td>
+<td>A reload is in progress; retry after it completes.</td>
+</tr>
+<tr>
+<td><code>PERSIST_IO</code></td>
+<td>Persist</td>
+<td>Temp-file write, fsync, or rename failed; rollback completed.</td>
+</tr>
+<tr>
+<td><code>STALE_TEMP_FILE</code></td>
+<td>Startup (informational, not a command failure)</td>
+<td>A <code>&lt;target&gt;.tmp</code> was found at startup and removed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="53-message-resolution">5.3 Message resolution<a class="headerlink" href="#53-message-resolution" title="Permanent link">&para;</a></h3>
+<p>Each <code>reasonCode</code> resolves to <code>messages.yml → config.error.&lt;reasonCode&gt;</code> (lowercased, e.g. <code>config.error.out_of_range</code>). The message template may reference <code>${parameterPath}</code>, <code>${attemptedValue}</code>, <code>${detail}</code>, and (where defined) <code>${expectedRange}</code> / <code>${expectedType}</code>. Missing key → <code>Level.WARNING</code> log per the existing REQ-RTP-F-013 enforcement pattern, plus a safe English fallback; never <code>null</code>, never the empty string. The legacy hardcoded fallbacks in <code>BukkitBaseRTPCmd#msgInvalidCommand</code> / <code>msgBadParameter</code> are removed in favor of this resolution path.</p>
+<h2 id="6-audit-record-schema">6. Audit Record Schema<a class="headerlink" href="#6-audit-record-schema" title="Permanent link">&para;</a></h2>
+<p>Every invocation — success or failure, live or dry-run — emits <strong>exactly one</strong> audit record. Records are written through <code>RTP.log</code> (never <code>Bukkit.getLogger()</code> or <code>System.out</code>, per the project's logging contract).</p>
+<h3 id="61-record-fields">6.1 Record fields<a class="headerlink" href="#61-record-fields" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Always present</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>timestamp</code></td>
+<td>ISO-8601 UTC</td>
+<td>yes</td>
+<td>When the lifecycle entered §3.1 <em>Parse</em>.</td>
+</tr>
+<tr>
+<td><code>actor</code></td>
+<td>string</td>
+<td>yes</td>
+<td>The caller identity: <code>console</code>, <code>player:&lt;uuid&gt;</code> (and the player's name in a secondary field), or <code>addon:&lt;addonName&gt;</code> for <code>rtp-api</code>-driven invocations.</td>
+</tr>
+<tr>
+<td><code>command</code></td>
+<td>string</td>
+<td>yes</td>
+<td>The fully-resolved canonical command string the caller issued, with the configured <code>dryRunFlag</code> normalized but argument case and order preserved.</td>
+</tr>
+<tr>
+<td><code>targetFile</code></td>
+<td>string</td>
+<td>yes</td>
+<td>Resolved canonical file path relative to <code>plugins/RTP/</code> (e.g. <code>regions/nether.yml</code>).</td>
+</tr>
+<tr>
+<td><code>mutations</code></td>
+<td>array</td>
+<td>yes (may be empty for <code>view</code>)</td>
+<td>Per-mutation <code>{ parameterPath, oldValue, newValue, applied: bool, reasonCode? }</code>. <code>applied=false</code> with <code>reasonCode = NOT_REACHED</code> indicates a mutation that was queued but never validated because an earlier mutation failed.</td>
+</tr>
+<tr>
+<td><code>dryRun</code></td>
+<td>bool</td>
+<td>yes</td>
+<td>True when the invocation carried <code>--dry-run</code>.</td>
+</tr>
+<tr>
+<td><code>outcome</code></td>
+<td>enum</td>
+<td>yes</td>
+<td><code>COMMITTED</code> | <code>DRY_RUN_OK</code> | <code>REJECTED</code> | <code>ROLLED_BACK</code>.</td>
+</tr>
+<tr>
+<td><code>reasonCode</code></td>
+<td>string</td>
+<td>only when <code>outcome ∈ {REJECTED, ROLLED_BACK}</code></td>
+<td>The closed-set code from §5.2.</td>
+</tr>
+<tr>
+<td><code>detail</code></td>
+<td>string</td>
+<td>optional</td>
+<td>Free-form human-oriented detail (e.g. the underlying <code>IOException</code> message for <code>PERSIST_IO</code>). Never used for control flow.</td>
+</tr>
+<tr>
+<td><code>durationMs</code></td>
+<td>integer</td>
+<td>yes</td>
+<td>Wall-clock time from §3.1 to record emission.</td>
+</tr>
+</tbody>
+</table>
+<p>Success records are emitted at <code>Level.INFO</code>; failure and rollback records at <code>Level.WARNING</code>. The <code>view</code> sub-form is <code>Level.INFO</code> with <code>outcome = DRY_RUN_OK</code> and an empty <code>mutations</code> array (its read-only payload, if any, is delivered to the caller, not the audit log, to avoid <code>messages.yml</code> content leaking into log files when an admin runs <code>view</code> against <code>messages.yml</code>).</p>
+<h3 id="62-single-formatter-single-sink">6.2 Single formatter, single sink<a class="headerlink" href="#62-single-formatter-single-sink" title="Permanent link">&para;</a></h3>
+<p>All records flow through one <code>ConfigAuditFormatter</code>. Per the existing <code>SendMessage.addInterceptor(Consumer&lt;String&gt;)</code> pattern documented in <code>AGENTS.md → Logging &amp; Feedback</code>, tests and the <code>rtp test full</code> audit pass shall consume the formatted line stream rather than scraping platform-specific logger output. The formatter's output is deterministic given the record (no clock-derived suffix beyond <code>timestamp</code>, no <code>Object#toString</code> leakage of identity hash codes). The single invocation produces exactly one record; rollback in §3.7 emits the same record (with <code>outcome = ROLLED_BACK</code> and the failing <code>reasonCode</code>) rather than a paired pre/post record, so no cross-record correlation key is needed.</p>
+<hr />
+<h2 id="7-permission-grammar">7. Permission Grammar<a class="headerlink" href="#7-permission-grammar" title="Permanent link">&para;</a></h2>
+<h3 id="71-node-hierarchy">7.1 Node hierarchy<a class="headerlink" href="#71-node-hierarchy" title="Permanent link">&para;</a></h3>
+<p>Permissions are additive over the existing umbrella nodes:</p>
+<table>
+<thead>
+<tr>
+<th>Node</th>
+<th>Grants</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rtp.config</code></td>
+<td>Legacy alias retained for back-compat; equivalent to <code>rtp.config.view</code> + <code>rtp.config.set</code>.</td>
+</tr>
+<tr>
+<td><code>rtp.config.view</code></td>
+<td>The <code>view</code> sub-form (§2.4) against any file.</td>
+</tr>
+<tr>
+<td><code>rtp.config.set</code></td>
+<td>Any mutation against any file (umbrella).</td>
+</tr>
+<tr>
+<td><code>rtp.config.set.&lt;section&gt;</code></td>
+<td>Mutations against the named top-level section only. <code>&lt;section&gt;</code> is the basename of the target file or the multi-config group (e.g. <code>performance</code>, <code>economy</code>, <code>regions</code>, <code>worlds</code>, <code>safety</code>, <code>messages</code>, <code>config</code>, <code>logging</code>).</td>
+</tr>
+</tbody>
+</table>
+<p><code>set</code> implies <code>view</code> for the same section: a holder of <code>rtp.config.set.regions</code> may run <code>/rtp config regions &lt;subfile&gt; view</code> without holding <code>rtp.config.view</code>.</p>
+<h3 id="72-resolution">7.2 Resolution<a class="headerlink" href="#72-resolution" title="Permanent link">&para;</a></h3>
+<p>For a given invocation against <code>&lt;targetFile&gt;</code>:</p>
+<ol>
+<li>Compute the section name (<code>section = basename of targetFile, stripped of any subfile suffix and</code>.yml`).</li>
+<li>If the caller holds <code>rtp.config.set.&lt;section&gt;</code> → authorized.</li>
+<li>Else if the caller holds the umbrella <code>rtp.config.set</code> → authorized.</li>
+<li>Else if the invocation is a <code>view</code> and the caller holds <code>rtp.config.view</code> or <code>rtp.config</code> → authorized.</li>
+<li>Else → <code>NO_PERMISSION</code>.</li>
+</ol>
+<p>Per-region scoping (e.g. "edit only <code>regions/nether.yml</code>") is <strong>not</strong> part of the beta.3 hardening; the section is the smallest grain. A wizard that needs finer scoping shall propose its own ADR.</p>
+<hr />
+<h2 id="8-schema-checked-reload">8. Schema-Checked Reload<a class="headerlink" href="#8-schema-checked-reload" title="Permanent link">&para;</a></h2>
+<p><code>/rtp reload</code> (whether issued directly, dispatched by §3.7, or triggered by the dedicated <code>LanguageCmd</code>) runs the parsed-but-not-applied config through the same <code>ConfigParameterValidator</code> chain (§5) <strong>before</strong> swapping it in. The check runs against the same composite-invariant pass §3.5 uses, so a reload of a file that was edited offline (bypassing the command surface) is guarded by the same invariant set as a write through the command surface.</p>
+<h3 id="81-failure-semantics">8.1 Failure semantics<a class="headerlink" href="#81-failure-semantics" title="Permanent link">&para;</a></h3>
+<p>A reload-time validation failure aborts the swap with the previous in-memory state intact. The audit record carries <code>outcome = REJECTED</code> and the failing <code>reasonCode</code>. The diagram-09 swap node is not entered; in-flight teleports continue to see the previous state. The caller is told which file and which key failed and is invited to re-edit and retry. No partial-swap state is observable.</p>
+<h3 id="82-shape-invariants">8.2 Shape invariants<a class="headerlink" href="#82-shape-invariants" title="Permanent link">&para;</a></h3>
+<p>The shape-specific invariants from <a href="../../adr/ADR-034-memory-shape-catalog/">ADR-034</a> (<code>Polygon</code> rejects <code>expand=true</code>, polygon vertex validity, <code>Rectangle</code> half-extent positivity, <code>Ellipse</code> axis positivity) are registered as composite invariants and run on every reload, not only on <code>/rtp config</code> writes. This eliminates the "reload, then discover at next teleport" failure mode that motivated contract 7 of <a href="../../adr/ADR-037-harden-rtp-config-commands/">ADR-037</a>.</p>
+<hr />
+<h2 id="9-tab-complete-contract-parsecomplete-parity">9. Tab-Complete Contract (Parse/Complete Parity)<a class="headerlink" href="#9-tab-complete-contract-parsecomplete-parity" title="Permanent link">&para;</a></h2>
+<p><code>onCommand</code> and <code>onTabComplete</code> consume the <strong>same</strong> <code>ConfigParameterGrammar</code> definition per parameter. There is exactly one source of truth for:</p>
+<ul>
+<li>The set of valid <code>&lt;file&gt;</code> tokens at position 1 (the <code>Configs</code> registry, §4.5).</li>
+<li>The set of valid <code>&lt;subfile&gt;</code> tokens at position 2 for multi-config groups (filesystem enumeration of the group directory).</li>
+<li>The set of valid <code>&lt;key&gt;</code> tokens at the next position (the file's parameter registry).</li>
+<li>The set of valid <code>&lt;value&gt;</code> completions for a typed key (enum members for enum-typed keys; <code>add:</code> / <code>remove:</code> literal completions plus current-list-members for <code>remove:</code> on <code>List</code> keys; numeric placeholder hints with the declared range for numeric keys).</li>
+</ul>
+<p>Any completion the player sees is a <strong>parseable</strong> command. The test <code>ConfigParameterGrammarParseCompleteParityTest</code> (per ADR-037 <em>Migration / Rollout</em>) asserts this by, for every registered parameter, completing one step deeper than the previous tab and round-tripping the completion through the parser; any completion that fails to parse fails the test.</p>
+<p>Tab-complete may filter by the caller's permissions (a holder of <code>rtp.config.set.regions</code> who tabs at position 1 shall see only <code>regions</code>, <code>worlds</code>-if-also-granted, etc.). This is a UX nicety and does not change the parser; it only suppresses suggestions the caller could not act on. It is <strong>not</strong> a substitute for the §7 authorization step in the lifecycle.</p>
+<hr />
+<h2 id="10-error-matrix">10. Error Matrix<a class="headerlink" href="#10-error-matrix" title="Permanent link">&para;</a></h2>
+<p>The matrix below is exhaustive over the §3 lifecycle stages cross-producted with the §5 reasonCodes. Read it as: <em>for input class X, the expected outcome is Y, with audit <code>outcome</code> Z</em>. Cells marked "n/a" are unreachable by construction (e.g. <code>PERSIST_IO</code> cannot occur before §3.6).</p>
+<table>
+<thead>
+<tr>
+<th>Input class</th>
+<th>Stage that detects</th>
+<th><code>reasonCode</code></th>
+<th>Audit <code>outcome</code></th>
+<th>Caller sees</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unknown file / group</td>
+<td>Parse</td>
+<td><code>UNKNOWN_FILE</code></td>
+<td><code>REJECTED</code></td>
+<td><code>config.error.unknown_file</code></td>
+</tr>
+<tr>
+<td>Unknown key</td>
+<td>Parse</td>
+<td><code>UNKNOWN_KEY</code></td>
+<td><code>REJECTED</code></td>
+<td><code>config.error.unknown_key</code></td>
+</tr>
+<tr>
+<td><code>add:</code> on scalar / <code>key:value</code> on list</td>
+<td>Parse</td>
+<td><code>WRONG_OPERATOR_FOR_TYPE</code></td>
+<td><code>REJECTED</code></td>
+<td><code>config.error.wrong_operator_for_type</code></td>
+</tr>
+<tr>
+<td>Malformed token (no <code>:</code> separator, empty value, etc.)</td>
+<td>Parse</td>
+<td><code>MALFORMED_ARGUMENT</code></td>
+<td><code>REJECTED</code></td>
+<td><code>config.error.malformed_argument</code></td>
+</tr>
+<tr>
+<td>Reserved-token key</td>
+<td>Parse</td>
+<td><code>RESERVED_TOKEN_COLLISION</code></td>
+<td><code>REJECTED</code></td>
+<td><code>config.error.reserved_token_collision</code></td>
+</tr>
+<tr>
+<td><code>language.yml</code> via generic path</td>
+<td>Parse</td>
+<td><code>USE_DEDICATED_COMMAND</code></td>
+<td><code>REJECTED</code></td>
+<td><code>config.error.use_dedicated_command</code> (names <code>LanguageCmd</code>)</td>
+</tr>
+<tr>
+<td>Insufficient permission</td>
+<td>Authorize</td>
+<td><code>NO_PERMISSION</code></td>
+<td><code>REJECTED</code></td>
+<td><code>config.error.no_permission</code></td>
+</tr>
+<tr>
+<td>Reload in progress</td>
+<td>Authorize</td>
+<td><code>RELOAD_IN_PROGRESS</code></td>
+<td><code>REJECTED</code></td>
+<td><code>config.error.reload_in_progress</code></td>
+</tr>
+<tr>
+<td>Numeric out of range</td>
+<td>Validate</td>
+<td><code>OUT_OF_RANGE</code></td>
+<td><code>REJECTED</code></td>
+<td><code>config.error.out_of_range</code></td>
+</tr>
+<tr>
+<td>Type mismatch</td>
+<td>Validate</td>
+<td><code>WRONG_TYPE</code></td>
+<td><code>REJECTED</code></td>
+<td><code>config.error.wrong_type</code></td>
+</tr>
+<tr>
+<td>Unknown region name</td>
+<td>Validate</td>
+<td><code>UNKNOWN_REGION</code></td>
+<td><code>REJECTED</code></td>
+<td><code>config.error.unknown_region</code></td>
+</tr>
+<tr>
+<td>Unknown world name</td>
+<td>Validate</td>
+<td><code>UNKNOWN_WORLD</code></td>
+<td><code>REJECTED</code></td>
+<td><code>config.error.unknown_world</code></td>
+</tr>
+<tr>
+<td>Startup-only key</td>
+<td>Validate</td>
+<td><code>IMMUTABLE_AT_RUNTIME</code></td>
+<td><code>REJECTED</code></td>
+<td><code>config.error.immutable_at_runtime</code></td>
+</tr>
+<tr>
+<td>Composite-invariant failure (e.g. Polygon <code>expand=true</code>)</td>
+<td>Validate (composite)</td>
+<td><code>SCHEMA_INVARIANT</code></td>
+<td><code>ROLLED_BACK</code></td>
+<td><code>config.error.schema_invariant</code></td>
+</tr>
+<tr>
+<td>Temp write / fsync / rename failure</td>
+<td>Persist</td>
+<td><code>PERSIST_IO</code></td>
+<td><code>ROLLED_BACK</code></td>
+<td><code>config.error.persist_io</code></td>
+</tr>
+<tr>
+<td>All validations pass, dry-run</td>
+<td>Audit</td>
+<td>n/a</td>
+<td><code>DRY_RUN_OK</code></td>
+<td><code>config.dryRun.diff</code> rendering</td>
+</tr>
+<tr>
+<td>All validations pass, live</td>
+<td>Audit</td>
+<td>n/a</td>
+<td><code>COMMITTED</code></td>
+<td><code>config.success.committed</code></td>
+</tr>
+</tbody>
+</table>
+<p>Any future <code>reasonCode</code> shall extend the table and the <code>messages.yml</code> map together; a code without a matching message key (or vice versa) is a spec-conformance bug caught by <code>ReqRtpF013ConfigMessageCoverageTest</code>.</p>
+<hr />
+<h2 id="appendix-a-current-gaps-vs-spec">Appendix A: Current Gaps vs. Spec<a class="headerlink" href="#appendix-a-current-gaps-vs-spec" title="Permanent link">&para;</a></h2>
+<p>The pre-hardening implementation (<code>rtp-core/.../commands/config/{ConfigCmd,SubConfigCmd,ViewSubConfigCmd}.java</code> plus <code>commands/config/list/</code>, as of the spec-authoring date) diverges from this spec in the ways enumerated below. Each row is a candidate for one of the ADR-037 contracts and shall be closed (and the row removed) as the contract ships. The appendix is informative, not normative; the body above is the contract.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>Spec section</th>
+<th>ADR-037 contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A1</td>
+<td><code>SubConfigCmd#onCommand</code> inlines per-type parse-and-coerce with mixed <code>return false</code> / silent-fail branches; no central <code>ConfigParameterValidator</code>.</td>
+<td>§3.3, §5</td>
+<td>1</td>
+</tr>
+<tr>
+<td>A2</td>
+<td>No <code>ConfigTransaction</code>; mutations are applied to in-memory state directly and serialized lazily; rollback is not available.</td>
+<td>§3.4, §3.5, §3.7</td>
+<td>2</td>
+</tr>
+<tr>
+<td>A3</td>
+<td>No <code>--dry-run</code> flag; no preview path.</td>
+<td>§2.1, §3.7</td>
+<td>3</td>
+</tr>
+<tr>
+<td>A4</td>
+<td>Audit records are partial: some successful sets are not logged; some failures are silently rejected.</td>
+<td>§6</td>
+<td>4</td>
+</tr>
+<tr>
+<td>A5</td>
+<td><code>BukkitBaseRTPCmd#msgInvalidCommand</code> / <code>msgBadParameter</code> carry hardcoded English fallbacks.</td>
+<td>§5.3</td>
+<td>5</td>
+</tr>
+<tr>
+<td>A6</td>
+<td>Permission grain is <code>rtp.config</code> (umbrella) only; no scoped <code>rtp.config.set.&lt;section&gt;</code> nodes.</td>
+<td>§7</td>
+<td>6</td>
+</tr>
+<tr>
+<td>A7</td>
+<td><code>ReloadCmd</code> re-reads config without running the validator chain against the resulting state; shape-invariant violations surface at sample time.</td>
+<td>§8</td>
+<td>7</td>
+</tr>
+<tr>
+<td>A8</td>
+<td><code>onTabComplete</code> and <code>onCommand</code> parse the argument grammar independently; some completions do not round-trip.</td>
+<td>§9</td>
+<td>8</td>
+</tr>
+<tr>
+<td>A9</td>
+<td>Writes are not atomic-rename: the parser serializes directly to the target file. A crash mid-write can leave the file truncated.</td>
+<td>§4.2, §4.6</td>
+<td>2 (persist substep)</td>
+</tr>
+<tr>
+<td>A10</td>
+<td><code>language.yml</code> cannot be mutated at runtime through any command surface; locale changes require a server restart.</td>
+<td>§4.4</td>
+<td>2 (LanguageCmd hardening)</td>
+</tr>
+<tr>
+<td>A11</td>
+<td>Startup does not log/clean stray <code>*.tmp</code> siblings of registered config files (no temp files exist today; this row is "starting state for the new contract," not a regression).</td>
+<td>§4.2</td>
+<td>2</td>
+</tr>
+<tr>
+<td>A12</td>
+<td>The YAML substrate does not guarantee that block / inline comments survive a write-back round-trip. The <code>view</code> hover-text feature (§2.4) depends on comment preservation; until the substrate is upgraded (or replaced with an in-house parser), hover-text falls back to declared type + bounds. Comment preservation is also valuable independently of <code>/rtp config</code> for admins who hand-edit YAML and reload.</td>
+<td>§2.4, §4.2</td>
+<td>— (separate ADR; tracked here for visibility)</td>
+</tr>
+</tbody>
+</table>
+<p>When this appendix is empty, the implementation has caught up with the spec and ADR-037 may be marked <strong>Implemented</strong> independently of any subsequent revisions to this document.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.2.1
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>
