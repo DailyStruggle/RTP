@@ -46,7 +46,7 @@ air, or into a claimed region they cannot build in.
    under `unsafeBlocks` and that the safety check is enabled (`safetyCheck: true`).
 3. If the issue is claimed-land: confirm the relevant protection plugin
    (GriefPrevention, WorldGuard, etc.) is installed and loaded. Claim-plugin support is bundled
-   directly into the RTP jar (see ADR-019) — there is no separate integration jar to install.
+   directly into the RTP jar — there is no separate integration jar to install.
 4. Check if the region has been recently reconfigured or if `safety.yml` was edited manually,
    as a syntax error can silently disable safety checks.
 

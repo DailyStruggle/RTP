@@ -142,7 +142,7 @@ The `scan` command is used to proactively map out the world. While the standard 
 **Required permission:** `rtp.scan`  
 **Target region resolution:** If `region` is omitted and the caller is a player, the player's current region is used. If the caller is the console, all permanent regions are targeted.
 
-> **MemoryShape requirement:** All scan sub-commands require the region's shape to be a `MemoryShape` implementation. Regions backed by other shape types are silently skipped with a `badArg` message.
+> **Scannable-shape requirement:** All scan sub-commands require the region to use a shape type that supports spatial memory. Regions backed by other shape types are silently skipped with an "invalid argument" message.
 
 ---
 
@@ -352,7 +352,7 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 | `%rtp_pluginForced%` | Whether a plugin forced the region |
 | `%rtp_serverForced%` | Whether the server forced the region |
 | `%rtp_cacheCap%` | Region cache capacity |
-| `%rtp_backlogCacheCap%` | L3 backlog cache capacity (ADR-028); 0 disables L3 |
+| `%rtp_backlogCacheCap%` | Backlog (unverified) cache capacity; 0 disables it |
 | `%rtp_cached%` | Total currently cached locations |
 | `%rtp_keptCache%` | Locations whose chunks are kept loaded (hot/ready-to-serve) |
 | `%rtp_unkeptCache%` | Verified locations whose chunks were released (warm) |

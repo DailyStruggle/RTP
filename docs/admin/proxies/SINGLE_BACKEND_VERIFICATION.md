@@ -1,22 +1,20 @@
 # Single-Backend Network Verification (`rtp test network` + Redis)
 
-This page documents how a single Paper/Folia backend operator can verify the RTP network-mode SPI end-to-end against a real Redis instance, **without** standing up a proxy or a second backend. The verification uses `rtp test network`, an in-process Shape A simulator that publishes synthetic peers through the live `NetworkTransport`, asserts subscriber fan-out, and exercises the reservation-token claim/release/reap path.
+This page documents how a single Paper/Folia backend operator can verify RTP network mode end-to-end against a real Redis instance, **without** standing up a proxy or a second backend. The verification uses `rtp test network`, an in-process simulator that publishes synthetic peers through the live network transport, asserts subscriber fan-out, and exercises the reservation-token claim/release/reap path.
 
-> Scope: this is a **single-JVM** smoke test. It proves the Redis transport binding is reachable, the Lua scripts load, heartbeats round-trip, and reservation tokens claim atomically. It does **not** prove multi-server agreement, HMAC trust boundaries (Phase 4), or proxy-side routing. Multi-backend acceptance lives in `MULTI_SERVER_PLAN.md` Phase 2 acceptance row.
+> Scope: this is a **single-JVM** smoke test. It proves the Redis transport binding is reachable, the Lua scripts load, heartbeats round-trip, and reservation tokens claim atomically. It does **not** prove multi-server agreement, HMAC trust boundaries, or proxy-side routing - those require a full proxy + multi-backend setup.
 
-Related design docs:
+Related pages:
 
-- [`docs/dev/MULTI_SERVER_PLAN.md`](../../dev/MULTI_SERVER_PLAN.md) - phase status, Phase 2e-Redis A1/A2 slice notes.
-- [`rtp-proxy-ADR-005`](https://github.com/dailystruggle/RTP/blob/V3/platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-005-redis-binding.md) - Redis binding key layout and Lua scripts.
-- [`rtp-proxy-ADR-002`](https://github.com/dailystruggle/RTP/blob/V3/platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-002-network-yml-schema.md) - `network.yml` schema and validation rules.
-- [`rtp-proxy-ADR-010`](https://github.com/dailystruggle/RTP/blob/V3/platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-010-security-hardening.md) - HMAC + kill switch (deferred for single-backend).
-- REQ-RTP-NET-002 (parity when disabled), REQ-RTP-PROXY-007 (`secretEnv` fail-fast).
+- [Proxy mode overview](INDEX.md) - what network mode is and what it needs.
+- [network.yml configuration](CONFIGURATION.md) - the schema and validation rules for the backend config.
+- [Cross-server verification](CROSS_SERVER_VERIFICATION.md) - the full proxy + multi-backend round-trip.
 
 ---
 
 ## Prerequisites
 
-- A running Paper or Folia backend on Java 21+, RTP plugin installed (full jar, not lite - lite strips Jedis and the SQL/Redis drivers per ADR-024).
+- A running Paper or Folia backend on Java 21+, RTP plugin installed (full jar, not lite - the lite build ships without the SQL/Redis drivers).
 - Docker available on the same host (or a reachable Redis 7+ instance on the network).
 - Console / op access to run `/rtp test network` from the server console or an opped player.
 
@@ -43,7 +41,7 @@ For a Redis that already lives in your infrastructure, skip this step and use it
 
 ## Step 2: Set the shared-secret env var
 
-The plugin's network bootstrap fail-fasts at startup if `network.enabled: true` and the configured `secretEnv` is unset or empty. This guard is REQ-RTP-PROXY-007; it fires regardless of whether HMAC envelope enforcement is wired (the wire-level HMAC verifier is Phase 4, but the operator-discipline guard fires today).
+The plugin's network bootstrap fail-fasts at startup if `network.enabled: true` and the configured `secretEnv` is unset or empty. This guard fires regardless of whether wire-level HMAC enforcement is active - it is an operator-discipline check that requires you to set a secret before network mode will enable.
 
 Generate a 32+ byte base64 secret and export it before launching the server JVM:
 
@@ -128,7 +126,7 @@ From the server console (or as an opped player):
 /rtp test network all count=4
 ```
 
-Probe-mode subcommands and their parameters (commands-api §2.2: bare tokens dispatch as subcommands; sizing is passed as `key=value` parameters):
+Probe-mode subcommands and their parameters (bare tokens dispatch as subcommands; sizing is passed as `key=value` parameters):
 
 - `/rtp test network` - heartbeat round-trip with defaults (3 peers, 500ms observe window).
 - `/rtp test network heartbeat [count=N] [observeMs=M]` - publish N synthetic peers (default 3, max 16), assert snapshot + subscriber fan-out, clean up with `SHUTTING_DOWN`. `observeMs` clamps to 250..30000.
@@ -142,7 +140,7 @@ The audit row appears in console output and the server log. A successful run on 
 [RTP test/network] PASS: tokens peers=4 claim_us=<us> find_us=<us> release_us=<us> reap_us=<us> total_us=<us> (RedisNetworkStateBinding)
 ```
 
-If the audit row reports `(InMemoryNetworkStateBinding)` instead of `(RedisNetworkStateBinding)`, the D3 slot resolved to the wrong transport - usually because `network.enabled: false` or because `transport.type` was not changed from `sql` / `in-memory`. Re-check `network.yml`.
+If the audit row reports `(InMemoryNetworkStateBinding)` instead of `(RedisNetworkStateBinding)`, the transport slot resolved to the wrong transport - usually because `network.enabled: false` or because `transport.type` was not changed from `sql` / `in-memory`. Re-check `network.yml`.
 
 A `NOT-CONFIGURED` skip means the binding never opened. Look upstream in the log for the bootstrap warning.
 
@@ -172,7 +170,7 @@ The simulator cleans up its synthetic rows by republishing them with `pluginStat
 | `network.secretEnv='RTP_NET_SECRET' is unset` at startup | Env var not exported to the server JVM | Step 2; on systemd, set in the unit's `Environment=` block |
 | `JedisConnectionException: Failed to connect` | Wrong host/port or Redis bound to `127.0.0.1` inside docker | Use `host.docker.internal` or expose with `-p 0.0.0.0:6379:6379` |
 | Audit row says `(InMemoryNetworkStateBinding)` | `network.enabled: false` or `transport.type` not `redis` | Re-check `network.yml`; the bootstrap log line in Step 4 confirms transport type |
-| Audit row says `NOT-CONFIGURED` | Bootstrap failed silently; binding not installed on the D3 slot | Look earlier in the log for `[NETWORK]` warnings; usually a config validation throw |
+| Audit row says `NOT-CONFIGURED` | Bootstrap failed silently; the transport binding was not installed | Look earlier in the log for `[NETWORK]` warnings; usually a config validation throw |
 | `Lua script SHA mismatch` on first claim | Redis was restarted mid-session and lost its script cache, OR the shipped `.sha1` sidecar drifted from `.lua` | Restart the server; the binding re-loads on construction. Persistent mismatch is a bug - file with the audit row attached |
 | `tokens` step times out on TTL reap | Reservation reaper interval is longer than the observe window | Lower `reservation.reapIntervalMs` in `network.yml` (default 30000ms) or run the test with a larger observe argument |
 | Heartbeat row never appears in `HGETALL` | Server clock skew vs Redis past the TTL window | Sync NTP on the host |
@@ -181,12 +179,12 @@ The simulator cleans up its synthetic rows by republishing them with `pluginStat
 
 ## What this does NOT verify
 
-- **Multi-server agreement**: a second backend reading the first backend's heartbeat. That requires two JVMs and is the Phase 2 acceptance row in `MULTI_SERVER_PLAN.md`.
+- **Multi-server agreement**: a second backend reading the first backend's heartbeat. That requires two JVMs (see the cross-server verification guide).
 - **Proxy-side routing**: `/rtp` on a Velocity proxy dispatching to this backend. Requires a Velocity instance with `rtp-proxy-velocity` and the same `RTP_NET_SECRET`.
-- **HMAC verification**: ADR-010 Phase 4. The single-backend self-loop never crosses a trust boundary, so wire-level HMAC is not currently enforced even when Redis is the transport.
-- **Kill switch propagation**: ADR-010, deferred.
-- **DragonflyDB compatibility**: open Phase 2 acceptance row; the Lua scripts are written to RESP-compatible primitives but have not been exercised against Dragonfly.
-- **Network partition recovery**: A4 hardening turn, not yet implemented; the current binding logs and retries on reconnect via Jedis pool's default behaviour.
+- **HMAC verification**: the single-backend self-loop never crosses a trust boundary, so wire-level HMAC is not currently enforced even when Redis is the transport.
+- **Kill switch propagation**: not yet implemented.
+- **DragonflyDB compatibility**: not yet verified; the Lua scripts are written to RESP-compatible primitives but have not been exercised against Dragonfly.
+- **Network partition recovery**: reconnect hardening is not yet implemented; the current binding logs and retries on reconnect via the Jedis pool's default behaviour.
 
 ---
 
@@ -199,7 +197,7 @@ docker stop rtp-redis
 docker rm rtp-redis
 ```
 
-In `network.yml`, set `network.enabled: false` to return the backend to byte-identical pre-Phase-2 behaviour (REQ-RTP-NET-002). The `secretEnv` no longer needs to be exported once disabled.
+In `network.yml`, set `network.enabled: false` to return the backend to byte-identical single-server behaviour. The `secretEnv` no longer needs to be exported once disabled.
 
 ---
 
@@ -209,4 +207,4 @@ Once a single-backend run is green:
 
 1. Start a second backend on a different `serverId`, same `RTP_NET_SECRET`, same Redis host. Confirm each sees the other's row in `HGETALL rtp:net:backend:<other-serverId>` and that `/rtp test network heartbeat count=1` observes the real peer in its snapshot alongside the synthetic one.
 2. Add a Velocity proxy with `rtp-proxy-velocity`, same secret, same Redis. The proxy publishes its own heartbeat on `rtp:net:proxy:<proxyId>` and reads backend snapshots for selection.
-3. The 2-proxy + 2-backend devstack acceptance harness is the next plan box (Phase 2, `MULTI_SERVER_PLAN.md`) and remains an open follow-up.
+3. A full 2-proxy + 2-backend acceptance harness remains an open follow-up.

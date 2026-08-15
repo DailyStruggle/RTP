@@ -2,7 +2,7 @@
 
 This document lists known hazards for the RTP plugin: conditions that could cause harm to players,
 degrade server stability, or corrupt persistent state. Each hazard records its severity, the
-mitigation implemented, and the governing requirement or architecture decision.
+mitigation implemented.
 
 A **hazard** is any condition that, if left unmitigated, produces an undesirable outcome. Severity
 is rated on four levels:
@@ -30,7 +30,7 @@ The player takes fatal damage with no opportunity to escape.
 
 **Mitigation (primary):** The safety check layer evaluates the candidate location before it is
 placed in the queue. Any location whose landing column contains a disqualifying block is marked
-as a bad sector in `MemoryShape` and is never served to a player. The set of disqualifying
+as a bad sector in the region's spatial-memory map and is never served to a player. The set of disqualifying
 blocks is configurable per region via `safety.yml`.
 
 **Mitigation (secondary):** When a player is placed on a block type that is not recognised as
@@ -40,8 +40,6 @@ occupying the space above the platform — up to a configurable height — are b
 clearing the landing column. Because natural block-breaking can affect bedrock at the world
 boundary, it is strongly recommended to constrain the region's placement Y-range so teleport
 destinations are never within breaking distance of the bedrock floor or ceiling.
-
-**Governing:** `REQ-RTP-S-001`, `REQ-RTP-F-007`
 
 ---
 
@@ -57,8 +55,6 @@ into the queue.
 
 **Mitigation (secondary):** Same platform-generation and block-clearing fallback as H-001 (secondary); see H-001 for full details and the bedrock Y-range operator warning.
 
-**Governing:** `REQ-RTP-S-001`, `REQ-RTP-F-007`
-
 ---
 
 ### H-003 — Player Teleported Into a Protected or Claimed Region
@@ -70,9 +66,7 @@ trapping the player.
 
 **Mitigation:** The claim-check layer (populated via `rtp-api` addon integrations) validates
 candidate locations against registered protection plugins before they are accepted into the
-queue. See `REQ-RTP-F-011`.
-
-**Governing:** `REQ-RTP-S-003`, `REQ-RTP-F-011`
+queue.
 
 ---
 
@@ -97,8 +91,6 @@ are logged at ERROR level for operator review.
 **Mitigation (tertiary):** `WeakReference` semantics allow the JVM to deallocate un-ticketed
 reservation objects that go out of scope without an explicit close.
 
-**Governing:** `REQ-RTP-S-002`, `REQ-RTP-NF-002`, ADR-008
-
 ---
 
 ### H-005 — Teleport Request Flood / Queue Exhaustion
@@ -108,12 +100,10 @@ reservation objects that go out of scope without an explicit close.
 automated script) exhausts the pre-generated queue faster than the replenishment task can
 refill it. Subsequent requests find an empty queue and either fail silently or block.
 
-**Mitigation:** Per-user isolated queues (see ADR-007) ensure that permissioned players
+**Mitigation:** Per-user isolated queues ensure that permissioned players
 (operators, VIPs) are served from a private queue unaffected by the global pool. The global
 queue size and replenishment rate are configurable in `performance.yml`. All failures are
-logged and the player receives an explicit message (`REQ-RTP-S-004`).
-
-**Governing:** `REQ-RTP-S-004`, ADR-006, ADR-007
+logged and the player receives an explicit message.
 
 ---
 
@@ -127,8 +117,6 @@ teleport requests.
 **Mitigation:** All chunk loading and location validation runs asynchronously via
 platform-appropriate schedulers (`TaskPipe` implementations). The Spigot adapter uses a
 bounded synchronous fallback only for final teleport dispatch, not for validation.
-
-**Governing:** `REQ-RTP-S-005`, `REQ-RTP-F-008`, ADR-004
 
 ---
 
@@ -144,8 +132,6 @@ Paper/Folia API differs from the compiled adapter, causing `ClassNotFoundExcepti
 one API surface. There is no runtime reflection or version detection that can silently
 fall back to broken behaviour.
 
-**Governing:** `REQ-RTP-SYS-002`, ADR-010
-
 ---
 
 ### H-008 — Database Corruption on Unclean Shutdown
@@ -159,8 +145,6 @@ the map may be unreadable, requiring a full fill rebuild.
 database in a recoverable state; on next open H2 replays the write-ahead log automatically.
 If the database is unreadable, the plugin logs a WARN-level message and rebuilds the map from
 scratch (at the cost of a fill operation).
-
-**Governing:** `REQ-RTP-NF-001`, ADR-002
 
 ---
 
@@ -177,11 +161,9 @@ operator-facing explanation.
 **Mitigation:** Contract-surface entry points throw `IllegalStateException` with an explicit
 message (e.g. `[RTP API] Cannot access hooks: Core implementation is not loaded.`) rather than
 a `NullPointerException`. Custom shape / vertical-adjustor registration is an implementation-tier
-extension performed against `rtp-core` (two-tier API model, ADR-051). Addon developers are
+extension performed against `rtp-core`. Addon developers are
 directed to call these inside their own `onEnable` after declaring RTP as a `depend` (not
 `softdepend`) in `plugin.yml`.
-
-**Governing:** `REQ-RTP-S-006`, `REQ-RTP-F-010`, ADR-011
 
 ---
 
@@ -193,11 +175,9 @@ chunk ticket outside the managed lifecycle. The ticket may never be released bec
 `MemoryTracker` only monitors reservations it created.
 
 **Mitigation:** `ChunkReservation` is documented as an internal API class not intended to be
-constructed by addon code (see ADR-012). Addon developers should request locations through
+constructed by addon code. Addon developers should request locations through
 `ILocationGenerator` and consume `GenerationResult.reservation()` rather than managing
 tickets directly.
-
-**Governing:** `REQ-RTP-S-002`, ADR-012
 
 ---
 
@@ -222,14 +202,14 @@ tickets directly.
 
 Failure modes describe specific component-level failures, how they are detected, and the system's defined response.
 
-| ID | Component | Failure | Response | Req |
-|----|-----------|---------|----------|-----|
-| FM-001 | `RegionQueueManager` | Queue empty | Queue player UUID for deferred teleport; fulfilled on next replenishment. | `REQ-RTP-S-004` |
-| FM-002 | `MemoryShape` | All sectors bad | Log ERROR; operator must reconfigure or reset scan. | `REQ-RTP-S-004` |
-| FM-003 | Safety check | Location unsafe at dispatch | Discard location, mark bad in memory, serve next in queue. | `REQ-RTP-S-001/003` |
-| FM-004 | `MemoryTracker` | Pipeline timeout | Force cancel and cleanup; release chunk tickets; log SEVERE. | `REQ-RTP-S-002` |
-| FM-005 | Platform adapter | Chunk load timeout | Handled by FM-004; retry location in next scan cycle. | `REQ-RTP-S-002`, `REQ-RTP-F-008` |
-| FM-006 | DB Accessor | Database unreadable | Log WARN; initialize empty memory; rebuild via new scan. | `REQ-RTP-NF-001` |
-| FM-007 | Config loader | Malformed config | Log ERROR; skip affected region; others continue. | `REQ-RTP-S-004` |
-| FM-008 | Platform adapter | API linkage failure | Plugin disabled by Bukkit; operator must fix JAR version. | `REQ-RTP-SYS-002` |
-| FM-010 | `RTPAPI` | Early API call | Throw `IllegalStateException` with clear explanation. | `REQ-RTP-S-006` |
+| ID | Component | Failure | Response |
+|----|-----------|---------|----------|
+| FM-001 | `RegionQueueManager` | Queue empty | Queue player UUID for deferred teleport; fulfilled on next replenishment. |
+| FM-002 | Spatial-memory map | All sectors bad | Log ERROR; operator must reconfigure or reset scan. |
+| FM-003 | Safety check | Location unsafe at dispatch | Discard location, mark bad in memory, serve next in queue. |
+| FM-004 | `MemoryTracker` | Pipeline timeout | Force cancel and cleanup; release chunk tickets; log SEVERE. |
+| FM-005 | Platform adapter | Chunk load timeout | Handled by FM-004; retry location in next scan cycle. |
+| FM-006 | DB Accessor | Database unreadable | Log WARN; initialize empty memory; rebuild via new scan. |
+| FM-007 | Config loader | Malformed config | Log ERROR; skip affected region; others continue. |
+| FM-008 | Platform adapter | API linkage failure | Plugin disabled by Bukkit; operator must fix JAR version. |
+| FM-010 | `RTPAPI` | Early API call | Throw `IllegalStateException` with clear explanation. |

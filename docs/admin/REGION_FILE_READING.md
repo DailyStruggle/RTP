@@ -83,5 +83,4 @@ To confirm what the pre-filter is doing on your server, run the built-in diagnos
 
 - [SAFETY.md](configuration/SAFETY.md) - `anvilPrefilterEnabled` and the landing safety pipeline.
 - [REGIONS.md](configuration/REGIONS.md#backlog-cache-l3) - how the backlog cache verifies one `.mca` bin at a time using this reader.
-- [ADR-016](../adr/ADR-016-anvil-subsystem.md) - the design decision behind the read-only anvil pre-filter and the `UNKNOWN` -> pass-through (resolved at the live-load stage) contract.
-- [ADR-028](../adr/ADR-028-l3-backlog-cache.md) - the L3 backlog cache and its one-`.mca`-per-pulse screening.
+- [COMMANDS.md](COMMANDS.md) - the `/rtp test` diagnostics that report the pre-filter's hit rate.

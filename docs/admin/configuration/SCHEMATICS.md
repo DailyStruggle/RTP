@@ -27,7 +27,7 @@ plugins/RTP/advanced/schematics/spawn_island.schem # pasted on every teleport in
 
 - **No WorldEdit required.** Sponge v3 `.schem` files are decoded in-house, so WorldEdit (or any other plugin) does not need to be installed for pasting to work.
 - **Cross-platform.** The same file works on Bukkit, Paper, Folia, Fabric, and NeoForge - each platform only supplies the block writer; the decode is shared.
-- **Claim-aware.** Pasting never overwrites claim-protected land, consistent with the rest of RTP's safety invariants (S-003).
+- **Claim-aware.** Pasting never overwrites claim-protected land, consistent with the rest of RTP's safety invariants.
 - **Centered on the landing spot.** The structure is placed relative to the player's arrival coordinate, not a fixed world position.
 - **Both extensions accepted, one format.** `<region>.schem` is preferred; `<region>.schematic` also resolves - but in either case the file must contain Sponge v3 NBT. The extension does not change the decoder; legacy MCEdit `.schematic` data is not supported.
 
@@ -49,4 +49,3 @@ Some prefabs (e.g. Skyblock) ship a schematic baked into the jar and drop it her
 
 - [REGIONS.md](REGIONS.md) - region configuration (shape, vert, caches).
 - [SAFETY.md](SAFETY.md) - landing safety checks and platform building.
-- [ADR-058](../../adr/ADR-058-region-specific-schematic-paste.md) - the design decision behind the file-presence trigger and the in-house Sponge decoder.

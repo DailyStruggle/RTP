@@ -81,7 +81,7 @@ Order and names come directly from the matching `*TypeNames` enum in `effects-ap
 
 **`FIREWORK`** — `FireworkTypeNames`
 
-Canonical positional order matches `FireworkEffect.KEY_ORDER` in `effects-api`. Since effects-api-ADR-002 (3.0.0-beta.2), `Effect.setData(String...)` walks `KEY_ORDER` with a non-rewinding cursor and assigns each token to the *first remaining key whose default type accepts it* — so trailing booleans land on `FLICKER` / `TRAIL` / `SAFE` even when given before the offsets. For predictability, supply tokens in the order below.
+Since 3.0.0-beta.2, the firework parser walks the canonical key order with a non-rewinding cursor and assigns each token to the *first remaining key whose default type accepts it* — so trailing booleans land on `FLICKER` / `TRAIL` / `SAFE` even when given before the offsets. For predictability, supply tokens in the order below.
 
 | Pos | Variable | Typical values |
 |-----|----------|----------------|
@@ -236,7 +236,7 @@ RTP publishes Bukkit-style events under `io.github.dailystruggle.rtp.bukkit.even
 A complete, compilable template ships in the repository. It demonstrates the four API touch-points every addon typically needs:
 
 1. **Config registration** — `ConfigParser<CountdownKeys>` participates in `/rtp reload`.
-2. **Safety contribution** — `GlobalRegionVerifiers.addGlobalRegionVerifier(...)` predicate, invoked asynchronously by the teleport pipeline (S-003 / S-005 compliant).
+2. **Safety contribution** — `GlobalRegionVerifiers.addGlobalRegionVerifier(...)` predicate, invoked asynchronously by the teleport pipeline (runs off the main thread and never loads chunks synchronously).
 3. **Event handling** — a Bukkit `Listener` for one of RTP's lifecycle events.
 4. **Reload hook** — `Configs.onReload(Runnable)` so operator `/rtp reload` picks up addon changes without a restart.
 
@@ -284,7 +284,7 @@ All events live in `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/
 | `PreSetupTeleportEvent` | Before `TeleportPipelineTask` setup stage. **Cancellable** — setting cancelled aborts the teleport. |
 | `PostSetupTeleportEvent` | Setup stage completed successfully. |
 | `PreLoadChunksEvent` | Before async chunk load of the destination. |
-| `PostLoadChunksEvent` | Destination chunks are loaded (still async-safe — S-005). |
+| `PostLoadChunksEvent` | Destination chunks are loaded (still async-safe). |
 | `PreTeleportEvent` | Immediately before the entity teleport call. |
 | `PostTeleportEvent` | Immediately after a successful teleport. |
 | `TeleportCancelEvent` | Player/pipeline cancelled a scheduled teleport (`RTPTeleportCancel`). |
@@ -296,12 +296,12 @@ All events live in `rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/
 
 ### Developer do / don't
 
-Pulled from [`REQUIREMENTS.md §3`](../../dev/REQUIREMENTS.md) (S-00x rules):
+RTP's internal safety rules require every listener to follow these:
 
-- **Do** put chunk / claim / biome checks inside a `GlobalRegionVerifiers` lambda — it runs asynchronously and is S-005 safe.
+- **Do** put chunk / claim / biome checks inside a `GlobalRegionVerifiers` lambda — it runs asynchronously and never loads chunks on the main thread.
 - **Do** log via `RTP.log(Level, msg[, throwable])`. Never `Bukkit.getLogger()`, never `printStackTrace()`.
-- **Don't** perform synchronous `world.getChunkAt(...)` inside an event handler (S-005).
-- **Don't** silently `return` on a teleport failure (S-004) — surface via the event or log.
+- **Don't** perform synchronous `world.getChunkAt(...)` inside an event handler.
+- **Don't** silently `return` on a teleport failure — surface via the event or log.
 - **Don't** import `org.bukkit.*` from `rtp-core` or `rtp-api`; keep platform code in the adapter module or in the addon.
 
 ---
@@ -312,5 +312,5 @@ Pulled from [`REQUIREMENTS.md §3`](../../dev/REQUIREMENTS.md) (S-00x rules):
 - Source of truth, effect registry: `effects-api/src/main/java/io/github/dailystruggle/effectsapi/EffectFactory.java`
 - Parameter enums: `effects-api/src/main/java/io/github/dailystruggle/effectsapi/LocalEffects/enums/`
 - Developer walkthrough: `addons/LeafRTPCountdownAddon/README.md`
-- Safety rules every listener must follow: [`../dev/REQUIREMENTS.md §3`](../../dev/REQUIREMENTS.md)
+- Safety rules every listener must follow: see the do / don't list above.
 - Auto-teleport (`rtp.onevent.*`) permissions: [`COMMANDS.md`](../COMMANDS.md)
