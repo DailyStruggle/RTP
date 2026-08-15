@@ -162,7 +162,7 @@ These are not bugs but they are worth knowing:
 
 1. **You hand-renamed a key.** If you renamed a baseline key in your live file to something neither the old nor new locale recognizes, RTP cannot map it back to an enum constant. The value will be dropped on the next upgrade. Always edit values, not key names.
 2. **You changed a value's type.** If a key expects an integer and you set a string, RTP logs a warning and either coerces or falls back to default. The `.old1` file still has your original.
-3. **The new version intentionally retires a key.** When a release note in [CHANGELOG.md](../../../CHANGELOG.md) lists a key as removed, the overlay will re-introduce it on the immediate next upgrade only if RTP did not add an explicit removal step. Either way, the key will no longer have any effect because the enum constant is gone. Remove it from your live file at your leisure.
+3. **The new version intentionally retires a key.** When a release note in [CHANGELOG.md](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md) lists a key as removed, the overlay will re-introduce it on the immediate next upgrade only if RTP did not add an explicit removal step. Either way, the key will no longer have any effect because the enum constant is gone. Remove it from your live file at your leisure.
 4. **You edited a `.lang.yml` rename map by hand.** Do not do this. The rename maps are generated from `scripts/out/locale-<lang>.tsv` (see [TRANSLATION_GUIDE](../../dev/TRANSLATION_GUIDE.md) for contributors). Hand edits will be overwritten the next time the locale pipeline runs.
 
 ---
@@ -183,7 +183,7 @@ flowchart TD
 
 `.oldN` files are plain YAML. You can read them with any editor. The newest snapshot is always `.old1`.
 
-If a key was renamed across versions, the safest reference is the **new** file's defaults plus the value you find in `.oldN`. The plugin's [CHANGELOG.md](../../../CHANGELOG.md) lists any key renames per release.
+If a key was renamed across versions, the safest reference is the **new** file's defaults plus the value you find in `.oldN`. The plugin's [CHANGELOG.md](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md) lists any key renames per release.
 
 ---
 

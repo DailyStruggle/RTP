@@ -78,7 +78,7 @@ A new `MenuAction.Kind.OPEN_MAP` (added in Stage 2 of the checklist) carries
 a short-lived `ChartSpec` token (60 s TTL by default, single-use) consumed by
 a platform-side handler in `rtp-plugin`. Tokens live in a `ChartSpecTokens`
 store in `rtp-core` and mirror the existing menu-redeem token pattern from
-[ADR-035](ADR-035-menu-framework.md).
+[ADR-035](ADR-035-interactive-menus-book-first.md).
 
 The bridge is **strictly downstream** of `MetricsSnapshot` and any future
 ADR-039 `SurfaceModel`. Maps cannot widen the data contract; if a new chart
@@ -181,7 +181,7 @@ needs new data, that data must land in `metrics-api` / `rtp-core` first.
 - [`docs/dev/TRACEABILITY.md`](../dev/TRACEABILITY.md) - REQ-RTP-MAP-006 row.
 - [ADR-001](ADR-001-archimedean-spiral-1d-mapping.md) - spiral model consumed by the bad-points resolver via `Shape.locationToXZ`.
 - [ADR-026](ADR-026-external-hook-api-surface.md) - `RTPHooks` registry pattern.
-- [ADR-035](ADR-035-menu-framework.md) - menu framework; `MenuAction.Kind.OPEN_MAP` extension and token pattern.
+- [ADR-035](ADR-035-interactive-menus-book-first.md) - menu framework; `MenuAction.Kind.OPEN_MAP` extension and token pattern.
 - [ADR-039](ADR-039-rtpadmin-diagnostic-surfaces.md) - diagnostic surfaces; future consumer of the bridge.
 - [ADR-040](ADR-040-cross-backend-metric-time-series-publication.md) - cross-backend metrics; sourced read-only by Stage-3 resolvers.
 - [ADR-044](ADR-044-command-tree-menu-reflector.md) - command-tree menu reflector; entry-point composition site.

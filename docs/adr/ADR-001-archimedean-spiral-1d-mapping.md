@@ -44,6 +44,6 @@ https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/
 
 - Original mathematical proof authored and published by the plugin's sole developer: https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/
 - Implementing classes: `MemoryShape`, `Circle`, `Square` (`rtp-core`)
-- Design reference: [`DESIGN.md` §3 — Deterministic Spatial Algorithms](../DESIGN.md)
+- Design reference: [`DESIGN.md` §3 — Deterministic Spatial Algorithms](../dev/DESIGN.md)
 - Requirements: `REQ-RTP-F-005`, `REQ-RTP-F-006`, `REQ-RTP-F-007`, `REQ-CORE-F-003`, `REQ-CORE-F-004`, `REQ-CORE-F-005`
 - Tests: `MemoryShapeTest`

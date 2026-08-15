@@ -253,7 +253,7 @@ Exercise the full pipeline against a real player (every safety guard remains act
 
 - `iterations` is clamped to `[1, 1000]` (default `10`); `intervalTicks` to `[10, 6000]` (default `40`).
 - Per-iteration failures log at `WARNING` (REQ-RTP-S-004) — watch the console.
-- `stress` is the only sub-command available today; `queue`, `safety`, `verifiers`, `memory`, `platform`, `full` are planned — see [`RUNTIME_TEST_SUITE_PLAN.md`](../dev/RUNTIME_TEST_SUITE_PLAN.md).
+- `stress` is the only sub-command available today; `queue`, `safety`, `verifiers`, `memory`, `platform`, `full` are planned.
 
 Full reference: [COMMANDS.md](COMMANDS.md) §`/rtp test`.
 
@@ -305,5 +305,5 @@ Once Steps 0–10 are green, the recurring loop is small:
 - [RUNBOOK.md](RUNBOOK.md) — incident response and operational procedures
 - [FAQ.md](FAQ.md) — common questions and gotchas
 - [ADDONS.md](ADDONS.md) — how RTP loads addons, the bundled GUI demo, and how to turn addons off
-- [CONTRIBUTING.md](../../CONTRIBUTING.md) — how to build and extend the plugin
-- [../addons/](../addons/) — example addons for claim plugin integration, Iris, and more
+- [CONTRIBUTING.md](https://github.com/dailystruggle/RTP/blob/V3/CONTRIBUTING.md) — how to build and extend the plugin
+- [example addons](https://github.com/dailystruggle/RTP/tree/V3/addons) — example addons for claim plugin integration, Iris, and more

@@ -29,5 +29,5 @@ Because `rtp-paper` is loaded only on Paper servers, a compatibility shim is unn
 - PaperLib repository: https://github.com/PaperMC/PaperLib
 - Implementing module: `rtp-paper` (all version submodules)
 - Changelog entry: [`CHANGELOG.md` — 2.0.18](../../CHANGELOG.md)
-- Upgrade notes for operators: [`MIGRATION.md`](../MIGRATION.md)
+- Upgrade notes for operators: [`MIGRATION.md`](../admin/MIGRATION.md)
 - Requirements: `REQ-RTP-S-001` (platform compatibility), `REQ-PAPER-F-001` (async chunk loading)

@@ -5,9 +5,8 @@
 This document provides step-by-step diagnosis and resolution procedures for common operational
 problems. Each section follows the pattern: **Symptom → Diagnosis → Resolution**.
 
-For the full list of failure modes and their defined system responses see
-[`FAILURE_MODES.md`](FAILURE_MODES.md).
-For the hazard register see [`HAZARDS.md`](HAZARDS.md).
+For the full list of failure modes and their defined system responses, and the hazard
+register, see [`HAZARDS.md`](HAZARDS.md).
 
 ---
 
@@ -72,7 +71,7 @@ air, or into a claimed region they cannot build in.
 1. Find the first exception in the console output after `[RTP] Enabling`. The most common
    causes are:
    - `ClassNotFoundException` or `NoSuchMethodError`, usually the wrong adapter jar for this server
-     version (see FM-008 in `FAILURE_MODES.md`).
+     version (see FM-008 in `HAZARDS.md`).
    - `IllegalStateException: [RTP API] Cannot access hooks: Core implementation is not loaded`, which
      happens when an addon touches an `rtp-api` contract entry point before RTP core finishes loading
      (see FM-009).

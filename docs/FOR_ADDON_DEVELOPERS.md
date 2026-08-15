@@ -39,7 +39,7 @@ talks to instead of talking to the server directly:
 
 ### The proof: `LeafRTPCountdownAddon`
 
-[`addons/LeafRTPCountdownAddon/`](../addons/LeafRTPCountdownAddon/) is the canonical reference. It is a
+[`addons/LeafRTPCountdownAddon/`](https://github.com/dailystruggle/RTP/tree/V3/addons/LeafRTPCountdownAddon) is the canonical reference. It is a
 **single module with no platform sub-module** - three Java files, one `example.yml`, and one
 `ServiceLoader` descriptor line - and it has **zero `org.bukkit.*` imports**. It is discovered by
 `rtp-core` through the `RTPAddon` SPI and runs identically on Bukkit/Paper/Folia, Fabric, and
@@ -64,7 +64,7 @@ do synchronous chunk I/O on the main thread, S-005); what you skip is the per-pl
 
 A platform-specific module is required only when your addon reaches for a surface RTP deliberately
 does **not** abstract - typically a platform-native UI or API with no cross-platform equivalent. The
-bundled GUI addon ([`addons/LeafRTPGuiAddon/`](../addons/LeafRTPGuiAddon/)) is the worked example: it opens
+bundled GUI addon ([`addons/LeafRTPGuiAddon/`](https://github.com/dailystruggle/RTP/tree/V3/addons/LeafRTPGuiAddon)) is the worked example: it opens
 a native Bukkit inventory, so it has a thin `rtp-gui-bukkit` module (a handful of files) sitting on
 top of a platform-neutral `rtp-gui-common` module that holds the menu model, actions, and renderer
 seam. Even then, the split is the point: the model and behavior stay in `common`, and only the
@@ -130,5 +130,5 @@ descriptor, classpath placement, and lifecycle). The decision behind it is
 
 ## Also Useful
 
-- [`addons/LeafRTPCountdownAddon/`](../addons/LeafRTPCountdownAddon/) — the canonical addon template; among other things it contributes a safety (claim/biome/distance) verifier via `RTPAPI.hooks()`, which is the same seam a claim-check hook uses. The claim-plugin integrations that once shipped as a standalone `RTP_ClaimPluginIntegrations` addon are now bundled directly into the plugin (see [ADR-019](adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)).
-- [CONTRIBUTING.md](../CONTRIBUTING.md) — if you want to upstream a change to `rtp-api` itself, follow the contribution workflow there.
+- [`addons/LeafRTPCountdownAddon/`](https://github.com/dailystruggle/RTP/tree/V3/addons/LeafRTPCountdownAddon) — the canonical addon template; among other things it contributes a safety (claim/biome/distance) verifier via `RTPAPI.hooks()`, which is the same seam a claim-check hook uses. The claim-plugin integrations that once shipped as a standalone `RTP_ClaimPluginIntegrations` addon are now bundled directly into the plugin (see [ADR-019](adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)).
+- [CONTRIBUTING.md](https://github.com/dailystruggle/RTP/blob/V3/CONTRIBUTING.md) — if you want to upstream a change to `rtp-api` itself, follow the contribution workflow there.

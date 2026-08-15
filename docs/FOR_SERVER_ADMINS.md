@@ -42,13 +42,9 @@ Read this before upgrading an existing server.
 Incident response for common operational problems: TPS drops, players landing in unsafe locations, plugin failing to enable, fill task stalls, and more.
 Each entry follows the pattern: **Symptom → Diagnosis → Resolution**.
 
-### 7. [FAILURE_MODES.md](admin/FAILURE_MODES.md)
-Catalog of every known failure mode with detection signals and defined system responses.
-Companion to the Runbook — use this when you know *what* failed but not *why*.
-
-### 8. [HAZARDS.md](admin/HAZARDS.md)
-Hazard register with severity ratings and mitigations for risks inherent to the plugin's design.
-Useful for capacity planning and risk assessment before deploying in production.
+### 7. [HAZARDS.md](admin/HAZARDS.md)
+Hazard register with severity ratings and mitigations for risks inherent to the plugin's design (it also absorbs the former failure-mode catalog: detection signals and defined system responses).
+Companion to the Runbook — use this when you know *what* failed but not *why*, and for capacity planning and risk assessment before deploying in production.
 
 ---
 

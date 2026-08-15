@@ -9,7 +9,7 @@ If you are fixing a bug, adding a feature, or updating the architecture, start h
 
 ## Recommended Reading Order
 
-### 1. [CONTRIBUTING.md](../CONTRIBUTING.md)
+### 1. [CONTRIBUTING.md](https://github.com/dailystruggle/RTP/blob/V3/CONTRIBUTING.md)
 Build instructions, code style rules, branch naming, the four-step requirement workflow, and CI expectations.
 Read this before opening a pull request.
 
@@ -47,6 +47,5 @@ Read the relevant ADRs before changing anything the decisions describe.
 
 ## Reference Material
 
-- [FAILURE_MODES.md](admin/FAILURE_MODES.md) — per-component failure catalog; useful when writing or reviewing error-handling code.
-- [HAZARDS.md](admin/HAZARDS.md) — hazard register; consult when a change touches chunk loading, scheduling, or memory management.
-- [CHANGELOG.md](../CHANGELOG.md) — release history; follow the existing format when adding an Unreleased entry.
+- [HAZARDS.md](admin/HAZARDS.md) — hazard register (also the per-component failure catalog); consult when a change touches chunk loading, scheduling, or memory management, or when writing or reviewing error-handling code.
+- [CHANGELOG.md](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md) — release history; follow the existing format when adding an Unreleased entry.
