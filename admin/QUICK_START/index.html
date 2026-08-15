@@ -1772,7 +1772,6 @@
 
 
 <h1 id="quick-start-guide">Quick Start Guide<a class="headerlink" href="#quick-start-guide" title="Permanent link">&para;</a></h1>
-<p><strong>Current Plugin Version:</strong> <code>3.2.1</code></p>
 <p>Get RTP running on your server in under 5 minutes, then follow the rest of the sequence to take it to production. The numbered steps below are the <strong>recommended end-to-end setup sequence</strong>: prerequisites → install → worlds → regions → permissions → economy → scan → verify. Each step summarises what to do and links to the canonical doc for full detail.</p>
 <blockquote>
 <p><strong>TL;DR sequence:</strong> pregenerate → install → configure worlds → configure regions → set permissions → (optional) economy → <code>/rtp scan</code> to pre-warm → <code>/rtp info</code> + <code>/rtp test</code> to verify.</p>
@@ -2007,7 +2006,7 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 <ul>
 <li><code>iterations</code> is clamped to <code>[1, 1000]</code> (default <code>10</code>); <code>intervalTicks</code> to <code>[10, 6000]</code> (default <code>40</code>).</li>
 <li>Per-iteration failures log at <code>WARNING</code> (REQ-RTP-S-004) — watch the console.</li>
-<li><code>stress</code> is the only sub-command available today; <code>queue</code>, <code>safety</code>, <code>verifiers</code>, <code>memory</code>, <code>platform</code>, <code>full</code> are planned — see <a href="../dev/RUNTIME_TEST_SUITE_PLAN.md"><code>RUNTIME_TEST_SUITE_PLAN.md</code></a>.</li>
+<li><code>stress</code> is the only sub-command available today; <code>queue</code>, <code>safety</code>, <code>verifiers</code>, <code>memory</code>, <code>platform</code>, <code>full</code> are planned.</li>
 </ul>
 <p>Full reference: <a href="../COMMANDS/">COMMANDS.md</a> §<code>/rtp test</code>.</p>
 <p>Manual smoke checks:</p>
@@ -2086,8 +2085,8 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 <li><a href="../RUNBOOK/">RUNBOOK.md</a> — incident response and operational procedures</li>
 <li><a href="../FAQ/">FAQ.md</a> — common questions and gotchas</li>
 <li><a href="../ADDONS/">ADDONS.md</a> — how RTP loads addons, the bundled GUI demo, and how to turn addons off</li>
-<li><a href="../../CONTRIBUTING.md">CONTRIBUTING.md</a> — how to build and extend the plugin</li>
-<li><a href="../addons/">../addons/</a> — example addons for claim plugin integration, Iris, and more</li>
+<li><a href="https://github.com/dailystruggle/RTP/blob/V3/CONTRIBUTING.md">CONTRIBUTING.md</a> — how to build and extend the plugin</li>
+<li><a href="https://github.com/dailystruggle/RTP/tree/V3/addons">example addons</a> — example addons for claim plugin integration, Iris, and more</li>
 </ul>
 
 
@@ -2124,6 +2123,10 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
       <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.2.1
+    </div>
   
   
     Made with

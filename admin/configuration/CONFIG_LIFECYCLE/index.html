@@ -1813,7 +1813,7 @@
 <ol>
 <li><strong>You hand-renamed a key.</strong> If you renamed a baseline key in your live file to something neither the old nor new locale recognizes, RTP cannot map it back to an enum constant. The value will be dropped on the next upgrade. Always edit values, not key names.</li>
 <li><strong>You changed a value's type.</strong> If a key expects an integer and you set a string, RTP logs a warning and either coerces or falls back to default. The <code>.old1</code> file still has your original.</li>
-<li><strong>The new version intentionally retires a key.</strong> When a release note in <a href="../../../CHANGELOG.md">CHANGELOG.md</a> lists a key as removed, the overlay will re-introduce it on the immediate next upgrade only if RTP did not add an explicit removal step. Either way, the key will no longer have any effect because the enum constant is gone. Remove it from your live file at your leisure.</li>
+<li><strong>The new version intentionally retires a key.</strong> When a release note in <a href="https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md">CHANGELOG.md</a> lists a key as removed, the overlay will re-introduce it on the immediate next upgrade only if RTP did not add an explicit removal step. Either way, the key will no longer have any effect because the enum constant is gone. Remove it from your live file at your leisure.</li>
 <li><strong>You edited a <code>.lang.yml</code> rename map by hand.</strong> Do not do this. The rename maps are generated from <code>scripts/out/locale-&lt;lang&gt;.tsv</code> (see <a href="../../../dev/TRANSLATION_GUIDE/">TRANSLATION_GUIDE</a> for contributors). Hand edits will be overwritten the next time the locale pipeline runs.</li>
 </ol>
 <hr />
@@ -1828,7 +1828,7 @@
     F --&gt; G[Start server]
     G --&gt; H[Verify with /rtp viewconfig]</code></pre>
 <p><code>.oldN</code> files are plain YAML. You can read them with any editor. The newest snapshot is always <code>.old1</code>.</p>
-<p>If a key was renamed across versions, the safest reference is the <strong>new</strong> file's defaults plus the value you find in <code>.oldN</code>. The plugin's <a href="../../../CHANGELOG.md">CHANGELOG.md</a> lists any key renames per release.</p>
+<p>If a key was renamed across versions, the safest reference is the <strong>new</strong> file's defaults plus the value you find in <code>.oldN</code>. The plugin's <a href="https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md">CHANGELOG.md</a> lists any key renames per release.</p>
 <hr />
 <h2 id="verifying-the-upgrade-worked">Verifying the upgrade worked<a class="headerlink" href="#verifying-the-upgrade-worked" title="Permanent link">&para;</a></h2>
 <p>After a version bump, the following are healthy signs:</p>
@@ -1882,6 +1882,10 @@
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
       <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.2.1
+    </div>
   
   
     Made with

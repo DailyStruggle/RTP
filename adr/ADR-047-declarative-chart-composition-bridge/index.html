@@ -1573,7 +1573,7 @@ that already own each concern:</p>
 a short-lived <code>ChartSpec</code> token (60 s TTL by default, single-use) consumed by
 a platform-side handler in <code>rtp-plugin</code>. Tokens live in a <code>ChartSpecTokens</code>
 store in <code>rtp-core</code> and mirror the existing menu-redeem token pattern from
-<a href="ADR-035-menu-framework.md">ADR-035</a>.</p>
+<a href="../ADR-035-interactive-menus-book-first/">ADR-035</a>.</p>
 <p>The bridge is <strong>strictly downstream</strong> of <code>MetricsSnapshot</code> and any future
 ADR-039 <code>SurfaceModel</code>. Maps cannot widen the data contract; if a new chart
 needs new data, that data must land in <code>metrics-api</code> / <code>rtp-core</code> first.</p>
@@ -1673,7 +1673,7 @@ needs new data, that data must land in <code>metrics-api</code> / <code>rtp-core
 <li><a href="../../dev/TRACEABILITY/"><code>docs/dev/TRACEABILITY.md</code></a> - REQ-RTP-MAP-006 row.</li>
 <li><a href="../ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a> - spiral model consumed by the bad-points resolver via <code>Shape.locationToXZ</code>.</li>
 <li><a href="../ADR-026-external-hook-api-surface/">ADR-026</a> - <code>RTPHooks</code> registry pattern.</li>
-<li><a href="ADR-035-menu-framework.md">ADR-035</a> - menu framework; <code>MenuAction.Kind.OPEN_MAP</code> extension and token pattern.</li>
+<li><a href="../ADR-035-interactive-menus-book-first/">ADR-035</a> - menu framework; <code>MenuAction.Kind.OPEN_MAP</code> extension and token pattern.</li>
 <li><a href="../ADR-039-rtpadmin-diagnostic-surfaces/">ADR-039</a> - diagnostic surfaces; future consumer of the bridge.</li>
 <li><a href="../ADR-040-cross-backend-metric-time-series-publication/">ADR-040</a> - cross-backend metrics; sourced read-only by Stage-3 resolvers.</li>
 <li><a href="../ADR-044-command-tree-menu-reflector/">ADR-044</a> - command-tree menu reflector; entry-point composition site.</li>
@@ -1714,6 +1714,10 @@ needs new data, that data must land in <code>metrics-api</code> / <code>rtp-core
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
       <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.2.1
+    </div>
   
   
     Made with

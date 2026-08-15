@@ -1712,7 +1712,6 @@
 
 
 <h1 id="prefabs-one-click-admin-setups">Prefabs - one-click admin setups<a class="headerlink" href="#prefabs-one-click-admin-setups" title="Permanent link">&para;</a></h1>
-<p><strong>Current Plugin Version:</strong> <code>3.2.1</code></p>
 <blockquote>
 <p><strong>Availability:</strong> Prefabs landed in <code>3.0.0-beta.3</code> (the <code>Setup (quick start)</code> section in <code>/rtp admin</code>). If your jar predates that, prefabs are not available; the rest of <a href="../QUICK_START/">QUICK_START.md</a> still applies.</p>
 <p><strong>TL;DR:</strong> A prefab is a curated overlay on <code>performance.yml</code> and <code>regions/default.yml</code> (and, for <code>multi-world</code>, synthesised per-world region files) you can apply in one click from the admin panel. Apply opens a confirmation menu that shows the exact diff; confirming writes <code>.bak.&lt;timestamp&gt;</code> siblings of every touched file before replacing them. Rollback restores the most recent bak.</p>
@@ -1846,7 +1845,6 @@
 <li><a href="../configuration/REGIONS/">REGIONS.md</a> - reference for every knob a prefab might set in <code>regions/&lt;id&gt;.yml</code>.</li>
 <li><a href="../RUNBOOK/">RUNBOOK.md</a> - what to run when things go wrong after an apply (<code>/rtp info</code>, <code>/rtp test</code>, <code>/rtp scan reset</code>).</li>
 <li><a href="../../adr/ADR-024-rtp-lite-assembly-variant/"><code>docs/adr/ADR-024-rtp-lite-assembly-variant.md</code></a> - the <code>lightweight</code> prefab is the pro-portable subset of the lite assembly's <code>regions/default.yml</code>; as of 2026-06-18 lite inherits the full <code>regions/default.yml</code> (including <code>backlogCacheCap: 1000</code>).</li>
-<li><a href="../dev/scratch/PROPOSAL-admin-panel-prefabs.md"><code>docs/dev/scratch/PROPOSAL-admin-panel-prefabs.md</code></a> - design rationale.</li>
 </ul>
 
 
@@ -1883,6 +1881,10 @@
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
       <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.2.1
+    </div>
   
   
     Made with

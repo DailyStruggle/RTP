@@ -1616,12 +1616,10 @@
 
 
 <h1 id="operator-runbook">Operator Runbook<a class="headerlink" href="#operator-runbook" title="Permanent link">&para;</a></h1>
-<p><strong>Current Plugin Version:</strong> <code>3.2.1</code></p>
 <p>This document provides step-by-step diagnosis and resolution procedures for common operational
 problems. Each section follows the pattern: <strong>Symptom → Diagnosis → Resolution</strong>.</p>
-<p>For the full list of failure modes and their defined system responses see
-<a href="FAILURE_MODES.md"><code>FAILURE_MODES.md</code></a>.
-For the hazard register see <a href="../HAZARDS/"><code>HAZARDS.md</code></a>.</p>
+<p>For the full list of failure modes and their defined system responses, and the hazard
+register, see <a href="../HAZARDS/"><code>HAZARDS.md</code></a>.</p>
 <hr />
 <h2 id="server-tps-drops-after-rtp-activity">Server TPS Drops After RTP Activity<a class="headerlink" href="#server-tps-drops-after-rtp-activity" title="Permanent link">&para;</a></h2>
 <p><strong>Symptom:</strong> Server tick-rate (TPS) noticeably degrades shortly after players use <code>/rtp</code>, or
@@ -1672,7 +1670,7 @@ air, or into a claimed region they cannot build in.</p>
 1. Find the first exception in the console output after <code>[RTP] Enabling</code>. The most common
    causes are:
    - <code>ClassNotFoundException</code> or <code>NoSuchMethodError</code>, usually the wrong adapter jar for this server
-     version (see FM-008 in <code>FAILURE_MODES.md</code>).
+     version (see FM-008 in <code>HAZARDS.md</code>).
    - <code>IllegalStateException: [RTP API] Cannot access hooks: Core implementation is not loaded</code>, which
      happens when an addon touches an <code>rtp-api</code> contract entry point before RTP core finishes loading
      (see FM-009).
@@ -1849,6 +1847,10 @@ appear to take effect.</p>
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
       <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.2.1
+    </div>
   
   
     Made with
