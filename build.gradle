@@ -5,8 +5,10 @@ plugins {
 }
 
 group = 'io.github.dailystruggle'
-version = '3.2.1'
-ext.liteVersion = '3.2.1'
+// Single source of truth for both version lines: `gradle.properties`
+// (`version` / `liteVersion`). Do not hardcode the number here.
+version = providers.gradleProperty('version').get()
+ext.liteVersion = providers.gradleProperty('liteVersion').get()
 
 spotless {
     java {
@@ -20,7 +22,7 @@ spotless {
 
 allprojects {
     group = 'io.github.dailystruggle'
-    version = '3.2.1'
+    version = providers.gradleProperty('version').get()
 
     // RTP-lite ships a separate version line from Pro. Pro tracks the
     // root `version` above (currently 3.2.1); lite is pinned via

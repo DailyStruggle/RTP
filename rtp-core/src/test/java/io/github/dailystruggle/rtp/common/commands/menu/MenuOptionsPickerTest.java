@@ -85,4 +85,5 @@ class MenuOptionsPickerTest {
         assertThrows(IllegalArgumentException.class, () -> builder.buildOptionsPicker(
                 UUID.randomUUID(), "database", "database.type", null, List.of()));
     }
+
 }

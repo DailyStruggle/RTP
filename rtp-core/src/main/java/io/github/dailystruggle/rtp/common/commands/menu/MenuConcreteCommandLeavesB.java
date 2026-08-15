@@ -145,6 +145,7 @@ final class MenuConcreteCommandLeavesB {
         private final String displayName;
         private final java.util.function.Function<String, String> colorSupplier;
         private final boolean executeOnClick;
+        private final @Nullable MenuAction backAction;
 
         SelectionLeaf(MenuRedeemSubcommand owner,
                       String[] parentPath,
@@ -152,6 +153,17 @@ final class MenuConcreteCommandLeavesB {
                       String displayName,
                       java.util.function.Function<String, String> colorSupplier,
                       boolean executeOnClick) {
+            this(owner, parentPath, paramName, displayName, colorSupplier,
+                    executeOnClick, null);
+        }
+
+        SelectionLeaf(MenuRedeemSubcommand owner,
+                      String[] parentPath,
+                      String paramName,
+                      String displayName,
+                      java.util.function.Function<String, String> colorSupplier,
+                      boolean executeOnClick,
+                      @Nullable MenuAction backAction) {
             super(owner);
             this.owner = owner;
             this.parentPath = parentPath;
@@ -159,6 +171,7 @@ final class MenuConcreteCommandLeavesB {
             this.displayName = displayName;
             this.colorSupplier = colorSupplier;
             this.executeOnClick = executeOnClick;
+            this.backAction = backAction;
         }
 
         @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
@@ -170,7 +183,7 @@ final class MenuConcreteCommandLeavesB {
 
         private boolean run(UUID c, @Nullable Consumer<String> m) {
             return owner.dispatchSelectionMenu(c, parentPath, paramName,
-                    displayName, colorSupplier, executeOnClick, m);
+                    displayName, colorSupplier, executeOnClick, backAction, m);
         }
     }
 
@@ -208,7 +221,11 @@ final class MenuConcreteCommandLeavesB {
      */
     static final class PrefabCmd extends SelectionLeaf {
         PrefabCmd(MenuRedeemSubcommand owner) {
-            super(owner, new String[]{"admin", "prefab", "apply"}, "id", "prefab", null, false);
+            // The prefab picker stages values onto `admin prefab apply`, but is
+            // reached from the admin panel; its Back row returns there rather
+            // than looping onto the (non-navigable) value-staging path.
+            super(owner, new String[]{"admin", "prefab", "apply"}, "id", "prefab",
+                    null, false, new MenuAction.OpenAdminPanel());
         }
         @Override public String name() { return "prefab"; }
     }

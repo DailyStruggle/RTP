@@ -1,6 +1,6 @@
 # Start Here — Server Administrators
 
-**Current Plugin Version:** `3.0.0-beta.1`
+**Current Plugin Version:** `@version@`
 
 This page guides server operators through the RTP documentation in the recommended reading order.
 If you install, configure, or maintain RTP on a Bukkit/Spigot/Paper/Folia server, this is your entry point.

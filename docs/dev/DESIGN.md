@@ -1,6 +1,6 @@
 # RTP System Architecture and High-Reliability Design
 
-**Current Plugin Version:** `3.0.0-beta.1`
+**Current Plugin Version:** `@version@`
 
 > **Note:** In the context of this architecture, **RTP** holds a dual meaning: **R**andom **T**ele**P**ort and **R**eal-**T**ime **P**rocess. This reflects the core design philosophy that the plugin's codebase should be structured and analyzed with the rigor of highly reliable server software.
 

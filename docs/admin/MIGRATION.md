@@ -1,6 +1,6 @@
 # Migration Guide
 
-**Current Plugin Version:** `3.0.0-beta.1`
+**Current Plugin Version:** `@version@`
 
 This document provides upgrade instructions for server operators and addon developers when moving between RTP versions.
 

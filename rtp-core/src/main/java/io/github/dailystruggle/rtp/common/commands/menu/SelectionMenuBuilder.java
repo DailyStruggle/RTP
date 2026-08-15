@@ -65,11 +65,40 @@ public final class SelectionMenuBuilder {
                            Collection<String> entries,
                            Function<String, String> colorSupplier,
                            boolean executeOnClick) {
+        return build(parentPath, paramName, displayName, entries, colorSupplier,
+                executeOnClick, null);
+    }
+
+    /**
+     * Build the selection page with an explicit Back-row destination.
+     *
+     * <p>Identical to {@link #build(List, String, String, Collection, Function,
+     * boolean)} except the Back row dispatches {@code backAction} instead of
+     * re-opening {@code parentPath}. This matters when the value-staging
+     * {@code parentPath} (which entry rows append onto) is <em>not</em> a
+     * navigable menu page: the prefab picker stages onto
+     * {@code admin prefab apply} but is reached from the admin panel, so its
+     * Back row must return to the admin panel rather than loop onto the
+     * staging path.
+     *
+     * @param backAction the action the Back row dispatches; when {@code null}
+     *                   the Back row defaults to re-opening {@code parentPath}
+     */
+    public MenuModel build(List<String> parentPath,
+                           String paramName,
+                           String displayName,
+                           Collection<String> entries,
+                           Function<String, String> colorSupplier,
+                           boolean executeOnClick,
+                           MenuAction backAction) {
         String[] parentPathArr = parentPath.toArray(new String[0]);
 
+        MenuAction back = (backAction != null)
+                ? backAction
+                : new MenuAction.OpenMenu(parentPathArr);
         MenuLine backLine = MenuLine.of(new MenuFragment(
                 lookupMsg(CommandMessages.menuBack, "&7« back"), null,
-                new MenuAction.OpenMenu(parentPathArr)));
+                back));
 
         String name = (displayName == null || displayName.isEmpty()) ? paramName : displayName;
         // Bold + uppercased + a leading marker glyph so the header reads as a

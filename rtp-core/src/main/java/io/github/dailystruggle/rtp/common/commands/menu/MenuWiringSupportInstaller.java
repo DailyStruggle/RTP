@@ -218,7 +218,8 @@ final class MenuWiringSupportInstaller {
                 if (parser == null) return null;
                 return new CommandTreeMenuBuilder()
                         .buildConfigFile(viewer, stripYml(fileName), parser,
-                                new LinkedHashMap<>());
+                                new LinkedHashMap<>(),
+                                parser.subDir == null ? "" : parser.subDir);
             }
 
             @Override
@@ -233,7 +234,8 @@ final class MenuWiringSupportInstaller {
                         .buildConfigFile(viewer, stripYml(fileName), parser,
                                 cartSnapshot == null
                                         ? new LinkedHashMap<>()
-                                        : cartSnapshot);
+                                        : cartSnapshot,
+                                parser.subDir == null ? "" : parser.subDir);
             }
 
             @Override

@@ -3,13 +3,15 @@
 Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent that doesn't yet know which file to open. For task-based routing use [`dev/INDEX.md`](dev/INDEX.md).
 
 ## Top-level entry points
-- [`FOR_ADDON_DEVELOPERS.md`](FOR_ADDON_DEVELOPERS.md) — router for addon authors (depends only on `rtp-api`).
+- [`FOR_ADDON_DEVELOPERS.md`](https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md) — router for addon authors (depends only on `rtp-api`); not bundled in the jar, read it in the public repository.
 - [`ADDON_QUICKSTART.md`](ADDON_QUICKSTART.md) — one-page "register a custom shape in ~20 lines" addon tutorial.
 - [`FOR_CONTRIBUTORS.md`](FOR_CONTRIBUTORS.md) — router for core contributors.
 - [`FOR_SERVER_ADMINS.md`](FOR_SERVER_ADMINS.md) — router to `admin/`.
 
 ## Engineering (`dev/`)
 - [`dev/INDEX.md`](dev/INDEX.md) — task → file+anchor router.
+- [`dev/ADDON_MENUS.md`](dev/ADDON_MENUS.md) — build a destination menu/GUI on `rtp-api`.
+- [`dev/ADDON_CROSS_SERVER.md`](dev/ADDON_CROSS_SERVER.md) — offer remote (network-mode) destinations from an addon.
 - [`dev/REQUIREMENTS.md`](dev/REQUIREMENTS.md) — absolute laws (REQ-*, S-00x). Normative.
 - [`dev/ARCHITECTURE.md`](dev/ARCHITECTURE.md) — module layout, import boundaries.
 - [`dev/DESIGN.md`](dev/DESIGN.md) — threading, `MemoryTracker`, chunk reservation.

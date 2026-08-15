@@ -1,0 +1,119 @@
+site_name: LeafRTP
+site_description: Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.
+site_author: DailyStruggle
+repo_name: DailyStruggle/RTP
+repo_url: https://github.com/DailyStruggle/RTP
+edit_uri: edit/main/docs/
+
+# Serve the tracked Markdown under docs/ directly; no separate content copy.
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: green
+      accent: green
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: green
+      accent: green
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+    - content.tabs.link
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  # Admonitions used across docs/site (!!! note / warning / tip).
+  - admonition
+  - pymdownx.details
+  # Content tabs (=== "...") used in docs/site pages.
+  - pymdownx.tabbed:
+      alternate_style: true
+  # Fenced code, syntax highlighting, and nested blocks.
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      use_pygments: true
+      guess_lang: false
+  - pymdownx.inlinehilite
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+plugins:
+  # Client-side search ships with Material; no extra dependency needed.
+  - search
+
+# Only narrative + operator-facing pages are published. Internal engineering
+# trees (dev/, adr/, architecture/) are intentionally left out of nav.
+nav:
+  - Home: site/index.md
+  - Why: site/why.md
+  - Intended usage: site/intended-usage.md
+  - What NOT to do: site/what-not-to-do.md
+  - Getting started:
+      - Server administrators: FOR_SERVER_ADMINS.md
+      - Quick start: admin/QUICK_START.md
+      - Prefabs: admin/PREFABS.md
+      - Commands: admin/COMMANDS.md
+      - FAQ: admin/FAQ.md
+      - Migration guide: admin/MIGRATION.md
+      - Documentation map: MAP.md
+  - Operations:
+      - Runbook: admin/RUNBOOK.md
+      - Hazard register: admin/HAZARDS.md
+      - Addons: admin/ADDONS.md
+  - Configuration:
+      - Overview: admin/configuration/CONFIGURATION.md
+      - Config lifecycle: admin/configuration/CONFIG_LIFECYCLE.md
+      - Core (config.yml): admin/configuration/CORE_CONFIG.md
+      - Regions: admin/configuration/REGIONS.md
+      - Worlds: admin/configuration/WORLDS.md
+      - Schematics: admin/configuration/SCHEMATICS.md
+      - Safety: admin/configuration/SAFETY.md
+      - Region file reading: admin/configuration/REGION_FILE_READING.md
+      - Performance: admin/configuration/PERFORMANCE.md
+      - Economy: admin/configuration/ECONOMY.md
+      - Events & effects: admin/configuration/EVENTS_AND_EFFECTS.md
+      - Integrations: admin/configuration/INTEGRATIONS.md
+      - Messages: admin/configuration/MESSAGES.md
+      - Language: admin/configuration/LANGUAGE.md
+      - Logging: admin/configuration/LOGGING.md
+      - Metrics: admin/configuration/METRICS.md
+  - Proxy mode:
+      - Overview: admin/proxies/INDEX.md
+      - Configuration (network.yml): admin/proxies/CONFIGURATION.md
+      - Single-backend verification: admin/proxies/SINGLE_BACKEND_VERIFICATION.md
+      - Cross-server verification: admin/proxies/CROSS_SERVER_VERIFICATION.md
+  - Developers:
+      - Addon developers: FOR_ADDON_DEVELOPERS.md
+      - Addon quickstart: ADDON_QUICKSTART.md
+      - Contributors: FOR_CONTRIBUTORS.md
+
+# Keep the build honest: internal-only trees are not part of the site, so do
+# not warn about them being absent from nav.
+not_in_nav: |
+  /dev/
+  /adr/
+  /architecture/
+  /assets/
+  /site/README.md
+  /FRONT_PAGE*.md
+  /FRONT_PAGE*.bbcode
+  /FRONT_PAGE_LITE_MODRINTH.md

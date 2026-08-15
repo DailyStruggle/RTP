@@ -6,6 +6,8 @@
 // Loom is scoped here AND in :rtp-fabric:** only â€” never at root or in any
 // platform-free / Bukkit-family module (ADR-022 Â§3, MULTI_PLATFORM_PLAN
 // Phase 1).
+import org.apache.tools.ant.filters.ReplaceTokens
+
 plugins {
     id 'com.gradleup.shadow'
     // Version pinned in settings.gradle pluginManagement.plugins {}.
@@ -297,7 +299,11 @@ dependencies {
 }
 
 tasks.register('copyDocs', Copy) {
-    // Ship only audience-A (server admin) and audience-B (addon author) docs.
+    // Ship only audience-A (server admin) docs. Addon-author material
+    // (`FOR_ADDON_DEVELOPERS.md`, `ADDON_QUICKSTART.md`, ...) is API/
+    // developer-facing, not operator runbook content, so it is NOT bundled
+    // in the released jar -- it stays available in the public repository and
+    // is linked from the bundled `MAP.md` via an absolute GitHub URL.
     // Contributor-facing material (`docs/dev/**`, `docs/adr/**`,
     // `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `FOR_CONTRIBUTORS.md`,
     // SpigotMC `*.bbcode` listing sources, `DOCS_OPTIMIZATION_PLAN.md`, ...)
@@ -311,7 +317,6 @@ tasks.register('copyDocs', Copy) {
         // Top-level audience landing pages (the ones that actually live under docs/).
         include 'MAP.md'
         include 'FOR_SERVER_ADMINS.md'
-        include 'FOR_ADDON_DEVELOPERS.md'
         // Audience-A: operator-facing server-admin docs only.
         include 'admin/**'
         // The `architecture/**` tree (per-attempt pipeline internals, chunk-
@@ -325,6 +330,15 @@ tasks.register('copyDocs', Copy) {
     from(rootProject.projectDir) {
         include 'LICENSE'
     }
+    // Expand the single-source version stamp: docs carry the literal token
+    // `@version@`, which is replaced here with the authoritative Gradle
+    // `version` (defined once in `gradle.properties`). This is why bumping
+    // the version no longer requires hand-editing every doc's header stamp.
+    // ReplaceTokens' default `@...@` delimiters are markdown-safe (they do
+    // not collide with `${...}` code samples the way Groovy `expand` would).
+    def docsVersion = project.version.toString()
+    inputs.property 'docsVersion', docsVersion
+    filter(ReplaceTokens, tokens: [version: docsVersion])
     // Defensive: never ship editor/agent backup files even if a `.bak`
     // slips into a kept subtree (AGENTS.md backup policy + 2026-05-05
     // Pro-jar audit, where two `docs/*.bak` files leaked into the released

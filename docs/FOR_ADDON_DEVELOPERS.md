@@ -1,6 +1,6 @@
 # Start Here — Addon Developers
 
-**Current Plugin Version:** `3.0.0-beta.1`
+**Current Plugin Version:** `@version@`
 
 This page guides third-party plugin developers who extend RTP using the `rtp-api` module.
 If you are implementing a custom shape, vertical adjustor, biome filter, or claim-check hook, start here.
@@ -110,6 +110,14 @@ Once your addon is written, see [dev/ADDON_LOADING.md](dev/ADDON_LOADING.md) for
 discovers, loads, and unloads it on every platform (the `RTPAddon` SPI + `ServiceLoader`
 descriptor, classpath placement, and lifecycle). The decision behind it is
 [ADR-057](adr/ADR-057-platform-agnostic-addon-spi.md).
+
+---
+
+## Building on the API
+
+- [dev/ADDON_MENUS.md](dev/ADDON_MENUS.md) — build your own destination menu / GUI on the stable `rtp-api` surface (`getAllowedTargets` / `getTargetStatus` / `teleport`), with the `LeafRTPGuiAddon` reference.
+- [dev/ADDON_CROSS_SERVER.md](dev/ADDON_CROSS_SERVER.md) — offer remote (network-mode) destinations from an addon via the `rtp-proxy-common` transport SPI (`readSnapshot` / `claim` / `ReservationToken`).
+- [dev/EXTERNAL_HOOKS.md](dev/EXTERNAL_HOOKS.md) — the behavior-modification hook catalog (root action, safety verifiers) via `RTPAPI.hooks()`.
 
 ---
 

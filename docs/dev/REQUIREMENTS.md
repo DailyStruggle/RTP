@@ -1,6 +1,6 @@
 # RTP Requirements Overview
 
-**Current Plugin Version:** `3.0.0-beta.1`
+**Current Plugin Version:** `@version@`
 
 This document outlines the high-level functional and non-functional requirements for the RTP (Random Teleport) plugin. These requirements guide the system's architecture, ensuring it meets strict performance, safety, and reliability standards.
 

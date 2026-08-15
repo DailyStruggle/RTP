@@ -822,6 +822,29 @@ public final class CommandTreeMenuBuilder {
                                                          String fileName,
                                                          ConfigParser<E> parser,
                                                          java.util.LinkedHashMap<String, String> cartSnapshot) {
+        return buildConfigFile(callerId, fileName, parser, cartSnapshot, "");
+    }
+
+    /**
+     * Directory-aware overload. {@code backSubDir} is the forward-slashed
+     * relative directory the file lives in (empty for the config root); the
+     * Back row returns to that directory's selector page so a file opened from
+     * a nested folder (e.g. {@code advanced/}) returns to the folder listing it
+     * came from rather than jumping all the way back to the root config menu.
+     *
+     * @param <E>          the enum type of the config parser
+     * @param callerId     UUID of the viewing player
+     * @param fileName     the config file name
+     * @param parser       the config parser whose keys populate the page
+     * @param cartSnapshot snapshot of the viewer's staged changes; may be empty
+     * @param backSubDir   directory the file lives in; empty for the config root
+     * @return the assembled {@link MenuModel}
+     */
+    public <E extends Enum<E>> MenuModel buildConfigFile(UUID callerId,
+                                                         String fileName,
+                                                         ConfigParser<E> parser,
+                                                         java.util.LinkedHashMap<String, String> cartSnapshot,
+                                                         String backSubDir) {
         Objects.requireNonNull(callerId, "callerId");
         Objects.requireNonNull(fileName, "fileName");
         Objects.requireNonNull(parser, "parser");
@@ -832,10 +855,15 @@ public final class CommandTreeMenuBuilder {
 
         // Back row → selector page. Encoded as an OpenConfigSelector action
         // (not OpenMenu) so the redeem path re-renders the curated selector
-        // rather than reflecting an arbitrary command tree node.
+        // rather than reflecting an arbitrary command tree node. The selector
+        // is scoped to the file's own directory so Back returns to the folder
+        // listing the file was opened from, not the root config menu.
         String backLabel = lookupMsg(CommandMessages.menuBack, "« back");
+        MenuAction backAction = (backSubDir == null || backSubDir.isEmpty())
+                ? new MenuAction.OpenConfigSelector()
+                : new MenuAction.OpenConfigSelector(backSubDir);
         MenuLine backRow = MenuLine.of(new MenuFragment(backLabel, null,
-                new MenuAction.OpenConfigSelector()));
+                backAction));
         // Header — locale key deferred to step 8; English fallback only.
         MenuLine headerRow = MenuLine.of(new MenuFragment("&1&l" + fileName, null, null));
 
