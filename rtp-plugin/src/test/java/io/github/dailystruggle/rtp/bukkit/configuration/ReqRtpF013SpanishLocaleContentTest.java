@@ -87,9 +87,17 @@ public class ReqRtpF013SpanishLocaleContentTest {
         assertTrue(Files.isDirectory(BASELINE_DIR),
                 "Expected baseline messages directory to exist: " + BASELINE_DIR.toAbsolutePath());
         Map<String, Object> merged = new LinkedHashMap<>();
+        // The glob "*.yml" also matches the co-located rename-map dotfiles
+        // (".commands.lang.yml", ".placeholders.lang.yml", ...) whose identity
+        // "key: key" string values would otherwise clobber the real typed
+        // baseline values. Iteration order is filesystem-dependent, so this
+        // silently passes on some platforms and fails on others; skip them.
         try (java.nio.file.DirectoryStream<Path> ymls =
                      Files.newDirectoryStream(BASELINE_DIR, "*.yml")) {
-            for (Path p : ymls) merged.putAll(load(p));
+            for (Path p : ymls) {
+                if (p.getFileName().toString().endsWith(".lang.yml")) continue;
+                merged.putAll(load(p));
+            }
         }
         return merged;
     }
