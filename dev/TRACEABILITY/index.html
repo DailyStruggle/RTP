@@ -629,27 +629,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3411,7 +3390,7 @@
 <tr>
 <td>REQ-RTP-MAP-006</td>
 <td>Declarative chart composition bridge (<code>ChartSpec</code> + <code>ChartSpecResolver</code> + <code>MapDispatch</code>; extends REQ-RTP-F-008 / REQ-RTP-S-005 to chart-composition surface; failure paths under REQ-RTP-F-013 / REQ-RTP-S-004)</td>
-<td><a href="../../adr/ADR-047-declarative-chart-composition-bridge/">ADR-047</a>, <a href="../scratch/CHECKLIST-metrics-to-maps/"><code>CHECKLIST-metrics-to-maps.md</code></a></td>
+<td><a href="../../adr/ADR-047-declarative-chart-composition-bridge/">ADR-047</a>, <a href="scratch/CHECKLIST-metrics-to-maps.md"><code>CHECKLIST-metrics-to-maps.md</code></a></td>
 <td><code>ChartSpec</code> (<code>rtp-api</code>, Stage 1.A); <code>ChartSpecResolver</code>, <code>ChartSpecResolvers</code>, <code>BadPointsHeatmapResolver</code>, <code>MapDispatch</code> (<code>rtp-core</code>, Stage 1.B); <code>ChartSpecTokens</code>, <code>MenuAction.OpenMap</code> (sealed-record permit), <code>MenuRedeemSubcommand.dispatchOpenMap</code>, <code>InfoBookBuilder</code> map row, <code>BookMenuRenderer</code> <code>OpenMap</code> case arm (Stage 2 landed 2026-05-21)</td>
 <td><code>ChartSpecSurfaceTest</code> (Stage 1.A); <code>BadPointsHeatmapResolverTest</code>, <code>MapDispatchTest</code>, <code>ReqRtpMap006CoreNoPlatformImportTest</code> (Stage 1.B); <code>ChartSpecTokensTest</code> (Stage 2.B, 21/21 green); <code>MenuActionOpenMapBackcompatTest</code> (Stage 2.A, deferred — sealed-record shape guarantees back-compat structurally)</td>
 </tr>
@@ -4027,7 +4006,7 @@
 </table>
 <hr />
 <h2 id="rtp-neoforge-requirements">rtp-neoforge Requirements<a class="headerlink" href="#rtp-neoforge-requirements" title="Permanent link">&para;</a></h2>
-<p>NeoForge is in-scope per <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> and <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md">rtp-neoforge-ADR-001</a> (Accepted). Per ADR-033 §3.4 the S-005 and S-006 guards are authored as part of the Phase N2 platform-adapter bring-up; both rows below are now <strong>implemented</strong>. Remaining NeoForge functional parity (the <code>/rtp</code> round-trip exit gate and the final <code>-PincludeNeoforge</code> build) is tracked in <a href="../scratch/CHECKLIST-neoforge-phase-n2/"><code>scratch/CHECKLIST-neoforge-phase-n2.md</code></a>.</p>
+<p>NeoForge is in-scope per <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> and <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md">rtp-neoforge-ADR-001</a> (Accepted). Per ADR-033 §3.4 the S-005 and S-006 guards are authored as part of the Phase N2 platform-adapter bring-up; both rows below are now <strong>implemented</strong>. Remaining NeoForge functional parity (the <code>/rtp</code> round-trip exit gate and the final <code>-PincludeNeoforge</code> build) is tracked in <a href="scratch/CHECKLIST-neoforge-phase-n2.md"><code>scratch/CHECKLIST-neoforge-phase-n2.md</code></a>.</p>
 <table>
 <thead>
 <tr>

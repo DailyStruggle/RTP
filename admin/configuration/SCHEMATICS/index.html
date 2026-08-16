@@ -635,27 +635,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3203,7 +3182,7 @@ plugins/RTP/advanced/schematics/spawn_island.schem # pasted on every teleport in
 <ul>
 <li><strong>No WorldEdit required.</strong> Sponge v3 <code>.schem</code> files are decoded in-house, so WorldEdit (or any other plugin) does not need to be installed for pasting to work.</li>
 <li><strong>Cross-platform.</strong> The same file works on Bukkit, Paper, Folia, Fabric, and NeoForge - each platform only supplies the block writer; the decode is shared.</li>
-<li><strong>Claim-aware.</strong> Pasting never overwrites claim-protected land, consistent with the rest of RTP's safety invariants (S-003).</li>
+<li><strong>Claim-aware.</strong> Pasting never overwrites claim-protected land, consistent with the rest of RTP's safety invariants.</li>
 <li><strong>Centered on the landing spot.</strong> The structure is placed relative to the player's arrival coordinate, not a fixed world position.</li>
 <li><strong>Both extensions accepted, one format.</strong> <code>&lt;region&gt;.schem</code> is preferred; <code>&lt;region&gt;.schematic</code> also resolves - but in either case the file must contain Sponge v3 NBT. The extension does not change the decoder; legacy MCEdit <code>.schematic</code> data is not supported.</li>
 </ul>
@@ -3237,7 +3216,6 @@ plugins/RTP/advanced/schematics/spawn_island.schem # pasted on every teleport in
 <ul>
 <li><a href="../REGIONS/">REGIONS.md</a> - region configuration (shape, vert, caches).</li>
 <li><a href="../SAFETY/">SAFETY.md</a> - landing safety checks and platform building.</li>
-<li><a href="../../../adr/ADR-058-region-specific-schematic-paste/">ADR-058</a> - the design decision behind the file-presence trigger and the in-house Sponge decoder.</li>
 </ul>
 
 

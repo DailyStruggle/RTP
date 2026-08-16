@@ -635,27 +635,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3507,7 +3486,7 @@
 <h1 id="configuration-reference">Configuration Reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h1>
 <p>One jar covers every platform. Configuration is generated on first server start and lives under <code>plugins/RTP/</code> on the Bukkit family (Paper, Spigot, Folia and their forks, Arclight, Mohist) or under <code>config/rtp/</code> on Fabric / NeoForge. Edit the files directly and run <code>/rtp reload</code> to apply changes without a server restart, or change an individual key at runtime with <code>/rtp config &lt;file&gt; &lt;key&gt;=&lt;value&gt;</code> (atomic write + auto-reload).</p>
 <blockquote>
-<p><strong>Folder layout (ADR-076):</strong> the everyday files (<code>config.yml</code>, <code>economy.yml</code>, <code>language.yml</code>, <code>safety.yml</code>) sit at the top level. The named definitions you author (<code>regions/</code>, <code>worlds/</code>, <code>effects/</code>, plus the shared <code>shape/</code> and <code>vert/</code> catalogs) live under <code>definitions/</code>. The rarely-hand-edited tuning and text files (<code>performance.yml</code>, <code>logging.yml</code>, <code>metrics.yml</code>, <code>network.yml</code>, <code>database.yml</code>, <code>biomes.yml</code>, <code>blocks.yml</code>, the <code>messages/</code> tree, and the <code>schematics/</code> folder) live under <code>advanced/</code>. The per-locale translation mirror stays at <code>lang/</code>. Each rename map is a co-located hidden dotfile (<code>.&lt;name&gt;.lang.yml</code>) beside the file it describes. On upgrade from an older layout, RTP relocates your authored files automatically and archives the old folders as <code>&lt;name&gt;.migrated</code>.</p>
+<p><strong>Folder layout:</strong> the everyday files (<code>config.yml</code>, <code>economy.yml</code>, <code>language.yml</code>, <code>safety.yml</code>) sit at the top level. The named definitions you author (<code>regions/</code>, <code>worlds/</code>, <code>effects/</code>, plus the shared <code>shape/</code> and <code>vert/</code> catalogs) live under <code>definitions/</code>. The rarely-hand-edited tuning and text files (<code>performance.yml</code>, <code>logging.yml</code>, <code>metrics.yml</code>, <code>network.yml</code>, <code>database.yml</code>, <code>biomes.yml</code>, <code>blocks.yml</code>, the <code>messages/</code> tree, and the <code>schematics/</code> folder) live under <code>advanced/</code>. The per-locale translation mirror stays at <code>lang/</code>. Each rename map is a co-located hidden dotfile (<code>.&lt;name&gt;.lang.yml</code>) beside the file it describes. On upgrade from an older layout, RTP relocates your authored files automatically and archives the old folders as <code>&lt;name&gt;.migrated</code>.</p>
 <p><strong>Inheritance:</strong> to avoid repeating the same value across many region/world files, a region/world setting can inherit a global default with an <code>@&lt;file&gt;</code> token (e.g. <code>@config</code>, <code>@economy</code>). See <a href="../CORE_CONFIG/#defaults-inheritance">CORE_CONFIG.md → Defaults (inheritance)</a>.</p>
 <p>📎 <strong>How RTP loads, reloads, and upgrades these files</strong> (including what the <code>.old1</code>/<code>.old2</code> files are, and how your customizations are preserved across version bumps and locale switches): see <a href="../CONFIG_LIFECYCLE/">CONFIG_LIFECYCLE.md</a>.</p>
 </blockquote>
@@ -3650,7 +3629,7 @@
 <td><code>backlogCacheCap</code></td>
 <td>Integer</td>
 <td><code>1000</code> (lite: <code>0</code>)</td>
-<td>Maximum <strong>unverified</strong> candidates staged upstream of <code>cacheCap</code>. Spiral picks land here without chunk I/O, then a per-region pulse verifies one <code>.mca</code> bin at a time and promotes in insertion order. Set to <code>0</code> to disable. See <a href="../REGIONS/#backlog-cache-l3">REGIONS.md → Backlog Cache (L3)</a> and <a href="../../../adr/ADR-028-l3-backlog-cache/">ADR-028</a>.</td>
+<td>Maximum <strong>unverified</strong> candidates staged upstream of <code>cacheCap</code>. Spiral picks land here without chunk I/O, then a per-region pulse verifies one <code>.mca</code> bin at a time and promotes in insertion order. Set to <code>0</code> to disable. See <a href="../REGIONS/#backlog-cache-l3">REGIONS.md → Backlog Cache (L3)</a>.</td>
 </tr>
 <tr>
 <td><code>activeChunkCap</code></td>

@@ -635,27 +635,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1254,18 +1233,9 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#planned-pages" class="md-nav__link">
+  <a href="#pages" class="md-nav__link">
     <span class="md-ellipsis">
-      Planned pages
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#contribution-rules" class="md-nav__link">
-    <span class="md-ellipsis">
-      Contribution rules
+      Pages
     </span>
   </a>
   
@@ -3109,18 +3079,9 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#planned-pages" class="md-nav__link">
+  <a href="#pages" class="md-nav__link">
     <span class="md-ellipsis">
-      Planned pages
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#contribution-rules" class="md-nav__link">
-    <span class="md-ellipsis">
-      Contribution rules
+      Pages
     </span>
   </a>
   
@@ -3146,77 +3107,66 @@
 
 <h1 id="rtp-proxy-mode-admin-documentation">RTP Proxy Mode — Admin Documentation<a class="headerlink" href="#rtp-proxy-mode-admin-documentation" title="Permanent link">&para;</a></h1>
 <p>This directory hosts admin-facing documentation for running RTP across <strong>multiple backend servers behind a proxy</strong> (Velocity primary, BungeeCord/Waterfall secondary).</p>
-<blockquote>
-<p>Status: <strong>Stub.</strong> Proxy mode is not yet released. The design plan lives in <a href="../../../dev/MULTI_SERVER_PLAN/"><code>../../dev/MULTI_SERVER_PLAN.md</code></a> and is gated by Rule D-005 (see <a href="https://github.com/dailystruggle/RTP/blob/V3/.junie/AGENTS.md"><code>AGENTS.md</code></a>). This directory will be populated as Phase 2/3 of that plan lands.</p>
-</blockquote>
-<p>This is <strong>distinct from</strong> multi-platform support (Spigot/Paper/Folia/Fabric) — see <a href="../../../dev/MULTI_PLATFORM_PLAN/"><code>../../dev/MULTI_PLATFORM_PLAN.md</code></a> for that axis.</p>
+<p>The same jar you install on each backend also runs on a <strong>Velocity</strong> proxy, where it acts as the router for cross-server <code>/rtp</code>. The free build ships the <code>proxy-direct</code> transport (a lightweight TCP socket that needs no Redis or SQL), so a bare <code>/rtp</code> on one server can send a player to a region on another with just the jar on the proxy and each backend. The Redis and SQL shared-state transports are LeafRTP-Pro extras.</p>
+<p>This is <strong>distinct from</strong> multi-platform support (the plugin running on Paper, Spigot, Folia, Fabric, or NeoForge) - proxy mode is about routing between several of those backends.</p>
 <hr />
-<h2 id="planned-pages">Planned pages<a class="headerlink" href="#planned-pages" title="Permanent link">&para;</a></h2>
-<p>Each row links to the design source until the admin doc is authored.</p>
+<h2 id="pages">Pages<a class="headerlink" href="#pages" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>File</th>
+<th>Page</th>
 <th>Topic</th>
-<th>Source / status</th>
+<th>Status</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><a href="../SINGLE_BACKEND_VERIFICATION/"><code>SINGLE_BACKEND_VERIFICATION.md</code></a></td>
-<td>Single-backend operator smoke test: <code>rtp test network</code> against real Redis (no proxy required)</td>
-<td><strong>Available</strong> (Phase 2e-Redis A1/A2 shipped)</td>
+<td><a href="../CONFIGURATION/">Configuration (network.yml)</a></td>
+<td>The <code>network.yml</code> reference: transport, triggers, reservation, security</td>
+<td>Available</td>
 </tr>
 <tr>
-<td><a href="../CROSS_SERVER_VERIFICATION/"><code>CROSS_SERVER_VERIFICATION.md</code></a></td>
-<td>Multi-proxy / multi-backend round-trip verification (claim → transfer → redeem); paired devstack at <a href="https://github.com/dailystruggle/RTP/tree/V3/platforms/rtp-proxy/devstack"><code>platforms/rtp-proxy/devstack/</code></a></td>
-<td><strong>Available</strong> (Phase 2 L3)</td>
+<td><a href="../SINGLE_BACKEND_VERIFICATION/">Single-backend verification</a></td>
+<td>Single-backend operator smoke test (no proxy required)</td>
+<td>Available</td>
 </tr>
 <tr>
-<td><code>QUICK_START.md</code></td>
-<td>Minimal Velocity + 2× Paper setup with Redis transport</td>
-<td>Phase 2</td>
+<td><a href="../CROSS_SERVER_VERIFICATION/">Cross-server verification</a></td>
+<td>Multi-proxy / multi-backend round-trip (claim → transfer → redeem)</td>
+<td>Available</td>
 </tr>
 <tr>
-<td><code>CONFIGURATION.md</code></td>
-<td><code>network.yml</code> reference (transport, triggers, reservation, security)</td>
-<td>Phase 2</td>
+<td>Quick start</td>
+<td>Minimal Velocity + 2× backend setup</td>
+<td>Planned</td>
 </tr>
 <tr>
-<td><code>LOAD_BALANCING.md</code></td>
-<td>Configurable weighted-average heuristics, curve catalogue, <strong>rendered curve plots</strong></td>
-<td>Phase 2 spec / Phase 3 visuals (see <em>Documentation follow-up</em> in <code>MULTI_SERVER_PLAN.md</code>)</td>
+<td>Load balancing</td>
+<td>Weighted-average backend-selection heuristics</td>
+<td>Planned</td>
 </tr>
 <tr>
-<td><code>TRANSPORTS.md</code></td>
-<td>Redis vs. Postgres vs. generic SQL; <code>plugin-message</code> is dev-only (D2)</td>
-<td>Phase 2 / Phase 3</td>
+<td>Transports</td>
+<td><code>proxy-direct</code> (free) vs. Redis vs. SQL (Pro)</td>
+<td>Planned</td>
 </tr>
 <tr>
-<td><code>SECURITY.md</code></td>
-<td>HMAC shared-secret distribution, replay protection, kill switch (D4)</td>
-<td>Phase 2 (blocked on D4)</td>
+<td>Security</td>
+<td>Shared-secret distribution, replay protection, kill switch</td>
+<td>Planned</td>
 </tr>
 <tr>
-<td><code>TROUBLESHOOTING.md</code></td>
-<td>Stale-backend symptoms, reservation TTL expiry, version-skew negotiation</td>
-<td>Phase 4</td>
+<td>Troubleshooting</td>
+<td>Stale-backend symptoms, reservation expiry, version-skew</td>
+<td>Planned</td>
 </tr>
 <tr>
-<td><code>MIGRATION.md</code></td>
-<td>Single-server → proxy-mode migration; <code>network.enabled: false</code> no-op contract (REQ-RTP-NET-005)</td>
-<td>Phase 4</td>
+<td>Migration</td>
+<td>Single-server to proxy-mode migration</td>
+<td>Planned</td>
 </tr>
 </tbody>
 </table>
-<hr />
-<h2 id="contribution-rules">Contribution rules<a class="headerlink" href="#contribution-rules" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Admin docs here describe <strong>operator-facing behaviour</strong> only. Implementation details, ADRs, and engineering lore stay in <code>docs/dev/</code> and <code>docs/adr/</code>.</li>
-<li>Curve plot images and any generation script live alongside the admin doc that uses them; the script is reproducible (matplotlib or similar) and committed under <code>scripts/</code>.</li>
-<li>Cross-link the relevant REQ-* and ADR rows when documenting a behaviour rule (e.g. REQ-RTP-NET-005 for the no-op contract).</li>
-<li>Per <code>AGENTS.md &gt; Self-Updating Protocol</code>, do not duplicate engineering pitfalls here — those go to <code>docs/dev/LESSONS_LEARNED.md</code>.</li>
-</ul>
 
 
 

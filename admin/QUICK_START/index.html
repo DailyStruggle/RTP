@@ -821,27 +821,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3397,27 +3376,27 @@
 </blockquote>
 <hr />
 <h2 id="step-0-prerequisites-pregenerate-the-world">Step 0 — Prerequisites &amp; Pregenerate the World<a class="headerlink" href="#step-0-prerequisites-pregenerate-the-world" title="Permanent link">&para;</a></h2>
-<p>Before installing RTP, get the environment ready. RTP does not ship its own pregenerator; it loads chunks asynchronously on demand (S-005 — never sync chunk I/O on the main thread), so a cold world makes the first teleports slow and the first <code>/rtp scan</code> (Step 9) chunkgen-bound.</p>
+<p>Before installing RTP, get the environment ready. RTP does not ship its own pregenerator; it loads chunks asynchronously on demand (it never does synchronous chunk I/O on the main thread), so a cold world makes the first teleports slow and the first <code>/rtp scan</code> (Step 9) chunkgen-bound.</p>
 <ol>
-<li><strong>Java 21+</strong> is required (REQ-RTP-SYS-001).</li>
-<li><strong>Pick your platform:</strong> Spigot, Paper, Folia, or Fabric. Fabric is unstable — see <a href="../../dev/MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a>.</li>
+<li><strong>Java 21+</strong> is required.</li>
+<li><strong>Pick your platform:</strong> Paper, Spigot, Folia, Fabric, or NeoForge.</li>
 <li><strong>Install Vault + an economy plugin first</strong> if you plan to charge for <code>/rtp</code> (Step 7).</li>
-<li><strong>Install your claim plugin first</strong> (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, …) if you want claim-aware teleport (S-003). RTP autodetects them at load.</li>
+<li><strong>Install your claim plugin first</strong> (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, …) if you want claim-aware teleport. RTP autodetects them at load.</li>
 <li><strong>Pregenerate</strong> every world you'll add to RTP, sized to match the region you'll configure in Step 4. A region with <code>shape.radius: 256</code> (chunks) needs ~4 096 blocks pregenerated from <code>centerX, centerZ</code>, plus a small margin.</li>
 <li><strong>Chunky</strong> (Paper/Spigot/Folia): <code>/chunky world &lt;world&gt;</code>, <code>/chunky radius &lt;blocks&gt;</code>, <code>/chunky start</code>.</li>
 <li><strong>WorldBorder</strong> (legacy): <code>/wb &lt;world&gt; set &lt;radius&gt;</code>, <code>/wb fill</code>.</li>
 </ol>
 <blockquote>
-<p>Pregenerating now means Step 9's <code>/rtp scan</code> only validates safety, instead of also generating chunks. See <a href="../../architecture/05-scan-task-crawler/"><code>docs/architecture/05-scan-task-crawler.md</code></a> for why scan throughput is bound by chunk-load latency.</p>
+<p>Pregenerating now means Step 9's <code>/rtp scan</code> only validates safety, instead of also generating chunks. Scan throughput is bound by chunk-load latency, so pregenerating first keeps it fast.</p>
 </blockquote>
 <hr />
 <h2 id="step-1-install-the-plugin">Step 1 — Install the Plugin<a class="headerlink" href="#step-1-install-the-plugin" title="Permanent link">&para;</a></h2>
 <ol>
-<li>Download the latest <code>RTP-&lt;version&gt;.jar</code> from the <a href="https://www.spigotmc.org/resources/rtp.94812/">SpigotMC resource page</a>.</li>
-<li>Drop the jar into your server's <code>plugins/</code> folder.</li>
+<li>Download the jar from <a href="https://modrinth.com/plugin/leafrtp">Modrinth</a> (free build) or <a href="https://builtbybit.com/resources/leafrtp-pro.105418/">BuiltByBit</a> (Pro).</li>
+<li>Drop the jar into your server's <code>plugins/</code> folder (or <code>mods/</code> on Fabric / NeoForge).</li>
 <li>Restart the server (rather than using <code>/reload</code>), as a full restart ensures all hooks register correctly.</li>
 </ol>
-<p>After the first start, RTP creates its config folder at <code>plugins/RTP/</code> containing <code>regions/default.yml</code>, one <code>worlds/&lt;world&gt;.yml</code> per loaded world, plus <code>safety.yml</code>, <code>economy.yml</code>, <code>performance.yml</code>, <code>messages.yml</code>, and more.</p>
+<p>After the first start, RTP creates its config folder at <code>plugins/RTP/</code> containing <code>definitions/regions/default.yml</code>, one <code>definitions/worlds/&lt;world&gt;.yml</code> per loaded world, plus <code>safety.yml</code>, <code>economy.yml</code>, <code>performance.yml</code>, <code>messages.yml</code>, and more. (On Fabric / NeoForge the folder is <code>config/rtp/</code> instead of <code>plugins/RTP/</code>.)</p>
 <hr />
 <h2 id="step-2-verify-it-loaded">Step 2 — Verify It Loaded<a class="headerlink" href="#step-2-verify-it-loaded" title="Permanent link">&para;</a></h2>
 <p>Run this in your server console or as an operator:</p>
@@ -3499,7 +3478,7 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 </tr>
 <tr>
 <td><code>rtp.other</code></td>
-<td>Teleport another player (<code>/rtp player:&lt;player&gt;</code>)</td>
+<td>Teleport another player (<code>/rtp player=&lt;player&gt;</code>)</td>
 </tr>
 <tr>
 <td><code>rtp.reload</code></td>
@@ -3563,32 +3542,32 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 <span class="w">  </span><span class="nt">minY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32</span>
 <span class="w">  </span><span class="nt">maxY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">120</span>
 </code></pre></div></li>
-<li>Update or create <code>plugins/RTP/worlds/world_nether.yml</code> so the world points at the new region (<code>region: "nether"</code>).</li>
+<li>Update or create <code>plugins/RTP/definitions/worlds/world_nether.yml</code> so the world points at the new region (<code>region: "nether"</code>).</li>
 <li>Run <code>/rtp reload</code> to apply the new region.</li>
 </ol>
-<p>Players can now target it with <code>/rtp region:nether</code> (requires <code>rtp.region</code> + <code>rtp.regions.nether</code> permissions).</p>
+<p>Players can now target it with <code>/rtp region=nether</code> (requires <code>rtp.region</code> + <code>rtp.regions.nether</code> permissions).</p>
 <h3 id="programmatic-in-game-edits-with-rtp-config">Programmatic / In-Game Edits with <code>/rtp config</code><a class="headerlink" href="#programmatic-in-game-edits-with-rtp-config" title="Permanent link">&para;</a></h3>
 <blockquote>
-<p>⚠️ <strong>Hardening in <code>3.0.0-beta.3</code>.</strong> The <code>/rtp config</code> surface is being hardened against a normative spec (<a href="../../dev/CONFIG_COMMAND_SPEC/"><code>docs/dev/CONFIG_COMMAND_SPEC.md</code></a>, decided in <a href="../../adr/ADR-037-harden-rtp-config-commands/">ADR-037</a>, implemented per <a href="../../adr/ADR-041-config-command-and-save-implementation/">ADR-041</a>). Behavior described here is the <strong>target</strong>; earlier builds may still silently ignore unknown keys or skip validation. For production use on pre-beta.3 builds, prefer hand-editing the YAML files plus <code>/rtp reload</code>.</p>
+<p>⚠️ <strong>Hardening in <code>3.0.0-beta.3</code>.</strong> Behavior described here is the <strong>target</strong>; earlier builds may still silently ignore unknown keys or skip validation. For production use on pre-beta.3 builds, prefer hand-editing the YAML files plus <code>/rtp reload</code>.</p>
 </blockquote>
 <p>Instead of editing files by hand, you can read or change any region key at runtime using the <code>/rtp config</code> command:</p>
-<div class="highlight"><pre><span></span><code>/rtp config &lt;file&gt; &lt;key&gt;:&lt;value&gt; [&lt;key&gt;:&lt;value&gt; …] [--dry-run]
-/rtp config &lt;file&gt; &lt;list-key&gt; add:&lt;value&gt; [remove:&lt;value&gt;] [--dry-run]
-/rtp config &lt;multifile&gt; &lt;subfile&gt; &lt;key&gt;:&lt;value&gt; [--dry-run]
+<div class="highlight"><pre><span></span><code>/rtp config &lt;file&gt; &lt;key&gt;=&lt;value&gt; [&lt;key&gt;=&lt;value&gt; …] [--dry-run]
+/rtp config &lt;file&gt; &lt;list-key&gt; add=&lt;value&gt; [remove=&lt;value&gt;] [--dry-run]
+/rtp config &lt;multifile&gt; &lt;subfile&gt; &lt;key&gt;=&lt;value&gt; [--dry-run]
 /rtp config &lt;file&gt; view              # inspect current state interactively
 /rtp config &lt;file&gt; view &lt;key&gt;
 </code></pre></div>
 <p>Permissions are additive (see <a href="../COMMANDS/">COMMANDS.md</a> §<code>/rtp config</code>): <code>rtp.config.set</code> grants all writes; <code>rtp.config.set.&lt;section&gt;</code> (e.g. <code>rtp.config.set.regions</code>) grants only that section; <code>rtp.config.view</code> grants the read-only <code>view</code> form; the legacy <code>rtp.config</code> continues to grant view + set.</p>
 <p>For example, to update the nether region's world after the file already exists:</p>
-<div class="highlight"><pre><span></span><code>/rtp config regions nether world:world_nether
-/rtp config regions nether shape.radius:128 --dry-run    # preview, no change
-/rtp config regions nether shape.radius:128              # commit
-/rtp config regions nether biomeWhitelist add:FOREST add:PLAINS remove:OCEAN
+<div class="highlight"><pre><span></span><code>/rtp config regions nether world=world_nether
+/rtp config regions nether shape.radius=128 --dry-run    # preview, no change
+/rtp config regions nether shape.radius=128              # commit
+/rtp config regions nether biomeWhitelist add=FOREST add=PLAINS remove=OCEAN
 /rtp config regions nether view shape                    # show the current shape block
 </code></pre></div>
-<p>Each successful <code>/rtp config</code> write is <strong>atomic</strong> (write-to-temp → fsync → rename) and the affected parser is reloaded automatically — no <code>/rtp reload</code> is required after a <code>/rtp config</code> write. Use <code>/rtp reload</code> only when you have hand-edited YAML on disk. Every invocation — success or failure, live or dry-run — emits exactly one audit record (<code>INFO</code> on success, <code>WARNING</code> on failure) with a <code>reasonCode</code> you can match against <a href="../../dev/CONFIG_COMMAND_SPEC/#5-validation-model-and-reasoncode-catalog"><code>messages.yml</code></a> for translation.</p>
+<p>Each successful <code>/rtp config</code> write is <strong>atomic</strong> (write-to-temp → fsync → rename) and the affected parser is reloaded automatically — no <code>/rtp reload</code> is required after a <code>/rtp config</code> write. Use <code>/rtp reload</code> only when you have hand-edited YAML on disk. Every invocation — success or failure, live or dry-run — emits exactly one audit record (<code>INFO</code> on success, <code>WARNING</code> on failure) with a <code>reasonCode</code> you can match against <code>messages.yml</code> for translation.</p>
 <blockquote>
-<p><strong>Tip for automation:</strong> Scripts, RCON clients, and addon plugins can issue <code>/rtp config</code> commands programmatically. Use <code>--dry-run</code> to preview the diff before committing; the audit record's <code>outcome</code> field (<code>COMMITTED</code> / <code>DRY_RUN_OK</code> / <code>REJECTED</code> / <code>ROLLED_BACK</code>) tells you what happened without parsing chat output. See <a href="../COMMANDS/">COMMANDS.md</a> for the full syntax and the <a href="../../dev/CONFIG_COMMAND_SPEC/">spec</a> for the error matrix.</p>
+<p><strong>Tip for automation:</strong> Scripts, RCON clients, and addon plugins can issue <code>/rtp config</code> commands programmatically. Use <code>--dry-run</code> to preview the diff before committing; the audit record's <code>outcome</code> field (<code>COMMITTED</code> / <code>DRY_RUN_OK</code> / <code>REJECTED</code> / <code>ROLLED_BACK</code>) tells you what happened without parsing chat output. See <a href="../COMMANDS/">COMMANDS.md</a> for the full syntax and error codes.</p>
 </blockquote>
 <hr />
 <h2 id="step-9-pre-warm-with-rtp-scan-spatial-memory">Step 9 — Pre-warm with <code>/rtp scan</code> (Spatial Memory)<a class="headerlink" href="#step-9-pre-warm-with-rtp-scan-spatial-memory" title="Permanent link">&para;</a></h2>
@@ -3597,42 +3576,42 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 </blockquote>
 <p>Once worlds are pregenerated (Step 0) and regions are configured (Steps 4 and 8), map them so future teleports skip known-bad coordinates instantly. Scanning is async on every platform and never blocks tick threads.</p>
 <div class="highlight"><pre><span></span><code>/rtp scan start                       # caller&#39;s region (player) or all (console)
-/rtp scan start  region:mining
-/rtp scan pause  region:mining
-/rtp scan resume region:mining
-/rtp scan cancel region:mining        # stop without clearing memory
-/rtp scan reset  region:mining        # forget everything; required after safety.yml changes
+/rtp scan start  region=mining
+/rtp scan pause  region=mining
+/rtp scan resume region=mining
+/rtp scan cancel region=mining        # stop without clearing memory
+/rtp scan reset  region=mining        # forget everything; required after safety.yml changes
 </code></pre></div>
 <ul>
-<li>Requires the region's shape to be a <code>MemoryShape</code> (the built-in shapes are).</li>
-<li>Console without a <code>region:</code> argument scans <strong>all</strong> permanent regions.</li>
+<li>Requires a region shape that supports spatial memory (the built-in shapes do).</li>
+<li>Console without a <code>region=</code> argument scans <strong>all</strong> permanent regions.</li>
 <li>Monitor progress live via PlaceholderAPI: <code>%rtp_scan_chunks%</code>, <code>%rtp_scan_totalChunks%</code>, <code>%rtp_scan_cps%</code>, <code>%rtp_scan_eta%</code>, <code>%rtp_scan_landPercentage%</code>.</li>
 <li>If a scan is too heavy on the server, lower <code>performance.yml &gt; scanTaskCount</code>, then <code>/rtp scan resume</code>.</li>
 </ul>
-<p>Full sub-command reference: <a href="../COMMANDS/">COMMANDS.md</a> §<code>/rtp scan</code>. Architecture: <a href="../../architecture/05-scan-task-crawler/"><code>docs/architecture/05-scan-task-crawler.md</code></a>. Operational playbook (after-safety-edit, chunk-leak, oversized memory file): <a href="../RUNBOOK/">RUNBOOK.md</a>.</p>
+<p>Full sub-command reference: <a href="../COMMANDS/">COMMANDS.md</a> §<code>/rtp scan</code>. Operational playbook (after-safety-edit, chunk-leak, oversized memory file): <a href="../RUNBOOK/">RUNBOOK.md</a>.</p>
 <hr />
 <h2 id="step-10-verify-with-rtp-info-and-rtp-test">Step 10 — Verify with <code>/rtp info</code> and <code>/rtp test</code><a class="headerlink" href="#step-10-verify-with-rtp-info-and-rtp-test" title="Permanent link">&para;</a></h2>
 <p>Inspect runtime state:</p>
 <div class="highlight"><pre><span></span><code>/rtp info                              # all loaded worlds and permanent regions
-/rtp info world:world_nether
-/rtp info region:default               # queue depth, in-flight calcs, shape, cacheCap
+/rtp info world=world_nether
+/rtp info region=default               # queue depth, in-flight calcs, shape, cacheCap
 </code></pre></div>
 <p>Exercise the full pipeline against a real player (every safety guard remains active — cooldown, economy, claim verifiers, async chunk I/O):</p>
-<div class="highlight"><pre><span></span><code>/rtp test stress player:Alice
-/rtp test stress player:Alice iterations:50 intervalTicks:60
-/rtp test stress player:Alice player:Bob region:mining
+<div class="highlight"><pre><span></span><code>/rtp test stress player=Alice
+/rtp test stress player=Alice iterations=50 intervalTicks=60
+/rtp test stress player=Alice player=Bob region=mining
 </code></pre></div>
 <ul>
 <li><code>iterations</code> is clamped to <code>[1, 1000]</code> (default <code>10</code>); <code>intervalTicks</code> to <code>[10, 6000]</code> (default <code>40</code>).</li>
-<li>Per-iteration failures log at <code>WARNING</code> (REQ-RTP-S-004) — watch the console.</li>
+<li>Per-iteration failures log at <code>WARNING</code> — watch the console.</li>
 <li><code>stress</code> is the only sub-command available today; <code>queue</code>, <code>safety</code>, <code>verifiers</code>, <code>memory</code>, <code>platform</code>, <code>full</code> are planned.</li>
 </ul>
 <p>Full reference: <a href="../COMMANDS/">COMMANDS.md</a> §<code>/rtp test</code>.</p>
 <p>Manual smoke checks:</p>
 <div class="highlight"><pre><span></span><code>/rtp                       # default region in current world
-/rtp region:mining
-/rtp world:world_nether
-/rtp player:&lt;name&gt;         # other-player teleport (rtp.other)
+/rtp region=mining
+/rtp world=world_nether
+/rtp player=&lt;name&gt;         # other-player teleport (rtp.other)
 </code></pre></div>
 <hr />
 <h2 id="operational-cadence-after-setup">Operational Cadence (after setup)<a class="headerlink" href="#operational-cadence-after-setup" title="Permanent link">&para;</a></h2>
@@ -3694,7 +3673,7 @@ A radius of 256 chunks = 4 096 blocks from centre.</p>
 <hr />
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../../dev/CONCEPTS/">CONCEPTS.md</a> — how RTP works under the hood (queue, shapes, pipeline)</li>
+<li><a href="../../site/intended-usage/">Intended usage</a> — how RTP works under the hood (queue, shapes, pipeline)</li>
 <li><a href="../COMMANDS/">COMMANDS.md</a> — full command and permission reference</li>
 <li><a href="../configuration/WORLDS/">WORLDS.md</a> — every <code>worlds/&lt;world&gt;.yml</code> key</li>
 <li><a href="../configuration/REGIONS/">REGIONS.md</a> — every <code>regions/&lt;name&gt;.yml</code> key</li>

@@ -709,27 +709,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3214,8 +3193,11 @@ LeafRTP-Pro extras.) See <a href="admin/proxies/INDEX/">Proxy mode</a>.</p>
 </ol>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Folia, multi-server / proxy, and SQL/Redis shared state are LeafRTP-Pro features. The
-free jar runs on Paper / Spigot / Fabric / NeoForge as-is. Optional soft dependencies
+<p>The free jar runs on Paper, Spigot, Folia, Fabric, and NeoForge as-is - including
+single-jar cross-server <code>/rtp</code> through the bundled <code>proxy-direct</code> transport. LeafRTP-Pro
+adds the shaded database drivers (the SQL/Redis shared-state transports) and a
+parallelized Folia scheduler tuned for regionised threading; on the free build Folia
+runs on the Paper-optimized scheduler and still performs well. Optional soft dependencies
 (all auto-detected): Vault (economy charge), PlaceholderAPI, ProtocolLib.</p>
 </div>
 <h2 id="where-to-start">Where to start<a class="headerlink" href="#where-to-start" title="Permanent link">&para;</a></h2>

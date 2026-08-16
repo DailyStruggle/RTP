@@ -635,27 +635,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3661,7 +3640,7 @@
 <li>The backlog holds no chunk tickets and no in-flight teleport tasks, so a high cap has minimal runtime memory cost beyond the raw coordinate records themselves.</li>
 </ul>
 <h3 id="relationship-to-other-caches">Relationship to other caches<a class="headerlink" href="#relationship-to-other-caches" title="Permanent link">&para;</a></h3>
-<p><code>backlogCacheCap</code> (L3, unverified) → <code>unkeptLocations</code> (L2, verified, chunks released) → <code>keptLocations</code> (L1, verified, chunks held). <code>/rtp</code> polls L1 first, falls back to L2 (which re-loads chunks on use), and the L3 pulse keeps L2 supplied. See <a href="../../../adr/ADR-028-l3-backlog-cache/">ADR-028</a> for the full design.</p>
+<p>Candidates flow through three tiers: the backlog (L3, unverified) → the cold cache (L2, verified, chunks released) → the hot cache (L1, verified, chunks held). <code>/rtp</code> polls the hot cache first, falls back to the cold cache (which re-loads chunks on use), and the backlog pulse keeps the cold cache supplied.</p>
 <hr />
 <h2 id="tips-for-customization">Tips for Customization<a class="headerlink" href="#tips-for-customization" title="Permanent link">&para;</a></h2>
 <ol>

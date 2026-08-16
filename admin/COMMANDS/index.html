@@ -812,27 +812,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3373,18 +3352,18 @@
 
 
 <h1 id="command-reference">Command Reference<a class="headerlink" href="#command-reference" title="Permanent link">&para;</a></h1>
-<p>All RTP commands are subcommands of <code>/rtp</code>. Parameters are passed in <code>key:value</code> format and can be combined freely unless noted otherwise. Tab-completion is available for all parameters and reflects live server state.</p>
+<p>All RTP commands are subcommands of <code>/rtp</code>. Parameters are passed in <code>key=value</code> format and can be combined freely unless noted otherwise. Tab-completion is available for all parameters and reflects live server state.</p>
 <hr />
 <h2 id="rtp-random-teleport"><code>/rtp</code> — Random Teleport<a class="headerlink" href="#rtp-random-teleport" title="Permanent link">&para;</a></h2>
 <p>Initiates a random teleportation sequence for the executing player (or a named target). Guards (permission, cooldown, duplicate-processing, reload-lock) run synchronously on the calling thread; the location search and teleport pipeline are dispatched asynchronously and never block the main server thread.</p>
 <p><strong>Syntax</strong>
 <div class="highlight"><pre><span></span><code>/rtp
-/rtp [player:&lt;name&gt;] [world:&lt;name&gt;] [region:&lt;name&gt;]
-/rtp [biome:&lt;name&gt;]
-/rtp [shape:&lt;name&gt; [&lt;shape-key&gt;:&lt;value&gt; …]]
-/rtp [vert:&lt;name&gt;  [&lt;vert-key&gt;:&lt;value&gt;  …]]
-/rtp [worldBorderOverride:&lt;true|false&gt;]
-/rtp [toggletargetperms:&lt;true|false&gt;]
+/rtp [player=&lt;name&gt;] [world=&lt;name&gt;] [region=&lt;name&gt;]
+/rtp [biome=&lt;name&gt;]
+/rtp [shape=&lt;name&gt; [&lt;shape-key&gt;=&lt;value&gt; …]]
+/rtp [vert=&lt;name&gt;  [&lt;vert-key&gt;=&lt;value&gt;  …]]
+/rtp [worldBorderOverride=&lt;true|false&gt;]
+/rtp [toggletargetperms=&lt;true|false&gt;]
 </code></pre></div></p>
 <p><strong>Parameters</strong></p>
 <table>
@@ -3404,49 +3383,49 @@
 <td>Teleport the executing player using the default region for their current world.</td>
 </tr>
 <tr>
-<td><code>player:&lt;name&gt;</code></td>
+<td><code>player=&lt;name&gt;</code></td>
 <td>String (online player name)</td>
 <td><code>rtp.use</code></td>
-<td>Teleport a named online player instead of (or in addition to) yourself. Repeat for multiple targets: <code>player:Alice player:Bob</code>.</td>
+<td>Teleport a named online player instead of (or in addition to) yourself. Repeat for multiple targets: <code>player=Alice player=Bob</code>.</td>
 </tr>
 <tr>
-<td><code>world:&lt;name&gt;</code></td>
+<td><code>world=&lt;name&gt;</code></td>
 <td>String (loaded world name)</td>
 <td><code>rtp.use</code></td>
 <td>Derive the target region from this world's configuration rather than the sender's current world. Ignored when <code>region</code> is also supplied.</td>
 </tr>
 <tr>
-<td><code>region:&lt;name&gt;</code></td>
+<td><code>region=&lt;name&gt;</code></td>
 <td>String (region name)</td>
 <td><code>rtp.use</code></td>
 <td>Teleport into a specific, named region. Takes priority over <code>world</code>. Repeat for multiple values; one is chosen at random each time.</td>
 </tr>
 <tr>
-<td><code>biome:&lt;name&gt;</code></td>
+<td><code>biome=&lt;name&gt;</code></td>
 <td>String (Minecraft biome key, upper-case)</td>
 <td><code>rtp.use</code></td>
 <td>Restrict the destination to locations inside the specified biome. Repeat to allow multiple biomes. Forces a fresh async search — pre-cached locations are not used.</td>
 </tr>
 <tr>
-<td><code>shape:&lt;name&gt;</code></td>
+<td><code>shape=&lt;name&gt;</code></td>
 <td>String (factory key)</td>
 <td><code>rtp.params</code></td>
 <td>Override the region's default shape for this single teleport. The region is cloned; its permanent definition is not changed. Sub-keys for the chosen shape type (e.g. <code>radius</code>, <code>weight</code>) may follow immediately.</td>
 </tr>
 <tr>
-<td><code>vert:&lt;name&gt;</code></td>
+<td><code>vert=&lt;name&gt;</code></td>
 <td>String (factory key)</td>
 <td><code>rtp.params</code></td>
 <td>Override the region's vertical adjustor for this single teleport. Sub-keys for the chosen vert type may follow.</td>
 </tr>
 <tr>
-<td><code>worldBorderOverride:&lt;bool&gt;</code></td>
+<td><code>worldBorderOverride=&lt;bool&gt;</code></td>
 <td>Boolean</td>
 <td><code>rtp.params</code></td>
 <td>When <code>true</code>, replaces the region shape with the server's current world-border shape for this teleport. Incurs the <code>paramsPrice</code> economy charge.</td>
 </tr>
 <tr>
-<td><code>toggletargetperms:&lt;bool&gt;</code></td>
+<td><code>toggletargetperms=&lt;bool&gt;</code></td>
 <td>Boolean</td>
 <td><code>rtp.params</code></td>
 <td>When <code>true</code>, cooldown, delay, and economy checks are evaluated against each <em>target</em> player's attributes rather than the sender's.</td>
@@ -3455,13 +3434,13 @@
 </table>
 <p><strong>Examples</strong>
 <div class="highlight"><pre><span></span><code>/rtp
-/rtp player:Steve
-/rtp world:world_nether
-/rtp region:mining
-/rtp region:default biome:BADLANDS
-/rtp region:default shape:SQUARE radius:256
-/rtp player:Steve toggletargetperms:true
-/rtp worldBorderOverride:true
+/rtp player=Steve
+/rtp world=world_nether
+/rtp region=mining
+/rtp region=default biome=BADLANDS
+/rtp region=default shape=SQUARE radius=256
+/rtp player=Steve toggletargetperms=true
+/rtp worldBorderOverride=true
 </code></pre></div></p>
 <blockquote>
 <p><strong>Threading note:</strong> Permission, cooldown, and duplicate-processing guards run synchronously. The <code>TeleportPipelineTask</code> is always dispatched via the async scheduler. Synchronous execution only occurs when a pre-cached (globally queued) location is available for the player <strong>and</strong> the teleport delay is ≤ 0. In that case <code>syncLoading</code> is implicitly treated as <code>true</code> because no chunk loading is required — the cached location is used directly without any I/O.</p>
@@ -3503,16 +3482,16 @@
 <h2 id="rtp-config-edit-configuration-at-runtime"><code>/rtp config</code> — Edit Configuration at Runtime<a class="headerlink" href="#rtp-config-edit-configuration-at-runtime" title="Permanent link">&para;</a></h2>
 <p>Reads and writes individual keys in any loaded configuration file. One child sub-command is registered for every loaded <code>ConfigParser</code> and <code>MultiConfigParser</code> (file names with <code>.yml</code> stripped); tab-complete at position 1 enumerates the live set. Each successful write is <strong>atomic</strong> (temp + fsync + rename) and the affected parser is reloaded automatically — <code>/rtp reload</code> is only needed after hand-edits on disk.</p>
 <blockquote>
-<p>⚠️ <strong>Hardening in <code>3.0.0-beta.3</code>.</strong> This section describes the <strong>target</strong> behavior per the normative spec <a href="../../dev/CONFIG_COMMAND_SPEC/"><code>docs/dev/CONFIG_COMMAND_SPEC.md</code></a> (<a href="../../adr/ADR-037-harden-rtp-config-commands/">ADR-037</a> decision, <a href="../../adr/ADR-041-config-command-and-save-implementation/">ADR-041</a> implementation). Pre-beta.3 builds may still silently ignore unknown keys or skip validation; for production use on those builds, prefer hand-editing the YAML files followed by <code>/rtp reload</code>.</p>
+<p>⚠️ <strong>Hardening in <code>3.0.0-beta.3</code>.</strong> This section describes the <strong>target</strong> behavior. Pre-beta.3 builds may still silently ignore unknown keys or skip validation; for production use on those builds, prefer hand-editing the YAML files followed by <code>/rtp reload</code>.</p>
 </blockquote>
 <p><strong>Syntax</strong>
-<div class="highlight"><pre><span></span><code>/rtp config &lt;file&gt; &lt;key&gt;:&lt;value&gt; [&lt;key&gt;:&lt;value&gt; …] [--dry-run]
-/rtp config &lt;file&gt; &lt;list-key&gt; add:&lt;value&gt; [add:&lt;value&gt; …] [remove:&lt;value&gt; …] [--dry-run]
-/rtp config &lt;multifile&gt; &lt;subfile&gt; &lt;key&gt;:&lt;value&gt; [--dry-run]
+<div class="highlight"><pre><span></span><code>/rtp config &lt;file&gt; &lt;key&gt;=&lt;value&gt; [&lt;key&gt;=&lt;value&gt; …] [--dry-run]
+/rtp config &lt;file&gt; &lt;list-key&gt; add=&lt;value&gt; [add=&lt;value&gt; …] [remove=&lt;value&gt; …] [--dry-run]
+/rtp config &lt;multifile&gt; &lt;subfile&gt; &lt;key&gt;=&lt;value&gt; [--dry-run]
 /rtp config &lt;file&gt; view
 /rtp config &lt;file&gt; view &lt;key&gt; [&lt;key&gt; …]
 </code></pre></div></p>
-<p>One invocation targets <strong>exactly one</strong> file. Multiple <code>&lt;key&gt;:&lt;value&gt;</code> pairs (or <code>add:</code> / <code>remove:</code> operators on the same list key) within that file form one all-or-nothing transaction. The <code>--dry-run</code> token (default literal, configurable via <code>commands.config.dryRunFlag</code>) runs validation and renders the would-be diff without touching disk.</p>
+<p>One invocation targets <strong>exactly one</strong> file. Multiple <code>&lt;key&gt;=&lt;value&gt;</code> pairs (or <code>add=</code> / <code>remove=</code> operators on the same list key) within that file form one all-or-nothing transaction. The <code>--dry-run</code> token (default literal, configurable via <code>commands.config.dryRunFlag</code>) runs validation and renders the would-be diff without touching disk.</p>
 <p><strong>Required permissions</strong> (additive; the most-specific node wins):</p>
 <table>
 <thead>
@@ -3549,12 +3528,12 @@
 </thead>
 <tbody>
 <tr>
-<td><code>/rtp config &lt;file&gt; &lt;key&gt;:&lt;value&gt;</code></td>
+<td><code>/rtp config &lt;file&gt; &lt;key&gt;=&lt;value&gt;</code></td>
 <td>Set one or more scalar keys in the named config file. Validation is uniform; unknown keys, type mismatches, out-of-range values, and unknown region / world names are rejected with a <code>reasonCode</code> (see below) before any state mutates.</td>
 </tr>
 <tr>
-<td><code>/rtp config &lt;file&gt; &lt;list-key&gt; add:&lt;value&gt;</code> / <code>remove:&lt;value&gt;</code></td>
-<td>Append to / remove from a YAML list field. Duplicate <code>add:</code> and <code>remove:</code> of non-members are no-ops, not failures.</td>
+<td><code>/rtp config &lt;file&gt; &lt;list-key&gt; add=&lt;value&gt;</code> / <code>remove=&lt;value&gt;</code></td>
+<td>Append to / remove from a YAML list field. Duplicate <code>add=</code> and <code>remove=</code> of non-members are no-ops, not failures.</td>
 </tr>
 <tr>
 <td><code>/rtp config &lt;file&gt; view</code></td>
@@ -3570,17 +3549,17 @@
 </tr>
 </tbody>
 </table>
-<p><strong>Audit &amp; error reporting.</strong> Every invocation — success or failure, live or dry-run — emits exactly one audit record at <code>INFO</code> (success) or <code>WARNING</code> (failure) via <code>RTP.log</code>, carrying <code>actor</code>, <code>command</code>, <code>targetFile</code>, the per-mutation <code>oldValue</code> / <code>newValue</code> diff, <code>outcome</code>, and (on failure) a <code>reasonCode</code>. Failure messages render from <code>messages.yml → config.error.&lt;reasonCode&gt;</code> (REQ-RTP-F-013); the closed set of codes is documented in <a href="../../dev/CONFIG_COMMAND_SPEC/#52-reasoncode-enumeration"><code>CONFIG_COMMAND_SPEC.md</code> §5.2</a> and includes <code>UNKNOWN_FILE</code>, <code>UNKNOWN_KEY</code>, <code>WRONG_TYPE</code>, <code>OUT_OF_RANGE</code>, <code>UNKNOWN_REGION</code>, <code>UNKNOWN_WORLD</code>, <code>SCHEMA_INVARIANT</code>, <code>NO_PERMISSION</code>, <code>RELOAD_IN_PROGRESS</code>, <code>PERSIST_IO</code>, and others.</p>
+<p><strong>Audit &amp; error reporting.</strong> Every invocation — success or failure, live or dry-run — emits exactly one audit record at <code>INFO</code> (success) or <code>WARNING</code> (failure) in the server log, carrying the actor, command, target file, the per-mutation old/new value diff, the outcome, and (on failure) a <code>reasonCode</code>. Failure messages render from the <code>config.error.&lt;reasonCode&gt;</code> entries in <code>messages.yml</code>; the codes include <code>UNKNOWN_FILE</code>, <code>UNKNOWN_KEY</code>, <code>WRONG_TYPE</code>, <code>OUT_OF_RANGE</code>, <code>UNKNOWN_REGION</code>, <code>UNKNOWN_WORLD</code>, <code>SCHEMA_INVARIANT</code>, <code>NO_PERMISSION</code>, <code>RELOAD_IN_PROGRESS</code>, <code>PERSIST_IO</code>, and others.</p>
 <blockquote>
-<p><strong>World-aware vertical clamping</strong> (applies on every write <strong>and</strong> every reload): when updating a region config that targets a <code>_nether</code> world, <code>maxY</code> is automatically clamped to 128, <code>vert</code> is forced to <code>LINEAR</code>, and <code>requireskylight</code> is set to <code>false</code>. For <code>_the_end</code> worlds, <code>requireskylight</code> is set to <code>false</code>. In all cases <code>maxY</code>/<code>minY</code> are clamped to the world's actual height limits. These run as composite schema invariants (see <a href="../../adr/ADR-034-memory-shape-catalog/">ADR-034</a>); a violation aborts the transaction with <code>reasonCode = SCHEMA_INVARIANT</code> and the on-disk file is unchanged.</p>
+<p><strong>World-aware vertical clamping</strong> (applies on every write <strong>and</strong> every reload): when updating a region config that targets a <code>_nether</code> world, <code>maxY</code> is automatically clamped to 128, <code>vert</code> is forced to <code>LINEAR</code>, and <code>requireskylight</code> is set to <code>false</code>. For <code>_the_end</code> worlds, <code>requireskylight</code> is set to <code>false</code>. In all cases <code>maxY</code>/<code>minY</code> are clamped to the world's actual height limits. A violation aborts the transaction with <code>reasonCode = SCHEMA_INVARIANT</code> and the on-disk file is unchanged.</p>
 <p><strong><code>language.yml</code> is not addressable</strong> through the generic <code>/rtp config language …</code> form because a locale change requires re-initializing every parser. The dedicated <code>LanguageCmd</code> path handles it (subject to the same audit, permission, and atomic-write contracts as this surface). Attempts via the generic path fail with <code>reasonCode = USE_DEDICATED_COMMAND</code>.</p>
 </blockquote>
 <p><strong>Examples</strong>
-<div class="highlight"><pre><span></span><code>/rtp config performance maxAttempts:20
-/rtp config economy price:100 --dry-run
-/rtp config regions nether world:world_nether
-/rtp config regions nether maxY:128
-/rtp config regions default biomeWhitelist add:FOREST add:PLAINS remove:OCEAN
+<div class="highlight"><pre><span></span><code>/rtp config performance maxAttempts=20
+/rtp config economy price=100 --dry-run
+/rtp config regions nether world=world_nether
+/rtp config regions nether maxY=128
+/rtp config regions default biomeWhitelist add=FOREST add=PLAINS remove=OCEAN
 /rtp config regions default view shape
 /rtp config performance view
 </code></pre></div></p>
@@ -3592,13 +3571,13 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <p><strong>Required permission:</strong> <code>rtp.scan</code><br />
 <strong>Target region resolution:</strong> If <code>region</code> is omitted and the caller is a player, the player's current region is used. If the caller is the console, all permanent regions are targeted.</p>
 <blockquote>
-<p><strong>MemoryShape requirement:</strong> All scan sub-commands require the region's shape to be a <code>MemoryShape</code> implementation. Regions backed by other shape types are silently skipped with a <code>badArg</code> message.</p>
+<p><strong>Scannable-shape requirement:</strong> All scan sub-commands require the region to use a shape type that supports spatial memory. Regions backed by other shape types are silently skipped with an "invalid argument" message.</p>
 </blockquote>
 <hr />
 <h3 id="rtp-scan-start"><code>/rtp scan start</code><a class="headerlink" href="#rtp-scan-start" title="Permanent link">&para;</a></h3>
 <p>Discards any existing spatial memory for the region and begins a full-space enumeration from the first coordinate. Use this when you have radically changed your <code>safety.yml</code> or added new protection plugins and want to re-verify the entire world.</p>
 <p><strong>Syntax</strong>
-<div class="highlight"><pre><span></span><code>/rtp scan start [region:&lt;name&gt;]
+<div class="highlight"><pre><span></span><code>/rtp scan start [region=&lt;name&gt;]
 </code></pre></div></p>
 <table>
 <thead>
@@ -3609,7 +3588,7 @@ The <code>scan</code> command is used to proactively map out the world. While th
 </thead>
 <tbody>
 <tr>
-<td><code>region:&lt;name&gt;</code></td>
+<td><code>region=&lt;name&gt;</code></td>
 <td>Target a specific region. Omit to use the caller's current region (player) or all regions (console).</td>
 </tr>
 </tbody>
@@ -3620,67 +3599,67 @@ The <code>scan</code> command is used to proactively map out the world. While th
 </ul>
 <p><strong>Example</strong>
 <div class="highlight"><pre><span></span><code>/rtp scan start
-/rtp scan start region:mining
+/rtp scan start region=mining
 </code></pre></div></p>
 <hr />
 <h3 id="rtp-scan-reset"><code>/rtp scan reset</code><a class="headerlink" href="#rtp-scan-reset" title="Permanent link">&para;</a></h3>
 <p>Clears all spatial memory and cached locations for a region without starting a new scan pass. This effectively "forgets" everything the plugin knows about safe/unsafe spots in that region.</p>
 <p><strong>Syntax</strong>
-<div class="highlight"><pre><span></span><code>/rtp scan reset [region:&lt;name&gt;]
+<div class="highlight"><pre><span></span><code>/rtp scan reset [region=&lt;name&gt;]
 </code></pre></div></p>
 <ul>
 <li>If a scan task is currently running for the region, it is cancelled, paused, and its persistence file deleted before the shape data is cleared.</li>
 <li>On completion, <code>MessagesKeys.scanReset</code> is broadcast to all <code>rtp.scan</code> holders.</li>
 </ul>
 <p><strong>Example</strong>
-<div class="highlight"><pre><span></span><code>/rtp scan reset region:default
+<div class="highlight"><pre><span></span><code>/rtp scan reset region=default
 </code></pre></div></p>
 <hr />
 <h3 id="rtp-scan-pause"><code>/rtp scan pause</code><a class="headerlink" href="#rtp-scan-pause" title="Permanent link">&para;</a></h3>
 <p>Suspends an active scan task, preserving progress so it can be resumed later. The current <code>MemoryShape</code> state is persisted to disk immediately.</p>
 <p><strong>Syntax</strong>
-<div class="highlight"><pre><span></span><code>/rtp scan pause [region:&lt;name&gt;]
+<div class="highlight"><pre><span></span><code>/rtp scan pause [region=&lt;name&gt;]
 </code></pre></div></p>
 <ul>
 <li>If no scan task is running for the region, <code>MessagesKeys.scanNotRunning</code> is broadcast and no further action is taken.</li>
 </ul>
 <p><strong>Example</strong>
-<div class="highlight"><pre><span></span><code>/rtp scan pause region:mining
+<div class="highlight"><pre><span></span><code>/rtp scan pause region=mining
 </code></pre></div></p>
 <hr />
 <h3 id="rtp-scan-resume"><code>/rtp scan resume</code><a class="headerlink" href="#rtp-scan-resume" title="Permanent link">&para;</a></h3>
 <p>Resumes a paused scan task from its last saved position. If no task exists for the region, delegates automatically to <code>scan start</code>.</p>
 <p><strong>Syntax</strong>
-<div class="highlight"><pre><span></span><code>/rtp scan resume [region:&lt;name&gt;]
-/rtp scan [region:&lt;name&gt;]
+<div class="highlight"><pre><span></span><code>/rtp scan resume [region=&lt;name&gt;]
+/rtp scan [region=&lt;name&gt;]
 </code></pre></div></p>
 <ul>
 <li>Clears the <code>pause</code> flag on the existing <code>ScanTask</code> and re-schedules it via the async scheduler.</li>
 </ul>
 <p><strong>Example</strong>
 <div class="highlight"><pre><span></span><code>/rtp scan resume
-/rtp scan resume region:mining
+/rtp scan resume region=mining
 </code></pre></div></p>
 <hr />
 <h3 id="rtp-scan-cancel"><code>/rtp scan cancel</code><a class="headerlink" href="#rtp-scan-cancel" title="Permanent link">&para;</a></h3>
 <p>Permanently stops an active or paused scan task and deletes its persistence file. Progress is lost.</p>
 <p><strong>Syntax</strong>
-<div class="highlight"><pre><span></span><code>/rtp scan cancel [region:&lt;name&gt;]
+<div class="highlight"><pre><span></span><code>/rtp scan cancel [region=&lt;name&gt;]
 </code></pre></div></p>
 <ul>
 <li>If no scan task is running, <code>MessagesKeys.scanNotRunning</code> is broadcast.</li>
 <li>On success, the task is removed from the scan task registry and <code>MessagesKeys.scanCancel</code> is broadcast to all <code>rtp.scan</code> holders.</li>
 </ul>
 <p><strong>Example</strong>
-<div class="highlight"><pre><span></span><code>/rtp scan cancel region:mining
+<div class="highlight"><pre><span></span><code>/rtp scan cancel region=mining
 </code></pre></div></p>
 <hr />
 <h2 id="rtp-info-plugin-information"><code>/rtp info</code> — Plugin Information<a class="headerlink" href="#rtp-info-plugin-information" title="Permanent link">&para;</a></h2>
 <p>Displays the current runtime state of the plugin: loaded worlds, permanent regions, queue statistics, and performance metrics.</p>
 <p><strong>Syntax</strong>
 <div class="highlight"><pre><span></span><code>/rtp info
-/rtp info world:&lt;name&gt;
-/rtp info region:&lt;name&gt;
+/rtp info world=&lt;name&gt;
+/rtp info region=&lt;name&gt;
 </code></pre></div></p>
 <p><strong>Required permission:</strong> <code>rtp.info</code></p>
 <table>
@@ -3696,11 +3675,11 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <td>List all loaded worlds and permanent regions. In-game players receive clickable suggest-click entries; console receives full inline detail.</td>
 </tr>
 <tr>
-<td><code>world:&lt;name&gt;</code></td>
+<td><code>world=&lt;name&gt;</code></td>
 <td>Display the <code>worldInfo</code> message template for each named world. Inactive or non-existent worlds are silently skipped.</td>
 </tr>
 <tr>
-<td><code>region:&lt;name&gt;</code></td>
+<td><code>region=&lt;name&gt;</code></td>
 <td>Display the <code>regionInfo</code> message template for each named region, including queue depth, in-flight calculations, shape, cache cap, and a persistent learned-state summary (coverage, bad fraction, top rejection cause).</td>
 </tr>
 </tbody>
@@ -3741,12 +3720,12 @@ The <code>scan</code> command is used to proactively map out the world. While th
 </blockquote>
 <p><strong>Examples</strong>
 <div class="highlight"><pre><span></span><code>/rtp info
-/rtp info world:world_nether
-/rtp info region:default
+/rtp info world=world_nether
+/rtp info region=default
 </code></pre></div></p>
 <hr />
 <h2 id="rtp-test-runtime-test-suite"><code>/rtp test</code> — Runtime Test Suite<a class="headerlink" href="#rtp-test-runtime-test-suite" title="Permanent link">&para;</a></h2>
-<p>Operator-facing self-test commands that exercise the teleport pipeline, queue, safety checks, verifiers, and scheduler against the live server. See <code>docs/dev/RUNTIME_TEST_SUITE_PLAN.md</code> for the full design and roadmap.</p>
+<p>Operator-facing self-test commands that exercise the teleport pipeline, queue, safety checks, verifiers, and scheduler against the live server.</p>
 <p><strong>Required permission:</strong> <code>rtp.test</code></p>
 <table>
 <thead>
@@ -3758,24 +3737,24 @@ The <code>scan</code> command is used to proactively map out the world. While th
 </thead>
 <tbody>
 <tr>
-<td><code>/rtp test stress player:&lt;name&gt; [iterations:N] [intervalTicks:T] [region:&lt;name&gt;]</code></td>
+<td><code>/rtp test stress player=&lt;name&gt; [iterations=N] [intervalTicks=T] [region=&lt;name&gt;]</code></td>
 <td>Available</td>
 <td>Repeatedly teleports the listed player(s) through the real <code>/rtp</code> pipeline. <code>iterations</code> is clamped to <code>[1, 1000]</code> (default <code>10</code>); <code>intervalTicks</code> to <code>[10, 6000]</code> (default <code>40</code>).</td>
 </tr>
 <tr>
 <td><code>/rtp test queue</code>, <code>safety</code>, <code>verifiers</code>, <code>memory</code>, <code>platform</code>, <code>full</code></td>
 <td>Planned</td>
-<td>Documented in <code>RUNTIME_TEST_SUITE_PLAN.md §4</code>.</td>
+<td>Not yet available.</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Examples</strong>
-<div class="highlight"><pre><span></span><code>/rtp test stress player:leaf26
-/rtp test stress player:leaf26 iterations:50 intervalTicks:60
-/rtp test stress player:Alice player:Bob region:mining
+<div class="highlight"><pre><span></span><code>/rtp test stress player=leaf26
+/rtp test stress player=leaf26 iterations=50 intervalTicks=60
+/rtp test stress player=Alice player=Bob region=mining
 </code></pre></div></p>
 <blockquote>
-<p><strong>Threading note:</strong> The stress loop runs on <code>runTaskTimerAsynchronously</code> and delegates each iteration to the standard <code>/rtp</code> pipeline, so every safety guard (cooldown, economy, claim verifiers, async chunk I/O) remains active. Per-iteration failures are logged at <code>Level.WARNING</code> to satisfy REQ-RTP-S-004.</p>
+<p><strong>Threading note:</strong> The stress loop runs asynchronously and delegates each iteration to the standard <code>/rtp</code> pipeline, so every safety guard (cooldown, economy, claim verifiers, async chunk I/O) remains active. Per-iteration failures are logged at <code>WARNING</code> in the server log.</p>
 </blockquote>
 <hr />
 <h2 id="rtp-help-help"><code>/rtp help</code> — Help<a class="headerlink" href="#rtp-help-help" title="Permanent link">&para;</a></h2>
@@ -3890,7 +3869,7 @@ The <code>scan</code> command is used to proactively map out the world. While th
 </tr>
 <tr>
 <td><code>%rtp_backlogCacheCap%</code></td>
-<td>L3 backlog cache capacity (ADR-028); 0 disables L3</td>
+<td>Backlog (unverified) cache capacity; 0 disables it</td>
 </tr>
 <tr>
 <td><code>%rtp_cached%</code></td>
@@ -4051,12 +4030,12 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <tr>
 <td><code>rtp.other</code></td>
 <td>op</td>
-<td>Teleport another player with <code>player:&lt;name&gt;</code></td>
+<td>Teleport another player with <code>player=&lt;name&gt;</code></td>
 </tr>
 <tr>
 <td><code>rtp.notme</code></td>
 <td>op</td>
-<td>Make yourself untargetable by other players' <code>/rtp player:&lt;name&gt;</code> - prevents forced RTP by other ops. Console is exempt and can always target any player.</td>
+<td>Make yourself untargetable by other players' <code>/rtp player=&lt;name&gt;</code> - prevents forced RTP by other ops. Console is exempt and can always target any player.</td>
 </tr>
 <tr>
 <td><code>rtp.reload</code></td>
@@ -4086,7 +4065,7 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <tr>
 <td><code>rtp.update</code></td>
 <td>op</td>
-<td>Write individual config keys or list items via <code>SubConfigCmd</code> (legacy node; subsumed by <code>rtp.config.set</code> per <a href="../../dev/CONFIG_COMMAND_SPEC/"><code>CONFIG_COMMAND_SPEC.md</code></a>).</td>
+<td>Write individual config keys or list items (legacy node; subsumed by <code>rtp.config.set</code>).</td>
 </tr>
 <tr>
 <td><code>rtp.info</code></td>

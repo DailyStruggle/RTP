@@ -635,27 +635,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3590,7 +3569,7 @@
 <h4 id="positional-arguments-per-type">Positional arguments per type<a class="headerlink" href="#positional-arguments-per-type" title="Permanent link">&para;</a></h4>
 <p>Order and names come directly from the matching <code>*TypeNames</code> enum in <code>effects-api/.../LocalEffects/enums/</code>.</p>
 <p><strong><code>FIREWORK</code></strong> — <code>FireworkTypeNames</code></p>
-<p>Canonical positional order matches <code>FireworkEffect.KEY_ORDER</code> in <code>effects-api</code>. Since effects-api-ADR-002 (3.0.0-beta.2), <code>Effect.setData(String...)</code> walks <code>KEY_ORDER</code> with a non-rewinding cursor and assigns each token to the <em>first remaining key whose default type accepts it</em> — so trailing booleans land on <code>FLICKER</code> / <code>TRAIL</code> / <code>SAFE</code> even when given before the offsets. For predictability, supply tokens in the order below.</p>
+<p>Since 3.0.0-beta.2, the firework parser walks the canonical key order with a non-rewinding cursor and assigns each token to the <em>first remaining key whose default type accepts it</em> — so trailing booleans land on <code>FLICKER</code> / <code>TRAIL</code> / <code>SAFE</code> even when given before the offsets. For predictability, supply tokens in the order below.</p>
 <table>
 <thead>
 <tr>
@@ -3954,7 +3933,7 @@
 <p>A complete, compilable template ships in the repository. It demonstrates the four API touch-points every addon typically needs:</p>
 <ol>
 <li><strong>Config registration</strong> — <code>ConfigParser&lt;CountdownKeys&gt;</code> participates in <code>/rtp reload</code>.</li>
-<li><strong>Safety contribution</strong> — <code>GlobalRegionVerifiers.addGlobalRegionVerifier(...)</code> predicate, invoked asynchronously by the teleport pipeline (S-003 / S-005 compliant).</li>
+<li><strong>Safety contribution</strong> — <code>GlobalRegionVerifiers.addGlobalRegionVerifier(...)</code> predicate, invoked asynchronously by the teleport pipeline (runs off the main thread and never loads chunks synchronously).</li>
 <li><strong>Event handling</strong> — a Bukkit <code>Listener</code> for one of RTP's lifecycle events.</li>
 <li><strong>Reload hook</strong> — <code>Configs.onReload(Runnable)</code> so operator <code>/rtp reload</code> picks up addon changes without a restart.</li>
 </ol>
@@ -4029,7 +4008,7 @@
 </tr>
 <tr>
 <td><code>PostLoadChunksEvent</code></td>
-<td>Destination chunks are loaded (still async-safe — S-005).</td>
+<td>Destination chunks are loaded (still async-safe).</td>
 </tr>
 <tr>
 <td><code>PreTeleportEvent</code></td>
@@ -4066,12 +4045,12 @@
 </tbody>
 </table>
 <h3 id="developer-do-dont">Developer do / don't<a class="headerlink" href="#developer-do-dont" title="Permanent link">&para;</a></h3>
-<p>Pulled from <a href="../../../dev/REQUIREMENTS/"><code>REQUIREMENTS.md §3</code></a> (S-00x rules):</p>
+<p>RTP's internal safety rules require every listener to follow these:</p>
 <ul>
-<li><strong>Do</strong> put chunk / claim / biome checks inside a <code>GlobalRegionVerifiers</code> lambda — it runs asynchronously and is S-005 safe.</li>
+<li><strong>Do</strong> put chunk / claim / biome checks inside a <code>GlobalRegionVerifiers</code> lambda — it runs asynchronously and never loads chunks on the main thread.</li>
 <li><strong>Do</strong> log via <code>RTP.log(Level, msg[, throwable])</code>. Never <code>Bukkit.getLogger()</code>, never <code>printStackTrace()</code>.</li>
-<li><strong>Don't</strong> perform synchronous <code>world.getChunkAt(...)</code> inside an event handler (S-005).</li>
-<li><strong>Don't</strong> silently <code>return</code> on a teleport failure (S-004) — surface via the event or log.</li>
+<li><strong>Don't</strong> perform synchronous <code>world.getChunkAt(...)</code> inside an event handler.</li>
+<li><strong>Don't</strong> silently <code>return</code> on a teleport failure — surface via the event or log.</li>
 <li><strong>Don't</strong> import <code>org.bukkit.*</code> from <code>rtp-core</code> or <code>rtp-api</code>; keep platform code in the adapter module or in the addon.</li>
 </ul>
 <hr />
@@ -4081,7 +4060,7 @@
 <li>Source of truth, effect registry: <code>effects-api/src/main/java/io/github/dailystruggle/effectsapi/EffectFactory.java</code></li>
 <li>Parameter enums: <code>effects-api/src/main/java/io/github/dailystruggle/effectsapi/LocalEffects/enums/</code></li>
 <li>Developer walkthrough: <code>addons/LeafRTPCountdownAddon/README.md</code></li>
-<li>Safety rules every listener must follow: <a href="../../../dev/REQUIREMENTS/"><code>../dev/REQUIREMENTS.md §3</code></a></li>
+<li>Safety rules every listener must follow: see the do / don't list above.</li>
 <li>Auto-teleport (<code>rtp.onevent.*</code>) permissions: <a href="../../COMMANDS/"><code>COMMANDS.md</code></a></li>
 </ul>
 

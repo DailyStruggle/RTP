@@ -770,27 +770,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3298,9 +3277,9 @@
 <h2 id="the-happy-path">The happy path<a class="headerlink" href="#the-happy-path" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Install</strong> and start the server once to write the default config.</li>
-<li><strong>Configure</strong> a region's geometry (shape, size, center) - see <a href="https://github.com/DailyStruggle/RTP/wiki/Regions">Regions</a>.</li>
-<li><strong>Point each world at a region</strong> in its config - see <a href="https://github.com/DailyStruggle/RTP/wiki/Worlds">Worlds</a>.</li>
-<li><strong>Warm the cache</strong>: <code>/rtp scan start region=&lt;name&gt;</code> per reasonably-sized region - see <a href="https://github.com/DailyStruggle/RTP/wiki/Scan-and-Spatial-Memory">Scan and spatial memory</a>.</li>
+<li><strong>Configure</strong> a region's geometry (shape, size, center) - see <a href="../../admin/configuration/REGIONS/">Regions</a>.</li>
+<li><strong>Point each world at a region</strong> in its config - see <a href="../../admin/configuration/WORLDS/">Worlds</a>.</li>
+<li><strong>Warm the cache</strong>: <code>/rtp scan start region=&lt;name&gt;</code> per reasonably-sized region - see the <a href="../../admin/QUICK_START/">Quick start</a> scan step.</li>
 <li>Players run a plain <strong><code>/rtp</code></strong>, which resolves to their world's region.</li>
 </ol>
 <div class="admonition tip">
@@ -3317,10 +3296,10 @@
 <span class="w">  </span><span class="nt">centerX</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">       </span><span class="c1"># center, in chunks</span>
 <span class="w">  </span><span class="nt">centerZ</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 </code></pre></div>
-<p>Then point the overworld at that region (<a href="https://github.com/DailyStruggle/RTP/wiki/Worlds">Worlds</a>), warm it with <code>/rtp scan start region=overworld</code> (watch <code>/rtp scan info</code>), and you are done. A player typing <code>/rtp</code> gets a cached, pre-verified coordinate.</p>
+<p>Then point the overworld at that region (<a href="../../admin/configuration/WORLDS/">Worlds</a>), warm it with <code>/rtp scan start region=overworld</code> (watch <code>/rtp scan info</code>), and you are done. A player typing <code>/rtp</code> gets a cached, pre-verified coordinate.</p>
 <div class="admonition note">
 <p class="admonition-title"><code>radius</code>, <code>centerX</code>, and <code>centerZ</code> are measured in chunks</p>
-<p>They live <em>inside</em> the <code>shape:</code> block (not at the top level), and their unit is <strong>chunks</strong>, not blocks - 1 chunk is 16 blocks. A <code>radius</code> of <code>625</code> therefore reaches 10,000 blocks. See <a href="https://github.com/DailyStruggle/RTP/wiki/Regions">Regions</a> for the full field reference.</p>
+<p>They live <em>inside</em> the <code>shape:</code> block (not at the top level), and their unit is <strong>chunks</strong>, not blocks - 1 chunk is 16 blocks. A <code>radius</code> of <code>625</code> therefore reaches 10,000 blocks. See <a href="../../admin/configuration/REGIONS/">Regions</a> for the full field reference.</p>
 </div>
 <div class="admonition note">
 <p class="admonition-title">That is the whole loop</p>
@@ -3387,7 +3366,7 @@
 <div class="tabbed-block">
 <p>Larger servers commonly run <strong>many worlds at once</strong> - separate overworld, nether, end, a resource world that resets, minigame worlds, and modded dimensions - and on regionised-threading platforms those worlds (and even areas within one world) run on <strong>parallel threads</strong>.</p>
 <ul>
-<li>Define <strong>one region per place you want <code>/rtp</code> to send players</strong> (overworld, resource world, each dimension), then point each world file at the right region. See <a href="https://github.com/DailyStruggle/RTP/wiki/Worlds">Worlds</a> and <a href="https://github.com/DailyStruggle/RTP/wiki/Regions">Regions</a>.</li>
+<li>Define <strong>one region per place you want <code>/rtp</code> to send players</strong> (overworld, resource world, each dimension), then point each world file at the right region. See <a href="../../admin/configuration/WORLDS/">Worlds</a> and <a href="../../admin/configuration/REGIONS/">Regions</a>.</li>
 <li>Warm each static region with its own <code>/rtp scan start region=&lt;name&gt;</code>. Skip warming worlds that reset often (a resource world) - their memory would be invalidated on every reset.</li>
 <li>Because the engine does all chunk work off the main thread, it stays compatible with regionised, multi-threaded servers - no world's RTP traffic stalls another's.</li>
 </ul>
@@ -3440,11 +3419,11 @@
 <hr />
 <h2 id="where-to-go-next">Where to go next<a class="headerlink" href="#where-to-go-next" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="https://github.com/DailyStruggle/RTP/wiki/Regions">Regions</a> / <a href="https://github.com/DailyStruggle/RTP/wiki/Worlds">Worlds</a> - configure the model.</li>
-<li><a href="https://github.com/DailyStruggle/RTP/wiki/Typical-Configuration-Order">Typical configuration order</a> - the recommended sequence.</li>
-<li><a href="https://github.com/DailyStruggle/RTP/wiki/Scan-and-Spatial-Memory">Scan and spatial memory</a> - warm the cache.</li>
+<li><a href="../../admin/configuration/REGIONS/">Regions</a> / <a href="../../admin/configuration/WORLDS/">Worlds</a> - configure the model.</li>
+<li><a href="../../admin/QUICK_START/">Quick start</a> - the recommended end-to-end setup sequence.</li>
+<li><a href="../../admin/COMMANDS/">Commands</a> - the <code>/rtp scan</code> reference for warming the cache.</li>
 <li><a href="../what-not-to-do/">What NOT to do!</a> - the anti-patterns.</li>
-<li><a href="https://github.com/DailyStruggle/RTP/wiki/Behavior">Behavior</a> - the runtime story in depth.</li>
+<li><a href="../why/">Why LeafRTP exists</a> - the runtime story and distribution algorithm in depth.</li>
 </ul>
 
 

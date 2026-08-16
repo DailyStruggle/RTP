@@ -635,27 +635,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3324,7 +3303,7 @@
 <td><code>staleChunkRetryLimit</code></td>
 <td>Integer</td>
 <td><code>2</code></td>
-<td>Bounded retry budget for the stale-chunk guard (ADR-015). Prevents race conditions where a chunk unloads before evaluation.</td>
+<td>Bounded retry budget for the stale-chunk guard. Prevents race conditions where a chunk unloads before evaluation.</td>
 </tr>
 <tr>
 <td><code>anvilPrefilterEnabled</code></td>
@@ -3374,18 +3353,18 @@
 <td><code>platformRestoreSeconds</code></td>
 <td>Integer</td>
 <td><code>-1</code></td>
-<td>Optional timeout after which a built platform's footprint is restored to its original blocks. <code>-1</code> disables restoration (permanent platform). <code>0</code> restores as soon as the footprint chunk is loaded again; a positive value restores after that many seconds. The countdown only advances while the footprint chunk is loaded (it pauses while the area is unloaded), and pending restores survive a server restart. See <a href="../../../adr/ADR-060-emergency-platform-block-restoration-timeout/">ADR-060</a>.</td>
+<td>Optional timeout after which a built platform's footprint is restored to its original blocks. <code>-1</code> disables restoration (permanent platform). <code>0</code> restores as soon as the footprint chunk is loaded again; a positive value restores after that many seconds. The countdown only advances while the footprint chunk is loaded (it pauses while the area is unloaded), and pending restores survive a server restart.</td>
 </tr>
 </tbody>
 </table>
 <blockquote>
-<p><strong>Note on <code>platformRestoreSeconds</code>.</strong> Restoration writes the captured original blocks back; every restore (and any failure) is logged, never silently dropped. Available on the Bukkit/Spigot/Paper and Folia platforms; the Fabric platform does not build emergency platforms, so the timeout has no effect there. Because the platform is only ever built on land the safety pipeline already cleared of claims (S-003), the footprint starts in unclaimed terrain; if you expect players to build on top of the temporary platform before it expires, leave restoration disabled (<code>-1</code>).</p>
+<p><strong>Note on <code>platformRestoreSeconds</code>.</strong> Restoration writes the captured original blocks back; every restore (and any failure) is logged, never silently dropped. Available on the Bukkit/Spigot/Paper and Folia platforms; the Fabric platform does not build emergency platforms, so the timeout has no effect there. Because the platform is only ever built on land the safety pipeline already cleared of claims, the footprint starts in unclaimed terrain; if you expect players to build on top of the temporary platform before it expires, leave restoration disabled (<code>-1</code>).</p>
 </blockquote>
 <hr />
 <h2 id="block-filters-token-grammar">Block Filters &amp; Token Grammar<a class="headerlink" href="#block-filters-token-grammar" title="Permanent link">&para;</a></h2>
-<p>The <code>airBlocks</code> and <code>unsafeBlocks</code> lists use a specific grammar (ADR-017) to match blocks and properties.</p>
+<p>The <code>airBlocks</code> and <code>unsafeBlocks</code> lists use a specific grammar to match blocks and properties.</p>
 <blockquote>
-<p><strong>Edition note (Pro only).</strong> The plain-material rows below work in every edition, but the <strong>block-tag and block-state-predicate grammar</strong> (<code>#namespace:tag</code>, <code>MATERIAL[...]</code>, <code>*[...]</code>, including the numeric range predicates) ships only in the full (Pro) edition. The <strong>rtp-lite</strong> assembly variant (<a href="../../../adr/ADR-024-rtp-lite-assembly-variant/">ADR-024</a>) parses <code>unsafeBlocks</code> / <code>airBlocks</code> as a <strong>flat material allow/deny list</strong> and does not honour any <code>#tag</code> token or <code>[...]</code> predicate. See the bundled lite docs (<code>SAFETY.md</code> inside the lite jar) for the lite-only surface.</p>
+<p><strong>Edition note (Pro only).</strong> The plain-material rows below work in every edition, but the <strong>block-tag and block-state-predicate grammar</strong> (<code>#namespace:tag</code>, <code>MATERIAL[...]</code>, <code>*[...]</code>, including the numeric range predicates) ships only in the full (Pro) edition. The <strong>rtp-lite</strong> build parses <code>unsafeBlocks</code> / <code>airBlocks</code> as a <strong>flat material allow/deny list</strong> and does not honour any <code>#tag</code> token or <code>[...]</code> predicate. See the bundled lite docs (<code>SAFETY.md</code> inside the lite jar) for the lite-only surface.</p>
 </blockquote>
 <h3 id="grammar-token-syntax">Grammar (Token Syntax)<a class="headerlink" href="#grammar-token-syntax" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3400,8 +3379,8 @@
 <ul>
 <li>Multiple predicates inside one <code>[ ... ]</code> combine with logical <strong>AND</strong> (e.g., <code>WATER[falling=true,level&gt;=5]</code>).</li>
 <li>Two range bounds on the same key form an interval, e.g., <code>LAVA[level&gt;=2,level&lt;=5]</code>.</li>
-<li>Equality (<code>=</code>) compares values as case-insensitive strings; the range operators parse both sides as integers. A live block whose property is absent or non-numeric is treated as a <strong>miss</strong> (fail-open per ADR-017 §4) — it is never rejected by a predicate it cannot satisfy.</li>
-<li>Malformed tokens (non-integer bound, empty value, duplicate <code>key</code>+operator, unbalanced brackets) are dropped at load with a single startup <code>WARNING</code> and never silently ignored (REQ-RTP-S-004).</li>
+<li>Equality (<code>=</code>) compares values as case-insensitive strings; the range operators parse both sides as integers. A live block whose property is absent or non-numeric is treated as a <strong>miss</strong> (fail-open) - it is never rejected by a predicate it cannot satisfy.</li>
+<li>Malformed tokens (non-integer bound, empty value, duplicate <code>key</code>+operator, unbalanced brackets) are dropped at load with a single startup <code>WARNING</code> and never silently ignored.</li>
 </ul>
 <h3 id="airblocks"><code>airBlocks</code><a class="headerlink" href="#airblocks" title="Permanent link">&para;</a></h3>
 <p>Materials treated as walkable / non-blocking space above the landing.

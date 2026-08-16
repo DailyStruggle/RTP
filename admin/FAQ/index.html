@@ -1004,27 +1004,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3872,7 +3851,7 @@
 <h3 id="how-does-rtp-load-addons-and-how-do-i-turn-the-bundled-ones-off">How does RTP load addons, and how do I turn the bundled ones off?<a class="headerlink" href="#how-does-rtp-load-addons-and-how-do-i-turn-the-bundled-ones-off" title="Permanent link">&para;</a></h3>
 <p>Addons can arrive three ways - as a standalone plugin/mod, dropped into <code>plugins/RTP/addons/</code>, or bundled inside the RTP jar and auto-extracted to that folder on first run (this is how the on-by-default GUI picker ships). To turn a bundled addon off, delete its individual jar from <code>plugins/RTP/addons/</code> (do <strong>not</strong> delete the whole folder - a missing folder is treated as a fresh install and re-extracts the bundled jars) or set its config knob. Full details, including the <code>/rtp gui</code> behavior and a troubleshooting table, are in <a href="../ADDONS/">ADDONS.md</a>.</p>
 <h3 id="i-want-to-add-a-custom-claim-plugin-integration-where-do-i-start">I want to add a custom claim plugin integration. Where do I start?<a class="headerlink" href="#i-want-to-add-a-custom-claim-plugin-integration-where-do-i-start" title="Permanent link">&para;</a></h3>
-<p>RTP already bundles claim-plugin support for the common protection plugins (GriefPrevention, WorldGuard, Towny, etc.) directly in the plugin jar — there is no separate integration jar to install (see <a href="../../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/">ADR-019</a>). To add your <em>own</em> integration, look at the <code>addons/RTP_ExampleAddon/</code> directory for a working example: your addon compiles against <code>rtp-api</code> only, registers a safety verifier through <code>RTPAPI.hooks()</code> (the same seam the bundled claim checks use), and registers itself on plugin enable. See <a href="https://github.com/dailystruggle/RTP/blob/V3/addons/REQUIREMENTS.md">the addon API contract</a> for details.</p>
+<p>RTP already bundles claim-plugin support for the common protection plugins (GriefPrevention, WorldGuard, Towny, etc.) directly in the plugin jar — there is no separate integration jar to install. To add your <em>own</em> integration, look at the <code>addons/RTP_ExampleAddon/</code> directory for a working example: your addon compiles against <code>rtp-api</code> only, registers a safety verifier through <code>RTPAPI.hooks()</code> (the same seam the bundled claim checks use), and registers itself on plugin enable. See <a href="https://github.com/dailystruggle/RTP/blob/V3/addons/REQUIREMENTS.md">the addon API contract</a> for details.</p>
 <h3 id="i-added-a-requirement-to-a-requirementsmd-file-and-ci-is-failing">I added a requirement to a <code>REQUIREMENTS.md</code> file and CI is failing.<a class="headerlink" href="#i-added-a-requirement-to-a-requirementsmd-file-and-ci-is-failing" title="Permanent link">&para;</a></h3>
 <p>The <code>check_traceability.sh</code> script enforces that every <code>REQ-*</code> ID in a requirements file has a corresponding row in <code>TRACEABILITY.md</code>. Add the row before pushing. See <a href="https://github.com/dailystruggle/RTP/blob/V3/CONTRIBUTING.md">CONTRIBUTING.md</a> for the full four-step workflow.</p>
 <h3 id="where-are-the-automated-tests">Where are the automated tests?<a class="headerlink" href="#where-are-the-automated-tests" title="Permanent link">&para;</a></h3>

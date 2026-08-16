@@ -635,27 +635,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3272,12 +3251,10 @@
 
 <h1 id="cross-server-rtp-verification">Cross-Server <code>/rtp</code> Verification<a class="headerlink" href="#cross-server-rtp-verification" title="Permanent link">&para;</a></h1>
 <p>Operator-facing manual verification of the cross-server <code>/rtp</code> round-trip on
-a multi-proxy, multi-backend network. The dev-facing automated fixture for
-the same scenarios lives at <a href="https://github.com/dailystruggle/RTP/tree/V3/platforms/rtp-proxy/devstack"><code>platforms/rtp-proxy/devstack/</code></a>.</p>
-<p>Single-backend / in-memory transport precursor:
-<a href="../SINGLE_BACKEND_VERIFICATION/"><code>SINGLE_BACKEND_VERIFICATION.md</code></a>.</p>
-<p>Reference: <a href="../../../dev/MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a>,
-<a href="../../../adr/ADR-036-network-mode-multi-server-multi-proxy/">ADR-036</a>.</p>
+a multi-proxy, multi-backend network.</p>
+<p>Start with the single-backend precursor first:
+<a href="../SINGLE_BACKEND_VERIFICATION/"><code>SINGLE_BACKEND_VERIFICATION.md</code></a>, and see the
+<a href="../INDEX/">Proxy mode overview</a> for what network mode is and what it needs.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Two Velocity proxies sharing the same <code>forwarding.secret</code>.</li>
@@ -3349,7 +3326,7 @@ participant (it silently runs in-memory).</p>
    so the immediately-following <code>/rtp</code> dispatch consumes that exact
    coord (no second pipeline run).</li>
 </ol>
-<p>L6 queue + reservation state transitions an operator can observe:</p>
+<p>Queue + reservation state transitions an operator can observe:</p>
 <ul>
 <li><code>rtp:net:wq:status:&lt;pid&gt;</code> HASH cycles through <code>PENDING -&gt; ROUTING -&gt;
   RESERVED -&gt; COMPLETED</code> (or <code>FAILED/CANCELLED</code> on the failure paths);
@@ -3419,7 +3396,7 @@ canary for the Lua contract, not as authoritative acceptance evidence.</p>
 <h2 id="teardown">Teardown<a class="headerlink" href="#teardown" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>network.enabled: false</code> on every participant restores byte-identical
-  pre-Phase-2 behavior (REQ-RTP-NET-002).</li>
+  single-server behavior.</li>
 <li>Reservation rows older than their TTL are reaped automatically. To
   flush manually: <code>redis-cli --scan --pattern 'rtp:net:*' | xargs redis-cli DEL</code>.</li>
 </ul>

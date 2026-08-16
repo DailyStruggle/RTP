@@ -16,7 +16,7 @@
         <link rel="prev" href="../RECIPES/">
       
       
-        <link rel="next" href="../../MAP/">
+        <link rel="next" href="../RUNBOOK/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -753,27 +753,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -3319,7 +3298,7 @@
 <h3 id="configuration-files">Configuration Files<a class="headerlink" href="#configuration-files" title="Permanent link">&para;</a></h3>
 <p>No configuration keys were renamed, removed, or restructured in 3.0.0-beta.1. Existing <code>config.yml</code>, <code>performance.yml</code>, <code>safety.yml</code>, <code>economy.yml</code>, <code>worlds/</code>, and <code>regions/</code> files are fully forward-compatible — no edits required.</p>
 <h3 id="database-spatial-memory-cache">Database / Spatial Memory Cache<a class="headerlink" href="#database-spatial-memory-cache" title="Permanent link">&para;</a></h3>
-<p>The spatial memory format (<code>MemoryShape</code> bad-sector index ranges) is unchanged. Your existing cache will be read correctly after upgrade — no rebuild required.</p>
+<p>The spatial memory format (the bad-sector index ranges the plugin persists per region) is unchanged. Your existing cache will be read correctly after upgrade — no rebuild required.</p>
 <p>If you want a clean slate (e.g., after significantly changing a region's geometry), delete the relevant database entries or run:
 <div class="highlight"><pre><span></span><code>/rtp scan reset
 </code></pre></div></p>

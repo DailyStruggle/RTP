@@ -635,27 +635,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3360,7 +3339,7 @@
 <strong>Target release:</strong> <code>3.0.0-beta.3</code> (surface + reflector already shipped under <code>rtp-api</code>/<code>rtp-core</code>); module extraction lands once Stage 5 of <code>CHECKLIST-generalized-menu.md</code> completes.
 <strong>Supersedes (in part):</strong> the prior "Command-Tree Menu Reflector" draft of this ADR (which placed <code>CommandTreeMenuBuilder</code> permanently in <code>rtp-core</code>).</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
-<p><a href="../ADR-035-interactive-menus-book-first/">ADR-035</a> (Accepted, 2026-05-15 amendment) defines the platform-neutral menu primitive: <code>MenuModel</code> / <code>MenuPage</code> / <code>MenuLine</code> / <code>MenuFragment</code> / <code>MenuAction</code> plus <code>MenuRenderer</code> / <code>MenuTokenRegistry</code> / <code>MenuConsumerProfile</code> / <code>MenuOpenRequest</code> / <code>YamlCommentLookup</code>. The first concrete implementation has already shipped under the staged checklist at <a href="../../dev/scratch/CHECKLIST-generalized-menu/"><code>docs/dev/scratch/CHECKLIST-generalized-menu.md</code></a>:</p>
+<p><a href="../ADR-035-interactive-menus-book-first/">ADR-035</a> (Accepted, 2026-05-15 amendment) defines the platform-neutral menu primitive: <code>MenuModel</code> / <code>MenuPage</code> / <code>MenuLine</code> / <code>MenuFragment</code> / <code>MenuAction</code> plus <code>MenuRenderer</code> / <code>MenuTokenRegistry</code> / <code>MenuConsumerProfile</code> / <code>MenuOpenRequest</code> / <code>YamlCommentLookup</code>. The first concrete implementation has already shipped under the staged checklist at <a href="../dev/scratch/CHECKLIST-generalized-menu.md"><code>docs/dev/scratch/CHECKLIST-generalized-menu.md</code></a>:</p>
 <ul>
 <li><strong>Stage 1</strong> — sealed surface placed in <code>rtp-api/.../menu/</code> (10 types, no platform imports).</li>
 <li><strong>Stage 2</strong> — <code>LocalMenuTokenRegistry</code>, <code>MenuRedeemSubcommand</code>, <code>CommandTreeMenuBuilder</code>, <code>ConfigMenuConsumerProfile</code> in <code>rtp-core/.../commands/menu/</code>.</li>
@@ -3533,7 +3512,7 @@
 <li>Stale hover text between mint and redeem under fast config edits. Carried forward from the prior draft.</li>
 </ul>
 <h2 id="migration-rollout">Migration / Rollout<a class="headerlink" href="#migration-rollout" title="Permanent link">&para;</a></h2>
-<p>This ADR ratifies the <strong>module-extraction</strong> step, not the initial surface ship. The implementation lives in <code>rtp-api</code>/<code>rtp-core</code> as Stages 1–4 of <a href="../../dev/scratch/CHECKLIST-generalized-menu/"><code>CHECKLIST-generalized-menu.md</code></a>. The checklist's amended <strong>Stage 6</strong> captures the extraction work itself, gated on:</p>
+<p>This ADR ratifies the <strong>module-extraction</strong> step, not the initial surface ship. The implementation lives in <code>rtp-api</code>/<code>rtp-core</code> as Stages 1–4 of <a href="../dev/scratch/CHECKLIST-generalized-menu.md"><code>CHECKLIST-generalized-menu.md</code></a>. The checklist's amended <strong>Stage 6</strong> captures the extraction work itself, gated on:</p>
 <ol>
 <li><strong>Stage 5.3 (paginated chat renderers on Paper/Folia/Spigot) complete</strong> — minimizes mid-stage import churn.</li>
 <li><strong>Stage 5.2 go/no-go for the Fabric obf/unobf carrier confirmed</strong> — drives whether <code>menu-api-fabric-unobf/</code> is created in the same extraction or deferred.</li>
@@ -3564,7 +3543,7 @@
 <li><a href="../../dev/CONFIG_COMMAND_SPEC/">CONFIG_COMMAND_SPEC §2.4</a> — <code>view</code> sub-form; the <code>/rtp config</code> consumer mirrors its hover / click-suggest contract.</li>
 <li><a href="../../dev/REQUIREMENTS/">REQUIREMENTS.md §3</a> — Prohibitions; the menu subsystem inherits S-004, S-005, S-006, S-007.</li>
 <li><a href="../../dev/TRACEABILITY/">TRACEABILITY.md</a> — REQ-RTP-F-013 row covers menu chrome strings; REQ-RTP-MENU-001..004 rows added during Stage 6.</li>
-<li><a href="../../dev/scratch/CHECKLIST-generalized-menu/"><code>docs/dev/scratch/CHECKLIST-generalized-menu.md</code></a> — multi-session implementation plan, including the Stage 6 module-extraction sub-plan ratified by this ADR.</li>
+<li><a href="../dev/scratch/CHECKLIST-generalized-menu.md"><code>docs/dev/scratch/CHECKLIST-generalized-menu.md</code></a> — multi-session implementation plan, including the Stage 6 module-extraction sub-plan ratified by this ADR.</li>
 </ul>
 
 

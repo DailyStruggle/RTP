@@ -629,27 +629,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3159,7 +3138,7 @@
 <h1 id="neoforge-loose-planning-notes">NeoForge — Loose Planning Notes<a class="headerlink" href="#neoforge-loose-planning-notes" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p><strong>Status:</strong> Pre-proposal scratch. <strong>Not</strong> a plan, <strong>not</strong> an ADR, <strong>not</strong> a commitment. These notes exist so we don't have to re-derive the landscape every time NeoForge comes up. Anything here that turns into actual work must go through a D-005 proposal first and (likely) a formal ADR + an entry in <code>MULTI_PLATFORM_PLAN.md</code>.</p>
-<p><strong>Current scope reminder (updated 2026-06-02):</strong> NeoForge is <strong>in scope</strong> per <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> (Accepted), the Fabric stabilization gate is <strong>clear</strong> (Fabric confirmed stable 2026-06-01), the D-005 proposal (<a href="../scratch/PROPOSAL-neoforge-bringup/"><code>scratch/PROPOSAL-neoforge-bringup.md</code></a>) is <strong>approved</strong>, and the named maintainer is assigned (project lead, <code>@leaf_26</code>). The <strong>Phase N1 module skeleton has landed</strong> under <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/README.md"><code>platforms/rtp-neoforge/</code></a>: ModDevGradle build wiring, <code>neoforge.mods.toml</code>, the <code>@Mod</code> entry point, a complete server-thread scheduler, and command/version-adapter scaffolds, merged into the unified LeafRTP-Pro jar so a single artifact loads on Bukkit/Fabric/Velocity and NeoForge. The NeoForge modules build BY DEFAULT; drop them with <code>-PexcludeNeoforge</code> (or EXCLUDE_NEOFORGE) on network-constrained hosts to keep the offline build green. <strong>Still open:</strong> the <code>RTPServerAccessor</code> implementation, command Brigadier-bridge wiring, the S-005 async chunk path, the <code>/rtp</code> round-trip exit gate, the S-005/S-006 REQ-traceable guards, and a network-host build verification.</p>
+<p><strong>Current scope reminder (updated 2026-06-02):</strong> NeoForge is <strong>in scope</strong> per <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> (Accepted), the Fabric stabilization gate is <strong>clear</strong> (Fabric confirmed stable 2026-06-01), the D-005 proposal (<a href="scratch/PROPOSAL-neoforge-bringup.md"><code>scratch/PROPOSAL-neoforge-bringup.md</code></a>) is <strong>approved</strong>, and the named maintainer is assigned (project lead, <code>@leaf_26</code>). The <strong>Phase N1 module skeleton has landed</strong> under <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/README.md"><code>platforms/rtp-neoforge/</code></a>: ModDevGradle build wiring, <code>neoforge.mods.toml</code>, the <code>@Mod</code> entry point, a complete server-thread scheduler, and command/version-adapter scaffolds, merged into the unified LeafRTP-Pro jar so a single artifact loads on Bukkit/Fabric/Velocity and NeoForge. The NeoForge modules build BY DEFAULT; drop them with <code>-PexcludeNeoforge</code> (or EXCLUDE_NEOFORGE) on network-constrained hosts to keep the offline build green. <strong>Still open:</strong> the <code>RTPServerAccessor</code> implementation, command Brigadier-bridge wiring, the S-005 async chunk path, the <code>/rtp</code> round-trip exit gate, the S-005/S-006 REQ-traceable guards, and a network-host build verification.</p>
 </blockquote>
 <hr />
 <h2 id="1-why-neoforge-and-why-now-eventually">1. Why NeoForge, and why now (eventually)<a class="headerlink" href="#1-why-neoforge-and-why-now-eventually" title="Permanent link">&para;</a></h2>

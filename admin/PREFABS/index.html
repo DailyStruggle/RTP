@@ -791,27 +791,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3445,7 +3424,7 @@
 <li><strong>Confirmation menu.</strong> The merged result is diffed against the on-disk file; the diff is rendered as a per-file list of changed keys with old -&gt; new values. You see this and pick <code>Confirm</code> or <code>Cancel</code>.</li>
 <li><strong>Bak + atomic write.</strong> On <code>Confirm</code>, each touched file is copied to <code>&lt;file&gt;.yml.bak.&lt;timestamp&gt;</code>. The merged YAML is written to <code>&lt;file&gt;.yml.tmp</code>, fsync'd, then renamed over <code>&lt;file&gt;.yml</code>.</li>
 <li><strong>Reload.</strong> RTP runs the equivalent of <code>/rtp reload</code> to pick up the new values.</li>
-<li><strong>Audit log.</strong> Every confirmed apply and every rollback is logged via <code>RTP.log(Level.INFO, ...)</code> with the caller id, prefab name, list of touched files, and bak paths. No silent-discard paths (REQ-RTP-S-004).</li>
+<li><strong>Audit log.</strong> Every confirmed apply and every rollback is logged with the caller id, prefab name, list of touched files, and bak paths. Nothing is silently discarded.</li>
 </ol>
 <p>If you have players mid-teleport when the confirm runs, their in-flight pipelines complete against the pre-apply settings; new <code>/rtp</code> calls see the new settings after the reload completes. This is the same staleness contract a hand-edit + <code>/rtp reload</code> has.</p>
 <hr />
@@ -3463,7 +3442,7 @@
 <li><a href="../configuration/PERFORMANCE/">PERFORMANCE.md</a> - reference for every knob a prefab might set in <code>performance.yml</code>.</li>
 <li><a href="../configuration/REGIONS/">REGIONS.md</a> - reference for every knob a prefab might set in <code>regions/&lt;id&gt;.yml</code>.</li>
 <li><a href="../RUNBOOK/">RUNBOOK.md</a> - what to run when things go wrong after an apply (<code>/rtp info</code>, <code>/rtp test</code>, <code>/rtp scan reset</code>).</li>
-<li><a href="../../adr/ADR-024-rtp-lite-assembly-variant/"><code>docs/adr/ADR-024-rtp-lite-assembly-variant.md</code></a> - the <code>lightweight</code> prefab is the pro-portable subset of the lite assembly's <code>regions/default.yml</code>; as of 2026-06-18 lite inherits the full <code>regions/default.yml</code> (including <code>backlogCacheCap: 1000</code>).</li>
+<li>The <code>lightweight</code> prefab is a trimmed subset of the shipped <code>regions/default.yml</code>; both the full and lite editions ship <code>backlogCacheCap: 1000</code> (enabled) by default.</li>
 </ul>
 
 

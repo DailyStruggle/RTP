@@ -779,27 +779,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3423,7 +3402,7 @@
 <p>Supported plugins (full list on the <a href="../configuration/INTEGRATIONS/">Integrations</a> page): SaberFactions, FactionsBridge, GriefDefender, GriefPrevention, Lands, RedProtect, Residence, CrashClaim, HuskClaims, KingdomsX, Towny Advanced, WorldGuard.</p>
 <div class="admonition note">
 <p class="admonition-title">This is a safety guarantee, not just a convenience</p>
-<p>Re-rolling out of claims is enforced inside the teleport pipeline (prohibition S-003), so a destination cannot leak into protected land through the menu, the command, or the API. The reroll honours the bounded spiral selector and eventually exhausts attempts (<code>performance.yml</code> -&gt; <code>maxAttempts</code>) rather than looping forever. See <a href="../configuration/SAFETY/">Safety</a>.</p>
+<p>Re-rolling out of claims is enforced inside the teleport pipeline itself, so a destination cannot leak into protected land through the menu, the command, or the API. The reroll honours the bounded spiral selector and eventually exhausts attempts (<code>performance.yml</code> -&gt; <code>maxAttempts</code>) rather than looping forever. See <a href="../configuration/SAFETY/">Safety</a>.</p>
 </div>
 <hr />
 <h2 id="show-cooldown-queue-region-info-on-a-scoreboard-tab-or-hologram">Show cooldown / queue / region info on a scoreboard, tab, or hologram<a class="headerlink" href="#show-cooldown-queue-region-info-on-a-scoreboard-tab-or-hologram" title="Permanent link">&para;</a></h2>
@@ -3506,7 +3485,7 @@
 </tr>
 <tr>
 <td>Avoid teleporting into claims</td>
-<td><code>integrations.yml</code> <code>reroll*</code> toggles (S-003)</td>
+<td><code>integrations.yml</code> <code>reroll*</code> toggles</td>
 </tr>
 <tr>
 <td>Show cooldown / queue / region info</td>

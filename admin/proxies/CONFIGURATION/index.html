@@ -635,27 +635,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3321,7 +3300,7 @@
 <h1 id="network-mode-configuration-reference-networkyml">Network Mode Configuration Reference (<code>network.yml</code>)<a class="headerlink" href="#network-mode-configuration-reference-networkyml" title="Permanent link">&para;</a></h1>
 <p><code>network.yml</code> configures <strong>multi-server / multi-proxy network mode</strong> (cross-server <code>/rtp</code>). It is <strong>disabled by default</strong>; flipping <code>network.enabled: true</code> opts a backend into the cross-server network.</p>
 <blockquote>
-<p>When <code>enabled: false</code>, this file is read, validated, and otherwise ignored: no threads start, no database tables are created, no transport opens. The backend behaves byte-identically to a build without network mode (REQ-RTP-NET-002).</p>
+<p>When <code>enabled: false</code>, this file is read, validated, and otherwise ignored: no threads start, no database tables are created, no transport opens. The backend behaves byte-identically to a build without network mode.</p>
 </blockquote>
 <p>For the conceptual model and verification walkthroughs see <a href="../INDEX/"><code>INDEX.md</code></a>, <a href="../SINGLE_BACKEND_VERIFICATION/"><code>SINGLE_BACKEND_VERIFICATION.md</code></a>, and <a href="../CROSS_SERVER_VERIFICATION/"><code>CROSS_SERVER_VERIFICATION.md</code></a>.</p>
 <hr />
@@ -3725,7 +3704,7 @@
 </table>
 <hr />
 <blockquote>
-<p>The <code>config.yml</code> <code>network.redis</code> block is a separate, simpler Redis-backed state binding for single-network cached-location sync; see <a href="../../configuration/CORE_CONFIG/#network-redis"><code>../CORE_CONFIG.md</code></a>. Full design rationale lives in <a href="../../../dev/MULTI_SERVER_PLAN/"><code>../../dev/MULTI_SERVER_PLAN.md</code></a> and <a href="../../../adr/ADR-036-network-mode-multi-server-multi-proxy/">ADR-036</a>.</p>
+<p>The <code>config.yml</code> <code>network.redis</code> block is a separate, simpler Redis-backed state binding for single-network cached-location sync; see <a href="../../configuration/CORE_CONFIG/#network-redis"><code>CORE_CONFIG.md</code></a>.</p>
 </blockquote>
 
 

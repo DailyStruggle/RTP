@@ -629,27 +629,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3126,29 +3105,29 @@ Mohist.</p>
 </ol>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Folia, multi-server / proxy, and SQL/Redis shared state are LeafRTP-Pro features. The
-free jar runs on Paper / Spigot / Fabric / NeoForge as-is. Optional soft dependencies
+<p>The free jar runs on Paper, Spigot, Folia, Fabric, and NeoForge as-is - including
+single-jar cross-server <code>/rtp</code> through the bundled <code>proxy-direct</code> transport. LeafRTP-Pro
+adds the shaded database drivers (the SQL/Redis shared-state transports) and a
+parallelized Folia scheduler tuned for regionised threading; on the free build Folia
+runs on the Paper-optimized scheduler and still performs well. Optional soft dependencies
 (all auto-detected): Vault (economy charge), PlaceholderAPI, ProtocolLib.</p>
 </div>
 <h2 id="where-to-start">Where to start<a class="headerlink" href="#where-to-start" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Read <a href="intended-usage/">Intended usage</a> first - it is the mental model the rest of the
   documentation assumes.</li>
-<li><a href="https://github.com/DailyStruggle/RTP/wiki/Commands">Commands</a>, the interactive
-  <a href="https://github.com/DailyStruggle/RTP/wiki/Menu">Menu</a>, and
-  <a href="https://github.com/DailyStruggle/RTP/wiki/Permissions">Permissions</a></li>
-<li><a href="https://github.com/DailyStruggle/RTP/wiki/Core-Configuration">Core Configuration</a> and
-  the <a href="https://github.com/DailyStruggle/RTP/wiki/Typical-Configuration-Order">Typical Configuration Order</a></li>
-<li><a href="https://github.com/DailyStruggle/RTP/wiki/Regions">Regions</a>,
-  <a href="https://github.com/DailyStruggle/RTP/wiki/Shapes">Shapes</a>, and
-  <a href="https://github.com/DailyStruggle/RTP/wiki/Biome-Controls">Biome Controls</a></li>
+<li><a href="../admin/COMMANDS/">Commands</a>, the interactive menu, and permissions</li>
+<li><a href="../admin/configuration/CORE_CONFIG/">Core Configuration</a> and the
+  <a href="../admin/configuration/CONFIGURATION/">Configuration overview</a></li>
+<li><a href="../admin/configuration/REGIONS/">Regions</a>,
+  <a href="../admin/configuration/SCHEMATICS/">Schematics / shapes</a>, and
+  <a href="../admin/configuration/SAFETY/">Safety</a></li>
 <li><a href="what-not-to-do/">What NOT to do!</a></li>
 </ul>
 <h2 id="beyond-the-basics">Beyond the basics<a class="headerlink" href="#beyond-the-basics" title="Permanent link">&para;</a></h2>
 <p>Recent versions also add a multi-server / proxy "network mode" (cross-server <code>/rtp</code> via
-Velocity with SQL/Redis shared state), runtime metrics, Vault economy, a lifecycle
-<a href="https://github.com/DailyStruggle/RTP/wiki/Effects">Effects</a> engine, and a cross-platform
-addon <a href="https://github.com/DailyStruggle/RTP/wiki/API">API</a>.</p>
+Velocity), runtime metrics, Vault economy, a lifecycle effects engine, and a
+cross-platform addon <a href="../FOR_ADDON_DEVELOPERS/">API</a>.</p>
 
 
 

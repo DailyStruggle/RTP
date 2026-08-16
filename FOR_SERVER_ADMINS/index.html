@@ -776,27 +776,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3302,13 +3281,13 @@
 
 <h1 id="start-here-server-administrators">Start Here — Server Administrators<a class="headerlink" href="#start-here-server-administrators" title="Permanent link">&para;</a></h1>
 <p>This page guides server operators through the RTP documentation in the recommended reading order.
-If you install, configure, or maintain RTP on a Bukkit/Spigot/Paper/Folia server, this is your entry point.</p>
+If you install, configure, or maintain RTP on a Paper, Spigot, Folia, Fabric, or NeoForge server, this is your entry point.</p>
 <hr />
 <h2 id="minimum-operational-requirements">Minimum Operational Requirements<a class="headerlink" href="#minimum-operational-requirements" title="Permanent link">&para;</a></h2>
 <p>RTP trades memory for tick time. The pre-warmed location queue, per-region spatial memory, and the Anvil pre-filter caches all consume heap so that teleports resolve without loading chunks on demand. On a heap-starved host the JVM spends its time garbage-collecting and the server appears to hang - that is an under-provisioned deployment, not a plugin fault.</p>
 <ul>
 <li><strong>Java 21+</strong> (hard requirement).</li>
-<li><strong>Heap headroom for the caches.</strong> <code>cacheCap</code> and <code>activeChunkCap</code> (in your region files) are <em>absolute</em> per-region caps: each region costs a fixed amount of heap (roughly <code>cacheCap + activeChunkCap</code> cached entries), so total cache memory scales with your region count, not with radius. Radius changes only the size of the per-region spatial memory (the <code>MemoryShape</code> land/bad-sector map), not the queue or ticket pool. RTP ships a heap-pressure gate (<code>performance.yml</code> -&gt; <code>maxHeapPercent</code>, default 85%) that pauses <em>background cache generation</em> and logs a warning while the heap is under pressure; already-cached teleports keep serving. A gate that trips persistently means the host cannot afford the configured <code>cacheCap</code> - lower it or raise <code>-Xmx</code>.</li>
+<li><strong>Heap headroom for the caches.</strong> <code>cacheCap</code> and <code>activeChunkCap</code> (in your region files) are <em>absolute</em> per-region caps: each region costs a fixed amount of heap (roughly <code>cacheCap + activeChunkCap</code> cached entries), so total cache memory scales with your region count, not with radius. Radius changes only the size of the per-region spatial memory (the land/bad-sector map), not the queue or ticket pool. RTP ships a heap-pressure gate (<code>performance.yml</code> -&gt; <code>maxHeapPercent</code>, default 85%) that pauses <em>background cache generation</em> and logs a warning while the heap is under pressure; already-cached teleports keep serving. A gate that trips persistently means the host cannot afford the configured <code>cacheCap</code> - lower it or raise <code>-Xmx</code>.</li>
 </ul>
 <p><strong>Reference environment (measured, not a certified minimum).</strong> The in-repo devstack and stress harness run on a <strong>Ryzen 9 3900X with 16 GiB allocated to the server</strong>. Treat this as a known-good baseline rather than a floor - a single small region needs far less. A properly-sourced minimum (heap per region at a given <code>cacheCap</code>) is planned once opt-in telemetry lands to measure real deployments; until then, provision generously and watch the console for <code>maxHeapPercent</code> warnings.</p>
 <hr />
@@ -3335,8 +3314,8 @@ Companion to the Runbook — use this when you know <em>what</em> failed but not
 <hr />
 <h2 id="also-useful">Also Useful<a class="headerlink" href="#also-useful" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../dev/CONCEPTS/">CONCEPTS.md</a> — plain-language explanation of how RTP's queue, shapes, and teleport pipeline work. Helpful for understanding <em>why</em> certain config values behave the way they do.</li>
-<li><a href="../adr/">docs/adr/</a> — architecture decision records explaining key design choices and the alternatives that were rejected.</li>
+<li><a href="../site/intended-usage/">Intended usage</a> — plain-language explanation of how RTP's regions, queue, shapes, and teleport pipeline work. Helpful for understanding <em>why</em> certain config values behave the way they do.</li>
+<li><a href="../site/why/">Why LeafRTP exists</a> — the motivation and the distribution algorithm behind the plugin.</li>
 </ul>
 
 

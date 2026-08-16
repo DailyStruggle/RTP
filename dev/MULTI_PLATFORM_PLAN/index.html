@@ -629,27 +629,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../MAP/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Documentation map
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -4048,11 +4027,11 @@
 </ul>
 <h2 id="phase-4-neoforge-adapter-rtp-neoforge">Phase 4: NeoForge Adapter (<code>rtp-neoforge</code>)<a class="headerlink" href="#phase-4-neoforge-adapter-rtp-neoforge" title="Permanent link">&para;</a></h2>
 <p>NeoForge is an <strong>in-scope</strong> target platform per <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a>; legacy Forge, Sponge, and hybrid servers (Mohist / Magma / Arclight) remain out of scope. The landscape analysis, API-surface delta from Fabric, reuse map, risks, and S-00x mapping live in <a href="../NEOFORGE_NOTES/"><code>NEOFORGE_NOTES.md</code></a>. The phase rows below scope the work; they mirror the Fabric Phases 0-3 / Steps A-K structure so the Fabric experience transfers directly.</p>
-<p><strong>Activation gate (ADR-033 Decision §2) — CLEARED 2026-06-01.</strong> The gate required the Fabric platform to clear its stability bar: no open S-005 violations in <code>rtp-fabric</code>, the <code>FabricServerAccessor.getLocationGenerator</code> null stub resolved, the Loom dependency resolved, and a green <code>rtp test full</code> on at least one shipped MC carrier. Fabric is <strong>confirmed stable</strong> as of 2026-06-01 (Phase 2 Step H dual-runtime smoke test passed; Fabric beta shipped Phase 3, 2026-05-31). The ADR-033 §3 bring-up prerequisites (Phase N0) are now in progress: the D-005 proposal (<a href="../scratch/PROPOSAL-neoforge-bringup/"><code>scratch/PROPOSAL-neoforge-bringup.md</code></a>) and the subproject ADR (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md">rtp-neoforge-ADR-001</a>) are drafted, <code>rtp-neoforge/REQUIREMENTS.md</code> is authored, and TRACEABILITY placeholder rows are added. The D-005 proposal was <strong>approved by the project lead on 2026-06-01</strong> and the <strong>named maintainer</strong> gate is satisfied (project lead, <code>@leaf_26</code>), clearing both prerequisites. The <strong>Phase N1 module skeleton landed 2026-06-02</strong> (see Phase N1 below); the platform-adapter implementation surfaces (Phase N2) and documentation/release (Phase N3) are now complete - NeoForge is a runtime-functional, first-class platform.</p>
+<p><strong>Activation gate (ADR-033 Decision §2) — CLEARED 2026-06-01.</strong> The gate required the Fabric platform to clear its stability bar: no open S-005 violations in <code>rtp-fabric</code>, the <code>FabricServerAccessor.getLocationGenerator</code> null stub resolved, the Loom dependency resolved, and a green <code>rtp test full</code> on at least one shipped MC carrier. Fabric is <strong>confirmed stable</strong> as of 2026-06-01 (Phase 2 Step H dual-runtime smoke test passed; Fabric beta shipped Phase 3, 2026-05-31). The ADR-033 §3 bring-up prerequisites (Phase N0) are now in progress: the D-005 proposal (<a href="scratch/PROPOSAL-neoforge-bringup.md"><code>scratch/PROPOSAL-neoforge-bringup.md</code></a>) and the subproject ADR (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md">rtp-neoforge-ADR-001</a>) are drafted, <code>rtp-neoforge/REQUIREMENTS.md</code> is authored, and TRACEABILITY placeholder rows are added. The D-005 proposal was <strong>approved by the project lead on 2026-06-01</strong> and the <strong>named maintainer</strong> gate is satisfied (project lead, <code>@leaf_26</code>), clearing both prerequisites. The <strong>Phase N1 module skeleton landed 2026-06-02</strong> (see Phase N1 below); the platform-adapter implementation surfaces (Phase N2) and documentation/release (Phase N3) are now complete - NeoForge is a runtime-functional, first-class platform.</p>
 <p><strong>Ownership.</strong> Per ADR-033 / ADR-022, NeoForge bring-up requires a named maintainer who owns the platform end-to-end (build, mappings, CI toolchain, S-00x proofs, ongoing maintenance) before Phase N1 begins. <strong>Owner: project lead (<code>@leaf_26</code>), assigned 2026-06-01.</strong></p>
 <h3 id="phase-n0-scope-unlock-bring-up-prerequisites-adr-033-3">Phase N0 — Scope unlock &amp; bring-up prerequisites <em>(ADR-033 §3)</em><a class="headerlink" href="#phase-n0-scope-unlock-bring-up-prerequisites-adr-033-3" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[x] <strong>D-005 proposal</strong> <em>(2026-06-01)</em> referencing <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> and <a href="../NEOFORGE_NOTES/"><code>NEOFORGE_NOTES.md</code></a>, confirming the Fabric activation gate is clear: <a href="../scratch/PROPOSAL-neoforge-bringup/"><code>scratch/PROPOSAL-neoforge-bringup.md</code></a>. Maintainer assignment still open (see Ownership).</li>
+<li>[x] <strong>D-005 proposal</strong> <em>(2026-06-01)</em> referencing <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> and <a href="../NEOFORGE_NOTES/"><code>NEOFORGE_NOTES.md</code></a>, confirming the Fabric activation gate is clear: <a href="scratch/PROPOSAL-neoforge-bringup.md"><code>scratch/PROPOSAL-neoforge-bringup.md</code></a>. Maintainer assignment still open (see Ownership).</li>
 <li>[x] <strong>Subproject ADR</strong> <em>(2026-06-01)</em> <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md"><code>platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md</code></a> mirroring <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a> (subproject ADR numbering restarts at <code>001</code> per AGENTS.md <em>Self-Updating Protocol</em>); row added to the <em>Subproject ADRs</em> table in <a href="../../adr/"><code>docs/adr/README.md</code></a>.</li>
 <li>[x] <strong><code>rtp-neoforge/REQUIREMENTS.md</code></strong> <em>(2026-06-01)</em> authored (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/REQUIREMENTS.md"><code>platforms/rtp-neoforge/REQUIREMENTS.md</code></a>), mirroring <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/REQUIREMENTS.md"><code>platforms/rtp-fabric/REQUIREMENTS.md</code></a>: <code>REQ-NEOFORGE-F-001..0NN</code> (accessor / world / player / scheduler / single-JAR-or-mod metadata / lifecycle wiring / login reserve) and <code>REQ-NEOFORGE-ARCH-001..0NN</code> (no-Bukkit-imports, no-core-pollution, build-plugin scope, S-005 async chunk loading, S-004 failure attribution, memory hygiene, S-006 fail-loud + pre-init guard, config dir resolution, DB delegation), restating the Fabric requirements against NeoForge entry-point / event-bus / toolchain surfaces.</li>
 <li>[x] <strong>Build-toolchain decision</strong> <em>(2026-06-01)</em> captured in <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md">rtp-neoforge-ADR-001</a> §4: <strong>ModDevGradle</strong> (over NeoGradle), Java 21+ (REQ-RTP-SYS-001). The <code>run_test</code> / IntelliJ <code>.run</code> dev-server confirmation spike remains a Phase N1 task.</li>
