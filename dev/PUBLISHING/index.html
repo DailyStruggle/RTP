@@ -3097,13 +3097,64 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#maven-central-how-to-enable-later" class="md-nav__link">
+  <a href="#github-packages-repo-scoped-maven-registry" class="md-nav__link">
     <span class="md-ellipsis">
-      Maven Central (how to enable later)
+      GitHub Packages (repo-scoped Maven registry)
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Maven Central (how to enable later)">
+    <nav class="md-nav" aria-label="GitHub Packages (repo-scoped Maven registry)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configuration-in-this-repo_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration in this repo
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publishing-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      Publishing locally
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publishing-from-ci-github-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Publishing from CI (GitHub Actions)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#consumer-buildgradle-out-of-repo-addon_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consumer build.gradle (out-of-repo addon)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#maven-central-first-party-wiring-manual-portal-upload" class="md-nav__link">
+    <span class="md-ellipsis">
+      Maven Central (first-party wiring, manual Portal upload)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Maven Central (first-party wiring, manual Portal upload)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3125,9 +3176,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-build-script-changes" class="md-nav__link">
+  <a href="#3-build-script-changes-already-in-place" class="md-nav__link">
     <span class="md-ellipsis">
-      3. Build-script changes
+      3. Build-script changes (already in place)
     </span>
   </a>
   
@@ -3152,9 +3203,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-publish" class="md-nav__link">
+  <a href="#6-publish-sign-locally-upload-the-bundle" class="md-nav__link">
     <span class="md-ellipsis">
-      6. Publish
+      6. Publish (sign locally, upload the bundle)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-ci-publishing-github-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. CI publishing (GitHub Actions)
     </span>
   </a>
   
@@ -3207,13 +3267,14 @@ configurable selection model) and <code>rtp-core</code> (the <code>RTP</code> fa
 <code>ConfigParser</code>, etc.). Out-of-repo addon authors cannot use the in-build
 <code>compileOnly project(':rtp-api')</code> references, so those two modules (plus their
 inter-module project-dependency closure) are published to a public Maven coordinate.</p>
-<p>This document covers the two channels:</p>
+<p>This document covers the channels:</p>
 <ol>
 <li><strong>JitPack</strong> - active now, zero-credentials, builds straight from a git tag.</li>
+<li><strong>GitHub Packages</strong> - repo-scoped Maven registry, credentialed; wiring is in place.</li>
 <li><strong>Maven Central</strong> - the durable, discoverable channel; not yet enabled, full how-to below.</li>
 </ol>
 <p>The publication wiring itself lives in the root <code>build.gradle</code> (<code>maven-publish</code> applied to
-the <code>publishedModulePaths</code> closure) and is shared by both channels.</p>
+the <code>publishedModulePaths</code> closure) and is shared by all channels.</p>
 <hr />
 <h2 id="what-gets-published">What gets published<a class="headerlink" href="#what-gets-published" title="Permanent link">&para;</a></h2>
 <p><code>maven-publish</code> is applied to exactly this closure (root <code>build.gradle</code>):</p>
@@ -3346,10 +3407,98 @@ Packages), replace the <code>publishToMavenLocal</code> tasks in <code>PUBLISH_T
 <code>publish</code> target and inject the repository credentials via Jenkins secrets - see the Maven
 Central section below for the publication/signing wiring.</p>
 <hr />
-<h2 id="maven-central-how-to-enable-later">Maven Central (how to enable later)<a class="headerlink" href="#maven-central-how-to-enable-later" title="Permanent link">&para;</a></h2>
+<h2 id="github-packages-repo-scoped-maven-registry">GitHub Packages (repo-scoped Maven registry)<a class="headerlink" href="#github-packages-repo-scoped-maven-registry" title="Permanent link">&para;</a></h2>
+<p>GitHub Packages hosts a Maven registry per repository at
+<code>https://maven.pkg.github.com/DailyStruggle/RTP</code>. It needs credentials on both ends (publish
+<em>and</em> consume), so it is not as frictionless as JitPack, but it requires no Sonatype account
+or GPG signing and it lives right next to the code. Use it when you want authenticated,
+immutable coordinates without the Maven Central onboarding.</p>
+<h3 id="configuration-in-this-repo_1">Configuration in this repo<a class="headerlink" href="#configuration-in-this-repo_1" title="Permanent link">&para;</a></h3>
+<p>The root <code>build.gradle</code> publishing closure already declares the GitHub Packages repository
+(<code>name = 'GitHubPackages'</code>) for the same <code>publishedModulePaths</code> closure. It is only wired
+when a token is present, so a credential-free <code>.\gradlew build</code> is unaffected and no
+unauthenticated <code>publish</code> target is exposed. Credentials are resolved in this order:</p>
+<ol>
+<li>Gradle properties <code>gpr.user</code> / <code>gpr.key</code> (put them in <code>~/.gradle/gradle.properties</code>, never
+   commit them).</li>
+<li>Env vars <code>GITHUB_ACTOR</code> / <code>GITHUB_TOKEN</code> (GitHub Actions injects these automatically).</li>
+</ol>
+<p>The publish token needs the <strong><code>write:packages</code></strong> scope (a classic PAT with <code>write:packages</code>,
+or the workflow <code>GITHUB_TOKEN</code> with <code>packages: write</code> permission). Reading needs
+<strong><code>read:packages</code></strong>.</p>
+<h3 id="publishing-locally">Publishing locally<a class="headerlink" href="#publishing-locally" title="Permanent link">&para;</a></h3>
+<p>Add credentials to <code>~/.gradle/gradle.properties</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="na">gpr.user</span><span class="o">=</span><span class="s">&lt;your-github-username&gt;</span>
+<span class="na">gpr.key</span><span class="o">=</span><span class="s">&lt;personal-access-token-with-write:packages&gt;</span>
+</code></pre></div>
+<p>Then publish the closure to GitHub Packages (mirror the smoke-test task list, swapping
+<code>publishToMavenLocal</code> for <code>publishMavenJavaPublicationToGitHubPackagesRepository</code>). Do <strong>not</strong>
+pass <code>-PexcludeJdk25</code> here: that flag is only for JDK-21-only hosts like JitPack, and this
+publish runs on a box that has JDK 25, so the JDK-25 Loom modules should stay in the build
+graph:</p>
+<div class="highlight"><pre><span></span><code><span class="p">.\</span><span class="n">gradlew</span> <span class="p">-</span><span class="n">-no-daemon</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">commands-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToGitHubPackagesRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">yaml-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToGitHubPackagesRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">metrics-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToGitHubPackagesRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">maps-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToGitHubPackagesRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">effects-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToGitHubPackagesRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">rtp-proxy</span><span class="p">:</span><span class="n">rtp-proxy-common</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToGitHubPackagesRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">rtp-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToGitHubPackagesRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">rtp-core</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToGitHubPackagesRepository</span>
+</code></pre></div>
+<p>The shorter <code>.\gradlew publish</code> also works but fans out to every publishable
+module and every declared repository; the explicit task list keeps it to the addon-API
+closure and the GitHub Packages target only.</p>
+<h3 id="publishing-from-ci-github-actions">Publishing from CI (GitHub Actions)<a class="headerlink" href="#publishing-from-ci-github-actions" title="Permanent link">&para;</a></h3>
+<p>A minimal workflow needs <code>packages: write</code> permission and the built-in token:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">permissions</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
+<span class="w">  </span><span class="nt">packages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+<span class="c1"># ...</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Publish to GitHub Packages</span>
+<span class="w">      </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./gradlew publishMavenJavaPublicationToGitHubPackagesRepository</span>
+<span class="w">      </span><span class="nt">env</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">GITHUB_ACTOR</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.actor }}</span>
+<span class="w">        </span><span class="nt">GITHUB_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ secrets.GITHUB_TOKEN }}</span>
+</code></pre></div>
+<p>For the Jenkins pipeline, inject a PAT as <code>gpr.user</code> / <code>gpr.key</code> (or <code>GITHUB_ACTOR</code> /
+<code>GITHUB_TOKEN</code>) secrets and swap the <code>publishToMavenLocal</code> tasks in <code>PUBLISH_TASKS</code> for the
+<code>...ToGitHubPackagesRepository</code> targets.</p>
+<h3 id="consumer-buildgradle-out-of-repo-addon_1">Consumer build.gradle (out-of-repo addon)<a class="headerlink" href="#consumer-buildgradle-out-of-repo-addon_1" title="Permanent link">&para;</a></h3>
+<p>GitHub Packages requires the consumer to authenticate too (there is no anonymous read):</p>
+<div class="highlight"><pre><span></span><code>repositories {
+    mavenCentral()
+    maven {
+        url = &#39;https://maven.pkg.github.com/DailyStruggle/RTP&#39;
+        credentials {
+            username = findProperty(&#39;gpr.user&#39;) ?: System.getenv(&#39;GITHUB_ACTOR&#39;)
+            password = findProperty(&#39;gpr.key&#39;)  ?: System.getenv(&#39;GITHUB_TOKEN&#39;)
+        }
+    }
+}
+
+dependencies {
+    compileOnly &#39;io.github.dailystruggle:rtp-api:3.2.1&#39;
+    compileOnly &#39;io.github.dailystruggle:rtp-core:3.2.1&#39;
+}
+</code></pre></div>
+<p>The consumer's token only needs <code>read:packages</code>. Because of this read-time credential
+requirement, JitPack remains the friendlier choice for public addon authors; GitHub Packages
+is best for internal / org-scoped consumers who already authenticate to GitHub.</p>
+<hr />
+<h2 id="maven-central-first-party-wiring-manual-portal-upload">Maven Central (first-party wiring, manual Portal upload)<a class="headerlink" href="#maven-central-first-party-wiring-manual-portal-upload" title="Permanent link">&para;</a></h2>
 <p>Maven Central is the right destination once the <code>rtp-api</code> contract is stable and you expect
 real third-party volume. It is more work than JitPack (one-time account + signing setup) but
 gives discoverable, permanent coordinates with no per-tag build step on the consumer side.</p>
+<p><strong>Trust posture:</strong> this build deliberately uses <strong>only first-party Gradle tooling</strong> for the
+Central path - <code>maven-publish</code> and the built-in <code>signing</code> plugin, both of which ship inside
+the Gradle distribution. No third-party publish plugin is applied, so no external, auto-
+updating build code ever gets access to the Central token, the GPG signing key, or the
+compiled jars before they are signed. The trade-off is one manual step at release time:
+Gradle signs the artifacts into a local staging directory, and that bundle is uploaded to the
+Central Portal by hand (or a single <code>curl</code>). Sonatype's new Portal has no first-party Gradle
+upload protocol, so automating that last step would mean adding a community plugin - which is
+exactly the trust surface this posture avoids.</p>
 <blockquote>
 <p>Sequencing note: ideally land Phase 2 of <code>docs/dev/scratch/CHECKLIST-rtp-api-devux.md</code>
 (the typed <code>rtp-api</code> registration surface) before the first Central release, so the
@@ -3374,62 +3523,39 @@ permanent public contract is not pinned to <code>rtp-core</code> internals.</p>
 <p>Export the secret key (in-memory ASCII-armored form is easiest for CI):</p>
 <div class="highlight"><pre><span></span><code><span class="n">gpg</span> <span class="p">-</span><span class="n">-armor</span> <span class="p">-</span><span class="n">-export-secret-keys</span> <span class="p">&lt;</span><span class="n">KEY_ID</span><span class="p">&gt;</span>
 </code></pre></div>
-<h3 id="3-build-script-changes">3. Build-script changes<a class="headerlink" href="#3-build-script-changes" title="Permanent link">&para;</a></h3>
-<p>Apply the <code>signing</code> plugin alongside <code>maven-publish</code> for the published closure, and add the
-POM metadata Central requires (name, description, url, license, developers, scm). In the
-root <code>build.gradle</code> block that already configures <code>mavenJava</code>:</p>
-<div class="highlight"><pre><span></span><code>configure(publishedModulePaths.collect { project(it) }) {
-    apply plugin: &#39;maven-publish&#39;
-    apply plugin: &#39;signing&#39;
-
-    afterEvaluate {
-        // sources + javadoc jars are mandatory on Central
-        java { withSourcesJar(); withJavadocJar() }
-
-        publishing {
-            publications {
-                mavenJava(MavenPublication) {
-                    from components.java
-                    pom {
-                        name = project.name
-                        description = &#39;RTP addon-facing API module: &#39; + project.name
-                        url = &#39;https://github.com/DailyStruggle/RTP&#39;
-                        licenses {
-                            license {
-                                name = &#39;GPL-3.0&#39;   // confirm against repo LICENSE
-                                url  = &#39;https://www.gnu.org/licenses/gpl-3.0.txt&#39;
-                            }
-                        }
-                        developers {
-                            developer { id = &#39;DailyStruggle&#39;; name = &#39;DailyStruggle&#39; }
-                        }
-                        scm {
-                            connection = &#39;scm:git:https://github.com/DailyStruggle/RTP.git&#39;
-                            developerConnection = &#39;scm:git:ssh://git@github.com/DailyStruggle/RTP.git&#39;
-                            url = &#39;https://github.com/DailyStruggle/RTP&#39;
-                        }
-                    }
-                }
-            }
-        }
-
-        signing {
-            def signingKey = findProperty(&#39;signingKey&#39;)
-            def signingPassword = findProperty(&#39;signingPassword&#39;)
-            if (signingKey) {
-                useInMemoryPgpKeys(signingKey, signingPassword)
-                sign publishing.publications.mavenJava
-            }
-        }
-    }
-}
-</code></pre></div>
-<p>For the upload itself, the simplest current path is the
-<strong><code>com.vanniktech.maven.publish</code></strong> community plugin (it targets the new Central Portal and
-handles the staging/release dance), or the official
-<code>org.sonatype.central:central-publishing-maven-plugin</code> for a Maven-side flow. With the
-vanniktech plugin the publication metadata above is configured through its <code>mavenPublishing { }</code>
-DSL instead of hand-rolled POM blocks.</p>
+<h3 id="3-build-script-changes-already-in-place">3. Build-script changes (already in place)<a class="headerlink" href="#3-build-script-changes-already-in-place" title="Permanent link">&para;</a></h3>
+<p>The root <code>build.gradle</code> <code>configure(publishedModulePaths.collect { project(it) })</code> block
+already implements the full first-party Central wiring - you do <strong>not</strong> need to edit the build
+for a release. What it does:</p>
+<ul>
+<li>Applies the built-in <strong><code>signing</code></strong> plugin alongside <code>maven-publish</code>.</li>
+<li>Produces the mandatory <strong><code>-sources</code> and <code>-javadoc</code> jars</strong> for the published closure
+  (<code>withSourcesJar()</code> / <code>withJavadocJar()</code>), with doclint relaxed for those javadoc tasks so
+  a missing <code>@param</code>/<code>@return</code> on <code>rtp-api</code>/<code>rtp-core</code> cannot fail a release.</li>
+<li>Adds the <strong>POM metadata</strong> Central validates (name, description, url, license, developers, scm).</li>
+<li>Declares a local <strong><code>CentralStaging</code></strong> Maven repository at <code>&lt;root&gt;/build/central-staging/</code>,
+  shared by every module so the whole closure lands in one directory ready to bundle.</li>
+<li>Wires <strong>GPG signing</strong> in two mutually exclusive modes, both gated so a credential-free
+  <code>.\gradlew build</code> never signs and never fails:</li>
+<li><strong>In-memory key</strong> from the <code>signingKey</code> / <code>signingPassword</code> Gradle properties (best for
+    CI: no gpg binary or keyring needed).</li>
+<li><strong>Local <code>gpg</code> CLI</strong>, enabled with <code>-PsignWithGpgCmd</code> (Gradle shells out to <code>gpg</code>).</li>
+<li>Skips the <code>rtp-core</code> <strong>test-fixtures variant</strong> from the published component, so no stray
+  <code>-test-fixtures</code> jar is published (Central rejects those) and the "cannot be mapped to
+  Maven" POM-capability warning is gone.</li>
+</ul>
+<p>Because everything is gated on the credentials being present, none of this affects a normal
+developer build, JitPack, or the GitHub Packages path.</p>
+<blockquote>
+<p><strong>Modern-GnuPG note (verified 2026-08-16):</strong> a secret key exported by a very recent GnuPG
+(2.4+/2.5+; this box runs 2.5.18) can be <strong>unreadable by the BouncyCastle bundled in
+Gradle's <code>signing</code> plugin</strong>, failing the sign task with <code>Cannot perform signing task ...
+because it has no configured signatory</code>. If you hit that with the in-memory <code>signingKey</code>
+path, switch to the <code>gpg</code> CLI path (<code>-PsignWithGpgCmd</code>), which signs with whatever key
+<code>gpg</code> itself resolves (respecting <code>GNUPGHOME</code> / <code>gpg.conf</code>) and side-steps the parse issue.
+The full staging + signing flow (<code>.asc</code> for jar, sources, javadoc, module, and pom) was
+verified end-to-end via the <code>gpg</code> CLI path.</p>
+</blockquote>
 <h3 id="4-decouple-the-artifact-version-phase-51">4. Decouple the artifact version (Phase 5.1)<a class="headerlink" href="#4-decouple-the-artifact-version-phase-51" title="Permanent link">&para;</a></h3>
 <p>The plugin currently versions everything at <code>3.0.1</code> (root <code>build.gradle</code>). For Central,
 give the API artifacts a version line that moves on the <code>rtp-api</code>/<code>rtp-core</code> semver cadence
@@ -3437,17 +3563,105 @@ rather than the plugin release cadence, and document the policy (Phase 5.2 of
 <code>CHECKLIST-rtp-api-devux.md</code>). A practical approach is an <code>apiVersion</code> ext property applied
 only to the published closure.</p>
 <h3 id="5-credentials-never-commit">5. Credentials (never commit)<a class="headerlink" href="#5-credentials-never-commit" title="Permanent link">&para;</a></h3>
-<p>Put tokens and the signing key in <code>~/.gradle/gradle.properties</code> or CI secrets:</p>
-<div class="highlight"><pre><span></span><code><span class="na">mavenCentralUsername</span><span class="o">=</span><span class="s">&lt;central-token-user&gt;</span>
-<span class="na">mavenCentralPassword</span><span class="o">=</span><span class="s">&lt;central-token-pass&gt;</span>
-<span class="na">signingKey</span><span class="o">=</span><span class="s">-----BEGIN PGP PRIVATE KEY BLOCK----- ...</span>
+<p>The signing key + passphrase feed the build; the Portal token is used only by the upload
+step (not the build).</p>
+<p><strong>Local dev box</strong> - put the signing key in <code>~/.gradle/gradle.properties</code> (never in the repo):</p>
+<div class="highlight"><pre><span></span><code><span class="na">signingKey</span><span class="o">=</span><span class="s">-----BEGIN PGP PRIVATE KEY BLOCK----- ...</span>
 <span class="na">signingPassword</span><span class="o">=</span><span class="s">&lt;key-passphrase&gt;</span>
 </code></pre></div>
-<h3 id="6-publish">6. Publish<a class="headerlink" href="#6-publish" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="c"># vanniktech plugin</span>
-<span class="p">.\</span><span class="n">gradlew</span> <span class="n">publishToMavenCentral</span> <span class="p">-</span><span class="n">-no-configuration-cache</span>
-<span class="c"># or, after staging, release via the Central Portal UI / publishAndReleaseToMavenCentral</span>
+<p><strong>CI (the recommended place to publish from)</strong> - do not write a properties file. Gradle maps
+any env var named <code>ORG_GRADLE_PROJECT_&lt;name&gt;</code> to the project property <code>&lt;name&gt;</code>, so expose the
+signing key as CI secrets with exactly these names:</p>
+<div class="highlight"><pre><span></span><code>ORG_GRADLE_PROJECT_signingKey       = &lt;ASCII-armored PGP private key&gt;
+ORG_GRADLE_PROJECT_signingPassword  = &lt;key passphrase&gt;
 </code></pre></div>
+<p>That is the "repo variable" the signing step reads - no build-script change is needed to feed
+it. Store the armored key as a single multi-line secret (GitHub Actions / Jenkins credentials
+both support multi-line values). The Central Portal token (<code>central-token-user</code> /
+<code>central-token-pass</code>) is a <strong>separate</strong> secret used only by the upload command below; keep it
+out of the build entirely.</p>
+<h3 id="6-publish-sign-locally-upload-the-bundle">6. Publish (sign locally, upload the bundle)<a class="headerlink" href="#6-publish-sign-locally-upload-the-bundle" title="Permanent link">&para;</a></h3>
+<p>Step 1 - sign the closure into the local staging dir (mirror the smoke-test task list,
+targeting the <code>CentralStaging</code> repo). With the signing key present, each publish task also
+runs the <code>sign...</code> task automatically. Do <strong>not</strong> pass <code>-PexcludeJdk25</code>: that flag is only for
+JDK-21-only hosts like JitPack, and a release runs on a JDK-25 box, so leave the JDK-25 Loom
+modules in the build graph:</p>
+<p>In-memory-key form (CI):</p>
+<div class="highlight"><pre><span></span><code><span class="p">.\</span><span class="n">gradlew</span> <span class="p">-</span><span class="n">-no-daemon</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">commands-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">yaml-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">metrics-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">maps-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">effects-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">rtp-proxy</span><span class="p">:</span><span class="n">rtp-proxy-common</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">rtp-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">rtp-core</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span>
+</code></pre></div>
+<p>Local <code>gpg</code> CLI form (recommended on a box with a modern GnuPG, e.g. this dev box) - add
+<code>-PsignWithGpgCmd</code> and drop the <code>signingKey</code> properties; <code>gpg</code> supplies the key:</p>
+<div class="highlight"><pre><span></span><code><span class="p">.\</span><span class="n">gradlew</span> <span class="p">-</span><span class="n">-no-daemon</span> <span class="n">-PsignWithGpgCmd</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">commands-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">yaml-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">metrics-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">maps-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">effects-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">rtp-proxy</span><span class="p">:</span><span class="n">rtp-proxy-common</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">rtp-api</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span> <span class="p">`</span>
+    <span class="p">:</span><span class="n">rtp-core</span><span class="p">:</span><span class="n">publishMavenJavaPublicationToCentralStagingRepository</span>
+</code></pre></div>
+<p>The signed artifacts (jar, sources, javadoc, <code>.pom</code>, and their <code>.asc</code> signatures) land under
+<code>build/central-staging/io/github/dailystruggle/...</code>.</p>
+<p>Step 2 - zip that tree and upload it to the Portal. The Portal expects a zip whose internal
+layout is the Maven repository layout (i.e. the contents of <code>build/central-staging</code>):</p>
+<div class="highlight"><pre><span></span><code><span class="nb">Compress-Archive</span> <span class="n">-Path</span> <span class="n">build</span><span class="p">/</span><span class="n">central-staging</span><span class="p">/*</span> <span class="n">-DestinationPath</span> <span class="n">build</span><span class="p">/</span><span class="n">central-bundle</span><span class="p">.</span><span class="n">zip</span> <span class="n">-Force</span>
+<span class="nv">$pair</span> <span class="p">=</span> <span class="s1">&#39;&lt;central-token-user&gt;:&lt;central-token-pass&gt;&#39;</span>
+<span class="nv">$auth</span> <span class="p">=</span> <span class="no">[Convert]</span><span class="p">::</span><span class="n">ToBase64String</span><span class="p">(</span><span class="no">[Text.Encoding]</span><span class="p">::</span><span class="n">ASCII</span><span class="p">.</span><span class="n">GetBytes</span><span class="p">(</span><span class="nv">$pair</span><span class="p">))</span>
+<span class="n">curl</span><span class="p">.</span><span class="n">exe</span> <span class="n">-H</span> <span class="s2">&quot;Authorization: Bearer $auth&quot;</span> <span class="p">`</span>
+    <span class="o">-F</span> <span class="n">bundle</span><span class="p">=</span><span class="nv">@build</span><span class="p">/</span><span class="n">central-bundle</span><span class="p">.</span><span class="n">zip</span> <span class="p">`</span>
+    <span class="n">https</span><span class="p">://</span><span class="n">central</span><span class="p">.</span><span class="n">sonatype</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">api</span><span class="p">/</span><span class="n">v1</span><span class="p">/</span><span class="n">publisher</span><span class="p">/</span><span class="n">upload</span>
+</code></pre></div>
+<p>Step 3 - go to <a href="https://central.sonatype.com">https://central.sonatype.com</a> → <strong>Deployments</strong>, review the validated
+deployment, and click <strong>Publish</strong> (or drop the automatic-release query param on the upload).
+That manual click is the price of not handing a third-party plugin your signing key.</p>
+<h3 id="7-ci-publishing-github-actions">7. CI publishing (GitHub Actions)<a class="headerlink" href="#7-ci-publishing-github-actions" title="Permanent link">&para;</a></h3>
+<p>The workflow <code>.github/workflows/maven-central.yml</code> automates steps 1-2 above (sign into the
+<code>CentralStaging</code> dir, zip, and <code>curl</code> the bundle to the Portal). It runs <strong>only on a push to a
+release-line branch</strong> (<code>V1</code>, <code>V2</code>, <code>V3</code>, ... and their lowercase forms), plus manual
+<code>workflow_dispatch</code>. Because those branches are protected, a push happens only when a pull
+request is merged - so publication is gated behind a PR, never an ad-hoc direct commit or a
+feature branch.</p>
+<p>Required repository secrets (<strong>Settings → Secrets and variables → Actions</strong>):</p>
+<table>
+<thead>
+<tr>
+<th>Secret</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SIGNING_KEY</code></td>
+<td>ASCII-armored PGP private key (multi-line), fed to Gradle as <code>ORG_GRADLE_PROJECT_signingKey</code></td>
+</tr>
+<tr>
+<td><code>SIGNING_PASSWORD</code></td>
+<td>passphrase for the key (empty string if none)</td>
+</tr>
+<tr>
+<td><code>CENTRAL_TOKEN_USER</code></td>
+<td>Central Portal user-token username (upload only)</td>
+</tr>
+<tr>
+<td><code>CENTRAL_TOKEN_PASS</code></td>
+<td>Central Portal user-token password (upload only)</td>
+</tr>
+</tbody>
+</table>
+<p>The workflow uses the <strong>in-memory-key</strong> signing path (no <code>gpg</code> binary on the runner), verifies
+that <code>.asc</code> signatures were actually produced before uploading (fail-loud per S-004), and does
+<strong>not</strong> auto-release - the deployment lands VALIDATED and a human clicks <strong>Publish</strong> on the
+Portal. To auto-release instead, append <code>?publishingType=AUTOMATIC</code> to the upload URL in the
+workflow.</p>
 <h3 id="consumer-buildgradle-after-central-release">Consumer build.gradle (after Central release)<a class="headerlink" href="#consumer-buildgradle-after-central-release" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code>repositories { mavenCentral() }
 
