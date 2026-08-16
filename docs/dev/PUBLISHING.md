@@ -6,13 +6,14 @@ configurable selection model) and `rtp-core` (the `RTP` facade, the `Shape` hier
 `compileOnly project(':rtp-api')` references, so those two modules (plus their
 inter-module project-dependency closure) are published to a public Maven coordinate.
 
-This document covers the two channels:
+This document covers the channels:
 
 1. **JitPack** - active now, zero-credentials, builds straight from a git tag.
-2. **Maven Central** - the durable, discoverable channel; not yet enabled, full how-to below.
+2. **GitHub Packages** - repo-scoped Maven registry, credentialed; wiring is in place.
+3. **Maven Central** - the durable, discoverable channel; not yet enabled, full how-to below.
 
 The publication wiring itself lives in the root `build.gradle` (`maven-publish` applied to
-the `publishedModulePaths` closure) and is shared by both channels.
+the `publishedModulePaths` closure) and is shared by all channels.
 
 ---
 
@@ -145,11 +146,123 @@ Central section below for the publication/signing wiring.
 
 ---
 
-## Maven Central (how to enable later)
+## GitHub Packages (repo-scoped Maven registry)
+
+GitHub Packages hosts a Maven registry per repository at
+`https://maven.pkg.github.com/DailyStruggle/RTP`. It needs credentials on both ends (publish
+*and* consume), so it is not as frictionless as JitPack, but it requires no Sonatype account
+or GPG signing and it lives right next to the code. Use it when you want authenticated,
+immutable coordinates without the Maven Central onboarding.
+
+### Configuration in this repo
+
+The root `build.gradle` publishing closure already declares the GitHub Packages repository
+(`name = 'GitHubPackages'`) for the same `publishedModulePaths` closure. It is only wired
+when a token is present, so a credential-free `.\gradlew build` is unaffected and no
+unauthenticated `publish` target is exposed. Credentials are resolved in this order:
+
+1. Gradle properties `gpr.user` / `gpr.key` (put them in `~/.gradle/gradle.properties`, never
+   commit them).
+2. Env vars `GITHUB_ACTOR` / `GITHUB_TOKEN` (GitHub Actions injects these automatically).
+
+The publish token needs the **`write:packages`** scope (a classic PAT with `write:packages`,
+or the workflow `GITHUB_TOKEN` with `packages: write` permission). Reading needs
+**`read:packages`**.
+
+### Publishing locally
+
+Add credentials to `~/.gradle/gradle.properties`:
+
+```properties
+gpr.user=<your-github-username>
+gpr.key=<personal-access-token-with-write:packages>
+```
+
+Then publish the closure to GitHub Packages (mirror the smoke-test task list, swapping
+`publishToMavenLocal` for `publishMavenJavaPublicationToGitHubPackagesRepository`). Do **not**
+pass `-PexcludeJdk25` here: that flag is only for JDK-21-only hosts like JitPack, and this
+publish runs on a box that has JDK 25, so the JDK-25 Loom modules should stay in the build
+graph:
+
+```powershell
+.\gradlew --no-daemon `
+    :commands-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :yaml-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :metrics-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :maps-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :effects-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :rtp-proxy:rtp-proxy-common:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :rtp-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :rtp-core:publishMavenJavaPublicationToGitHubPackagesRepository
+```
+
+The shorter `.\gradlew publish` also works but fans out to every publishable
+module and every declared repository; the explicit task list keeps it to the addon-API
+closure and the GitHub Packages target only.
+
+### Publishing from CI (GitHub Actions)
+
+A minimal workflow needs `packages: write` permission and the built-in token:
+
+```yaml
+permissions:
+  contents: read
+  packages: write
+# ...
+    - name: Publish to GitHub Packages
+      run: ./gradlew publishMavenJavaPublicationToGitHubPackagesRepository
+      env:
+        GITHUB_ACTOR: ${{ github.actor }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+For the Jenkins pipeline, inject a PAT as `gpr.user` / `gpr.key` (or `GITHUB_ACTOR` /
+`GITHUB_TOKEN`) secrets and swap the `publishToMavenLocal` tasks in `PUBLISH_TASKS` for the
+`...ToGitHubPackagesRepository` targets.
+
+### Consumer build.gradle (out-of-repo addon)
+
+GitHub Packages requires the consumer to authenticate too (there is no anonymous read):
+
+```gradle
+repositories {
+    mavenCentral()
+    maven {
+        url = 'https://maven.pkg.github.com/DailyStruggle/RTP'
+        credentials {
+            username = findProperty('gpr.user') ?: System.getenv('GITHUB_ACTOR')
+            password = findProperty('gpr.key')  ?: System.getenv('GITHUB_TOKEN')
+        }
+    }
+}
+
+dependencies {
+    compileOnly 'io.github.dailystruggle:rtp-api:3.2.1'
+    compileOnly 'io.github.dailystruggle:rtp-core:3.2.1'
+}
+```
+
+The consumer's token only needs `read:packages`. Because of this read-time credential
+requirement, JitPack remains the friendlier choice for public addon authors; GitHub Packages
+is best for internal / org-scoped consumers who already authenticate to GitHub.
+
+---
+
+## Maven Central (first-party wiring, manual Portal upload)
 
 Maven Central is the right destination once the `rtp-api` contract is stable and you expect
 real third-party volume. It is more work than JitPack (one-time account + signing setup) but
 gives discoverable, permanent coordinates with no per-tag build step on the consumer side.
+
+**Trust posture:** this build deliberately uses **only first-party Gradle tooling** for the
+Central path - `maven-publish` and the built-in `signing` plugin, both of which ship inside
+the Gradle distribution. No third-party publish plugin is applied, so no external, auto-
+updating build code ever gets access to the Central token, the GPG signing key, or the
+compiled jars before they are signed. The trade-off is one manual step at release time:
+Gradle signs the artifacts into a local staging directory, and that bundle is uploaded to the
+Central Portal by hand (or a single `curl`). Sonatype's new Portal has no first-party Gradle
+upload protocol, so automating that last step would mean adding a community plugin - which is
+exactly the trust surface this posture avoids.
 
 > Sequencing note: ideally land Phase 2 of `docs/dev/scratch/CHECKLIST-rtp-api-devux.md`
 > (the typed `rtp-api` registration surface) before the first Central release, so the
@@ -181,66 +294,39 @@ Export the secret key (in-memory ASCII-armored form is easiest for CI):
 gpg --armor --export-secret-keys <KEY_ID>
 ```
 
-### 3. Build-script changes
+### 3. Build-script changes (already in place)
 
-Apply the `signing` plugin alongside `maven-publish` for the published closure, and add the
-POM metadata Central requires (name, description, url, license, developers, scm). In the
-root `build.gradle` block that already configures `mavenJava`:
+The root `build.gradle` `configure(publishedModulePaths.collect { project(it) })` block
+already implements the full first-party Central wiring - you do **not** need to edit the build
+for a release. What it does:
 
-```gradle
-configure(publishedModulePaths.collect { project(it) }) {
-    apply plugin: 'maven-publish'
-    apply plugin: 'signing'
+- Applies the built-in **`signing`** plugin alongside `maven-publish`.
+- Produces the mandatory **`-sources` and `-javadoc` jars** for the published closure
+  (`withSourcesJar()` / `withJavadocJar()`), with doclint relaxed for those javadoc tasks so
+  a missing `@param`/`@return` on `rtp-api`/`rtp-core` cannot fail a release.
+- Adds the **POM metadata** Central validates (name, description, url, license, developers, scm).
+- Declares a local **`CentralStaging`** Maven repository at `<root>/build/central-staging/`,
+  shared by every module so the whole closure lands in one directory ready to bundle.
+- Wires **GPG signing** in two mutually exclusive modes, both gated so a credential-free
+  `.\gradlew build` never signs and never fails:
+  - **In-memory key** from the `signingKey` / `signingPassword` Gradle properties (best for
+    CI: no gpg binary or keyring needed).
+  - **Local `gpg` CLI**, enabled with `-PsignWithGpgCmd` (Gradle shells out to `gpg`).
+- Skips the `rtp-core` **test-fixtures variant** from the published component, so no stray
+  `-test-fixtures` jar is published (Central rejects those) and the "cannot be mapped to
+  Maven" POM-capability warning is gone.
 
-    afterEvaluate {
-        // sources + javadoc jars are mandatory on Central
-        java { withSourcesJar(); withJavadocJar() }
+Because everything is gated on the credentials being present, none of this affects a normal
+developer build, JitPack, or the GitHub Packages path.
 
-        publishing {
-            publications {
-                mavenJava(MavenPublication) {
-                    from components.java
-                    pom {
-                        name = project.name
-                        description = 'RTP addon-facing API module: ' + project.name
-                        url = 'https://github.com/DailyStruggle/RTP'
-                        licenses {
-                            license {
-                                name = 'GPL-3.0'   // confirm against repo LICENSE
-                                url  = 'https://www.gnu.org/licenses/gpl-3.0.txt'
-                            }
-                        }
-                        developers {
-                            developer { id = 'DailyStruggle'; name = 'DailyStruggle' }
-                        }
-                        scm {
-                            connection = 'scm:git:https://github.com/DailyStruggle/RTP.git'
-                            developerConnection = 'scm:git:ssh://git@github.com/DailyStruggle/RTP.git'
-                            url = 'https://github.com/DailyStruggle/RTP'
-                        }
-                    }
-                }
-            }
-        }
-
-        signing {
-            def signingKey = findProperty('signingKey')
-            def signingPassword = findProperty('signingPassword')
-            if (signingKey) {
-                useInMemoryPgpKeys(signingKey, signingPassword)
-                sign publishing.publications.mavenJava
-            }
-        }
-    }
-}
-```
-
-For the upload itself, the simplest current path is the
-**`com.vanniktech.maven.publish`** community plugin (it targets the new Central Portal and
-handles the staging/release dance), or the official
-`org.sonatype.central:central-publishing-maven-plugin` for a Maven-side flow. With the
-vanniktech plugin the publication metadata above is configured through its `mavenPublishing { }`
-DSL instead of hand-rolled POM blocks.
+> **Modern-GnuPG note (verified 2026-08-16):** a secret key exported by a very recent GnuPG
+> (2.4+/2.5+; this box runs 2.5.18) can be **unreadable by the BouncyCastle bundled in
+> Gradle's `signing` plugin**, failing the sign task with `Cannot perform signing task ...
+> because it has no configured signatory`. If you hit that with the in-memory `signingKey`
+> path, switch to the `gpg` CLI path (`-PsignWithGpgCmd`), which signs with whatever key
+> `gpg` itself resolves (respecting `GNUPGHOME` / `gpg.conf`) and side-steps the parse issue.
+> The full staging + signing flow (`.asc` for jar, sources, javadoc, module, and pom) was
+> verified end-to-end via the `gpg` CLI path.
 
 ### 4. Decouple the artifact version (Phase 5.1)
 
@@ -252,22 +338,110 @@ only to the published closure.
 
 ### 5. Credentials (never commit)
 
-Put tokens and the signing key in `~/.gradle/gradle.properties` or CI secrets:
+The signing key + passphrase feed the build; the Portal token is used only by the upload
+step (not the build).
+
+**Local dev box** - put the signing key in `~/.gradle/gradle.properties` (never in the repo):
 
 ```properties
-mavenCentralUsername=<central-token-user>
-mavenCentralPassword=<central-token-pass>
 signingKey=-----BEGIN PGP PRIVATE KEY BLOCK----- ...
 signingPassword=<key-passphrase>
 ```
 
-### 6. Publish
+**CI (the recommended place to publish from)** - do not write a properties file. Gradle maps
+any env var named `ORG_GRADLE_PROJECT_<name>` to the project property `<name>`, so expose the
+signing key as CI secrets with exactly these names:
+
+```
+ORG_GRADLE_PROJECT_signingKey       = <ASCII-armored PGP private key>
+ORG_GRADLE_PROJECT_signingPassword  = <key passphrase>
+```
+
+That is the "repo variable" the signing step reads - no build-script change is needed to feed
+it. Store the armored key as a single multi-line secret (GitHub Actions / Jenkins credentials
+both support multi-line values). The Central Portal token (`central-token-user` /
+`central-token-pass`) is a **separate** secret used only by the upload command below; keep it
+out of the build entirely.
+
+### 6. Publish (sign locally, upload the bundle)
+
+Step 1 - sign the closure into the local staging dir (mirror the smoke-test task list,
+targeting the `CentralStaging` repo). With the signing key present, each publish task also
+runs the `sign...` task automatically. Do **not** pass `-PexcludeJdk25`: that flag is only for
+JDK-21-only hosts like JitPack, and a release runs on a JDK-25 box, so leave the JDK-25 Loom
+modules in the build graph:
+
+In-memory-key form (CI):
 
 ```powershell
-# vanniktech plugin
-.\gradlew publishToMavenCentral --no-configuration-cache
-# or, after staging, release via the Central Portal UI / publishAndReleaseToMavenCentral
+.\gradlew --no-daemon `
+    :commands-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :yaml-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :metrics-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :maps-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :effects-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :rtp-proxy:rtp-proxy-common:publishMavenJavaPublicationToCentralStagingRepository `
+    :rtp-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :rtp-core:publishMavenJavaPublicationToCentralStagingRepository
 ```
+
+Local `gpg` CLI form (recommended on a box with a modern GnuPG, e.g. this dev box) - add
+`-PsignWithGpgCmd` and drop the `signingKey` properties; `gpg` supplies the key:
+
+```powershell
+.\gradlew --no-daemon -PsignWithGpgCmd `
+    :commands-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :yaml-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :metrics-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :maps-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :effects-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :rtp-proxy:rtp-proxy-common:publishMavenJavaPublicationToCentralStagingRepository `
+    :rtp-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :rtp-core:publishMavenJavaPublicationToCentralStagingRepository
+```
+
+The signed artifacts (jar, sources, javadoc, `.pom`, and their `.asc` signatures) land under
+`build/central-staging/io/github/dailystruggle/...`.
+
+Step 2 - zip that tree and upload it to the Portal. The Portal expects a zip whose internal
+layout is the Maven repository layout (i.e. the contents of `build/central-staging`):
+
+```powershell
+Compress-Archive -Path build/central-staging/* -DestinationPath build/central-bundle.zip -Force
+$pair = '<central-token-user>:<central-token-pass>'
+$auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair))
+curl.exe -H "Authorization: Bearer $auth" `
+    -F bundle=@build/central-bundle.zip `
+    https://central.sonatype.com/api/v1/publisher/upload
+```
+
+Step 3 - go to <https://central.sonatype.com> → **Deployments**, review the validated
+deployment, and click **Publish** (or drop the automatic-release query param on the upload).
+That manual click is the price of not handing a third-party plugin your signing key.
+
+### 7. CI publishing (GitHub Actions)
+
+The workflow `.github/workflows/maven-central.yml` automates steps 1-2 above (sign into the
+`CentralStaging` dir, zip, and `curl` the bundle to the Portal). It runs **only on a push to a
+release-line branch** (`V1`, `V2`, `V3`, ... and their lowercase forms), plus manual
+`workflow_dispatch`. Because those branches are protected, a push happens only when a pull
+request is merged - so publication is gated behind a PR, never an ad-hoc direct commit or a
+feature branch.
+
+Required repository secrets (**Settings → Secrets and variables → Actions**):
+
+| Secret | Purpose |
+|--------|---------|
+| `SIGNING_KEY` | ASCII-armored PGP private key (multi-line), fed to Gradle as `ORG_GRADLE_PROJECT_signingKey` |
+| `SIGNING_PASSWORD` | passphrase for the key (empty string if none) |
+| `CENTRAL_TOKEN_USER` | Central Portal user-token username (upload only) |
+| `CENTRAL_TOKEN_PASS` | Central Portal user-token password (upload only) |
+
+The workflow uses the **in-memory-key** signing path (no `gpg` binary on the runner), verifies
+that `.asc` signatures were actually produced before uploading (fail-loud per S-004), and does
+**not** auto-release - the deployment lands VALIDATED and a human clicks **Publish** on the
+Portal. To auto-release instead, append `?publishingType=AUTOMATIC` to the upload URL in the
+workflow.
 
 ### Consumer build.gradle (after Central release)
 

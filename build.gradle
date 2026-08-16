@@ -240,15 +240,169 @@ if (!executableAddonHelperPaths.isEmpty()) {
 
 configure(publishedModulePaths.collect { project(it) }) {
     apply plugin: 'maven-publish'
+    // `signing` is a first-party Gradle plugin (ships inside the Gradle
+    // distribution, no external coordinate). It GPG-signs every published
+    // artifact, which Maven Central requires. Applying it unconditionally is
+    // harmless: the `signing {}` block below only wires signing tasks when a
+    // key is actually present, so a credential-free `.\gradlew build` never
+    // signs and never fails.
+    apply plugin: 'signing'
 
     // Publish after evaluation so each module's `java`/`java-library` component
     // (and any withSourcesJar/withJavadocJar wiring) is fully registered first.
     afterEvaluate {
+        // Maven Central rejects a publication that lacks `-sources` and
+        // `-javadoc` jars, so the published closure produces both (the rest of
+        // the build still ships thin executable jars only - see the `java {}`
+        // note in `subprojects`). rtp-api/rtp-core keep strict doclint for the
+        // in-repo build, but the Javadoc *jar* only needs to build, so doclint
+        // is relaxed here for the published modules to keep the javadoc task
+        // from failing the release on a missing @param/@return tag.
+        tasks.withType(Javadoc).configureEach {
+            options.addStringOption('Xdoclint:none', '-quiet')
+            failOnError = false
+        }
+        java {
+            withSourcesJar()
+            withJavadocJar()
+        }
+
         publishing {
             publications {
                 mavenJava(MavenPublication) {
                     from components.java
+
+                    // rtp-core applies `java-test-fixtures`, which adds
+                    // testFixtures{Api,Runtime}Elements variants to the `java`
+                    // component. Those carry a Gradle capability that cannot be
+                    // represented in a POM (hence the "cannot be mapped to Maven"
+                    // warning) and would publish a stray `-test-fixtures` jar that
+                    // Maven Central rejects. Addon consumers never need the test
+                    // fixtures, so drop those variants from every published module
+                    // that has them (only rtp-core does today).
+                    ['testFixturesApiElements', 'testFixturesRuntimeElements'].each { cfgName ->
+                        if (configurations.findByName(cfgName) != null) {
+                            components.java.withVariantsFromConfiguration(configurations.getByName(cfgName)) {
+                                skip()
+                            }
+                        }
+                    }
+
+                    // POM metadata required by Maven Central (name, description,
+                    // url, license, developers, scm). Central validates these on
+                    // upload; JitPack / GitHub Packages ignore them, so adding
+                    // them is safe for every channel.
+                    pom {
+                        name = project.name
+                        description = 'RTP addon-facing API module: ' + project.name
+                        url = 'https://github.com/DailyStruggle/RTP'
+                        licenses {
+                            license {
+                                name = 'GPL-3.0'
+                                url  = 'https://www.gnu.org/licenses/gpl-3.0.txt'
+                            }
+                        }
+                        developers {
+                            developer {
+                                id = 'DailyStruggle'
+                                name = 'DailyStruggle'
+                            }
+                        }
+                        scm {
+                            connection = 'scm:git:https://github.com/DailyStruggle/RTP.git'
+                            developerConnection = 'scm:git:ssh://git@github.com/DailyStruggle/RTP.git'
+                            url = 'https://github.com/DailyStruggle/RTP'
+                        }
+                    }
                 }
+            }
+
+            // GitHub Packages Maven registry.
+            //
+            // Publishes the addon-facing closure to
+            //   https://maven.pkg.github.com/DailyStruggle/RTP
+            // Consumers add that URL as a Maven repo and depend on
+            //   io.github.dailystruggle:<module>:<version>
+            // (the same group/coordinate this build already produces).
+            //
+            // Credentials are read from Gradle properties `gpr.user` / `gpr.key`
+            // (e.g. in ~/.gradle/gradle.properties, never committed) or, failing
+            // that, the env vars GITHUB_ACTOR / GITHUB_TOKEN that GitHub Actions
+            // injects automatically. Publishing to GitHub Packages needs a token
+            // with the `write:packages` scope; reading needs `read:packages`.
+            //
+            // The repository is only wired when a token is actually present, so a
+            // normal `.\gradlew build` on a dev box without credentials neither
+            // fails configuration nor exposes an unauthenticated `publish` target.
+            def ghUser = (findProperty('gpr.user') ?: System.getenv('GITHUB_ACTOR')) as String
+            def ghKey  = (findProperty('gpr.key') ?: System.getenv('GITHUB_TOKEN')) as String
+            if (ghUser && ghKey) {
+                repositories {
+                    maven {
+                        name = 'GitHubPackages'
+                        url = 'https://maven.pkg.github.com/DailyStruggle/RTP'
+                        credentials {
+                            username = ghUser
+                            password = ghKey
+                        }
+                    }
+                }
+            }
+
+            // Maven Central staging (first-party only).
+            //
+            // Sonatype's new Central Portal accepts a signed *bundle* rather
+            // than a live Nexus deploy, and there is no first-party Gradle
+            // plugin that speaks the Portal upload protocol. So instead of
+            // trusting a third-party publish plugin with the signing key and
+            // token, this build publishes the signed artifacts into a local
+            // staging directory, which is then zipped and uploaded to the
+            // Portal by hand (or a single curl step). See docs/dev/PUBLISHING.md.
+            //
+            // All published modules deploy into ONE shared root directory so the
+            // whole closure can be bundled together:
+            //   <root>/build/central-staging/
+            repositories {
+                maven {
+                    name = 'CentralStaging'
+                    url = rootProject.layout.buildDirectory.dir('central-staging')
+                }
+            }
+        }
+
+        // Artifact signing (first-party `signing` plugin).
+        //
+        // The signing key + passphrase are read from Gradle properties
+        // `signingKey` (ASCII-armored in-memory PGP private key) and
+        // `signingPassword`. In CI, provide them WITHOUT committing anything by
+        // exporting the Gradle-property env vars:
+        //   ORG_GRADLE_PROJECT_signingKey       = <armored private key>
+        //   ORG_GRADLE_PROJECT_signingPassword  = <key passphrase>
+        // Gradle maps any ORG_GRADLE_PROJECT_<name> env var to project property
+        // <name>, so no build-script change is needed to feed CI secrets.
+        //
+        // Signing is wired only when a key is present, so a credential-free
+        // `.\gradlew build` neither signs nor fails.
+        signing {
+            def signingKey = findProperty('signingKey') as String
+            def signingPassword = findProperty('signingPassword') as String
+            // Two mutually exclusive signing modes:
+            //   1. In-memory ASCII-armored key via `signingKey` / `signingPassword`
+            //      (best for CI: no gpg binary or keyring needed). NOTE: a key
+            //      exported by a very recent GnuPG (2.4+/2.5+) can be unreadable
+            //      by the BouncyCastle bundled in Gradle's signing plugin
+            //      ("no configured signatory"); if you hit that, use mode 2.
+            //   2. The local `gpg` CLI, enabled with `-PsignWithGpgCmd`. Gradle
+            //      shells out to gpg, so it signs with whatever key gpg itself
+            //      resolves (respecting GNUPGHOME / gpg.conf). This side-steps the
+            //      BouncyCastle parse issue and is the reliable path on a box with
+            //      a modern gpg installed.
+            if (findProperty('signWithGpgCmd') != null) {
+                useGpgCmd()
+                sign publishing.publications.mavenJava
+            } else if (signingKey) {
+                useInMemoryPgpKeys(signingKey, signingPassword)
+                sign publishing.publications.mavenJava
             }
         }
     }

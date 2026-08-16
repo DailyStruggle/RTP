@@ -1,0 +1,130 @@
+name: Publish API artifacts to Maven Central
+
+# Signs the addon-facing API closure (rtp-api / rtp-core + their published
+# project-dependency closure) and uploads the bundle to the Sonatype Central
+# Portal.
+#
+# WHEN THIS RUNS
+#   Only on a push to a release line branch -- `V1`, `V2`, `V3`, ... (and their
+#   lowercase forms). A push to a protected release branch happens only when a
+#   pull request is merged into it, so in practice this publishes "after a pull
+#   request", never on an ad-hoc direct commit or a feature branch. A manual
+#   `workflow_dispatch` is also allowed for re-runs.
+#
+# WHY FIRST-PARTY ONLY
+#   The build uses only Gradle's built-in `maven-publish` + `signing` plugins
+#   (see docs/dev/PUBLISHING.md "Trust posture"). No third-party publish plugin
+#   ever sees the signing key, the Central token, or the jars. Gradle signs the
+#   artifacts into build/central-staging/, and this workflow zips that tree and
+#   uploads it with a single authenticated curl -- the same manual flow a human
+#   would run, just automated.
+#
+# REQUIRED REPO SECRETS (Settings -> Secrets and variables -> Actions)
+#   SIGNING_KEY          ASCII-armored PGP private key (multi-line value).
+#   SIGNING_PASSWORD     passphrase for that key (empty string if none).
+#   CENTRAL_TOKEN_USER   Central Portal user-token username.
+#   CENTRAL_TOKEN_PASS   Central Portal user-token password.
+#
+# The signing key is fed to Gradle via the ORG_GRADLE_PROJECT_<name> env-var
+# convention (Gradle maps ORG_GRADLE_PROJECT_signingKey -> project property
+# `signingKey`), which is exactly what the `signing {}` block in the root
+# build.gradle reads. No build-script change is needed to feed these.
+#
+# NOTE: this deliberately does NOT auto-release. The upload lands the deployment
+# in a VALIDATED state on the Portal; a human then reviews and clicks Publish at
+# https://central.sonatype.com -> Deployments. That manual click is the price of
+# not handing a third-party plugin the signing key. To auto-release instead, add
+# `?publishingType=AUTOMATIC` to the upload URL.
+
+on:
+  push:
+    branches:
+      - 'V[0-9]*'
+      - 'v[0-9]*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # The published closure (rtp-api / rtp-core + deps) is JDK-21 code, but a
+      # release must NOT pass -PexcludeJdk25 (see PUBLISHING.md): the JDK-25
+      # Fabric/Loom modules stay in the build graph, so their Java 25 toolchain
+      # must be resolvable. Install both JDKs; setup-java registers each for
+      # Gradle's toolchain auto-detection. JDK 25 is last, so it is JAVA_HOME.
+      - name: Set up JDKs (21 + 25)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: |
+            21
+            25
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Sign + stage the whole published closure into build/central-staging/.
+      # With SIGNING_KEY present, each publish task also runs its sign... task.
+      - name: Sign + stage to Central staging
+        run: >-
+          ./gradlew --no-daemon
+          :commands-api:publishMavenJavaPublicationToCentralStagingRepository
+          :yaml-api:publishMavenJavaPublicationToCentralStagingRepository
+          :metrics-api:publishMavenJavaPublicationToCentralStagingRepository
+          :maps-api:publishMavenJavaPublicationToCentralStagingRepository
+          :effects-api:publishMavenJavaPublicationToCentralStagingRepository
+          :rtp-proxy:rtp-proxy-common:publishMavenJavaPublicationToCentralStagingRepository
+          :rtp-api:publishMavenJavaPublicationToCentralStagingRepository
+          :rtp-core:publishMavenJavaPublicationToCentralStagingRepository
+        env:
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+
+      # Fail loudly if signing was skipped (missing/invalid key) -- a bundle
+      # without .asc signatures is rejected by Central, and a silent skip would
+      # contradict S-004 (no silently swallowed failures).
+      - name: Verify signatures were produced
+        run: |
+          ASC_COUNT=$(find build/central-staging -name '*.asc' | wc -l)
+          echo "Found ${ASC_COUNT} .asc signature files."
+          if [ "${ASC_COUNT}" -eq 0 ]; then
+            echo "::error::No .asc signatures in build/central-staging -- signing did not run. Check the SIGNING_KEY secret."
+            exit 1
+          fi
+
+      # The Portal expects a zip whose internal layout IS the Maven repository
+      # layout (i.e. the contents of build/central-staging).
+      - name: Bundle the staging tree
+        run: |
+          cd build/central-staging
+          zip -r ../central-bundle.zip .
+          cd -
+          ls -l build/central-bundle.zip
+
+      - name: Upload bundle to the Central Portal
+        env:
+          CENTRAL_TOKEN_USER: ${{ secrets.CENTRAL_TOKEN_USER }}
+          CENTRAL_TOKEN_PASS: ${{ secrets.CENTRAL_TOKEN_PASS }}
+        run: |
+          AUTH=$(printf '%s:%s' "${CENTRAL_TOKEN_USER}" "${CENTRAL_TOKEN_PASS}" | base64 -w0)
+          HTTP_CODE=$(curl --silent --show-error --write-out '%{http_code}' --output upload-response.txt \
+            -H "Authorization: Bearer ${AUTH}" \
+            -F bundle=@build/central-bundle.zip \
+            https://central.sonatype.com/api/v1/publisher/upload)
+          echo "Portal responded HTTP ${HTTP_CODE}:"
+          cat upload-response.txt || true
+          echo
+          if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
+            echo "::error::Central Portal upload failed (HTTP ${HTTP_CODE})."
+            exit 1
+          fi
+          echo "::notice::Deployment uploaded. Review + click Publish at https://central.sonatype.com -> Deployments."
